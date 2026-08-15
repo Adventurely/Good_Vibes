@@ -31,18 +31,33 @@ look like it belongs with the old art.
 Fractional coordinates are the one thing to watch for: `fillRect` antialiases
 them, and a soft edge is obvious the moment the canvas is scaled up.
 
-## Deploying
+## Hosting
 
-The page is static, so anything that serves a file will do. To put it on
-Cloudflare Workers:
+This repo is where the work happens; it is not what serves it. The site is
+[Tool Haven](https://github.com/Adventurely/Tool-Haven), a Cloudflare Worker
+that Workers Builds redeploys within a minute of any push to its `main`.
 
-```bash
-npx wrangler deploy
-```
+So publishing is a copy, not a deploy. `.github/workflows/publish-to-tool-haven.yml`
+runs on every push to `main` here: it runs the tests, copies `public/` into
+Tool Haven's `tools/good-vibes/`, and commits. Cloudflare does the rest. The
+page then lives at `/tools/good-vibes/` on the site, behind its Cloudflare
+Access sign-in.
 
-`wrangler.toml` publishes `public/` as static assets under a worker named
-`good-vibes-pixel`. It deliberately does not reuse an existing worker name —
-deploying with someone else's name overwrites that worker.
+Nothing deploys from this repo directly, and there is no `wrangler.toml` here
+on purpose — deploying a worker from here would either create a stray second
+worker or, with the wrong name, overwrite Tool Haven itself.
+
+**One-time setup.** The workflow needs push access to the other repo, which a
+`GITHUB_TOKEN` does not have. Create a fine-grained personal access token
+scoped to `Adventurely/Tool-Haven` with **Contents: read and write**, then add
+it to this repo as a secret named `TOOL_HAVEN_TOKEN` (Settings → Secrets and
+variables → Actions). Until that exists the workflow fails at the checkout
+step, and nothing reaches the site.
+
+**Registering a new slug.** The workflow syncs files but does not touch Tool
+Haven's `data/manifest.json`, which is what puts a card on its homepage. Adding
+a second page there is a one-time manual edit in that repo. `good-vibes` is
+already registered.
 
 ## Requirements
 
