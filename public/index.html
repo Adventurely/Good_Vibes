@@ -217,6 +217,26 @@
         margin-bottom: 0.15rem;
       }
 
+      code {
+        color: var(--accent);
+        font-size: 0.95em;
+      }
+
+      .cta {
+        margin-top: 0.9rem;
+      }
+
+      a {
+        color: var(--accent);
+        text-decoration-thickness: 1px;
+        text-underline-offset: 3px;
+      }
+
+      a:hover,
+      a:focus-visible {
+        color: var(--text);
+      }
+
       footer {
         margin-top: 2.5rem;
         text-align: center;
@@ -261,477 +281,344 @@
           <li><b>Font</b>5 &times; 7 bitmap, 1px letter spacing</li>
           <li><b>Hero sprite</b>12 &times; 16, 2-frame walk cycle</li>
           <li><b>Gradients</b>4 &times; 4 ordered (Bayer) dither</li>
-          <li><b>Dependencies</b>None — one HTML file</li>
+          <li><b>Dependencies</b>None — the palette and font are in <code>pixel.js</code></li>
         </ul>
+      </section>
+
+      <section>
+        <h2>The game</h2>
+        <p>
+          The lobby is the first thing built on this palette. It needs a signed-in
+          Tool Haven account and the <code>good-vibes</code> tool granted to it.
+        </p>
+        <p class="cta"><a href="play.html">Open the lobby</a></p>
       </section>
 
       <footer>Tool Haven &middot; a starting point for the game</footer>
     </div>
 
-    <script>
-      (() => {
-        'use strict';
+    <script type="module">
+      import {
+        PALETTE, hex, GLYPH_W, TRACKING,
+        textWidth, drawTextOutlined, drawSprite,
+        fitCanvas, context2d,
+      } from './pixel.js';
 
-        // ---- palette -------------------------------------------------------
-        // 16 colours. Every pixel on screen comes from this list, which is what
-        // keeps the scene reading as one piece.
-        const PAL = {
-          k: ['#0d0b1f', 'ink'],
-          d: ['#241a3a', 'deep violet'],
-          v: ['#3b2b5a', 'violet'],
-          s: ['#5a4f8c', 'slate'],
-          b: ['#2b6bb0', 'blue'],
-          c: ['#4fc4d3', 'cyan'],
-          t: ['#7ff0d3', 'mint'],
-          g: ['#3fa34d', 'grass'],
-          G: ['#245f3c', 'pine'],
-          y: ['#ffd34e', 'gold'],
-          o: ['#f08c33', 'ember'],
-          r: ['#e04b5a', 'rose'],
-          p: ['#a63b6d', 'plum'],
-          n: ['#f2b48c', 'skin'],
-          N: ['#c07a58', 'oak'],
-          w: ['#fdf6e3', 'bone'],
+      /* The scene. The palette, the font and the drawing routines come from
+         pixel.js so this page and the game cannot drift apart; what lives here
+         is only what is particular to this picture. */
+
+      // ---- sprites -------------------------------------------------------
+      // Each string is one row; each character is a palette key ('.' = clear).
+      const HERO_HEAD = [
+        '....kkkk....',
+        '...kyyyyk...',
+        '.kkyyyyyykk.',
+        '..knnnnnnk..',
+        '..knknnknk..',
+        '..knnnnnnk..',
+        '..knnNNnnk..',
+        '...knnnnk...',
+        '.kkrrrrrrkk.',
+        'krkrryyrrkrk',
+        'krkrryyrrkrk',
+        'knkrryyrrknk',
+        '.kkrryyrrkk.',
+      ];
+      // Two leg frames share the head and torso above — the whole walk cycle.
+      const HERO_LEGS = [
+        ['..kbbbbbbk..', '..kbbkkbbk..', '..kkk..kkk..'],
+        ['..kbbbbbbk..', '.kbbk..kbbk.', '.kkk....kkk.'],
+      ];
+      const HERO = HERO_LEGS.map(legs => HERO_HEAD.concat(legs));
+
+      const SLIME = [
+        '..kkkk..',
+        '.kttttk.',
+        'ktccccck',
+        'kckcckck',
+        'kcccccck',
+        'kcckkcck',
+        'kcccccck',
+        '.kkkkkk.',
+      ];
+
+      const TREE = [
+        '....k....',
+        '...kgk...',
+        '..kgGgk..',
+        '.kgGGGgk.',
+        '..kgGgk..',
+        '.kgGGGgk.',
+        'kgGGGGGgk',
+        '.kgGGGgk.',
+        'kgGGGGGgk',
+        '...kNk...',
+        '...kNk...',
+        '..kNNNk..',
+      ];
+
+      // High dusk clouds: a plum rim catching the last light, slate body,
+      // violet underside. Muted on purpose — they sit in the darkest sky band.
+      const CLOUD = [
+        '....pppp........',
+        '..ppssssss..ss..',
+        '.ssssssssssssss.',
+        'ssssssssssssssss',
+        '.vvvvvvvvvvvvvv.',
+        '....vvvv...vv...',
+      ];
+
+      // ---- canvas --------------------------------------------------------
+      const W = 320;
+      const H = 180;
+      const HORIZON = 104;
+      const GROUND = 110;
+
+      const canvas = document.getElementById('stage');
+      const ctx = context2d(canvas);
+
+      const px = (x, y, key, wide = 1, tall = 1) => {
+        ctx.fillStyle = hex(key);
+        ctx.fillRect(x | 0, y | 0, wide, tall);
+      };
+
+      const centered = (str, scale) => Math.round((W - textWidth(str, scale)) / 2);
+
+      // ---- deterministic noise -------------------------------------------
+      // A tiny LCG so the stars land in the same place every load — pixel art
+      // should not shimmer between refreshes.
+      function rng(seed){
+        let s = seed >>> 0;
+        return () => {
+          s = (s * 1664525 + 1013904223) >>> 0;
+          return s / 4294967296;
         };
-        const hex = (key) => PAL[key][0];
+      }
 
-        // ---- 5x7 bitmap font ----------------------------------------------
-        const GLYPHS = {
-          A: '.###.,#...#,#...#,#####,#...#,#...#,#...#',
-          B: '####.,#...#,#...#,####.,#...#,#...#,####.',
-          C: '.###.,#...#,#....,#....,#....,#...#,.###.',
-          D: '####.,#...#,#...#,#...#,#...#,#...#,####.',
-          E: '#####,#....,#....,####.,#....,#....,#####',
-          F: '#####,#....,#....,####.,#....,#....,#....',
-          G: '.###.,#...#,#....,#..##,#...#,#...#,.####',
-          H: '#...#,#...#,#...#,#####,#...#,#...#,#...#',
-          I: '#####,..#..,..#..,..#..,..#..,..#..,#####',
-          J: '..###,...#.,...#.,...#.,...#.,#..#.,.##..',
-          K: '#...#,#..#.,#.#..,##...,#.#..,#..#.,#...#',
-          L: '#....,#....,#....,#....,#....,#....,#####',
-          M: '#...#,##.##,#.#.#,#.#.#,#...#,#...#,#...#',
-          N: '#...#,##..#,#.#.#,#..##,#...#,#...#,#...#',
-          O: '.###.,#...#,#...#,#...#,#...#,#...#,.###.',
-          P: '####.,#...#,#...#,####.,#....,#....,#....',
-          Q: '.###.,#...#,#...#,#...#,#.#.#,#..#.,.##.#',
-          R: '####.,#...#,#...#,####.,#.#..,#..#.,#...#',
-          S: '.####,#....,#....,.###.,....#,....#,####.',
-          T: '#####,..#..,..#..,..#..,..#..,..#..,..#..',
-          U: '#...#,#...#,#...#,#...#,#...#,#...#,.###.',
-          V: '#...#,#...#,#...#,#...#,#...#,.#.#.,..#..',
-          W: '#...#,#...#,#...#,#.#.#,#.#.#,##.##,#...#',
-          X: '#...#,#...#,.#.#.,..#..,.#.#.,#...#,#...#',
-          Y: '#...#,#...#,.#.#.,..#..,..#..,..#..,..#..',
-          Z: '#####,....#,...#.,..#..,.#...,#....,#####',
-          0: '.###.,#..##,#..##,#.#.#,##..#,##..#,.###.',
-          1: '..#..,.##..,..#..,..#..,..#..,..#..,.###.',
-          2: '.###.,#...#,....#,...#.,..#..,.#...,#####',
-          3: '#####,...#.,..#..,...#.,....#,#...#,.###.',
-          4: '...#.,..##.,.#.#.,#..#.,#####,...#.,...#.',
-          5: '#####,#....,####.,....#,....#,#...#,.###.',
-          6: '..##.,.#...,#....,####.,#...#,#...#,.###.',
-          7: '#####,....#,...#.,..#..,.#...,.#...,.#...',
-          8: '.###.,#...#,#...#,.###.,#...#,#...#,.###.',
-          9: '.###.,#...#,#...#,.####,....#,...#.,.##..',
-          ' ': '.....,.....,.....,.....,.....,.....,.....',
-          '!': '..#..,..#..,..#..,..#..,..#..,.....,..#..',
-          '.': '.....,.....,.....,.....,.....,.....,..#..',
-          ',': '.....,.....,.....,.....,.....,..#..,.#...',
-          "'": '..#..,..#..,.....,.....,.....,.....,.....',
-          '-': '.....,.....,.....,.###.,.....,.....,.....',
-          ':': '.....,..#..,.....,.....,..#..,.....,.....',
-          '?': '.###.,#...#,....#,...#.,..#..,.....,..#..',
-          '/': '....#,...#.,...#.,..#..,.#...,.#...,#....',
-          '&': '.##..,#..#.,#..#.,.##..,#.#.#,#..#.,.##.#',
-        };
-        // Split once, at load, into arrays of row strings.
-        const FONT = {};
-        for (const [ch, rows] of Object.entries(GLYPHS)) FONT[ch] = rows.split(',');
+      const BAYER = [
+        [0, 8, 2, 10],
+        [12, 4, 14, 6],
+        [3, 11, 1, 9],
+        [15, 7, 13, 5],
+      ];
 
-        const GLYPH_W = 5;
-        const GLYPH_H = 7;
-        const TRACKING = 1;
+      // ---- static background ---------------------------------------------
+      // Sky, sun, mountains and ground never change, so they are drawn once
+      // into an offscreen canvas and blitted each frame.
+      const bg = document.createElement('canvas');
+      bg.width = W;
+      bg.height = H;
 
-        // ---- sprites -------------------------------------------------------
-        // Each string is one row; each character is a palette key ('.' = clear).
-        const HERO_HEAD = [
-          '....kkkk....',
-          '...kyyyyk...',
-          '.kkyyyyyykk.',
-          '..knnnnnnk..',
-          '..knknnknk..',
-          '..knnnnnnk..',
-          '..knnNNnnk..',
-          '...knnnnk...',
-          '.kkrrrrrrkk.',
-          'krkrryyrrkrk',
-          'krkrryyrrkrk',
-          'knkrryyrrknk',
-          '.kkrryyrrkk.',
-        ];
-        // Two leg frames share the head/torso above — that is the whole walk cycle.
-        const HERO_LEGS = [
-          ['..kbbbbbbk..', '..kbbkkbbk..', '..kkk..kkk..'],
-          ['..kbbbbbbk..', '.kbbk..kbbk.', '.kkk....kkk.'],
-        ];
-        const HERO = HERO_LEGS.map((legs) => HERO_HEAD.concat(legs));
+      const STARS = [];
 
-        const SLIME = [
-          '..kkkk..',
-          '.kttttk.',
-          'ktccccck',
-          'kckcckck',
-          'kcccccck',
-          'kcckkcck',
-          'kcccccck',
-          '.kkkkkk.',
-        ];
-
-        const TREE = [
-          '....k....',
-          '...kgk...',
-          '..kgGgk..',
-          '.kgGGGgk.',
-          '..kgGgk..',
-          '.kgGGGgk.',
-          'kgGGGGGgk',
-          '.kgGGGgk.',
-          'kgGGGGGgk',
-          '...kNk...',
-          '...kNk...',
-          '..kNNNk..',
-        ];
-
-        // High dusk clouds: a plum rim catching the last light, slate body,
-        // violet underside. Muted on purpose — they sit in the darkest sky band.
-        const CLOUD = [
-          '....pppp........',
-          '..ppssssss..ss..',
-          '.ssssssssssssss.',
-          'ssssssssssssssss',
-          '.vvvvvvvvvvvvvv.',
-          '....vvvv...vv...',
-        ];
-
-        // ---- canvas --------------------------------------------------------
-        const W = 320;
-        const H = 180;
-        const HORIZON = 104;
-        const GROUND = 110;
-
-        const canvas = document.getElementById('stage');
-        const ctx = canvas.getContext('2d', { alpha: false });
-        ctx.imageSmoothingEnabled = false;
-
-        const px = (x, y, key, wide = 1, tall = 1) => {
-          ctx.fillStyle = hex(key);
-          ctx.fillRect(x | 0, y | 0, wide, tall);
+      function buildBackground(){
+        const bctx = bg.getContext('2d');
+        // Everything is rounded: a fractional fillRect gets antialiased, and a
+        // soft edge is instantly visible once the canvas is scaled up 3x.
+        const bpx = (x, y, key, wide = 1, tall = 1) => {
+          bctx.fillStyle = hex(key);
+          bctx.fillRect(Math.round(x), Math.round(y), Math.round(wide), Math.round(tall));
         };
 
-        function drawSprite(rows, x, y, flip = false) {
-          const w = rows[0].length;
-          for (let r = 0; r < rows.length; r++) {
-            for (let c = 0; c < w; c++) {
-              const key = rows[r][flip ? w - 1 - c : c];
-              if (key !== '.') px(x + c, y + r, key);
-            }
+        // Sky: an 8-stop ramp, dithered between stops so the bands stay chunky
+        // instead of going smooth and un-pixel-like.
+        const ramp = ['k', 'd', 'v', 's', 'p', 'r', 'o', 'y'];
+        for(let y = 0; y < HORIZON; y++){
+          const t = (y / (HORIZON - 1)) * (ramp.length - 1);
+          const i = Math.min(ramp.length - 2, Math.floor(t));
+          const frac = t - i;
+          for(let x = 0; x < W; x++){
+            bpx(x, y, frac > BAYER[y & 3][x & 3] / 16 ? ramp[i + 1] : ramp[i]);
           }
         }
 
-        const textWidth = (str, scale) => str.length * (GLYPH_W + TRACKING) * scale - TRACKING * scale;
-
-        function drawText(str, x, y, key, scale = 1) {
-          ctx.fillStyle = hex(key);
-          let cx = x;
-          for (const raw of str.toUpperCase()) {
-            const glyph = FONT[raw] ?? FONT['?'];
-            for (let r = 0; r < GLYPH_H; r++) {
-              for (let c = 0; c < GLYPH_W; c++) {
-                if (glyph[r][c] === '#') {
-                  ctx.fillRect(cx + c * scale, y + r * scale, scale, scale);
-                }
-              }
-            }
-            cx += (GLYPH_W + TRACKING) * scale;
-          }
+        // Retro sun, sinking into the horizon with cut-out stripes.
+        const sunX = 160;
+        const sunY = 100;
+        const sunR = 30;
+        for(let y = sunY - sunR; y <= sunY + sunR; y++){
+          if(y < 0 || y >= HORIZON) continue;
+          const half = Math.floor(Math.sqrt(sunR * sunR - (y - sunY) * (y - sunY)));
+          const band = y - (sunY - sunR);
+          // Stripes widen going down — the classic synthwave sun.
+          if(band > 34 && band % 6 < 3) continue;
+          bpx(sunX - half, y, y < sunY - 6 ? 'y' : 'o', half * 2 + 1, 1);
         }
 
-        // Outline first in ink, then the fill on top — cheap, and it keeps text
-        // legible against any background.
-        function drawTextOutlined(str, x, y, key, scale = 1) {
-          for (let dy = -1; dy <= 1; dy++) {
-            for (let dx = -1; dx <= 1; dx++) {
-              if (dx || dy) drawText(str, x + dx * scale, y + dy * scale, 'k', scale);
-            }
-          }
-          drawText(str, x, y, key, scale);
+        // Two mountain ridges. Summed sines give a believable skyline without
+        // hand-placing a single peak.
+        for(let x = 0; x < W; x++){
+          const far = Math.round(
+            HORIZON -
+              (16 + 9 * Math.sin(x * 0.031) + 5 * Math.sin(x * 0.017 + 1.3) + 3 * Math.sin(x * 0.09 + 2.1)),
+          );
+          bpx(x, far, 's', 1, HORIZON - far);
+          if(far < HORIZON - 22) bpx(x, far, 'w', 1, 2);
+        }
+        for(let x = 0; x < W; x++){
+          const near = Math.round(
+            GROUND - (10 + 7 * Math.sin(x * 0.041 + 2.7) + 4 * Math.sin(x * 0.023 + 0.4)),
+          );
+          bpx(x, near, 'd', 1, GROUND - near);
         }
 
-        const centered = (str, scale) => Math.round((W - textWidth(str, scale)) / 2);
-
-        // ---- deterministic noise -------------------------------------------
-        // A tiny LCG so the stars and grass tufts land in the same place every
-        // load — pixel art should not shimmer between refreshes.
-        function rng(seed) {
-          let s = seed >>> 0;
-          return () => {
-            s = (s * 1664525 + 1013904223) >>> 0;
-            return s / 4294967296;
-          };
-        }
-
-        const BAYER = [
-          [0, 8, 2, 10],
-          [12, 4, 14, 6],
-          [3, 11, 1, 9],
-          [15, 7, 13, 5],
-        ];
-
-        // ---- static background ---------------------------------------------
-        // Sky, sun, mountains and ground never change, so they are rendered once
-        // into an offscreen canvas and blitted each frame.
-        const bg = document.createElement('canvas');
-        bg.width = W;
-        bg.height = H;
-
-        const STARS = [];
-
-        function buildBackground() {
-          const bctx = bg.getContext('2d');
-          // Everything is floored: a fractional fillRect gets antialiased, and a
-          // soft edge is instantly visible once the canvas is scaled up 3x.
-          const bpx = (x, y, key, wide = 1, tall = 1) => {
-            bctx.fillStyle = hex(key);
-            bctx.fillRect(Math.round(x), Math.round(y), Math.round(wide), Math.round(tall));
-          };
-
-          // Sky: an 8-stop ramp, dithered between stops so the bands stay chunky
-          // instead of going smooth and un-pixel-like.
-          const ramp = ['k', 'd', 'v', 's', 'p', 'r', 'o', 'y'];
-          for (let y = 0; y < HORIZON; y++) {
-            const t = (y / (HORIZON - 1)) * (ramp.length - 1);
-            const i = Math.min(ramp.length - 2, Math.floor(t));
-            const frac = t - i;
-            for (let x = 0; x < W; x++) {
-              const threshold = BAYER[y & 3][x & 3] / 16;
-              bpx(x, y, frac > threshold ? ramp[i + 1] : ramp[i]);
-            }
-          }
-
-          // Retro sun, sinking into the horizon with cut-out stripes.
-          const sunX = 160;
-          const sunY = 100;
-          const sunR = 30;
-          for (let y = sunY - sunR; y <= sunY + sunR; y++) {
-            if (y < 0 || y >= HORIZON) continue;
-            const half = Math.floor(Math.sqrt(sunR * sunR - (y - sunY) * (y - sunY)));
-            const band = y - (sunY - sunR);
-            // Stripes widen as they go down — the classic synthwave sun.
-            if (band > 34 && band % 6 < 3) continue;
-            bpx(sunX - half, y, y < sunY - 6 ? 'y' : 'o', half * 2 + 1, 1);
-          }
-
-          // Two mountain ridges. Summed sines give a believable skyline without
-          // hand-placing a single peak.
-          for (let x = 0; x < W; x++) {
-            const far = Math.round(
-              HORIZON -
-                (16 + 9 * Math.sin(x * 0.031) + 5 * Math.sin(x * 0.017 + 1.3) + 3 * Math.sin(x * 0.09 + 2.1)),
-            );
-            bpx(x, far, 's', 1, HORIZON - far);
-            if (far < HORIZON - 22) bpx(x, far, 'w', 1, 2);
-          }
-          for (let x = 0; x < W; x++) {
-            const near = Math.round(
-              GROUND - (10 + 7 * Math.sin(x * 0.041 + 2.7) + 4 * Math.sin(x * 0.023 + 0.4)),
-            );
-            bpx(x, near, 'd', 1, GROUND - near);
-          }
-
-          // Ground: a lit rim, a dithered transition, then solid pine.
-          bpx(0, GROUND, 'g', W, 3);
-          for (let y = GROUND + 3; y < GROUND + 12; y++) {
-            const frac = (y - GROUND - 3) / 9;
-            for (let x = 0; x < W; x++) {
-              bpx(x, y, frac > BAYER[y & 3][x & 3] / 16 ? 'G' : 'g');
-            }
-          }
-          bpx(0, GROUND + 12, 'G', W, H - GROUND - 12);
-
-          const rand = rng(20260815);
-
-          for (let i = 0; i < 70; i++) {
-            STARS.push({
-              x: Math.floor(rand() * W),
-              y: Math.floor(rand() * 62),
-              phase: rand() * Math.PI * 2,
-              key: rand() > 0.75 ? 'c' : 'w',
-            });
-          }
-
-          // Trees line the treeline on both sides, framing the clearing.
-          for (const x of [12, 34, 52, 246, 268, 292]) {
-            drawSpriteOn(bctx, TREE, x, GROUND - 4);
-          }
-
-          // Foreground grass blades, darkening toward the bottom of the frame.
-          for (let i = 0; i < 150; i++) {
-            const x = Math.floor(rand() * W);
-            const y = GROUND + 20 + Math.floor(rand() * (H - GROUND - 24));
-            bpx(x, y, y > 150 ? 'd' : 'G', 1, 2 + Math.floor(rand() * 3));
+        // Ground: a lit rim, a dithered transition, then solid pine.
+        bpx(0, GROUND, 'g', W, 3);
+        for(let y = GROUND + 3; y < GROUND + 12; y++){
+          const frac = (y - GROUND - 3) / 9;
+          for(let x = 0; x < W; x++){
+            bpx(x, y, frac > BAYER[y & 3][x & 3] / 16 ? 'G' : 'g');
           }
         }
+        bpx(0, GROUND + 12, 'G', W, H - GROUND - 12);
 
-        function drawSpriteOn(target, rows, x, y) {
-          const w = rows[0].length;
-          for (let r = 0; r < rows.length; r++) {
-            for (let c = 0; c < w; c++) {
-              const key = rows[r][c];
-              if (key === '.') continue;
-              target.fillStyle = hex(key);
-              target.fillRect(x + c, y + r, 1, 1);
-            }
-          }
+        const rand = rng(20260815);
+
+        for(let i = 0; i < 70; i++){
+          STARS.push({
+            x: Math.floor(rand() * W),
+            y: Math.floor(rand() * 62),
+            phase: rand() * Math.PI * 2,
+            key: rand() > 0.75 ? 'c' : 'w',
+          });
         }
 
-        buildBackground();
-
-        // ---- frame ---------------------------------------------------------
-        const CLOUDS = [
-          { x: 20, y: 24, speed: 3 },
-          { x: 150, y: 14, speed: 4.5 },
-          { x: 250, y: 36, speed: 2.2 },
-        ];
-
-        const TITLE = 'HELLO WORLD';
-        const TITLE_SCALE = 3;
-        const TITLE_X = centered(TITLE, TITLE_SCALE);
-
-        function drawFrame(time) {
-          ctx.drawImage(bg, 0, 0);
-
-          // Stars twinkle on a slow sine, each with its own phase offset.
-          for (const star of STARS) {
-            const shine = Math.sin(time * 2.4 + star.phase);
-            if (shine > 0.25) px(star.x, star.y, star.key);
-          }
-
-          for (const cloud of CLOUDS) {
-            const x = Math.round(((cloud.x + time * cloud.speed) % (W + 40)) - 20);
-            drawSprite(CLOUD, x, cloud.y);
-          }
-
-          // Birds: three pixels each, that is all a bird needs at this scale.
-          for (let i = 0; i < 3; i++) {
-            const bx = Math.round(((time * 9 + i * 46) % (W + 30)) - 15);
-            const by = 54 + i * 7 + Math.round(Math.sin(time * 1.6 + i) * 2);
-            const flap = Math.sin(time * 7 + i) > 0 ? 1 : 0;
-            px(bx, by, 'd');
-            px(bx - 1, by - flap, 'd');
-            px(bx + 1, by - flap, 'd');
-          }
-
-          // Hero paces the clearing; the slime trails a beat behind.
-          const span = 210;
-          const cycle = (time * 26) % (span * 2);
-          const walkingRight = cycle < span;
-          const heroX = Math.round(52 + (walkingRight ? cycle : span * 2 - cycle));
-          const step = Math.floor(time * 7) % 2;
-          const bob = step === 0 ? 0 : 1;
-          drawSprite(HERO[step], heroX, 136 + bob, !walkingRight);
-
-          const hop = Math.abs(Math.sin(time * 4.2));
-          const slimeX = heroX + (walkingRight ? -22 : 22);
-          drawSprite(SLIME, slimeX, 146 - Math.round(hop * 5));
-
-          // Title, bobbing letter by letter on a travelling sine.
-          for (let i = 0; i < TITLE.length; i++) {
-            const lift = Math.round(Math.sin(time * 2.6 - i * 0.45) * 2);
-            const x = TITLE_X + i * (GLYPH_W + TRACKING) * TITLE_SCALE;
-            drawTextOutlined(TITLE[i], x, 24 + lift, 'y', TITLE_SCALE);
-          }
-
-          const subtitle = 'PIXEL ART STARTER KIT';
-          drawTextOutlined(subtitle, centered(subtitle, 1), 58, 'c', 1);
-
-          if (Math.sin(time * 3.4) > -0.2) {
-            const prompt = 'PRESS START';
-            drawTextOutlined(prompt, centered(prompt, 1), 158, 'w', 1);
-          }
-
-          drawTextOutlined('TOOL HAVEN', 6, 6, 'c', 1);
-          const version = 'V1.0';
-          drawTextOutlined(version, W - textWidth(version, 1) - 6, 6, 's', 1);
+        // Trees line the treeline on both sides, framing the clearing.
+        for(const x of [12, 34, 52, 246, 268, 292]){
+          drawSprite(bctx, TREE, x, GROUND - 4);
         }
 
-        // ---- loop ----------------------------------------------------------
-        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-        let animating = !reduceMotion.matches;
-        let raf = 0;
-        let frozenAt = 1.2; // A pose worth looking at when motion is off.
+        // Foreground grass blades, darkening toward the bottom of the frame.
+        for(let i = 0; i < 150; i++){
+          const x = Math.floor(rand() * W);
+          const y = GROUND + 20 + Math.floor(rand() * (H - GROUND - 24));
+          bpx(x, y, y > 150 ? 'd' : 'G', 1, 2 + Math.floor(rand() * 3));
+        }
+      }
 
-        function loop(now) {
-          drawFrame(now / 1000);
-          raf = requestAnimationFrame(loop);
+      buildBackground();
+
+      // ---- frame ---------------------------------------------------------
+      const CLOUDS = [
+        { x: 20, y: 24, speed: 3 },
+        { x: 150, y: 14, speed: 4.5 },
+        { x: 250, y: 36, speed: 2.2 },
+      ];
+
+      const TITLE = 'HELLO WORLD';
+      const TITLE_SCALE = 3;
+      const TITLE_X = centered(TITLE, TITLE_SCALE);
+
+      function drawFrame(time){
+        ctx.drawImage(bg, 0, 0);
+
+        // Stars twinkle on a slow sine, each with its own phase offset.
+        for(const star of STARS){
+          if(Math.sin(time * 2.4 + star.phase) > 0.25) px(star.x, star.y, star.key);
         }
 
-        function setAnimating(on) {
-          animating = on;
-          motionButton.setAttribute('aria-pressed', String(on));
-          cancelAnimationFrame(raf);
-          if (on) raf = requestAnimationFrame(loop);
-          else drawFrame(frozenAt);
+        for(const cloud of CLOUDS){
+          const x = Math.round(((cloud.x + time * cloud.speed) % (W + 40)) - 20);
+          drawSprite(ctx, CLOUD, x, cloud.y);
         }
 
-        const screen = document.getElementById('screen');
-        const crtButton = document.getElementById('toggle-crt');
-        const motionButton = document.getElementById('toggle-motion');
-
-        crtButton.addEventListener('click', () => {
-          const on = screen.dataset.crt !== 'on';
-          screen.dataset.crt = on ? 'on' : 'off';
-          crtButton.setAttribute('aria-pressed', String(on));
-        });
-
-        motionButton.addEventListener('click', () => setAnimating(!animating));
-        reduceMotion.addEventListener('change', (event) => setAnimating(!event.matches));
-
-        setAnimating(animating);
-
-        // ---- integer scaling -------------------------------------------------
-        // Fractional scale factors make some pixels 2 screen-pixels wide and
-        // others 3, which reads as a rendering bug. Only ever scale by integers.
-        function fit() {
-          const available = document.querySelector('.wrap').clientWidth;
-          const byWidth = Math.floor(available / W);
-          const byHeight = Math.floor((window.innerHeight * 0.72) / H);
-          const scale = Math.max(1, Math.min(byWidth, byHeight));
-          canvas.style.width = `${W * scale}px`;
-          canvas.style.height = `${H * scale}px`;
+        // Birds: three pixels each, which is all a bird needs at this scale.
+        for(let i = 0; i < 3; i++){
+          const bx = Math.round(((time * 9 + i * 46) % (W + 30)) - 15);
+          const by = 54 + i * 7 + Math.round(Math.sin(time * 1.6 + i) * 2);
+          const flap = Math.sin(time * 7 + i) > 0 ? 1 : 0;
+          px(bx, by, 'd');
+          px(bx - 1, by - flap, 'd');
+          px(bx + 1, by - flap, 'd');
         }
 
-        window.addEventListener('resize', fit);
-        fit();
+        // The hero paces the clearing; the slime trails a beat behind.
+        const span = 210;
+        const cycle = (time * 26) % (span * 2);
+        const walkingRight = cycle < span;
+        const heroX = Math.round(52 + (walkingRight ? cycle : span * 2 - cycle));
+        const step = Math.floor(time * 7) % 2;
+        drawSprite(ctx, HERO[step], heroX, 136 + (step === 0 ? 0 : 1), !walkingRight);
 
-        // ---- style guide ----------------------------------------------------
-        const swatches = document.getElementById('swatches');
-        for (const [key, [value, name]] of Object.entries(PAL)) {
-          const li = document.createElement('li');
-          const chip = document.createElement('span');
-          chip.className = 'chip';
-          chip.style.background = value;
-          const label = document.createElement('span');
-          const nameEl = document.createElement('span');
-          nameEl.className = 'chip-name';
-          nameEl.textContent = name;
-          const hexEl = document.createElement('span');
-          hexEl.className = 'chip-hex';
-          hexEl.textContent = value;
-          label.append(nameEl, hexEl);
-          li.append(chip, label);
-          swatches.append(li);
+        const hop = Math.abs(Math.sin(time * 4.2));
+        drawSprite(ctx, SLIME, heroX + (walkingRight ? -22 : 22), 146 - Math.round(hop * 5));
+
+        // Title, bobbing letter by letter on a travelling sine.
+        for(let i = 0; i < TITLE.length; i++){
+          const lift = Math.round(Math.sin(time * 2.6 - i * 0.45) * 2);
+          const x = TITLE_X + i * (GLYPH_W + TRACKING) * TITLE_SCALE;
+          drawTextOutlined(ctx, TITLE[i], x, 24 + lift, 'y', TITLE_SCALE);
         }
-      })();
-    </script>
+
+        const subtitle = 'PIXEL ART STARTER KIT';
+        drawTextOutlined(ctx, subtitle, centered(subtitle, 1), 58, 'c', 1);
+
+        if(Math.sin(time * 3.4) > -0.2){
+          const prompt = 'PRESS START';
+          drawTextOutlined(ctx, prompt, centered(prompt, 1), 158, 'w', 1);
+        }
+
+        drawTextOutlined(ctx, 'TOOL HAVEN', 6, 6, 'c', 1);
+        const version = 'V1.0';
+        drawTextOutlined(ctx, version, W - textWidth(version, 1) - 6, 6, 's', 1);
+      }
+
+      // ---- loop ----------------------------------------------------------
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+      let animating = !reduceMotion.matches;
+      let raf = 0;
+      const FROZEN_AT = 1.2;          // a pose worth looking at when motion is off
+
+      function loop(now){
+        drawFrame(now / 1000);
+        raf = requestAnimationFrame(loop);
+      }
+
+      const screen = document.getElementById('screen');
+      const crtButton = document.getElementById('toggle-crt');
+      const motionButton = document.getElementById('toggle-motion');
+
+      function setAnimating(on){
+        animating = on;
+        motionButton.setAttribute('aria-pressed', String(on));
+        cancelAnimationFrame(raf);
+        if(on) raf = requestAnimationFrame(loop);
+        else drawFrame(FROZEN_AT);
+      }
+
+      crtButton.addEventListener('click', () => {
+        const on = screen.dataset.crt !== 'on';
+        screen.dataset.crt = on ? 'on' : 'off';
+        crtButton.setAttribute('aria-pressed', String(on));
+      });
+
+      motionButton.addEventListener('click', () => setAnimating(!animating));
+      reduceMotion.addEventListener('change', event => setAnimating(!event.matches));
+
+      setAnimating(animating);
+
+      const fit = () => fitCanvas(canvas, W, H, { container: document.querySelector('.wrap') });
+      window.addEventListener('resize', fit);
+      fit();
+
+      // ---- style guide ----------------------------------------------------
+      const swatches = document.getElementById('swatches');
+      for(const [, [value, name]] of Object.entries(PALETTE)){
+        const li = document.createElement('li');
+        const chip = document.createElement('span');
+        chip.className = 'chip';
+        chip.style.background = value;
+        const label = document.createElement('span');
+        const nameEl = document.createElement('span');
+        nameEl.className = 'chip-name';
+        nameEl.textContent = name;
+        const hexEl = document.createElement('span');
+        hexEl.className = 'chip-hex';
+        hexEl.textContent = value;
+        label.append(nameEl, hexEl);
+        li.append(chip, label);
+        swatches.append(li);
+      }    </script>
   </body>
 </html>

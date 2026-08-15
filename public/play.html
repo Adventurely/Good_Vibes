@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Good Vibes — lobby</title>
+    <meta name="description" content="Join a Good Vibes room and wait for the table to fill." />
+    <style>
+      :root {
+        color-scheme: dark;
+        --ink: #0d0b1f;
+        --panel: #16132b;
+        --line: #2b2450;
+        --text: #fdf6e3;
+        --muted: #8f86bf;
+        --accent: #4fc4d3;
+        --good: #3fa34d;
+        --warn: #ffd34e;
+        --bad: #e04b5a;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 2rem 1rem 3rem;
+        background: var(--ink);
+        background-image: radial-gradient(circle at 50% -10%, #241a3a 0%, #0d0b1f 65%);
+        color: var(--text);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        line-height: 1.6;
+      }
+
+      .wrap {
+        max-width: 40rem;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+
+      canvas {
+        display: block;
+        margin: 0 auto;
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+        border: 2px solid var(--line);
+        border-radius: 6px;
+      }
+
+      h2 {
+        font-size: 0.78rem;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 0 0 0.9rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--line);
+      }
+
+      p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+
+      /* --- status line --------------------------------------------------- */
+
+      .status {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        font-size: 0.75rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .dot {
+        width: 0.55rem;
+        height: 0.55rem;
+        border-radius: 50%;
+        background: var(--muted);
+        flex: none;
+      }
+
+      .status[data-state='open'] .dot { background: var(--good); }
+      .status[data-state='connecting'] .dot { background: var(--warn); }
+      .status[data-state='closed'] .dot { background: var(--bad); }
+
+      /* --- join ----------------------------------------------------------- */
+
+      form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        justify-content: center;
+      }
+
+      input {
+        font: inherit;
+        text-transform: uppercase;
+        letter-spacing: 0.3em;
+        text-align: center;
+        width: 8rem;
+        padding: 0.4rem 0.6rem;
+        color: var(--text);
+        background: var(--panel);
+        border: 2px solid var(--line);
+        border-radius: 4px;
+      }
+
+      input:focus-visible,
+      button:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      button {
+        font: inherit;
+        font-size: 0.8rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text);
+        background: var(--panel);
+        border: 2px solid var(--line);
+        border-radius: 4px;
+        padding: 0.4rem 0.9rem;
+        cursor: pointer;
+      }
+
+      button:hover:not(:disabled),
+      button:focus-visible {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      button.primary {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      /* --- seats ---------------------------------------------------------- */
+
+      ol {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+      }
+
+      li {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        padding: 0.5rem 0.75rem;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        font-size: 0.85rem;
+      }
+
+      li[data-you='true'] {
+        border-color: var(--accent);
+      }
+
+      .seat-name {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .tag {
+        font-size: 0.65rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        padding: 0.1rem 0.4rem;
+        border-radius: 3px;
+        border: 1px solid var(--line);
+        color: var(--muted);
+        flex: none;
+      }
+
+      .tag[data-kind='ready'] { color: var(--good); border-color: var(--good); }
+      .tag[data-kind='waiting'] { color: var(--muted); }
+      .tag[data-kind='host'] { color: var(--warn); border-color: var(--warn); }
+      .tag[data-kind='away'] { color: var(--bad); border-color: var(--bad); }
+
+      .empty-seat {
+        opacity: 0.4;
+        font-style: italic;
+      }
+
+      .actions {
+        display: flex;
+        gap: 0.5rem;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+
+      .notice {
+        padding: 0.6rem 0.8rem;
+        border: 1px solid var(--bad);
+        border-radius: 4px;
+        color: var(--bad);
+        font-size: 0.8rem;
+        text-align: center;
+      }
+
+      .notice:empty {
+        display: none;
+      }
+
+      [hidden] {
+        display: none !important;
+      }
+
+      a {
+        color: var(--accent);
+        text-underline-offset: 3px;
+      }
+
+      footer {
+        text-align: center;
+        font-size: 0.72rem;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <canvas id="banner" width="240" height="60" aria-label="Good Vibes"></canvas>
+
+      <div class="status" id="status" data-state="idle">
+        <span class="dot"></span><span id="status-text">Not connected</span>
+      </div>
+
+      <p class="notice" id="notice"></p>
+
+      <!-- Before joining -->
+      <section id="join">
+        <h2>Join a room</h2>
+        <form id="join-form">
+          <input
+            id="code"
+            name="code"
+            maxlength="6"
+            minlength="4"
+            pattern="[A-Za-z0-9]{4,6}"
+            placeholder="CODE"
+            aria-label="Room code, four to six letters or numbers"
+            autocomplete="off"
+            required
+          />
+          <button type="submit">Join</button>
+          <button type="button" id="new-room">New room</button>
+        </form>
+        <p style="text-align: center; margin-top: 0.9rem">
+          Share the address once you are in — the code travels with it.
+        </p>
+      </section>
+
+      <!-- After joining -->
+      <section id="room" hidden>
+        <h2>Room <span id="room-code"></span></h2>
+        <ol id="seats"></ol>
+        <div class="actions" style="margin-top: 1rem">
+          <button type="button" id="ready">Ready</button>
+          <button type="button" id="start" class="primary" hidden>Start</button>
+          <button type="button" id="leave">Leave</button>
+        </div>
+      </section>
+
+      <noscript>
+        <p style="text-align: center">The lobby needs JavaScript to hold its connection open.</p>
+      </noscript>
+
+      <footer><a href="index.html">Back to the style guide</a></footer>
+    </div>
+
+    <script type="module">
+      import { drawTextOutlined, textWidth, fitCanvas, context2d, hex } from './pixel.js';
+
+      /* The lobby.
+       *
+       * All it does is hold a socket open and render whatever the room sends
+       * back. It deliberately keeps no game state of its own: the room object
+       * is the only writer, so anything this file decided for itself would be
+       * a second source of truth and eventually a disagreement.
+       */
+
+      const W = 240;
+      const H = 60;
+      const banner = document.getElementById('banner');
+      const bctx = context2d(banner);
+
+      function drawBanner(code){
+        bctx.fillStyle = hex('d');
+        bctx.fillRect(0, 0, W, H);
+        // A horizon band, so the lobby is recognisably the same world.
+        bctx.fillStyle = hex('p');
+        bctx.fillRect(0, 40, W, 6);
+        bctx.fillStyle = hex('G');
+        bctx.fillRect(0, 46, W, H - 46);
+
+        const title = 'GOOD VIBES';
+        drawTextOutlined(bctx, title, Math.round((W - textWidth(title, 2)) / 2), 10, 'y', 2);
+        const sub = code ? `ROOM ${code}` : 'LOBBY';
+        drawTextOutlined(bctx, sub, Math.round((W - textWidth(sub, 1)) / 2), 30, 'c', 1);
+      }
+
+      const fit = () => fitCanvas(banner, W, H, { container: document.querySelector('.wrap'), maxHeightFraction: 0.3 });
+      window.addEventListener('resize', fit);
+
+      /* ---- elements ---------------------------------------------------- */
+      const els = {
+        status: document.getElementById('status'),
+        statusText: document.getElementById('status-text'),
+        notice: document.getElementById('notice'),
+        join: document.getElementById('join'),
+        joinForm: document.getElementById('join-form'),
+        code: document.getElementById('code'),
+        newRoom: document.getElementById('new-room'),
+        room: document.getElementById('room'),
+        roomCode: document.getElementById('room-code'),
+        seats: document.getElementById('seats'),
+        ready: document.getElementById('ready'),
+        start: document.getElementById('start'),
+        leave: document.getElementById('leave'),
+      };
+
+      /* ---- connection --------------------------------------------------- */
+      let socket = null;
+      let room = null;          // the last view the room sent
+      let code = null;
+      let attempt = 0;          // consecutive failed connects, for backoff
+      let deliberate = false;   // set when we close the socket on purpose
+      let keepalive = 0;
+
+      const CODE_RE = /^[A-Z0-9]{4,6}$/;
+
+      function setStatus(state, text){
+        els.status.dataset.state = state;
+        els.statusText.textContent = text;
+      }
+
+      function notify(message){
+        els.notice.textContent = message || '';
+      }
+
+      // Ambiguous characters are left out: a room code gets read aloud, and
+      // "was that an O or a zero" is the whole cost of including both.
+      const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      const newCode = () =>
+        Array.from(crypto.getRandomValues(new Uint8Array(4)), b => ALPHABET[b % ALPHABET.length]).join('');
+
+      function connect(next){
+        code = next;
+        location.hash = code;
+        drawBanner(code);
+        els.roomCode.textContent = code;
+        deliberate = false;
+        setStatus('connecting', attempt ? `Reconnecting (${attempt})` : 'Connecting');
+
+        const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        // An absolute path: this page sits at /tools/good-vibes/ but the socket
+        // is a site-level route, so it must not be resolved relative to here.
+        socket = new WebSocket(`${scheme}//${location.host}/api/good-vibes/ws?code=${encodeURIComponent(code)}`);
+
+        socket.addEventListener('open', () => {
+          attempt = 0;
+          setStatus('open', 'Connected');
+          notify('');
+          // Something small and regular, so an idle room is not mistaken for a
+          // dead one by anything between here and the Worker.
+          clearInterval(keepalive);
+          keepalive = setInterval(() => send({ t: 'ping' }), 25000);
+        });
+
+        socket.addEventListener('message', event => {
+          let msg;
+          try{ msg = JSON.parse(event.data); }catch{ return; }
+          if(msg.t === 'state'){ room = msg.state; render(); }
+          else if(msg.t === 'error') notify(msg.message);
+          else if(msg.t === 'rejected'){
+            // A refused join is final: retrying would just be refused again.
+            deliberate = true;
+            notify(msg.message);
+            socket.close();
+            leave({ keepNotice: true });
+          }
+        });
+
+        socket.addEventListener('close', () => {
+          clearInterval(keepalive);
+          if(deliberate) return;
+          setStatus('closed', 'Connection lost');
+          // Back off, but keep trying — a laptop lid closing should not cost
+          // somebody their seat.
+          attempt += 1;
+          const wait = Math.min(15000, 500 * 2 ** Math.min(attempt, 5));
+          setTimeout(() => { if(!deliberate && code) connect(code); }, wait);
+        });
+      }
+
+      function send(msg){
+        if(socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(msg));
+      }
+
+      function leave({ keepNotice = false } = {}){
+        deliberate = true;
+        clearInterval(keepalive);
+        if(socket) socket.close();
+        socket = null;
+        room = null;
+        code = null;
+        attempt = 0;
+        history.replaceState(null, '', location.pathname);
+        drawBanner(null);
+        els.room.hidden = true;
+        els.join.hidden = false;
+        setStatus('idle', 'Not connected');
+        if(!keepNotice) notify('');
+      }
+
+      /* ---- rendering ---------------------------------------------------- */
+      function tag(text, kind){
+        const el = document.createElement('span');
+        el.className = 'tag';
+        el.dataset.kind = kind;
+        el.textContent = text;
+        return el;
+      }
+
+      function render(){
+        if(!room) return;
+        els.join.hidden = true;
+        els.room.hidden = false;
+
+        els.seats.replaceChildren();
+        for(const p of room.players){
+          const li = document.createElement('li');
+          li.dataset.you = String(p.id === room.you);
+
+          const name = document.createElement('span');
+          name.className = 'seat-name';
+          name.textContent = p.name + (p.id === room.you ? ' (you)' : '');
+          li.append(name);
+
+          if(p.host) li.append(tag('Host', 'host'));
+          if(!p.connected) li.append(tag('Away', 'away'));
+          else li.append(p.ready ? tag('Ready', 'ready') : tag('Waiting', 'waiting'));
+          els.seats.append(li);
+        }
+
+        // Show the empty seats too — a table you can see the size of is easier
+        // to decide about than a number in a sentence.
+        for(let i = room.players.length; i < room.maxPlayers; i++){
+          const li = document.createElement('li');
+          const name = document.createElement('span');
+          name.className = 'seat-name empty-seat';
+          name.textContent = 'empty';
+          li.append(name);
+          els.seats.append(li);
+        }
+
+        const you = room.players.find(p => p.id === room.you);
+        const playing = room.phase !== 'lobby';
+
+        els.ready.textContent = you && you.ready ? 'Not ready' : 'Ready';
+        els.ready.disabled = playing || !you;
+        els.start.hidden = !(you && you.host);
+        els.start.disabled = playing;
+
+        if(playing) setStatus('open', 'Game started');
+      }
+
+      /* ---- events -------------------------------------------------------- */
+      els.joinForm.addEventListener('submit', event => {
+        event.preventDefault();
+        const wanted = els.code.value.trim().toUpperCase();
+        if(!CODE_RE.test(wanted)){
+          notify('A room code is four to six letters or numbers.');
+          return;
+        }
+        notify('');
+        attempt = 0;
+        connect(wanted);
+      });
+
+      els.newRoom.addEventListener('click', () => {
+        els.code.value = newCode();
+        els.joinForm.requestSubmit();
+      });
+
+      els.ready.addEventListener('click', () => {
+        const you = room && room.players.find(p => p.id === room.you);
+        send({ t: 'ready', ready: !(you && you.ready) });
+      });
+
+      els.start.addEventListener('click', () => send({ t: 'start' }));
+      els.leave.addEventListener('click', () => leave());
+
+      /* ---- boot ---------------------------------------------------------- */
+      drawBanner(null);
+      fit();
+
+      // A room code in the address is what makes the page shareable, so treat
+      // arriving with one as a request to join it.
+      const fromUrl = location.hash.replace('#', '').toUpperCase();
+      if(CODE_RE.test(fromUrl)){
+        els.code.value = fromUrl;
+        connect(fromUrl);
+      }
+    </script>
+  </body>
+</html>

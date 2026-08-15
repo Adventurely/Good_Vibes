@@ -94,8 +94,41 @@ npm test
 ## Layout
 
 ```
-public/index.html   the pixel art hello world page
-src/app.js          request handler / routing
+public/pixel.js     the style system — palette, bitmap font, draw routines
+public/index.html   the pixel art hello world page and style guide
+public/play.html    the lobby
+src/app.js          dev server: static files out of public/
 src/server.js       HTTP server entry point
 test/server.test.js integration tests
 ```
+
+`pixel.js` is the file that keeps this looking like one game. Both pages import
+the same palette and the same glyphs rather than carrying a copy, so a colour
+can only be changed in one place — which is the only way a style guide stays
+true once there is more than one screen.
+
+## Where the game lives
+
+The client is all here. The server is not, and cannot be: rooms are Durable
+Objects, and a Durable Object binding is declared in the Worker that owns it —
+Tool Haven's `wrangler.jsonc`. So the game is split, deliberately, along the
+line of what a bad push costs:
+
+| Half | Repo | If it breaks |
+| --- | --- | --- |
+| Client — art, UI, the loop | here | one page on the site |
+| Rules and room state | `Adventurely/Tool-Haven` (`src/game/good-vibes.js`, `src/good-vibes-room.js`) | the whole site, including sign-in |
+
+That is why the high-churn half is the one that syncs automatically. Working
+here needs no access to the other repo at all.
+
+**The room is the only writer of game state.** The client sends intents and the
+engine decides what they mean. Keep it that way: it is what makes cheating a
+non-issue, and it is what makes this half safe to move fast in.
+
+## Playing locally
+
+`npm start` serves the pages, but not the socket — `/api/good-vibes/ws` only
+exists on Tool Haven, so the lobby will sit there reconnecting. The lobby is
+best tested on the deployed site. Everything that does not need a room — the
+scene, the palette, the page itself — works offline.

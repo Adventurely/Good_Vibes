@@ -29,6 +29,30 @@ test('GET / returns the hello world page', async () => {
   assert.match(await res.text(), /Hello, world!/);
 });
 
+test('the style module is served with a JavaScript type', async () => {
+  const res = await fetch(`${baseUrl}/pixel.js`);
+  assert.equal(res.status, 200);
+  // A module served as text/plain is refused by the browser, and the page then
+  // fails with nothing drawn and nothing obviously wrong.
+  assert.match(res.headers.get('content-type'), /javascript/);
+  assert.match(await res.text(), /export const PALETTE/);
+});
+
+test('the lobby page is served', async () => {
+  const res = await fetch(`${baseUrl}/play.html`);
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type'), /text\/html/);
+});
+
+test('paths cannot escape public/', async () => {
+  // Sent raw and encoded: the encoded form survives URL normalisation, so it
+  // is the one that reaches the handler still looking like a traversal.
+  for (const attack of ['/../package.json', '/..%2Fpackage.json', '/%2e%2e/package.json']) {
+    const res = await fetch(`${baseUrl}${attack}`);
+    assert.equal(res.status, 404, `${attack} returned ${res.status}`);
+  }
+});
+
 test('GET /healthz reports ok', async () => {
   const res = await fetch(`${baseUrl}/healthz`);
   assert.equal(res.status, 200);

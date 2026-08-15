@@ -1,21 +1,51 @@
 import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const indexPath = fileURLToPath(new URL('../public/index.html', import.meta.url));
+const publicDir = fileURLToPath(new URL('../public/', import.meta.url));
 
-let cachedPage;
+const TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.png': 'image/png',
+  '.svg': 'image/svg+xml',
+};
 
-async function renderIndex() {
-  cachedPage ??= await readFile(indexPath);
-  return cachedPage;
+const cache = new Map();
+
+/* Resolve a URL path to a file inside public/, or null.
+ *
+ * The join is done first and the result checked against the directory
+ * afterwards, because that is the only order that catches every way out:
+ * '..' segments, an absolute path, and on some platforms a symlink. Checking
+ * the URL for '..' before joining looks equivalent and is not. */
+async function readPublic(pathname) {
+  const relative = pathname === '/' ? 'index.html' : decodeURIComponent(pathname).replace(/^\/+/, '');
+  const file = path.resolve(publicDir, relative);
+  if (!file.startsWith(publicDir)) return null;
+
+  if (!cache.has(file)) {
+    try {
+      cache.set(file, await readFile(file));
+    } catch {
+      return null;
+    }
+  }
+  return { body: cache.get(file), type: TYPES[path.extname(file)] ?? 'application/octet-stream' };
 }
 
 /**
- * Request handler for the hello world server.
+ * Request handler for the Good Vibes dev server.
  *
- * GET /        -> the hello world page
+ * GET /        -> public/index.html
+ * GET /<file>  -> that file from public/
  * GET /healthz -> {"status":"ok"}
  * anything else -> 404
+ *
+ * On Tool Haven the same files are served by Cloudflare's asset store, so this
+ * exists for local work only — keep it boring, and keep it matching.
  */
 export async function handleRequest(req, res) {
   const { pathname } = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`);
@@ -32,13 +62,10 @@ export async function handleRequest(req, res) {
     return;
   }
 
-  if (pathname === '/') {
-    const page = await renderIndex();
-    res.writeHead(200, {
-      'Content-Type': 'text/html; charset=utf-8',
-      'Content-Length': page.length,
-    });
-    res.end(page);
+  const file = await readPublic(pathname);
+  if (file) {
+    res.writeHead(200, { 'Content-Type': file.type, 'Content-Length': file.body.length });
+    res.end(req.method === 'HEAD' ? undefined : file.body);
     return;
   }
 
