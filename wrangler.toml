@@ -1,0 +1,11 @@
+# Optional: deploy the pixel art page to Cloudflare Workers as static assets.
+#
+#   npx wrangler deploy
+#
+# This publishes a SEPARATE worker named below. It does not touch any existing
+# worker — change `name` only if you intend to overwrite that worker.
+name = "good-vibes-pixel"
+compatibility_date = "2026-08-15"
+
+[assets]
+directory = "./public"
