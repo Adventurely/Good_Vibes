@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Good Vibes</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f6f7f9;
+        --fg: #16181d;
+        --muted: #5b6270;
+        --card: #ffffff;
+        --border: #e2e5ea;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #14161a;
+          --fg: #f2f3f5;
+          --muted: #a2a9b6;
+          --card: #1c1f25;
+          --border: #2c313a;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 1.5rem;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        line-height: 1.5;
+      }
+
+      main {
+        max-width: 32rem;
+        width: 100%;
+        padding: 2.5rem;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        text-align: center;
+      }
+
+      h1 {
+        margin: 0 0 0.5rem;
+        font-size: clamp(1.75rem, 5vw, 2.5rem);
+      }
+
+      p {
+        margin: 0;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Hello, world!</h1>
+      <p>The Good Vibes Node server is running.</p>
+    </main>
+  </body>
+</html>

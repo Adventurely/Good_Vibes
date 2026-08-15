@@ -1,0 +1,15 @@
+{
+  "name": "good-vibes",
+  "version": "1.0.0",
+  "description": "A minimal Node.js HTTP server serving a hello world page.",
+  "type": "module",
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test"
+  },
+  "license": "MIT"
+}
