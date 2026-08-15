@@ -149,6 +149,40 @@ export const OPEN_ROLES = [
   { slot: 5, suggestion: 'Wildcard — the one that makes a run go strangely' },
 ];
 
+/* ================================================================ phases === */
+
+/* A cycle is: build on the map, then hold it when the blight surges.
+ *
+ * 'playing' is the name the room used when the run was one long gather phase,
+ * and it is still accepted as a synonym for 'build' so a client newer than the
+ * deployed room does not render a blank screen. Remove it once the room sends
+ * 'build'.
+ */
+export const PHASES = {
+  lobby: 'lobby',
+  build: 'build',
+  combat: 'combat',
+  over: 'over',
+};
+
+export const isBuildPhase = phase => phase === PHASES.build || phase === 'playing';
+
+/* Who still has to ready up before the blight arrives.
+ *
+ * Disconnected players are left out of both halves: a party of five should not
+ * be stuck in the build phase because someone's train went into a tunnel. They
+ * rejoin into whatever phase the room has moved on to.
+ *
+ * Returned as counts rather than a boolean because "3 of 4 ready" is what the
+ * UI needs to draw, and deriving that separately is how the two ends of this
+ * end up disagreeing about who they are waiting for.
+ */
+export function readyState(players){
+  const present = (players || []).filter(p => p.connected);
+  const ready = present.filter(p => p.ready);
+  return { ready: ready.length, total: present.length, all: present.length > 0 && ready.length === present.length };
+}
+
 /* =============================================================== levels === */
 
 /* A run is five levels deep, and the ruin itself is the pressure: blight is
@@ -202,4 +236,153 @@ export function materialFor(roll){
     if(point <= 0) return id;
   }
   return entries[entries.length - 1][0];
+}
+
+/* ================================================================== map === */
+
+/* The ground the build phase happens on.
+ *
+ * The map is a grid because everything the build phase wants to ask is a
+ * question about neighbours — does this tile drain into that one, is that
+ * structure close enough to shelter this tile — and a grid answers those with
+ * arithmetic instead of geometry.
+ *
+ * It is generated once and kept. That is the whole point of the two-phase
+ * design: you come back to the plot you cleared last cycle and it is still
+ * cleared. Only the herbs are respawned between cycles.
+ */
+
+export const MAP_W = 18;
+export const MAP_H = 9;
+
+/* walk  can a player stand here
+   build can a structure go here (the build phase's reason to care about terrain)
+   grows can a herb spawn here */
+export const TERRAIN = {
+  grass:  { name: 'Overgrowth',  walk: true,  build: true,  grows: true },
+  floor:  { name: 'Panel floor', walk: true,  build: true,  grows: false },
+  rubble: { name: 'Rubble',      walk: false, build: false, grows: false },
+  water:  { name: 'Meltwater',   walk: false, build: false, grows: false },
+};
+
+/* How many herbs a cycle puts out. Fewer than there are open tiles by a wide
+   margin, so where they land still reads as a choice of where to walk. */
+export const HERB_COUNT = 9;
+
+export const inBounds = (x, y) => x >= 0 && y >= 0 && x < MAP_W && y < MAP_H;
+export const tileIndex = (x, y) => y * MAP_W + x;
+export const tileAt = (terrain, x, y) => (inBounds(x, y) ? terrain[tileIndex(x, y)] : null);
+
+/* Deterministic PRNG (mulberry32). Same seed, same map, on both sides of the
+ * wire and in the tests.
+ *
+ * This is a factory and not a value: calling it is what produces randomness, so
+ * importing this module still costs nothing and decides nothing. The room seeds
+ * it from the room code so a party can be told which ruin they are standing in.
+ */
+export function seededRandom(seed){
+  let a = (seed >>> 0) || 1;
+  return function(){
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* Seed from a room code, so the same room is always the same ruin. */
+export function seedFromCode(code){
+  let hash = 2166136261;
+  for(const ch of String(code || '')){
+    hash ^= ch.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+/* A drunkard's walk from a starting tile. Cheap, and it produces the ragged
+   edges that a ruin wants — a rectangle of water would read as a swimming
+   pool. Walks are allowed to wander off the map and come back; they just do
+   not paint while they are outside it. */
+function blob(cells, random, kind, size){
+  let x = Math.floor(random() * MAP_W);
+  let y = Math.floor(random() * MAP_H);
+  for(let step = 0; step < size; step++){
+    if(inBounds(x, y)) cells[tileIndex(x, y)] = kind;
+    const dir = Math.floor(random() * 4);
+    if(dir === 0) x += 1;
+    else if(dir === 1) x -= 1;
+    else if(dir === 2) y += 1;
+    else y -= 1;
+  }
+}
+
+/* Terrain only. Herbs are a separate pass because they are reseeded every
+   cycle and the ground is not. */
+export function generateTerrain(random){
+  const cells = new Array(MAP_W * MAP_H).fill('grass');
+
+  // Order matters and is fixed: water first so rubble can silt up its edge,
+  // floor last so a slab reads as something built on top of the ruin.
+  blob(cells, random, 'water', 14);
+  blob(cells, random, 'water', 9);
+  blob(cells, random, 'rubble', 11);
+  blob(cells, random, 'rubble', 7);
+  blob(cells, random, 'floor', 12);
+
+  return cells;
+}
+
+/* Scatter herbs across whatever the terrain left growable.
+ *
+ * Tiles are drawn without replacement, so two herbs can never occupy one tile
+ * — a duplicate would render as one sprite and gather as two, which looks like
+ * a lost click. materialFor decides *what* grows, so the rarity weights in
+ * MATERIALS stay the single source of that answer.
+ */
+export function spawnHerbs(terrain, random, count = HERB_COUNT){
+  const open = [];
+  for(let i = 0; i < terrain.length; i++){
+    if(TERRAIN[terrain[i]] && TERRAIN[terrain[i]].grows) open.push(i);
+  }
+
+  const nodes = [];
+  for(let n = 0; n < count && open.length; n++){
+    const [index] = open.splice(Math.floor(random() * open.length), 1);
+    nodes.push({
+      id: `n${n}`,
+      x: index % MAP_W,
+      y: Math.floor(index / MAP_W),
+      material: materialFor(random()),
+      taken: false,
+    });
+  }
+  return nodes;
+}
+
+/* The whole ground state for a cycle. The room calls this with its own seeded
+   generator and sends the result down; the client never calls it during real
+   play, because a client that generated its own map would be a second source
+   of truth about where the Cellsap is. */
+export function generateMap(random){
+  const terrain = generateTerrain(random);
+  return { terrain, nodes: spawnHerbs(terrain, random) };
+}
+
+/* A player's walkable start. Centre-ish and always on solid ground, so nobody
+   opens the build phase standing in a pond. */
+export function spawnTile(terrain, offset = 0){
+  const cx = Math.floor(MAP_W / 2);
+  const cy = Math.floor(MAP_H / 2);
+  for(let radius = 0; radius < Math.max(MAP_W, MAP_H); radius++){
+    for(let dy = -radius; dy <= radius; dy++){
+      for(let dx = -radius; dx <= radius; dx++){
+        const x = cx + dx + offset;
+        const y = cy + dy;
+        const tile = tileAt(terrain, x, y);
+        if(tile && TERRAIN[tile].walk) return { x, y };
+      }
+    }
+  }
+  return { x: cx, y: cy };
 }

@@ -120,6 +120,98 @@ export const HERO_ART = {
   ], 14, [[10, 7], [13, 7]]),
 };
 
+/* ============================================================== terrain === */
+
+/* Sixteen by sixteen, one per terrain kind in content.js.
+ *
+ * Drawn as noise rather than as a motif on purpose: these tile against copies
+ * of themselves in every direction, and anything with a centre — a flower, a
+ * crack, a shape — turns into a visible grid the moment it repeats. Speckle
+ * has no centre, so a field of it reads as ground instead of as wallpaper.
+ *
+ * The keys are the same palette as everything else here, so terrain shades
+ * match the sprites standing on it without a second set of greens.
+ */
+export const TILE = 16;
+
+export const TERRAIN_ART = {
+  grass: [
+    'GgGGGvGGGgGGGGgG',
+    'GGGlGGGGGGgGGGGG',
+    'gGGGGGGgGvGGlGGG',
+    'GGGvGGlGGGGGGGgG',
+    'GGgGGGGGGGgGGvGG',
+    'lGGGGgGGvGGGGGGl',
+    'GGGGGGGGGGGGgGGG',
+    'GvGGgGGlGGGvGGGG',
+    'GGGGGGGGgGGGGGGg',
+    'GgGGvGGGGGGlGGGG',
+    'GGGlGGgGGGGGGGvG',
+    'vGGGGGGGGgGGGGGG',
+    'GGGgGGvGGGGGgGGG',
+    'GGGGGlGGGGvGGGGG',
+    'gGGGGGGGgGGGGlGG',
+    'GGvGGgGGGGGGGGGG',
+  ],
+  /* Old panelling: a grout line down the middle and along the bottom, so a
+     run of floor tiles reads as slabs laid in a grid rather than as one
+     enormous sheet of steel. */
+  floor: [
+    'MMMMMMMMxMMMMMMM',
+    'MmMMMtMMxMMMMtMM',
+    'MMMMMMMMxMMMMMMM',
+    'MMtMMMMMxMMtMMMM',
+    'MMMMMMMMxMMMMMMM',
+    'MMMMtMMMxMMMMMtM',
+    'MMMMMMMMxMMMMMMM',
+    'xxxxxxxxxxxxxxxx',
+    'MMMMMMMMxMMMMMMM',
+    'MtMMMMMMxMMtMMMM',
+    'MMMMMMMMxMMMMMMM',
+    'MMMMMtMMxMMMMMMt',
+    'MMMMMMMMxMMMMMMM',
+    'MMtMMMMMxMMMMtMM',
+    'MMMMMMMMxMMMMMMM',
+    'xxxxxxxxxxxxxxxx',
+  ],
+  rubble: [
+    'xMxx#xMMxxMx#xxM',
+    'MxxMxxx#MxxMxxxM',
+    'xx#MxxMxxRxxMx#x',
+    'xMxxMx#xxMxxrxxM',
+    '#xxMxxxMxxMx#xMx',
+    'xMxxxMxxMxxxMxxx',
+    'xxMx#xxMxrxMxxMx',
+    'Mxxxxx#xxMxxxM#x',
+    'xMxxMxxxMxxMxxxM',
+    'xxx#xMxxxxMx#xxx',
+    'MxxMxxMx#xxxMxMx',
+    'xxMxxxxMxxRxxxMx',
+    '#xxxMx#xxMxxMxx#',
+    'xMxxxMxxMxxxxMxx',
+    'xxMxxxMxxxMxMxxM',
+    'MxxMx#xxMxxMxxxx',
+  ],
+  water: [
+    'bbbBbbbbbbBbbbbb',
+    'bbbbbbBbbbbbbbBb',
+    'BbbbbbbbbcbbbbbB',
+    'bbbBbbbbbbbbBbbb',
+    'bbbbbbbcbbbbbbbb',
+    'bBbbbbbbbbBbbbbb',
+    'bbbbBbbbbbbbbbcb',
+    'bbbbbbbbBbbbbbbb',
+    'cbbbbbbbbbbBbbbb',
+    'bbbBbbbbbbbbbbbB',
+    'bbbbbbBbbcbbbbbb',
+    'bbBbbbbbbbbbBbbb',
+    'bbbbbbbbbBbbbbbb',
+    'Bbbbbcbbbbbbbbbb',
+    'bbbbbbbBbbbbbBbb',
+    'bbBbbbbbbbbbbbbb',
+  ],
+};
+
 /* ============================================================ materials === */
 
 /* Eight by eight, drawn on the ground line so they sit in a row without

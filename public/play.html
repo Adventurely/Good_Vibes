@@ -40,6 +40,15 @@
 
       canvas { image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
       #banner { margin: 0 auto; border: 2px solid var(--line); border-radius: 6px; }
+      #map { margin: 0 auto; border: 2px solid var(--line); border-radius: 6px; cursor: pointer; }
+      #map:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+      .ready-line {
+        display: flex; align-items: center; justify-content: center; gap: 0.6rem;
+        font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
+        margin-top: 0.8rem;
+      }
+      .ready-line b { color: var(--sun); font-weight: 400; font-variant-numeric: tabular-nums; }
 
       h2 {
         font-size: 0.72rem;
@@ -173,8 +182,11 @@
                  autocomplete="off" required />
           <button type="submit">Join</button>
           <button type="button" id="new-room">New room</button>
+          <button type="button" id="preview">Preview the site</button>
         </form>
         <p style="text-align:center;margin-top:0.8rem">Share the address once you are in — the code travels with it.</p>
+        <p style="text-align:center;margin-top:0.4rem">Preview draws a site offline, with no room and no other players — it is
+          how the map is looked at from <code>npm start</code>.</p>
       </section>
 
       <!-- lobby -->
@@ -198,9 +210,20 @@
         </div>
         <p id="level-note" style="margin-bottom:1rem"></p>
 
-        <ol id="party"></ol>
+        <canvas id="map" width="288" height="160"
+                aria-label="The site. Herbs are gathered by clicking them."></canvas>
 
-        <h2 style="margin-top:1.4rem">The level</h2>
+        <div class="ready-line">
+          <span id="ready-count"></span>
+          <button type="button" id="hold">Ready</button>
+        </div>
+
+        <ol id="party" style="margin-top:1.2rem"></ol>
+
+        <!-- The same herbs as the map, as buttons. A canvas cannot be tabbed
+             through, so this is the keyboard path to the identical intents —
+             not a duplicate feature, the accessible one. -->
+        <h2 style="margin-top:1.4rem">Growing here</h2>
         <div class="chips" id="nodes"></div>
 
         <h2 style="margin-top:1.4rem">Stash</h2>
@@ -221,14 +244,29 @@
         <div class="log" id="log"></div>
       </section>
 
+      <!-- combat -->
+      <section id="combat" hidden>
+        <h2>The blight surges</h2>
+        <p id="combat-note">Everyone readied up, and the light went out of the sky.</p>
+        <ol id="combat-party" style="margin-top:1.2rem"></ol>
+        <div class="actions" style="margin-top:1.2rem">
+          <button type="button" id="leave-combat">Leave</button>
+        </div>
+      </section>
+
       <noscript><p style="text-align:center">The game needs JavaScript to hold its connection open.</p></noscript>
       <footer><a href="index.html">Style guide</a></footer>
     </div>
 
     <script type="module">
       import { drawTextOutlined, textWidth, fitCanvas, context2d } from './pixel.js';
-      import { PALETTE, HERO_ART, MATERIAL_ART } from './art.js';
-      import { CLASSES, OPEN_ROLES, MATERIALS, RECIPES, missingFor } from './content.js';
+      import { PALETTE, HERO_ART, MATERIAL_ART, TERRAIN_ART, TILE } from './art.js';
+      import {
+        CLASSES, OPEN_ROLES, MATERIALS, RECIPES, missingFor,
+        MAP_W, MAP_H, TERRAIN, PHASES, isBuildPhase, readyState,
+        generateMap, seededRandom, seedFromCode, spawnTile, tileAt,
+        LEVELS, PARTY_SIZE,
+      } from './content.js';
 
       /* The client.
        *
@@ -252,6 +290,101 @@
         drawTextOutlined(bctx, title, Math.round((W - textWidth(title, 2)) / 2), 12, 'y', 2);
         const sub = code ? `ROOM ${code}` : 'SOLARPUNK ROGUELIKE';
         drawTextOutlined(bctx, sub, Math.round((W - textWidth(sub, 1)) / 2), 32, 'c', 1);
+      }
+
+      /* ---- the map -------------------------------------------------------- */
+
+      /* A header strip for the level line, then the grid. Both are pixel units:
+         the canvas is scaled by a whole number afterwards, never drawn into at
+         a fraction. */
+      const HEADER = 16;
+      const MAP_PX_W = MAP_W * TILE;
+      const MAP_PX_H = MAP_H * TILE;
+
+      const map = document.getElementById('map');
+      const mctx = context2d(map);
+      let hover = null;   // {x, y} tile under the pointer, or null
+
+      /* Draw a palette-key grid straight onto a context. `pixels` below makes a
+         whole <canvas> per sprite, which is right for a sprite in a list and
+         wrong for four hundred tiles a frame. */
+      function blit(ctx, rows, x, y){
+        for(let r = 0; r < rows.length; r++){
+          const row = rows[r];
+          for(let c = 0; c < row.length; c++){
+            const key = row[c];
+            if(key === '.' || key === ' ') continue;
+            ctx.fillStyle = PALETTE[key];
+            ctx.fillRect(x + c, y + r, 1, 1);
+          }
+        }
+      }
+
+      const nodeAt = (x, y) => (room.nodes || []).find(n => n.x === x && n.y === y && !n.taken);
+
+      function drawMap(){
+        mctx.fillStyle = '#241a10';
+        mctx.fillRect(0, 0, MAP_PX_W, HEADER + MAP_PX_H);
+
+        const level = room.level;
+        const state = readyState(room.players);
+        const left = level ? `${level.name}` : 'THE SITE';
+        const right = `${state.ready}/${state.total} READY`;
+        drawTextOutlined(mctx, left, 2, 4, 'y', 1);
+        drawTextOutlined(mctx, right, MAP_PX_W - textWidth(right, 1) - 2, 4, 'c', 1);
+
+        // Ground first, everything else on top of it.
+        const terrain = room.terrain || [];
+        for(let y = 0; y < MAP_H; y++){
+          for(let x = 0; x < MAP_W; x++){
+            const kind = tileAt(terrain, x, y) || 'grass';
+            const art = TERRAIN_ART[kind] || TERRAIN_ART.grass;
+            blit(mctx, art, x * TILE, HEADER + y * TILE);
+          }
+        }
+
+        // Herbs sit low in their tile so the sprite reads as standing on the
+        // ground rather than floating in the middle of it.
+        for(const node of room.nodes || []){
+          if(node.taken || node.x === undefined) continue;
+          const art = MATERIAL_ART[node.material];
+          if(art) blit(mctx, art, node.x * TILE + 4, HEADER + node.y * TILE + 6);
+        }
+
+        // Heroes are 24x32 on a 16x16 tile: centred and stood on the tile's
+        // floor, so they overhang upwards and to the sides the way a person
+        // standing on a flagstone does.
+        for(const p of room.players || []){
+          if(p.x === undefined || p.y === undefined) continue;
+          const cls = CLASSES.find(c => c.id === p.classId);
+          const art = cls && HERO_ART[cls.art];
+          if(!art) continue;
+          const w = art.rows[0].length;
+          blit(mctx, art.rows, p.x * TILE + (TILE - w) / 2, HEADER + (p.y + 1) * TILE - art.rows.length);
+        }
+
+        if(hover){
+          const gatherable = !!nodeAt(hover.x, hover.y);
+          mctx.fillStyle = gatherable ? '#ffd23f' : '#fffaf0';
+          mctx.globalAlpha = gatherable ? 0.9 : 0.35;
+          const x = hover.x * TILE, y = HEADER + hover.y * TILE;
+          mctx.fillRect(x, y, TILE, 1);
+          mctx.fillRect(x, y + TILE - 1, TILE, 1);
+          mctx.fillRect(x, y, 1, TILE);
+          mctx.fillRect(x + TILE - 1, y, 1, TILE);
+          mctx.globalAlpha = 1;
+        }
+      }
+
+      /* Pointer position to tile. The canvas is CSS-scaled by a whole number,
+         so undo that scale rather than assuming it — the page is responsive and
+         the factor changes with the window. */
+      function tileFromEvent(event){
+        const rect = map.getBoundingClientRect();
+        const scale = rect.width / MAP_PX_W;
+        const x = Math.floor((event.clientX - rect.left) / scale / TILE);
+        const y = Math.floor(((event.clientY - rect.top) / scale - HEADER) / TILE);
+        return x >= 0 && y >= 0 && x < MAP_W && y < MAP_H ? { x, y } : null;
       }
 
       /* Sprites as <canvas>, because a palette-key grid is not an image and
@@ -282,6 +415,8 @@
         levelNote: els('level-note'), party: els('party'), nodes: els('nodes'),
         stash: els('stash'), recipes: els('recipes'), potions: els('potions'),
         wait: els('wait'), leaveRun: els('leave-run'), log: els('log'),
+        preview: els('preview'), hold: els('hold'), readyCount: els('ready-count'),
+        combat: els('combat'), combatParty: els('combat-party'), leaveCombat: els('leave-combat'),
       };
 
       /* ---- connection ---------------------------------------------------- */
@@ -341,20 +476,95 @@
       }
 
       const send = msg => {
+        if(demo) return demoSend(msg);
         if(socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(msg));
       };
 
       function leave({ keepNotice = false } = {}){
         deliberate = true;
+        demo = false;
         clearInterval(keepalive);
         if(socket) socket.close();
         socket = null; room = null; code = null; attempt = 0;
         history.replaceState(null, '', location.pathname);
         drawBanner(null);
-        ui.lobby.hidden = ui.run.hidden = true;
+        ui.lobby.hidden = ui.run.hidden = ui.combat.hidden = true;
         ui.join.hidden = false;
         setStatus('idle', 'Not connected');
         if(!keepNotice) notify('');
+      }
+
+      /* ---- offline preview ------------------------------------------------ */
+
+      /* npm start serves these files but not the socket — /api/good-vibes/ws
+       * only exists on Tool Haven — so without this the map could not be looked
+       * at until it was deployed.
+       *
+       * This is the one place the client writes game state, and it is fenced
+       * off behind `demo` for exactly that reason: in a real room every one of
+       * these decisions belongs to the room, and duplicating them here would be
+       * the second source of truth the architecture is built to avoid. It is a
+       * preview of the drawing, not a second implementation of the game.
+       */
+      let demo = false;
+
+      function startPreview(){
+        demo = true;
+        deliberate = true;                    // there is no socket to reconnect to
+        const random = seededRandom(seedFromCode(newCode()));
+        const { terrain, nodes } = generateMap(random);
+        const cls = CLASSES.find(c => c.status === 'live');
+        const start = spawnTile(terrain);
+
+        room = {
+          you: 'p1', phase: PHASES.build, round: 0, maxPlayers: PARTY_SIZE,
+          level: { ...LEVELS[0], index: 0, of: LEVELS.length },
+          terrain, nodes, stash: {}, potions: [], events: [],
+          players: [{
+            id: 'p1', name: 'You', host: true, connected: true, ready: false, down: false,
+            classId: cls.id, hp: cls.hp, maxHp: cls.hp, effects: [], intent: null,
+            x: start.x, y: start.y,
+          }],
+        };
+
+        drawBanner(null);                     // there is no room, so do not label one
+        setStatus('open', 'Preview — no room');
+        notify('');
+        render();
+      }
+
+      function demoSend(msg){
+        const you = room.players[0];
+        room.events = [];
+
+        if(msg.t === 'ready'){
+          you.ready = !!msg.ready;
+          // The rule the room applies, from the same helper, so the preview
+          // cannot drift from the real thing about when the surge lands.
+          if(readyState(room.players).all){
+            room.phase = PHASES.combat;
+            room.events.push({ t: 'surge' });
+          }
+        }else if(msg.t === 'intent' && msg.intent.t === 'gather'){
+          const node = room.nodes.find(n => n.id === msg.intent.node && !n.taken);
+          if(node){
+            node.taken = true;
+            you.x = node.x; you.y = node.y;
+            const cls = CLASSES.find(c => c.id === you.classId);
+            const yielded = cls ? cls.gather : 1;
+            room.stash[node.material] = (room.stash[node.material] || 0) + yielded;
+            room.events.push({ t: 'log', text: `Gathered ${yielded} ${MATERIALS[node.material].name}.` });
+          }
+        }else if(msg.t === 'intent' && msg.intent.t === 'craft'){
+          const recipe = RECIPES[msg.intent.recipe];
+          if(recipe && Object.keys(missingFor(msg.intent.recipe, room.stash)).length === 0){
+            for(const [material, n] of Object.entries(recipe.costs)) room.stash[material] -= n;
+            room.potions.push({ name: recipe.name, effect: recipe.effect });
+            room.events.push({ t: 'log', text: `Brewed ${recipe.name}.` });
+          }
+        }
+
+        render();
       }
 
       /* ---- small builders ------------------------------------------------- */
@@ -461,6 +671,27 @@
         ui.start.hidden = !(you && you.host);
       }
 
+      /* ---- combat ---------------------------------------------------------- */
+
+      /* The phase exists and the party arrives in it; what happens here is the
+         next thing to build. Rendering the roster rather than a blank screen
+         keeps it obvious that the switch worked. */
+      function renderCombat(){
+        ui.combatParty.replaceChildren();
+        for(const p of room.players){
+          const li = document.createElement('li');
+          li.dataset.you = String(p.id === room.you);
+          li.dataset.down = String(p.down);
+          const cls = CLASSES.find(c => c.id === p.classId);
+          if(cls && HERO_ART[cls.art]) li.append(pixels(HERO_ART[cls.art].rows, 1));
+          const name = document.createElement('span');
+          name.className = 'seat-name';
+          name.textContent = p.name + (p.id === room.you ? ' (you)' : '');
+          li.append(name, healthBar(p));
+          ui.combatParty.append(li);
+        }
+      }
+
       /* ---- run ------------------------------------------------------------ */
       function renderRun(){
         const level = room.level;
@@ -489,7 +720,18 @@
         }
 
         const you = me();
-        const acting = !!you && !you.down && room.phase === 'playing';
+        const acting = !!you && !you.down && isBuildPhase(room.phase);
+
+        drawMap();
+
+        // The room decides when the phase turns; this only reports what it is
+        // still waiting for, from the same helper the room counts with.
+        const state = readyState(room.players);
+        ui.readyCount.textContent = state.all
+          ? 'The party is ready'
+          : `${state.ready} of ${state.total} ready`;
+        ui.hold.textContent = you && you.ready ? 'Not ready' : 'Ready';
+        ui.hold.disabled = !acting;
 
         ui.nodes.replaceChildren();
         for(const node of room.nodes){
@@ -586,16 +828,21 @@
         for(const event of room.events || []){
           if(event.t === 'log') logLines.unshift(event.text);
           if(event.t === 'started') logLines.unshift('The run begins.');
+          if(event.t === 'surge') logLines.unshift('Everyone is ready. The blight surges.');
         }
         logLines.length = Math.min(logLines.length, 80);
 
         ui.join.hidden = true;
-        const inLobby = room.phase === 'lobby';
+        const inLobby = room.phase === PHASES.lobby;
+        const inCombat = room.phase === PHASES.combat;
         ui.lobby.hidden = !inLobby;
-        ui.run.hidden = inLobby;
-        if(inLobby) renderLobby(); else renderRun();
+        ui.run.hidden = inLobby || inCombat;
+        ui.combat.hidden = !inCombat;
+        if(inLobby) renderLobby();
+        else if(inCombat) renderCombat();
+        else renderRun();
 
-        if(room.phase === 'over'){
+        if(room.phase === PHASES.over){
           setStatus('open', room.outcome === 'won' ? 'The Array is lit' : 'The run is over');
         }
       }
@@ -608,15 +855,46 @@
         notify(''); attempt = 0; connect(wanted);
       });
       ui.newRoom.addEventListener('click', () => { ui.code.value = newCode(); ui.joinForm.requestSubmit(); });
+      ui.preview.addEventListener('click', startPreview);
       ui.ready.addEventListener('click', () => { const you = me(); send({ t: 'ready', ready: !(you && you.ready) }); });
+      ui.hold.addEventListener('click', () => { const you = me(); send({ t: 'ready', ready: !(you && you.ready) }); });
       ui.start.addEventListener('click', () => send({ t: 'start' }));
       ui.wait.addEventListener('click', () => send({ t: 'intent', intent: { t: 'wait' } }));
       ui.leave.addEventListener('click', () => leave());
       ui.leaveRun.addEventListener('click', () => leave());
+      ui.leaveCombat.addEventListener('click', () => leave());
+
+      /* Clicking a herb is the same intent the chip below the map sends. The
+         canvas is the fast path, not the only one. */
+      map.addEventListener('click', event => {
+        if(!room || !isBuildPhase(room.phase)) return;
+        const tile = tileFromEvent(event);
+        const node = tile && nodeAt(tile.x, tile.y);
+        if(node) send({ t: 'intent', intent: { t: 'gather', node: node.id } });
+      });
+
+      map.addEventListener('mousemove', event => {
+        if(!room || !isBuildPhase(room.phase)) return;
+        const tile = tileFromEvent(event);
+        const same = tile && hover ? tile.x === hover.x && tile.y === hover.y : tile === hover;
+        if(same) return;                       // only redraw when the tile changes
+        hover = tile;
+        drawMap();
+      });
+
+      map.addEventListener('mouseleave', () => {
+        if(!hover) return;
+        hover = null;
+        if(room && isBuildPhase(room.phase)) drawMap();
+      });
 
       /* ---- boot ------------------------------------------------------------ */
       drawBanner(null);
-      const fit = () => fitCanvas(banner, W, H, { container: document.querySelector('.wrap'), maxHeightFraction: 0.25 });
+      const wrap = document.querySelector('.wrap');
+      const fit = () => {
+        fitCanvas(banner, W, H, { container: wrap, maxHeightFraction: 0.25 });
+        fitCanvas(map, MAP_PX_W, HEADER + MAP_PX_H, { container: wrap, maxHeightFraction: 0.55 });
+      };
       window.addEventListener('resize', fit);
       fit();
 

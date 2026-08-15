@@ -94,14 +94,14 @@ npm test
 ## Layout
 
 ```
-public/content.js   the game as data — classes, materials, recipes, levels
-public/art.js       the palette and every sprite, as text
-public/play.html    the game: lobby, class select, and the run
+public/content.js   the game as data — classes, materials, recipes, levels, map
+public/art.js       the palette, the terrain tiles, and every sprite, as text
+public/play.html    the game: lobby, class select, the build phase, the surge
 public/pixel.js     bitmap font and canvas helpers
 public/index.html   the pixel art hello world page and its style guide
 src/app.js          dev server: static files out of public/
 src/server.js       HTTP server entry point
-test/content.test.js validates the class and sprite data
+test/content.test.js validates the class, sprite and map data
 test/server.test.js integration tests
 ```
 
@@ -140,6 +140,34 @@ double and it is the only class that can turn the pile into potions.
 the four classes built to fight it, so blight stands in as the pressure until
 those exist. The loop underneath it is real and finishable today.
 
+### The build phase
+
+A cycle alternates between building on the site and holding it when the blight
+surges, and the map is what makes that worth doing: it is generated once and
+kept, so the ground you cleared last cycle is still cleared when you come back
+to it. Only the herbs are reseeded.
+
+The map is an 18&times;9 grid of 16px tiles — a grid because every question the
+build phase asks is about neighbours, and a grid answers those with arithmetic
+instead of geometry. Terrain decides three things: whether you can stand on a
+tile, whether a structure can go there, and whether anything grows there.
+
+Herbs are scattered across the growable tiles by `spawnHerbs`, which draws
+tiles without replacement so two can never share one, and asks the existing
+`materialFor` what grew — so the rarity weights in `MATERIALS` stay the only
+place that answer lives. Click a herb on the map to gather it, or use the
+buttons under the map, which send the identical intent and are the path that
+works from a keyboard.
+
+**The phase turns when everyone is ready.** `readyState` counts only connected
+players, so a party is not held in the build phase by someone whose train went
+into a tunnel, and it returns counts rather than a boolean because "3 of 4
+ready" is what the UI has to draw. The room applies the rule; the client calls
+the same helper only to report what it is still waiting for.
+
+Map generation is seeded — `seededRandom(seedFromCode(code))` — so a room code
+is a ruin, the same one on the server, in the client, and in the tests.
+
 `pixel.js` is the file that keeps this looking like one game. Both pages import
 the same palette and the same glyphs rather than carrying a copy, so a colour
 can only be changed in one place — which is the only way a style guide stays
@@ -167,6 +195,18 @@ non-issue, and it is what makes this half safe to move fast in.
 ## Playing locally
 
 `npm start` serves the pages, but not the socket — `/api/good-vibes/ws` only
-exists on Tool Haven, so the lobby will sit there reconnecting. The lobby is
-best tested on the deployed site. Everything that does not need a room — the
+exists on Tool Haven, so joining a room will sit there reconnecting. Rooms are
+best tested on the deployed site. Everything that does not need one — the
 scene, the palette, the page itself — works offline.
+
+**Preview the site** on the join screen is the exception, and it exists because
+the map could not otherwise be looked at until it was deployed. It generates a
+map locally and drops you into the build phase alone: gathering, brewing and
+readying up all work, and readying up switches to the combat phase because a
+party of one is a party that is entirely ready.
+
+It is the one place the client writes game state, and it is fenced behind a
+`demo` flag for exactly that reason. In a real room every one of those
+decisions belongs to the room, and a second implementation of them here is the
+disagreement this architecture exists to prevent. Preview is a preview of the
+drawing, not a second copy of the game — do not grow it into one.
