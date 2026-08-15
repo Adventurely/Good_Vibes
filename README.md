@@ -94,13 +94,51 @@ npm test
 ## Layout
 
 ```
-public/pixel.js     the style system — palette, bitmap font, draw routines
-public/index.html   the pixel art hello world page and style guide
-public/play.html    the lobby
+public/content.js   the game as data — classes, materials, recipes, levels
+public/art.js       the palette and every sprite, as text
+public/play.html    the game: lobby, class select, and the run
+public/pixel.js     bitmap font and canvas helpers
+public/index.html   the pixel art hello world page and its style guide
 src/app.js          dev server: static files out of public/
 src/server.js       HTTP server entry point
+test/content.test.js validates the class and sprite data
 test/server.test.js integration tests
 ```
+
+**`content.js` is the file to edit.** It is imported by the browser *and* by
+the authoritative room object in Tool Haven, which is what stops the rules and
+the UI ever disagreeing about what a potion does. It is also why the file stays
+declarative — a throw at its top level would take the whole Worker down — and
+why `test/content.test.js` checks the shape of every class before the publish
+workflow will sync anything.
+
+Adding a class is a block in `CLASSES` and a sprite in `art.js`. Every field is
+documented above the array, and the test names the one you missed. Four seats
+are still open; `OPEN_ROLES` says what the party is short of and the lobby
+shows them as locked rather than pretending the roster is full.
+
+**`art.js` is client-only** — the engine references an art key by name and
+never reads a sprite. A mistake in there can break a picture but not the
+Worker, which makes it the safest file in the project to experiment in.
+
+## The game
+
+Solarpunk roguelike. Five levels down through a ruin that is growing back, and
+the ruin itself is the pressure: blight is ambient damage every round, rising
+per level, so standing still costs health.
+
+A round is **simultaneous** — everyone commits an action and the whole round
+resolves when the last one is in. Five players never watch each other think,
+and resolution order is fixed by player id so the same commitments always
+produce the same round however the network delivered them.
+
+Materials go to a **shared stash**: anyone can gather, and the Alchemist brews
+from the pool for the whole party. That is the Alchemist's role — it gathers
+double and it is the only class that can turn the pile into potions.
+
+**There are no enemies yet, on purpose.** What a fight looks like depends on
+the four classes built to fight it, so blight stands in as the pressure until
+those exist. The loop underneath it is real and finishable today.
 
 `pixel.js` is the file that keeps this looking like one game. Both pages import
 the same palette and the same glyphs rather than carrying a copy, so a colour

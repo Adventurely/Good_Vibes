@@ -3,240 +3,156 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Good Vibes — lobby</title>
-    <meta name="description" content="Join a Good Vibes room and wait for the table to fill." />
+    <title>Good Vibes</title>
+    <meta name="description" content="Gather what the ruin grew, brew what the party needs, and get to the Array." />
     <style>
       :root {
         color-scheme: dark;
-        --ink: #0d0b1f;
-        --panel: #16132b;
-        --line: #2b2450;
-        --text: #fdf6e3;
-        --muted: #8f86bf;
-        --accent: #4fc4d3;
-        --good: #3fa34d;
-        --warn: #ffd34e;
-        --bad: #e04b5a;
+        --ink: #241a10;
+        --panel: #33261a;
+        --line: #4a3826;
+        --text: #fff6e8;
+        --muted: #b9a189;
+        --accent: #6cc24a;
+        --sun: #ffd23f;
+        --bad: #ef5a45;
       }
 
-      * {
-        box-sizing: border-box;
-      }
+      * { box-sizing: border-box; }
 
       body {
         margin: 0;
-        padding: 2rem 1rem 3rem;
+        padding: 1.5rem 1rem 3rem;
         background: var(--ink);
-        background-image: radial-gradient(circle at 50% -10%, #241a3a 0%, #0d0b1f 65%);
+        background-image: radial-gradient(circle at 50% -20%, #3d2c1c 0%, #241a10 70%);
         color: var(--text);
         font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         line-height: 1.6;
       }
 
       .wrap {
-        max-width: 40rem;
+        max-width: 46rem;
         margin: 0 auto;
         display: flex;
         flex-direction: column;
-        gap: 1.5rem;
+        gap: 1.25rem;
       }
 
-      canvas {
-        display: block;
-        margin: 0 auto;
-        image-rendering: pixelated;
-        image-rendering: crisp-edges;
-        border: 2px solid var(--line);
-        border-radius: 6px;
-      }
+      canvas { image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
+      #banner { margin: 0 auto; border: 2px solid var(--line); border-radius: 6px; }
 
       h2 {
-        font-size: 0.78rem;
+        font-size: 0.72rem;
         letter-spacing: 0.22em;
         text-transform: uppercase;
         color: var(--muted);
-        margin: 0 0 0.9rem;
-        padding-bottom: 0.5rem;
+        margin: 0 0 0.7rem;
+        padding-bottom: 0.4rem;
         border-bottom: 1px solid var(--line);
       }
 
-      p {
-        margin: 0;
-        color: var(--muted);
-        font-size: 0.85rem;
-      }
-
-      /* --- status line --------------------------------------------------- */
+      p { margin: 0; color: var(--muted); font-size: 0.85rem; }
 
       .status {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.5rem;
-        font-size: 0.75rem;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        color: var(--muted);
+        display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+        font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
       }
-
-      .dot {
-        width: 0.55rem;
-        height: 0.55rem;
-        border-radius: 50%;
-        background: var(--muted);
-        flex: none;
-      }
-
-      .status[data-state='open'] .dot { background: var(--good); }
-      .status[data-state='connecting'] .dot { background: var(--warn); }
+      .dot { width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--muted); flex: none; }
+      .status[data-state='open'] .dot { background: var(--accent); }
+      .status[data-state='connecting'] .dot { background: var(--sun); }
       .status[data-state='closed'] .dot { background: var(--bad); }
 
-      /* --- join ----------------------------------------------------------- */
-
-      form {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        justify-content: center;
-      }
+      form { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; }
 
       input {
-        font: inherit;
-        text-transform: uppercase;
-        letter-spacing: 0.3em;
-        text-align: center;
-        width: 8rem;
-        padding: 0.4rem 0.6rem;
-        color: var(--text);
-        background: var(--panel);
-        border: 2px solid var(--line);
-        border-radius: 4px;
+        font: inherit; text-transform: uppercase; letter-spacing: 0.3em; text-align: center;
+        width: 8rem; padding: 0.4rem 0.6rem; color: var(--text);
+        background: var(--panel); border: 2px solid var(--line); border-radius: 4px;
       }
-
-      input:focus-visible,
-      button:focus-visible {
-        outline: 2px solid var(--accent);
-        outline-offset: 2px;
-      }
+      input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
       button {
-        font: inherit;
-        font-size: 0.8rem;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: var(--text);
-        background: var(--panel);
-        border: 2px solid var(--line);
-        border-radius: 4px;
-        padding: 0.4rem 0.9rem;
-        cursor: pointer;
+        font: inherit; font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase;
+        color: var(--text); background: var(--panel);
+        border: 2px solid var(--line); border-radius: 4px; padding: 0.4rem 0.9rem; cursor: pointer;
       }
+      button:hover:not(:disabled), button:focus-visible { border-color: var(--accent); color: var(--accent); }
+      button:disabled { opacity: 0.4; cursor: not-allowed; }
+      button.primary { border-color: var(--accent); color: var(--accent); }
 
-      button:hover:not(:disabled),
-      button:focus-visible {
-        border-color: var(--accent);
-        color: var(--accent);
-      }
-
-      button:disabled {
-        opacity: 0.45;
-        cursor: not-allowed;
-      }
-
-      button.primary {
-        border-color: var(--accent);
-        color: var(--accent);
-      }
-
-      /* --- seats ---------------------------------------------------------- */
-
-      ol {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 0.4rem;
-      }
+      ol, ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.35rem; }
 
       li {
-        display: flex;
-        align-items: center;
-        gap: 0.7rem;
-        padding: 0.5rem 0.75rem;
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 4px;
-        font-size: 0.85rem;
+        display: flex; align-items: center; gap: 0.6rem;
+        padding: 0.45rem 0.7rem; background: var(--panel);
+        border: 1px solid var(--line); border-radius: 4px; font-size: 0.85rem;
       }
+      li[data-you='true'] { border-color: var(--accent); }
+      li[data-down='true'] { opacity: 0.55; }
 
-      li[data-you='true'] {
-        border-color: var(--accent);
-      }
-
-      .seat-name {
-        flex: 1;
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
+      .seat-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
       .tag {
-        font-size: 0.65rem;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-        padding: 0.1rem 0.4rem;
-        border-radius: 3px;
-        border: 1px solid var(--line);
-        color: var(--muted);
-        flex: none;
+        font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase;
+        padding: 0.1rem 0.4rem; border-radius: 3px; border: 1px solid var(--line);
+        color: var(--muted); flex: none;
       }
+      .tag[data-kind='ready'] { color: var(--accent); border-color: var(--accent); }
+      .tag[data-kind='host'] { color: var(--sun); border-color: var(--sun); }
+      .tag[data-kind='away'], .tag[data-kind='down'] { color: var(--bad); border-color: var(--bad); }
 
-      .tag[data-kind='ready'] { color: var(--good); border-color: var(--good); }
-      .tag[data-kind='waiting'] { color: var(--muted); }
-      .tag[data-kind='host'] { color: var(--warn); border-color: var(--warn); }
-      .tag[data-kind='away'] { color: var(--bad); border-color: var(--bad); }
+      .empty-seat { opacity: 0.4; font-style: italic; }
 
-      .empty-seat {
-        opacity: 0.4;
-        font-style: italic;
+      /* --- health ------------------------------------------------------- */
+      .hp { width: 5.5rem; flex: none; }
+      .hp-bar { height: 0.4rem; background: #1b130c; border-radius: 2px; overflow: hidden; }
+      .hp-fill { height: 100%; background: var(--accent); }
+      .hp-fill[data-low='true'] { background: var(--bad); }
+      .hp-text { font-size: 0.62rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+      /* --- pickable grids ------------------------------------------------ */
+      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: 0.5rem; }
+
+      .card {
+        display: flex; gap: 0.6rem; text-align: left; align-items: flex-start;
+        padding: 0.6rem; text-transform: none; letter-spacing: 0; font-size: 0.8rem;
       }
+      .card[aria-pressed='true'] { border-color: var(--accent); background: #2c3a22; }
+      .card-body { min-width: 0; }
+      .card-name { display: block; color: var(--text); }
+      .card-sub { display: block; font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+      .card-blurb { display: block; font-size: 0.72rem; color: var(--muted); margin-top: 0.3rem; }
+      .card.locked { opacity: 0.45; cursor: not-allowed; }
 
-      .actions {
-        display: flex;
-        gap: 0.5rem;
-        justify-content: center;
-        flex-wrap: wrap;
+      .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+      .chip {
+        display: flex; align-items: center; gap: 0.4rem;
+        padding: 0.3rem 0.55rem; font-size: 0.75rem; text-transform: none; letter-spacing: 0;
       }
+      .chip .count { color: var(--sun); font-variant-numeric: tabular-nums; }
+
+      .log {
+        /* Newest first, top down: the lines are already unshifted in that
+           order, and column-reverse would only push them below the fold. */
+        max-height: 11rem; overflow-y: auto; display: flex; flex-direction: column;
+        gap: 0.2rem; font-size: 0.76rem; color: var(--muted);
+        background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 0.6rem;
+      }
+      .log div { padding: 0.05rem 0; }
 
       .notice {
-        padding: 0.6rem 0.8rem;
-        border: 1px solid var(--bad);
-        border-radius: 4px;
-        color: var(--bad);
-        font-size: 0.8rem;
-        text-align: center;
+        padding: 0.5rem 0.7rem; border: 1px solid var(--bad); border-radius: 4px;
+        color: var(--bad); font-size: 0.8rem; text-align: center;
       }
+      .notice:empty { display: none; }
 
-      .notice:empty {
-        display: none;
-      }
+      .actions { display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; }
+      .level-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
+      .level-head b { font-weight: 400; color: var(--sun); }
 
-      [hidden] {
-        display: none !important;
-      }
-
-      a {
-        color: var(--accent);
-        text-underline-offset: 3px;
-      }
-
-      footer {
-        text-align: center;
-        font-size: 0.72rem;
-        color: var(--muted);
-      }
+      [hidden] { display: none !important; }
+      a { color: var(--accent); text-underline-offset: 3px; }
+      footer { text-align: center; font-size: 0.7rem; color: var(--muted); }
     </style>
   </head>
   <body>
@@ -249,119 +165,134 @@
 
       <p class="notice" id="notice"></p>
 
-      <!-- Before joining -->
       <section id="join">
         <h2>Join a room</h2>
         <form id="join-form">
-          <input
-            id="code"
-            name="code"
-            maxlength="6"
-            minlength="4"
-            pattern="[A-Za-z0-9]{4,6}"
-            placeholder="CODE"
-            aria-label="Room code, four to six letters or numbers"
-            autocomplete="off"
-            required
-          />
+          <input id="code" maxlength="6" minlength="4" pattern="[A-Za-z0-9]{4,6}"
+                 placeholder="CODE" aria-label="Room code, four to six letters or numbers"
+                 autocomplete="off" required />
           <button type="submit">Join</button>
           <button type="button" id="new-room">New room</button>
         </form>
-        <p style="text-align: center; margin-top: 0.9rem">
-          Share the address once you are in — the code travels with it.
-        </p>
+        <p style="text-align:center;margin-top:0.8rem">Share the address once you are in — the code travels with it.</p>
       </section>
 
-      <!-- After joining -->
-      <section id="room" hidden>
-        <h2>Room <span id="room-code"></span></h2>
+      <!-- lobby -->
+      <section id="lobby" hidden>
+        <h2>The party</h2>
         <ol id="seats"></ol>
-        <div class="actions" style="margin-top: 1rem">
+        <h2 style="margin-top:1.4rem">Pick a class</h2>
+        <div class="grid" id="classes"></div>
+        <div class="actions" style="margin-top:1rem">
           <button type="button" id="ready">Ready</button>
-          <button type="button" id="start" class="primary" hidden>Start</button>
+          <button type="button" id="start" class="primary" hidden>Start the run</button>
           <button type="button" id="leave">Leave</button>
         </div>
       </section>
 
-      <noscript>
-        <p style="text-align: center">The lobby needs JavaScript to hold its connection open.</p>
-      </noscript>
+      <!-- run -->
+      <section id="run" hidden>
+        <div class="level-head">
+          <h2 style="border:0;margin:0;padding:0" id="level-name"></h2>
+          <span class="hp-text" id="level-meta"></span>
+        </div>
+        <p id="level-note" style="margin-bottom:1rem"></p>
 
-      <footer><a href="index.html">Back to the style guide</a></footer>
+        <ol id="party"></ol>
+
+        <h2 style="margin-top:1.4rem">The level</h2>
+        <div class="chips" id="nodes"></div>
+
+        <h2 style="margin-top:1.4rem">Stash</h2>
+        <div class="chips" id="stash"></div>
+
+        <h2 style="margin-top:1.4rem">Brewing</h2>
+        <div class="grid" id="recipes"></div>
+
+        <h2 style="margin-top:1.4rem">The rack</h2>
+        <div class="chips" id="potions"></div>
+
+        <div class="actions" style="margin-top:1.2rem">
+          <button type="button" id="wait">Hold position</button>
+          <button type="button" id="leave-run">Leave</button>
+        </div>
+
+        <h2 style="margin-top:1.4rem">Log</h2>
+        <div class="log" id="log"></div>
+      </section>
+
+      <noscript><p style="text-align:center">The game needs JavaScript to hold its connection open.</p></noscript>
+      <footer><a href="index.html">Style guide</a></footer>
     </div>
 
     <script type="module">
-      import { drawTextOutlined, textWidth, fitCanvas, context2d, hex } from './pixel.js';
+      import { drawTextOutlined, textWidth, fitCanvas, context2d } from './pixel.js';
+      import { PALETTE, HERO_ART, MATERIAL_ART } from './art.js';
+      import { CLASSES, OPEN_ROLES, MATERIALS, RECIPES, missingFor } from './content.js';
 
-      /* The lobby.
+      /* The client.
        *
-       * All it does is hold a socket open and render whatever the room sends
-       * back. It deliberately keeps no game state of its own: the room object
-       * is the only writer, so anything this file decided for itself would be
-       * a second source of truth and eventually a disagreement.
+       * It renders whatever the room sends and sends back intents. It keeps no
+       * game state of its own — the room is the only writer, so anything
+       * decided here would be a second source of truth and eventually a
+       * disagreement. The one thing it does locally is disable a button it
+       * knows the room will refuse, which is politeness, not authority: the
+       * room still checks.
        */
 
-      const W = 240;
-      const H = 60;
+      const W = 240, H = 60;
       const banner = document.getElementById('banner');
       const bctx = context2d(banner);
 
       function drawBanner(code){
-        bctx.fillStyle = hex('d');
-        bctx.fillRect(0, 0, W, H);
-        // A horizon band, so the lobby is recognisably the same world.
-        bctx.fillStyle = hex('p');
-        bctx.fillRect(0, 40, W, 6);
-        bctx.fillStyle = hex('G');
-        bctx.fillRect(0, 46, W, H - 46);
-
+        bctx.fillStyle = '#33261a'; bctx.fillRect(0, 0, W, H);
+        bctx.fillStyle = '#3f8f38'; bctx.fillRect(0, 44, W, H - 44);
+        bctx.fillStyle = '#6cc24a'; bctx.fillRect(0, 44, W, 2);
         const title = 'GOOD VIBES';
-        drawTextOutlined(bctx, title, Math.round((W - textWidth(title, 2)) / 2), 10, 'y', 2);
-        const sub = code ? `ROOM ${code}` : 'LOBBY';
-        drawTextOutlined(bctx, sub, Math.round((W - textWidth(sub, 1)) / 2), 30, 'c', 1);
+        drawTextOutlined(bctx, title, Math.round((W - textWidth(title, 2)) / 2), 12, 'y', 2);
+        const sub = code ? `ROOM ${code}` : 'SOLARPUNK ROGUELIKE';
+        drawTextOutlined(bctx, sub, Math.round((W - textWidth(sub, 1)) / 2), 32, 'c', 1);
       }
 
-      const fit = () => fitCanvas(banner, W, H, { container: document.querySelector('.wrap'), maxHeightFraction: 0.3 });
-      window.addEventListener('resize', fit);
+      /* Sprites as <canvas>, because a palette-key grid is not an image and
+         inventing an <img> for it would mean encoding one at build time. */
+      function pixels(rows, scale, width = rows[0].length, height = rows.length){
+        const el = document.createElement('canvas');
+        el.width = width; el.height = height;
+        el.style.width = `${width * scale}px`;
+        el.style.height = `${height * scale}px`;
+        el.style.imageRendering = 'pixelated';
+        el.style.flex = 'none';
+        const ctx = el.getContext('2d');
+        rows.forEach((row, y) => [...row].forEach((key, x) => {
+          if(key === '.' || key === ' ') return;
+          ctx.fillStyle = PALETTE[key];
+          ctx.fillRect(x, y, 1, 1);
+        }));
+        return el;
+      }
 
-      /* ---- elements ---------------------------------------------------- */
-      const els = {
-        status: document.getElementById('status'),
-        statusText: document.getElementById('status-text'),
-        notice: document.getElementById('notice'),
-        join: document.getElementById('join'),
-        joinForm: document.getElementById('join-form'),
-        code: document.getElementById('code'),
-        newRoom: document.getElementById('new-room'),
-        room: document.getElementById('room'),
-        roomCode: document.getElementById('room-code'),
-        seats: document.getElementById('seats'),
-        ready: document.getElementById('ready'),
-        start: document.getElementById('start'),
-        leave: document.getElementById('leave'),
+      const els = id => document.getElementById(id);
+      const ui = {
+        status: els('status'), statusText: els('status-text'), notice: els('notice'),
+        join: els('join'), joinForm: els('join-form'), code: els('code'), newRoom: els('new-room'),
+        lobby: els('lobby'), seats: els('seats'), classes: els('classes'),
+        ready: els('ready'), start: els('start'), leave: els('leave'),
+        run: els('run'), levelName: els('level-name'), levelMeta: els('level-meta'),
+        levelNote: els('level-note'), party: els('party'), nodes: els('nodes'),
+        stash: els('stash'), recipes: els('recipes'), potions: els('potions'),
+        wait: els('wait'), leaveRun: els('leave-run'), log: els('log'),
       };
 
-      /* ---- connection --------------------------------------------------- */
-      let socket = null;
-      let room = null;          // the last view the room sent
-      let code = null;
-      let attempt = 0;          // consecutive failed connects, for backoff
-      let deliberate = false;   // set when we close the socket on purpose
-      let keepalive = 0;
-
+      /* ---- connection ---------------------------------------------------- */
+      let socket = null, room = null, code = null, attempt = 0, deliberate = false, keepalive = 0;
       const CODE_RE = /^[A-Z0-9]{4,6}$/;
 
-      function setStatus(state, text){
-        els.status.dataset.state = state;
-        els.statusText.textContent = text;
-      }
+      const setStatus = (state, text) => { ui.status.dataset.state = state; ui.statusText.textContent = text; };
+      const notify = message => { ui.notice.textContent = message || ''; };
 
-      function notify(message){
-        els.notice.textContent = message || '';
-      }
-
-      // Ambiguous characters are left out: a room code gets read aloud, and
-      // "was that an O or a zero" is the whole cost of including both.
+      // Ambiguous characters left out: a room code gets read aloud, and "was
+      // that an O or a zero" is the whole cost of including both.
       const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
       const newCode = () =>
         Array.from(crypto.getRandomValues(new Uint8Array(4)), b => ALPHABET[b % ALPHABET.length]).join('');
@@ -370,21 +301,18 @@
         code = next;
         location.hash = code;
         drawBanner(code);
-        els.roomCode.textContent = code;
         deliberate = false;
         setStatus('connecting', attempt ? `Reconnecting (${attempt})` : 'Connecting');
 
         const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
-        // An absolute path: this page sits at /tools/good-vibes/ but the socket
-        // is a site-level route, so it must not be resolved relative to here.
+        // Absolute: this page sits under /tools/good-vibes/ but the socket is a
+        // site-level route and must not resolve relative to here.
         socket = new WebSocket(`${scheme}//${location.host}/api/good-vibes/ws?code=${encodeURIComponent(code)}`);
 
         socket.addEventListener('open', () => {
           attempt = 0;
           setStatus('open', 'Connected');
           notify('');
-          // Something small and regular, so an idle room is not mistaken for a
-          // dead one by anything between here and the Worker.
           clearInterval(keepalive);
           keepalive = setInterval(() => send({ t: 'ping' }), 25000);
         });
@@ -395,8 +323,7 @@
           if(msg.t === 'state'){ room = msg.state; render(); }
           else if(msg.t === 'error') notify(msg.message);
           else if(msg.t === 'rejected'){
-            // A refused join is final: retrying would just be refused again.
-            deliberate = true;
+            deliberate = true;                 // a refused join would only be refused again
             notify(msg.message);
             socket.close();
             leave({ keepNotice: true });
@@ -407,123 +334,294 @@
           clearInterval(keepalive);
           if(deliberate) return;
           setStatus('closed', 'Connection lost');
-          // Back off, but keep trying — a laptop lid closing should not cost
-          // somebody their seat.
           attempt += 1;
           const wait = Math.min(15000, 500 * 2 ** Math.min(attempt, 5));
           setTimeout(() => { if(!deliberate && code) connect(code); }, wait);
         });
       }
 
-      function send(msg){
+      const send = msg => {
         if(socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(msg));
-      }
+      };
 
       function leave({ keepNotice = false } = {}){
         deliberate = true;
         clearInterval(keepalive);
         if(socket) socket.close();
-        socket = null;
-        room = null;
-        code = null;
-        attempt = 0;
+        socket = null; room = null; code = null; attempt = 0;
         history.replaceState(null, '', location.pathname);
         drawBanner(null);
-        els.room.hidden = true;
-        els.join.hidden = false;
+        ui.lobby.hidden = ui.run.hidden = true;
+        ui.join.hidden = false;
         setStatus('idle', 'Not connected');
         if(!keepNotice) notify('');
       }
 
-      /* ---- rendering ---------------------------------------------------- */
-      function tag(text, kind){
+      /* ---- small builders ------------------------------------------------- */
+      const tag = (text, kind) => {
         const el = document.createElement('span');
-        el.className = 'tag';
-        el.dataset.kind = kind;
-        el.textContent = text;
+        el.className = 'tag'; el.dataset.kind = kind; el.textContent = text;
         return el;
+      };
+
+      function healthBar(p){
+        const box = document.createElement('span');
+        box.className = 'hp';
+        const bar = document.createElement('span');
+        bar.className = 'hp-bar';
+        const fill = document.createElement('span');
+        fill.className = 'hp-fill';
+        const share = p.maxHp ? Math.max(0, p.hp / p.maxHp) : 0;
+        fill.style.width = `${share * 100}%`;
+        fill.dataset.low = String(share <= 0.3);
+        bar.append(fill);
+        const text = document.createElement('span');
+        text.className = 'hp-text';
+        text.textContent = `${p.hp}/${p.maxHp}`;
+        box.append(bar, text);
+        return box;
       }
 
-      function render(){
-        if(!room) return;
-        els.join.hidden = true;
-        els.room.hidden = false;
+      const me = () => room && room.players.find(p => p.id === room.you);
 
-        els.seats.replaceChildren();
+      /* ---- lobby ---------------------------------------------------------- */
+      function renderLobby(){
+        ui.seats.replaceChildren();
         for(const p of room.players){
           const li = document.createElement('li');
           li.dataset.you = String(p.id === room.you);
-
           const name = document.createElement('span');
           name.className = 'seat-name';
-          name.textContent = p.name + (p.id === room.you ? ' (you)' : '');
+          const cls = CLASSES.find(c => c.id === p.classId);
+          name.textContent = p.name + (p.id === room.you ? ' (you)' : '') + (cls ? ` — ${cls.name}` : '');
           li.append(name);
-
           if(p.host) li.append(tag('Host', 'host'));
           if(!p.connected) li.append(tag('Away', 'away'));
           else li.append(p.ready ? tag('Ready', 'ready') : tag('Waiting', 'waiting'));
-          els.seats.append(li);
+          ui.seats.append(li);
         }
-
-        // Show the empty seats too — a table you can see the size of is easier
-        // to decide about than a number in a sentence.
         for(let i = room.players.length; i < room.maxPlayers; i++){
           const li = document.createElement('li');
           const name = document.createElement('span');
           name.className = 'seat-name empty-seat';
           name.textContent = 'empty';
           li.append(name);
-          els.seats.append(li);
+          ui.seats.append(li);
         }
 
-        const you = room.players.find(p => p.id === room.you);
-        const playing = room.phase !== 'lobby';
+        const you = me();
+        ui.classes.replaceChildren();
+        for(const cls of CLASSES){
+          const taken = room.players.find(p => p.classId === cls.id && p.id !== room.you);
+          const card = document.createElement('button');
+          card.type = 'button';
+          card.className = 'card';
+          card.setAttribute('aria-pressed', String(you && you.classId === cls.id));
+          card.disabled = cls.status !== 'live' || !!taken;
+          if(HERO_ART[cls.art]) card.append(pixels(HERO_ART[cls.art].rows, 2));
+          const body = document.createElement('span');
+          body.className = 'card-body';
+          const name = document.createElement('b');
+          name.className = 'card-name';
+          name.textContent = cls.name;
+          const sub = document.createElement('span');
+          sub.className = 'card-sub';
+          sub.textContent = taken ? `${taken.name} has it` : `${cls.archetype} · ${cls.hp} hp`;
+          const blurb = document.createElement('span');
+          blurb.className = 'card-blurb';
+          blurb.textContent = cls.blurb;
+          body.append(name, sub, blurb);
+          card.append(body);
+          card.onclick = () => send({ t: 'class', classId: you && you.classId === cls.id ? null : cls.id });
+          ui.classes.append(card);
+        }
+        // The seats nobody has designed yet. Showing them is more honest than a
+        // roster that looks complete at one class.
+        for(const role of OPEN_ROLES){
+          const card = document.createElement('div');
+          card.className = 'card locked';
+          const body = document.createElement('span');
+          body.className = 'card-body';
+          const name = document.createElement('b');
+          name.className = 'card-name';
+          name.textContent = `Seat ${role.slot}`;
+          const sub = document.createElement('span');
+          sub.className = 'card-sub';
+          sub.textContent = 'Not built yet';
+          const blurb = document.createElement('span');
+          blurb.className = 'card-blurb';
+          blurb.textContent = role.suggestion;
+          body.append(name, sub, blurb);
+          card.append(body);
+          ui.classes.append(card);
+        }
 
-        els.ready.textContent = you && you.ready ? 'Not ready' : 'Ready';
-        els.ready.disabled = playing || !you;
-        els.start.hidden = !(you && you.host);
-        els.start.disabled = playing;
-
-        if(playing) setStatus('open', 'Game started');
+        ui.ready.textContent = you && you.ready ? 'Not ready' : 'Ready';
+        ui.ready.disabled = !you || !you.classId;
+        ui.start.hidden = !(you && you.host);
       }
 
-      /* ---- events -------------------------------------------------------- */
-      els.joinForm.addEventListener('submit', event => {
-        event.preventDefault();
-        const wanted = els.code.value.trim().toUpperCase();
-        if(!CODE_RE.test(wanted)){
-          notify('A room code is four to six letters or numbers.');
-          return;
+      /* ---- run ------------------------------------------------------------ */
+      function renderRun(){
+        const level = room.level;
+        ui.levelName.textContent = level ? level.name : '';
+        ui.levelMeta.textContent = level
+          ? `Level ${level.index + 1} of ${level.of} · blight ${level.blight} · round ${room.round + 1}`
+          : '';
+        ui.levelNote.textContent = level ? level.note : '';
+
+        ui.party.replaceChildren();
+        for(const p of room.players){
+          const li = document.createElement('li');
+          li.dataset.you = String(p.id === room.you);
+          li.dataset.down = String(p.down);
+          const cls = CLASSES.find(c => c.id === p.classId);
+          if(cls && HERO_ART[cls.art]) li.append(pixels(HERO_ART[cls.art].rows, 1));
+          const name = document.createElement('span');
+          name.className = 'seat-name';
+          name.textContent = p.name + (p.id === room.you ? ' (you)' : '');
+          li.append(name, healthBar(p));
+          if(p.down) li.append(tag('Down', 'down'));
+          else if(!p.connected) li.append(tag('Away', 'away'));
+          else if(p.intent) li.append(tag(p.intent.t, 'ready'));
+          for(const effect of p.effects) li.append(tag(`${effect.kind} ${effect.rounds}`, 'waiting'));
+          ui.party.append(li);
         }
-        notify('');
-        attempt = 0;
-        connect(wanted);
+
+        const you = me();
+        const acting = !!you && !you.down && room.phase === 'playing';
+
+        ui.nodes.replaceChildren();
+        for(const node of room.nodes){
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'chip';
+          button.disabled = node.taken || !acting;
+          if(MATERIAL_ART[node.material]) button.append(pixels(MATERIAL_ART[node.material], 2));
+          button.append(document.createTextNode(MATERIALS[node.material].name));
+          button.onclick = () => send({ t: 'intent', intent: { t: 'gather', node: node.id } });
+          ui.nodes.append(button);
+        }
+        if(!room.nodes.some(n => !n.taken)){
+          const done = document.createElement('p');
+          done.textContent = 'Stripped bare. The way down opens.';
+          ui.nodes.append(done);
+        }
+
+        ui.stash.replaceChildren();
+        const held = Object.entries(room.stash).filter(([, n]) => n > 0);
+        if(!held.length) ui.stash.append(Object.assign(document.createElement('p'), { textContent: 'Nothing gathered yet.' }));
+        for(const [material, count] of held){
+          const chip = document.createElement('span');
+          chip.className = 'chip';
+          if(MATERIAL_ART[material]) chip.append(pixels(MATERIAL_ART[material], 2));
+          chip.append(document.createTextNode(MATERIALS[material].name));
+          const n = document.createElement('b');
+          n.className = 'count';
+          n.textContent = `x${count}`;
+          chip.append(n);
+          ui.stash.append(chip);
+        }
+
+        const canBrew = you && CLASSES.find(c => c.id === you.classId)?.craft;
+        ui.recipes.replaceChildren();
+        if(!canBrew){
+          ui.recipes.append(Object.assign(document.createElement('p'),
+            { textContent: 'Only the Alchemist can brew.' }));
+        }else{
+          for(const [id, recipe] of Object.entries(RECIPES)){
+            const short = missingFor(id, room.stash);
+            const missing = Object.entries(short).map(([m, n]) => `${n} ${MATERIALS[m].name}`);
+            const card = document.createElement('button');
+            card.type = 'button';
+            card.className = 'card';
+            card.disabled = !acting || missing.length > 0;
+            const body = document.createElement('span');
+            body.className = 'card-body';
+            const name = document.createElement('b');
+            name.className = 'card-name';
+            name.textContent = recipe.name;
+            const sub = document.createElement('span');
+            sub.className = 'card-sub';
+            sub.textContent = Object.entries(recipe.costs)
+              .map(([m, n]) => `${n} ${MATERIALS[m].name}`).join(' + ');
+            const note = document.createElement('span');
+            note.className = 'card-blurb';
+            // "You need one more Dewglass" is the only version of this a player
+            // can act on, so say that rather than greying the button in silence.
+            note.textContent = missing.length ? `Short of ${missing.join(' and ')}.` : recipe.note;
+            body.append(name, sub, note);
+            card.append(body);
+            card.onclick = () => send({ t: 'intent', intent: { t: 'craft', recipe: id } });
+            ui.recipes.append(card);
+          }
+        }
+
+        ui.potions.replaceChildren();
+        if(!room.potions.length){
+          ui.potions.append(Object.assign(document.createElement('p'), { textContent: 'The rack is empty.' }));
+        }
+        room.potions.forEach((potion, index) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'chip';
+          button.disabled = !acting;
+          button.textContent = `${potion.name} — drink`;
+          button.onclick = () => send({ t: 'intent', intent: { t: 'use', potion: index, target: room.you } });
+          ui.potions.append(button);
+        });
+
+        ui.wait.disabled = !acting;
+
+        ui.log.replaceChildren();
+        for(const line of logLines) ui.log.append(Object.assign(document.createElement('div'), { textContent: line }));
+      }
+
+      /* Events arrive once and are cleared by the room, so the log is kept
+         here — the alternative is a durable record that grows forever. */
+      const logLines = [];
+
+      function render(){
+        if(!room) return;
+        for(const event of room.events || []){
+          if(event.t === 'log') logLines.unshift(event.text);
+          if(event.t === 'started') logLines.unshift('The run begins.');
+        }
+        logLines.length = Math.min(logLines.length, 80);
+
+        ui.join.hidden = true;
+        const inLobby = room.phase === 'lobby';
+        ui.lobby.hidden = !inLobby;
+        ui.run.hidden = inLobby;
+        if(inLobby) renderLobby(); else renderRun();
+
+        if(room.phase === 'over'){
+          setStatus('open', room.outcome === 'won' ? 'The Array is lit' : 'The run is over');
+        }
+      }
+
+      /* ---- events ---------------------------------------------------------- */
+      ui.joinForm.addEventListener('submit', event => {
+        event.preventDefault();
+        const wanted = ui.code.value.trim().toUpperCase();
+        if(!CODE_RE.test(wanted)){ notify('A room code is four to six letters or numbers.'); return; }
+        notify(''); attempt = 0; connect(wanted);
       });
+      ui.newRoom.addEventListener('click', () => { ui.code.value = newCode(); ui.joinForm.requestSubmit(); });
+      ui.ready.addEventListener('click', () => { const you = me(); send({ t: 'ready', ready: !(you && you.ready) }); });
+      ui.start.addEventListener('click', () => send({ t: 'start' }));
+      ui.wait.addEventListener('click', () => send({ t: 'intent', intent: { t: 'wait' } }));
+      ui.leave.addEventListener('click', () => leave());
+      ui.leaveRun.addEventListener('click', () => leave());
 
-      els.newRoom.addEventListener('click', () => {
-        els.code.value = newCode();
-        els.joinForm.requestSubmit();
-      });
-
-      els.ready.addEventListener('click', () => {
-        const you = room && room.players.find(p => p.id === room.you);
-        send({ t: 'ready', ready: !(you && you.ready) });
-      });
-
-      els.start.addEventListener('click', () => send({ t: 'start' }));
-      els.leave.addEventListener('click', () => leave());
-
-      /* ---- boot ---------------------------------------------------------- */
+      /* ---- boot ------------------------------------------------------------ */
       drawBanner(null);
+      const fit = () => fitCanvas(banner, W, H, { container: document.querySelector('.wrap'), maxHeightFraction: 0.25 });
+      window.addEventListener('resize', fit);
       fit();
 
-      // A room code in the address is what makes the page shareable, so treat
-      // arriving with one as a request to join it.
       const fromUrl = location.hash.replace('#', '').toUpperCase();
-      if(CODE_RE.test(fromUrl)){
-        els.code.value = fromUrl;
-        connect(fromUrl);
-      }
+      if(CODE_RE.test(fromUrl)){ ui.code.value = fromUrl; connect(fromUrl); }
     </script>
   </body>
 </html>
