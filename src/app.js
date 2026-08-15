@@ -13,8 +13,6 @@ const TYPES = {
   '.svg': 'image/svg+xml',
 };
 
-const cache = new Map();
-
 /* Resolve a URL path to a file inside public/, or null.
  *
  * The join is done first and the result checked against the directory
@@ -26,14 +24,16 @@ async function readPublic(pathname) {
   const file = path.resolve(publicDir, relative);
   if (!file.startsWith(publicDir)) return null;
 
-  if (!cache.has(file)) {
-    try {
-      cache.set(file, await readFile(file));
-    } catch {
-      return null;
-    }
+  // Read every time. This server exists so you can edit a file and reload, and
+  // an in-memory cache turns that into "edit, reload, see the old one, and
+  // spend ten minutes wondering why the change did nothing".
+  let body;
+  try {
+    body = await readFile(file);
+  } catch {
+    return null;
   }
-  return { body: cache.get(file), type: TYPES[path.extname(file)] ?? 'application/octet-stream' };
+  return { body, type: TYPES[path.extname(file)] ?? 'application/octet-stream' };
 }
 
 /**

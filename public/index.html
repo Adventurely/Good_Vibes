@@ -222,8 +222,56 @@
         font-size: 0.95em;
       }
 
-      .cta {
-        margin-top: 0.9rem;
+      /* The one thing anyone opening this page actually wants. It sits directly
+         under the screen rather than below the style guide, because a button
+         you have to scroll past two reference sections to find is a button
+         nobody finds. */
+      .play {
+        display: block;
+        width: 100%;
+        max-width: 24rem;
+        margin: 2rem auto 0;
+        padding: 1rem 1.5rem;
+        text-align: center;
+        text-decoration: none;
+        font-size: 1.05rem;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--ink);
+        background: var(--accent);
+        border: 2px solid var(--accent);
+        border-radius: 6px;
+        /* A chunky drop shadow rather than a flat fill: it reads as a physical
+           button, which is the right idiom on the way into a game. */
+        box-shadow: 0 6px 0 #2b7f8a;
+        transition: transform 80ms linear, box-shadow 80ms linear;
+      }
+
+      .play:hover,
+      .play:focus-visible {
+        color: var(--ink);
+        transform: translateY(2px);
+        box-shadow: 0 4px 0 #2b7f8a;
+      }
+
+      .play:active {
+        transform: translateY(6px);
+        box-shadow: 0 0 0 #2b7f8a;
+      }
+
+      .play small {
+        display: block;
+        margin-top: 0.4rem;
+        font-size: 0.62rem;
+        letter-spacing: 0.1em;
+        text-transform: none;
+        opacity: 0.8;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .play {
+          transition: none;
+        }
       }
 
       a {
@@ -262,6 +310,11 @@
         <button type="button" id="toggle-motion" aria-pressed="true">Motion</button>
       </div>
 
+      <a class="play" href="play.html">
+        Play Good Vibes
+        <small>Five levels down &middot; up to five players</small>
+      </a>
+
       <noscript>
         <p style="text-align: center; margin-top: 1rem">
           This scene is rendered with JavaScript on a canvas — enable it to see the art.
@@ -283,15 +336,6 @@
           <li><b>Gradients</b>4 &times; 4 ordered (Bayer) dither</li>
           <li><b>Dependencies</b>None — the palette and font are in <code>pixel.js</code></li>
         </ul>
-      </section>
-
-      <section>
-        <h2>The game</h2>
-        <p>
-          The lobby is the first thing built on this palette. It needs a signed-in
-          Tool Haven account and the <code>good-vibes</code> tool granted to it.
-        </p>
-        <p class="cta"><a href="play.html">Open the lobby</a></p>
       </section>
 
       <footer>Tool Haven &middot; a starting point for the game</footer>
