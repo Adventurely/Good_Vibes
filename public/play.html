@@ -554,10 +554,11 @@
       import {
         PALETTE, HERO_ART, MATERIAL_ART, TERRAIN_ART, BUILDING_ART, SALVAGE_ART,
         PAGES_ART, ENEMY_ART, CARD_ART, MARK_ART, TILE,
+        TERRAIN_VARIANTS, PROP_ART, TREE_ART, FIRE_ART,
       } from './art.js';
       import {
         CLASSES, OPEN_ROLES, MATERIALS, RECIPES, missingFor, playableClasses,
-        pathTo, walkableAt, brew,
+        pathTo, walkableAt, brew, CAMP_X, CAMP_Y, CAMP_RADIUS,
         MAP_W, MAP_H, TERRAIN, PHASES, isBuildPhase, readyState,
         generateMap, generateCombatTerrain, respawnItems, seededRandom, seedFromCode, spawnTile, tileAt,
         ROUNDS_BEFORE_BOSS, BOSS_ROUND, roundInfo, phaseCard, PARTY_SIZE, classById,
@@ -624,17 +625,114 @@
 
       /* Draw a palette-key grid straight onto a context. `pixels` below makes a
          whole <canvas> per sprite, which is right for a sprite in a list and
-         wrong for four hundred tiles a frame. */
-      function blit(ctx, rows, x, y){
+         wrong for four hundred tiles a frame.
+
+         `flip` mirrors horizontally at read time rather than needing a second
+         sprite drawn the other way round: the destination column still advances
+         left to right, only the source index runs backwards. It costs nothing
+         and it is the difference between a cast that faces where it is going
+         and one that moons the wave.
+
+         `lift` shifts every row above it up a pixel. That is the idle breath —
+         art.js has built every hero with a `split` row for exactly this since
+         the file was written, and nothing had ever read it. */
+      function blit(ctx, rows, x, y, flip = false, lift = 0, split = 0){
         for(let r = 0; r < rows.length; r++){
           const row = rows[r];
-          for(let c = 0; c < row.length; c++){
-            const key = row[c];
+          const w = row.length;
+          const dy = (lift && r < split) ? -lift : 0;
+          for(let c = 0; c < w; c++){
+            const key = row[flip ? w - 1 - c : c];
             if(key === '.' || key === ' ') continue;
             ctx.fillStyle = PALETTE[key];
-            ctx.fillRect(x + c, y + r, 1, 1);
+            ctx.fillRect(x + c, y + r + dy, 1, 1);
           }
         }
+      }
+
+      /* A shadow under everything that stands, so sprites sit on the ground
+         instead of hovering a few pixels above it. Drawn as a flattened ellipse
+         of solid ink rather than an alpha wash — the palette has no greys that
+         read as shade over both grass and water, and alpha would be the only
+         blending on the map. */
+      function shadow(ctx, cx, groundY, width){
+        ctx.fillStyle = '#2b1d12';
+        const rx = Math.max(3, Math.round(width * 0.34));
+        for(let dy = -2; dy <= 2; dy++){
+          const span = Math.round(rx * Math.sqrt(Math.max(0, 1 - (dy / 2.6) ** 2)));
+          if(span <= 0) continue;
+          ctx.fillRect(Math.round(cx - span), groundY + dy, span * 2, 1);
+        }
+      }
+
+      /* ---- the ambient clock ---------------------------------------------- */
+
+      /* One clock for everything that moves on its own. The map had no frame
+         loop at all — sprites only ever redrew on a click, a hover or a
+         resolved card — so a still site was genuinely still, and a camp nobody
+         is moving in reads as abandoned rather than as home.
+
+         Held as a variable rather than read from performance.now() at each call
+         site so that everything in a frame agrees about what time it is. */
+      let now = 0;
+
+      /* Which way each hero is looking. Local, like `hover` and `holding`: it
+         is a fact about the last step you watched, not about the room. */
+      const facing = new Map();
+
+      /* The idle breath. One pixel, off and on, at a rate that differs per
+         player so five people round a fire are not a chorus line. Uses the
+         `split` row art.js has recorded for every hero since it was written. */
+      function breath(id){
+        if(stillness) return 0;
+        const phase = hash2(id.length * 31 + id.charCodeAt(0), 7) % 900;
+        return Math.floor((now + phase) / 700) % 2;
+      }
+
+      /* Firelight on the ground: a pool of warm keys thrown into the dither of
+         the grass rather than an alpha wash, because alpha would be the only
+         blending on the map and the palette is the whole style. Flickers on the
+         same clock as the flame. */
+      function firelight(ctx, cx, groundY){
+        const beat = Math.sin(now / 190) * 1.5 + Math.sin(now / 70) * 0.8;
+        const radius = 22 + beat;
+        for(let dy = -8; dy <= 6; dy++){
+          for(let dx = -Math.round(radius); dx <= radius; dx++){
+            const d = Math.sqrt(dx * dx + (dy * 2.4) ** 2) / radius;
+            if(d > 1) continue;
+            // Ordered dither: denser at the centre, sparse at the rim, so the
+            // pool has an edge that reads as light rather than as a disc.
+            const t = (hash2(cx + dx, groundY + dy) & 7) / 8;
+            if(t < d * d) continue;
+            ctx.fillStyle = d < 0.45 ? PALETTE.o : PALETTE.T;
+            ctx.fillRect(Math.round(cx + dx), groundY + dy, 1, 1);
+          }
+        }
+      }
+
+      /* Prints left behind a walking hero, fading on a timer. Soft ground only:
+         nobody leaves a footprint on a slab. */
+      const prints = [];
+      function dropPrint(x, y){
+        const kind = tileAt(room.terrain, x, y);
+        if(kind !== 'grass' && kind !== 'camp') return;
+        prints.push({ x, y, at: now });
+        if(prints.length > 40) prints.shift();
+      }
+
+      /* The camp's own ground: worn earth ringing the tent, and whatever prints
+         are still fading. Drawn over the cached terrain rather than into it,
+         because the prints change and the cache does not. */
+      function campGround(ctx, top){
+        for(const print of prints){
+          const age = (now - print.at) / 4200;
+          if(age >= 1) continue;
+          ctx.fillStyle = age < 0.5 ? PALETTE.T : PALETTE.t;
+          const px = print.x * TILE + 6, py = top + print.y * TILE + 11;
+          ctx.fillRect(px, py, 2, 2);
+          ctx.fillRect(px + 4, py + 2, 2, 2);
+        }
+        while(prints.length && now - prints[0].at > 4200) prints.shift();
       }
 
       /* Softer kinds feather over harder ones at every boundary, which is what
@@ -657,11 +755,20 @@
         return ((h ^ (h >>> 16)) >>> 0);
       };
 
+      /* Which cut of a kind this tile gets. Hashed from the coordinates, like
+         the fringe, so the ground varies from tile to tile and never shimmers
+         between redraws. */
+      function tileArt(kind, x, y){
+        const cuts = TERRAIN_VARIANTS[kind];
+        if(!cuts || !cuts.length) return TERRAIN_ART[kind] || TERRAIN_ART.grass;
+        return cuts[hash2(x * 3 + 11, y * 3 + 7) % cuts.length];
+      }
+
       function drawTerrain(ctx, terrain, top, rows = MAP_H, fallback = 'grass'){
         for(let y = 0; y < rows; y++){
           for(let x = 0; x < MAP_W; x++){
             const kind = tileAt(terrain, x, y) || fallback;
-            blit(ctx, TERRAIN_ART[kind] || TERRAIN_ART[fallback], x * TILE, top + y * TILE);
+            blit(ctx, tileArt(TERRAIN_VARIANTS[kind] ? kind : fallback, x, y), x * TILE, top + y * TILE);
           }
         }
         for(let y = 0; y < rows; y++){
@@ -713,6 +820,38 @@
         }
       }
 
+      /* The ground, painted once and kept.
+       *
+       * drawTerrain is ~130,000 fillRects for the build map, and it used to run
+       * on every hover twitch and inside every frame of every effect. That was
+       * affordable only because nothing asked for a second frame; the moment
+       * anything animates continuously it is the whole budget.
+       *
+       * Terrain is a pure function of the tiles and their coordinates — the
+       * variant and the fringe both come out of hash2 — so it can be painted
+       * into an offscreen canvas and stamped back with one drawImage. The key
+       * is what the picture depends on: the terrain itself, how many rows of it
+       * are showing, and the round, because the light changes with the hour.
+       */
+      const groundCache = { key: null, canvas: null };
+
+      function groundFor(terrain, rows, fallback, round){
+        const key = `${rows}:${fallback}:${round}:${(terrain || []).join('')}`;
+        if(groundCache.key === key) return groundCache.canvas;
+
+        const canvas = groundCache.canvas && groundCache.canvas.height === rows * TILE
+          ? groundCache.canvas
+          : Object.assign(document.createElement('canvas'), { width: MAP_PX_W, height: rows * TILE });
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawTerrain(ctx, terrain || [], 0, rows, fallback);
+
+        groundCache.key = key;
+        groundCache.canvas = canvas;
+        return canvas;
+      }
+
       const nodeAt = (x, y) => (room.nodes || []).find(n => n.x === x && n.y === y && !n.taken);
 
       /* ---- walking -------------------------------------------------------- */
@@ -750,9 +889,13 @@
         }
 
         const step = walking.steps[walking.at++];
+        // Face the way you are going. A cast that always looked one direction
+        // walked backwards half the time and nobody could say why it read wrong.
+        if(step.x !== player.x) facing.set(player.id, step.x > player.x ? 1 : -1);
+        dropPrint(player.x, player.y);
         player.x = step.x;
         player.y = step.y;
-        drawMap();                       // just the canvas: the panels have not changed
+        schedule();                      // just the canvas: the panels have not changed
         walkTimer = setTimeout(stepWalk, STEP_MS);
       }
 
@@ -816,8 +959,10 @@
         drawTextOutlined(mctx, left, 2, 4, 'y', 1);
         drawTextOutlined(mctx, right, MAP_PX_W - textWidth(right, 1) - 2, 4, 'c', 1);
 
-        // Ground first, everything else on top of it.
-        drawTerrain(mctx, room.terrain || [], HEADER, MAP_H, 'grass');
+        // Ground first, everything else on top of it. Stamped from the cache:
+        // the picture only changes when the terrain or the hour does.
+        mctx.drawImage(groundFor(room.terrain, MAP_H, 'grass', room.round || 1), 0, HEADER);
+        campGround(mctx, HEADER);
 
         // Items sit low in their tile so the sprite reads as standing on the
         // ground rather than floating in the middle of it. Three kinds, one
@@ -840,28 +985,63 @@
          * front of them.
          */
         const standing = [];
+
+        /* Everything joins one list and is sorted by its ground line in
+           pixels, not by its tile row. Row order could not compare a building
+           (top-aligned to its tile) with a hero (stood on the tile's floor),
+           so the two were ordered by which happened to be pushed first. Sorting
+           on the floor they share is what makes walking behind a tree work. */
+        const stand = (groundY, art, x, extra = {}) =>
+          standing.push({ groundY, art, x, top: groundY - art.length, ...extra });
+
+        // The tent, once, anchored on the bottom row of its footprint.
+        const tentArt = PROP_ART.tent;
+        stand(HEADER + (CAMP_Y + 2) * TILE, tentArt,
+          (CAMP_X + 0.5) * TILE - tentArt[0].length / 2, { noShadow: true });
+
+        // The fire, beside the door, on the yard.
+        const fireArt = FIRE_ART[Math.floor(now / 130) % FIRE_ART.length];
+        stand(HEADER + (CAMP_Y + 2) * TILE - 2, fireArt,
+          (CAMP_X - 2) * TILE, { noShadow: true, glow: true });
+
+        // Trees are terrain for the rules and props for the picture: the tile
+        // holds roots and litter, the canopy stands in this list so a hero one
+        // row behind it goes in behind it.
+        for(let ty = 0; ty < MAP_H; ty++){
+          for(let tx = 0; tx < MAP_W; tx++){
+            if(tileAt(room.terrain, tx, ty) !== 'tree') continue;
+            const art = TREE_ART[hash2(tx * 5 + 3, ty * 5 + 9) % TREE_ART.length];
+            stand(HEADER + (ty + 1) * TILE, art, (tx + 0.5) * TILE - art[0].length / 2);
+          }
+        }
+
         for(const placed of room.buildings || []){
           const building = BUILDINGS[placed.id];
-          const art = building && BUILDING_ART[building.art];
-          if(art) standing.push({ y: placed.y, art, x: placed.x * TILE, top: HEADER + placed.y * TILE });
+          if(!building) continue;
+          // A prop where there is one, the tile-sized sprite otherwise, so a
+          // building added later still draws before anyone has drawn it big.
+          const art = PROP_ART[building.art] || BUILDING_ART[building.art];
+          if(!art) continue;
+          stand(HEADER + (placed.y + 1) * TILE, art, (placed.x + 0.5) * TILE - art[0].length / 2);
         }
+
         for(const p of room.players || []){
           if(p.x === undefined || p.y === undefined) continue;
           const cls = CLASSES.find(c => c.id === p.classId);
           const art = cls && HERO_ART[cls.art];
           if(!art) continue;
-          standing.push({
-            y: p.y,
-            art: art.rows,
-            x: p.x * TILE + (TILE - art.rows[0].length) / 2,
-            top: HEADER + (p.y + 1) * TILE - art.rows.length,
-            player: p,
-            tileX: p.x * TILE,
-          });
+          stand(HEADER + (p.y + 1) * TILE, art.rows,
+            p.x * TILE + (TILE - art.rows[0].length) / 2,
+            { player: p, tileX: p.x * TILE, split: art.split, face: facing.get(p.id) });
         }
-        standing.sort((a, b) => a.y - b.y);
+
+        standing.sort((a, b) => a.groundY - b.groundY);
         for(const thing of standing){
-          blit(mctx, thing.art, thing.x, thing.top);
+          if(thing.glow) firelight(mctx, thing.x + thing.art[0].length / 2, thing.groundY);
+          if(!thing.noShadow) shadow(mctx, thing.x + thing.art[0].length / 2, thing.groundY - 1, thing.art[0].length);
+          // Only the cast breathes: props that bobbed would read as wobbling.
+          const lift = thing.player ? breath(thing.player.id) : 0;
+          blit(mctx, thing.art, thing.x, thing.top, thing.face === -1, lift, thing.split || 0);
           if(thing.player) drawMark(mctx, thing.player, thing.tileX, thing.top);
         }
 
@@ -920,7 +1100,6 @@
          as one volley — a turn resolves all at once, and the picture should
          agree. Reduced motion collapses each to a flash. */
       const fxQueue = [];
-      let fxRunning = false;
       const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
       /* The tables live in fx.js so a test can ask them the same question the
@@ -934,22 +1113,38 @@
           fxQueue.push(event);
           any = true;
           audio.sfx(soundFor(event.kind, audio.has));
+          // A hit is a thing that happens to a body, so the body reacts: the
+          // struck sprite recoils and flashes for a beat. Recorded here rather
+          // than drawn, because the scene is painted by the loop.
+          if(event.kind === 'hit' && event.player) struck.set(event.player, now);
+          else if(event.target) struck.set(event.target, now);
         }
-        if(any && !fxRunning) runFx();
+        if(any && !volley) startVolley();
+        // Under reduced motion the loop parks itself after a frame, so a volley
+        // has to ask for the frames it needs rather than assume they arrive.
+        if(any) schedule();
       }
 
-      function runFx(){
-        if(!fxQueue.length || room?.phase !== PHASES.combat){ fxQueue.length = 0; fxRunning = false; return; }
-        fxRunning = true;
-        const volley = fxQueue.splice(0, fxQueue.length);
-        const started = performance.now();
-        const duration = reducedMotion.matches ? 120 : 620;
+      /* The volley in flight, or null. Everything that arrived in one state
+         update plays together, because a turn resolves all at once and the
+         picture should agree. */
+      let volley = null;
 
-        function frame(now){
-          const t = Math.min(1, (now - started) / duration);
-          drawCombat();
+      function startVolley(){
+        if(!fxQueue.length || room?.phase !== PHASES.combat){ fxQueue.length = 0; volley = null; return; }
+        volley = {
+          events: fxQueue.splice(0, fxQueue.length),
+          started: now,
+          duration: stillness() ? 120 : 620,
+        };
+      }
 
-          for(const fx of volley){
+      /* The effects layer, painted over whatever the scene left. Split out of
+         the old frame loop so the scene and the overlay are drawn by one clock
+         rather than by two that each thought they owned the canvas. */
+      function paintFx(t){
+        {
+          for(const fx of volley.events){
             const from = stagePos.players.get(fx.player) || { x: 2 * TILE + 12, y: HEADER + 5 * TILE };
             const style = styleFor(FX_STYLE, fx.kind);
             if(style){
@@ -991,16 +1186,62 @@
               }
             }
           }
+        }
+      }
 
-          if(t < 1) requestAnimationFrame(frame);
-          else{
-            drawCombat();
-            if(fxQueue.length) runFx();
-            else fxRunning = false;
+      /* ---- the frame ------------------------------------------------------ */
+
+      /* Reduced motion is a request to hold still, not to go dark: the scene
+         still draws, it simply stops moving. */
+      const stillness = () => reducedMotion.matches;
+
+      /* Which sprites were hit recently, and when, so they can recoil. */
+      const struck = new Map();
+
+      let frameHandle = 0;
+
+      /* One loop for both canvases.
+       *
+       * There was no loop at all before this: the map redrew on a click and the
+       * combat canvas redrew inside the effects animation, which is why nothing
+       * on either screen ever moved on its own. Everything that breathes,
+       * flickers, sways or recoils is on this clock now, and because the ground
+       * is cached a frame is one drawImage plus the sprites rather than the
+       * hundred and thirty thousand rectangles it used to be.
+       */
+      function frame(stamp){
+        frameHandle = 0;
+        now = stamp;
+
+        if(volley){
+          const t = Math.min(1, (now - volley.started) / volley.duration);
+          if(t >= 1){
+            volley = null;
+            if(fxQueue.length) startVolley();
           }
         }
-        requestAnimationFrame(frame);
+
+        if(room && !document.hidden){
+          if(room.phase === PHASES.combat){
+            drawCombat();
+            if(volley) paintFx(Math.min(1, (now - volley.started) / volley.duration));
+          }else if(!ui.run.hidden){
+            drawMap();
+          }
+        }
+
+        // Nothing to animate is not the same as nothing to draw: hold the last
+        // frame rather than spinning, and wake again when something changes.
+        if(!document.hidden && (!stillness() || volley)) schedule();
       }
+
+      function schedule(){
+        if(!frameHandle) frameHandle = requestAnimationFrame(frame);
+      }
+
+      // A tab that comes back should not show the frame it left on.
+      document.addEventListener('visibilitychange', () => { if(!document.hidden) schedule(); });
+      reducedMotion.addEventListener?.('change', schedule);
 
       function drawCombat(){
         cctx.fillStyle = '#241a10';
@@ -1734,7 +1975,7 @@
           ? `Round ${room.round} of ${room.rounds || ROUNDS_BEFORE_BOSS}${boss ? ' — boss' : ''} · ${info.name}`
           : '';
 
-        drawCombat();
+        schedule();
 
         const you = me();
         const acting = !!you && !you.down && room.phase === PHASES.combat;
@@ -1945,7 +2186,7 @@
         const acting = !!you && !you.down && isBuildPhase(room.phase);
         const cls = you ? classById(you.classId) : null;
 
-        drawMap();
+        schedule();
         renderRoster(ui.roster);
         renderDeckList(you);
 
@@ -2263,13 +2504,13 @@
         const same = tile && hover ? tile.x === hover.x && tile.y === hover.y : tile === hover;
         if(same) return;                       // only redraw when the tile changes
         hover = tile;
-        drawMap();
+        schedule();
       });
 
       map.addEventListener('mouseleave', () => {
         if(!hover) return;
         hover = null;
-        if(room && isBuildPhase(room.phase)) drawMap();
+        if(room && isBuildPhase(room.phase)) schedule();
       });
 
       /* Stepping with the keyboard.
