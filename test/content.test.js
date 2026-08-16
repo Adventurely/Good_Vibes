@@ -676,6 +676,27 @@ test('every deck holds the universal cards', () => {
   }
 });
 
+test('everybody can swing something, and Strike is the floor of what they swing', () => {
+  // The reason Strike exists: without it a party that built economy and drew no
+  // attack could only hold, which made a thin opening round unwinnable rather
+  // than hard.
+  assert.ok(UNIVERSAL_CARDS.includes('strike'), 'Strike must be in every deck');
+  assert.equal(CARDS.strike.effect.kind, 'strike');
+  for (const cls of playableClasses()) {
+    assert.ok(deckFor(cls.id).includes('strike'), `"${cls.id}" cannot swing anything`);
+  }
+  // And it is the floor: nothing in the game hits for less than a fist. Note
+  // that the Alchemist's Acid Flask ties it at 3 — a class attack that is now
+  // exactly the card everybody already holds. That is a balance question for
+  // whoever owns the Alchemist, not something this test should hide, so it
+  // asserts the floor and leaves the tie visible.
+  for (const [id, card] of Object.entries(CARDS)) {
+    if (card.effect.kind !== 'strike') continue;
+    assert.ok(card.effect.amount >= CARDS.strike.effect.amount,
+      `"${id}" hits for ${card.effect.amount}, less than a fist`);
+  }
+});
+
 test('a card that costs pages is dealt but not playable without them', () => {
   // The interesting kind of bad draw: one the player caused by spending.
   assert.equal(cardPlayable('fireball', { pages: 0, classId: 'wizard' }), false);

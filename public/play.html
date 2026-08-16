@@ -573,6 +573,7 @@
         salvageAfterCombat, addSalvage, spendSalvage,
       } from './content.js';
       import { createAudio } from './audio.js';
+      import { fxStyles, styleFor, soundFor, verbOf } from './fx.js';
 
       const audio = createAudio();
       // Browsers only allow sound after a gesture; the first one unlocks it.
@@ -916,14 +917,9 @@
       let fxRunning = false;
       const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
-      const FX_STYLE = {
-        fireball: { colour: PALETTE.o, trail: PALETTE.Y, size: 3, arc: true },
-        spark:    { colour: PALETTE.c, trail: PALETTE.b, size: 2, jagged: true },
-        boltgun:  { colour: PALETTE.m, trail: PALETTE.M, size: 2 },
-        flask:    { colour: PALETTE.l, trail: PALETTE.g, size: 3, arc: true },
-        wrench:   { colour: PALETTE.o, trail: PALETTE.O, size: 2 },
-        strike:   { colour: PALETTE.m, trail: PALETTE.M, size: 2 },
-      };
+      /* The tables live in fx.js so a test can ask them the same question the
+         page does — see the note at the top of that file about the fallback. */
+      const FX_STYLE = fxStyles(PALETTE);
 
       function queueFx(events){
         let any = false;
@@ -931,7 +927,7 @@
           if(event.t !== 'fx') continue;
           fxQueue.push(event);
           any = true;
-          audio.sfx(FX_STYLE[event.kind] ? (event.kind === 'fireball' ? 'fireball' : event.kind === 'spark' ? 'arc' : 'strike') : event.kind);
+          audio.sfx(soundFor(event.kind, audio.has));
         }
         if(any && !fxRunning) runFx();
       }
@@ -949,7 +945,7 @@
 
           for(const fx of volley){
             const from = stagePos.players.get(fx.player) || { x: 2 * TILE + 12, y: HEADER + 5 * TILE };
-            const style = FX_STYLE[fx.kind];
+            const style = styleFor(FX_STYLE, fx.kind);
             if(style){
               const to = stagePos.enemies.get(fx.target) || { x: MAP_PX_W - 3 * TILE, y: HEADER + 5 * TILE };
               if(t < 0.75){
@@ -971,8 +967,8 @@
                   cctx.fillRect((to.x + Math.cos(a) * r) | 0, (to.y + Math.sin(a) * r) | 0, 2, 2);
                 }
               }
-            }else if(fx.kind === 'heal' || fx.kind === 'regen' || fx.kind === 'ward'){
-              const colour = fx.kind === 'ward' ? PALETTE.c : PALETTE.l;
+            }else if(['heal', 'regen', 'ward'].includes(verbOf(fx.kind))){
+              const colour = verbOf(fx.kind) === 'ward' ? PALETTE.c : PALETTE.l;
               cctx.fillStyle = colour;
               for(let k = 0; k < 6; k++){
                 const seed = hash2(k, (fx.player || '').length + k);
@@ -1299,20 +1295,29 @@
        * building, so both paths land here rather than growing two copies that
        * drift.
        */
-      function demoTurn(you, effect, label, targetId){
+      function demoTurn(you, effect, label, targetId, cardId){
+        // The same fx events the room emits, in the same shape and at the same
+        // point in the turn. Without them the preview is the one screen where
+        // cards resolve in silence against a still board — and the preview is
+        // how you play this without a room at all.
+        const fx = event => room.events.push({ t: 'fx', ...event });
+
         if(effect.kind === 'strike'){
           const alive = room.enemies.filter(e => e.hp > 0);
           const target = alive.find(e => e.id === targetId) ||
             [...alive].sort((a, b) => a.dist - b.dist)[0];
           if(target){
+            fx({ kind: cardId || 'strike', player: you.id, target: target.id });
             target.hp = Math.max(0, target.hp - effect.amount);
             room.events.push({ t: 'log', text: `${label} hits the ${target.name} for ${effect.amount}.` });
             if(target.hp <= 0) room.events.push({ t: 'log', text: `The ${target.name} comes apart.` });
           }
         }else if(effect.kind === 'ward'){
+          fx({ kind: effect.kind, player: you.id });
           you.block = (you.block || 0) + effect.amount;
           room.events.push({ t: 'log', text: `${label} — ${effect.amount} of guard up.` });
         }else if(effect.kind === 'heal'){
+          fx({ kind: effect.kind, player: you.id });
           const before = you.hp;
           you.hp = Math.min(you.maxHp, you.hp + effect.amount);
           room.events.push({ t: 'log', text: `${label} mends ${you.hp - before}.` });
@@ -1327,6 +1332,7 @@
           you.block = (you.block || 0) - blocked;
           const through = enemy.hits - blocked;
           if(through > 0) you.hp = Math.max(1, you.hp - through);   // the preview never kills you
+          fx({ kind: 'hit', player: you.id, from: enemy.id });
           room.events.push({
             t: 'log',
             text: blocked
@@ -1422,7 +1428,8 @@
           clearTimeout(demoBeat);
           demoBeat = setTimeout(() => {
             you.intent = null;
-            demoTurn(you, cardEffect(hand[msg.intent.index], room.upgrades), card.name, msg.intent.target);
+            demoTurn(you, cardEffect(hand[msg.intent.index], room.upgrades), card.name,
+              msg.intent.target, hand[msg.intent.index]);
             if(room.phase === PHASES.combat) demoDeal(you);
             render();
           }, 420);

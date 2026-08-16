@@ -234,8 +234,12 @@ export const EFFECT_KINDS = ['heal', 'regen', 'ward', 'strike'];
 
 /* The cards every deck holds regardless of class, by id. Kept as its own
    export because the Tool Haven room imports it; UNIVERSAL_CARDS derives the
-   same list from the card table and is what the client reads. */
-export const BASE_ACTIONS = ['hold'];
+   same list from the card table and is what the client reads.
+
+   Strike is here rather than in a class deck for the reason it exists at all:
+   a party that built economy and drew no attack still has hands, and a fight
+   nobody can swing in is arithmetic, not a fight. */
+export const BASE_ACTIONS = ['strike', 'hold'];
 
 /* COMBAT_ACTIONS is now the card table, aliased below where CARDS is defined.
    Every one of these lives in a deck. */
@@ -619,8 +623,21 @@ export const CARDS = {
     note: 'A captive bolt driver on a battery. Loud, ugly, and it goes through.',
   },
 
-  /* Everyone holds one. The floor of a turn: whatever else the hand deals you,
-     there is something to do with it. */
+  /* --- universal -------------------------------------------------------
+   *
+   * The two everybody holds, one to swing and one to duck behind, so whatever
+   * else the hand deals you there is something to do with it. Deliberately the
+   * weakest of their kinds: the floor of a turn, not a plan.
+   */
+
+  /* Three damage is not a strategy, but it is a hand. Without it a party that
+     spent its round building economy and drew no attack could only hold, which
+     made a thin opening round unwinnable rather than hard. */
+  strike: {
+    name: 'Strike', kind: 'attack', universal: true,
+    effect: { kind: 'strike', amount: 3 },
+    note: 'A pipe, a pry bar, a fist. Whatever is closest.',
+  },
   hold: {
     name: 'Hold', kind: 'defend', universal: true,
     effect: { kind: 'ward', amount: 2, rounds: 1 },

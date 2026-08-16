@@ -254,5 +254,10 @@ export function createAudio(){
     if(fn) fn(ctx.currentTime + 0.01);
   }
 
-  return { play, stop, unlock, sfx, setMuted, isMuted: () => muted, current: () => songName };
+  /* Is there a sound under this name? The client asks before falling back from
+     a card's own sound to its effect kind's, so a card with no entry lands on
+     `strike` or `heal` rather than on silence. */
+  const has = name => Object.prototype.hasOwnProperty.call(SFX, name);
+
+  return { play, stop, unlock, sfx, has, setMuted, isMuted: () => muted, current: () => songName };
 }

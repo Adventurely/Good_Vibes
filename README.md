@@ -194,6 +194,9 @@ npm test
 public/content.js   the game as data — classes, cards, resources, buildings,
                     enemies, rounds, and the pure functions over them
 public/art.js       the palette, the tiles, and every sprite, as text
+public/fx.js        what a resolved effect looks and sounds like, card first
+                    and effect kind second, so nothing lands silently
+public/audio.js     the two phase tracks and every sound, synthesised
 public/play.html    the game: lobby, build phase, the surge, the hand
 public/pixel.js     bitmap font and canvas helpers, shared by both pages
 public/index.html   the pixel art hello world page and its style guide
@@ -202,6 +205,8 @@ src/ws.js           a WebSocket server, standard library only
 src/rooms.js        the authoritative game state: rooms, seats, phases
 src/server.js       http + the socket route
 test/content.test.js validates every table above and the rules over them
+test/rooms.test.js  drives a real room: what a card resolves to, and that the
+                    client has an animation and a sound for all of it
 test/server.test.js integration tests
 ```
 
@@ -340,8 +345,13 @@ and a planning problem you cannot coordinate is just a wait. Discarding the
 whole hand is what keeps a turn atomic: nobody holds a card for three rounds
 waiting for a setup the other four cannot see coming.
 
-A deck is nine cards — eight class cards plus the universal `hold` — so at three
-a turn it cycles about every three turns and a fight sees the whole thing twice.
+A deck is ten cards — eight class cards plus the two universals, `strike` and
+`hold` — so at three a turn it cycles about every three turns and a fight sees
+the whole thing twice. The universals are the floor of a turn rather than a
+choice: something to swing and something to duck behind, so no hand is ever
+three cards you cannot afford. Strike hits for 3, the weakest attack in the
+game on purpose — a party that spent its round on economy and drew nothing is
+still in the fight, but only just.
 
 `deckFor(classId)` builds the opening deck once, and everything after that adds
 to it in place — the Alchemist brewing, the Engineer buying a barrel. A deck
@@ -457,6 +467,22 @@ Waves scale by **composition, not stats**: a later round sends more and faster
 things rather than the same thing with a bigger number, because "there are four
 of them now" is legible on a screen in a way "+2 hp" never is. A test proves the
 boss cannot leak into an earlier round.
+
+#### Effects, on screen and in the ear
+
+Resolving an effect emits an `fx` event beside the log line, and the client
+stages what arrived together as one volley on the combat canvas. An `fx` names
+the **card** when a card caused it and the **effect kind** when nothing did, and
+`public/fx.js` reads its two tables in that order: card first, kind second.
+
+The fallback is the part worth keeping. A card with its own row looks and sounds
+like itself — Fireball lobs, Spark crackles — and a card without one falls back
+to its verb, so a new strike-kind card jabs and cracks the way Strike does the
+day it is written. Keyed on cards alone the tables were already one card short:
+Greenfire resolved in silence with nothing on screen, and every card added later
+would have joined it. `test/rooms.test.js` plays every attack card through a
+real room and fails if any of them resolves to no animation or no sound, which
+is why the dispatch is a module and not a block inside the page.
 
 `EFFECT_KINDS` lists what the engine implements: `heal`, `regen`, `ward`, and
 `strike`. **`strike` is implemented in the offline preview only** — the Tool
