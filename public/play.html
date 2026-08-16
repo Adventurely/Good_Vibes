@@ -644,10 +644,51 @@
           for(let c = 0; c < w; c++){
             const key = row[flip ? w - 1 - c : c];
             if(key === '.' || key === ' ') continue;
-            ctx.fillStyle = PALETTE[key];
+            ctx.fillStyle = inkFor[key] || PALETTE[key];
             ctx.fillRect(x + c, y + r + dy, 1, 1);
           }
         }
+      }
+
+      /* ---- the hour ------------------------------------------------------- */
+
+      /* The light changes across a run: morning on round one, low gold by the
+       * third, dusk when the Array wakes. Done as a palette remap rather than a
+       * wash over the top, because a translucent sheet would be the only
+       * blending on the map — every pixel drawn here is still one flat opaque
+       * palette colour, it is just a different one by evening.
+       *
+       * Only the ground is graded. Grading the cast too made three classes that
+       * are meant to read apart at a glance converge on the same dim brown.
+       */
+      const HOURS = ['#ffffff', '#ffe9c0', '#ffc98a', '#7f7bc0'];
+
+      const mix = (hex, tint, amount) => {
+        const a = parseInt(hex.slice(1), 16), b = parseInt(tint.slice(1), 16);
+        const ch = (shift) => {
+          const x = (a >> shift) & 255, y = (b >> shift) & 255;
+          return Math.round(x * (1 - amount) + (x * y / 255) * amount);
+        };
+        return `#${((ch(16) << 16) | (ch(8) << 8) | ch(0)).toString(16).padStart(6, '0')}`;
+      };
+
+      /* The palette blit is currently drawing with. A module-level swap rather
+         than a parameter threaded through every call: the only thing that ever
+         wants a different palette is the ground cache, and it wants it for one
+         call. */
+      let inkFor = PALETTE;
+
+      const hourCache = new Map();
+      function paletteForRound(round){
+        const step = Math.min(HOURS.length - 1, Math.max(0, (round || 1) - 1));
+        if(step === 0) return PALETTE;
+        if(hourCache.has(step)) return hourCache.get(step);
+        const tint = HOURS[step];
+        const amount = step === HOURS.length - 1 ? 0.85 : 0.55;
+        const out = {};
+        for(const [key, hex] of Object.entries(PALETTE)) out[key] = mix(hex, tint, amount);
+        hourCache.set(step, out);
+        return out;
       }
 
       /* A shadow under everything that stands, so sprites sit on the ground
@@ -845,7 +886,9 @@
         const ctx = canvas.getContext('2d');
         ctx.imageSmoothingEnabled = false;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        inkFor = paletteForRound(round);
         drawTerrain(ctx, terrain || [], 0, rows, fallback);
+        inkFor = PALETTE;
 
         groundCache.key = key;
         groundCache.canvas = canvas;
@@ -1198,6 +1241,11 @@
       /* Which sprites were hit recently, and when, so they can recoil. */
       const struck = new Map();
 
+      /* When each enemy died, so it can come apart over half a second instead
+         of vanishing between frames. Kept apart from `struck` because a recoil
+         is over in a fifth of a second and a death is not. */
+      const dying = new Map();
+
       let frameHandle = 0;
 
       /* One loop for both canvases.
@@ -1243,6 +1291,49 @@
       document.addEventListener('visibilitychange', () => { if(!document.hidden) schedule(); });
       reducedMotion.addEventListener?.('change', schedule);
 
+      /* How hard, and which way, a sprite is still reeling from a hit. Decays
+         over a fifth of a second: long enough to read as a reaction, short
+         enough that it is over before the next card resolves. */
+      function recoil(id){
+        const at = struck.get(id);
+        if(at === undefined) return 0;
+        const t = (now - at) / 220;
+        if(t >= 1){ struck.delete(id); return 0; }
+        return (1 - t) * Math.cos(t * 18);
+      }
+
+      /* The sky behind the lane.
+       *
+       * The fight used to happen on a strip of texture with nothing behind it,
+       * which is most of why it read as a diagram. Two bands and a treeline
+       * give it a somewhere, and both drift with the wave's progress so the
+       * party reads as holding ground rather than standing on a conveyor.
+       */
+      const HORIZON = 30;                 // how much of the lane is sky
+
+      function backdrop(ctx, round){
+        // The sky goes over the ground rather than under it: terrain tiles are
+        // fully opaque, so a backdrop painted first would simply be covered.
+        // This band is the top of the lane, and the ground starts below it.
+        const sky = ['#3fa9dd', '#20629f', '#8a5bb8', '#3b2b5a'];
+        ctx.fillStyle = sky[Math.min(sky.length - 1, Math.max(0, round - 1))];
+        ctx.fillRect(0, HEADER, MAP_PX_W, HORIZON);
+
+        // A far ridge and a nearer treeline, each on its own parallax offset,
+        // so the wave reads as crossing ground rather than riding a conveyor.
+        const drift = stillness() ? 0 : now / 110;
+        for(const [depth, colour, height] of [[0.18, '#245c2c', 17], [0.42, '#1b3a24', 11]]){
+          ctx.fillStyle = colour;
+          for(let x = 0; x < MAP_PX_W; x++){
+            const wx = Math.round(x + drift * depth);
+            const h = height
+              + Math.round(Math.sin(wx / 27) * 3)
+              + (hash2(wx >> 3, Math.round(depth * 10)) & 3);
+            ctx.fillRect(x, HEADER + HORIZON - h, 1, h);
+          }
+        }
+      }
+
       function drawCombat(){
         cctx.fillStyle = '#241a10';
         cctx.fillRect(0, 0, MAP_PX_W, HEADER + COMBAT_PX_H);
@@ -1253,25 +1344,44 @@
         const right = info ? info.name.toUpperCase() : '';
         drawTextOutlined(cctx, right, MAP_PX_W - textWidth(right, 1) - 2, 4, 'c', 1);
 
-        drawTerrain(cctx, room.terrain || [], HEADER, COMBAT_H, 'floor');
+        cctx.drawImage(groundFor(room.terrain, COMBAT_H, 'floor', room.round || 1), 0, HEADER);
+        backdrop(cctx, room.round || 1);
 
-        // The party, spread down the left edge.
+        /* The party, holding the left of the lane and facing the wave.
+         *
+         * Three rows two apart, then a step back for anyone past the third: a
+         * hero is forty pixels on a sixteen-pixel row, so evenly dividing the
+         * lane by the party size stacked them into one another and five people
+         * became a single unreadable column. Two rows apart still overlaps a
+         * little, which is what a group of people standing together looks like,
+         * and the depth sort makes the overlap read as depth.
+         */
         stagePos.players.clear();
         const standing = room.players.filter(p => !p.down);
-        standing.forEach((p, i) => {
+        const placed = standing.map((p, i) => {
           const cls = CLASSES.find(c => c.id === p.classId);
           const art = cls && HERO_ART[cls.art];
-          if(!art) return;
+          if(!art) return null;
           // From row 2, never row 1: a sprite on the top row puts its ready
           // mark up inside the header strip, over the round title.
-          const y = 2 + Math.floor(i * (COMBAT_H - 3) / Math.max(1, standing.length));
-          const top = HEADER + (y + 1) * TILE - art.rows.length;
-          stagePos.players.set(p.id, { x: 2 * TILE + 12, y: top + 16 });
-          blit(cctx, art.rows, 2 * TILE, top);
+          const row = 2 + (i % 3) * 2;
+          const rank = Math.floor(i / 3);
+          return { p, art, row, ground: HEADER + (row + 1) * TILE, x: 2 * TILE - rank * 13 };
+        }).filter(Boolean);
+
+        placed.sort((a, b) => a.ground - b.ground);
+        for(const { p, art, ground, x: baseX } of placed){
+          const top = ground - art.rows.length;
+          const kick = Math.round(recoil(p.id) * -5);      // knocked back, away from the wave
+          const x = baseX + kick;
+          stagePos.players.set(p.id, { x: x + 14, y: top + 20 });
+          shadow(cctx, x + art.rows[0].length / 2, ground - 1, art.rows[0].length);
+          blit(cctx, art.rows, x, top, false, breath(p.id), art.split);
+          if(struck.has(p.id)) flash(cctx, art.rows, x, top);
           // Who has locked a card in. With five people choosing at once this is
           // the only thing on screen that answers "are we waiting on you".
-          drawMark(cctx, p, 2 * TILE, top);
-        });
+          drawMark(cctx, p, baseX, top);
+        }
 
         // The wave. dist 0 stands one stride from the party; the spawn edge is
         // the right side of the map. Dead enemies leave the field.
@@ -1284,16 +1394,35 @@
         const laneFrom = 5 * TILE;
         const laneTo = MAP_PX_W - 3 * TILE;
         room.enemies.forEach((enemy, i) => {
-          if(enemy.hp <= 0) return;
           const art = ENEMY_ART[enemy.art];
           if(!art) return;
-          const x = laneFrom + Math.round((enemy.dist / maxDist) * (laneTo - laneFrom));
+
+          // A thing that dies should be seen dying. Dead enemies used to stop
+          // being drawn between one frame and the next, which reads as a
+          // rendering fault rather than as a kill. Deaths get their own record
+          // because the recoil clears itself long before the dissolve is done.
+          const gone = enemy.hp <= 0;
+          if(gone && !dying.has(enemy.id)) dying.set(enemy.id, now);
+          const fade = gone ? (now - dying.get(enemy.id)) / 460 : 0;
+          if(gone && fade >= 1) return;
+
+          const kick = Math.round(recoil(enemy.id) * 6);   // knocked back, away from the party
+          const x = laneFrom + Math.round((enemy.dist / maxDist) * (laneTo - laneFrom)) + kick;
           // Two rows apart: sprites are taller than a tile, so neighbouring
           // lanes overlap and two enemies read as one with a strange outline.
           const lanes = Math.max(1, Math.floor((COMBAT_H - 2) / 2));
-          const y = HEADER + (2 + (i % lanes) * 2 + 1) * TILE - art.length;
+          // A slow bob out of phase per enemy, so the wave is a set of things
+          // breathing rather than a row of decals sliding down a lane.
+          const bob = stillness() ? 0 : Math.round(Math.sin(now / 420 + i * 1.7));
+          const y = HEADER + (2 + (i % lanes) * 2 + 1) * TILE - art.length + bob;
           stagePos.enemies.set(enemy.id, { x: x + art[0].length / 2, y: y + art.length / 2 });
-          blit(cctx, art, x, y);
+
+          shadow(cctx, x + art[0].length / 2, HEADER + (2 + (i % lanes) * 2 + 2) * TILE - 1, art[0].length);
+          // The wave comes from the right, so it faces left to meet the party.
+          blit(cctx, dissolve(art, fade), x, y, true);
+          if(!gone && struck.has(enemy.id)) flash(cctx, art, x, y);
+          if(gone) return;
+
           // A health bar over each head beats a number in a list. Three pixels
           // with a dark bed under it, or it vanishes against a grass tile.
           const share = enemy.hp / enemy.maxHp;
@@ -1303,6 +1432,32 @@
           cctx.fillRect(x, y - 5, art[0].length, 3);
           cctx.fillStyle = share > 0.4 ? PALETTE.g : PALETTE.e;
           cctx.fillRect(x, y - 5, Math.max(1, Math.round(art[0].length * share)), 3);
+        });
+      }
+
+      /* A struck sprite goes white for a beat. Painted as its own silhouette
+         rather than a rectangle over it, so the flash has the shape of the
+         thing that was hit. */
+      function flash(ctx, rows, x, y){
+        ctx.fillStyle = PALETTE.w;
+        for(let r = 0; r < rows.length; r++){
+          for(let c = 0; c < rows[r].length; c++){
+            const key = rows[r][c];
+            if(key === '.' || key === ' ') continue;
+            if(((r + c + Math.floor(now / 60)) & 1) === 0) continue;   // dither, not a wash
+            ctx.fillRect(x + c, y + r, 1, 1);
+          }
+        }
+      }
+
+      /* Coming apart: pixels drop out of the sprite as it goes, from the top
+         down, so a kill reads as a thing collapsing rather than blinking out. */
+      function dissolve(rows, t){
+        if(t <= 0) return rows;
+        return rows.map((row, r) => {
+          const height = r / rows.length;
+          return [...row].map((key, c) =>
+            (hash2(c, r) & 15) / 16 < t * 1.6 - height * 0.6 ? '.' : key).join('');
         });
       }
 

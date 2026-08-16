@@ -111,10 +111,59 @@ needs more than nine pixels across:
 
 | Thing | Size |
 | --- | --- |
-| Hero sprites | 24 &times; 32, one skeleton under the whole cast |
+| Hero sprites | 32 &times; 40, one skeleton under the whole cast |
 | Terrain tiles | 16 &times; 16, noise rather than motifs so they tile |
-| Buildings | 16 &times; 16, transparent at the corners |
+| Terrain cuts | 2–3 per kind, picked per tile from a coordinate hash |
+| Props — tent, trees, panel, workbench | bigger than a tile, bottom-anchored |
+| Buildings (card art) | 16 &times; 16, transparent at the corners |
 | Icons — materials, salvage, cards, marks | 8 &times; 8 |
+
+Heroes are built from a silhouette rather than fixed-width rows — a skull that
+rounds at the crown and a jaw that narrows is most of what makes a head look
+like a head at this size, and the first cut at 32 &times; 40 framed every face in
+a rigid rectangle and read as a box.
+
+**A kind can be cut more than one way.** `TERRAIN_ART` is one tile per kind and
+`TERRAIN_VARIANTS` is the list it comes from; the renderer picks a cut per tile
+from `hash2(x, y)`, so the ground varies without ever shimmering between
+redraws. Every grass tile used to be pixel-identical to every other, which read
+as wallpaper however good the individual tile was.
+
+**`PROP_ART` is for things too big for the tile they stand on.** Props are drawn
+in the depth-sorted layer with the heroes rather than in the ground pass, which
+is what lets you walk behind a tree. Everything in that layer is sorted by its
+**ground line in pixels**, not by its tile row: a building top-aligned to its
+tile and a hero stood on the tile's floor cannot be compared by row, and used to
+be ordered by whichever was pushed into the list first.
+
+### Things that move
+
+There was no frame loop at all until recently — sprites redrew on a click, a
+hover or a resolved card, so a site nobody was touching was a still picture.
+There is one loop now, driving both canvases:
+
+| | |
+| --- | --- |
+| Idle breath | one pixel, on the rows above a hero's `split`, out of phase per player |
+| Facing | `blit` mirrors at read time, so the cast walks the way it looks |
+| Campfire | three frames, plus a pool of light dithered onto the ground |
+| Footprints | a few seconds of prints behind a walking hero, on soft ground only |
+| Combat | enemy idle bob, hit recoil and flash, a death dissolve, a parallax treeline |
+
+It is only affordable because **the ground is cached**. `drawTerrain` is about
+130,000 `fillRect`s for the build map and it used to run on every hover twitch;
+terrain is a pure function of the tiles and their coordinates, so it is painted
+once into an offscreen canvas and stamped back with one `drawImage`. Measured in
+the preview, a frame holds 60fps with no spikes.
+
+`prefers-reduced-motion` parks the loop on a clean static frame rather than
+juddering, and a hidden tab stops drawing entirely.
+
+**The light changes with the round** — morning, then low gold, then dusk when
+the Array wakes. It is a palette remap, not a wash over the top: every pixel is
+still one flat opaque palette colour, just a different one by evening. Only the
+ground is graded, because grading the cast too made three classes that are meant
+to read apart at a glance converge on the same dim brown.
 
 ## Hosting
 
@@ -181,7 +230,8 @@ npm test
 ```
 public/content.js   the game as data — classes, cards, resources, buildings,
                     enemies, rounds, and the pure functions over them
-public/art.js       the palette, the tiles, and every sprite, as text
+public/art.js       the palette, the tiles and their cuts, the props, and every
+                    sprite, as text
 public/fx.js        what a resolved effect looks and sounds like, card first
                     and effect kind second, so nothing lands silently
 public/audio.js     the two phase tracks and every sound, synthesised
@@ -396,6 +446,39 @@ herb still standing on it.
 under it — every standing node as a row of buttons — and it said nothing the
 tiles did not already show while costing a section of screen to say it.
 
+### The camp
+
+Dead centre of every site, on every seed, there is a tent with a fire outside
+it. It is the one fixed thing on a map that is otherwise rolled, which is what
+makes walking back to it feel like coming back rather than arriving somewhere
+new. The party spawns in a ring around it.
+
+**It is terrain, not a building.** Every rule that matters — walking, building,
+growing, spawning, pathing — already reads `TERRAIN`, so two table entries and a
+stamp buy the whole footprint:
+
+| kind | walk | build | grows | |
+| --- | --- | --- | --- | --- |
+| `tent` | ✗ | ✗ | ✗ | the 3&times;3 solid middle |
+| `camp` | ✓ | ✓ | ✗ | the trodden yard ringing it |
+
+Nothing in `src/rooms.js` changed for any of it, which means nothing needed
+re-porting to the deployed room — it delegates all of this to `content.js`, and
+`content.js` is imported there directly.
+
+Two things the stamp has to keep. It runs **last**, after the tree pass, and
+**clears its own ground**: rolled blind, the centre came up water or a crevice on
+better than one site in ten and the tent floated in a pond. And it makes **no
+call to `random()`**, or every existing room code would render a different ruin
+everywhere else on the map.
+
+`spawnTile`'s `offset` is a seat index rather than a sideways shift of the search
+window. It used to slide the whole window east, which strung the party out in a
+line — seat five could open the round seven tiles from camp with nobody in
+sight. Candidates are ordered by ring out from the tent and then clockwise around
+it, so five players stand round it the way five people stand round a fire. Same
+signature, so the deployed room is unaffected.
+
 **One panel per class.** Below the map you get the pool you spend and the verb
 you have, and nothing belonging to somebody else's economy: the Alchemist's
 stash and recipes, the Engineer's salvage, buildings, power and workbench, the
@@ -428,6 +511,10 @@ Two buildings, and they are the Engineer's whole mechanic.
 | --- | --- | --- |
 | **Solar Panel** | 3 Screws + 2 Plating | +1 power a fight. Build as many as you like |
 | **Workbench** | 4 Screws + 3 Pipe | Upgrades the bolt gun. Max one |
+
+> **The panel is drawn two tiles across but occupies one.** That is deliberate
+> and temporary: a real footprint is a `content.js` signature change and
+> therefore a `src/rooms.js` re-port. See **[Multi-tile buildings](#multi-tile-buildings-not-built-yet)**.
 
 **Power is the only pool nobody carries.** Panels make it, a fight spends it,
 and whatever is left at the end evaporates — `powerFrom` recomputes it at every
@@ -496,6 +583,34 @@ is why the dispatch is a module and not a block inside the page.
 `strike`. **`strike` is implemented in the offline preview only** — the Tool
 Haven room has not grown it yet, so it works when you play the preview and does
 nothing in a real room. Known gap, held open by a test.
+
+## Multi-tile buildings (not built yet)
+
+The Solar Panel is **drawn** two tiles across and **occupies** one. The camp got
+away without this because terrain is per-cell already — nine cells of `tent` are
+nine solid cells for free — but a *building* is one record with one `x,y`, and
+every rule reads it that way.
+
+Doing it properly is a `content.js` signature change, and that makes
+`src/rooms.js` a re-port for someone with Tool Haven access. Worth doing, worth
+doing deliberately:
+
+- `BUILDINGS` entries gain `w`/`h`.
+- `canBuildAt(terrain, buildings, nodes, x, y, buildingId)` has to learn what is
+  being placed, and check **every covered cell** plus the map bounds — today it
+  checks one tile and relies on `tileAt` returning `null` off-map.
+- `walkableAt` has to block every covered cell, not just the origin. It is the
+  single chokepoint through which buildings block anything: `reachableFrom`,
+  `pathTo`, `spawnItems` and `spawnTile` all go through it, so widening it there
+  fixes all of them at once.
+- **One record must stay one structure.** `buildingsOf`, `powerFrom`,
+  `canBuildMore` and `salvageAfterCombat` all count array entries, so storing a
+  2&times;2 panel as four records would pay four power, count four toward `max`,
+  and pay income four times.
+- The `{id, x, y}` record is a **persistence** contract — Tool Haven stores it
+  and mid-run rooms survive redeploys, so a stored room can come back holding
+  the old shape after a new deploy.
+- The hover ghost and the placement preview in `play.html` outline one tile.
 
 ## What is not built yet
 
