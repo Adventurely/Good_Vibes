@@ -910,14 +910,25 @@ export const ENEMIES = {
     note: 'It was built to harvest. It still is.' },
 };
 
-export function waveFor(round){
+/* The wave tables are written for a full table of five. A smaller party gets
+ * a proportionally smaller wave — trimmed from the back, so the table's
+ * opening enemies are the ones every party size meets — because a lone player
+ * facing the five-player wave is not difficulty, it is arithmetic. The boss
+ * never trims away: escorts go, the Extractor is the appointment.
+ */
+export function waveFor(round, partySize = PARTY_SIZE){
   const waves = {
     1: ['sporeling', 'sporeling', 'creeper'],
     2: ['sporeling', 'sporeling', 'creeper', 'creeper'],
     3: ['creeper', 'creeper', 'hulk', 'sporeling'],
     [BOSS_ROUND]: ['extractor', 'creeper', 'creeper'],
   };
-  return waves[Math.min(round, BOSS_ROUND)] || waves[BOSS_ROUND];
+  const full = waves[Math.min(round, BOSS_ROUND)] || waves[BOSS_ROUND];
+  const size = Math.max(1, Math.min(PARTY_SIZE, partySize));
+  const count = Math.max(1, Math.ceil(full.length * size / PARTY_SIZE));
+  const wave = full.slice(0, count);
+  if(round >= BOSS_ROUND && !wave.some(t => ENEMIES[t].boss)) wave[0] = 'extractor';
+  return wave;
 }
 
 /* =============================================================== helpers === */
@@ -1150,6 +1161,14 @@ export function generateTerrain(random){
   blob(cells, random, 'floor', 24);
   blob(cells, random, 'floor', 14);
 
+  // Two smoothing passes before the trees go in. A raw drunkard's walk leaves
+  // single-tile spurs and pinholes, and those hard right angles are what read
+  // as "blocks" instead of landscape. Majority-vote smoothing rounds a blob
+  // into something deposition might have made. Deterministic — no randomness —
+  // so it cannot cost the generator its replay guarantee.
+  smooth(cells);
+  smooth(cells);
+
   // Trees are dotted, not blobbed — a copse is single trunks with light
   // between them, and a solid mass of them would read as one green rock.
   for(let i = 0; i < 14; i++){
@@ -1158,6 +1177,33 @@ export function generateTerrain(random){
   }
 
   return cells;
+}
+
+/* One cellular pass: a tile surrounded mostly by some other kind becomes that
+   kind. Ties keep the tile, which is what stops the map draining to all-grass
+   over repeated passes. */
+function smooth(cells){
+  const before = cells.slice();
+  for(let y = 0; y < MAP_H; y++){
+    for(let x = 0; x < MAP_W; x++){
+      const counts = {};
+      for(let dy = -1; dy <= 1; dy++){
+        for(let dx = -1; dx <= 1; dx++){
+          if(!dx && !dy) continue;
+          const nx = x + dx, ny = y + dy;
+          if(!inBounds(nx, ny)) continue;
+          const kind = before[tileIndex(nx, ny)];
+          counts[kind] = (counts[kind] || 0) + 1;
+        }
+      }
+      const self = before[tileIndex(x, y)];
+      let best = self, bestCount = counts[self] || 0;
+      for(const [kind, count] of Object.entries(counts)){
+        if(count > bestCount + 1){ best = kind; bestCount = count; }
+      }
+      cells[tileIndex(x, y)] = best;
+    }
+  }
 }
 
 /* The surge's ground. Same generator family, different mix: mostly open so

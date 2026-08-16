@@ -233,7 +233,8 @@ class Room {
     this.phase = PHASES.combat;
     this.terrain = generateCombatTerrain(this.random);
     this.power = powerFrom(this.buildings);
-    this.enemies = waveFor(this.round).map((type, i) => {
+    const partySize = Math.max(1, this.players.filter(p => p.classId && p.connected).length);
+    this.enemies = waveFor(this.round, partySize).map((type, i) => {
       const def = ENEMIES[type];
       return { id: `e${i}`, type, name: def.name, art: def.art,
                hp: def.hp, maxHp: def.hp, dist: def.dist, hits: def.hits };
@@ -453,7 +454,10 @@ class Room {
       if(card.powerCost) this.power -= card.powerCost;
 
       const effect = cardEffect(intent.card, this.upgrades);
-      this.apply(player, effect, card.name, intent.target);
+      if(effect.kind !== 'strike'){
+        this.event({ t: 'fx', kind: effect.kind, player: (this.players.find(p => p.id === intent.target) || player).id });
+      }
+      this.apply(player, effect, card.name, intent.target, intent.card);
     }
 
     // Hands down: the played card and the two that were not, minus anything
@@ -477,12 +481,13 @@ class Room {
     this.broadcast();
   }
 
-  apply(player, effect, label, targetId){
+  apply(player, effect, label, targetId, cardId){
     if(effect.kind === 'strike'){
       const alive = this.enemies.filter(e => e.hp > 0);
       const target = alive.find(e => e.id === targetId)
         || [...alive].sort((a, b) => a.dist - b.dist)[0];
       if(!target) return;
+      this.event({ t: 'fx', kind: cardId || 'strike', player: player.id, target: target.id });
       target.hp = Math.max(0, target.hp - effect.amount);
       this.log(`${player.name}'s ${label} hits the ${target.name} for ${effect.amount}.`);
       if(target.hp <= 0) this.log(`The ${target.name} comes apart.`);
@@ -511,6 +516,7 @@ class Room {
       if(enemy.dist > 0){ enemy.dist -= 1; continue; }
 
       const victim = standing[turn++ % standing.length];
+      this.event({ t: 'fx', kind: 'hit', player: victim.id, from: enemy.id });
       const blocked = Math.min(victim.block || 0, enemy.hits);
       victim.block = (victim.block || 0) - blocked;
       const through = enemy.hits - blocked;
