@@ -210,8 +210,10 @@
         </div>
         <p id="level-note" style="margin-bottom:1rem"></p>
 
-        <canvas id="map" width="288" height="160"
-                aria-label="The site. Herbs are gathered by clicking them."></canvas>
+        <!-- Sized from MAP_W/MAP_H at boot so the canvas cannot drift from the
+             grid it draws. These are the current values, not the authority. -->
+        <canvas id="map" width="384" height="240"
+                aria-label="The site. Click a herb to gather it, or a clear tile to build on."></canvas>
 
         <div class="ready-line">
           <span id="ready-count"></span>
@@ -219,6 +221,13 @@
         </div>
 
         <ol id="party" style="margin-top:1.2rem"></ol>
+
+        <h2 style="margin-top:1.4rem">Salvage</h2>
+        <div class="chips" id="salvage"></div>
+
+        <h2 style="margin-top:1.4rem">Building</h2>
+        <p id="build-hint" style="margin-bottom:0.6rem"></p>
+        <div class="grid" id="buildings"></div>
 
         <!-- The same herbs as the map, as buttons. A canvas cannot be tabbed
              through, so this is the keyboard path to the identical intents —
@@ -249,7 +258,14 @@
         <h2>The blight surges</h2>
         <p id="combat-note">Everyone readied up, and the light went out of the sky.</p>
         <ol id="combat-party" style="margin-top:1.2rem"></ol>
+
+        <h2 style="margin-top:1.4rem">What you can do</h2>
+        <p style="margin-bottom:0.6rem">Decided in the build phase: these are what the site can do,
+          not what you are carrying.</p>
+        <div class="grid" id="options"></div>
+
         <div class="actions" style="margin-top:1.2rem">
+          <button type="button" id="end-combat">Hold the line</button>
           <button type="button" id="leave-combat">Leave</button>
         </div>
       </section>
@@ -260,12 +276,17 @@
 
     <script type="module">
       import { drawTextOutlined, textWidth, fitCanvas, context2d } from './pixel.js';
-      import { PALETTE, HERO_ART, MATERIAL_ART, TERRAIN_ART, TILE } from './art.js';
+      import {
+        PALETTE, HERO_ART, MATERIAL_ART, TERRAIN_ART, BUILDING_ART, SALVAGE_ART, TILE,
+      } from './art.js';
       import {
         CLASSES, OPEN_ROLES, MATERIALS, RECIPES, missingFor,
         MAP_W, MAP_H, TERRAIN, PHASES, isBuildPhase, readyState,
         generateMap, seededRandom, seedFromCode, spawnTile, tileAt,
-        LEVELS, PARTY_SIZE,
+        LEVELS, PARTY_SIZE, classById,
+        SALVAGE, BUILDINGS, COMBAT_ACTIONS, STARTING_SALVAGE,
+        combatOptions, missingForBuilding, canBuildAt,
+        salvageAfterCombat, addSalvage, spendSalvage,
       } from './content.js';
 
       /* The client.
@@ -302,6 +323,14 @@
       const MAP_PX_H = MAP_H * TILE;
 
       const map = document.getElementById('map');
+
+      // Size from the grid rather than trusting the attribute in the markup:
+      // MAP_W and MAP_H are the authority, and a mismatch would quietly crop
+      // the map. Done before the context exists, because setting either
+      // dimension resets the context's state.
+      map.width = MAP_PX_W;
+      map.height = HEADER + MAP_PX_H;
+
       const mctx = context2d(map);
       let hover = null;   // {x, y} tile under the pointer, or null
 
@@ -321,6 +350,14 @@
       }
 
       const nodeAt = (x, y) => (room.nodes || []).find(n => n.x === x && n.y === y && !n.taken);
+
+      /* The building the player has picked up but not put down yet. Local, and
+         deliberately so: an unplaced building is a pointer state, not a fact
+         about the room, and sending it would make every other client redraw. */
+      let holding = null;
+
+      const canPlaceHere = (x, y) =>
+        !!holding && canBuildAt(room.terrain, room.buildings, room.nodes, x, y);
 
       function drawMap(){
         mctx.fillStyle = '#241a10';
@@ -351,22 +388,59 @@
           if(art) blit(mctx, art, node.x * TILE + 4, HEADER + node.y * TILE + 6);
         }
 
-        // Heroes are 24x32 on a 16x16 tile: centred and stood on the tile's
-        // floor, so they overhang upwards and to the sides the way a person
-        // standing on a flagstone does.
+        /* Standing things, painted back to front.
+         *
+         * A hero is 24x32 on a 16x16 tile — centred, stood on the tile's floor,
+         * so it overhangs upwards and to the sides the way a person on a
+         * flagstone does. That overhang is why draw order has to be by row and
+         * not by kind: whoever is further down the map is nearer the camera and
+         * has to be painted last, or a player walks behind a pylon that is in
+         * front of them.
+         */
+        const standing = [];
+        for(const placed of room.buildings || []){
+          const building = BUILDINGS[placed.id];
+          const art = building && BUILDING_ART[building.art];
+          if(art) standing.push({ y: placed.y, art, x: placed.x * TILE, top: HEADER + placed.y * TILE });
+        }
         for(const p of room.players || []){
           if(p.x === undefined || p.y === undefined) continue;
           const cls = CLASSES.find(c => c.id === p.classId);
           const art = cls && HERO_ART[cls.art];
           if(!art) continue;
-          const w = art.rows[0].length;
-          blit(mctx, art.rows, p.x * TILE + (TILE - w) / 2, HEADER + (p.y + 1) * TILE - art.rows.length);
+          standing.push({
+            y: p.y,
+            art: art.rows,
+            x: p.x * TILE + (TILE - art.rows[0].length) / 2,
+            top: HEADER + (p.y + 1) * TILE - art.rows.length,
+          });
         }
+        standing.sort((a, b) => a.y - b.y);
+        for(const thing of standing) blit(mctx, thing.art, thing.x, thing.top);
 
         if(hover){
+          // Three answers, three colours: green you may put it here, red you
+          // may not, gold there is something to pick up. Holding a building
+          // changes what the cursor is asking, so it changes what it says.
           const gatherable = !!nodeAt(hover.x, hover.y);
-          mctx.fillStyle = gatherable ? '#ffd23f' : '#fffaf0';
-          mctx.globalAlpha = gatherable ? 0.9 : 0.35;
+          let colour = '#fffaf0', alpha = 0.35;
+          if(holding) [colour, alpha] = canPlaceHere(hover.x, hover.y)
+            ? ['#6cc24a', 0.95] : ['#ef5a45', 0.8];
+          else if(gatherable) [colour, alpha] = ['#ffd23f', 0.9];
+
+          // A held building previews on the tile, so "will it fit" is answered
+          // by looking rather than by placing it and finding out.
+          if(holding && canPlaceHere(hover.x, hover.y)){
+            const art = BUILDING_ART[BUILDINGS[holding].art];
+            if(art){
+              mctx.globalAlpha = 0.55;
+              blit(mctx, art, hover.x * TILE, HEADER + hover.y * TILE);
+              mctx.globalAlpha = 1;
+            }
+          }
+
+          mctx.fillStyle = colour;
+          mctx.globalAlpha = alpha;
           const x = hover.x * TILE, y = HEADER + hover.y * TILE;
           mctx.fillRect(x, y, TILE, 1);
           mctx.fillRect(x, y + TILE - 1, TILE, 1);
@@ -417,6 +491,8 @@
         wait: els('wait'), leaveRun: els('leave-run'), log: els('log'),
         preview: els('preview'), hold: els('hold'), readyCount: els('ready-count'),
         combat: els('combat'), combatParty: els('combat-party'), leaveCombat: els('leave-combat'),
+        salvage: els('salvage'), buildings: els('buildings'), buildHint: els('build-hint'),
+        options: els('options'), endCombat: els('end-combat'),
       };
 
       /* ---- connection ---------------------------------------------------- */
@@ -508,18 +584,25 @@
        */
       let demo = false;
 
+      let demoRandom = null;
+
       function startPreview(){
         demo = true;
         deliberate = true;                    // there is no socket to reconnect to
-        const random = seededRandom(seedFromCode(newCode()));
-        const { terrain, nodes } = generateMap(random);
-        const cls = CLASSES.find(c => c.status === 'live');
+        demoRandom = seededRandom(seedFromCode(newCode()));
+        const { terrain, nodes } = generateMap(demoRandom);
+
+        // The Engineer, because the build phase is the thing being previewed
+        // and it is the class that can do anything in it.
+        const cls = classById('engineer') || CLASSES.find(c => c.status === 'live');
         const start = spawnTile(terrain);
+        holding = null;
 
         room = {
           you: 'p1', phase: PHASES.build, round: 0, maxPlayers: PARTY_SIZE,
           level: { ...LEVELS[0], index: 0, of: LEVELS.length },
-          terrain, nodes, stash: {}, potions: [], events: [],
+          terrain, nodes, buildings: [], stash: {}, potions: [], events: [],
+          salvage: { ...STARTING_SALVAGE },
           players: [{
             id: 'p1', name: 'You', host: true, connected: true, ready: false, down: false,
             classId: cls.id, hp: cls.hp, maxHp: cls.hp, effects: [], intent: null,
@@ -544,6 +627,28 @@
           if(readyState(room.players).all){
             room.phase = PHASES.combat;
             room.events.push({ t: 'surge' });
+          }
+        }else if(msg.t === 'endCombat'){
+          // Combat itself is not built yet, so the preview shows the half of it
+          // that is: the fight ends, salvage comes in, and the next build phase
+          // has more to spend than the last one did.
+          const drawn = salvageAfterCombat(room.players, room.buildings, demoRandom);
+          room.salvage = addSalvage(room.salvage, drawn);
+          const summary = Object.entries(drawn)
+            .map(([id, n]) => `${n} ${SALVAGE[id].name}`).join(', ');
+          room.phase = PHASES.build;
+          room.round += 1;
+          for(const p of room.players) p.ready = false;
+          room.events.push({ t: 'log', text: summary ? `Salvaged ${summary}.` : 'Nothing worth carrying.' });
+        }else if(msg.t === 'intent' && msg.intent.t === 'build'){
+          const { building: id, x, y } = msg.intent;
+          const building = BUILDINGS[id];
+          const affordable = building && Object.keys(missingForBuilding(id, room.salvage)).length === 0;
+          if(building && affordable && canBuildAt(room.terrain, room.buildings, room.nodes, x, y)){
+            room.salvage = spendSalvage(room.salvage, building.costs);
+            room.buildings.push({ id, x, y });
+            room.events.push({ t: 'log', text: `Raised the ${building.name}.` });
+            holding = null;
           }
         }else if(msg.t === 'intent' && msg.intent.t === 'gather'){
           const node = room.nodes.find(n => n.id === msg.intent.node && !n.taken);
@@ -690,6 +795,43 @@
           li.append(name, healthBar(p));
           ui.combatParty.append(li);
         }
+
+        // The deck, and the build phase is the deckbuilding: every option here
+        // beyond the base ones is standing on the map somewhere.
+        const ids = combatOptions(room.buildings);
+        const from = new Map();
+        for(const [id, building] of Object.entries(BUILDINGS)){
+          if(!(room.buildings || []).some(b => b.id === id)) continue;
+          for(const action of building.grants) if(!from.has(action)) from.set(action, building.name);
+        }
+
+        ui.options.replaceChildren();
+        for(const id of ids){
+          const action = COMBAT_ACTIONS[id];
+          const card = document.createElement('button');
+          card.type = 'button';
+          card.className = 'card';
+          const body = document.createElement('span');
+          body.className = 'card-body';
+          const name = document.createElement('b');
+          name.className = 'card-name';
+          name.textContent = action.name;
+          const sub = document.createElement('span');
+          sub.className = 'card-sub';
+          const e = action.effect;
+          sub.textContent = `${e.kind} ${e.amount}${e.rounds ? ` · ${e.rounds} round${e.rounds > 1 ? 's' : ''}` : ''}`;
+          const source = document.createElement('span');
+          source.className = 'card-sub';
+          source.style.color = 'var(--sun)';
+          source.textContent = from.get(id) ? `From the ${from.get(id)}` : 'Always available';
+          const note = document.createElement('span');
+          note.className = 'card-blurb';
+          note.textContent = action.note;
+          body.append(name, sub, source, note);
+          card.append(body);
+          card.onclick = () => send({ t: 'intent', intent: { t: 'act', action: id } });
+          ui.options.append(card);
+        }
       }
 
       /* ---- run ------------------------------------------------------------ */
@@ -765,6 +907,78 @@
           ui.stash.append(chip);
         }
 
+        // --- salvage, and what it can be turned into -----------------------
+        ui.salvage.replaceChildren();
+        const inHand = Object.entries(room.salvage || {}).filter(([, n]) => n > 0);
+        if(!inHand.length){
+          ui.salvage.append(Object.assign(document.createElement('p'),
+            { textContent: 'No salvage. The next fight is where it comes from.' }));
+        }
+        for(const [id, count] of inHand){
+          const chip = document.createElement('span');
+          chip.className = 'chip';
+          if(SALVAGE_ART[id]) chip.append(pixels(SALVAGE_ART[id], 2));
+          chip.append(document.createTextNode(SALVAGE[id].name));
+          const n = document.createElement('b');
+          n.className = 'count';
+          n.textContent = `x${count}`;
+          chip.append(n);
+          ui.salvage.append(chip);
+        }
+
+        const canBuild = !!(you && classById(you.classId)?.build);
+        ui.buildings.replaceChildren();
+        if(!canBuild){
+          holding = null;
+          ui.buildHint.textContent = 'Only the Engineer can build.';
+        }else{
+          ui.buildHint.textContent = holding
+            ? `Placing the ${BUILDINGS[holding].name} — click a clear tile, or pick it again to put it down.`
+            : 'Pick a structure, then click where it goes.';
+
+          for(const [id, building] of Object.entries(BUILDINGS)){
+            const short = missingForBuilding(id, room.salvage || {});
+            const missing = Object.entries(short).map(([r, n]) => `${n} ${SALVAGE[r].name}`);
+            const card = document.createElement('button');
+            card.type = 'button';
+            card.className = 'card';
+            card.disabled = !acting || missing.length > 0;
+            card.setAttribute('aria-pressed', String(holding === id));
+            if(BUILDING_ART[building.art]) card.append(pixels(BUILDING_ART[building.art], 2));
+
+            const body = document.createElement('span');
+            body.className = 'card-body';
+            const name = document.createElement('b');
+            name.className = 'card-name';
+            name.textContent = building.name;
+            const sub = document.createElement('span');
+            sub.className = 'card-sub';
+            sub.textContent = Object.entries(building.costs)
+              .map(([r, n]) => `${n} ${SALVAGE[r].name}`).join(' + ');
+
+            // What it gives is the reason to build it, so it goes above the
+            // flavour rather than under it.
+            const gives = document.createElement('span');
+            gives.className = 'card-sub';
+            gives.style.color = 'var(--accent)';
+            const grants = building.grants.map(a => COMBAT_ACTIONS[a].name);
+            const income = Object.entries(building.income).map(([r, n]) => `+${n} ${SALVAGE[r].name}`);
+            gives.textContent = [
+              grants.length ? `In combat: ${grants.join(', ')}` : '',
+              income.length ? `Each fight: ${income.join(', ')}` : '',
+            ].filter(Boolean).join(' · ');
+
+            const note = document.createElement('span');
+            note.className = 'card-blurb';
+            note.textContent = missing.length ? `Short of ${missing.join(' and ')}.` : building.note;
+
+            body.append(name, sub, gives, note);
+            card.append(body);
+            card.onclick = () => { holding = holding === id ? null : id; render(); };
+            ui.buildings.append(card);
+          }
+        }
+
         const canBrew = you && CLASSES.find(c => c.id === you.classId)?.craft;
         ui.recipes.replaceChildren();
         if(!canBrew){
@@ -830,6 +1044,10 @@
           if(event.t === 'started') logLines.unshift('The run begins.');
           if(event.t === 'surge') logLines.unshift('Everyone is ready. The blight surges.');
         }
+        // Consumed, so drop them: render() also runs for local reasons — picking
+        // a building up does not touch the room — and an uncleared list would
+        // write the last round's events into the log again every time.
+        if(room.events) room.events = [];
         logLines.length = Math.min(logLines.length, 80);
 
         ui.join.hidden = true;
@@ -863,13 +1081,27 @@
       ui.leave.addEventListener('click', () => leave());
       ui.leaveRun.addEventListener('click', () => leave());
       ui.leaveCombat.addEventListener('click', () => leave());
+      ui.endCombat.addEventListener('click', () => send({ t: 'endCombat' }));
 
       /* Clicking a herb is the same intent the chip below the map sends. The
-         canvas is the fast path, not the only one. */
+         canvas is the fast path, not the only one.
+
+         Holding a building takes priority: once you have picked something up,
+         a click means "put it here", and clicking a herb by accident should
+         not silently gather instead of building. */
       map.addEventListener('click', event => {
         if(!room || !isBuildPhase(room.phase)) return;
         const tile = tileFromEvent(event);
-        const node = tile && nodeAt(tile.x, tile.y);
+        if(!tile) return;
+
+        if(holding){
+          if(canPlaceHere(tile.x, tile.y)){
+            send({ t: 'intent', intent: { t: 'build', building: holding, x: tile.x, y: tile.y } });
+          }
+          return;
+        }
+
+        const node = nodeAt(tile.x, tile.y);
         if(node) send({ t: 'intent', intent: { t: 'gather', node: node.id } });
       });
 

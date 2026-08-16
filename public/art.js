@@ -118,6 +118,150 @@ export const HERO_ART = {
     '......#####..#####......',
     '........................'
   ], 14, [[10, 7], [13, 7]]),
+
+  /* The Engineer. Goggles pushed up onto the forehead rather than worn, which
+     is what someone who has been working looks like; rust-orange jacket over a
+     steel collar, and a tool belt heavy enough to change how they stand. Warm
+     metal against the Alchemist's green, so the two read apart at one pixel a
+     tile on the map. */
+  engineer: sprite([
+    '........................',
+    '......############......',
+    '......#nnnnnnnnnn#......',
+    '......#nmmmmmmmmn#......',
+    '......#nmccmmccmn#......',
+    '......#nssssssssn#......',
+    '......#ns==ss==sn#......',
+    '......#ns=wssw=sn#......',
+    '......#nsssSSsssn#......',
+    '......#nSssssssSn#......',
+    '......#nSss==ssSn#......',
+    '......#nNSssssSNn#......',
+    '.......#NNNNNNNN#.......',
+    '..........#ss#..........',
+    '...#rR#rmmmmmmmmr#rR#...',
+    '...#rR#rmMMMMMMmr#rR#...',
+    '...#rR#rrrrrrrrrr#rR#...',
+    '...#rR#rRRmmmmRRr#rR#...',
+    '...#rR#rRRRRRRRRr#rR#...',
+    '...#rR#rRRRRRRRRr#rR#...',
+    '...#ss#rRRRRRRRRr#ss#...',
+    '...####rttttttttR####...',
+    '......#rTMTTTTMTR#......',
+    '......#rRRRRRRRRr#......',
+    '......#xxx#..#xxx#......',
+    '......#xxx#..#xxx#......',
+    '......#xxx#..#xxx#......',
+    '......#NNN#..#NNN#......',
+    '......#NNN#..#NNN#......',
+    '......#NNN#..#NNN#......',
+    '......#####..#####......',
+    '........................'
+  ], 14, [[10, 7], [13, 7]]),
+};
+
+/* ============================================================ buildings === */
+
+/* One tile each, 16x16, transparent where the ground should show through.
+ *
+ * They are drawn standing on the tile rather than filling it: a building that
+ * painted its whole square would tile edge-to-edge with its neighbour and a
+ * row of three would read as a wall. Leaving the corners open is what keeps a
+ * base looking like separate things somebody put there.
+ *
+ * The key matches the `art` field in content.js BUILDINGS.
+ */
+export const BUILDING_ART = {
+  workbench: [
+    '................',
+    '................',
+    '.....#M#........',
+    '....########....',
+    '...#mmmmmmmm#...',
+    '...#MMMMMMMM#...',
+    '...#tttttttt#...',
+    '...#TtTtTtTt#...',
+    '...##T####T##...',
+    '....#T#..#T#....',
+    '....#T#..#T#....',
+    '....#T#..#T#....',
+    '....#N#..#N#....',
+    '....###..###....',
+    '................',
+    '................',
+  ],
+  pylon: [
+    '................',
+    '.......cc.......',
+    '......cyyc......',
+    '.....cyYYyc.....',
+    '......cyyc......',
+    '.......##.......',
+    '......#mm#......',
+    '......#Mm#......',
+    '......#mM#......',
+    '......#Mm#......',
+    '......#mM#......',
+    '.....##mm##.....',
+    '....#MMMMMM#....',
+    '....#xxxxxx#....',
+    '....########....',
+    '................',
+  ],
+  condenser: [
+    '................',
+    '....########....',
+    '...#mMMMMMMm#...',
+    '...#MccccccM#...',
+    '...#McbbbbcM#...',
+    '...#McbBBbcM#...',
+    '...#McbBBbcM#...',
+    '...#McbbbbcM#...',
+    '...#MccccccM#...',
+    '...#mMMMMMMm#...',
+    '...##MMMMMM##...',
+    '....#x####x#....',
+    '....#x#..#x#....',
+    '....###..###....',
+    '................',
+    '................',
+  ],
+  bulwark: [
+    '................',
+    '................',
+    '..############..',
+    '..#mMmMmMmMmM#..',
+    '..#MmMmMmMmMm#..',
+    '..############..',
+    '..#mMmMmMmMmM#..',
+    '..#MmMmMmMmMm#..',
+    '..############..',
+    '..#mMmMmMmMmM#..',
+    '..#MmMmMmMmMm#..',
+    '..############..',
+    '..#xx##xx##xx#..',
+    '..############..',
+    '................',
+    '................',
+  ],
+  rig: [
+    '................',
+    '..#..........#..',
+    '..#x########x#..',
+    '..#xrrrrrrrrx#..',
+    '..#xrRRRRRRrx#..',
+    '..#xrRooooRrx#..',
+    '..#xrRoOOoRrx#..',
+    '..#xrRooooRrx#..',
+    '..#xrRRRRRRrx#..',
+    '..#xrrrrrrrrx#..',
+    '..#x########x#..',
+    '..#xx#....#xx#..',
+    '..#MM#....#MM#..',
+    '..####....####..',
+    '................',
+    '................',
+  ],
 };
 
 /* ============================================================== terrain === */
@@ -266,6 +410,55 @@ export const MATERIAL_ART = {
     '.#pPPp#.',
     '.#PPPP#.',
     '.#pPPp#.',
+    '..####..'
+  ],
+};
+
+/* ============================================================== salvage === */
+
+/* Eight by eight, same as the materials, because they sit in the same kind of
+   chip. Cold metal against the materials' warm growing things — the two pools
+   should be tellable apart at a glance without reading the label. The key
+   matches the id in content.js SALVAGE. */
+export const SALVAGE_ART = {
+  screw: [
+    '..MMMM..',
+    '.M####M.',
+    '..MmmM..',
+    '...MM...',
+    '...Mm...',
+    '...MM...',
+    '...Mm...',
+    '...##...'
+  ],
+  pipe: [
+    '........',
+    '.xxxxxx.',
+    'xMMMMMMx',
+    'xmxxxxmx',
+    'xmxxxxmx',
+    'xMMMMMMx',
+    '.xxxxxx.',
+    '........'
+  ],
+  plating: [
+    '........',
+    '.######.',
+    '.#mmmm#.',
+    '.#mMMm#.',
+    '.#mMMm#.',
+    '.#mmmm#.',
+    '.######.',
+    '........'
+  ],
+  coil: [
+    '..####..',
+    '.#cccc#.',
+    '#crrrrc#',
+    '#cRRRRc#',
+    '#crrrrc#',
+    '#cRRRRc#',
+    '.#cccc#.',
     '..####..'
   ],
 };

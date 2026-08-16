@@ -94,7 +94,7 @@ npm test
 ## Layout
 
 ```
-public/content.js   the game as data — classes, materials, recipes, levels, map
+public/content.js   the game as data — classes, resources, buildings, map
 public/art.js       the palette, the terrain tiles, and every sprite, as text
 public/play.html    the game: lobby, class select, the build phase, the surge
 public/pixel.js     bitmap font and canvas helpers
@@ -113,7 +113,7 @@ why `test/content.test.js` checks the shape of every class before the publish
 workflow will sync anything.
 
 Adding a class is a block in `CLASSES` and a sprite in `art.js`. Every field is
-documented above the array, and the test names the one you missed. Four seats
+documented above the array, and the test names the one you missed. Three seats
 are still open; `OPEN_ROLES` says what the party is short of and the lobby
 shows them as locked rather than pretending the roster is full.
 
@@ -136,6 +136,46 @@ Materials go to a **shared stash**: anyone can gather, and the Alchemist brews
 from the pool for the whole party. That is the Alchemist's role — it gathers
 double and it is the only class that can turn the pile into potions.
 
+### Two classes, two economies
+
+The Engineer is not a second gatherer. It runs on a different resource, earned
+a different way, spent on a different thing:
+
+| | Alchemist | Engineer |
+| --- | --- | --- |
+| Resource | herbs, from `MATERIALS` | salvage, from `SALVAGE` |
+| Earned by | walking to it on the map | surviving a fight |
+| Spent on | potions, consumed once | buildings, which stay |
+| Pool | `stash` | `salvage` |
+
+Both pools are shared by the party and each has exactly one class that can
+spend it — `craft` on the Alchemist, `build` on the Engineer. A test holds that
+line, because two classes that both gather and both spend would be one class
+with two sprites.
+
+Salvage never appears on the map. It is what the blight leaves behind, so it
+arrives *after* a fight rather than during a walk: `salvageAfterCombat` pays
+the crew a rolled share per Engineer and the standing buildings a fixed one.
+Building is how you stop being at the mercy of the roll.
+
+### Buildings, and why the build phase decides the fight
+
+A building is not a stat. It is a tile you spent and a combat option the whole
+party gets afterwards — `combatOptions` reads what is standing on the map and
+returns what everyone can do when the blight arrives. That one field, `grants`,
+is the entire two-phase loop: **what you build is what your combat looks like.**
+
+The opening is deliberately a decision. `STARTING_SALVAGE` affords the
+Workbench *or* the Arc Pylon and never both, and nothing in tier 2 at all —
+economy or teeth, pick one, live with it for a cycle. That property is pinned
+by a test rather than left to a comment, so a later balance pass cannot quietly
+make the first move free.
+
+`EFFECT_KINDS` lists what the engine implements. **`strike` is new and the
+combat half of the room does not implement it yet**, so an Arc Pylon builds,
+shows its option, and the option is currently inert. That is a known gap held
+open by a test, not a silent one.
+
 **There are no enemies yet, on purpose.** What a fight looks like depends on
 the four classes built to fight it, so blight stands in as the pressure until
 those exist. The loop underneath it is real and finishable today.
@@ -147,10 +187,16 @@ surges, and the map is what makes that worth doing: it is generated once and
 kept, so the ground you cleared last cycle is still cleared when you come back
 to it. Only the herbs are reseeded.
 
-The map is an 18&times;9 grid of 16px tiles — a grid because every question the
+The map is a 24&times;14 grid of 16px tiles — a grid because every question the
 build phase asks is about neighbours, and a grid answers those with arithmetic
 instead of geometry. Terrain decides three things: whether you can stand on a
 tile, whether a structure can go there, and whether anything grows there.
+
+Terrain is random, so the generator has a promise to keep: `BASE_ROOM` is the
+smallest *connected* buildable pocket a site is allowed to roll, checked by
+`largestBuildableArea` over a hundred seeds in the tests. Counting buildable
+tiles would not do — thirty tiles in three pockets separated by water is not
+somewhere a base goes.
 
 Herbs are scattered across the growable tiles by `spawnHerbs`, which draws
 tiles without replacement so two can never share one, and asks the existing
@@ -201,9 +247,10 @@ scene, the palette, the page itself — works offline.
 
 **Preview the site** on the join screen is the exception, and it exists because
 the map could not otherwise be looked at until it was deployed. It generates a
-map locally and drops you into the build phase alone: gathering, brewing and
-readying up all work, and readying up switches to the combat phase because a
-party of one is a party that is entirely ready.
+map locally and drops you in as the Engineer, alone: gathering, building,
+readying up and ending the fight all work, so the whole cycle — spend salvage,
+surge, collect salvage, spend more — can be walked through offline. Readying up
+switches phase because a party of one is a party that is entirely ready.
 
 It is the one place the client writes game state, and it is fenced behind a
 `demo` flag for exactly that reason. In a real room every one of those

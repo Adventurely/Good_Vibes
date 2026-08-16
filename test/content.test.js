@@ -1,13 +1,18 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { PALETTE, HERO_ART, MATERIAL_ART, TERRAIN_ART, TILE } from '../public/art.js';
+import {
+  PALETTE, HERO_ART, MATERIAL_ART, TERRAIN_ART, BUILDING_ART, SALVAGE_ART, TILE,
+} from '../public/art.js';
 import {
   PARTY_SIZE, CLASSES, OPEN_ROLES, MATERIALS, RECIPES, LEVELS,
   classById, playableClasses, missingFor, materialFor,
   MAP_W, MAP_H, TERRAIN, HERB_COUNT, PHASES, isBuildPhase, readyState,
   seededRandom, seedFromCode, generateTerrain, spawnHerbs, generateMap,
-  spawnTile, tileAt, inBounds,
+  spawnTile, tileAt, inBounds, BASE_ROOM, largestBuildableArea,
+  SALVAGE, salvageFor, BUILDINGS, STARTING_SALVAGE, COMBAT_ACTIONS,
+  BASE_ACTIONS, EFFECT_KINDS, combatOptions, missingForBuilding, canAfford,
+  affordableBuildings, canBuildAt, salvageAfterCombat, addSalvage, spendSalvage,
 } from '../public/content.js';
 
 /* content.js is imported by the authoritative room object in Tool Haven, not
@@ -31,7 +36,26 @@ test('every class carries the fields the engine reads', () => {
     assert.ok(Number.isInteger(cls.hp) && cls.hp > 0, `${where}: hp must be a positive integer`);
     assert.match(cls.colour, /^#[0-9a-f]{6}$/i, `${where}: colour must be a hex value`);
     assert.ok(Number.isInteger(cls.gather) && cls.gather > 0, `${where}: gather must be a positive integer`);
+    assert.equal(typeof cls.craft, 'boolean', `${where}: craft must be a boolean`);
+    assert.equal(typeof cls.build, 'boolean', `${where}: build must be a boolean`);
+    assert.ok(Number.isInteger(cls.salvage) && cls.salvage >= 0,
+      `${where}: salvage must be a non-negative integer`);
   }
+});
+
+test('the two built classes do different jobs', () => {
+  // Two classes that both gather and both brew would be one class with two
+  // sprites. The split is the design: herbs and potions against salvage and
+  // structures.
+  const builders = playableClasses().filter((c) => c.build);
+  const brewers = playableClasses().filter((c) => c.craft);
+  assert.ok(builders.length, 'nobody can build');
+  assert.ok(brewers.length, 'nobody can brew');
+  for (const cls of builders) {
+    assert.ok(!cls.craft, `"${cls.id}" both builds and brews`);
+    assert.ok(cls.salvage > 0, `"${cls.id}" builds but cannot pay for anything`);
+  }
+  for (const cls of brewers) assert.ok(!cls.build, `"${cls.id}" both brews and builds`);
 });
 
 test('class ids are unique', () => {
@@ -108,6 +132,16 @@ test('sprites are rectangular and use only palette keys', () => {
 
   for (const [name, rows] of Object.entries(MATERIAL_ART)) {
     check(`material "${name}"`, rows, rows[0].length);
+  }
+
+  for (const [name, rows] of Object.entries(SALVAGE_ART)) {
+    check(`salvage "${name}"`, rows, rows[0].length);
+  }
+
+  // Buildings sit on one map tile, so their art has to be exactly one tile.
+  for (const [name, rows] of Object.entries(BUILDING_ART)) {
+    assert.equal(rows.length, TILE, `building "${name}" must be ${TILE} rows tall`);
+    check(`building "${name}"`, rows, TILE);
   }
 });
 
@@ -255,4 +289,194 @@ test('isBuildPhase still accepts the name the deployed room sends', () => {
   assert.ok(!isBuildPhase(PHASES.combat));
   assert.ok(!isBuildPhase(PHASES.lobby));
   assert.ok(!isBuildPhase(PHASES.over));
+});
+
+test('every site has room for a base, not just loose buildable tiles', () => {
+  // The generator is random, so this is the promise it has to keep. A site
+  // that rolls three pockets of twenty tiles is not somewhere a base goes.
+  for (let seed = 1; seed <= 120; seed++) {
+    const terrain = generateTerrain(seededRandom(seed));
+    const area = largestBuildableArea(terrain);
+    assert.ok(area >= BASE_ROOM,
+      `seed ${seed} left a largest buildable pocket of ${area}, under BASE_ROOM ${BASE_ROOM}`);
+  }
+});
+
+test('largestBuildableArea counts one pocket, not every tile', () => {
+  // A map split down the middle by water has half the buildable tiles it
+  // looks like it has, and that is the number a builder cares about.
+  const terrain = new Array(MAP_W * MAP_H).fill('grass');
+  for (let y = 0; y < MAP_H; y++) terrain[y * MAP_W + Math.floor(MAP_W / 2)] = 'water';
+  const area = largestBuildableArea(terrain);
+  const buildable = terrain.filter((k) => TERRAIN[k].build).length;
+  assert.ok(area < buildable, 'a wall down the middle should split the area');
+  assert.equal(area, Math.floor(MAP_W / 2) * MAP_H);
+});
+
+/* ------------------------------------------------------------- the engineer */
+
+test('every salvage kind can be drawn and picked', () => {
+  for (const [id, item] of Object.entries(SALVAGE)) {
+    assert.ok(SALVAGE_ART[id], `salvage "${id}" has no art`);
+    assert.ok(PALETTE[item.colour], `salvage "${id}" has colour "${item.colour}"`);
+    assert.ok(item.rarity > 0, `salvage "${id}" must have a positive rarity weight`);
+    assert.equal(typeof item.note, 'string');
+  }
+  for (let i = 0; i < 200; i++) {
+    assert.ok(SALVAGE[salvageFor(i / 200)], `roll ${i / 200} produced nothing real`);
+  }
+});
+
+test('the two resource pools do not overlap', () => {
+  // The whole point of salvage is that it is not a herb. An id in both tables
+  // would make "can the Alchemist brew with this" a real question.
+  for (const id of Object.keys(SALVAGE)) {
+    assert.ok(!MATERIALS[id], `"${id}" is in both MATERIALS and SALVAGE`);
+  }
+});
+
+test('every building is buildable, draws, and grants real actions', () => {
+  for (const [id, building] of Object.entries(BUILDINGS)) {
+    const where = `building "${id}"`;
+    assert.equal(typeof building.name, 'string', `${where}: needs a name`);
+    assert.ok([1, 2].includes(building.tier), `${where}: tier must be 1 or 2`);
+    assert.ok(BUILDING_ART[building.art], `${where}: art "${building.art}" does not exist`);
+    assert.ok(Object.keys(building.costs).length, `${where}: must cost something`);
+
+    for (const [resource, n] of Object.entries(building.costs)) {
+      assert.ok(SALVAGE[resource], `${where}: costs "${resource}", which is not salvage`);
+      assert.ok(Number.isInteger(n) && n > 0, `${where}: cost of ${resource} must be a positive integer`);
+    }
+    for (const [resource, n] of Object.entries(building.income)) {
+      assert.ok(SALVAGE[resource], `${where}: pays "${resource}", which is not salvage`);
+      assert.ok(Number.isInteger(n) && n > 0, `${where}: income of ${resource} must be a positive integer`);
+    }
+    for (const action of building.grants) {
+      assert.ok(COMBAT_ACTIONS[action], `${where}: grants "${action}", which is not a combat action`);
+    }
+
+    // A building that neither pays nor arms is a tile you spent for nothing.
+    assert.ok(building.grants.length || Object.keys(building.income).length,
+      `${where}: grants nothing and pays nothing`);
+  }
+});
+
+test('every combat action does something the engine implements', () => {
+  for (const [id, action] of Object.entries(COMBAT_ACTIONS)) {
+    assert.equal(typeof action.name, 'string', `action "${id}" needs a name`);
+    assert.ok(EFFECT_KINDS.includes(action.effect.kind),
+      `action "${id}" has effect kind "${action.effect.kind}", which the engine does not implement`);
+    assert.ok(action.effect.amount > 0, `action "${id}" must do a positive amount`);
+  }
+  for (const id of BASE_ACTIONS) {
+    assert.ok(COMBAT_ACTIONS[id], `base action "${id}" does not exist`);
+  }
+});
+
+test('the opening is a choice: starting salvage affords one tier-1 building, never both', () => {
+  // This is the design, pinned. A balance pass that makes the first move free
+  // takes the decision out of the opening, and should fail here first.
+  const openers = Object.entries(BUILDINGS).filter(([, b]) => b.tier === 1);
+  assert.ok(openers.length >= 2, 'there must be at least two things to choose between');
+
+  for (const [id, building] of openers) {
+    assert.ok(canAfford(building.costs, STARTING_SALVAGE),
+      `"${id}" is tier 1 but cannot be afforded at the start`);
+
+    const after = spendSalvage(STARTING_SALVAGE, building.costs);
+    for (const [other, rival] of openers) {
+      if (other === id) continue;
+      assert.ok(!canAfford(rival.costs, after),
+        `building "${id}" first still leaves enough for "${other}" — the opening is not a choice`);
+    }
+  }
+
+  for (const [id, building] of Object.entries(BUILDINGS)) {
+    if (building.tier === 1) continue;
+    assert.ok(!canAfford(building.costs, STARTING_SALVAGE),
+      `tier-2 "${id}" is affordable from the start`);
+  }
+});
+
+test('affordableBuildings agrees with what can be paid for', () => {
+  assert.deepEqual(
+    affordableBuildings(STARTING_SALVAGE).sort(),
+    Object.entries(BUILDINGS).filter(([, b]) => b.tier === 1).map(([id]) => id).sort(),
+  );
+  assert.deepEqual(affordableBuildings({}), []);
+});
+
+test('missingForBuilding reports the shortfall, not just that there is one', () => {
+  assert.deepEqual(missingForBuilding('workbench', { screw: 4, pipe: 3 }), {});
+  assert.deepEqual(missingForBuilding('workbench', { screw: 1 }), { screw: 3, pipe: 3 });
+  assert.equal(missingForBuilding('not-a-building', {}), null);
+});
+
+test('combat options come from what is standing', () => {
+  assert.deepEqual(combatOptions([]), BASE_ACTIONS,
+    'with nothing built there should still be something to do');
+
+  const withPylon = combatOptions([{ id: 'pylon', x: 1, y: 1 }]);
+  assert.ok(withPylon.includes('arc'), 'a pylon should arm the party');
+  assert.ok(withPylon.includes('hold'), 'base actions do not go away');
+
+  // Two of the same building is one option, not two buttons that do the same.
+  const doubled = combatOptions([{ id: 'pylon', x: 1, y: 1 }, { id: 'pylon', x: 2, y: 1 }]);
+  assert.equal(new Set(doubled).size, doubled.length);
+  assert.deepEqual(doubled, withPylon);
+
+  assert.deepEqual(combatOptions([{ id: 'not-a-building', x: 0, y: 0 }]), BASE_ACTIONS);
+});
+
+test('the two openers lead to different fights, which is the point', () => {
+  const bench = combatOptions([{ id: 'workbench', x: 1, y: 1 }]);
+  const pylon = combatOptions([{ id: 'pylon', x: 1, y: 1 }]);
+  assert.notDeepEqual(bench, pylon, 'both openings produce the same combat');
+});
+
+test('canBuildAt refuses water, rubble, occupied tiles and standing herbs', () => {
+  const terrain = new Array(MAP_W * MAP_H).fill('grass');
+  terrain[0] = 'water';
+  terrain[1] = 'rubble';
+  const buildings = [{ id: 'workbench', x: 2, y: 0 }];
+  const nodes = [
+    { id: 'n0', x: 3, y: 0, material: 'sunpetal', taken: false },
+    { id: 'n1', x: 4, y: 0, material: 'sunpetal', taken: true },
+  ];
+
+  assert.equal(canBuildAt(terrain, buildings, nodes, 0, 0), false, 'built on water');
+  assert.equal(canBuildAt(terrain, buildings, nodes, 1, 0), false, 'built on rubble');
+  assert.equal(canBuildAt(terrain, buildings, nodes, 2, 0), false, 'built on a building');
+  assert.equal(canBuildAt(terrain, buildings, nodes, 3, 0), false, 'paved over a herb');
+  assert.equal(canBuildAt(terrain, buildings, nodes, 4, 0), true, 'a gathered herb should free its tile');
+  assert.equal(canBuildAt(terrain, buildings, nodes, 5, 0), true);
+  assert.equal(canBuildAt(terrain, buildings, nodes, -1, 0), false, 'built off the map');
+});
+
+test('salvage after combat pays the crew and the buildings', () => {
+  const players = [
+    { classId: 'engineer', down: false },
+    { classId: 'alchemist', down: false },
+  ];
+  const drawn = salvageAfterCombat(players, [{ id: 'rig', x: 1, y: 1 }], seededRandom(3));
+
+  const total = Object.values(drawn).reduce((a, b) => a + b, 0);
+  const rig = BUILDINGS.rig.income;
+  const fromRig = Object.values(rig).reduce((a, b) => a + b, 0);
+  assert.equal(total, classById('engineer').salvage + fromRig,
+    'the draw should be the engineer’s share plus the rig’s output');
+  for (const id of Object.keys(drawn)) assert.ok(SALVAGE[id], `drew "${id}", which is not salvage`);
+});
+
+test('a downed engineer draws nothing, and a party without one draws nothing', () => {
+  assert.deepEqual(salvageAfterCombat([{ classId: 'engineer', down: true }], [], seededRandom(1)), {});
+  assert.deepEqual(salvageAfterCombat([{ classId: 'alchemist', down: false }], [], seededRandom(1)), {});
+  assert.deepEqual(salvageAfterCombat([], [], seededRandom(1)), {});
+});
+
+test('adding and spending salvage does not mutate the pool it was given', () => {
+  const pool = { screw: 5 };
+  assert.deepEqual(addSalvage(pool, { screw: 2, coil: 1 }), { screw: 7, coil: 1 });
+  assert.deepEqual(spendSalvage(pool, { screw: 2 }), { screw: 3 });
+  assert.deepEqual(pool, { screw: 5 }, 'the original pool was written to');
 });
