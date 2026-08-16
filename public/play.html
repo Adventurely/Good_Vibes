@@ -260,6 +260,19 @@
       }
       .ready-line b { color: var(--sun); font-weight: 400; font-variant-numeric: tabular-nums; }
 
+      /* The scene, before the form. Ranged left and held to a readable measure
+         rather than centred like the notes under the form — three sentences
+         centred reads as a poster, and this is meant to be read. */
+      .intro {
+        max-width: 34rem;
+        margin: 0 auto 1.6rem;
+        padding-left: 0.9rem;
+        border-left: 2px solid var(--accent);
+      }
+      .intro p { margin: 0 0 0.6rem; line-height: 1.65; color: var(--muted); }
+      .intro p:last-child { margin-bottom: 0; }
+      .intro b { color: var(--text); font-weight: 400; }
+
       h2 {
         font-size: 0.72rem;
         letter-spacing: 0.22em;
@@ -391,6 +404,20 @@
       <p class="notice" id="notice"></p>
 
       <section id="join">
+        <!-- The front door says what kind of place this is before it asks for
+             a room code. Three sentences: what happened, what is happening, and
+             what you are being asked to do about it. -->
+        <div class="intro">
+          <p><b>The grid went quiet a long time ago, and the green came back up through it.</b></p>
+          <p>Ivy in the stairwells, meltwater in the substations, sunflowers on the cooling
+            halls — and people, learning the old machines back into use one salvaged part at
+            a time. It works. It has worked for years.</p>
+          <p>Then the blight started coming back, and something under The Array began drawing
+            power again. So a handful of you walk out to a ruin with a stash of herbs, a bag
+            of screws and a book of pages, and you make it somewhere worth standing —
+            <b>three rounds to build, before the fourth comes for you.</b></p>
+        </div>
+
         <h2>Join a room</h2>
         <form id="join-form">
           <input id="code" maxlength="6" minlength="4" pattern="[A-Za-z0-9]{4,6}"
