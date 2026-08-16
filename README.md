@@ -113,7 +113,7 @@ needs more than nine pixels across:
 | --- | --- |
 | Hero sprites | 32 &times; 40, one skeleton under the whole cast |
 | Terrain tiles | 16 &times; 16, noise rather than motifs so they tile |
-| Terrain cuts | 2–3 per kind, picked per tile from a coordinate hash |
+| Terrain cuts | 1–3 per kind, picked per tile from a coordinate hash |
 | Props — tent, trees, panel, workbench | bigger than a tile, bottom-anchored |
 | Buildings (card art) | 16 &times; 16, transparent at the corners |
 | Icons — materials, salvage, cards, marks | 8 &times; 8 |
@@ -135,6 +135,14 @@ is what lets you walk behind a tree. Everything in that layer is sorted by its
 **ground line in pixels**, not by its tile row: a building top-aligned to its
 tile and a hero stood on the tile's floor cannot be compared by row, and used to
 be ordered by whichever was pushed into the list first.
+
+**Both canvases clip to below the header strip, and the strip draws last.** A
+sprite that overhangs the top of the map is correct — it is a tall thing
+standing on the top row — but a tree is three tiles high and a hero two and a
+half, so on row 0 they begin sixteen and eight pixels *above* the canvas and
+used to paint straight through the title. Clipping means nothing has to know how
+tall anything else is, and it covers the ready marks, which fly ten pixels over
+a sprite's head, and the combat effects, which lob twenty-six above their start.
 
 ### Things that move
 
@@ -448,19 +456,46 @@ tiles did not already show while costing a section of screen to say it.
 
 ### The camp
 
-Dead centre of every site, on every seed, there is a tent with a fire outside
-it. It is the one fixed thing on a map that is otherwise rolled, which is what
-makes walking back to it feel like coming back rather than arriving somewhere
-new. The party spawns in a ring around it.
+Dead centre of every site, on every seed, there is a fire in a clearing with a
+tent standing over it. It is the one fixed thing on a map that is otherwise
+rolled, which is what makes walking back to it feel like coming back rather than
+arriving somewhere new.
+
+**The fire is the middle, not the tent.** A tent is somewhere you sleep; the
+fire is the thing people actually gather at, so the camp is arranged around the
+fire and the party spawns in a ring about it, with the tent above as a backdrop.
+
+```
+     :###:      the tent, 3x3, solid
+     :###:
+     :###:
+     :::::
+     51:2:      the party
+     ::*::      the fire
+     :4:3:
+     :::::      the clearing
+```
 
 **It is terrain, not a building.** Every rule that matters — walking, building,
-growing, spawning, pathing — already reads `TERRAIN`, so two table entries and a
-stamp buy the whole footprint:
+growing, spawning, pathing — already reads `TERRAIN`, so three table entries and
+a stamp buy the whole footprint:
 
 | kind | walk | build | grows | |
 | --- | --- | --- | --- | --- |
-| `tent` | ✗ | ✗ | ✗ | the 3&times;3 solid middle |
-| `camp` | ✓ | ✓ | ✗ | the trodden yard ringing it |
+| `tent` | ✗ | ✗ | ✗ | the 3&times;3 shelter, above the clearing |
+| `camp` | ✓ | ✓ | ✗ | the trodden clearing |
+| `fire` | ✗ | ✗ | ✗ | one tile at its centre |
+
+The fire is solid for the same reason a pond is — you do not stand in a fire —
+and because ring zero has to be unavailable for "spawns *around* the fire" to
+mean anything.
+
+**Nothing grows near it.** A tree is a canopy three tiles tall, so one standing
+south of the camp sorts *in front* of the tent and swallows it; that happened on
+**49% of sites**, and over the fire specifically on 28%. The tree pass refuses
+any cell inside `inCamp(x, y, 2)` — tested on the same draw it already made, so
+the number of `random()` calls is unchanged and the replay guarantee holds. Both
+numbers are now 0/120.
 
 Nothing in `src/rooms.js` changed for any of it, which means nothing needed
 re-porting to the deployed room — it delegates all of this to `content.js`, and
@@ -475,9 +510,10 @@ everywhere else on the map.
 `spawnTile`'s `offset` is a seat index rather than a sideways shift of the search
 window. It used to slide the whole window east, which strung the party out in a
 line — seat five could open the round seven tiles from camp with nobody in
-sight. Candidates are ordered by ring out from the tent and then clockwise around
-it, so five players stand round it the way five people stand round a fire. Same
-signature, so the deployed room is unaffected.
+sight. Candidates are ordered by ring out from the fire and then clockwise
+around it, so five players stand round it the way five people stand round a
+fire. Same signature, so the deployed room is unaffected — and because the fire
+itself is unwalkable, the ring is the nearest thing the ordering can offer.
 
 **One panel per class.** Below the map you get the pool you spend and the verb
 you have, and nothing belonging to somebody else's economy: the Alchemist's

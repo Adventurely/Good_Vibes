@@ -1101,25 +1101,50 @@ export const TERRAIN = {
   hill:    { name: 'Spoil hill',  walk: true,  build: false, grows: false },
   tree:    { name: 'Sapling',     walk: false, build: false, grows: false },
   crevice: { name: 'Crevice',     walk: false, build: false, grows: false },
-  /* The camp. The tent itself is solid — you walk round it, you do not build
-     on it and nothing grows through it — and the yard is the trodden apron
-     you stand on. Terrain rather than a building on purpose: every rule that
-     matters (walking, building, growing, spawning, pathing) already reads
-     TERRAIN, so nine blocked cells cost nothing but this line. */
+  /* The camp. Three kinds, all of them terrain rather than buildings on
+     purpose: every rule that matters — walking, building, growing, spawning,
+     pathing — already reads TERRAIN, so the whole footprint costs these lines
+     and a stamp instead of a footprint-aware rewrite of all of it.
+
+     The fire is solid for the same reason a pond is: you do not stand in it,
+     and it has to be unstandable for "the party spawns around the fire" to
+     mean anything. */
   tent:    { name: 'The tent',    walk: false, build: false, grows: false },
-  camp:    { name: 'Camp yard',   walk: true,  build: true,  grows: false },
+  camp:    { name: 'The clearing', walk: true, build: true,  grows: false },
+  fire:    { name: 'The fire',    walk: false, build: false, grows: false },
 };
 
 /* Where the camp stands. Dead centre, fixed rather than rolled: it is the one
-   thing on a site that is the same every run, which is what makes coming back
-   to it feel like coming back. */
+ * thing on a site that is the same every run, which is what makes coming back
+ * to it feel like coming back.
+ *
+ * CAMP_X/CAMP_Y is the middle of the clearing, and the fire is on it. The tent
+ * sits above, as a backdrop — a tent is somewhere you sleep, and the fire is
+ * the thing people actually gather at, so the fire is what the camp is
+ * arranged around and what the party spawns in a ring about.
+ *
+ *        :###:      the tent, 3x3, solid
+ *        :###:
+ *        :###:
+ *        :::::      the clearing
+ *        ::*::      the fire, at its centre
+ *        :::::
+ */
 export const CAMP_X = Math.floor(MAP_W / 2);
 export const CAMP_Y = Math.floor(MAP_H / 2);
-export const CAMP_RADIUS = 2;               // 5x5 overall: 3x3 tent, one yard ring
+export const CAMP_RADIUS = 2;               // the clearing's half-width
+/* Centre row of the 3x3 tent. Four rows up rather than three: at three, the
+   seats on the near side of the fire stood directly against the tent's base and
+   covered two thirds of it, so the backdrop the tent is meant to be was mostly
+   a hat above somebody's head. */
+export const TENT_Y = CAMP_Y - 4;
 
-/* Is this tile part of the camp footprint? */
-export const inCamp = (x, y) =>
-  Math.abs(x - CAMP_X) <= CAMP_RADIUS && Math.abs(y - CAMP_Y) <= CAMP_RADIUS;
+/* The camp's whole footprint, from the tent's top row to the clearing's foot.
+   `margin` widens it, which is how the tree pass keeps a canopy far enough away
+   that it cannot be drawn over the camp. */
+export const inCamp = (x, y, margin = 0) =>
+  Math.abs(x - CAMP_X) <= CAMP_RADIUS + margin &&
+  y >= TENT_Y - 1 - margin && y <= CAMP_Y + CAMP_RADIUS + margin;
 
 /* How many herbs a cycle puts out. Fewer than there are open tiles by a wide
    margin, so where they land still reads as a choice of where to walk. */
@@ -1206,9 +1231,16 @@ export function generateTerrain(random){
 
   // Trees are dotted, not blobbed — a copse is single trunks with light
   // between them, and a solid mass of them would read as one green rock.
+  //
+  // Nothing grows near the camp. A tree is drawn as a canopy three tiles tall,
+  // and one standing south of the tent sorts in front of it and swallows the
+  // whole camp — which happened on about half of all sites. The margin is what
+  // a canopy can reach from outside it. Tested on the same draw, so the number
+  // of calls to random() is unchanged and the replay guarantee holds.
   for(let i = 0; i < 14; i++){
     const index = Math.floor(random() * cells.length);
-    if(cells[index] === 'grass') cells[index] = 'tree';
+    const x = index % MAP_W, y = Math.floor(index / MAP_W);
+    if(cells[index] === 'grass' && !inCamp(x, y, 2)) cells[index] = 'tree';
   }
 
   // The camp goes in last and clears its own ground, because the ruin does not
@@ -1223,19 +1255,20 @@ export function generateTerrain(random){
   return cells;
 }
 
-/* The camp footprint: a 3x3 tent with a trodden yard around it.
+/* The camp footprint: a tent above a clearing, with the fire in the middle of
+ * the clearing.
  *
- * The yard is what the party spawns onto and what makes the tent reachable
- * from any direction — a tent ringed by water would block half the approaches
- * and put seats on the far side of a pond from each other.
+ * The clearing is what the party spawns onto and what makes the fire reachable
+ * from every side — a camp ringed by water would block half the approaches and
+ * put seats on the far side of a pond from each other.
  */
 function stampCamp(cells){
-  for(let dy = -CAMP_RADIUS; dy <= CAMP_RADIUS; dy++){
-    for(let dx = -CAMP_RADIUS; dx <= CAMP_RADIUS; dx++){
-      const x = CAMP_X + dx, y = CAMP_Y + dy;
+  for(let y = TENT_Y - 1; y <= CAMP_Y + CAMP_RADIUS; y++){
+    for(let x = CAMP_X - CAMP_RADIUS; x <= CAMP_X + CAMP_RADIUS; x++){
       if(!inBounds(x, y)) continue;
-      const underTent = Math.abs(dx) <= 1 && Math.abs(dy) <= 1;
-      cells[tileIndex(x, y)] = underTent ? 'tent' : 'camp';
+      const underTent = Math.abs(x - CAMP_X) <= 1 && Math.abs(y - TENT_Y) <= 1;
+      const isFire = x === CAMP_X && y === CAMP_Y;
+      cells[tileIndex(x, y)] = underTent ? 'tent' : isFire ? 'fire' : 'camp';
     }
   }
 }

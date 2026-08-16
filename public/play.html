@@ -585,7 +585,7 @@
       } from './art.js';
       import {
         CLASSES, OPEN_ROLES, MATERIALS, RECIPES, missingFor, playableClasses,
-        pathTo, walkableAt, brew, CAMP_X, CAMP_Y, CAMP_RADIUS,
+        pathTo, walkableAt, brew, CAMP_X, CAMP_Y, CAMP_RADIUS, TENT_Y,
         MAP_W, MAP_H, TERRAIN, PHASES, isBuildPhase, readyState,
         generateMap, generateCombatTerrain, respawnItems, seededRandom, seedFromCode, spawnTile, tileAt,
         ROUNDS_BEFORE_BOSS, BOSS_ROUND, roundInfo, phaseCard, PARTY_SIZE, classById,
@@ -1026,8 +1026,21 @@
             + `${boss ? ' - THE BOSS' : ''} - BLIGHT ${info.blight}`
           : 'THE SITE';
         const right = `${state.ready}/${state.total} READY`;
-        drawTextOutlined(mctx, left, 2, 4, 'y', 1);
-        drawTextOutlined(mctx, right, MAP_PX_W - textWidth(right, 1) - 2, 4, 'c', 1);
+
+        /* Everything below the strip is clipped to the strip.
+         *
+         * A sprite that overhangs the top of the map is correct — it is a tall
+         * thing standing on the top row — but a tree is three tiles high and a
+         * hero is two and a half, so on row 0 they start sixteen and eight
+         * pixels *above* the canvas and paint straight through the title. The
+         * header is chrome; it goes on top of everything, and clipping means
+         * nothing has to know how tall anything else is. Ready marks fly ten
+         * pixels over a sprite's head and are covered by the same rule.
+         */
+        mctx.save();
+        mctx.beginPath();
+        mctx.rect(0, HEADER, MAP_PX_W, MAP_PX_H);
+        mctx.clip();
 
         // Ground first, everything else on top of it. Stamped from the cache:
         // the picture only changes when the terrain or the hour does.
@@ -1064,15 +1077,20 @@
         const stand = (groundY, art, x, extra = {}) =>
           standing.push({ groundY, art, x, top: groundY - art.length, ...extra });
 
-        // The tent, once, anchored on the bottom row of its footprint.
+        // The tent, once, anchored on the bottom row of its 3x3 — above the
+        // clearing, so it reads as the backdrop to the camp rather than the
+        // thing everyone is standing around.
         const tentArt = PROP_ART.tent;
-        stand(HEADER + (CAMP_Y + 2) * TILE, tentArt,
+        stand(HEADER + (TENT_Y + 2) * TILE, tentArt,
           (CAMP_X + 0.5) * TILE - tentArt[0].length / 2, { noShadow: true });
 
-        // The fire, beside the door, on the yard.
+        // The fire, in the middle of the clearing. Its ground line is below the
+        // tent's, so it paints in front; seats north of it paint between the
+        // two and seats south paint over it, which puts the fire in the middle
+        // of the group instead of behind it.
         const fireArt = FIRE_ART[Math.floor(now / 130) % FIRE_ART.length];
-        stand(HEADER + (CAMP_Y + 2) * TILE - 2, fireArt,
-          (CAMP_X - 2) * TILE, { noShadow: true, glow: true });
+        stand(HEADER + (CAMP_Y + 1) * TILE, fireArt,
+          (CAMP_X + 0.5) * TILE - fireArt[0].length / 2, { noShadow: true, glow: true });
 
         // Trees are terrain for the rules and props for the picture: the tile
         // holds roots and litter, the canopy stands in this list so a hero one
@@ -1145,6 +1163,12 @@
           mctx.fillRect(x + TILE - 1, y, 1, TILE);
           mctx.globalAlpha = 1;
         }
+
+        mctx.restore();
+
+        // The strip last, over the top of everything the clip held back.
+        drawTextOutlined(mctx, left, 2, 4, 'y', 1);
+        drawTextOutlined(mctx, right, MAP_PX_W - textWidth(right, 1) - 2, 4, 'c', 1);
       }
 
       /* ---- the combat scene ------------------------------------------------ */
@@ -1213,6 +1237,12 @@
          the old frame loop so the scene and the overlay are drawn by one clock
          rather than by two that each thought they owned the canvas. */
       function paintFx(t){
+        // Clipped like the scene under it: a lobbed projectile arcs twenty-six
+        // pixels above its start and would otherwise cross the header strip.
+        cctx.save();
+        cctx.beginPath();
+        cctx.rect(0, HEADER, MAP_PX_W, COMBAT_PX_H);
+        cctx.clip();
         {
           for(const fx of volley.events){
             const from = stagePos.players.get(fx.player) || { x: 2 * TILE + 12, y: HEADER + 5 * TILE };
@@ -1257,6 +1287,7 @@
             }
           }
         }
+        cctx.restore();
       }
 
       /* ---- the frame ------------------------------------------------------ */
@@ -1367,9 +1398,14 @@
 
         const info = room.roundInfo;
         const title = room.round >= (room.bossRound || 4) ? 'THE ARRAY WAKES' : 'THE SURGE';
-        drawTextOutlined(cctx, title, 2, 4, 'y', 1);
         const right = info ? info.name.toUpperCase() : '';
-        drawTextOutlined(cctx, right, MAP_PX_W - textWidth(right, 1) - 2, 4, 'c', 1);
+
+        // Same rule as the map: the lane is clipped to below the strip, because
+        // the party's top row and its ready marks reach above it.
+        cctx.save();
+        cctx.beginPath();
+        cctx.rect(0, HEADER, MAP_PX_W, COMBAT_PX_H);
+        cctx.clip();
 
         cctx.drawImage(groundFor(room.terrain, COMBAT_H, 'floor', room.round || 1), 0, HEADER);
         backdrop(cctx, room.round || 1);
@@ -1460,6 +1496,12 @@
           cctx.fillStyle = share > 0.4 ? PALETTE.g : PALETTE.e;
           cctx.fillRect(x, y - 5, Math.max(1, Math.round(art[0].length * share)), 3);
         });
+
+        cctx.restore();
+
+        // The strip last, over the top of everything the clip held back.
+        drawTextOutlined(cctx, title, 2, 4, 'y', 1);
+        drawTextOutlined(cctx, right, MAP_PX_W - textWidth(right, 1) - 2, 4, 'c', 1);
       }
 
       /* A struck sprite goes white for a beat. Painted as its own silhouette

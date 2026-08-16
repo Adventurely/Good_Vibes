@@ -20,7 +20,7 @@ import {
   UNIVERSAL_CARDS, deckFor, cardPlayable, COMBAT_H, generateCombatTerrain,
   UPGRADES, upgradeCost, buyUpgrade, cardEffect, powerFrom, canBuildMore, buildingsOf,
   brew, pathTo, walkableAt, respawnItems, combatOptions, LEVELS,
-  CAMP_X, CAMP_Y, CAMP_RADIUS, inCamp,
+  CAMP_X, CAMP_Y, CAMP_RADIUS, TENT_Y, inCamp,
 } from '../public/content.js';
 
 /* content.js is imported by the authoritative room object in Tool Haven, not
@@ -448,35 +448,46 @@ test('players start on ground they can stand on', () => {
 
 /* The camp is the one fixed thing on a site. It is terrain rather than a
  * building because every rule that matters — walking, building, growing,
- * spawning, pathing — already reads TERRAIN, so the whole footprint costs two
+ * spawning, pathing — already reads TERRAIN, so the whole footprint costs three
  * table entries and a stamp instead of a footprint-aware rewrite of all of it.
+ *
+ * The tent sits above a clearing and the fire is in the middle of the clearing,
+ * because a tent is somewhere you sleep and the fire is the thing people
+ * actually gather at.
  */
 
-test('every site has a camp at its centre, tent inside and yard around it', () => {
+test('every site has a tent above a clearing with a fire in the middle', () => {
   for (let seed = 1; seed <= 60; seed++) {
     const terrain = generateTerrain(seededRandom(seed));
-    for (let dy = -CAMP_RADIUS; dy <= CAMP_RADIUS; dy++) {
-      for (let dx = -CAMP_RADIUS; dx <= CAMP_RADIUS; dx++) {
-        const kind = tileAt(terrain, CAMP_X + dx, CAMP_Y + dy);
-        const inner = Math.abs(dx) <= 1 && Math.abs(dy) <= 1;
-        assert.equal(kind, inner ? 'tent' : 'camp',
-          `seed ${seed} at (${dx},${dy}) from centre is "${kind}"`);
+    for (let y = TENT_Y - 1; y <= CAMP_Y + CAMP_RADIUS; y++) {
+      for (let x = CAMP_X - CAMP_RADIUS; x <= CAMP_X + CAMP_RADIUS; x++) {
+        const kind = tileAt(terrain, x, y);
+        const underTent = Math.abs(x - CAMP_X) <= 1 && Math.abs(y - TENT_Y) <= 1;
+        const isFire = x === CAMP_X && y === CAMP_Y;
+        const want = underTent ? 'tent' : isFire ? 'fire' : 'camp';
+        assert.equal(kind, want, `seed ${seed} at (${x},${y}) is "${kind}", want "${want}"`);
       }
     }
+    // The tent has to be above the clearing, not in it.
+    assert.ok(TENT_Y + 1 < CAMP_Y, 'the tent overlaps the fire');
   }
 });
 
-test('the tent is solid and the yard is not', () => {
+test('the tent and the fire are solid, the clearing is not', () => {
   const terrain = generateTerrain(seededRandom(7));
-  assert.equal(walkableAt(terrain, [], CAMP_X, CAMP_Y), false, 'the tent is walkable');
-  assert.equal(canBuildAt(terrain, [], [], CAMP_X, CAMP_Y), false, 'you can build on the tent');
-  assert.equal(TERRAIN.tent.grows, false, 'herbs grow through the tent');
 
-  // The yard is the apron you stand on, so it has to be standable from every
-  // side — a tent you can only reach from the north is a wall with a door.
-  for (const [dx, dy] of [[-2, 0], [2, 0], [0, -2], [0, 2]]) {
+  for (const [what, x, y] of [['tent', CAMP_X, TENT_Y], ['fire', CAMP_X, CAMP_Y]]) {
+    assert.equal(walkableAt(terrain, [], x, y), false, `the ${what} is walkable`);
+    assert.equal(canBuildAt(terrain, [], [], x, y), false, `you can build on the ${what}`);
+  }
+  assert.equal(TERRAIN.tent.grows, false, 'herbs grow through the tent');
+  assert.equal(TERRAIN.fire.grows, false, 'herbs grow through the fire');
+
+  // The clearing is what you stand on, so the fire has to be reachable from
+  // every side — a fire you can only stand north of is a wall.
+  for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
     assert.ok(walkableAt(terrain, [], CAMP_X + dx, CAMP_Y + dy),
-      `the yard at (${dx},${dy}) is not walkable`);
+      `the clearing at (${dx},${dy}) from the fire is not walkable`);
   }
 });
 
@@ -485,19 +496,35 @@ test('the camp clears its own ground, whatever the ruin rolled', () => {
   // the centre and the tent floated in a pond.
   for (let seed = 1; seed <= 120; seed++) {
     const terrain = generateTerrain(seededRandom(seed));
-    for (let dy = -CAMP_RADIUS; dy <= CAMP_RADIUS; dy++) {
-      for (let dx = -CAMP_RADIUS; dx <= CAMP_RADIUS; dx++) {
-        const kind = tileAt(terrain, CAMP_X + dx, CAMP_Y + dy);
-        assert.ok(kind === 'tent' || kind === 'camp',
+    for (let y = TENT_Y - 1; y <= CAMP_Y + CAMP_RADIUS; y++) {
+      for (let x = CAMP_X - CAMP_RADIUS; x <= CAMP_X + CAMP_RADIUS; x++) {
+        const kind = tileAt(terrain, x, y);
+        assert.ok(kind === 'tent' || kind === 'camp' || kind === 'fire',
           `seed ${seed} left "${kind}" in the camp footprint`);
       }
     }
   }
 });
 
-test('the party spawns around the tent, not in a line east of it', () => {
+test('nothing grows close enough to be drawn over the camp', () => {
+  // A tree is a canopy three tiles tall. One standing south of the tent sorts
+  // in front of it and swallows the whole camp, which happened on about half
+  // of all sites before the tree pass learned to refuse the ground near it.
+  for (let seed = 1; seed <= 120; seed++) {
+    const terrain = generateTerrain(seededRandom(seed));
+    for (let y = 0; y < MAP_H; y++) {
+      for (let x = 0; x < MAP_W; x++) {
+        if (tileAt(terrain, x, y) !== 'tree') continue;
+        assert.ok(!inCamp(x, y, 2), `seed ${seed} grew a tree at (${x},${y}), over the camp`);
+      }
+    }
+  }
+});
+
+test('the party spawns around the fire', () => {
   // spawnTile's offset used to slide the search window sideways, which put
-  // seat five seven tiles from camp with nobody in sight.
+  // seat five seven tiles from camp with nobody in sight. It is a seat index
+  // now, ringing out from the fire — which is unwalkable, so nobody lands in it.
   for (let seed = 1; seed <= 60; seed++) {
     const terrain = generateTerrain(seededRandom(seed));
     const spots = [];
@@ -505,8 +532,9 @@ test('the party spawns around the tent, not in a line east of it', () => {
 
     for (const { x, y } of spots) {
       assert.ok(walkableAt(terrain, [], x, y), `seed ${seed} spawned a player in a wall`);
+      assert.ok(!(x === CAMP_X && y === CAMP_Y), `seed ${seed} spawned a player in the fire`);
       const ring = Math.max(Math.abs(x - CAMP_X), Math.abs(y - CAMP_Y));
-      assert.ok(ring <= CAMP_RADIUS + 1, `seed ${seed} spawned a player ${ring} tiles from camp`);
+      assert.ok(ring <= CAMP_RADIUS, `seed ${seed} spawned a player ${ring} tiles from the fire`);
     }
     const distinct = new Set(spots.map(s => `${s.x},${s.y}`));
     assert.equal(distinct.size, spots.length, `seed ${seed} sat two players on one tile`);
@@ -1248,7 +1276,7 @@ const PUBLISHED = [
   'walkableAt', 'reachableFrom', 'pathTo', 'largestBuildableArea',
   'seededRandom', 'seedFromCode',
   // the camp
-  'CAMP_X', 'CAMP_Y', 'CAMP_RADIUS', 'inCamp',
+  'CAMP_X', 'CAMP_Y', 'CAMP_RADIUS', 'TENT_Y', 'inCamp',
 ];
 
 test('every name this module has ever published is still exported', async () => {
