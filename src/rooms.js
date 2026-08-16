@@ -25,7 +25,7 @@ import {
   BUILDINGS, UPGRADES, upgradeCost, buyUpgrade, canBuildMore, powerFrom,
   CARDS, cardById, cardEffect, cardPlayable, deckFor, shuffle, draw, discardHand,
   HAND_SIZE, RECIPES, brew, missingForBuilding, canBuildAt,
-  generateMap, generateCombatTerrain, spawnTile, pathTo,
+  generateMap, generateCombatTerrain, respawnItems, spawnTile, pathTo,
   seededRandom, seedFromCode, readyState,
   ENEMIES, waveFor, salvageAfterCombat, addSalvage, spendSalvage,
 } from '../public/content.js';
@@ -50,7 +50,8 @@ class Room {
   reset(){
     this.phase = PHASES.lobby;
     this.round = 1;
-    this.terrain = [];
+    this.site = [];          // the ground, generated once a run and kept
+    this.terrain = [];       // what is on screen: the site, or a combat lane
     this.nodes = [];
     this.buildings = [];
     this.enemies = [];
@@ -198,20 +199,26 @@ class Room {
       p.down = false;
     }
     this.round = 1;
+    // The site is generated once for the whole run. Everything the party puts
+    // on it stands until the run ends — that is the entire reason to build.
+    const { terrain } = generateMap(this.random);
+    this.site = terrain;
+    this.buildings = [];
     this.enterBuild();
   }
 
   enterBuild(){
-    const { terrain, nodes } = generateMap(this.random);
     this.phase = PHASES.build;
-    this.terrain = terrain;
-    this.nodes = nodes;
-    this.buildings = [];     // the site is new each round — see the README gap
+    // Same ground, same structures, a fresh crop. Only what grows is reseeded:
+    // walking back onto the slab you cleared last round and finding your panel
+    // still bolted to it is the point of a build phase.
+    this.terrain = this.site;
+    this.nodes = respawnItems(this.site, this.buildings, this.random);
     this.enemies = [];
     this.power = 0;
 
     this.players.forEach((p, i) => {
-      const start = spawnTile(terrain, i * 2);
+      const start = spawnTile(this.site, i * 2, this.buildings);
       p.x = start.x;
       p.y = start.y;
       p.ready = false;

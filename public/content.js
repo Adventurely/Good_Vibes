@@ -1199,12 +1199,16 @@ export function largestBuildableArea(terrain){
  *   salvage  { salvage }   what SALVAGE entry, CACHE_YIELD.salvage pieces
  *   pages    { }           CACHE_YIELD.pages spell pages
  */
-export function spawnItems(terrain, random, spawns = SPAWNS){
+export function spawnItems(terrain, random, spawns = SPAWNS, buildings = []){
   // Only where a hero can actually get to. Terrain rolls islands — a pocket of
   // grass behind a pond — and a Cellsap on one is a node the player can see,
-  // walk at, and never reach. With six herbs on a site, losing one to an
-  // island is a sixth of the round's brewing.
-  const reachable = reachableFrom(terrain, [], spawnTile(terrain));
+  // walk at, and never reach. With five herbs on a site, losing one to an
+  // island is a fifth of the round's brewing.
+  //
+  // Buildings count as blocked, which does two jobs at once on a site that
+  // persists: nothing sprouts underneath a structure, and a pocket that this
+  // round's building walled off stops being somewhere the crop can land.
+  const reachable = reachableFrom(terrain, buildings, spawnTile(terrain, 0, buildings));
 
   const growable = [];
   const walkable = [];
@@ -1273,9 +1277,21 @@ export function generateMap(random){
   return { terrain, nodes: spawnItems(terrain, random) };
 }
 
+/* A fresh crop on ground that is already there.
+ *
+ * The site is generated once a run and kept — the slab you cleared and the
+ * panel you bolted down are still there next round, which is the whole reason
+ * to build anything. Only what grows is reseeded.
+ */
+export function respawnItems(terrain, buildings, random, spawns = SPAWNS){
+  return spawnItems(terrain, random, spawns, buildings);
+}
+
 /* A player's walkable start. Centre-ish and always on solid ground, so nobody
-   opens the build phase standing in a pond. */
-export function spawnTile(terrain, offset = 0){
+ * opens the build phase standing in a pond — or, once a site persists, inside
+ * the workbench they put up last round.
+ */
+export function spawnTile(terrain, offset = 0, buildings = []){
   const cx = Math.floor(MAP_W / 2);
   const cy = Math.floor(MAP_H / 2);
   for(let radius = 0; radius < Math.max(MAP_W, MAP_H); radius++){
@@ -1283,10 +1299,15 @@ export function spawnTile(terrain, offset = 0){
       for(let dx = -radius; dx <= radius; dx++){
         const x = cx + dx + offset;
         const y = cy + dy;
-        const tile = tileAt(terrain, x, y);
-        if(tile && TERRAIN[tile].walk) return { x, y };
+        if(walkableAt(terrain, buildings, x, y)) return { x, y };
       }
     }
+  }
+  // Nothing near the middle: take the first standable tile anywhere rather
+  // than returning a spot that is not.
+  for(let i = 0; i < terrain.length; i++){
+    const x = i % MAP_W, y = Math.floor(i / MAP_W);
+    if(walkableAt(terrain, buildings, x, y)) return { x, y };
   }
   return { x: cx, y: cy };
 }

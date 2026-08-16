@@ -281,6 +281,19 @@ when the library is empty, which is a bad draw the player caused.
 
 ### The build phase
 
+**The site is generated once a run and kept.** Walking back onto the slab you
+cleared last round and finding your panel still bolted to it is the entire
+reason to build anything, so terrain and structures persist and only the crop
+is reseeded — `respawnItems` puts a fresh five herbs, five caches and three
+pages on ground that is already there.
+
+That reseeding is building-aware, which does two jobs at once. Nothing sprouts
+underneath a structure, and a pocket this round's building walled off stops
+being somewhere the crop can land — the spawner floods with the buildings in
+place, so what it plants is what a hero can still walk to. Spawn tiles are
+building-aware for the same reason: nobody should open a round standing inside
+the workbench they put up last one.
+
 The site is a 30 &times; 17 grid of 16px tiles — a grid because every question
 the build phase asks is about neighbours, and a grid answers those with
 arithmetic instead of geometry. Terrain decides three things: whether you can
@@ -377,16 +390,14 @@ Honest status, so nobody discovers these at the table:
 - **Tool Haven has none of this.** The server here is a Node process; the
   deployed site's Durable Object still implements none of the two-phase loop.
   Publishing `public/` will sync the client and it will have nothing to talk to.
-- **The site does not persist.** Terrain is regenerated and `buildings` is reset
-  every round, so the base you built in round one is gone in round two. The
-  persistent site is the design; this is the gap.
 - **Only the Wizard is still a deck with a different mix.** Prepared spells are
   designed, not written; the Alchemist brews and the Engineer builds power.
 - **The Overcharged Coil may be out of reach in a short run.** It needs Coil,
   the rarest salvage at a weight of 3, and a three-round game may never turn one
   up.
-- **Decks carry within a run** — brewed cards and bought barrels stay — but the
-  site does not, so the base resets while the deck does not.
+- **A hand of nothing but costed cards is possible late.** An Engineer with
+  several Bolt Guns and no power can draw three unplayable cards; *Do nothing*
+  is the way out, and it is always available.
 - **Nobody can die.** Damage is clamped above zero in the preview, and there is
   no down state, no party wipe and no lose condition.
 - **Enemies only ever hit the local player** — no round-robin across a party.

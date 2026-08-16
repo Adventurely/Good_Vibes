@@ -19,7 +19,7 @@ import {
   HAND_SIZE, CARDS, STARTING_DECKS, buildDeck, shuffle, draw, discardHand, cardById,
   UNIVERSAL_CARDS, deckFor, cardPlayable, COMBAT_H, generateCombatTerrain,
   UPGRADES, upgradeCost, buyUpgrade, cardEffect, powerFrom, canBuildMore, buildingsOf,
-  brew, pathTo, walkableAt,
+  brew, pathTo, walkableAt, respawnItems,
 } from '../public/content.js';
 
 /* content.js is imported by the authoritative room object in Tool Haven, not
@@ -978,5 +978,73 @@ test('a deck keeps its size across a fight, hand included', () => {
     hand = [];
     assert.equal(deck.length, owned.length,
       `round ${round + 1}: the deck went from ${owned.length} to ${deck.length}`);
+  }
+});
+
+/* -------------------------------------------------------- a site that keeps */
+
+test('a respawned site keeps its ground and reseeds only what grows', () => {
+  const terrain = generateTerrain(seededRandom(4));
+  const buildings = [];
+  const first = respawnItems(terrain, buildings, seededRandom(1));
+  const second = respawnItems(terrain, buildings, seededRandom(2));
+
+  assert.equal(first.length, second.length, 'the same site should grow the same amount');
+  // Different seeds, different placement — otherwise coming back is not a
+  // fresh crop, it is the same round again.
+  assert.notDeepEqual(first.map((n) => `${n.x},${n.y}`), second.map((n) => `${n.x},${n.y}`));
+});
+
+test('nothing sprouts underneath a standing building', () => {
+  // The site persists, so round two spawns onto ground round one built on. A
+  // herb under the workbench is one the party can see and never pick up.
+  const terrain = new Array(MAP_W * MAP_H).fill('grass');
+  const buildings = [];
+  for (let x = 0; x < MAP_W; x++) for (let y = 0; y < 6; y++) buildings.push({ id: 'panel', x, y });
+
+  for (let seed = 1; seed <= 20; seed++) {
+    const nodes = respawnItems(terrain, buildings, seededRandom(seed));
+    for (const node of nodes) {
+      assert.ok(!buildings.some((b) => b.x === node.x && b.y === node.y),
+        `seed ${seed}: a ${node.kind} spawned under a building at ${node.x},${node.y}`);
+    }
+  }
+});
+
+test('a spawn tile is never inside a building', () => {
+  const terrain = new Array(MAP_W * MAP_H).fill('grass');
+  const cx = Math.floor(MAP_W / 2);
+  const cy = Math.floor(MAP_H / 2);
+  // Wall off the middle, where spawnTile likes to start.
+  const buildings = [];
+  for (let dx = -3; dx <= 3; dx++) for (let dy = -3; dy <= 3; dy++) {
+    buildings.push({ id: 'panel', x: cx + dx, y: cy + dy });
+  }
+  for (let offset = 0; offset < PARTY_SIZE; offset++) {
+    const spot = spawnTile(terrain, offset, buildings);
+    assert.ok(walkableAt(terrain, buildings, spot.x, spot.y),
+      `offset ${offset} spawned onto ${spot.x},${spot.y}, which is built on`);
+  }
+});
+
+test('everything on a persisted site is still reachable around the buildings', () => {
+  // A structure can wall a pocket off. The spawner floods with the buildings in
+  // place, so what it plants is what a hero can still walk to.
+  for (let seed = 1; seed <= 25; seed++) {
+    const terrain = generateTerrain(seededRandom(seed));
+    const random = seededRandom(seed + 500);
+    const buildings = [];
+    // Put a few structures down where a player could actually build them.
+    for (let i = 0; i < 6; i++) {
+      const spot = spawnTile(terrain, i * 3, buildings);
+      if (canBuildAt(terrain, buildings, [], spot.x, spot.y)) {
+        buildings.push({ id: 'panel', x: spot.x, y: spot.y });
+      }
+    }
+    const from = spawnTile(terrain, 0, buildings);
+    for (const node of respawnItems(terrain, buildings, random)) {
+      assert.ok(pathTo(terrain, buildings, from, { x: node.x, y: node.y }),
+        `seed ${seed}: ${node.kind} at ${node.x},${node.y} was walled off`);
+    }
   }
 });

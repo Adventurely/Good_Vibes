@@ -557,7 +557,7 @@
         CLASSES, OPEN_ROLES, MATERIALS, RECIPES, missingFor, playableClasses,
         pathTo, brew,
         MAP_W, MAP_H, TERRAIN, PHASES, isBuildPhase, readyState,
-        generateMap, generateCombatTerrain, seededRandom, seedFromCode, spawnTile, tileAt,
+        generateMap, generateCombatTerrain, respawnItems, seededRandom, seedFromCode, spawnTile, tileAt,
         ROUNDS_BEFORE_BOSS, BOSS_ROUND, roundInfo, phaseCard, PARTY_SIZE, classById,
         SALVAGE, BUILDINGS, STARTING_SALVAGE, CACHE_YIELD, PAGES,
         UPGRADES, upgradeCost, buyUpgrade, cardEffect, powerFrom, canBuildMore, buildingsOf,
@@ -1044,16 +1044,20 @@
       let demoBeat = 0;
 
       function demoEnterBuild(){
-        const { terrain, nodes } = generateMap(demoRandom);
+        // Same ground, same structures, a fresh crop — the room does exactly
+        // this, and a preview that reset the site would teach the wrong game.
         Object.assign(room, {
-          phase: PHASES.build, terrain, nodes, buildings: [], enemies: [],
+          phase: PHASES.build,
+          terrain: room.site,
+          nodes: respawnItems(room.site, room.buildings, demoRandom),
+          enemies: [],
           roundInfo: roundInfo(room.round),
         });
         walking = null;
         // Spread the party over neighbouring tiles rather than stacking them:
         // three sprites on one square read as one sprite drawn badly.
         room.players.forEach((player, i) => {
-          const start = spawnTile(terrain, i * 2);
+          const start = spawnTile(room.site, i * 2, room.buildings);
           player.x = start.x;
           player.y = start.y;
           player.ready = false;
@@ -1067,6 +1071,8 @@
         demo = true;
         deliberate = true;                    // there is no socket to reconnect to
         demoRandom = seededRandom(seedFromCode(newCode()));
+        // Generated once for the whole preview run, like the room does.
+        const site = generateMap(demoRandom).terrain;
 
         // The whole party, one player. Every class has a verb the others do not
         // — gather and brew, build, cast — and playing all three is the only way
@@ -1077,7 +1083,7 @@
         room = {
           you: 'p1', phase: PHASES.build, round: 1, rounds: ROUNDS_BEFORE_BOSS,
           bossRound: BOSS_ROUND, maxPlayers: PARTY_SIZE,
-          terrain: [], nodes: [], buildings: [], enemies: [],
+          site, terrain: site, nodes: [], buildings: [], enemies: [],
           stash: {}, pages: 2, events: [],
           salvage: { ...STARTING_SALVAGE }, upgrades: {}, power: 0,
           players: playableClasses().map((cls, i) => ({
