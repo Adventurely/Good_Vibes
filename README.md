@@ -1,7 +1,13 @@
 # Good Vibes
 
-A minimal Node.js HTTP server that serves a pixel art hello world page. No
-dependencies — just the Node standard library.
+A co-op solarpunk roguelike, and the pixel art page it grew out of. No
+dependencies anywhere — just the Node standard library and a browser.
+
+- **`public/play.html`** is the game: lobby, build phase, and the surge.
+- **`public/index.html`** is the hello world page and the style guide the whole
+  thing is drawn from.
+- `npm start` serves both. See [Playing locally](#playing-locally) — the game's
+  server half lives in another repo, so a room needs the deployed site.
 
 ## The page
 
@@ -30,6 +36,17 @@ look like it belongs with the old art.
 
 Fractional coordinates are the one thing to watch for: `fillRect` antialiases
 them, and a soft edge is obvious the moment the canvas is scaled up.
+
+**The game draws bigger.** The table above is this page's scene. `play.html`
+shares the palette and the font but authors at its own sizes, because a face
+needs more than nine pixels across:
+
+| Thing | Size |
+| --- | --- |
+| Hero sprites | 24 &times; 32, one skeleton under the whole cast |
+| Terrain tiles | 16 &times; 16, noise rather than motifs so they tile |
+| Buildings | 16 &times; 16, transparent at the corners |
+| Icons — materials, salvage, cards, marks | 8 &times; 8 |
 
 ## Hosting
 
@@ -94,14 +111,15 @@ npm test
 ## Layout
 
 ```
-public/content.js   the game as data — classes, resources, buildings, map
-public/art.js       the palette, the terrain tiles, and every sprite, as text
-public/play.html    the game: lobby, class select, the build phase, the surge
-public/pixel.js     bitmap font and canvas helpers
+public/content.js   the game as data — classes, cards, resources, buildings,
+                    enemies, rounds, and the pure functions over them
+public/art.js       the palette, the tiles, and every sprite, as text
+public/play.html    the game: lobby, build phase, the surge, the hand
+public/pixel.js     bitmap font and canvas helpers, shared by both pages
 public/index.html   the pixel art hello world page and its style guide
 src/app.js          dev server: static files out of public/
 src/server.js       HTTP server entry point
-test/content.test.js validates the class, sprite and map data
+test/content.test.js validates every table above and the rules over them
 test/server.test.js integration tests
 ```
 
@@ -112,10 +130,16 @@ declarative — a throw at its top level would take the whole Worker down — an
 why `test/content.test.js` checks the shape of every class before the publish
 workflow will sync anything.
 
-Adding a class is a block in `CLASSES` and a sprite in `art.js`. Every field is
-documented above the array, and the test names the one you missed. Three seats
-are still open; `OPEN_ROLES` says what the party is short of and the lobby
-shows them as locked rather than pretending the roster is full.
+Adding a class is a block in `CLASSES`, a deck in `STARTING_DECKS`, and a sprite
+in `art.js`. Every field is documented above the array, and the test names the
+one you missed. Two seats are still open; `OPEN_ROLES` says what the party is
+short of and the lobby shows them as locked rather than pretending the roster is
+full.
+
+`COMBAT_ACTIONS` is a **deprecated alias of `CARDS`**, kept only because the
+Tool Haven room imports this module and a missing export there is a throw at the
+top of the Worker — which takes the whole site down, sign-in included. Delete it
+once the room reads `CARDS`.
 
 **`art.js` is client-only** — the engine references an art key by name and
 never reads a sprite. A mistake in there can break a picture but not the
@@ -123,101 +147,165 @@ Worker, which makes it the safest file in the project to experiment in.
 
 ## The game
 
-Solarpunk roguelike. Five levels down through a ruin that is growing back, and
-the ruin itself is the pressure: blight is ambient damage every round, rising
-per level, so standing still costs health.
+Solarpunk co-op roguelike for up to five. A ruin is growing back and the blight
+is growing with it; you have three rounds to make the site defensible before the
+Extractor wakes up in the fourth.
 
-A round is **simultaneous** — everyone commits an action and the whole round
-resolves when the last one is in. Five players never watch each other think,
-and resolution order is fixed by player id so the same commitments always
-produce the same round however the network delivered them.
+**A round is two phases.** You build on a site, everyone readies up, and the
+blight surges onto a combat map of its own. Clear the wave and the next round
+begins. `phaseCard()` names each turn — "Round One — Build Phase / The party
+plans." — from content rather than the client, so the screen animates words it
+cannot misquote.
 
-Materials go to a **shared stash**: anyone can gather, and the Alchemist brews
-from the pool for the whole party. That is the Alchemist's role — it gathers
-double and it is the only class that can turn the pile into potions.
+`ROUNDS` is the posted schedule: three named sites, then **The Array**, where
+the boss is. `ROUNDS_BEFORE_BOSS` and `BOSS_ROUND` are derived from each other
+and pinned by a test, so the run cannot end up one round longer than the wave
+tables know about.
 
-### Two classes, two economies
+A round is **simultaneous** — everyone commits and the whole round resolves when
+the last one is in. Five players never watch each other think, and resolution
+order is fixed by player id so the same commitments always produce the same
+round however the network delivered them.
 
-The Engineer is not a second gatherer. It runs on a different resource, earned
-a different way, spent on a different thing:
+### Three classes, three economies
 
-| | Alchemist | Engineer |
-| --- | --- | --- |
-| Resource | herbs, from `MATERIALS` | salvage, from `SALVAGE` |
-| Earned by | walking to it on the map | surviving a fight |
-| Spent on | potions, consumed once | buildings, which stay |
-| Pool | `stash` | `salvage` |
+Every class spends a different pool, earned a different way, on a different
+thing. A test holds the line, because two classes that both gather and both
+spend would be one class with two sprites.
 
-Both pools are shared by the party and each has exactly one class that can
-spend it — `craft` on the Alchemist, `build` on the Engineer. A test holds that
-line, because two classes that both gather and both spend would be one class
-with two sprites.
+| | Alchemist | Engineer | Wizard |
+| --- | --- | --- | --- |
+| Flag | `craft` | `build` | `cast` |
+| Pool | `stash` (herbs) | `salvage` | `pages` |
+| Spends on | potions | buildings | fireballs |
+| Health | 30 | 32 | **22** |
 
-Salvage never appears on the map. It is what the blight leaves behind, so it
-arrives *after* a fight rather than during a walk: `salvageAfterCombat` pays
-the crew a rolled share per Engineer and the standing buildings a fixed one.
-Building is how you stop being at the mercy of the roll.
+The Wizard is the roster's glass floor and a test enforces it: strictly the
+lowest hp of any class. It has the best basic attack and the worst basic guard,
+which is the whole class in two cards.
 
-### Buildings, and why the build phase decides the fight
+Everything gatherable stands on the build map. `SPAWNS` puts out 12 herbs, 5
+salvage caches and 3 spell pages; herbs need growable ground, caches and pages
+only need somewhere walkable. `CACHE_YIELD` is fixed rather than rolled, so a
+player can count what a trip is worth before spending the rounds to make it.
+Pages are scarce on purpose — every fireball is a page somebody chose to burn.
 
-A building is not a stat. It is a tile you spent and a combat option the whole
-party gets afterwards — `combatOptions` reads what is standing on the map and
-returns what everyone can do when the blight arrives. That one field, `grants`,
-is the entire two-phase loop: **what you build is what your combat looks like.**
+Salvage also arrives *after* a fight: `salvageAfterCombat` pays each Engineer a
+rolled share and each standing building a fixed one. Building is how you stop
+being at the mercy of the roll.
 
-The opening is deliberately a decision. `STARTING_SALVAGE` affords the
-Workbench *or* the Arc Pylon and never both, and nothing in tier 2 at all —
-economy or teeth, pick one, live with it for a cycle. That property is pinned
-by a test rather than left to a comment, so a later balance pass cannot quietly
-make the first move free.
+### The hand
 
-`EFFECT_KINDS` lists what the engine implements. **`strike` is new and the
-combat half of the room does not implement it yet**, so an Arc Pylon builds,
-shows its option, and the option is currently inert. That is a known gap held
-open by a test, not a silent one.
+Everyone holds a deck. A turn is **draw three, play one, discard the hand** —
+the two you did not play go down with the one you did.
 
-**There are no enemies yet, on purpose.** What a fight looks like depends on
-the four classes built to fight it, so blight stands in as the pressure until
-those exist. The loop underneath it is real and finishable today.
+Three is small on purpose. Five players commit simultaneously, so a hand has to
+be readable in about three seconds or four people sit watching a fifth think,
+and a planning problem you cannot coordinate is just a wait. Discarding the
+whole hand is what keeps a turn atomic: nobody holds a card for three rounds
+waiting for a setup the other four cannot see coming.
+
+A deck is nine cards — eight class cards plus the universal `hold` — so at three
+a turn it cycles about every three turns and a fight sees the whole thing twice.
+
+`deckFor(classId, buildings)` is the two-phase loop's point of contact, and it
+is literal: **what you built is what you draw.** Every standing building deals a
+copy of what it `grants` into *everyone's* deck, because the pylon belongs to
+the site and not to whoever bolted it down.
+
+Shuffling and dealing are pure functions taking the generator, like everything
+else that rolls here. A client that shuffled for itself would hold cards the
+room never dealt it, and a replayed room would deal a different hand than the
+one that was played. Each player needs their own stream, too, or one player's
+draw shifts everyone else's. `draw()` returns new piles rather than mutating,
+because two callers sharing an array is how a hand ends up in somebody else's
+deck.
+
+Cards are the *only* interface in a fight. There is no second list of things you
+can do — a card that costs pages is dealt like any other and simply greys out
+when the library is empty, which is a bad draw the player caused.
 
 ### The build phase
 
-A cycle alternates between building on the site and holding it when the blight
-surges, and the map is what makes that worth doing: it is generated once and
-kept, so the ground you cleared last cycle is still cleared when you come back
-to it. Only the herbs are reseeded.
-
-The map is a 24&times;14 grid of 16px tiles — a grid because every question the
-build phase asks is about neighbours, and a grid answers those with arithmetic
-instead of geometry. Terrain decides three things: whether you can stand on a
-tile, whether a structure can go there, and whether anything grows there.
+The site is a 30 &times; 17 grid of 16px tiles — a grid because every question
+the build phase asks is about neighbours, and a grid answers those with
+arithmetic instead of geometry. Terrain decides three things: whether you can
+stand on a tile, whether a structure can go there, and whether anything grows
+there.
 
 Terrain is random, so the generator has a promise to keep: `BASE_ROOM` is the
-smallest *connected* buildable pocket a site is allowed to roll, checked by
-`largestBuildableArea` over a hundred seeds in the tests. Counting buildable
-tiles would not do — thirty tiles in three pockets separated by water is not
-somewhere a base goes.
+smallest *connected* buildable pocket a site may roll, checked by
+`largestBuildableArea` with a flood fill over a hundred seeds in the tests.
+Counting buildable tiles would not do — thirty tiles in three pockets separated
+by water is not somewhere a base goes.
 
-Herbs are scattered across the growable tiles by `spawnHerbs`, which draws
-tiles without replacement so two can never share one, and asks the existing
-`materialFor` what grew — so the rarity weights in `MATERIALS` stay the only
-place that answer lives. Click a herb on the map to gather it, or use the
-buttons under the map, which send the identical intent and are the path that
-works from a keyboard.
+Click a herb or a cache on the map to gather it, or use the buttons under the
+map, which send the identical intent and are the path that works from a
+keyboard. Pick a building, then click where it goes; the tile previews the
+structure and refuses water, rubble, another building and any tile with a herb
+still standing on it.
 
 **The phase turns when everyone is ready.** `readyState` counts only connected
 players, so a party is not held in the build phase by someone whose train went
 into a tunnel, and it returns counts rather than a boolean because "3 of 4
-ready" is what the UI has to draw. The room applies the rule; the client calls
-the same helper only to report what it is still waiting for.
+ready" is what the UI has to draw. A tick flies over each hero who has
+committed and three dots over each one still deciding — the same mark answers
+"are we waiting on you" in a fight, where it means a card is locked in.
 
 Map generation is seeded — `seededRandom(seedFromCode(code))` — so a room code
 is a ruin, the same one on the server, in the client, and in the tests.
 
-`pixel.js` is the file that keeps this looking like one game. Both pages import
-the same palette and the same glyphs rather than carrying a copy, so a colour
-can only be changed in one place — which is the only way a style guide stays
-true once there is more than one screen.
+### Buildings
+
+A building is a tile you spent and a card the whole party draws afterwards. The
+opening is deliberately a decision: `STARTING_SALVAGE` affords the Workbench
+*or* the Arc Pylon and never both, and nothing in tier 2 at all — economy or
+teeth, pick one, live with it for a cycle. That property is pinned by a test
+rather than left to a comment, so a later balance pass cannot quietly make the
+first move free.
+
+### The surge
+
+Combat is a **lane, not a field**: `COMBAT_H` is eight rows of the map's width,
+because the wave closes from one side and a full-height board spent most of its
+pixels on ground nobody crosses. It generates its own terrain and is a diorama
+of the numbers — everything clickable is in the wave row and the hand below it.
+
+An enemy is authored by its distance and its damage. `dist` is how many turns
+the party has before it arrives; `hits` is what each turn costs once it does.
+Every resolved action closes the whole wave by one stride, so there is no free
+action — a heal is a turn you did not spend on something still walking toward
+you. Strikes hit the enemy you aimed at, or the nearest one if you did not.
+
+Waves scale by **composition, not stats**: a later round sends more and faster
+things rather than the same thing with a bigger number, because "there are four
+of them now" is legible on a screen in a way "+2 hp" never is. A test proves the
+boss cannot leak into an earlier round.
+
+`EFFECT_KINDS` lists what the engine implements: `heal`, `regen`, `ward`, and
+`strike`. **`strike` is implemented in the offline preview only** — the Tool
+Haven room has not grown it yet, so it works when you play the preview and does
+nothing in a real room. Known gap, held open by a test.
+
+## What is not built yet
+
+Honest status, so nobody discovers these at the table:
+
+- **Multiplayer does not work.** Everything below the lobby is the offline
+  preview. The room object in Tool Haven does not implement the two-phase loop,
+  the deck, or `strike`.
+- **Hands are private and nothing supports that.** The room broadcasts one state
+  object to every client; a hand needs a per-player view.
+- **The site does not persist.** Terrain is regenerated and `buildings` is reset
+  every round, so the base you built in round one is gone in round two. The
+  persistent site is the design; this is the gap.
+- **Decks do not persist.** Everyone reshuffles a fresh nine when a surge lands.
+- **Nobody can die.** Damage is clamped above zero in the preview, and there is
+  no down state, no party wipe and no lose condition.
+- **Enemies only ever hit the local player** — no round-robin across a party.
+- **Gathering teleports you** to the node rather than walking there.
+- Per-class card systems — the Engineer's powered weapons, the Alchemist's
+  brewed one-shots, the Wizard's prepared spells — are designed, not written.
 
 ## Where the game lives
 
@@ -246,11 +334,19 @@ best tested on the deployed site. Everything that does not need one — the
 scene, the palette, the page itself — works offline.
 
 **Preview the site** on the join screen is the exception, and it exists because
-the map could not otherwise be looked at until it was deployed. It generates a
-map locally and drops you in as the Engineer, alone: gathering, building,
-readying up and ending the fight all work, so the whole cycle — spend salvage,
-surge, collect salvage, spend more — can be walked through offline. Readying up
-switches phase because a party of one is a party that is entirely ready.
+none of this could otherwise be looked at until it was deployed. It generates a
+site locally and drops you in as the Wizard, alone — the one class that can walk
+the whole loop by itself: gather, ready, burn the wave. Gathering, building,
+readying up, drawing a hand and playing cards all work, so a full cycle can be
+walked through offline. Readying up switches phase because a party of one is a
+party that is entirely ready.
+
+Two deep links skip the clicking, and the screenshot tooling drives both:
+
+```
+/play.html?preview          straight into a build phase
+/play.html?preview=combat   straight into a fight
+```
 
 It is the one place the client writes game state, and it is fenced behind a
 `demo` flag for exactly that reason. In a real room every one of those
