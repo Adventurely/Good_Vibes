@@ -1101,7 +1101,25 @@ export const TERRAIN = {
   hill:    { name: 'Spoil hill',  walk: true,  build: false, grows: false },
   tree:    { name: 'Sapling',     walk: false, build: false, grows: false },
   crevice: { name: 'Crevice',     walk: false, build: false, grows: false },
+  /* The camp. The tent itself is solid — you walk round it, you do not build
+     on it and nothing grows through it — and the yard is the trodden apron
+     you stand on. Terrain rather than a building on purpose: every rule that
+     matters (walking, building, growing, spawning, pathing) already reads
+     TERRAIN, so nine blocked cells cost nothing but this line. */
+  tent:    { name: 'The tent',    walk: false, build: false, grows: false },
+  camp:    { name: 'Camp yard',   walk: true,  build: true,  grows: false },
 };
+
+/* Where the camp stands. Dead centre, fixed rather than rolled: it is the one
+   thing on a site that is the same every run, which is what makes coming back
+   to it feel like coming back. */
+export const CAMP_X = Math.floor(MAP_W / 2);
+export const CAMP_Y = Math.floor(MAP_H / 2);
+export const CAMP_RADIUS = 2;               // 5x5 overall: 3x3 tent, one yard ring
+
+/* Is this tile part of the camp footprint? */
+export const inCamp = (x, y) =>
+  Math.abs(x - CAMP_X) <= CAMP_RADIUS && Math.abs(y - CAMP_Y) <= CAMP_RADIUS;
 
 /* How many herbs a cycle puts out. Fewer than there are open tiles by a wide
    margin, so where they land still reads as a choice of where to walk. */
@@ -1193,7 +1211,33 @@ export function generateTerrain(random){
     if(cells[index] === 'grass') cells[index] = 'tree';
   }
 
+  // The camp goes in last and clears its own ground, because the ruin does not
+  // get a vote on where home is. Without this the centre rolled into water or
+  // a crevice on better than one site in ten and the tent floated in a pond.
+  //
+  // Not one call to random(): the stamp is the same nine-plus-sixteen cells on
+  // every seed, so the map a code produces is still the map it always produced
+  // everywhere else on it.
+  stampCamp(cells);
+
   return cells;
+}
+
+/* The camp footprint: a 3x3 tent with a trodden yard around it.
+ *
+ * The yard is what the party spawns onto and what makes the tent reachable
+ * from any direction — a tent ringed by water would block half the approaches
+ * and put seats on the far side of a pond from each other.
+ */
+function stampCamp(cells){
+  for(let dy = -CAMP_RADIUS; dy <= CAMP_RADIUS; dy++){
+    for(let dx = -CAMP_RADIUS; dx <= CAMP_RADIUS; dx++){
+      const x = CAMP_X + dx, y = CAMP_Y + dy;
+      if(!inBounds(x, y)) continue;
+      const underTent = Math.abs(dx) <= 1 && Math.abs(dy) <= 1;
+      cells[tileIndex(x, y)] = underTent ? 'tent' : 'camp';
+    }
+  }
 }
 
 /* One cellular pass: a tile surrounded mostly by some other kind becomes that
@@ -1383,27 +1427,32 @@ export function respawnItems(terrain, buildings, random, spawns = SPAWNS){
   return spawnItems(terrain, random, spawns, buildings);
 }
 
-/* A player's walkable start. Centre-ish and always on solid ground, so nobody
- * opens the build phase standing in a pond — or, once a site persists, inside
- * the workbench they put up last round.
+/* A player's walkable start: the nth place round the fire.
+ *
+ * `offset` used to slide the whole search window sideways, which strung the
+ * party out in a line east of centre — seat five could open the round seven
+ * tiles from camp with nobody in sight. It is a seat index now: candidates are
+ * ordered by ring out from the camp and then clockwise around it, so five
+ * players stand round the tent the way five people stand round a fire.
+ *
+ * Pure in the terrain — no randomness — so the replay guarantee is untouched,
+ * and the signature is unchanged so the deployed room needs no re-port.
  */
 export function spawnTile(terrain, offset = 0, buildings = []){
-  const cx = Math.floor(MAP_W / 2);
-  const cy = Math.floor(MAP_H / 2);
-  for(let radius = 0; radius < Math.max(MAP_W, MAP_H); radius++){
-    for(let dy = -radius; dy <= radius; dy++){
-      for(let dx = -radius; dx <= radius; dx++){
-        const x = cx + dx + offset;
-        const y = cy + dy;
-        if(walkableAt(terrain, buildings, x, y)) return { x, y };
-      }
+  const seats = [];
+  for(let y = 0; y < MAP_H; y++){
+    for(let x = 0; x < MAP_W; x++){
+      if(!walkableAt(terrain, buildings, x, y)) continue;
+      const dx = x - CAMP_X, dy = y - CAMP_Y;
+      seats.push({ x, y, ring: Math.max(Math.abs(dx), Math.abs(dy)), angle: Math.atan2(dy, dx) });
     }
   }
-  // Nothing near the middle: take the first standable tile anywhere rather
-  // than returning a spot that is not.
-  for(let i = 0; i < terrain.length; i++){
-    const x = i % MAP_W, y = Math.floor(i / MAP_W);
-    if(walkableAt(terrain, buildings, x, y)) return { x, y };
-  }
-  return { x: cx, y: cy };
+  // Nothing standable anywhere: hand back the camp centre rather than throw.
+  // It is not walkable, but neither is anything else, and a caller reading
+  // {x,y} is better served by a number than by undefined.
+  if(!seats.length) return { x: CAMP_X, y: CAMP_Y };
+
+  seats.sort((a, b) => a.ring - b.ring || a.angle - b.angle);
+  const seat = seats[offset % seats.length];
+  return { x: seat.x, y: seat.y };
 }

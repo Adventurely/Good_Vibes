@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import {
-  PALETTE, HERO_ART, MATERIAL_ART, TERRAIN_ART, BUILDING_ART, SALVAGE_ART,
-  ENEMY_ART, PAGES_ART, CARD_ART, TILE,
+  PALETTE, HERO_ART, MATERIAL_ART, TERRAIN_ART, TERRAIN_VARIANTS, BUILDING_ART,
+  SALVAGE_ART, ENEMY_ART, PAGES_ART, CARD_ART, TILE, PROP_ART, TREE_ART, FIRE_ART,
 } from '../public/art.js';
 import {
   PARTY_SIZE, CLASSES, OPEN_ROLES, MATERIALS, RECIPES,
@@ -20,6 +20,7 @@ import {
   UNIVERSAL_CARDS, deckFor, cardPlayable, COMBAT_H, generateCombatTerrain,
   UPGRADES, upgradeCost, buyUpgrade, cardEffect, powerFrom, canBuildMore, buildingsOf,
   brew, pathTo, walkableAt, respawnItems, combatOptions, LEVELS,
+  CAMP_X, CAMP_Y, CAMP_RADIUS, inCamp,
 } from '../public/content.js';
 
 /* content.js is imported by the authoritative room object in Tool Haven, not
@@ -225,6 +226,11 @@ test('a build site spawns all three kinds of node, each on its own legal tile', 
   }
 });
 
+/* The cast's canvas. Named here rather than repeated as literals so raising
+   the hero resolution is one edit and not a hunt through assertions. */
+const HERO_W = 32;
+const HERO_H = 40;
+
 test('sprites are rectangular and use only palette keys', () => {
   const check = (label, rows, width) => {
     for (const [i, row] of rows.entries()) {
@@ -236,12 +242,14 @@ test('sprites are rectangular and use only palette keys', () => {
     }
   };
 
+  // One skeleton under the whole cast: same canvas, same ground line, so a
+  // change to one can be reasoned about for all.
   for (const [name, art] of Object.entries(HERO_ART)) {
-    assert.equal(art.rows.length, 32, `hero "${name}" must be 32 rows tall`);
-    check(`hero "${name}"`, art.rows, 24);
-    assert.ok(art.split > 0 && art.split < 32, `hero "${name}" has a split off the sprite`);
+    assert.equal(art.rows.length, HERO_H, `hero "${name}" must be ${HERO_H} rows tall`);
+    check(`hero "${name}"`, art.rows, HERO_W);
+    assert.ok(art.split > 0 && art.split < HERO_H, `hero "${name}" has a split off the sprite`);
     for (const [x, y] of art.eyes ?? []) {
-      assert.ok(x >= 0 && x < 24 && y >= 0 && y < 32, `hero "${name}" has an eye off the sprite`);
+      assert.ok(x >= 0 && x < HERO_W && y >= 0 && y < HERO_H, `hero "${name}" has an eye off the sprite`);
     }
   }
 
@@ -257,6 +265,57 @@ test('sprites are rectangular and use only palette keys', () => {
   for (const [name, rows] of Object.entries(BUILDING_ART)) {
     assert.equal(rows.length, TILE, `building "${name}" must be ${TILE} rows tall`);
     check(`building "${name}"`, rows, TILE);
+  }
+});
+
+test('every terrain kind has at least one cut, and every cut is a tile', () => {
+  // The renderer picks a cut per tile from a hash of its coordinates. A kind
+  // with no cuts would draw nothing; a cut of the wrong size would slide the
+  // whole grid sideways from that tile on.
+  for (const kind of Object.keys(TERRAIN)) {
+    const cuts = TERRAIN_VARIANTS[kind];
+    assert.ok(Array.isArray(cuts) && cuts.length, `terrain "${kind}" has no variants`);
+    for (const [n, rows] of cuts.entries()) {
+      assert.equal(rows.length, TILE, `terrain "${kind}" cut ${n} must be ${TILE} rows`);
+      for (const [i, row] of rows.entries()) {
+        assert.equal(row.length, TILE, `terrain "${kind}" cut ${n} row ${i} is ${row.length} wide`);
+        for (const key of row) {
+          assert.ok(PALETTE[key], `terrain "${kind}" cut ${n} uses "${key}"`);
+        }
+      }
+    }
+    // The canonical tile is the first cut, so the two can never disagree.
+    assert.deepEqual(TERRAIN_ART[kind], cuts[0], `terrain "${kind}" art is not its first cut`);
+  }
+});
+
+test('props are rectangular, opaque-keyed, and taller than the tile they stand on', () => {
+  // A prop that fits inside a tile belongs in TERRAIN_ART; this table exists
+  // for the things that overhang, which is what makes walking behind one work.
+  const props = [
+    ...Object.entries(PROP_ART).map(([name, rows]) => [`prop "${name}"`, rows]),
+    ...TREE_ART.map((rows, i) => [`tree ${i}`, rows]),
+    ...FIRE_ART.map((rows, i) => [`fire frame ${i}`, rows]),
+  ];
+  for (const [label, rows] of props) {
+    assert.ok(rows.length > 0, `${label} is empty`);
+    const width = rows[0].length;
+    for (const [i, row] of rows.entries()) {
+      assert.equal(row.length, width, `${label} row ${i} is ${row.length}, want ${width}`);
+      for (const key of row) {
+        if (key === '.' || key === ' ') continue;
+        assert.ok(PALETTE[key], `${label} row ${i} uses "${key}"`);
+      }
+    }
+  }
+  for (const [name, rows] of Object.entries(PROP_ART)) {
+    assert.ok(rows.length > TILE, `prop "${name}" is not taller than a tile`);
+  }
+  // Every fire frame is the same size, or the flame would jump between frames.
+  const [w, h] = [FIRE_ART[0][0].length, FIRE_ART[0].length];
+  for (const [i, rows] of FIRE_ART.entries()) {
+    assert.equal(rows.length, h, `fire frame ${i} is a different height`);
+    assert.equal(rows[0].length, w, `fire frame ${i} is a different width`);
   }
 });
 
@@ -382,6 +441,91 @@ test('players start on ground they can stand on', () => {
       assert.ok(inBounds(x, y), `seed ${seed} spawned a player off the map`);
       assert.ok(TERRAIN[tileAt(terrain, x, y)].walk, `seed ${seed} spawned a player in ${tileAt(terrain, x, y)}`);
     }
+  }
+});
+
+/* ----------------------------------------------------------------- camp --- */
+
+/* The camp is the one fixed thing on a site. It is terrain rather than a
+ * building because every rule that matters — walking, building, growing,
+ * spawning, pathing — already reads TERRAIN, so the whole footprint costs two
+ * table entries and a stamp instead of a footprint-aware rewrite of all of it.
+ */
+
+test('every site has a camp at its centre, tent inside and yard around it', () => {
+  for (let seed = 1; seed <= 60; seed++) {
+    const terrain = generateTerrain(seededRandom(seed));
+    for (let dy = -CAMP_RADIUS; dy <= CAMP_RADIUS; dy++) {
+      for (let dx = -CAMP_RADIUS; dx <= CAMP_RADIUS; dx++) {
+        const kind = tileAt(terrain, CAMP_X + dx, CAMP_Y + dy);
+        const inner = Math.abs(dx) <= 1 && Math.abs(dy) <= 1;
+        assert.equal(kind, inner ? 'tent' : 'camp',
+          `seed ${seed} at (${dx},${dy}) from centre is "${kind}"`);
+      }
+    }
+  }
+});
+
+test('the tent is solid and the yard is not', () => {
+  const terrain = generateTerrain(seededRandom(7));
+  assert.equal(walkableAt(terrain, [], CAMP_X, CAMP_Y), false, 'the tent is walkable');
+  assert.equal(canBuildAt(terrain, [], [], CAMP_X, CAMP_Y), false, 'you can build on the tent');
+  assert.equal(TERRAIN.tent.grows, false, 'herbs grow through the tent');
+
+  // The yard is the apron you stand on, so it has to be standable from every
+  // side — a tent you can only reach from the north is a wall with a door.
+  for (const [dx, dy] of [[-2, 0], [2, 0], [0, -2], [0, 2]]) {
+    assert.ok(walkableAt(terrain, [], CAMP_X + dx, CAMP_Y + dy),
+      `the yard at (${dx},${dy}) is not walkable`);
+  }
+});
+
+test('the camp clears its own ground, whatever the ruin rolled', () => {
+  // Before this, better than one site in ten rolled water or a crevice under
+  // the centre and the tent floated in a pond.
+  for (let seed = 1; seed <= 120; seed++) {
+    const terrain = generateTerrain(seededRandom(seed));
+    for (let dy = -CAMP_RADIUS; dy <= CAMP_RADIUS; dy++) {
+      for (let dx = -CAMP_RADIUS; dx <= CAMP_RADIUS; dx++) {
+        const kind = tileAt(terrain, CAMP_X + dx, CAMP_Y + dy);
+        assert.ok(kind === 'tent' || kind === 'camp',
+          `seed ${seed} left "${kind}" in the camp footprint`);
+      }
+    }
+  }
+});
+
+test('the party spawns around the tent, not in a line east of it', () => {
+  // spawnTile's offset used to slide the search window sideways, which put
+  // seat five seven tiles from camp with nobody in sight.
+  for (let seed = 1; seed <= 60; seed++) {
+    const terrain = generateTerrain(seededRandom(seed));
+    const spots = [];
+    for (let i = 0; i < PARTY_SIZE; i++) spots.push(spawnTile(terrain, i * 2));
+
+    for (const { x, y } of spots) {
+      assert.ok(walkableAt(terrain, [], x, y), `seed ${seed} spawned a player in a wall`);
+      const ring = Math.max(Math.abs(x - CAMP_X), Math.abs(y - CAMP_Y));
+      assert.ok(ring <= CAMP_RADIUS + 1, `seed ${seed} spawned a player ${ring} tiles from camp`);
+    }
+    const distinct = new Set(spots.map(s => `${s.x},${s.y}`));
+    assert.equal(distinct.size, spots.length, `seed ${seed} sat two players on one tile`);
+
+    // And they can all reach each other, or the party opens the round split up.
+    for (const spot of spots.slice(1)) {
+      assert.ok(pathTo(terrain, [], spots[0], spot) !== null,
+        `seed ${seed} spawned a player nobody can walk to`);
+    }
+  }
+});
+
+test('the camp does not consume the generator', () => {
+  // The stamp must not call random(), or every existing room code would render
+  // a different ruin everywhere else on the map.
+  for (const code of ['QF7K', 'ZZ42', 'AB12']) {
+    const a = generateTerrain(seededRandom(seedFromCode(code)));
+    const b = generateTerrain(seededRandom(seedFromCode(code)));
+    assert.deepEqual(a, b, `${code} did not generate the same terrain twice`);
   }
 });
 
@@ -1103,6 +1247,8 @@ const PUBLISHED = [
   'spawnHerbs', 'respawnItems', 'spawnTile', 'tileAt', 'tileIndex', 'inBounds',
   'walkableAt', 'reachableFrom', 'pathTo', 'largestBuildableArea',
   'seededRandom', 'seedFromCode',
+  // the camp
+  'CAMP_X', 'CAMP_Y', 'CAMP_RADIUS', 'inCamp',
 ];
 
 test('every name this module has ever published is still exported', async () => {
