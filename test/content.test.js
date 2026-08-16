@@ -2,10 +2,13 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import {
-  PALETTE, HERO_ART, MATERIAL_ART, TERRAIN_ART, BUILDING_ART, SALVAGE_ART, TILE,
+  PALETTE, HERO_ART, MATERIAL_ART, TERRAIN_ART, BUILDING_ART, SALVAGE_ART,
+  ENEMY_ART, PAGES_ART, TILE,
 } from '../public/art.js';
 import {
-  PARTY_SIZE, CLASSES, OPEN_ROLES, MATERIALS, RECIPES, LEVELS,
+  PARTY_SIZE, CLASSES, OPEN_ROLES, MATERIALS, RECIPES,
+  ROUNDS, ROUNDS_BEFORE_BOSS, BOSS_ROUND, roundInfo, phaseCard,
+  ENEMIES, waveFor, SPAWNS, CACHE_YIELD, PAGES, spawnItems,
   classById, playableClasses, missingFor, materialFor,
   MAP_W, MAP_H, TERRAIN, HERB_COUNT, PHASES, isBuildPhase, readyState,
   seededRandom, seedFromCode, generateTerrain, spawnHerbs, generateMap,
@@ -100,14 +103,80 @@ test('every material can be drawn and picked', () => {
   }
 });
 
-test('a run has levels, and they get harder', () => {
-  assert.ok(LEVELS.length >= 1);
-  for (const level of LEVELS) {
-    assert.ok(level.nodes > 0, `level "${level.name}" has nothing to gather`);
-    assert.ok(level.blight >= 0);
+test('a run has a posted schedule: rounds, then the boss', () => {
+  assert.equal(BOSS_ROUND, ROUNDS_BEFORE_BOSS + 1);
+  assert.equal(ROUNDS.length, BOSS_ROUND, 'every round including the boss needs a name and a blight');
+  for (const round of ROUNDS) {
+    assert.ok(typeof round.name === 'string' && round.name.length, 'a round needs a name');
+    assert.ok(round.blight >= 0);
   }
-  const blights = LEVELS.map((l) => l.blight);
-  assert.deepEqual(blights, [...blights].sort((a, b) => a - b), 'levels should not get easier');
+  const blights = ROUNDS.map((r) => r.blight);
+  assert.deepEqual(blights, [...blights].sort((a, b) => a - b), 'rounds should not get easier');
+  assert.equal(roundInfo(1), ROUNDS[0]);
+  assert.equal(roundInfo(99), ROUNDS[ROUNDS.length - 1], 'a round past the end clamps, never undefined');
+});
+
+test('the phase card says what the screen should shout', () => {
+  const build = phaseCard(1, 'build');
+  assert.match(build.title, /Round One — Build Phase/);
+  assert.equal(build.subtitle, 'The party plans.');
+  assert.match(phaseCard(2, 'combat').title, /Round Two — The Surge/);
+  assert.match(phaseCard(BOSS_ROUND, 'combat').title, /The Array Wakes/);
+});
+
+test('every wave is made of real enemies, and the boss round has the boss', () => {
+  for (let round = 1; round <= BOSS_ROUND; round++) {
+    const wave = waveFor(round);
+    assert.ok(wave.length > 0, `round ${round} sends nothing`);
+    for (const type of wave) assert.ok(ENEMIES[type], `round ${round} sends unknown "${type}"`);
+  }
+  assert.ok(waveFor(BOSS_ROUND).some((t) => ENEMIES[t].boss), 'the last wave must include the boss');
+  for (let round = 1; round < BOSS_ROUND; round++) {
+    assert.ok(!waveFor(round).some((t) => ENEMIES[t].boss), `the boss leaked into round ${round}`);
+  }
+});
+
+test('every enemy can be drawn and can arrive', () => {
+  for (const [id, enemy] of Object.entries(ENEMIES)) {
+    assert.ok(enemy.hp > 0 && enemy.hits > 0, `enemy "${id}" cannot fight`);
+    assert.ok(enemy.dist >= 1, `enemy "${id}" would spawn already adjacent`);
+    assert.ok(ENEMY_ART[enemy.art], `enemy "${id}" has no art key "${enemy.art}"`);
+  }
+});
+
+test('the wizard economy is wired end to end', () => {
+  const wizard = CLASSES.find((c) => c.id === 'wizard');
+  assert.ok(wizard && wizard.cast, 'the wizard must be the caster');
+  assert.ok(wizard.hp < Math.min(...CLASSES.filter((c) => c.id !== 'wizard').map((c) => c.hp)),
+    'squishy means the lowest hp in the roster');
+  const fireball = COMBAT_ACTIONS.fireball;
+  assert.equal(fireball.classOnly, 'wizard');
+  assert.ok(fireball.pageCost >= 1, 'a free fireball makes pages pointless');
+  assert.equal(fireball.effect.kind, 'strike');
+  assert.ok(SPAWNS.pages > 0, 'no pages ever spawn');
+  assert.ok(CACHE_YIELD.pages > 0);
+  assert.ok(PAGES.name);
+});
+
+test('exactly one class spends each pool', () => {
+  assert.equal(CLASSES.filter((c) => c.craft).length, 1);
+  assert.equal(CLASSES.filter((c) => c.build).length, 1);
+  assert.equal(CLASSES.filter((c) => c.cast).length, 1);
+});
+
+test('a build site spawns all three kinds of node, each on its own legal tile', () => {
+  for (let seed = 1; seed <= 20; seed++) {
+    const terrain = generateTerrain(seededRandom(seed));
+    const nodes = spawnItems(terrain, seededRandom(seed + 1000));
+    const kinds = new Set(nodes.map((n) => n.kind));
+    for (const kind of ['herb', 'salvage', 'pages']) assert.ok(kinds.has(kind), `seed ${seed}: no ${kind}`);
+    assert.equal(new Set(nodes.map((n) => `${n.x},${n.y}`)).size, nodes.length, `seed ${seed}: two nodes share a tile`);
+    for (const n of nodes) {
+      const tile = TERRAIN[tileAt(terrain, n.x, n.y)];
+      if (n.kind === 'herb') assert.ok(tile.grows, `seed ${seed}: a herb on ${tileAt(terrain, n.x, n.y)}`);
+      else assert.ok(tile.walk, `seed ${seed}: a cache on unwalkable ground`);
+    }
+  }
 });
 
 test('sprites are rectangular and use only palette keys', () => {
@@ -213,21 +282,29 @@ test('generated terrain is the right size and holds only real kinds', () => {
   }
 });
 
-test('herbs land in bounds, on growable ground, and never stack', () => {
+test('nodes land in bounds, on legal ground, and never stack', () => {
   for (let seed = 1; seed <= 40; seed++) {
     const { terrain, nodes } = generateMap(seededRandom(seed));
     const seen = new Set();
     for (const node of nodes) {
       const where = `seed ${seed} node ${node.id}`;
       assert.ok(inBounds(node.x, node.y), `${where} is off the map at ${node.x},${node.y}`);
-      assert.ok(MATERIALS[node.material], `${where} grew "${node.material}"`);
       assert.equal(node.taken, false, `${where} starts taken`);
 
       const kind = tileAt(terrain, node.x, node.y);
-      assert.ok(TERRAIN[kind].grows, `${where} is on ${kind}, which nothing grows on`);
+      if (node.kind === 'herb') {
+        assert.ok(MATERIALS[node.material], `${where} grew "${node.material}"`);
+        assert.ok(TERRAIN[kind].grows, `${where} is on ${kind}, which nothing grows on`);
+      } else if (node.kind === 'salvage') {
+        assert.ok(SALVAGE[node.salvage], `${where} holds "${node.salvage}"`);
+        assert.ok(TERRAIN[kind].walk, `${where} is on ${kind}, which cannot be reached`);
+      } else {
+        assert.equal(node.kind, 'pages', `${where} has kind "${node.kind}"`);
+        assert.ok(TERRAIN[kind].walk, `${where} is on ${kind}, which cannot be reached`);
+      }
 
       const key = `${node.x},${node.y}`;
-      assert.ok(!seen.has(key), `${where} shares a tile with another herb`);
+      assert.ok(!seen.has(key), `${where} shares a tile with another node`);
       seen.add(key);
     }
   }

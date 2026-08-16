@@ -33,6 +33,8 @@
  *             The Engineer's, for the same reason.
  *   salvage   how many pieces of salvage this class draws after each combat.
  *             0 for everyone who is not paid to look at a wreck and see parts.
+ *   cast      true if this class can spend spell pages. The Wizard's flag,
+ *             completing the pattern: three pools, three spenders, one each.
  *
  * Anything a class does beyond that is an ability, and abilities need the
  * combat model that does not exist yet — see OPEN_ROLES.
@@ -167,6 +169,30 @@ export function salvageFor(roll){
   return entries[entries.length - 1][0];
 }
 
+/* ========================================================== spell pages === */
+
+/* The Wizard's resource. One kind, not a table: pages are pages, and what
+ * varies is how many a cache holds. They spawn on the map like herbs do —
+ * something worth walking to — and each fireball burns one from the shared
+ * pool. The party carries the library; only the Wizard can read it.
+ */
+export const PAGES = {
+  name: 'Spell pages',
+  colour: 'w',
+  note: 'Paper that survived the rain because somebody meant it to. The ink still moves.',
+};
+
+/* How much of everything a build map puts out. Salvage caches on the ground
+   are the small change — crates the blight has not digested yet — while the
+   after-combat payout stays the Engineer's real income. Pages are scarce on
+   purpose: every fireball is a page the Wizard chose to burn. */
+export const SPAWNS = { herbs: 12, salvage: 5, pages: 3 };
+
+/* What one walked-to cache yields. Rolled sizes would make gathering a
+   lottery; fixed sizes make the map readable — a player can count what a
+   trip is worth before spending the rounds to make it. */
+export const CACHE_YIELD = { salvage: 2, pages: 1 };
+
 /* ====================================================== combat actions === */
 
 /* What a player can do when the blight surges.
@@ -188,6 +214,16 @@ export const COMBAT_ACTIONS = {
     name: 'Hold',
     effect: { kind: 'ward', amount: 2, rounds: 1 },
     note: 'Put your back to something and wait it out.',
+  },
+  /* The Wizard's own verb, not a building's. Costs a page from the shared
+     pool every time — the engine refuses the cast when the library is empty,
+     the same way it refuses a brew without herbs. */
+  fireball: {
+    name: 'Fireball',
+    effect: { kind: 'strike', amount: 7 },
+    pageCost: 1,
+    classOnly: 'wizard',
+    note: 'One page, read aloud, thrown. The blight burns like anything else.',
   },
   patch: {
     name: 'Patch',
@@ -320,23 +356,41 @@ export const CLASSES = [
     build: true,
     salvage: 3,
   },
+  {
+    id: 'wizard',
+    name: 'The Wizard',
+    archetype: 'Damage · glass cannon',
+    status: 'live',
+    hp: 22,
+    colour: '#d2a6f0',
+    blurb:
+      'Found the old library under the cooling halls and read all of it, twice. ' +
+      'Can end a fight from across the map, provided nothing so much as coughs on them first.',
+    downLine: 'The pages... keep them dry.',
+    art: 'wizard',
+    gather: 1,
+    craft: false,
+    build: false,
+    salvage: 0,
+    cast: true,
+  },
 ];
 
-/* The three seats still to be designed.
+/* The two seats still to be designed.
  *
  * These are not placeholder classes — they are the shape of the hole. The
  * lobby shows them as locked so a player can see the party is incomplete
- * rather than wondering why there are only three seats.
+ * rather than wondering why there are only three real seats.
  *
- * The roles below are a suggestion from what the two built classes do not do.
- * The Alchemist gathers and heals; the Engineer builds and pays for it. So the
- * party still has nobody who can take a hit, nobody who reliably deals one,
- * and nobody who can find what a site is hiding. Ignore them freely — the only
- * hard requirement is that CLASSES ends up with PARTY_SIZE entries.
+ * The roles below are a suggestion from what the built classes do not do.
+ * The Alchemist gathers and heals, the Engineer builds and pays for it, the
+ * Wizard deletes things from a distance and folds if breathed on. So the
+ * party still has nobody who can take a hit, and nobody who can find what a
+ * site is hiding. Ignore them freely — the only hard requirement is that
+ * CLASSES ends up with PARTY_SIZE entries.
  */
 export const OPEN_ROLES = [
-  { slot: 3, suggestion: 'Front line — stands in the blight so the builders do not have to' },
-  { slot: 4, suggestion: 'Damage — whatever ends up needing to be hit, hit properly' },
+  { slot: 4, suggestion: 'Front line — stands in the blight so the builders do not have to' },
   { slot: 5, suggestion: 'Scout — finds the salvage and the survivors a site is hiding' },
 ];
 
@@ -374,22 +428,72 @@ export function readyState(players){
   return { ready: ready.length, total: present.length, all: present.length > 0 && ready.length === present.length };
 }
 
-/* =============================================================== levels === */
+/* =============================================================== rounds === */
 
-/* A run is five levels deep, and the ruin itself is the pressure: blight is
- * ambient damage every round, so standing still costs health and gathering
- * everything before moving on is a real decision rather than free loot.
- *
- * This is what makes the Alchemist playable before there is a single enemy in
- * the game. Enemies arrive with the classes built to fight them.
+/* A run is three rounds and then the boss. Each round is one cycle: a build
+ * phase on a freshly generated site — walk to what the ruin grew, brew, raise
+ * structures — then a surge, where the blight comes to the party and what was
+ * built is what fights back. A new site is rolled for every round of every
+ * run, so no two walks are the same walk.
  */
-export const LEVELS = [
-  { name: 'The Overgrowth', blight: 1, nodes: 6, note: 'A stairwell the ivy took back.' },
-  { name: 'Panel Fields', blight: 2, nodes: 6, note: 'Acres of cracked glass, still tracking the sun.' },
-  { name: 'The Rustlands', blight: 3, nodes: 5, note: 'Everything orange, everything sharp.' },
-  { name: 'Cooling Halls', blight: 4, nodes: 5, note: 'Cold, quiet, and dripping.' },
-  { name: 'The Array', blight: 5, nodes: 4, note: 'Where the power went. Something is still drawing from it.' },
+export const ROUNDS_BEFORE_BOSS = 3;
+export const BOSS_ROUND = ROUNDS_BEFORE_BOSS + 1;
+
+export const ROUNDS = [
+  { name: 'The Overgrowth', blight: 1, note: 'A stairwell the ivy took back.' },
+  { name: 'Panel Fields', blight: 1, note: 'Acres of cracked glass, still tracking the sun.' },
+  { name: 'The Rustlands', blight: 2, note: 'Everything orange, everything sharp.' },
+  { name: 'The Array', blight: 2, note: 'Where the power went. It knows you are here.' },
 ];
+
+export const roundInfo = round =>
+  ROUNDS[Math.min(Math.max(1, round), ROUNDS.length) - 1];
+
+/* The splash card the client animates at each phase change. Words, not
+   layout: the client owns how it looks, this owns what it says, and the two
+   sides of the wire agree because there is only one copy. */
+const ORDINALS = ['One', 'Two', 'Three', 'Four', 'Five'];
+export function phaseCard(round, phase){
+  if(round >= BOSS_ROUND && phase === PHASES.combat){
+    return { title: 'The Array Wakes', subtitle: 'Boss combat — everything you built, all at once.' };
+  }
+  const ordinal = ORDINALS[round - 1] || String(round);
+  return phase === PHASES.build
+    ? { title: `Round ${ordinal} — Build Phase`, subtitle: 'The party plans.' }
+    : { title: `Round ${ordinal} — The Surge`, subtitle: 'The blight has found the site.' };
+}
+
+/* ============================================================== enemies === */
+
+/* What comes out of the blight when it surges. An enemy is authored by its
+ * distance and its damage: `dist` is how many combat rounds the party has
+ * before it arrives, and `hits` is what each of them costs once it does.
+ *
+ * The wave tables are per round, boss last. Composition over stat scaling —
+ * a later round sends more and faster things rather than the same thing with
+ * a bigger number, because "there are four of them now" is legible on a
+ * screen in a way "+2 hp" never is.
+ */
+export const ENEMIES = {
+  sporeling: { name: 'Sporeling', hp: 6, hits: 2, dist: 3, art: 'sporeling',
+    note: 'A puffball with intent. Pops wetly.' },
+  creeper: { name: 'Creeper', hp: 10, hits: 3, dist: 4, art: 'creeper',
+    note: 'Vine over bone over something that used to be a drone.' },
+  hulk: { name: 'Rust Hulk', hp: 18, hits: 5, dist: 5, art: 'hulk',
+    note: 'A maintenance chassis the blight wears like a coat.' },
+  extractor: { name: 'The Extractor', hp: 46, hits: 7, dist: 5, art: 'extractor', boss: true,
+    note: 'It was built to harvest. It still is.' },
+};
+
+export function waveFor(round){
+  const waves = {
+    1: ['sporeling', 'sporeling', 'creeper'],
+    2: ['sporeling', 'sporeling', 'creeper', 'creeper'],
+    3: ['creeper', 'creeper', 'hulk', 'sporeling'],
+    [BOSS_ROUND]: ['extractor', 'creeper', 'creeper'],
+  };
+  return waves[Math.min(round, BOSS_ROUND)] || waves[BOSS_ROUND];
+}
 
 /* =============================================================== helpers === */
 
@@ -531,16 +635,17 @@ export function materialFor(roll){
  * structure close enough to shelter this tile — and a grid answers those with
  * arithmetic instead of geometry.
  *
- * It is generated once and kept. That is the whole point of the two-phase
- * design: you come back to the plot you cleared last cycle and it is still
- * cleared. Only the herbs are respawned between cycles.
+ * A new site is generated for every round of every run. Walking out is part
+ * of the fiction, and it keeps the build phase a set of decisions instead of
+ * a base someone finished in round one. What carries between rounds is the
+ * pools — herbs, salvage, pages — not the ground they came from.
  */
 
-/* Sized for a small base rather than for a screen. A party needs somewhere to
-   put six or eight structures and still walk between them, and at 18x9 the
-   first two buildings already crowded the herbs off the good ground. */
-export const MAP_W = 24;
-export const MAP_H = 14;
+/* Sized for a walk, not just a base. The features — water, hills, trees,
+   crevices — need room to read as landscape rather than as noise, and at
+   24x14 three blobs already touched. */
+export const MAP_W = 30;
+export const MAP_H = 17;
 
 /* The smallest connected buildable area a generated site is allowed to have.
    Terrain is random, so this is the promise the generator has to keep: enough
@@ -551,10 +656,16 @@ export const BASE_ROOM = 60;
    build can a structure go here (the build phase's reason to care about terrain)
    grows can a herb spawn here */
 export const TERRAIN = {
-  grass:  { name: 'Overgrowth',  walk: true,  build: true,  grows: true },
-  floor:  { name: 'Panel floor', walk: true,  build: true,  grows: false },
-  rubble: { name: 'Rubble',      walk: false, build: false, grows: false },
-  water:  { name: 'Meltwater',   walk: false, build: false, grows: false },
+  grass:   { name: 'Overgrowth',  walk: true,  build: true,  grows: true },
+  floor:   { name: 'Panel floor', walk: true,  build: true,  grows: false },
+  rubble:  { name: 'Rubble',      walk: false, build: false, grows: false },
+  water:   { name: 'Meltwater',   walk: false, build: false, grows: false },
+  /* Landscape, not just obstacle. Hills can be walked but not built on — the
+     ground is not flat enough; trees grow herbs at their feet but block the
+     tile; a crevice blocks everything, including the eye line. */
+  hill:    { name: 'Spoil hill',  walk: true,  build: false, grows: false },
+  tree:    { name: 'Sapling',     walk: false, build: false, grows: false },
+  crevice: { name: 'Crevice',     walk: false, build: false, grows: false },
 };
 
 /* How many herbs a cycle puts out. Fewer than there are open tiles by a wide
@@ -615,18 +726,44 @@ export function generateTerrain(random){
   const cells = new Array(MAP_W * MAP_H).fill('grass');
 
   // Order matters and is fixed: water first so rubble can silt up its edge,
-  // floor last so a slab reads as something built on top of the ruin.
+  // hills and crevices next as the ground's own shape, floor last so a slab
+  // reads as something built on top of the ruin, trees last of all so they
+  // stand on whatever ended up under them being grass.
   //
   // Sized to leave the map mostly open. Obstacles are scenery here — they make
   // the ground have a shape — and a site you cannot fit a base on is a site
   // nobody wants to have rolled. largestBuildableArea is what holds that line.
-  blob(cells, random, 'water', 22);
-  blob(cells, random, 'water', 15);
-  blob(cells, random, 'rubble', 18);
-  blob(cells, random, 'rubble', 11);
-  blob(cells, random, 'floor', 20);
-  blob(cells, random, 'floor', 12);
+  blob(cells, random, 'water', 30);
+  blob(cells, random, 'water', 18);
+  blob(cells, random, 'hill', 24);
+  blob(cells, random, 'hill', 14);
+  blob(cells, random, 'crevice', 10);
+  blob(cells, random, 'rubble', 20);
+  blob(cells, random, 'rubble', 12);
+  blob(cells, random, 'floor', 24);
+  blob(cells, random, 'floor', 14);
 
+  // Trees are dotted, not blobbed — a copse is single trunks with light
+  // between them, and a solid mass of them would read as one green rock.
+  for(let i = 0; i < 14; i++){
+    const index = Math.floor(random() * cells.length);
+    if(cells[index] === 'grass') cells[index] = 'tree';
+  }
+
+  return cells;
+}
+
+/* The surge's ground. Same generator family, different mix: mostly open so
+   the wave has somewhere to come from, water and crevices as the walls the
+   party fights around, no trees to hide the thing walking at you. */
+export function generateCombatTerrain(random){
+  const cells = new Array(MAP_W * MAP_H).fill('floor');
+  blob(cells, random, 'grass', 40);
+  blob(cells, random, 'grass', 26);
+  blob(cells, random, 'water', 16);
+  blob(cells, random, 'crevice', 12);
+  blob(cells, random, 'rubble', 14);
+  blob(cells, random, 'hill', 12);
   return cells;
 }
 
@@ -667,31 +804,62 @@ export function largestBuildableArea(terrain){
   return best;
 }
 
-/* Scatter herbs across whatever the terrain left growable.
+/* Scatter what the site holds across the ground.
  *
- * Tiles are drawn without replacement, so two herbs can never occupy one tile
- * — a duplicate would render as one sprite and gather as two, which looks like
- * a lost click. materialFor decides *what* grows, so the rarity weights in
- * MATERIALS stay the single source of that answer.
+ * Three kinds of node, one shape: { kind, x, y, taken } plus what it yields.
+ * Herbs land on growable tiles only; salvage caches and page caches land on
+ * anything walkable, because a crate does not need soil. Tiles are drawn
+ * without replacement, so two nodes can never occupy one tile — a duplicate
+ * would render as one sprite and gather as two, which looks like a lost click.
+ *
+ *   herb     { material }  what MATERIALS entry, via the rarity weights
+ *   salvage  { salvage }   what SALVAGE entry, CACHE_YIELD.salvage pieces
+ *   pages    { }           CACHE_YIELD.pages spell pages
  */
-export function spawnHerbs(terrain, random, count = HERB_COUNT){
-  const open = [];
+export function spawnItems(terrain, random, spawns = SPAWNS){
+  const growable = [];
+  const walkable = [];
   for(let i = 0; i < terrain.length; i++){
-    if(TERRAIN[terrain[i]] && TERRAIN[terrain[i]].grows) open.push(i);
+    const tile = TERRAIN[terrain[i]];
+    if(!tile) continue;
+    if(tile.grows) growable.push(i);
+    if(tile.walk) walkable.push(i);
   }
 
+  const used = new Set();
+  const draw = pool => {
+    while(pool.length){
+      const [index] = pool.splice(Math.floor(random() * pool.length), 1);
+      if(!used.has(index)){ used.add(index); return index; }
+    }
+    return -1;
+  };
+
   const nodes = [];
-  for(let n = 0; n < count && open.length; n++){
-    const [index] = open.splice(Math.floor(random() * open.length), 1);
+  let serial = 0;
+  const place = (pool, make) => {
+    const index = draw(pool);
+    if(index < 0) return;
     nodes.push({
-      id: `n${n}`,
+      id: `n${serial++}`,
       x: index % MAP_W,
       y: Math.floor(index / MAP_W),
-      material: materialFor(random()),
       taken: false,
+      ...make(),
     });
-  }
+  };
+
+  for(let i = 0; i < spawns.herbs; i++) place(growable, () => ({ kind: 'herb', material: materialFor(random()) }));
+  for(let i = 0; i < spawns.salvage; i++) place(walkable, () => ({ kind: 'salvage', salvage: salvageFor(random()) }));
+  for(let i = 0; i < spawns.pages; i++) place(walkable, () => ({ kind: 'pages' }));
+
   return nodes;
+}
+
+/* Kept for the build-map tests and any caller that only wants herbs; the
+   real spawner is spawnItems. */
+export function spawnHerbs(terrain, random, count = HERB_COUNT){
+  return spawnItems(terrain, random, { herbs: count, salvage: 0, pages: 0 });
 }
 
 /* The whole ground state for a cycle. The room calls this with its own seeded
@@ -700,7 +868,7 @@ export function spawnHerbs(terrain, random, count = HERB_COUNT){
    of truth about where the Cellsap is. */
 export function generateMap(random){
   const terrain = generateTerrain(random);
-  return { terrain, nodes: spawnHerbs(terrain, random) };
+  return { terrain, nodes: spawnItems(terrain, random) };
 }
 
 /* A player's walkable start. Centre-ish and always on solid ground, so nobody

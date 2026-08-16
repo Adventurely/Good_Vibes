@@ -158,6 +158,148 @@ export const HERO_ART = {
     '......#####..#####......',
     '........................'
   ], 14, [[10, 7], [13, 7]]),
+
+  /* The Wizard. Deep violet robe with no armour anywhere on it — the
+     silhouette is the warning label. A page tucked into the belt glows
+     faintly gold, and the hood is worn up, because the rain and the pages
+     disagree. Violet against the Alchemist's green and the Engineer's rust,
+     so all three read apart at map scale. */
+  wizard: sprite([
+    '........................',
+    '......############......',
+    '......#PPPPPPPPPP#......',
+    '......#PppppppppP#......',
+    '......#PsNNssNNsP#......',
+    '......#PssssssssP#......',
+    '......#Ps==ss==sP#......',
+    '......#Ps=wssw=sP#......',
+    '......#PsssSSsssP#......',
+    '......#PSssssssSP#......',
+    '......#PSss==ssSP#......',
+    '......#PPSssssSPP#......',
+    '.......#PPPPPPPP#.......',
+    '..........#ss#..........',
+    '...#pP#pwwwwwwwwp#pP#...',
+    '...#pP#pwPPPPPPwp#pP#...',
+    '...#pP#pPPPPPPPPp#pP#...',
+    '...#pP#pPPyYyPPPp#pP#...',
+    '...#pP#pPPyyyPPPp#pP#...',
+    '...#pP#pPPPPPPPPp#pP#...',
+    '...#ss#pPPPPPPPPp#ss#...',
+    '...####pwwwwwwwwP####...',
+    '......#pPPPPPPPPP#......',
+    '......#pPPPPPPPPP#......',
+    '......#PPPP##PPPP#......',
+    '......#PPPP##PPPP#......',
+    '......#pPPP##PPPp#......',
+    '......#PPPP##PPPP#......',
+    '......#PPPP##PPPP#......',
+    '......#pPPP##PPPp#......',
+    '......#####..#####......',
+    '........................'
+  ], 14, [[10, 7], [13, 7]]),
+};
+
+/* ============================================================== enemies === */
+
+/* What the surge sends. Smaller things on smaller grids — a sporeling at the
+ * hero's 24x32 would read as a person, and it must not. The blight's palette
+ * is deep green and violet gone wrong, with the danger reds nothing friendly
+ * uses; a player should be able to tell friend from problem by colour alone
+ * before either has moved.
+ *
+ * The key matches the `art` field in content.js ENEMIES.
+ */
+export const ENEMY_ART = {
+  sporeling: [
+    '......####......',
+    '....##vvvv##....',
+    '...#vGvvvvGv#...',
+    '..#vvpvvvvpvv#..',
+    '..#vvvvvvvvvv#..',
+    '.#vvpvvevvpvvv#.',
+    '.#vvvvveevvvvv#.',
+    '.#Gvvvvvvvvvvv#.',
+    '.#vvvpvvvvpvvv#.',
+    '..#vvvvvvvvvv#..',
+    '..##vvvvvvvv##..',
+    '....#v#..#v#....',
+    '....#v#..#v#....',
+    '...##.#..#.##...',
+    '................',
+    '................',
+  ],
+  creeper: [
+    '................',
+    '..##........##..',
+    '.#vv#......#vv#.',
+    '.#Gvv######vvG#.',
+    '..#vvvvvvvvvv#..',
+    '.#vveevvvveevv#.',
+    '.#vveevvvveevv#.',
+    '.#Gvvvxxxxvvvv#.',
+    '..#vvvxMMxvvv#..',
+    '..#GvvvvvvvvG#..',
+    '.#vv#vv##vv#vv#.',
+    '.#v#.#v##v#.#v#.',
+    '.#v#.#v##v#.#v#.',
+    '..#...#..#...#..',
+    '................',
+    '................',
+  ],
+  hulk: [
+    '....##########......',
+    '...#xxxxxxxxxx#.....',
+    '..#xMMxxxxxxMMx#....',
+    '..#xMeexxxxeeMx#....',
+    '..#xMeexxxxeeMx#....',
+    '..#xxxxxxxxxxxx#....',
+    '.#xxgvxxxxxxvgxx#...',
+    '.#xrrxxMMMMxxrrx#...',
+    '.#xrrxMxxxxMxrrx#...',
+    '.#xxxxMxggxMxxxx#...',
+    '.#xxxxMxggxMxxxx#...',
+    '..#xxxMxxxxMxxx#....',
+    '..#xxxxxxxxxxxx#....',
+    '..#xxrrxxxxrrxx#....',
+    '...#xx#....#xx#.....',
+    '...#xx#....#xx#.....',
+    '..##xx##..##xx##....',
+    '..#xxxx#..#xxxx#....',
+    '..######..######....',
+    '....................',
+  ],
+  /* The boss. Wider than tall-oriented enemies and drawn to the hero grid's
+     height, because it shares the screen with the party and has to out-scale
+     them without leaving the style. */
+  extractor: [
+    '........................',
+    '....##############......',
+    '...#xxxxxxxxxxxxxx#.....',
+    '..#xxMMMMxxxxMMMMxx#....',
+    '..#xMeeeeMxxMeeeeMx#....',
+    '..#xMeEEeMxxMeEEeMx#....',
+    '..#xMeeeeMxxMeeeeMx#....',
+    '..#xxMMMMxxxxMMMMxx#....',
+    '..#xxxxxxxxxxxxxxxx#....',
+    '.#xxrrxxxMMMMxxxrrxx#...',
+    '.#xrrxxMMxxxxMMxxrrx#...',
+    '.#xrxxMxxeEEexxMxxrx#...',
+    '.#xxxxMxeEEEEexMxxxx#...',
+    '.#xxxxMxeEEEEexMxxxx#...',
+    '.#xxxxMxxeEEexxMxxxx#...',
+    '.#xgvxxMMxxxxMMxxvgx#...',
+    '.#xvgxxxxMMMMxxxxgvx#...',
+    '..#xxxxxxxxxxxxxxxx#....',
+    '..#xxMxxxxxxxxxxMxx#....',
+    '..#xMxxxxxxxxxxxxMx#....',
+    '.#xxMxxx#....#xxxMxx#...',
+    '.#xMxxx#......#xxxMx#...',
+    '.#xMxx#........#xxMx#...',
+    '.#xxx#..........#xxx#...',
+    '..###............###....',
+    '........................',
+  ],
 };
 
 /* ============================================================ buildings === */
@@ -354,6 +496,68 @@ export const TERRAIN_ART = {
     'bbbbbbbBbbbbbBbb',
     'bbBbbbbbbbbbbbbb',
   ],
+  /* A spoil hill: lighter on top where the sun hits, darker at the base. The
+     gradient is the one exception to the no-motif rule — it reads as slope,
+     and slope is the entire message. */
+  hill: [
+    'tttttttttttttttt',
+    'ttttttyttttttttt',
+    'tttttttttttytttt',
+    'ttTttttttttttttt',
+    'tttttttTtttttttt',
+    'ttttttttttttTttt',
+    'tTttttttTttttttt',
+    'ttttTttttttttttt',
+    'TttttttttTttttTt',
+    'ttTtttTttttttttt',
+    'tTtttttttTttTttt',
+    'TttTtTttttttttTt',
+    'tTtTttttTtTttttt',
+    'TtTttTtTttTtTtTt',
+    'TTtTTtTTtTtTTtTT',
+    'TTTTtTTTtTTTtTTT',
+  ],
+  /* A sapling stands alone on its tile — trees are dotted, never blobbed, so
+     a centred motif cannot turn into wallpaper here. Grass shows at the
+     corners so it sits on the ground instead of floating. */
+  tree: [
+    'GGGgGGGllGGGgGGG',
+    'GgGGGlgggglGGGGG',
+    'GGGGlggggggllGGG',
+    'GGGlgggvggggglGG',
+    'GGlggvggggvgggGG',
+    'GGgggggglgggggGG',
+    'GGlgvggggggvglGG',
+    'GGGgggglvggggGGG',
+    'GGGlggggggggGGGG',
+    'GGGGlgvggvglGGGG',
+    'GGGGGGlNNlGGGGGG',
+    'GGgGGGGNNGGGGvGG',
+    'GGGGGGGNNGGGGGGG',
+    'GGGGGGNNNNGGGGGG',
+    'GgGGGvGGGGgGGGGG',
+    'GGGGGGGgGGGGGvGG',
+  ],
+  /* A crevice: the ground failing. Nearly black at the seam, steel showing at
+     the lip where the slab sheared. */
+  crevice: [
+    'xxTxxxxxTxxxxxTx',
+    'xTxx##xxxx##xxxx',
+    'xx##==##x#==#xxT',
+    'Tx#====##====#xx',
+    'xx#=====#####xxx',
+    'xx##======##xxTx',
+    'xTx##======##xxx',
+    'xxxx#========#xx',
+    'xxT#====##====#x',
+    'xx#===##xx#===#x',
+    'x#===#xxTxx#==#x',
+    'x#==#xxxxxxx##xx',
+    'xx##xxTxxxxxxxTx',
+    'Txxxxxxx##xxxxxx',
+    'xxxxTxx#==#xxxxx',
+    'xxxxxxxx##xxxTxx',
+  ],
 };
 
 /* ============================================================ materials === */
@@ -462,3 +666,16 @@ export const SALVAGE_ART = {
     '..####..'
   ],
 };
+
+/* Spell pages, the Wizard's cache on the map. One icon, not a table — pages
+   are pages. Cream against the ground with a line of living ink. */
+export const PAGES_ART = [
+  '.######.',
+  '#wwwwww#',
+  '#wPwPww#',
+  '#wwwwww#',
+  '#wPwwPw#',
+  '#wwwwww#',
+  '#wwWWww#',
+  '.######.',
+];

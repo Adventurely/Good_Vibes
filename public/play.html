@@ -38,6 +38,106 @@
         gap: 1.25rem;
       }
 
+      /* The map is the game, so the game gets the width. 30 tiles at 16px is
+         480 canvas pixels, and integer scaling means the page must offer at
+         least 960 before the map earns 2x — inside a 46rem column it would
+         floor to 1x and stay a postage stamp. Lobby and join keep the narrow
+         column; the run does not. */
+      body[data-view='run'] .wrap,
+      body[data-view='combat'] .wrap {
+        max-width: 78rem;
+      }
+
+      /* --- the phase splash ------------------------------------------------ */
+
+      .splash {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: rgb(20 12 6 / 0.82);
+        z-index: 10;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 250ms ease-out;
+      }
+
+      .splash[data-show='true'] {
+        opacity: 1;
+      }
+
+      .splash-card {
+        text-align: center;
+        padding: 2rem 3rem;
+        border-top: 2px solid var(--accent);
+        border-bottom: 2px solid var(--accent);
+        background: rgb(36 26 16 / 0.9);
+      }
+
+      .splash-title {
+        font-size: clamp(1.4rem, 4.5vw, 2.6rem);
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--sun);
+        text-shadow: 0 3px 0 #3a2418;
+      }
+
+      .splash-sub {
+        margin-top: 0.6rem;
+        font-size: 0.85rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .splash[data-show='true'] .splash-title {
+        animation: splash-in 600ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+      }
+
+      .splash[data-show='true'] .splash-sub {
+        animation: splash-in 600ms 180ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+      }
+
+      @keyframes splash-in {
+        from { transform: translateY(0.6em) scale(0.92); opacity: 0; }
+        to   { transform: none; opacity: 1; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .splash { transition: none; }
+        .splash[data-show='true'] .splash-title,
+        .splash[data-show='true'] .splash-sub { animation: none; }
+      }
+
+      /* --- combat ---------------------------------------------------------- */
+
+      .enemy-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+        gap: 0.5rem;
+      }
+
+      .enemy {
+        display: flex;
+        gap: 0.6rem;
+        align-items: center;
+        padding: 0.55rem 0.7rem;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        font-size: 0.8rem;
+      }
+
+      .enemy[data-dead='true'] { opacity: 0.35; }
+      .enemy[data-here='true'] { border-color: var(--bad); }
+
+      .enemy-dist {
+        font-size: 0.62rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
       canvas { image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
       #banner { margin: 0 auto; border: 2px solid var(--line); border-radius: 6px; }
       #map { margin: 0 auto; border: 2px solid var(--line); border-radius: 6px; cursor: pointer; }
@@ -238,6 +338,9 @@
         <h2 style="margin-top:1.4rem">Stash</h2>
         <div class="chips" id="stash"></div>
 
+        <h2 style="margin-top:1.4rem">The library</h2>
+        <div class="chips" id="library"></div>
+
         <h2 style="margin-top:1.4rem">Brewing</h2>
         <div class="grid" id="recipes"></div>
 
@@ -255,20 +358,45 @@
 
       <!-- combat -->
       <section id="combat" hidden>
-        <h2>The blight surges</h2>
-        <p id="combat-note">Everyone readied up, and the light went out of the sky.</p>
+        <div class="level-head">
+          <h2 style="border:0;margin:0;padding:0" id="combat-name"></h2>
+          <span class="hp-text" id="combat-meta"></span>
+        </div>
+        <p id="combat-note" style="margin-bottom:1rem">The light went out of the sky.</p>
+
+        <canvas id="combat-map" width="480" height="288"
+                aria-label="The surge. The wave advances from the right toward the party."></canvas>
+
+        <h2 style="margin-top:1.2rem">The wave</h2>
+        <div class="enemy-row" id="enemies"></div>
+
         <ol id="combat-party" style="margin-top:1.2rem"></ol>
 
         <h2 style="margin-top:1.4rem">What you can do</h2>
-        <p style="margin-bottom:0.6rem">Decided in the build phase: these are what the site can do,
-          not what you are carrying.</p>
+        <p style="margin-bottom:0.6rem">Decided in the build phase: what the site grants, what the
+          Wizard can still read, and whatever is on the rack.</p>
         <div class="grid" id="options"></div>
 
+        <h2 style="margin-top:1.4rem">The rack</h2>
+        <div class="chips" id="combat-potions"></div>
+
         <div class="actions" style="margin-top:1.2rem">
-          <button type="button" id="end-combat">Hold the line</button>
+          <button type="button" id="combat-wait">Do nothing</button>
           <button type="button" id="leave-combat">Leave</button>
         </div>
+
+        <h2 style="margin-top:1.4rem">Log</h2>
+        <div class="log" id="combat-log"></div>
       </section>
+
+      <!-- The animated card at each phase turn: Round One — Build Phase, the
+           surge, the boss. aria-live so a reader hears the turn too. -->
+      <div class="splash" id="splash" data-show="false" aria-live="polite">
+        <div class="splash-card">
+          <div class="splash-title" id="splash-title"></div>
+          <div class="splash-sub" id="splash-sub"></div>
+        </div>
+      </div>
 
       <noscript><p style="text-align:center">The game needs JavaScript to hold its connection open.</p></noscript>
       <footer><a href="index.html">Style guide</a></footer>
@@ -277,14 +405,16 @@
     <script type="module">
       import { drawTextOutlined, textWidth, fitCanvas, context2d } from './pixel.js';
       import {
-        PALETTE, HERO_ART, MATERIAL_ART, TERRAIN_ART, BUILDING_ART, SALVAGE_ART, TILE,
+        PALETTE, HERO_ART, MATERIAL_ART, TERRAIN_ART, BUILDING_ART, SALVAGE_ART,
+        PAGES_ART, ENEMY_ART, TILE,
       } from './art.js';
       import {
         CLASSES, OPEN_ROLES, MATERIALS, RECIPES, missingFor,
         MAP_W, MAP_H, TERRAIN, PHASES, isBuildPhase, readyState,
-        generateMap, seededRandom, seedFromCode, spawnTile, tileAt,
-        LEVELS, PARTY_SIZE, classById,
-        SALVAGE, BUILDINGS, COMBAT_ACTIONS, STARTING_SALVAGE,
+        generateMap, generateCombatTerrain, seededRandom, seedFromCode, spawnTile, tileAt,
+        ROUNDS_BEFORE_BOSS, BOSS_ROUND, roundInfo, phaseCard, PARTY_SIZE, classById,
+        SALVAGE, BUILDINGS, COMBAT_ACTIONS, STARTING_SALVAGE, CACHE_YIELD, PAGES,
+        ENEMIES, waveFor,
         combatOptions, missingForBuilding, canBuildAt,
         salvageAfterCombat, addSalvage, spendSalvage,
       } from './content.js';
@@ -363,9 +493,9 @@
         mctx.fillStyle = '#241a10';
         mctx.fillRect(0, 0, MAP_PX_W, HEADER + MAP_PX_H);
 
-        const level = room.level;
+        const info = room.roundInfo;
         const state = readyState(room.players);
-        const left = level ? `${level.name}` : 'THE SITE';
+        const left = info ? `${info.name}` : 'THE SITE';
         const right = `${state.ready}/${state.total} READY`;
         drawTextOutlined(mctx, left, 2, 4, 'y', 1);
         drawTextOutlined(mctx, right, MAP_PX_W - textWidth(right, 1) - 2, 4, 'c', 1);
@@ -380,11 +510,14 @@
           }
         }
 
-        // Herbs sit low in their tile so the sprite reads as standing on the
-        // ground rather than floating in the middle of it.
+        // Items sit low in their tile so the sprite reads as standing on the
+        // ground rather than floating in the middle of it. Three kinds, one
+        // rule: herbs by material, caches by salvage, pages by the one icon.
         for(const node of room.nodes || []){
           if(node.taken || node.x === undefined) continue;
-          const art = MATERIAL_ART[node.material];
+          const art = node.kind === 'salvage' ? SALVAGE_ART[node.salvage]
+            : node.kind === 'pages' ? PAGES_ART
+            : MATERIAL_ART[node.material];
           if(art) blit(mctx, art, node.x * TILE + 4, HEADER + node.y * TILE + 6);
         }
 
@@ -450,6 +583,66 @@
         }
       }
 
+      /* ---- the combat scene ------------------------------------------------ */
+
+      const combatMap = document.getElementById('combat-map');
+      combatMap.width = MAP_PX_W;
+      combatMap.height = HEADER + MAP_PX_H;
+      const cctx = context2d(combatMap);
+
+      /* The surge, staged. The party stands on the left; the wave enters from
+         the right and each point of `dist` is a fixed stride of ground, so an
+         enemy visibly closes tile by tile with every resolved turn. This is a
+         diorama of the numbers, not a second board — nothing here is clickable
+         except through the cards below it. */
+      function drawCombat(){
+        cctx.fillStyle = '#241a10';
+        cctx.fillRect(0, 0, MAP_PX_W, HEADER + MAP_PX_H);
+
+        const info = room.roundInfo;
+        const title = room.round >= (room.bossRound || 4) ? 'THE ARRAY WAKES' : 'THE SURGE';
+        drawTextOutlined(cctx, title, 2, 4, 'y', 1);
+        const right = info ? info.name.toUpperCase() : '';
+        drawTextOutlined(cctx, right, MAP_PX_W - textWidth(right, 1) - 2, 4, 'c', 1);
+
+        const terrain = room.terrain || [];
+        for(let y = 0; y < MAP_H; y++){
+          for(let x = 0; x < MAP_W; x++){
+            const kind = tileAt(terrain, x, y) || 'floor';
+            blit(cctx, TERRAIN_ART[kind] || TERRAIN_ART.floor, x * TILE, HEADER + y * TILE);
+          }
+        }
+
+        // The party, spread down the left edge.
+        const standing = room.players.filter(p => !p.down);
+        standing.forEach((p, i) => {
+          const cls = CLASSES.find(c => c.id === p.classId);
+          const art = cls && HERO_ART[cls.art];
+          if(!art) return;
+          const y = 2 + Math.floor(i * (MAP_H - 4) / Math.max(1, standing.length));
+          blit(cctx, art.rows, 2 * TILE, HEADER + (y + 1) * TILE - art.rows.length);
+        });
+
+        // The wave. dist 0 stands one stride from the party; the spawn edge is
+        // the right side of the map. Dead enemies leave the field.
+        const strides = Math.max(...Object.values(ENEMIES).map(e => e.dist)) + 1;
+        const strideW = Math.floor((MAP_W - 8) / strides) * TILE;
+        room.enemies.forEach((enemy, i) => {
+          if(enemy.hp <= 0) return;
+          const art = ENEMY_ART[enemy.art];
+          if(!art) return;
+          const x = 5 * TILE + enemy.dist * strideW;
+          const y = HEADER + (3 + ((i * 5) % (MAP_H - 6))) * TILE - art.length + TILE;
+          blit(cctx, art, x, y);
+          // A one-tile health bar over each head beats a number in a list.
+          const share = enemy.hp / enemy.maxHp;
+          cctx.fillStyle = '#3a2418';
+          cctx.fillRect(x, y - 4, art[0].length, 2);
+          cctx.fillStyle = share > 0.4 ? PALETTE.g : PALETTE.e;
+          cctx.fillRect(x, y - 4, Math.max(1, Math.round(art[0].length * share)), 2);
+        });
+      }
+
       /* Pointer position to tile. The canvas is CSS-scaled by a whole number,
          so undo that scale rather than assuming it — the page is responsive and
          the factor changes with the window. */
@@ -492,7 +685,11 @@
         preview: els('preview'), hold: els('hold'), readyCount: els('ready-count'),
         combat: els('combat'), combatParty: els('combat-party'), leaveCombat: els('leave-combat'),
         salvage: els('salvage'), buildings: els('buildings'), buildHint: els('build-hint'),
-        options: els('options'), endCombat: els('end-combat'),
+        options: els('options'), library: els('library'),
+        combatName: els('combat-name'), combatMeta: els('combat-meta'),
+        enemies: els('enemies'), combatPotions: els('combat-potions'),
+        combatWait: els('combat-wait'), combatLog: els('combat-log'),
+        splash: els('splash'), splashTitle: els('splash-title'), splashSub: els('splash-sub'),
       };
 
       /* ---- connection ---------------------------------------------------- */
@@ -586,29 +783,42 @@
 
       let demoRandom = null;
 
+      function demoEnterBuild(){
+        const { terrain, nodes } = generateMap(demoRandom);
+        const start = spawnTile(terrain);
+        Object.assign(room, {
+          phase: PHASES.build, terrain, nodes, buildings: [], enemies: [],
+          roundInfo: roundInfo(room.round),
+        });
+        room.players[0].x = start.x;
+        room.players[0].y = start.y;
+        room.players[0].ready = false;
+        const cardText = phaseCard(room.round, PHASES.build);
+        room.events.push({ t: 'phase', ...cardText });
+      }
+
       function startPreview(){
         demo = true;
         deliberate = true;                    // there is no socket to reconnect to
         demoRandom = seededRandom(seedFromCode(newCode()));
-        const { terrain, nodes } = generateMap(demoRandom);
 
-        // The Engineer, because the build phase is the thing being previewed
-        // and it is the class that can do anything in it.
-        const cls = classById('engineer') || CLASSES.find(c => c.status === 'live');
-        const start = spawnTile(terrain);
+        // The Wizard, because with all three verbs in the game it is the one
+        // that can walk the whole loop alone: gather, ready, burn the wave.
+        const cls = classById('wizard') || CLASSES.find(c => c.status === 'live');
         holding = null;
 
         room = {
-          you: 'p1', phase: PHASES.build, round: 0, maxPlayers: PARTY_SIZE,
-          level: { ...LEVELS[0], index: 0, of: LEVELS.length },
-          terrain, nodes, buildings: [], stash: {}, potions: [], events: [],
+          you: 'p1', phase: PHASES.build, round: 1, rounds: ROUNDS_BEFORE_BOSS,
+          bossRound: BOSS_ROUND, maxPlayers: PARTY_SIZE,
+          terrain: [], nodes: [], buildings: [], enemies: [],
+          stash: {}, potions: [], pages: 2, events: [],
           salvage: { ...STARTING_SALVAGE },
           players: [{
             id: 'p1', name: 'You', host: true, connected: true, ready: false, down: false,
-            classId: cls.id, hp: cls.hp, maxHp: cls.hp, effects: [], intent: null,
-            x: start.x, y: start.y,
+            classId: cls.id, hp: cls.hp, maxHp: cls.hp, effects: [], intent: null, x: 0, y: 0,
           }],
         };
+        demoEnterBuild();
 
         drawBanner(null);                     // there is no room, so do not label one
         setStatus('open', 'Preview — no room');
@@ -620,27 +830,57 @@
         const you = room.players[0];
         room.events = [];
 
-        if(msg.t === 'ready'){
+        if(msg.t === 'ready' && room.phase === PHASES.build){
           you.ready = !!msg.ready;
           // The rule the room applies, from the same helper, so the preview
           // cannot drift from the real thing about when the surge lands.
           if(readyState(room.players).all){
             room.phase = PHASES.combat;
-            room.events.push({ t: 'surge' });
+            room.terrain = generateCombatTerrain(demoRandom);
+            room.enemies = waveFor(room.round).map((type, i) => {
+              const def = ENEMIES[type];
+              return { id: `e${i}`, type, name: def.name, art: def.art,
+                       hp: def.hp, maxHp: def.hp, dist: def.dist, hits: def.hits };
+            });
+            room.actions = combatOptions(room.buildings);
+            room.events.push({ t: 'phase', ...phaseCard(room.round, PHASES.combat) });
           }
-        }else if(msg.t === 'endCombat'){
-          // Combat itself is not built yet, so the preview shows the half of it
-          // that is: the fight ends, salvage comes in, and the next build phase
-          // has more to spend than the last one did.
-          const drawn = salvageAfterCombat(room.players, room.buildings, demoRandom);
-          room.salvage = addSalvage(room.salvage, drawn);
-          const summary = Object.entries(drawn)
-            .map(([id, n]) => `${n} ${SALVAGE[id].name}`).join(', ');
-          room.phase = PHASES.build;
-          room.round += 1;
-          for(const p of room.players) p.ready = false;
-          room.events.push({ t: 'log', text: summary ? `Salvaged ${summary}.` : 'Nothing worth carrying.' });
-        }else if(msg.t === 'intent' && msg.intent.t === 'build'){
+        }else if(msg.t === 'intent' && msg.intent.t === 'act' && room.phase === PHASES.combat){
+          const action = COMBAT_ACTIONS[msg.intent.action];
+          if(!action) return render();
+          if(action.pageCost){
+            if(room.pages < action.pageCost) return render();
+            room.pages -= action.pageCost;
+          }
+          if(action.effect.kind === 'strike'){
+            const alive = room.enemies.filter(e => e.hp > 0);
+            const target = alive.find(e => e.id === msg.intent.target) ||
+              [...alive].sort((a, b) => a.dist - b.dist)[0];
+            if(target){
+              target.hp = Math.max(0, target.hp - action.effect.amount);
+              room.events.push({ t: 'log', text: `${action.name} hits the ${target.name} for ${action.effect.amount}.` });
+            }
+          }
+          for(const e of room.enemies){
+            if(e.hp > 0 && e.dist > 0) e.dist -= 1;
+            else if(e.hp > 0 && e.dist === 0){
+              you.hp = Math.max(1, you.hp - e.hits);   // the preview never kills you
+              room.events.push({ t: 'log', text: `The ${e.name} hits you for ${e.hits}.` });
+            }
+          }
+          if(room.enemies.every(e => e.hp <= 0)){
+            const drawn = salvageAfterCombat(room.players, room.buildings, demoRandom);
+            room.salvage = addSalvage(room.salvage, drawn);
+            if(room.round >= BOSS_ROUND){
+              room.phase = PHASES.over;
+              room.outcome = 'won';
+            }else{
+              room.round += 1;
+              room.pages += 1;                          // stand-in for the walk
+              demoEnterBuild();
+            }
+          }
+        }else if(msg.t === 'intent' && msg.intent.t === 'place'){
           const { building: id, x, y } = msg.intent;
           const building = BUILDINGS[id];
           const affordable = building && Object.keys(missingForBuilding(id, room.salvage)).length === 0;
@@ -655,10 +895,18 @@
           if(node){
             node.taken = true;
             you.x = node.x; you.y = node.y;
-            const cls = CLASSES.find(c => c.id === you.classId);
-            const yielded = cls ? cls.gather : 1;
-            room.stash[node.material] = (room.stash[node.material] || 0) + yielded;
-            room.events.push({ t: 'log', text: `Gathered ${yielded} ${MATERIALS[node.material].name}.` });
+            if(node.kind === 'salvage'){
+              room.salvage = addSalvage(room.salvage, { [node.salvage]: CACHE_YIELD.salvage });
+              room.events.push({ t: 'log', text: `Cracked a cache: ${CACHE_YIELD.salvage} ${SALVAGE[node.salvage].name}.` });
+            }else if(node.kind === 'pages'){
+              room.pages += CACHE_YIELD.pages;
+              room.events.push({ t: 'log', text: `Found ${CACHE_YIELD.pages} spell page.` });
+            }else{
+              const cls = CLASSES.find(c => c.id === you.classId);
+              const yielded = cls ? cls.gather : 1;
+              room.stash[node.material] = (room.stash[node.material] || 0) + yielded;
+              room.events.push({ t: 'log', text: `Gathered ${yielded} ${MATERIALS[node.material].name}.` });
+            }
           }
         }else if(msg.t === 'intent' && msg.intent.t === 'craft'){
           const recipe = RECIPES[msg.intent.recipe];
@@ -778,10 +1026,52 @@
 
       /* ---- combat ---------------------------------------------------------- */
 
-      /* The phase exists and the party arrives in it; what happens here is the
-         next thing to build. Rendering the roster rather than a blank screen
-         keeps it obvious that the switch worked. */
+      /* The target for the next strike. Local pointer state, like `holding`:
+         which enemy you are aiming at is not a fact about the room until the
+         intent is sent. */
+      let aimAt = null;
+
       function renderCombat(){
+        const info = room.roundInfo;
+        const boss = room.round >= (room.bossRound || 4);
+        ui.combatName.textContent = boss ? 'The Array wakes' : 'The blight surges';
+        ui.combatMeta.textContent = info
+          ? `Round ${room.round} of ${room.rounds || ROUNDS_BEFORE_BOSS}${boss ? ' — boss' : ''} · ${info.name}`
+          : '';
+
+        drawCombat();
+
+        const you = me();
+        const acting = !!you && !you.down && room.phase === PHASES.combat;
+
+        // The wave, as cards: clicking one aims the next strike at it. The
+        // scene above is the picture; this is the interface.
+        ui.enemies.replaceChildren();
+        if(aimAt && !room.enemies.some(e => e.id === aimAt && e.hp > 0)) aimAt = null;
+        for(const enemy of room.enemies){
+          const el = document.createElement('button');
+          el.type = 'button';
+          el.className = 'enemy';
+          el.dataset.dead = String(enemy.hp <= 0);
+          el.dataset.here = String(enemy.hp > 0 && enemy.dist === 0);
+          el.disabled = enemy.hp <= 0 || !acting;
+          el.setAttribute('aria-pressed', String(aimAt === enemy.id));
+          if(aimAt === enemy.id) el.style.borderColor = 'var(--sun)';
+          if(ENEMY_ART[enemy.art]) el.append(pixels(ENEMY_ART[enemy.art], 1));
+          const body = document.createElement('span');
+          const name = document.createElement('b');
+          name.className = 'card-name';
+          name.textContent = enemy.name;
+          const dist = document.createElement('span');
+          dist.className = 'enemy-dist';
+          dist.textContent = enemy.hp <= 0 ? 'down'
+            : enemy.dist === 0 ? 'HERE' : `${enemy.dist} away`;
+          body.append(name, document.createElement('br'), dist);
+          el.append(body, healthBar({ hp: enemy.hp, maxHp: enemy.maxHp }));
+          el.onclick = () => { aimAt = aimAt === enemy.id ? null : enemy.id; render(); };
+          ui.enemies.append(el);
+        }
+
         ui.combatParty.replaceChildren();
         for(const p of room.players){
           const li = document.createElement('li');
@@ -793,12 +1083,19 @@
           name.className = 'seat-name';
           name.textContent = p.name + (p.id === room.you ? ' (you)' : '');
           li.append(name, healthBar(p));
+          if(p.down) li.append(tag('Down', 'down'));
+          else if(p.intent) li.append(tag(p.intent.t === 'act' ? p.intent.action : p.intent.t, 'ready'));
+          for(const effect of p.effects) li.append(tag(`${effect.kind} ${effect.rounds ?? ''}`, 'waiting'));
           ui.combatParty.append(li);
         }
 
-        // The deck, and the build phase is the deckbuilding: every option here
-        // beyond the base ones is standing on the map somewhere.
-        const ids = combatOptions(room.buildings);
+        // The deck, and the build phase was the deckbuilding: every option
+        // beyond the base ones is standing on the site somewhere — plus the
+        // Wizard's own verb, funded by the library rather than a building.
+        const ids = [...(room.actions || combatOptions(room.buildings))];
+        const cls = you && classById(you.classId);
+        if(cls && cls.cast && !ids.includes('fireball')) ids.push('fireball');
+
         const from = new Map();
         for(const [id, building] of Object.entries(BUILDINGS)){
           if(!(room.buildings || []).some(b => b.id === id)) continue;
@@ -808,9 +1105,12 @@
         ui.options.replaceChildren();
         for(const id of ids){
           const action = COMBAT_ACTIONS[id];
+          if(!action) continue;
           const card = document.createElement('button');
           card.type = 'button';
           card.className = 'card';
+          const needsPages = action.pageCost || 0;
+          card.disabled = !acting || (needsPages > 0 && (room.pages || 0) < needsPages);
           const body = document.createElement('span');
           body.className = 'card-body';
           const name = document.createElement('b');
@@ -819,29 +1119,65 @@
           const sub = document.createElement('span');
           sub.className = 'card-sub';
           const e = action.effect;
-          sub.textContent = `${e.kind} ${e.amount}${e.rounds ? ` · ${e.rounds} round${e.rounds > 1 ? 's' : ''}` : ''}`;
+          sub.textContent = `${e.kind} ${e.amount}${e.rounds ? ` · ${e.rounds} round${e.rounds > 1 ? 's' : ''}` : ''}`
+            + (needsPages ? ` · ${needsPages} page` : '');
           const source = document.createElement('span');
           source.className = 'card-sub';
           source.style.color = 'var(--sun)';
-          source.textContent = from.get(id) ? `From the ${from.get(id)}` : 'Always available';
+          source.textContent = needsPages
+            ? `${room.pages || 0} page${(room.pages || 0) === 1 ? '' : 's'} left`
+            : from.get(id) ? `From the ${from.get(id)}` : 'Always available';
           const note = document.createElement('span');
           note.className = 'card-blurb';
-          note.textContent = action.note;
+          note.textContent = e.kind === 'strike' && aimAt
+            ? `Aimed at the ${room.enemies.find(x => x.id === aimAt)?.name}.`
+            : action.note;
           body.append(name, sub, source, note);
           card.append(body);
-          card.onclick = () => send({ t: 'intent', intent: { t: 'act', action: id } });
+          card.onclick = () => send({ t: 'intent', intent: {
+            t: 'act', action: id,
+            ...(e.kind === 'strike' && aimAt ? { target: aimAt } : {}),
+          } });
           ui.options.append(card);
         }
+
+        // Potions are combat items too — the Alchemist throws them. Same
+        // intent as drinking in the build phase; the room does not care which
+        // phase a heal lands in.
+        ui.combatPotions.replaceChildren();
+        if(!room.potions.length){
+          ui.combatPotions.append(Object.assign(document.createElement('p'), { textContent: 'The rack is empty.' }));
+        }
+        room.potions.forEach((potion, index) => {
+          for(const p of room.players){
+            if(p.down) continue;
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'chip';
+            button.disabled = !acting;
+            button.textContent = p.id === room.you
+              ? `${potion.name} — drink`
+              : `${potion.name} — throw to ${p.name}`;
+            button.onclick = () => send({ t: 'intent', intent: { t: 'use', potion: index, target: p.id } });
+            ui.combatPotions.append(button);
+          }
+        });
+
+        ui.combatWait.disabled = !acting;
+
+        ui.combatLog.replaceChildren();
+        for(const line of logLines) ui.combatLog.append(Object.assign(document.createElement('div'), { textContent: line }));
       }
 
       /* ---- run ------------------------------------------------------------ */
       function renderRun(){
-        const level = room.level;
-        ui.levelName.textContent = level ? level.name : '';
-        ui.levelMeta.textContent = level
-          ? `Level ${level.index + 1} of ${level.of} · blight ${level.blight} · round ${room.round + 1}`
+        const info = room.roundInfo;
+        ui.levelName.textContent = info ? info.name : '';
+        ui.levelMeta.textContent = info
+          ? `Round ${room.round} of ${room.rounds || ROUNDS_BEFORE_BOSS}`
+            + `${room.round >= (room.bossRound || 4) ? ' — the boss waits' : ''} · blight ${info.blight}`
           : '';
-        ui.levelNote.textContent = level ? level.note : '';
+        ui.levelNote.textContent = info ? info.note : '';
 
         ui.party.replaceChildren();
         for(const p of room.players){
@@ -881,14 +1217,20 @@
           button.type = 'button';
           button.className = 'chip';
           button.disabled = node.taken || !acting;
-          if(MATERIAL_ART[node.material]) button.append(pixels(MATERIAL_ART[node.material], 2));
-          button.append(document.createTextNode(MATERIALS[node.material].name));
+          const art = node.kind === 'salvage' ? SALVAGE_ART[node.salvage]
+            : node.kind === 'pages' ? PAGES_ART
+            : MATERIAL_ART[node.material];
+          const label = node.kind === 'salvage' ? `${SALVAGE[node.salvage].name} cache`
+            : node.kind === 'pages' ? 'Spell pages'
+            : MATERIALS[node.material].name;
+          if(art) button.append(pixels(art, 2));
+          button.append(document.createTextNode(label));
           button.onclick = () => send({ t: 'intent', intent: { t: 'gather', node: node.id } });
           ui.nodes.append(button);
         }
         if(!room.nodes.some(n => !n.taken)){
           const done = document.createElement('p');
-          done.textContent = 'Stripped bare. The way down opens.';
+          done.textContent = 'Stripped bare. Nothing left but the surge.';
           ui.nodes.append(done);
         }
 
@@ -905,6 +1247,23 @@
           n.textContent = `x${count}`;
           chip.append(n);
           ui.stash.append(chip);
+        }
+
+        // --- the library ----------------------------------------------------
+        ui.library.replaceChildren();
+        if(!room.pages){
+          ui.library.append(Object.assign(document.createElement('p'),
+            { textContent: 'No pages. They turn up on the map, when they turn up at all.' }));
+        }else{
+          const chip = document.createElement('span');
+          chip.className = 'chip';
+          chip.append(pixels(PAGES_ART, 2));
+          chip.append(document.createTextNode(PAGES.name));
+          const n = document.createElement('b');
+          n.className = 'count';
+          n.textContent = `x${room.pages}`;
+          chip.append(n);
+          ui.library.append(chip);
         }
 
         // --- salvage, and what it can be turned into -----------------------
@@ -1037,12 +1396,30 @@
          here — the alternative is a durable record that grows forever. */
       const logLines = [];
 
+      /* The splash. Shown on every phase event the room posts, held long
+         enough to read, and never stacked — a new card replaces the last
+         rather than queueing behind it. */
+      let splashTimer = 0;
+      function showSplash(title, subtitle){
+        ui.splashTitle.textContent = title;
+        ui.splashSub.textContent = subtitle || '';
+        // Re-trigger the entry animation even if the card is already up.
+        ui.splash.dataset.show = 'false';
+        void ui.splash.offsetWidth;
+        ui.splash.dataset.show = 'true';
+        clearTimeout(splashTimer);
+        splashTimer = setTimeout(() => { ui.splash.dataset.show = 'false'; }, 2400);
+      }
+
       function render(){
         if(!room) return;
         for(const event of room.events || []){
           if(event.t === 'log') logLines.unshift(event.text);
           if(event.t === 'started') logLines.unshift('The run begins.');
-          if(event.t === 'surge') logLines.unshift('Everyone is ready. The blight surges.');
+          if(event.t === 'phase'){
+            logLines.unshift(`${event.title}. ${event.subtitle || ''}`);
+            showSplash(event.title, event.subtitle);
+          }
         }
         // Consumed, so drop them: render() also runs for local reasons — picking
         // a building up does not touch the room — and an uncleared list would
@@ -1056,6 +1433,13 @@
         ui.lobby.hidden = !inLobby;
         ui.run.hidden = inLobby || inCombat;
         ui.combat.hidden = !inCombat;
+        // The page is narrow for reading and wide for playing; fit() reruns
+        // because the width change moves the integer the map can scale by.
+        const view = inLobby ? 'lobby' : inCombat ? 'combat' : 'run';
+        if(document.body.dataset.view !== view){
+          document.body.dataset.view = view;
+          fit();
+        }
         if(inLobby) renderLobby();
         else if(inCombat) renderCombat();
         else renderRun();
@@ -1078,10 +1462,10 @@
       ui.hold.addEventListener('click', () => { const you = me(); send({ t: 'ready', ready: !(you && you.ready) }); });
       ui.start.addEventListener('click', () => send({ t: 'start' }));
       ui.wait.addEventListener('click', () => send({ t: 'intent', intent: { t: 'wait' } }));
+      ui.combatWait.addEventListener('click', () => send({ t: 'intent', intent: { t: 'wait' } }));
       ui.leave.addEventListener('click', () => leave());
       ui.leaveRun.addEventListener('click', () => leave());
       ui.leaveCombat.addEventListener('click', () => leave());
-      ui.endCombat.addEventListener('click', () => send({ t: 'endCombat' }));
 
       /* Clicking a herb is the same intent the chip below the map sends. The
          canvas is the fast path, not the only one.
@@ -1096,7 +1480,8 @@
 
         if(holding){
           if(canPlaceHere(tile.x, tile.y)){
-            send({ t: 'intent', intent: { t: 'build', building: holding, x: tile.x, y: tile.y } });
+            send({ t: 'intent', intent: { t: 'place', building: holding, x: tile.x, y: tile.y } });
+            holding = null;
           }
           return;
         }
@@ -1125,13 +1510,25 @@
       const wrap = document.querySelector('.wrap');
       const fit = () => {
         fitCanvas(banner, W, H, { container: wrap, maxHeightFraction: 0.25 });
-        fitCanvas(map, MAP_PX_W, HEADER + MAP_PX_H, { container: wrap, maxHeightFraction: 0.55 });
+        // The map earns most of the screen: it is the game, and 0.55 of the
+        // viewport was why it kept coming out a postage stamp.
+        fitCanvas(map, MAP_PX_W, HEADER + MAP_PX_H, { container: wrap, maxHeightFraction: 0.78 });
+        fitCanvas(combatMap, MAP_PX_W, HEADER + MAP_PX_H, { container: wrap, maxHeightFraction: 0.78 });
       };
       window.addEventListener('resize', fit);
       fit();
 
       const fromUrl = location.hash.replace('#', '').toUpperCase();
       if(CODE_RE.test(fromUrl)){ ui.code.value = fromUrl; connect(fromUrl); }
+
+      /* ?preview boots straight into the offline site, and ?preview=combat
+         readies it up on arrival — deep links for looking at either phase
+         without a room, which is also what the screenshot tooling drives. */
+      const previewParam = new URLSearchParams(location.search).get('preview');
+      if(previewParam !== null && !room){
+        startPreview();
+        if(previewParam === 'combat') demoSend({ t: 'ready', ready: true });
+      }
     </script>
   </body>
 </html>
