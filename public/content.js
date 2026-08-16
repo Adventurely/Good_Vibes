@@ -463,6 +463,139 @@ export function phaseCard(round, phase){
     : { title: `Round ${ordinal} — The Surge`, subtitle: 'The blight has found the site.' };
 }
 
+/* ================================================================ cards === */
+
+/* Everyone holds a deck, and a turn is: draw three, play one.
+ *
+ * Three is small on purpose. Five players commit simultaneously, so a hand has
+ * to be readable in about three seconds or four people sit watching a fifth
+ * think. A three-card hand is a choice; a ten-card hand is a planning problem,
+ * and a planning problem you cannot coordinate is just a wait.
+ *
+ * The unplayed two are discarded with the played one — a hand does not carry
+ * over. That is what keeps a turn atomic: nobody is holding a card for three
+ * rounds waiting for a setup that the other four cannot see coming.
+ */
+export const HAND_SIZE = 3;
+
+/* A card is an effect with a face. `kind` is only for the icon and the sort —
+ * the engine reads `effect`, exactly as it does for potions and buildings, so
+ * a card cannot do anything a potion could not.
+ *
+ * These are the basics: every class gets attacks and defends and nothing that
+ * runs out. The interesting cards — the Engineer's powered weapons, the
+ * Alchemist's brewed one-shots, the Wizard's prepared spells — are the next
+ * slice, and they go in the same table with the same shape.
+ */
+export const CARDS = {
+  /* --- the Alchemist: middling at both, and the only one who mends --- */
+  flask: {
+    name: 'Acid Flask', kind: 'attack', classId: 'alchemist',
+    effect: { kind: 'strike', amount: 3 },
+    note: 'Something from the bottom shelf, thrown hard.',
+  },
+  steady: {
+    name: 'Steady Hands', kind: 'defend', classId: 'alchemist',
+    effect: { kind: 'ward', amount: 4, rounds: 1 },
+    note: 'Do not spill it. Do not spill it.',
+  },
+  tonic: {
+    name: 'Tonic', kind: 'heal', classId: 'alchemist',
+    effect: { kind: 'heal', amount: 4 },
+    note: 'Bitter, and working before you have swallowed it.',
+  },
+
+  /* --- the Engineer: hits like a tool, holds like a wall --- */
+  wrench: {
+    name: 'Wrench', kind: 'attack', classId: 'engineer',
+    effect: { kind: 'strike', amount: 4 },
+    note: 'Forty centimetres of drop-forged persuasion.',
+  },
+  shore: {
+    name: 'Shore Up', kind: 'defend', classId: 'engineer',
+    effect: { kind: 'ward', amount: 5, rounds: 1 },
+    note: 'Plating, a strut, and eleven seconds. It will hold.',
+  },
+
+  /* --- the Wizard: the best basic attack and the worst basic guard, which
+         is the whole class in two cards --- */
+  spark: {
+    name: 'Spark', kind: 'attack', classId: 'wizard',
+    effect: { kind: 'strike', amount: 5 },
+    note: 'No page needed. Barely a spell. Still hurts.',
+  },
+  sign: {
+    name: 'Warding Sign', kind: 'defend', classId: 'wizard',
+    effect: { kind: 'ward', amount: 3, rounds: 1 },
+    note: 'Drawn in the air, and about as solid as that sounds.',
+  },
+};
+
+/* What each class opens with. Eight cards: at three drawn and three discarded
+   a turn, the deck cycles about every three turns, so a fight sees the whole
+   thing roughly twice and a player learns what is in theirs. */
+export const STARTING_DECKS = {
+  alchemist: { flask: 3, steady: 3, tonic: 2 },
+  engineer: { wrench: 4, shore: 4 },
+  wizard: { spark: 5, sign: 3 },
+};
+
+/* The deck as a flat list of card ids, unshuffled. Order is the caller's
+   problem, because the shuffle needs the room's generator. */
+export function buildDeck(classId){
+  const spec = STARTING_DECKS[classId] || {};
+  const cards = [];
+  for(const [id, count] of Object.entries(spec)){
+    for(let i = 0; i < count; i++) cards.push(id);
+  }
+  return cards;
+}
+
+/* Fisher-Yates, with the generator supplied.
+ *
+ * Every shuffle in this game has to be the room's: a client that shuffled its
+ * own deck would hold cards the room did not deal it, and a replayed room
+ * would deal a different hand than the one that was played. Each player needs
+ * their own stream, too, or one player's draw shifts everyone else's.
+ */
+export function shuffle(cards, random){
+  const out = [...cards];
+  for(let i = out.length - 1; i > 0; i--){
+    const j = Math.floor(random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+/* Draw a hand, reshuffling the discard back in when the deck runs dry.
+ *
+ * Returns new piles rather than mutating them: the room holds this state and
+ * two callers sharing an array is how a hand ends up in someone else's deck.
+ * If there is nothing anywhere the hand comes back short, which is a bad turn
+ * rather than a crash.
+ */
+export function draw(deck, discard, random, count = HAND_SIZE){
+  let pile = [...(deck || [])];
+  let used = [...(discard || [])];
+  const hand = [];
+
+  for(let i = 0; i < count; i++){
+    if(!pile.length){
+      if(!used.length) break;
+      pile = shuffle(used, random);
+      used = [];
+    }
+    hand.push(pile.shift());
+  }
+  return { hand, deck: pile, discard: used };
+}
+
+/* A turn ends with the whole hand face down — the one that was played and the
+   two that were not. */
+export const discardHand = (discard, hand) => [...(discard || []), ...(hand || [])];
+
+export const cardById = id => CARDS[id] || null;
+
 /* ============================================================== enemies === */
 
 /* What comes out of the blight when it surges. An enemy is authored by its

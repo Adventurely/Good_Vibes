@@ -618,6 +618,45 @@ export const MATERIAL_ART = {
   ],
 };
 
+/* ================================================================ cards === */
+
+/* One icon per card kind rather than per card. A hand is read at a glance and
+   in a hurry — what matters is "that one hits, that one holds", and seven
+   distinct pictures would say that slower than three do. Keyed by CARDS[].kind
+   in content.js. */
+export const CARD_ART = {
+  attack: [
+    '..e..e..',
+    '.eE..Ee.',
+    '..eEEe..',
+    '.eEEEEe.',
+    '.eEEEEe.',
+    '..eEEe..',
+    '.eE..Ee.',
+    '..e..e..'
+  ],
+  defend: [
+    '.MMMMMM.',
+    'MmmmmmmM',
+    'MmMMMMmM',
+    'MmMmmMmM',
+    'MmMmmMmM',
+    '.MmMMmM.',
+    '..MmmM..',
+    '...MM...'
+  ],
+  heal: [
+    '..#gg#..',
+    '..#gg#..',
+    '###gg###',
+    'gggggggg',
+    'gggggggg',
+    '###gg###',
+    '..#gg#..',
+    '..#gg#..'
+  ],
+};
+
 /* ============================================================== salvage === */
 
 /* Eight by eight, same as the materials, because they sit in the same kind of

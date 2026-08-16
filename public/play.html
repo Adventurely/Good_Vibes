@@ -143,6 +143,68 @@
       #map { margin: 0 auto; border: 2px solid var(--line); border-radius: 6px; cursor: pointer; }
       #map:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+      /* --- the table: deck, hand, discard ---------------------------------- */
+      .table {
+        display: flex; align-items: center; justify-content: center;
+        gap: 1rem; flex-wrap: wrap;
+      }
+
+      .pile { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; flex: none; }
+      .pile-face {
+        width: 3.2rem; height: 4.6rem; border-radius: 5px;
+        border: 2px solid var(--line); background: var(--panel);
+        /* A card back, drawn in gradients rather than as an image: the deck is
+           face down and needs to read as a stack, not as a blank rectangle. */
+        background-image:
+          repeating-linear-gradient(45deg, #3d2c1c 0 4px, transparent 4px 8px),
+          linear-gradient(#3a2b1d, #2b2014);
+        box-shadow: 3px 3px 0 -1px var(--panel), 3px 3px 0 0 var(--line),
+                    6px 6px 0 -1px var(--panel), 6px 6px 0 0 var(--line);
+      }
+      .pile-face.is-discard {
+        background-image: linear-gradient(#2e2417, #241a10);
+        opacity: 0.75;
+      }
+      .pile[data-empty='true'] .pile-face { opacity: 0.3; box-shadow: none; }
+      .pile-label {
+        font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted);
+      }
+      .pile-count { color: var(--sun); font-weight: 400; font-variant-numeric: tabular-nums; }
+
+      /* Not flex-grow: the hand expanding would shove the two piles out to the
+         edges of a wide screen, and the deck wants to read as sitting beside
+         the cards it dealt. */
+      .table { gap: 1.5rem; }
+      .hand { display: flex; gap: 0.6rem; justify-content: center; flex-wrap: wrap; flex: 0 1 auto; }
+
+      .pcard {
+        width: 9rem; min-height: 12rem;
+        display: flex; flex-direction: column; align-items: center; gap: 0.4rem;
+        padding: 0.7rem 0.5rem; text-align: center;
+        text-transform: none; letter-spacing: 0;
+        background: linear-gradient(#3a2b1d, #2f2317);
+        border: 2px solid var(--line); border-radius: 6px; cursor: pointer;
+      }
+      .pcard:hover:not(:disabled), .pcard:focus-visible {
+        border-color: var(--accent); transform: translateY(-3px);
+      }
+      .pcard:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+      .pcard-name { font-size: 0.8rem; color: var(--text); }
+      .pcard-amount {
+        font-size: 1.5rem; color: var(--sun); font-variant-numeric: tabular-nums; line-height: 1;
+      }
+      .pcard-kind {
+        font-size: 0.58rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted);
+      }
+      .pcard-note {
+        font-size: 0.66rem; color: var(--muted); margin-top: auto; line-height: 1.4;
+      }
+      .pcard[data-kind='attack'] { border-color: #6b3a2c; }
+      .pcard[data-kind='defend'] { border-color: #3f5568; }
+      .pcard[data-kind='heal']   { border-color: #3f6b3a; }
+
+      .hand-empty { color: var(--muted); font-size: 0.85rem; align-self: center; }
+
       .ready-line {
         display: flex; align-items: center; justify-content: center; gap: 0.6rem;
         font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
@@ -372,7 +434,27 @@
 
         <ol id="combat-party" style="margin-top:1.2rem"></ol>
 
-        <h2 style="margin-top:1.4rem">What you can do</h2>
+        <h2 style="margin-top:1.4rem">Your hand</h2>
+        <p style="margin-bottom:0.8rem">Three drawn, one played. The two you leave go to the discard
+          with it — a hand does not carry over.</p>
+
+        <div class="table">
+          <div class="pile" id="deck-pile">
+            <span class="pile-face" aria-hidden="true"></span>
+            <span class="pile-label">Deck</span>
+            <b class="pile-count" id="deck-count">0</b>
+          </div>
+
+          <div class="hand" id="hand"></div>
+
+          <div class="pile" id="discard-pile">
+            <span class="pile-face is-discard" aria-hidden="true"></span>
+            <span class="pile-label">Discard</span>
+            <b class="pile-count" id="discard-count">0</b>
+          </div>
+        </div>
+
+        <h2 style="margin-top:1.4rem">What the site grants</h2>
         <p style="margin-bottom:0.6rem">Decided in the build phase: what the site grants, what the
           Wizard can still read, and whatever is on the rack.</p>
         <div class="grid" id="options"></div>
@@ -406,7 +488,7 @@
       import { drawTextOutlined, textWidth, fitCanvas, context2d } from './pixel.js';
       import {
         PALETTE, HERO_ART, MATERIAL_ART, TERRAIN_ART, BUILDING_ART, SALVAGE_ART,
-        PAGES_ART, ENEMY_ART, TILE,
+        PAGES_ART, ENEMY_ART, CARD_ART, TILE,
       } from './art.js';
       import {
         CLASSES, OPEN_ROLES, MATERIALS, RECIPES, missingFor,
@@ -415,6 +497,7 @@
         ROUNDS_BEFORE_BOSS, BOSS_ROUND, roundInfo, phaseCard, PARTY_SIZE, classById,
         SALVAGE, BUILDINGS, COMBAT_ACTIONS, STARTING_SALVAGE, CACHE_YIELD, PAGES,
         ENEMIES, waveFor,
+        HAND_SIZE, CARDS, buildDeck, shuffle, draw, discardHand, cardById,
         combatOptions, missingForBuilding, canBuildAt,
         salvageAfterCombat, addSalvage, spendSalvage,
       } from './content.js';
@@ -688,6 +771,8 @@
         options: els('options'), library: els('library'),
         combatName: els('combat-name'), combatMeta: els('combat-meta'),
         enemies: els('enemies'), combatPotions: els('combat-potions'),
+        hand: els('hand'), deckPile: els('deck-pile'), discardPile: els('discard-pile'),
+        deckCount: els('deck-count'), discardCount: els('discard-count'),
         combatWait: els('combat-wait'), combatLog: els('combat-log'),
         splash: els('splash'), splashTitle: els('splash-title'), splashSub: els('splash-sub'),
       };
@@ -826,6 +911,74 @@
         render();
       }
 
+      /* Deal a fresh hand, reshuffling the discard if the deck has run out.
+         The preview holds one player, but this takes the player it is given so
+         it reads the same as the room's version will. */
+      function demoDeal(player){
+        const dealt = draw(player.deck, player.discard, demoRandom, HAND_SIZE);
+        player.hand = dealt.hand;
+        player.deck = dealt.deck;
+        player.discard = dealt.discard;
+      }
+
+      /* One combat turn, whichever interface started it.
+       *
+       * Applying the effect, advancing the wave and checking the field are the
+       * same three steps whether the effect came off a card or out of a
+       * building, so both paths land here rather than growing two copies that
+       * drift.
+       */
+      function demoTurn(you, effect, label, targetId){
+        if(effect.kind === 'strike'){
+          const alive = room.enemies.filter(e => e.hp > 0);
+          const target = alive.find(e => e.id === targetId) ||
+            [...alive].sort((a, b) => a.dist - b.dist)[0];
+          if(target){
+            target.hp = Math.max(0, target.hp - effect.amount);
+            room.events.push({ t: 'log', text: `${label} hits the ${target.name} for ${effect.amount}.` });
+            if(target.hp <= 0) room.events.push({ t: 'log', text: `The ${target.name} comes apart.` });
+          }
+        }else if(effect.kind === 'ward'){
+          you.block = (you.block || 0) + effect.amount;
+          room.events.push({ t: 'log', text: `${label} — ${effect.amount} of guard up.` });
+        }else if(effect.kind === 'heal'){
+          const before = you.hp;
+          you.hp = Math.min(you.maxHp, you.hp + effect.amount);
+          room.events.push({ t: 'log', text: `${label} mends ${you.hp - before}.` });
+        }
+
+        // The wave closes, then whatever arrived hits. Guard is spent absorbing
+        // it and does not carry — a ward is for the blow you saw coming.
+        for(const enemy of room.enemies){
+          if(enemy.hp <= 0) continue;
+          if(enemy.dist > 0){ enemy.dist -= 1; continue; }
+          const blocked = Math.min(you.block || 0, enemy.hits);
+          you.block = (you.block || 0) - blocked;
+          const through = enemy.hits - blocked;
+          if(through > 0) you.hp = Math.max(1, you.hp - through);   // the preview never kills you
+          room.events.push({
+            t: 'log',
+            text: blocked
+              ? `The ${enemy.name} hits for ${enemy.hits}; guard eats ${blocked}.`
+              : `The ${enemy.name} hits you for ${enemy.hits}.`,
+          });
+        }
+        you.block = 0;
+
+        if(room.enemies.every(e => e.hp <= 0)){
+          const drawn = salvageAfterCombat(room.players, room.buildings, demoRandom);
+          room.salvage = addSalvage(room.salvage, drawn);
+          if(room.round >= BOSS_ROUND){
+            room.phase = PHASES.over;
+            room.outcome = 'won';
+          }else{
+            room.round += 1;
+            room.pages += 1;                          // stand-in for the walk
+            demoEnterBuild();
+          }
+        }
+      }
+
       function demoSend(msg){
         const you = room.players[0];
         room.events = [];
@@ -843,8 +996,31 @@
                        hp: def.hp, maxHp: def.hp, dist: def.dist, hits: def.hits };
             });
             room.actions = combatOptions(room.buildings);
+
+            // Everyone shuffles and draws as the fight opens. A deck is per
+            // fight, not per run — for now: the cards that persist between
+            // fights are the next slice.
+            for(const player of room.players){
+              player.deck = shuffle(buildDeck(player.classId), demoRandom);
+              player.discard = [];
+              player.block = 0;
+              demoDeal(player);
+            }
+
             room.events.push({ t: 'phase', ...phaseCard(room.round, PHASES.combat) });
           }
+        }else if(msg.t === 'intent' && msg.intent.t === 'play' && room.phase === PHASES.combat){
+          const hand = you.hand || [];
+          const card = cardById(hand[msg.intent.index]);
+          // The id has to match the slot as well as exist: a click that landed
+          // after the hand was redealt would otherwise play whatever moved
+          // into that position.
+          if(!card || hand[msg.intent.index] !== msg.intent.card) return render();
+
+          you.discard = discardHand(you.discard, hand);
+          you.hand = [];
+          demoTurn(you, card.effect, card.name, msg.intent.target);
+          if(room.phase === PHASES.combat) demoDeal(you);
         }else if(msg.t === 'intent' && msg.intent.t === 'act' && room.phase === PHASES.combat){
           const action = COMBAT_ACTIONS[msg.intent.action];
           if(!action) return render();
@@ -852,34 +1028,7 @@
             if(room.pages < action.pageCost) return render();
             room.pages -= action.pageCost;
           }
-          if(action.effect.kind === 'strike'){
-            const alive = room.enemies.filter(e => e.hp > 0);
-            const target = alive.find(e => e.id === msg.intent.target) ||
-              [...alive].sort((a, b) => a.dist - b.dist)[0];
-            if(target){
-              target.hp = Math.max(0, target.hp - action.effect.amount);
-              room.events.push({ t: 'log', text: `${action.name} hits the ${target.name} for ${action.effect.amount}.` });
-            }
-          }
-          for(const e of room.enemies){
-            if(e.hp > 0 && e.dist > 0) e.dist -= 1;
-            else if(e.hp > 0 && e.dist === 0){
-              you.hp = Math.max(1, you.hp - e.hits);   // the preview never kills you
-              room.events.push({ t: 'log', text: `The ${e.name} hits you for ${e.hits}.` });
-            }
-          }
-          if(room.enemies.every(e => e.hp <= 0)){
-            const drawn = salvageAfterCombat(room.players, room.buildings, demoRandom);
-            room.salvage = addSalvage(room.salvage, drawn);
-            if(room.round >= BOSS_ROUND){
-              room.phase = PHASES.over;
-              room.outcome = 'won';
-            }else{
-              room.round += 1;
-              room.pages += 1;                          // stand-in for the walk
-              demoEnterBuild();
-            }
-          }
+          demoTurn(you, action.effect, action.name, msg.intent.target);
         }else if(msg.t === 'intent' && msg.intent.t === 'place'){
           const { building: id, x, y } = msg.intent;
           const building = BUILDINGS[id];
@@ -1031,6 +1180,69 @@
          intent is sent. */
       let aimAt = null;
 
+      /* The hand, the deck and the discard.
+       *
+       * Counts, not contents: the deck is face down and the discard is a heap,
+       * and showing either as a list would turn a card game into a spreadsheet.
+       * The room deals — everything here is drawn from what it sent.
+       */
+      function renderHand(you, acting){
+        const deck = (you && you.deck) || [];
+        const discard = (you && you.discard) || [];
+        const hand = (you && you.hand) || [];
+
+        ui.deckCount.textContent = deck.length;
+        ui.discardCount.textContent = discard.length;
+        ui.deckPile.dataset.empty = String(!deck.length);
+        ui.discardPile.dataset.empty = String(!discard.length);
+
+        ui.hand.replaceChildren();
+        if(!hand.length){
+          ui.hand.append(Object.assign(document.createElement('p'), {
+            className: 'hand-empty',
+            textContent: you && you.down ? 'You are down. No hand this turn.' : 'No cards drawn.',
+          }));
+          return;
+        }
+
+        hand.forEach((cardId, index) => {
+          const card = cardById(cardId);
+          if(!card) return;
+          const el = document.createElement('button');
+          el.type = 'button';
+          el.className = 'pcard';
+          el.dataset.kind = card.kind;
+          el.disabled = !acting;
+
+          if(CARD_ART[card.kind]) el.append(pixels(CARD_ART[card.kind], 3));
+
+          const name = document.createElement('b');
+          name.className = 'pcard-name';
+          name.textContent = card.name;
+
+          const amount = document.createElement('span');
+          amount.className = 'pcard-amount';
+          amount.textContent = card.effect.amount;
+
+          const kind = document.createElement('span');
+          kind.className = 'pcard-kind';
+          kind.textContent = card.effect.kind;
+
+          const note = document.createElement('span');
+          note.className = 'pcard-note';
+          note.textContent = card.note;
+
+          el.append(name, amount, kind, note);
+          // The index, not the id: a hand can hold two of the same card and
+          // the room has to know which one was played.
+          el.onclick = () => send({
+            t: 'intent',
+            intent: { t: 'play', card: cardId, index, target: aimAt || null },
+          });
+          ui.hand.append(el);
+        });
+      }
+
       function renderCombat(){
         const info = room.roundInfo;
         const boss = room.round >= (room.bossRound || 4);
@@ -1043,6 +1255,8 @@
 
         const you = me();
         const acting = !!you && !you.down && room.phase === PHASES.combat;
+
+        renderHand(you, acting);
 
         // The wave, as cards: clicking one aims the next strike at it. The
         // scene above is the picture; this is the interface.

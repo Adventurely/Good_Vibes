@@ -3,7 +3,7 @@ import { test } from 'node:test';
 
 import {
   PALETTE, HERO_ART, MATERIAL_ART, TERRAIN_ART, BUILDING_ART, SALVAGE_ART,
-  ENEMY_ART, PAGES_ART, TILE,
+  ENEMY_ART, PAGES_ART, CARD_ART, TILE,
 } from '../public/art.js';
 import {
   PARTY_SIZE, CLASSES, OPEN_ROLES, MATERIALS, RECIPES,
@@ -16,6 +16,7 @@ import {
   SALVAGE, salvageFor, BUILDINGS, STARTING_SALVAGE, COMBAT_ACTIONS,
   BASE_ACTIONS, EFFECT_KINDS, combatOptions, missingForBuilding, canAfford,
   affordableBuildings, canBuildAt, salvageAfterCombat, addSalvage, spendSalvage,
+  HAND_SIZE, CARDS, STARTING_DECKS, buildDeck, shuffle, draw, discardHand, cardById,
 } from '../public/content.js';
 
 /* content.js is imported by the authoritative room object in Tool Haven, not
@@ -556,4 +557,135 @@ test('adding and spending salvage does not mutate the pool it was given', () => 
   assert.deepEqual(addSalvage(pool, { screw: 2, coil: 1 }), { screw: 7, coil: 1 });
   assert.deepEqual(spendSalvage(pool, { screw: 2 }), { screw: 3 });
   assert.deepEqual(pool, { screw: 5 }, 'the original pool was written to');
+});
+
+/* ---------------------------------------------------------------- the deck */
+
+/* Draw three, play one, discard the hand. The room deals, so what these guard
+ * is that dealing is pure and repeatable: a client that shuffled for itself
+ * would hold cards the room never gave it.
+ */
+
+test('every card is a real effect with an icon to draw it', () => {
+  for (const [id, card] of Object.entries(CARDS)) {
+    const where = `card "${id}"`;
+    assert.ok(typeof card.name === 'string' && card.name.length, `${where}: needs a name`);
+    assert.ok(CARD_ART[card.kind], `${where}: kind "${card.kind}" has no icon`);
+    assert.ok(EFFECT_KINDS.includes(card.effect.kind),
+      `${where}: effect kind "${card.effect.kind}" is not one the engine implements`);
+    assert.ok(card.effect.amount > 0, `${where}: must do a positive amount`);
+    assert.ok(classById(card.classId), `${where}: belongs to unknown class "${card.classId}"`);
+    assert.equal(typeof card.note, 'string', `${where}: needs a note`);
+  }
+});
+
+test('every live class opens with a deck of cards that exist', () => {
+  for (const cls of playableClasses()) {
+    const spec = STARTING_DECKS[cls.id];
+    assert.ok(spec, `class "${cls.id}" has no starting deck`);
+    for (const [cardId, count] of Object.entries(spec)) {
+      assert.ok(CARDS[cardId], `"${cls.id}" opens with unknown card "${cardId}"`);
+      assert.equal(CARDS[cardId].classId, cls.id,
+        `"${cls.id}" opens with "${cardId}", which belongs to ${CARDS[cardId].classId}`);
+      assert.ok(Number.isInteger(count) && count > 0, `"${cls.id}": bad count for ${cardId}`);
+    }
+  }
+});
+
+test('every deck can attack and can defend, and is big enough to draw from', () => {
+  for (const cls of playableClasses()) {
+    const deck = buildDeck(cls.id);
+    assert.ok(deck.length >= HAND_SIZE,
+      `"${cls.id}" opens with ${deck.length} cards and cannot fill a hand of ${HAND_SIZE}`);
+    const kinds = new Set(deck.map((id) => CARDS[id].kind));
+    assert.ok(kinds.has('attack'), `"${cls.id}" has no way to hurt anything`);
+    assert.ok(kinds.has('defend'), `"${cls.id}" has no way to survive anything`);
+  }
+});
+
+test('buildDeck expands the counts and refuses to invent a deck', () => {
+  const deck = buildDeck('wizard');
+  assert.equal(deck.length, 8);
+  assert.equal(deck.filter((id) => id === 'spark').length, 5);
+  assert.equal(deck.filter((id) => id === 'sign').length, 3);
+  assert.deepEqual(buildDeck('nobody'), []);
+});
+
+test('the same seed shuffles the same way, and shuffling loses nothing', () => {
+  const deck = buildDeck('alchemist');
+  const a = shuffle(deck, seededRandom(9));
+  const b = shuffle(deck, seededRandom(9));
+  assert.deepEqual(a, b, 'one seed dealt two different decks');
+  assert.notDeepEqual(shuffle(deck, seededRandom(10)), a, 'two seeds dealt the same deck');
+
+  // Same cards, different order — a shuffle that drops a card is a shuffle
+  // that quietly changes the deck a player built.
+  assert.deepEqual([...a].sort(), [...deck].sort());
+  assert.deepEqual(deck, buildDeck('alchemist'), 'shuffle wrote to the deck it was given');
+});
+
+test('drawing takes from the top and leaves the rest', () => {
+  const { hand, deck, discard } = draw(['a', 'b', 'c', 'd'], [], seededRandom(1));
+  assert.deepEqual(hand, ['a', 'b', 'c']);
+  assert.deepEqual(deck, ['d']);
+  assert.deepEqual(discard, []);
+});
+
+test('an empty deck reshuffles the discard rather than dealing a short hand', () => {
+  const { hand, deck, discard } = draw([], ['x', 'y', 'z', 'w'], seededRandom(4));
+  assert.equal(hand.length, HAND_SIZE, 'the discard should have been reshuffled in');
+  assert.deepEqual([...hand, ...deck].sort(), ['w', 'x', 'y', 'z'], 'a card went missing in the reshuffle');
+  assert.deepEqual(discard, [], 'the discard should be empty once it has been shuffled back');
+});
+
+test('a deck part-drawn spills into the discard mid-hand', () => {
+  const { hand, deck, discard } = draw(['a'], ['b', 'c'], seededRandom(2));
+  assert.equal(hand.length, 3);
+  assert.equal(hand[0], 'a', 'the last card of the deck should come first');
+  assert.deepEqual([...hand].sort(), ['a', 'b', 'c']);
+  assert.deepEqual(deck, []);
+  assert.deepEqual(discard, []);
+});
+
+test('with nothing anywhere the hand comes back short, not broken', () => {
+  const { hand, deck, discard } = draw([], [], seededRandom(1));
+  assert.deepEqual(hand, []);
+  assert.deepEqual(deck, []);
+  assert.deepEqual(discard, []);
+});
+
+test('drawing does not write to the piles it was handed', () => {
+  const deck = ['a', 'b', 'c', 'd'];
+  const discard = ['e'];
+  draw(deck, discard, seededRandom(1));
+  assert.deepEqual(deck, ['a', 'b', 'c', 'd'], 'the deck was mutated');
+  assert.deepEqual(discard, ['e'], 'the discard was mutated');
+});
+
+test('a played hand goes to the discard whole, unplayed cards included', () => {
+  // The two you did not play cost you as much as the one you did: that is what
+  // stops a hand being carried across turns.
+  assert.deepEqual(discardHand(['x'], ['a', 'b', 'c']), ['x', 'a', 'b', 'c']);
+  assert.deepEqual(discardHand([], []), []);
+  assert.deepEqual(discardHand(undefined, undefined), []);
+});
+
+test('a deck cycles rather than running out', () => {
+  // Eight cards, three a turn: the fight should never reach a turn with no
+  // hand, however long it runs.
+  let deck = shuffle(buildDeck('engineer'), seededRandom(5));
+  let discard = [];
+  const random = seededRandom(6);
+  for (let turn = 0; turn < 40; turn++) {
+    const drawn = draw(deck, discard, random);
+    assert.equal(drawn.hand.length, HAND_SIZE, `turn ${turn} dealt ${drawn.hand.length} cards`);
+    discard = discardHand(drawn.discard, drawn.hand);
+    deck = drawn.deck;
+    assert.equal(deck.length + discard.length, 8, `turn ${turn} lost or gained a card`);
+  }
+});
+
+test('cardById refuses nonsense', () => {
+  assert.equal(cardById('spark').name, 'Spark');
+  assert.equal(cardById('not-a-card'), null);
 });
