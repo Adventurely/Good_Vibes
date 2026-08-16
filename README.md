@@ -117,8 +117,10 @@ public/art.js       the palette, the tiles, and every sprite, as text
 public/play.html    the game: lobby, build phase, the surge, the hand
 public/pixel.js     bitmap font and canvas helpers, shared by both pages
 public/index.html   the pixel art hello world page and its style guide
-src/app.js          dev server: static files out of public/
-src/server.js       HTTP server entry point
+src/app.js          static files out of public/
+src/ws.js           a WebSocket server, standard library only
+src/rooms.js        the authoritative game state: rooms, seats, phases
+src/server.js       http + the socket route
 test/content.test.js validates every table above and the rules over them
 test/server.test.js integration tests
 ```
@@ -372,11 +374,9 @@ nothing in a real room. Known gap, held open by a test.
 
 Honest status, so nobody discovers these at the table:
 
-- **Multiplayer does not work.** Everything below the lobby is the offline
-  preview. The room object in Tool Haven does not implement the two-phase loop,
-  the deck, or `strike`.
-- **Hands are private and nothing supports that.** The room broadcasts one state
-  object to every client; a hand needs a per-player view.
+- **Tool Haven has none of this.** The server here is a Node process; the
+  deployed site's Durable Object still implements none of the two-phase loop.
+  Publishing `public/` will sync the client and it will have nothing to talk to.
 - **The site does not persist.** Terrain is regenerated and `buildings` is reset
   every round, so the base you built in round one is gone in round two. The
   persistent site is the design; this is the gap.
@@ -385,9 +385,8 @@ Honest status, so nobody discovers these at the table:
 - **The Overcharged Coil may be out of reach in a short run.** It needs Coil,
   the rarest salvage at a weight of 3, and a three-round game may never turn one
   up.
-- **Decks do not persist between rounds.** Cards brewed and granted during a
-  build phase carry into that round's fight, but the next build phase starts
-  from the same nine.
+- **Decks carry within a run** — brewed cards and bought barrels stay — but the
+  site does not, so the base resets while the deck does not.
 - **Nobody can die.** Damage is clamped above zero in the preview, and there is
   no down state, no party wipe and no lose condition.
 - **Enemies only ever hit the local player** — no round-robin across a party.
@@ -397,29 +396,62 @@ Honest status, so nobody discovers these at the table:
 
 ## Where the game lives
 
-The client is all here. The server is not, and cannot be: rooms are Durable
-Objects, and a Durable Object binding is declared in the Worker that owns it —
-Tool Haven's `wrangler.jsonc`. So the game is split, deliberately, along the
-line of what a bad push costs:
+**The server is in this repo now**, in `src/`, and it is the authority. Clients
+send intents and get back a view; they never decide anything — not what a card
+does, not whether a tile was reachable, not whose turn resolved first.
 
-| Half | Repo | If it breaks |
-| --- | --- | --- |
-| Client — art, UI, the loop | here | one page on the site |
-| Rules and room state | `Adventurely/Tool-Haven` (`src/game/good-vibes.js`, `src/good-vibes-room.js`) | the whole site, including sign-in |
+```
+src/ws.js      a WebSocket server in the standard library and nothing else
+src/rooms.js   the authoritative state: rooms, seats, phases, intents
+src/server.js  http + the socket route at /api/good-vibes/ws
+```
 
-That is why the high-churn half is the one that syncs automatically. Working
-here needs no access to the other repo at all.
+`ws.js` exists because this project has no dependencies and Node ships a
+WebSocket *client* but not a server. It is the RFC 6455 handshake, frame
+parsing, and nothing else — no extensions, no binary frames. A turn-based game
+sends a few kilobytes of JSON per action, so none of that earns its complexity.
 
-**The room is the only writer of game state.** The client sends intents and the
-engine decides what they mean. Keep it that way: it is what makes cheating a
-non-issue, and it is what makes this half safe to move fast in.
+Every rule in `rooms.js` comes out of `public/content.js` — the same module the
+browser imports. That is the whole point of keeping that file pure: the two
+ends cannot disagree about what a potion does.
+
+### Rooms and seats
+
+A room is a code. Join `#ABCD` and you are in it; the first player is the host
+and only the host can start the run.
+
+**A seat is a character.** Pick a class in the lobby and it is yours — the room
+refuses a class somebody else has taken, because two Alchemists would both be
+spending the same stash with the same verbs. The seat is held by a **token**,
+not a connection: the client keeps one in `sessionStorage`, so a dropped socket
+comes back to the character it was playing rather than to a new one.
+
+### Private hands
+
+This is the first per-player state in the game, and it is why views are built
+per socket rather than broadcast whole. You get your own `deck`, `discard` and
+`hand` as arrays; everybody else arrives as `deckCount`, `discardCount` and
+`handCount`. Their `intent` says *that* they committed, never *what* — a hand
+is secret right up to the moment the round resolves.
+
+### Determinism
+
+Every shuffle and every roll comes from a generator the room owns, and each
+player has their own stream keyed off their id, so one player drawing cannot
+shift anyone else's draw. Combat resolves in player-id order and never in the
+order the clicks arrived: the same commitments have to produce the same round
+however the network delivered them.
 
 ## Playing locally
 
-`npm start` serves the pages, but not the socket — `/api/good-vibes/ws` only
-exists on Tool Haven, so joining a room will sit there reconnecting. Rooms are
-best tested on the deployed site. Everything that does not need one — the
-scene, the palette, the page itself — works offline.
+`npm start` serves the pages **and the socket**. Open
+`http://localhost:3000/play.html`, hit *New room*, and share the address — the
+code travels in the fragment, so anyone who can reach the host can join by
+opening the same link. On a LAN that is `http://<your-ip>:3000/play.html#CODE`.
+
+Two browser windows on one machine work too, as long as they are separate
+profiles or one is private: the seat token lives in `sessionStorage`, so two
+tabs of the same profile would try to claim the same seat.
 
 **Preview the site** on the join screen is the exception, and it exists because
 none of this could otherwise be looked at until it was deployed. It generates a

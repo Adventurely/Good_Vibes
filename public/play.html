@@ -478,9 +478,6 @@
         <h2 style="margin-top:1.4rem">Brewing</h2>
         <div class="grid" id="recipes"></div>
 
-        <h2 style="margin-top:1.4rem">The rack</h2>
-        <div class="chips" id="potions"></div>
-
         <div class="actions" style="margin-top:1.2rem">
           <button type="button" id="wait">Hold position</button>
           <button type="button" id="leave-run">Leave</button>
@@ -532,8 +529,6 @@
         <details style="margin-top:1.2rem">
           <summary>The party, the rack and the log</summary>
           <ol id="combat-party" style="margin-top:0.8rem"></ol>
-          <h2 style="margin-top:1.2rem">The rack</h2>
-          <div class="chips" id="combat-potions"></div>
           <h2 style="margin-top:1.2rem">Log</h2>
           <div class="log" id="combat-log"></div>
         </details>
@@ -678,6 +673,11 @@
       /* Standing on something picks it up. Walking onto a herb and having to
          click it again would be a second click for a decision already made. */
       function arrive(player){
+        // Preview only: in a room the pickup happened on the server the moment
+        // the move was accepted, and this animation is the replay. Sending a
+        // gather here would also mean watching another player's sprite arrive
+        // and claiming their herb.
+        if(!demo) return;
         const node = (room.nodes || []).find(n => n.x === player.x && n.y === player.y && !n.taken);
         if(node) send({ t: 'intent', intent: { t: 'gather', node: node.id } });
       }
@@ -923,7 +923,7 @@
         ready: els('ready'), start: els('start'), leave: els('leave'),
         run: els('run'), levelName: els('level-name'), levelMeta: els('level-meta'),
         levelNote: els('level-note'), nodes: els('nodes'),
-        stash: els('stash'), recipes: els('recipes'), potions: els('potions'),
+        stash: els('stash'), recipes: els('recipes'),
         wait: els('wait'), leaveRun: els('leave-run'), log: els('log'),
         preview: els('preview'), hold: els('hold'), readyCount: els('ready-count'),
         combat: els('combat'), combatParty: els('combat-party'), leaveCombat: els('leave-combat'),
@@ -932,7 +932,7 @@
         benchHint: els('bench-hint'), upgrades: els('upgrades'),
         library: els('library'),
         combatName: els('combat-name'), combatMeta: els('combat-meta'),
-        enemies: els('enemies'), combatPotions: els('combat-potions'),
+        enemies: els('enemies'),
         hand: els('hand'), deckPile: els('deck-pile'), discardPile: els('discard-pile'),
         roster: els('roster'), combatRoster: els('combat-roster'), deckList: els('deck-list'),
         buildDeckPile: els('build-deck-pile'), buildDeckCount: els('build-deck-count'),
@@ -962,9 +962,17 @@
         setStatus('connecting', attempt ? `Reconnecting (${attempt})` : 'Connecting');
 
         const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        // The seat, not the socket. A dropped connection should come back to the
+        // character it was playing rather than to a fresh one.
+        let token = sessionStorage.getItem('good-vibes-token');
+        if(!token){
+          token = crypto.randomUUID();
+          sessionStorage.setItem('good-vibes-token', token);
+        }
         // Absolute: this page sits under /tools/good-vibes/ but the socket is a
         // site-level route and must not resolve relative to here.
-        socket = new WebSocket(`${scheme}//${location.host}/api/good-vibes/ws?code=${encodeURIComponent(code)}`);
+        socket = new WebSocket(`${scheme}//${location.host}/api/good-vibes/ws`
+          + `?code=${encodeURIComponent(code)}&token=${encodeURIComponent(token)}`);
 
         socket.addEventListener('open', () => {
           attempt = 0;
@@ -1070,7 +1078,7 @@
           you: 'p1', phase: PHASES.build, round: 1, rounds: ROUNDS_BEFORE_BOSS,
           bossRound: BOSS_ROUND, maxPlayers: PARTY_SIZE,
           terrain: [], nodes: [], buildings: [], enemies: [],
-          stash: {}, potions: [], pages: 2, events: [],
+          stash: {}, pages: 2, events: [],
           salvage: { ...STARTING_SALVAGE }, upgrades: {}, power: 0,
           players: playableClasses().map((cls, i) => ({
             id: `p${i + 1}`, name: cls.name.replace(/^The /, ''),
@@ -1311,13 +1319,6 @@
               room.stash[node.material] = (room.stash[node.material] || 0) + yielded;
               room.events.push({ t: 'log', text: `Gathered ${yielded} ${MATERIALS[node.material].name}.` });
             }
-          }
-        }else if(msg.t === 'intent' && msg.intent.t === 'craft'){
-          const recipe = RECIPES[msg.intent.recipe];
-          if(recipe && Object.keys(missingFor(msg.intent.recipe, room.stash)).length === 0){
-            for(const [material, n] of Object.entries(recipe.costs)) room.stash[material] -= n;
-            room.potions.push({ name: recipe.name, effect: recipe.effect });
-            room.events.push({ t: 'log', text: `Brewed ${recipe.name}.` });
           }
         }
 
@@ -1595,25 +1596,6 @@
         // Potions are combat items too — the Alchemist throws them. Same
         // intent as drinking in the build phase; the room does not care which
         // phase a heal lands in.
-        ui.combatPotions.replaceChildren();
-        if(!room.potions.length){
-          ui.combatPotions.append(Object.assign(document.createElement('p'), { textContent: 'The rack is empty.' }));
-        }
-        room.potions.forEach((potion, index) => {
-          for(const p of room.players){
-            if(p.down) continue;
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = 'chip';
-            button.disabled = !acting;
-            button.textContent = p.id === room.you
-              ? `${potion.name} — drink`
-              : `${potion.name} — throw to ${p.name}`;
-            button.onclick = () => send({ t: 'intent', intent: { t: 'use', potion: index, target: p.id } });
-            ui.combatPotions.append(button);
-          }
-        });
-
         ui.combatWait.disabled = !acting;
 
         ui.combatLog.replaceChildren();
@@ -1640,15 +1622,22 @@
           name.textContent = cls ? cls.name.replace(/^The /, '') : p.name;
           const sub = document.createElement('span');
           sub.className = 'who-sub';
+          // Your own cards arrive as arrays and everyone else's as counts,
+          // because a hand is secret until the round resolves. Read whichever
+          // the room sent rather than assuming one of them.
+          const owned = p.deck
+            ? p.deck.length + (p.discard || []).length + (p.hand || []).length
+            : (p.deckCount || 0) + (p.discardCount || 0) + (p.handCount || 0);
+          const held = p.hand ? p.hand.length : (p.handCount || 0);
           sub.textContent = isBuildPhase(room.phase)
-            ? `${p.ready ? 'ready' : 'thinking'} · ${(p.deck || []).length} cards`
-            : `${p.intent ? 'committed' : 'thinking'} · ${(p.hand || []).length} in hand`;
+            ? `${p.ready ? 'ready' : 'thinking'} · ${owned} cards`
+            : `${p.intent ? 'committed' : 'thinking'} · ${held} in hand`;
           body.append(name, sub);
           el.append(body, healthBar(p));
 
           // Only the preview lets you be somebody else; in a room you are you.
           el.disabled = !demo;
-          el.onclick = () => { room.you = p.id; walking = null; render(); };
+          el.onclick = () => { if(demo){ room.you = p.id; walking = null; render(); } };
           target.append(el);
         }
       }
@@ -1960,20 +1949,6 @@
           }
         }
 
-        ui.potions.replaceChildren();
-        if(!room.potions.length){
-          ui.potions.append(Object.assign(document.createElement('p'), { textContent: 'The rack is empty.' }));
-        }
-        room.potions.forEach((potion, index) => {
-          const button = document.createElement('button');
-          button.type = 'button';
-          button.className = 'chip';
-          button.disabled = !acting;
-          button.textContent = `${potion.name} — drink`;
-          button.onclick = () => send({ t: 'intent', intent: { t: 'use', potion: index, target: room.you } });
-          ui.potions.append(button);
-        });
-
         ui.wait.disabled = !acting;
 
         ui.log.replaceChildren();
@@ -2007,6 +1982,17 @@
           if(event.t === 'phase'){
             logLines.unshift(`${event.title}. ${event.subtitle || ''}`);
             showSplash(event.title, event.subtitle);
+          }
+          // The room walked them; this walks the sprite. The state already
+          // carries the destination, so without replaying the route a player
+          // teleports across the site on everybody else's screen.
+          if(event.t === 'moved' && !demo){
+            const mover = (room.players || []).find(p => p.id === event.id);
+            if(mover && event.path && event.path.length){
+              mover.x = event.path[0].x;
+              mover.y = event.path[0].y;
+              walkTo(mover, event.path);
+            }
           }
         }
         // Consumed, so drop them: render() also runs for local reasons — picking
