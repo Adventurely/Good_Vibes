@@ -384,11 +384,31 @@ smallest *connected* buildable pocket a site may roll, checked by
 Counting buildable tiles would not do — thirty tiles in three pockets separated
 by water is not somewhere a base goes.
 
-Click a herb or a cache on the map to gather it, or use the buttons under the
-map, which send the identical intent and are the path that works from a
-keyboard. Pick a building, then click where it goes; the tile previews the
-structure and refuses water, rubble, another building and any tile with a herb
-still standing on it.
+Click a herb or a cache on the map to walk there and gather it, or step a tile
+at a time with the arrow keys — a canvas cannot be tabbed through, so the keys
+are the path that works without a pointer. Both send the same `moveTo` intent,
+so the room still decides whether the step was legal and arriving is still what
+picks a node up. Pick a building, then click where it goes; the tile previews
+the structure and refuses water, rubble, another building and any tile with a
+herb still standing on it.
+
+**The map is the only list of what is on the site.** There was a second one
+under it — every standing node as a row of buttons — and it said nothing the
+tiles did not already show while costing a section of screen to say it.
+
+**One panel per class.** Below the map you get the pool you spend and the verb
+you have, and nothing belonging to somebody else's economy: the Alchemist's
+stash and recipes, the Engineer's salvage, buildings, power and workbench, the
+Wizard's library. Each is hidden whole, heading included, on the rule power was
+already hidden by — a readout you cannot act on is one you learn to skip past,
+and a live heading over the words "only the Alchemist can brew" spends a
+section of the screen on saying no. The client branches on the `craft`, `build`
+and `cast` flags in `CLASSES`, never on the class id, so a fourth class gets a
+panel by declaring what it can do.
+
+This is presentation only. `stash`, `salvage`, `pages` and `power` are
+room-level fields that `viewFor` sends to everyone regardless of class; what
+changed is which of them a given seat draws.
 
 **The phase turns when everyone is ready.** `readyState` counts only connected
 players, so a party is not held in the build phase by someone whose train went
@@ -486,6 +506,9 @@ Honest status, so nobody discovers these at the table:
   at the top of this file before pushing to `main`.
 - **Only the Wizard is still a deck with a different mix.** Prepared spells are
   designed, not written; the Alchemist brews and the Engineer builds power.
+  One panel per class makes this plain rather than causing it: the Wizard's
+  build phase is walking and gathering, and its panel is a page count it cannot
+  spend until there is something to spend it on.
 - **The Overcharged Coil may be out of reach in a short run.** It needs Coil,
   the rarest salvage at a weight of 3, and a three-round game may never turn one
   up.

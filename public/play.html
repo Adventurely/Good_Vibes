@@ -420,24 +420,58 @@
 
       <!-- run -->
       <section id="run" hidden>
-        <div class="level-head">
-          <h2 style="border:0;margin:0;padding:0" id="level-name"></h2>
-          <span class="hp-text" id="level-meta"></span>
-        </div>
+        <!-- The site's name and the ready count are drawn into the canvas
+             header, where the player is already looking. Only the note lives
+             out here, because the header has no room for a sentence. -->
         <p id="level-note" style="margin-bottom:1rem"></p>
 
         <!-- Sized from MAP_W/MAP_H at boot so the canvas cannot drift from the
              grid it draws. These are the current values, not the authority. -->
-        <canvas id="map" width="384" height="240"
-                aria-label="The site. Click anywhere to walk there; walking onto a herb picks it up."></canvas>
+        <canvas id="map" width="384" height="240" tabindex="0"
+                aria-label="The site. Click anywhere to walk there, or step with the arrow keys; walking onto a herb picks it up."></canvas>
 
         <!-- One player, three characters. Click a portrait to take control of
              that one; the map click routes whoever is selected. -->
         <div class="roster" id="roster"></div>
 
         <div class="ready-line">
-          <span id="ready-count"></span>
           <button type="button" id="hold">Ready</button>
+        </div>
+
+        <!-- One panel per class.
+             You get the pool you spend and the verb you have, and nothing
+             belonging to somebody else's economy. Each is hidden whole,
+             heading included, on the rule the Engineer's panel already
+             followed: a readout you cannot act on is one you learn to skip
+             past, and printing "only the Alchemist can brew" under a live
+             heading spends a section on saying no. -->
+        <div id="alchemist-only" hidden>
+          <h2 style="margin-top:1.4rem">Stash</h2>
+          <div class="chips" id="stash"></div>
+
+          <h2 style="margin-top:1.4rem">Brewing</h2>
+          <div class="grid" id="recipes"></div>
+        </div>
+
+        <div id="engineer-only" hidden>
+          <h2 style="margin-top:1.4rem">Salvage</h2>
+          <div class="chips" id="salvage"></div>
+
+          <h2 style="margin-top:1.4rem">Building</h2>
+          <p id="build-hint" style="margin-bottom:0.6rem"></p>
+          <div class="grid" id="buildings"></div>
+
+          <h2 style="margin-top:1.4rem">Power</h2>
+          <p id="power-line" style="margin-bottom:0.6rem"></p>
+
+          <h2 style="margin-top:1.4rem">The workbench</h2>
+          <p id="bench-hint" style="margin-bottom:0.6rem"></p>
+          <div class="grid" id="upgrades"></div>
+        </div>
+
+        <div id="wizard-only" hidden>
+          <h2 style="margin-top:1.4rem">The library</h2>
+          <div class="chips" id="library"></div>
         </div>
 
         <h2 style="margin-top:1.4rem">Your deck</h2>
@@ -450,47 +484,9 @@
           <div class="deck-list" id="deck-list"></div>
         </div>
 
-        <h2 style="margin-top:1.4rem">Salvage</h2>
-        <div class="chips" id="salvage"></div>
-
-        <h2 style="margin-top:1.4rem">Building</h2>
-        <p id="build-hint" style="margin-bottom:0.6rem"></p>
-        <div class="grid" id="buildings"></div>
-
-        <!-- The Engineer's own readouts. Power is hidden from everyone else:
-             nobody but the Engineer can spend it, and a number you cannot use
-             is a number you learn to ignore. -->
-        <div id="engineer-only" hidden>
-          <h2 style="margin-top:1.4rem">Power</h2>
-          <p id="power-line" style="margin-bottom:0.6rem"></p>
-
-          <h2 style="margin-top:1.4rem">The workbench</h2>
-          <p id="bench-hint" style="margin-bottom:0.6rem"></p>
-          <div class="grid" id="upgrades"></div>
-        </div>
-
-        <!-- The same herbs as the map, as buttons. A canvas cannot be tabbed
-             through, so this is the keyboard path to the identical intents —
-             not a duplicate feature, the accessible one. -->
-        <h2 style="margin-top:1.4rem">Growing here</h2>
-        <div class="chips" id="nodes"></div>
-
-        <h2 style="margin-top:1.4rem">Stash</h2>
-        <div class="chips" id="stash"></div>
-
-        <h2 style="margin-top:1.4rem">The library</h2>
-        <div class="chips" id="library"></div>
-
-        <h2 style="margin-top:1.4rem">Brewing</h2>
-        <div class="grid" id="recipes"></div>
-
         <div class="actions" style="margin-top:1.2rem">
-          <button type="button" id="wait">Hold position</button>
           <button type="button" id="leave-run">Leave</button>
         </div>
-
-        <h2 style="margin-top:1.4rem">Log</h2>
-        <div class="log" id="log"></div>
       </section>
 
       <!-- combat -->
@@ -561,7 +557,7 @@
       } from './art.js';
       import {
         CLASSES, OPEN_ROLES, MATERIALS, RECIPES, missingFor, playableClasses,
-        pathTo, brew,
+        pathTo, walkableAt, brew,
         MAP_W, MAP_H, TERRAIN, PHASES, isBuildPhase, readyState,
         generateMap, generateCombatTerrain, respawnItems, seededRandom, seedFromCode, spawnTile, tileAt,
         ROUNDS_BEFORE_BOSS, BOSS_ROUND, roundInfo, phaseCard, PARTY_SIZE, classById,
@@ -803,9 +799,19 @@
         mctx.fillStyle = '#241a10';
         mctx.fillRect(0, 0, MAP_PX_W, HEADER + MAP_PX_H);
 
+        // Where the site is, how far into the run, and who is still deciding —
+        // the three things the screen used to repeat in a row of its own under
+        // the canvas. The header has the width for them, and this is where the
+        // player is already looking.
         const info = room.roundInfo;
         const state = readyState(room.players);
-        const left = info ? `${info.name}` : 'THE SITE';
+        // Separated with a hyphen, not a middle dot: the 5x7 font is A-Z, 0-9
+        // and a handful of punctuation, and anything outside it draws as '?'.
+        const boss = room.round >= (room.bossRound || BOSS_ROUND);
+        const left = info
+          ? `${info.name} - ROUND ${room.round}/${room.rounds || ROUNDS_BEFORE_BOSS}`
+            + `${boss ? ' - THE BOSS' : ''} - BLIGHT ${info.blight}`
+          : 'THE SITE';
         const right = `${state.ready}/${state.total} READY`;
         drawTextOutlined(mctx, left, 2, 4, 'y', 1);
         drawTextOutlined(mctx, right, MAP_PX_W - textWidth(right, 1) - 2, 4, 'c', 1);
@@ -1094,16 +1100,15 @@
         join: els('join'), joinForm: els('join-form'), code: els('code'), newRoom: els('new-room'),
         lobby: els('lobby'), seats: els('seats'), classes: els('classes'),
         ready: els('ready'), start: els('start'), leave: els('leave'),
-        run: els('run'), levelName: els('level-name'), levelMeta: els('level-meta'),
-        levelNote: els('level-note'), nodes: els('nodes'),
-        stash: els('stash'), recipes: els('recipes'),
-        wait: els('wait'), leaveRun: els('leave-run'), log: els('log'),
-        preview: els('preview'), hold: els('hold'), readyCount: els('ready-count'),
+        run: els('run'), levelNote: els('level-note'),
+        alchemistOnly: els('alchemist-only'), stash: els('stash'), recipes: els('recipes'),
+        leaveRun: els('leave-run'),
+        preview: els('preview'), hold: els('hold'),
         combat: els('combat'), combatParty: els('combat-party'), leaveCombat: els('leave-combat'),
         salvage: els('salvage'), buildings: els('buildings'), buildHint: els('build-hint'),
         engineerOnly: els('engineer-only'), powerLine: els('power-line'),
         benchHint: els('bench-hint'), upgrades: els('upgrades'),
-        library: els('library'),
+        wizardOnly: els('wizard-only'), library: els('library'),
         combatName: els('combat-name'), combatMeta: els('combat-meta'),
         enemies: els('enemies'),
         hand: els('hand'), deckPile: els('deck-pile'), discardPile: els('discard-pile'),
@@ -1931,59 +1936,29 @@
 
       function renderRun(){
         const info = room.roundInfo;
-        ui.levelName.textContent = info ? info.name : '';
-        ui.levelMeta.textContent = info
-          ? `Round ${room.round} of ${room.rounds || ROUNDS_BEFORE_BOSS}`
-            + `${room.round >= (room.bossRound || 4) ? ' — the boss waits' : ''} · blight ${info.blight}`
-          : '';
+        // The name, the round and the ready count are drawn into the canvas
+        // header by drawMap(). Only the note is printed, because a sentence
+        // does not fit in a 384px strip of bitmap font.
         ui.levelNote.textContent = info ? info.note : '';
-
 
         const you = me();
         const acting = !!you && !you.down && isBuildPhase(room.phase);
+        const cls = you ? classById(you.classId) : null;
 
         drawMap();
         renderRoster(ui.roster);
         renderDeckList(you);
 
-        // The room decides when the phase turns; this only reports what it is
-        // still waiting for, from the same helper the room counts with.
-        const state = readyState(room.players);
-        ui.readyCount.textContent = state.all
-          ? 'The party is ready'
-          : `${state.ready} of ${state.total} ready`;
+        // The room decides when the phase turns; the count of who it is still
+        // waiting for is in the canvas header, so this is only the commit.
         ui.hold.textContent = you && you.ready ? 'Not ready' : 'Ready';
         ui.hold.disabled = !acting;
 
-        // Only what is still standing. This list is the keyboard path to
-        // gathering, and a picked herb left in it is a dead button somebody has
-        // to tab past — and clicking one now walks you there for nothing.
-        ui.nodes.replaceChildren();
-        for(const node of room.nodes){
-          if(node.taken) continue;
-          const button = document.createElement('button');
-          button.type = 'button';
-          button.className = 'chip';
-          button.disabled = !acting;
-          const art = node.kind === 'salvage' ? SALVAGE_ART[node.salvage]
-            : node.kind === 'pages' ? PAGES_ART
-            : MATERIAL_ART[node.material];
-          const label = node.kind === 'salvage' ? `${SALVAGE[node.salvage].name} cache`
-            : node.kind === 'pages' ? 'Spell pages'
-            : MATERIALS[node.material].name;
-          if(art) button.append(pixels(art, 2));
-          button.append(document.createTextNode(label));
-          // Walk there, same as clicking the tile — arriving is what picks it
-          // up, so the two paths cannot disagree about whether you were close
-          // enough to reach it.
-          button.onclick = () => send({ t: 'intent', intent: { t: 'moveTo', x: node.x, y: node.y } });
-          ui.nodes.append(button);
-        }
-        if(!room.nodes.some(n => !n.taken)){
-          const done = document.createElement('p');
-          done.textContent = 'Stripped bare. Nothing left but the surge.';
-          ui.nodes.append(done);
-        }
+        // One panel per class, each hidden whole rather than greyed. What is
+        // on the site is on the map: it is the only place herbs are listed,
+        // and walking onto one is what picks it up.
+        ui.alchemistOnly.hidden = !cls?.craft;
+        ui.wizardOnly.hidden = !cls?.cast;
 
         ui.stash.replaceChildren();
         const held = Object.entries(room.stash).filter(([, n]) => n > 0);
@@ -2036,11 +2011,12 @@
           ui.salvage.append(chip);
         }
 
-        const canBuild = !!(you && classById(you.classId)?.build);
+        const canBuild = !!cls?.build;
         ui.buildings.replaceChildren();
         if(!canBuild){
+          // Nobody else can place one, so a structure cannot stay picked up
+          // across a change of character in the preview.
           holding = null;
-          ui.buildHint.textContent = 'Only the Engineer can build.';
         }else{
           ui.buildHint.textContent = holding
             ? `Placing the ${BUILDINGS[holding].name} — click a clear tile, or pick it again to put it down.`
@@ -2094,12 +2070,8 @@
 
         renderEngineer(you, acting, canBuild);
 
-        const canBrew = you && CLASSES.find(c => c.id === you.classId)?.craft;
         ui.recipes.replaceChildren();
-        if(!canBrew){
-          ui.recipes.append(Object.assign(document.createElement('p'),
-            { textContent: 'Only the Alchemist can brew.' }));
-        }else{
+        if(cls?.craft){
           for(const [id, recipe] of Object.entries(RECIPES)){
             const short = missingFor(id, room.stash);
             const missing = Object.entries(short).map(([m, n]) => `${n} ${MATERIALS[m].name}`);
@@ -2138,11 +2110,6 @@
             ui.recipes.append(card);
           }
         }
-
-        ui.wait.disabled = !acting;
-
-        ui.log.replaceChildren();
-        for(const line of logLines) ui.log.append(Object.assign(document.createElement('div'), { textContent: line }));
       }
 
       /* Events arrive once and are cleared by the room, so the log is kept
@@ -2255,16 +2222,12 @@
       ui.ready.addEventListener('click', () => { const you = me(); send({ t: 'ready', ready: !(you && you.ready) }); });
       ui.hold.addEventListener('click', () => { const you = me(); send({ t: 'ready', ready: !(you && you.ready) }); });
       ui.start.addEventListener('click', () => send({ t: 'start' }));
-      ui.wait.addEventListener('click', () => send({ t: 'intent', intent: { t: 'wait' } }));
       ui.combatWait.addEventListener('click', () => send({ t: 'intent', intent: { t: 'wait' } }));
       ui.leave.addEventListener('click', () => leave());
       ui.leaveRun.addEventListener('click', () => leave());
       ui.leaveCombat.addEventListener('click', () => leave());
 
-      /* Clicking a herb is the same intent the chip below the map sends. The
-         canvas is the fast path, not the only one.
-
-         Holding a building takes priority: once you have picked something up,
+      /* Holding a building takes priority: once you have picked something up,
          a click means "put it here", and clicking a herb by accident should
          not silently gather instead of building. */
       map.addEventListener('click', event => {
@@ -2307,6 +2270,42 @@
         if(!hover) return;
         hover = null;
         if(room && isBuildPhase(room.phase)) drawMap();
+      });
+
+      /* Stepping with the keyboard.
+       *
+       * A canvas cannot be tabbed through, so without this the build phase is
+       * mouse-only. It sends the same moveTo intent a click sends, one tile at
+       * a time, which means the room still decides whether the step was legal
+       * and arriving is still what gathers — there is no second path into the
+       * rules for a keyboard to disagree along.
+       *
+       * Held keys are dropped while a walk is in flight rather than queued: a
+       * step takes STEP_MS to animate, and a repeat rate faster than that would
+       * post intents for tiles the sprite has not reached yet.
+       */
+      const STEP_KEYS = {
+        ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
+        w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0],
+      };
+      window.addEventListener('keydown', event => {
+        if(event.altKey || event.ctrlKey || event.metaKey) return;
+        const step = STEP_KEYS[event.key.length === 1 ? event.key.toLowerCase() : event.key];
+        if(!step) return;
+        // Never steal a key from a field being typed in.
+        const el = event.target;
+        if(el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
+        if(!room || !isBuildPhase(room.phase)) return;
+
+        const you = me();
+        if(!you || you.down) return;
+        if(walking) { event.preventDefault(); return; }
+
+        const x = you.x + step[0], y = you.y + step[1];
+        event.preventDefault();                  // the page must not scroll under it
+        if(!walkableAt(room.terrain, room.buildings, x, y)) return;
+        notify('');
+        send({ t: 'intent', intent: { t: 'moveTo', x, y } });
       });
 
       /* ---- boot ------------------------------------------------------------ */
