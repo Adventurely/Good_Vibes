@@ -209,43 +209,8 @@ export const EFFECT_KINDS = ['heal', 'regen', 'ward', 'strike'];
    meant to be survivable and grim, not a screen with no buttons on it. */
 export const BASE_ACTIONS = ['hold'];
 
-export const COMBAT_ACTIONS = {
-  hold: {
-    name: 'Hold',
-    effect: { kind: 'ward', amount: 2, rounds: 1 },
-    note: 'Put your back to something and wait it out.',
-  },
-  /* The Wizard's own verb, not a building's. Costs a page from the shared
-     pool every time — the engine refuses the cast when the library is empty,
-     the same way it refuses a brew without herbs. */
-  fireball: {
-    name: 'Fireball',
-    effect: { kind: 'strike', amount: 7 },
-    pageCost: 1,
-    classOnly: 'wizard',
-    note: 'One page, read aloud, thrown. The blight burns like anything else.',
-  },
-  patch: {
-    name: 'Patch',
-    effect: { kind: 'heal', amount: 5 },
-    note: 'Tape, wire, and a flat sheet of plating over the worst of it.',
-  },
-  arc: {
-    name: 'Arc',
-    effect: { kind: 'strike', amount: 6 },
-    note: 'The pylon dumps its charge into the nearest thing that is spreading.',
-  },
-  douse: {
-    name: 'Douse',
-    effect: { kind: 'ward', amount: 5, rounds: 2 },
-    note: 'Clean water, under pressure, straight up into the bad air.',
-  },
-  brace: {
-    name: 'Brace',
-    effect: { kind: 'ward', amount: 8, rounds: 1 },
-    note: 'Get everyone behind the wall before it lands.',
-  },
-};
+/* COMBAT_ACTIONS is now the card table, aliased below where CARDS is defined.
+   Every one of these lives in a deck. */
 
 /* ============================================================ buildings === */
 
@@ -529,6 +494,55 @@ export const CARDS = {
     effect: { kind: 'ward', amount: 3, rounds: 1 },
     note: 'Drawn in the air, and about as solid as that sounds.',
   },
+
+  /* --- costed and granted cards ---------------------------------------
+   *
+   * These used to be a second list beside the hand, which meant two kinds of
+   * "things you can do this turn" on one screen with nothing to explain why
+   * one was a card and the other a grey box. They are cards now. What differs
+   * is only how they get into a deck.
+   */
+
+  /* The Wizard's, and the reason pages are worth walking to. Drawn like any
+     card and unplayable with an empty library — a bad draw the player caused,
+     which is the interesting kind. */
+  fireball: {
+    name: 'Fireball', kind: 'attack', classId: 'wizard', pageCost: 1,
+    effect: { kind: 'strike', amount: 7 },
+    note: 'One page, read aloud, thrown. The blight burns like anything else.',
+  },
+
+  /* Everyone holds one. The floor of a turn: whatever else the hand deals you,
+     there is something to do with it. */
+  hold: {
+    name: 'Hold', kind: 'defend', universal: true,
+    effect: { kind: 'ward', amount: 2, rounds: 1 },
+    note: 'Put your back to something and wait it out.',
+  },
+
+  /* Granted by a standing building, to everyone's deck — the site fires the
+     pylon, not the person. This is the two-phase loop's point of contact:
+     what you built is literally what you draw. */
+  patch: {
+    name: 'Patch', kind: 'heal', fromBuilding: 'workbench',
+    effect: { kind: 'heal', amount: 5 },
+    note: 'Tape, wire, and a flat sheet of plating over the worst of it.',
+  },
+  arc: {
+    name: 'Arc', kind: 'attack', fromBuilding: 'pylon',
+    effect: { kind: 'strike', amount: 6 },
+    note: 'The pylon dumps its charge into the nearest thing that is spreading.',
+  },
+  douse: {
+    name: 'Douse', kind: 'defend', fromBuilding: 'condenser',
+    effect: { kind: 'ward', amount: 5, rounds: 2 },
+    note: 'Clean water, under pressure, straight up into the bad air.',
+  },
+  brace: {
+    name: 'Brace', kind: 'defend', fromBuilding: 'bulwark',
+    effect: { kind: 'ward', amount: 8, rounds: 1 },
+    note: 'Get everyone behind the wall before it lands.',
+  },
 };
 
 /* What each class opens with. Eight cards: at three drawn and three discarded
@@ -537,8 +551,24 @@ export const CARDS = {
 export const STARTING_DECKS = {
   alchemist: { flask: 3, steady: 3, tonic: 2 },
   engineer: { wrench: 4, shore: 4 },
-  wizard: { spark: 5, sign: 3 },
+  wizard: { spark: 4, sign: 2, fireball: 2 },
 };
+
+/* Cards every deck holds regardless of class. */
+export const UNIVERSAL_CARDS = Object.entries(CARDS)
+  .filter(([, card]) => card.universal)
+  .map(([id]) => id);
+
+/* Deprecated alias, kept because the Tool Haven room imports this module and a
+ * missing export there is a throw at the top of the Worker — which takes the
+ * whole site down, sign-in included. Cards carry the same { name, effect, note }
+ * shape the actions did, so anything reading it still works.
+ *
+ * Delete once the room has been updated to read CARDS. It must stay below the
+ * CARDS definition: aliasing a const before its declaration is exactly the
+ * top-level throw this comment is about.
+ */
+export const COMBAT_ACTIONS = CARDS;
 
 /* The deck as a flat list of card ids, unshuffled. Order is the caller's
    problem, because the shuffle needs the room's generator. */
@@ -549,6 +579,35 @@ export function buildDeck(classId){
     for(let i = 0; i < count; i++) cards.push(id);
   }
   return cards;
+}
+
+/* The deck a player actually takes into a fight: their class cards, the
+ * universal one, and a copy of whatever every standing building grants.
+ *
+ * Building cards go to everybody. The pylon belongs to the site, not to the
+ * Engineer who bolted it down, and a party where only one player could fire it
+ * would make the build phase his hobby rather than the party's plan.
+ */
+export function deckFor(classId, buildings = []){
+  const cards = [...buildDeck(classId), ...UNIVERSAL_CARDS];
+  for(const placed of buildings){
+    const building = BUILDINGS[placed && placed.id];
+    if(!building) continue;
+    for(const cardId of building.grants){
+      if(CARDS[cardId]) cards.push(cardId);
+    }
+  }
+  return cards;
+}
+
+/* Can this card be played right now? Cost is the only thing that stops one —
+   the room checks this too, so a disabled button is politeness, not authority. */
+export function cardPlayable(cardId, { pages = 0, classId = null } = {}){
+  const card = CARDS[cardId];
+  if(!card) return false;
+  if(card.classId && classId && card.classId !== classId) return false;
+  if(card.pageCost && pages < card.pageCost) return false;
+  return true;
 }
 
 /* Fisher-Yates, with the generator supplied.
@@ -701,7 +760,7 @@ export function combatOptions(buildings){
       if(!ids.includes(action)) ids.push(action);
     }
   }
-  return ids.filter(id => COMBAT_ACTIONS[id]);
+  return ids.filter(id => CARDS[id]);
 }
 
 /* Salvage drawn once a fight is over: what the crew picks up, plus what the
@@ -840,11 +899,11 @@ export function seedFromCode(code){
    edges that a ruin wants — a rectangle of water would read as a swimming
    pool. Walks are allowed to wander off the map and come back; they just do
    not paint while they are outside it. */
-function blob(cells, random, kind, size){
+function blob(cells, random, kind, size, height = MAP_H){
   let x = Math.floor(random() * MAP_W);
-  let y = Math.floor(random() * MAP_H);
+  let y = Math.floor(random() * height);
   for(let step = 0; step < size; step++){
-    if(inBounds(x, y)) cells[tileIndex(x, y)] = kind;
+    if(x >= 0 && y >= 0 && x < MAP_W && y < height) cells[y * MAP_W + x] = kind;
     const dir = Math.floor(random() * 4);
     if(dir === 0) x += 1;
     else if(dir === 1) x -= 1;
@@ -889,14 +948,23 @@ export function generateTerrain(random){
 /* The surge's ground. Same generator family, different mix: mostly open so
    the wave has somewhere to come from, water and crevices as the walls the
    party fights around, no trees to hide the thing walking at you. */
+/* A fight is a lane, not a field.
+ *
+ * The build map is somewhere you walk around; combat is a wave closing from
+ * one side, and rendering that on a full-height board spent most of the screen
+ * on ground nobody crosses — and pushed the cards off the bottom of it. Eight
+ * rows is the band the wave actually walks.
+ */
+export const COMBAT_H = 8;
+
 export function generateCombatTerrain(random){
-  const cells = new Array(MAP_W * MAP_H).fill('floor');
-  blob(cells, random, 'grass', 40);
-  blob(cells, random, 'grass', 26);
-  blob(cells, random, 'water', 16);
-  blob(cells, random, 'crevice', 12);
-  blob(cells, random, 'rubble', 14);
-  blob(cells, random, 'hill', 12);
+  const cells = new Array(MAP_W * COMBAT_H).fill('floor');
+  blob(cells, random, 'grass', 26, COMBAT_H);
+  blob(cells, random, 'grass', 18, COMBAT_H);
+  blob(cells, random, 'water', 10, COMBAT_H);
+  blob(cells, random, 'crevice', 8, COMBAT_H);
+  blob(cells, random, 'rubble', 10, COMBAT_H);
+  blob(cells, random, 'hill', 8, COMBAT_H);
   return cells;
 }
 

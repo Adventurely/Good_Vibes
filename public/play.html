@@ -165,7 +165,12 @@
         background-image: linear-gradient(#2e2417, #241a10);
         opacity: 0.75;
       }
-      .pile[data-empty='true'] .pile-face { opacity: 0.3; box-shadow: none; }
+      /* An empty pile is a space where cards go, not a blank card. Dashed and
+         hollow, so it reads as "nothing here yet" rather than a missing image. */
+      .pile[data-empty='true'] .pile-face {
+        background-image: none; background: transparent;
+        border-style: dashed; box-shadow: none; opacity: 0.5;
+      }
       .pile-label {
         font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted);
       }
@@ -196,8 +201,29 @@
       .pcard-kind {
         font-size: 0.58rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted);
       }
+      /* Flavour on hover only. Three copies of the same card meant the same
+         three lines printed three times, which is charming once and noise at
+         triplicate — and it was the tallest thing on the card. Positioned
+         rather than toggled so revealing it never reflows the hand. */
+      .pcard { position: relative; }
       .pcard-note {
-        font-size: 0.66rem; color: var(--muted); margin-top: auto; line-height: 1.4;
+        position: absolute; bottom: calc(100% + 0.4rem); left: 50%; transform: translateX(-50%);
+        width: 11rem; padding: 0.45rem 0.55rem; z-index: 5;
+        font-size: 0.68rem; color: var(--text); line-height: 1.45;
+        background: #1b130c; border: 1px solid var(--line); border-radius: 4px;
+        opacity: 0; visibility: hidden; transition: opacity 120ms;
+        pointer-events: none;
+      }
+      .pcard:hover .pcard-note, .pcard:focus-visible .pcard-note { opacity: 1; visibility: visible; }
+
+      .pcard-cost {
+        font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--sun);
+      }
+      .pcard[data-playable='false'] { opacity: 0.4; }
+      .pcard[data-playable='false'] .pcard-cost { color: var(--bad); }
+      .pcard-source {
+        font-size: 0.58rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+        margin-top: auto;
       }
       .pcard[data-kind='attack'] { border-color: #6b3a2c; }
       .pcard[data-kind='defend'] { border-color: #3f5568; }
@@ -426,17 +452,13 @@
         </div>
         <p id="combat-note" style="margin-bottom:1rem">The light went out of the sky.</p>
 
-        <canvas id="combat-map" width="480" height="288"
+        <canvas id="combat-map" width="480" height="144"
                 aria-label="The surge. The wave advances from the right toward the party."></canvas>
 
-        <h2 style="margin-top:1.2rem">The wave</h2>
+        <!-- Aim and play, adjacent. Picking a target and playing the card at it
+             is one decision, and it used to be split across two places you
+             could not see at the same time. -->
         <div class="enemy-row" id="enemies"></div>
-
-        <ol id="combat-party" style="margin-top:1.2rem"></ol>
-
-        <h2 style="margin-top:1.4rem">Your hand</h2>
-        <p style="margin-bottom:0.8rem">Three drawn, one played. The two you leave go to the discard
-          with it — a hand does not carry over.</p>
 
         <div class="table">
           <div class="pile" id="deck-pile">
@@ -454,21 +476,19 @@
           </div>
         </div>
 
-        <h2 style="margin-top:1.4rem">What the site grants</h2>
-        <p style="margin-bottom:0.6rem">Decided in the build phase: what the site grants, what the
-          Wizard can still read, and whatever is on the rack.</p>
-        <div class="grid" id="options"></div>
-
-        <h2 style="margin-top:1.4rem">The rack</h2>
-        <div class="chips" id="combat-potions"></div>
-
-        <div class="actions" style="margin-top:1.2rem">
+        <div class="actions" style="margin-top:0.9rem">
           <button type="button" id="combat-wait">Do nothing</button>
           <button type="button" id="leave-combat">Leave</button>
         </div>
 
-        <h2 style="margin-top:1.4rem">Log</h2>
-        <div class="log" id="combat-log"></div>
+        <details style="margin-top:1.2rem">
+          <summary>The party, the rack and the log</summary>
+          <ol id="combat-party" style="margin-top:0.8rem"></ol>
+          <h2 style="margin-top:1.2rem">The rack</h2>
+          <div class="chips" id="combat-potions"></div>
+          <h2 style="margin-top:1.2rem">Log</h2>
+          <div class="log" id="combat-log"></div>
+        </details>
       </section>
 
       <!-- The animated card at each phase turn: Round One — Build Phase, the
@@ -488,17 +508,17 @@
       import { drawTextOutlined, textWidth, fitCanvas, context2d } from './pixel.js';
       import {
         PALETTE, HERO_ART, MATERIAL_ART, TERRAIN_ART, BUILDING_ART, SALVAGE_ART,
-        PAGES_ART, ENEMY_ART, CARD_ART, TILE,
+        PAGES_ART, ENEMY_ART, CARD_ART, MARK_ART, TILE,
       } from './art.js';
       import {
         CLASSES, OPEN_ROLES, MATERIALS, RECIPES, missingFor,
         MAP_W, MAP_H, TERRAIN, PHASES, isBuildPhase, readyState,
         generateMap, generateCombatTerrain, seededRandom, seedFromCode, spawnTile, tileAt,
         ROUNDS_BEFORE_BOSS, BOSS_ROUND, roundInfo, phaseCard, PARTY_SIZE, classById,
-        SALVAGE, BUILDINGS, COMBAT_ACTIONS, STARTING_SALVAGE, CACHE_YIELD, PAGES,
-        ENEMIES, waveFor,
-        HAND_SIZE, CARDS, buildDeck, shuffle, draw, discardHand, cardById,
-        combatOptions, missingForBuilding, canBuildAt,
+        SALVAGE, BUILDINGS, STARTING_SALVAGE, CACHE_YIELD, PAGES,
+        ENEMIES, waveFor, COMBAT_H,
+        HAND_SIZE, CARDS, deckFor, shuffle, draw, discardHand, cardById, cardPlayable,
+        missingForBuilding, canBuildAt,
         salvageAfterCombat, addSalvage, spendSalvage,
       } from './content.js';
 
@@ -563,6 +583,25 @@
       }
 
       const nodeAt = (x, y) => (room.nodes || []).find(n => n.x === x && n.y === y && !n.taken);
+
+      /* Has this player finished deciding? Readying up in the build phase and
+         committing a card in a fight are the same question to everyone else —
+         "are we waiting on you" — so they get the same mark. */
+      const committed = p => (isBuildPhase(room.phase) ? !!p.ready : !!p.intent);
+
+      /* The mark, flown over a sprite's head. Drawn with a dark bed under it so
+         it survives a light tile, and centred on the tile rather than on the
+         sprite, which overhangs. */
+      function drawMark(ctx, player, tileX, topY){
+        const art = MARK_ART[committed(player) ? 'ready' : 'waiting'];
+        if(!art) return;
+        const w = art[0].length;
+        const x = tileX + Math.round((TILE - w) / 2);
+        const y = topY - 10;
+        ctx.fillStyle = '#241a10';
+        ctx.fillRect(x - 1, y - 1, w + 2, art.length + 2);
+        blit(ctx, art, x, y);
+      }
 
       /* The building the player has picked up but not put down yet. Local, and
          deliberately so: an unplaced building is a pointer state, not a fact
@@ -629,10 +668,15 @@
             art: art.rows,
             x: p.x * TILE + (TILE - art.rows[0].length) / 2,
             top: HEADER + (p.y + 1) * TILE - art.rows.length,
+            player: p,
+            tileX: p.x * TILE,
           });
         }
         standing.sort((a, b) => a.y - b.y);
-        for(const thing of standing) blit(mctx, thing.art, thing.x, thing.top);
+        for(const thing of standing){
+          blit(mctx, thing.art, thing.x, thing.top);
+          if(thing.player) drawMark(mctx, thing.player, thing.tileX, thing.top);
+        }
 
         if(hover){
           // Three answers, three colours: green you may put it here, red you
@@ -669,8 +713,9 @@
       /* ---- the combat scene ------------------------------------------------ */
 
       const combatMap = document.getElementById('combat-map');
+      const COMBAT_PX_H = COMBAT_H * TILE;
       combatMap.width = MAP_PX_W;
-      combatMap.height = HEADER + MAP_PX_H;
+      combatMap.height = HEADER + COMBAT_PX_H;
       const cctx = context2d(combatMap);
 
       /* The surge, staged. The party stands on the left; the wave enters from
@@ -680,7 +725,7 @@
          except through the cards below it. */
       function drawCombat(){
         cctx.fillStyle = '#241a10';
-        cctx.fillRect(0, 0, MAP_PX_W, HEADER + MAP_PX_H);
+        cctx.fillRect(0, 0, MAP_PX_W, HEADER + COMBAT_PX_H);
 
         const info = room.roundInfo;
         const title = room.round >= (room.bossRound || 4) ? 'THE ARRAY WAKES' : 'THE SURGE';
@@ -689,7 +734,7 @@
         drawTextOutlined(cctx, right, MAP_PX_W - textWidth(right, 1) - 2, 4, 'c', 1);
 
         const terrain = room.terrain || [];
-        for(let y = 0; y < MAP_H; y++){
+        for(let y = 0; y < COMBAT_H; y++){
           for(let x = 0; x < MAP_W; x++){
             const kind = tileAt(terrain, x, y) || 'floor';
             blit(cctx, TERRAIN_ART[kind] || TERRAIN_ART.floor, x * TILE, HEADER + y * TILE);
@@ -702,27 +747,44 @@
           const cls = CLASSES.find(c => c.id === p.classId);
           const art = cls && HERO_ART[cls.art];
           if(!art) return;
-          const y = 2 + Math.floor(i * (MAP_H - 4) / Math.max(1, standing.length));
-          blit(cctx, art.rows, 2 * TILE, HEADER + (y + 1) * TILE - art.rows.length);
+          // From row 2, never row 1: a sprite on the top row puts its ready
+          // mark up inside the header strip, over the round title.
+          const y = 2 + Math.floor(i * (COMBAT_H - 3) / Math.max(1, standing.length));
+          const top = HEADER + (y + 1) * TILE - art.rows.length;
+          blit(cctx, art.rows, 2 * TILE, top);
+          // Who has locked a card in. With five people choosing at once this is
+          // the only thing on screen that answers "are we waiting on you".
+          drawMark(cctx, p, 2 * TILE, top);
         });
 
         // The wave. dist 0 stands one stride from the party; the spawn edge is
         // the right side of the map. Dead enemies leave the field.
-        const strides = Math.max(...Object.values(ENEMIES).map(e => e.dist)) + 1;
-        const strideW = Math.floor((MAP_W - 8) / strides) * TILE;
+        // The lane runs the width of the board: dist 0 is a stride off the
+        // party, the furthest an enemy can start is the right edge. Scaling to
+        // the widest dist in ENEMIES rather than a fixed stride is what keeps
+        // the wave using the whole picture instead of huddling on the left.
+        const maxDist = Math.max(...Object.values(ENEMIES).map(e => e.dist));
+        const laneFrom = 5 * TILE;
+        const laneTo = MAP_PX_W - 3 * TILE;
         room.enemies.forEach((enemy, i) => {
           if(enemy.hp <= 0) return;
           const art = ENEMY_ART[enemy.art];
           if(!art) return;
-          const x = 5 * TILE + enemy.dist * strideW;
-          const y = HEADER + (3 + ((i * 5) % (MAP_H - 6))) * TILE - art.length + TILE;
+          const x = laneFrom + Math.round((enemy.dist / maxDist) * (laneTo - laneFrom));
+          // Two rows apart: sprites are taller than a tile, so neighbouring
+          // lanes overlap and two enemies read as one with a strange outline.
+          const lanes = Math.max(1, Math.floor((COMBAT_H - 2) / 2));
+          const y = HEADER + (2 + (i % lanes) * 2 + 1) * TILE - art.length;
           blit(cctx, art, x, y);
-          // A one-tile health bar over each head beats a number in a list.
+          // A health bar over each head beats a number in a list. Three pixels
+          // with a dark bed under it, or it vanishes against a grass tile.
           const share = enemy.hp / enemy.maxHp;
+          cctx.fillStyle = '#241a10';
+          cctx.fillRect(x - 1, y - 6, art[0].length + 2, 5);
           cctx.fillStyle = '#3a2418';
-          cctx.fillRect(x, y - 4, art[0].length, 2);
+          cctx.fillRect(x, y - 5, art[0].length, 3);
           cctx.fillStyle = share > 0.4 ? PALETTE.g : PALETTE.e;
-          cctx.fillRect(x, y - 4, Math.max(1, Math.round(art[0].length * share)), 2);
+          cctx.fillRect(x, y - 5, Math.max(1, Math.round(art[0].length * share)), 3);
         });
       }
 
@@ -768,7 +830,7 @@
         preview: els('preview'), hold: els('hold'), readyCount: els('ready-count'),
         combat: els('combat'), combatParty: els('combat-party'), leaveCombat: els('leave-combat'),
         salvage: els('salvage'), buildings: els('buildings'), buildHint: els('build-hint'),
-        options: els('options'), library: els('library'),
+        library: els('library'),
         combatName: els('combat-name'), combatMeta: els('combat-meta'),
         enemies: els('enemies'), combatPotions: els('combat-potions'),
         hand: els('hand'), deckPile: els('deck-pile'), discardPile: els('discard-pile'),
@@ -848,6 +910,8 @@
         drawBanner(null);
         ui.lobby.hidden = ui.run.hidden = ui.combat.hidden = true;
         ui.join.hidden = false;
+        banner.hidden = false;                // back to the front door
+        ui.status.hidden = false;
         setStatus('idle', 'Not connected');
         if(!keepNotice) notify('');
       }
@@ -867,6 +931,7 @@
       let demo = false;
 
       let demoRandom = null;
+      let demoBeat = 0;
 
       function demoEnterBuild(){
         const { terrain, nodes } = generateMap(demoRandom);
@@ -995,13 +1060,14 @@
               return { id: `e${i}`, type, name: def.name, art: def.art,
                        hp: def.hp, maxHp: def.hp, dist: def.dist, hits: def.hits };
             });
-            room.actions = combatOptions(room.buildings);
 
             // Everyone shuffles and draws as the fight opens. A deck is per
             // fight, not per run — for now: the cards that persist between
             // fights are the next slice.
             for(const player of room.players){
-              player.deck = shuffle(buildDeck(player.classId), demoRandom);
+              // deckFor, not buildDeck: what is standing on the site is dealt
+              // into everyone's deck, which is the whole two-phase loop.
+              player.deck = shuffle(deckFor(player.classId, room.buildings), demoRandom);
               player.discard = [];
               player.block = 0;
               demoDeal(player);
@@ -1016,19 +1082,28 @@
           // after the hand was redealt would otherwise play whatever moved
           // into that position.
           if(!card || hand[msg.intent.index] !== msg.intent.card) return render();
+          if(!cardPlayable(hand[msg.intent.index], {
+            pages: room.pages || 0, classId: you.classId,
+          })) return render();
 
+          if(card.pageCost) room.pages -= card.pageCost;
+
+          // Commit, show the mark, then resolve on a beat. In a real room the
+          // wait is for the other four; here it is the only way to see the
+          // thing the mark is for.
+          you.intent = { t: 'play', card: hand[msg.intent.index] };
           you.discard = discardHand(you.discard, hand);
           you.hand = [];
-          demoTurn(you, card.effect, card.name, msg.intent.target);
-          if(room.phase === PHASES.combat) demoDeal(you);
-        }else if(msg.t === 'intent' && msg.intent.t === 'act' && room.phase === PHASES.combat){
-          const action = COMBAT_ACTIONS[msg.intent.action];
-          if(!action) return render();
-          if(action.pageCost){
-            if(room.pages < action.pageCost) return render();
-            room.pages -= action.pageCost;
-          }
-          demoTurn(you, action.effect, action.name, msg.intent.target);
+          render();
+
+          clearTimeout(demoBeat);
+          demoBeat = setTimeout(() => {
+            you.intent = null;
+            demoTurn(you, card.effect, card.name, msg.intent.target);
+            if(room.phase === PHASES.combat) demoDeal(you);
+            render();
+          }, 420);
+          return;
         }else if(msg.t === 'intent' && msg.intent.t === 'place'){
           const { building: id, x, y } = msg.intent;
           const building = BUILDINGS[id];
@@ -1205,14 +1280,21 @@
           return;
         }
 
+        const cls = you && classById(you.classId);
         hand.forEach((cardId, index) => {
           const card = cardById(cardId);
           if(!card) return;
+          const playable = cardPlayable(cardId, {
+            pages: room.pages || 0,
+            classId: cls ? cls.id : null,
+          });
+
           const el = document.createElement('button');
           el.type = 'button';
           el.className = 'pcard';
           el.dataset.kind = card.kind;
-          el.disabled = !acting;
+          el.dataset.playable = String(playable);
+          el.disabled = !acting || !playable;
 
           if(CARD_ART[card.kind]) el.append(pixels(CARD_ART[card.kind], 3));
 
@@ -1226,13 +1308,31 @@
 
           const kind = document.createElement('span');
           kind.className = 'pcard-kind';
-          kind.textContent = card.effect.kind;
+          kind.textContent = card.effect.kind
+            + (card.effect.rounds > 1 ? ` · ${card.effect.rounds} rounds` : '');
+
+          // Where the card came from, and what it costs. A Fireball with an
+          // empty library still gets dealt — it just says why it is greyed.
+          const source = document.createElement('span');
+          source.className = card.pageCost ? 'pcard-cost' : 'pcard-source';
+          if(card.pageCost){
+            source.textContent = playable
+              ? `${card.pageCost} page · ${room.pages || 0} left`
+              : 'no pages left';
+          }else if(card.fromBuilding){
+            source.textContent = BUILDINGS[card.fromBuilding]
+              ? `from the ${BUILDINGS[card.fromBuilding].name}` : '';
+          }else{
+            source.textContent = card.universal ? 'always' : '';
+          }
 
           const note = document.createElement('span');
           note.className = 'pcard-note';
-          note.textContent = card.note;
+          note.textContent = card.effect.kind === 'strike' && aimAt
+            ? `${card.note}  —  aimed at the ${room.enemies.find(x => x.id === aimAt)?.name}.`
+            : card.note;
 
-          el.append(name, amount, kind, note);
+          el.append(name, amount, kind, source, note);
           // The index, not the id: a hand can hold two of the same card and
           // the room has to know which one was played.
           el.onclick = () => send({
@@ -1303,57 +1403,6 @@
           ui.combatParty.append(li);
         }
 
-        // The deck, and the build phase was the deckbuilding: every option
-        // beyond the base ones is standing on the site somewhere — plus the
-        // Wizard's own verb, funded by the library rather than a building.
-        const ids = [...(room.actions || combatOptions(room.buildings))];
-        const cls = you && classById(you.classId);
-        if(cls && cls.cast && !ids.includes('fireball')) ids.push('fireball');
-
-        const from = new Map();
-        for(const [id, building] of Object.entries(BUILDINGS)){
-          if(!(room.buildings || []).some(b => b.id === id)) continue;
-          for(const action of building.grants) if(!from.has(action)) from.set(action, building.name);
-        }
-
-        ui.options.replaceChildren();
-        for(const id of ids){
-          const action = COMBAT_ACTIONS[id];
-          if(!action) continue;
-          const card = document.createElement('button');
-          card.type = 'button';
-          card.className = 'card';
-          const needsPages = action.pageCost || 0;
-          card.disabled = !acting || (needsPages > 0 && (room.pages || 0) < needsPages);
-          const body = document.createElement('span');
-          body.className = 'card-body';
-          const name = document.createElement('b');
-          name.className = 'card-name';
-          name.textContent = action.name;
-          const sub = document.createElement('span');
-          sub.className = 'card-sub';
-          const e = action.effect;
-          sub.textContent = `${e.kind} ${e.amount}${e.rounds ? ` · ${e.rounds} round${e.rounds > 1 ? 's' : ''}` : ''}`
-            + (needsPages ? ` · ${needsPages} page` : '');
-          const source = document.createElement('span');
-          source.className = 'card-sub';
-          source.style.color = 'var(--sun)';
-          source.textContent = needsPages
-            ? `${room.pages || 0} page${(room.pages || 0) === 1 ? '' : 's'} left`
-            : from.get(id) ? `From the ${from.get(id)}` : 'Always available';
-          const note = document.createElement('span');
-          note.className = 'card-blurb';
-          note.textContent = e.kind === 'strike' && aimAt
-            ? `Aimed at the ${room.enemies.find(x => x.id === aimAt)?.name}.`
-            : action.note;
-          body.append(name, sub, source, note);
-          card.append(body);
-          card.onclick = () => send({ t: 'intent', intent: {
-            t: 'act', action: id,
-            ...(e.kind === 'strike' && aimAt ? { target: aimAt } : {}),
-          } });
-          ui.options.append(card);
-        }
 
         // Potions are combat items too — the Alchemist throws them. Same
         // intent as drinking in the build phase; the room does not care which
@@ -1534,7 +1583,7 @@
             const gives = document.createElement('span');
             gives.className = 'card-sub';
             gives.style.color = 'var(--accent)';
-            const grants = building.grants.map(a => COMBAT_ACTIONS[a].name);
+            const grants = building.grants.map(a => CARDS[a].name);
             const income = Object.entries(building.income).map(([r, n]) => `+${n} ${SALVAGE[r].name}`);
             gives.textContent = [
               grants.length ? `In combat: ${grants.join(', ')}` : '',
@@ -1647,6 +1696,12 @@
         ui.lobby.hidden = !inLobby;
         ui.run.hidden = inLobby || inCombat;
         ui.combat.hidden = !inCombat;
+        // The banner is the front door, not furniture. In a fight it is 200
+        // pixels of title between the player and their cards, and the fold is
+        // the whole budget — so it goes once play starts.
+        banner.hidden = !inLobby;
+        ui.status.hidden = !inLobby;
+
         // The page is narrow for reading and wide for playing; fit() reruns
         // because the width change moves the integer the map can scale by.
         const view = inLobby ? 'lobby' : inCombat ? 'combat' : 'run';
@@ -1727,7 +1782,9 @@
         // The map earns most of the screen: it is the game, and 0.55 of the
         // viewport was why it kept coming out a postage stamp.
         fitCanvas(map, MAP_PX_W, HEADER + MAP_PX_H, { container: wrap, maxHeightFraction: 0.78 });
-        fitCanvas(combatMap, MAP_PX_W, HEADER + MAP_PX_H, { container: wrap, maxHeightFraction: 0.78 });
+        // Its own height: the combat lane is shorter than the site, and fitting
+        // it to the site's height stretches it vertically against its width.
+        fitCanvas(combatMap, MAP_PX_W, HEADER + COMBAT_PX_H, { container: wrap, maxHeightFraction: 0.45 });
       };
       window.addEventListener('resize', fit);
       fit();

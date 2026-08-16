@@ -17,6 +17,7 @@ import {
   BASE_ACTIONS, EFFECT_KINDS, combatOptions, missingForBuilding, canAfford,
   affordableBuildings, canBuildAt, salvageAfterCombat, addSalvage, spendSalvage,
   HAND_SIZE, CARDS, STARTING_DECKS, buildDeck, shuffle, draw, discardHand, cardById,
+  UNIVERSAL_CARDS, deckFor, cardPlayable, COMBAT_H, generateCombatTerrain,
 } from '../public/content.js';
 
 /* content.js is imported by the authoritative room object in Tool Haven, not
@@ -150,8 +151,9 @@ test('the wizard economy is wired end to end', () => {
   assert.ok(wizard && wizard.cast, 'the wizard must be the caster');
   assert.ok(wizard.hp < Math.min(...CLASSES.filter((c) => c.id !== 'wizard').map((c) => c.hp)),
     'squishy means the lowest hp in the roster');
-  const fireball = COMBAT_ACTIONS.fireball;
-  assert.equal(fireball.classOnly, 'wizard');
+  const fireball = CARDS.fireball;
+  assert.equal(fireball.classId, 'wizard', 'fireball must belong to the wizard');
+  assert.ok(STARTING_DECKS.wizard.fireball > 0, 'the wizard should open holding fireballs');
   assert.ok(fireball.pageCost >= 1, 'a free fireball makes pages pointless');
   assert.equal(fireball.effect.kind, 'strike');
   assert.ok(SPAWNS.pages > 0, 'no pages ever spawn');
@@ -574,7 +576,11 @@ test('every card is a real effect with an icon to draw it', () => {
     assert.ok(EFFECT_KINDS.includes(card.effect.kind),
       `${where}: effect kind "${card.effect.kind}" is not one the engine implements`);
     assert.ok(card.effect.amount > 0, `${where}: must do a positive amount`);
-    assert.ok(classById(card.classId), `${where}: belongs to unknown class "${card.classId}"`);
+    // A card belongs to a class, to a building, or to everybody — exactly one.
+    const owners = [card.classId, card.fromBuilding, card.universal].filter(Boolean).length;
+    assert.equal(owners, 1, `${where}: must belong to a class, a building, or everybody — not ${owners}`);
+    if (card.classId) assert.ok(classById(card.classId), `${where}: unknown class "${card.classId}"`);
+    if (card.fromBuilding) assert.ok(BUILDINGS[card.fromBuilding], `${where}: unknown building "${card.fromBuilding}"`);
     assert.equal(typeof card.note, 'string', `${where}: needs a note`);
   }
 });
@@ -606,8 +612,9 @@ test('every deck can attack and can defend, and is big enough to draw from', () 
 test('buildDeck expands the counts and refuses to invent a deck', () => {
   const deck = buildDeck('wizard');
   assert.equal(deck.length, 8);
-  assert.equal(deck.filter((id) => id === 'spark').length, 5);
-  assert.equal(deck.filter((id) => id === 'sign').length, 3);
+  assert.equal(deck.filter((id) => id === 'spark').length, 4);
+  assert.equal(deck.filter((id) => id === 'sign').length, 2);
+  assert.equal(deck.filter((id) => id === 'fireball').length, 2);
   assert.deepEqual(buildDeck('nobody'), []);
 });
 
@@ -688,4 +695,65 @@ test('a deck cycles rather than running out', () => {
 test('cardById refuses nonsense', () => {
   assert.equal(cardById('spark').name, 'Spark');
   assert.equal(cardById('not-a-card'), null);
+});
+
+test('what you built is what you draw', () => {
+  // The two-phase loop's whole point of contact, now literal: a building puts
+  // a card in the deck rather than a button in a second list.
+  const bare = deckFor('engineer');
+  const withPylon = deckFor('engineer', [{ id: 'pylon', x: 1, y: 1 }]);
+  assert.equal(withPylon.length, bare.length + 1, 'the pylon added no card');
+  assert.ok(withPylon.includes('arc'), 'the pylon should deal an Arc');
+  assert.ok(!bare.includes('arc'), 'an unbuilt pylon dealt an Arc anyway');
+
+  // Two pylons, two Arcs: a second one is a thicker deck, not a dead duplicate.
+  const two = deckFor('engineer', [{ id: 'pylon', x: 1, y: 1 }, { id: 'pylon', x: 2, y: 1 }]);
+  assert.equal(two.filter((id) => id === 'arc').length, 2);
+
+  assert.deepEqual(deckFor('engineer', [{ id: 'not-a-building' }]), bare);
+});
+
+test('the site deals to everyone, not just the builder', () => {
+  // The pylon belongs to the site. A party where only the Engineer could fire
+  // it would make the build phase his hobby rather than the party's plan.
+  for (const cls of playableClasses()) {
+    assert.ok(deckFor(cls.id, [{ id: 'pylon', x: 0, y: 0 }]).includes('arc'),
+      `"${cls.id}" was left out of what the site grants`);
+  }
+});
+
+test('every deck holds the universal cards', () => {
+  assert.ok(UNIVERSAL_CARDS.length, 'nothing is universal, so a deck could have no floor');
+  for (const cls of playableClasses()) {
+    const deck = deckFor(cls.id);
+    for (const id of UNIVERSAL_CARDS) assert.ok(deck.includes(id), `"${cls.id}" is missing "${id}"`);
+  }
+});
+
+test('a card that costs pages is dealt but not playable without them', () => {
+  // The interesting kind of bad draw: one the player caused by spending.
+  assert.equal(cardPlayable('fireball', { pages: 0, classId: 'wizard' }), false);
+  assert.equal(cardPlayable('fireball', { pages: 1, classId: 'wizard' }), true);
+  assert.equal(cardPlayable('spark', { pages: 0, classId: 'wizard' }), true);
+  assert.equal(cardPlayable('not-a-card', { pages: 9 }), false);
+  // Nothing stops a free card, whoever is holding it.
+  assert.equal(cardPlayable('hold', {}), true);
+});
+
+test('the combat lane is shorter than the site, and still a lane', () => {
+  assert.ok(COMBAT_H > 0 && COMBAT_H < MAP_H,
+    'combat should be a band of the map, not the whole field');
+  const terrain = generateCombatTerrain(seededRandom(3));
+  assert.equal(terrain.length, MAP_W * COMBAT_H);
+  for (const kind of terrain) assert.ok(TERRAIN[kind], `combat terrain has "${kind}"`);
+});
+
+test('combat terrain stays inside its own shorter grid', () => {
+  // blob() walks off the edges by design; with a height that is not MAP_H it
+  // must clip to the lane rather than wrapping into the next row.
+  for (let seed = 1; seed <= 30; seed++) {
+    const terrain = generateCombatTerrain(seededRandom(seed));
+    assert.equal(terrain.length, MAP_W * COMBAT_H, `seed ${seed} changed the grid size`);
+    assert.equal(terrain.filter((k) => k === undefined).length, 0, `seed ${seed} left a hole`);
+  }
 });

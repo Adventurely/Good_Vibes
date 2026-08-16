@@ -657,6 +657,38 @@ export const CARD_ART = {
   ],
 };
 
+/* ============================================================ indicators === */
+
+/* Flown over a hero's head when they have committed — readied up in the build
+ * phase, or picked a card in a fight. With five players choosing at once, "who
+ * are we still waiting for" is the question the screen has to answer without
+ * anyone asking it, and a tick above the sprite answers it where the player is
+ * already looking.
+ */
+export const MARK_ART = {
+  ready: [
+    '........',
+    '......gg',
+    '.....gg.',
+    '....gg..',
+    'g..gg...',
+    'gggg....',
+    '.gg.....',
+    '........'
+  ],
+  /* Still deciding: three dots, the universal "thinking". */
+  waiting: [
+    '........',
+    '........',
+    '........',
+    '.M.M.M..',
+    '.M.M.M..',
+    '........',
+    '........',
+    '........'
+  ],
+};
+
 /* ============================================================== salvage === */
 
 /* Eight by eight, same as the materials, because they sit in the same kind of
