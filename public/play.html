@@ -143,6 +143,28 @@
       #map { margin: 0 auto; border: 2px solid var(--line); border-radius: 6px; cursor: pointer; }
       #map:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+      /* --- the roster: one player, several characters ----------------------- */
+      .roster { display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; margin-top: 0.9rem; }
+      .who {
+        display: flex; align-items: center; gap: 0.5rem;
+        padding: 0.35rem 0.6rem; text-transform: none; letter-spacing: 0;
+        font-size: 0.78rem; text-align: left;
+      }
+      .who[aria-pressed='true'] { border-color: var(--accent); background: #2c3a22; }
+      .who-name { display: block; color: var(--text); }
+      .who-sub { display: block; font-size: 0.62rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+
+      /* What is in the deck, counted rather than listed one card per line —
+         nine cards as nine rows is a spreadsheet, not a deck. */
+      .deck-list { display: flex; flex-wrap: wrap; gap: 0.35rem; align-content: flex-start; max-width: 34rem; }
+      .deck-entry {
+        display: flex; align-items: center; gap: 0.35rem;
+        padding: 0.2rem 0.45rem; font-size: 0.72rem;
+        background: var(--panel); border: 1px solid var(--line); border-radius: 4px;
+      }
+      .deck-entry b { color: var(--sun); font-variant-numeric: tabular-nums; font-weight: 400; }
+      .deck-entry[data-brewed='true'] { border-color: var(--accent); }
+
       /* --- the table: deck, hand, discard ---------------------------------- */
       .table {
         display: flex; align-items: center; justify-content: center;
@@ -401,14 +423,26 @@
         <!-- Sized from MAP_W/MAP_H at boot so the canvas cannot drift from the
              grid it draws. These are the current values, not the authority. -->
         <canvas id="map" width="384" height="240"
-                aria-label="The site. Click a herb to gather it, or a clear tile to build on."></canvas>
+                aria-label="The site. Click anywhere to walk there; walking onto a herb picks it up."></canvas>
+
+        <!-- One player, three characters. Click a portrait to take control of
+             that one; the map click routes whoever is selected. -->
+        <div class="roster" id="roster"></div>
 
         <div class="ready-line">
           <span id="ready-count"></span>
           <button type="button" id="hold">Ready</button>
         </div>
 
-        <ol id="party" style="margin-top:1.2rem"></ol>
+        <h2 style="margin-top:1.4rem">Your deck</h2>
+        <div class="table" style="margin-bottom:0.6rem">
+          <div class="pile" id="build-deck-pile">
+            <span class="pile-face" aria-hidden="true"></span>
+            <span class="pile-label">Deck</span>
+            <b class="pile-count" id="build-deck-count">0</b>
+          </div>
+          <div class="deck-list" id="deck-list"></div>
+        </div>
 
         <h2 style="margin-top:1.4rem">Salvage</h2>
         <div class="chips" id="salvage"></div>
@@ -511,7 +545,8 @@
         PAGES_ART, ENEMY_ART, CARD_ART, MARK_ART, TILE,
       } from './art.js';
       import {
-        CLASSES, OPEN_ROLES, MATERIALS, RECIPES, missingFor,
+        CLASSES, OPEN_ROLES, MATERIALS, RECIPES, missingFor, playableClasses,
+        pathTo, brew,
         MAP_W, MAP_H, TERRAIN, PHASES, isBuildPhase, readyState,
         generateMap, generateCombatTerrain, seededRandom, seedFromCode, spawnTile, tileAt,
         ROUNDS_BEFORE_BOSS, BOSS_ROUND, roundInfo, phaseCard, PARTY_SIZE, classById,
@@ -583,6 +618,54 @@
       }
 
       const nodeAt = (x, y) => (room.nodes || []).find(n => n.x === x && n.y === y && !n.taken);
+
+      /* ---- walking -------------------------------------------------------- */
+
+      /* Point, click, walk. The click names a destination; the route is
+       * pathTo's, and the sprite is stepped along it a tile at a time so the
+       * distance is something the player watches rather than reads.
+       *
+       * Local animation over authoritative state: in a real room the move is an
+       * intent, the room decides where you ended up, and this walks the sprite
+       * to whatever it was told. Re-clicking mid-walk re-routes from where the
+       * sprite has actually got to, not from where it set off.
+       */
+      let walking = null;      // { id, steps, at }
+      let walkTimer = 0;
+      const STEP_MS = 90;
+
+      function walkTo(player, steps){
+        clearTimeout(walkTimer);
+        if(!steps || !steps.length) return arrive(player);
+        walking = { id: player.id, steps, at: 0 };
+        stepWalk();
+      }
+
+      function stepWalk(){
+        if(!walking) return;
+        const player = (room.players || []).find(p => p.id === walking.id);
+        if(!player){ walking = null; return; }
+
+        if(walking.at >= walking.steps.length){
+          walking = null;
+          arrive(player);
+          render();
+          return;
+        }
+
+        const step = walking.steps[walking.at++];
+        player.x = step.x;
+        player.y = step.y;
+        drawMap();                       // just the canvas: the panels have not changed
+        walkTimer = setTimeout(stepWalk, STEP_MS);
+      }
+
+      /* Standing on something picks it up. Walking onto a herb and having to
+         click it again would be a second click for a decision already made. */
+      function arrive(player){
+        const node = (room.nodes || []).find(n => n.x === player.x && n.y === player.y && !n.taken);
+        if(node) send({ t: 'intent', intent: { t: 'gather', node: node.id } });
+      }
 
       /* Has this player finished deciding? Readying up in the build phase and
          committing a card in a fight are the same question to everyone else —
@@ -824,7 +907,7 @@
         lobby: els('lobby'), seats: els('seats'), classes: els('classes'),
         ready: els('ready'), start: els('start'), leave: els('leave'),
         run: els('run'), levelName: els('level-name'), levelMeta: els('level-meta'),
-        levelNote: els('level-note'), party: els('party'), nodes: els('nodes'),
+        levelNote: els('level-note'), nodes: els('nodes'),
         stash: els('stash'), recipes: els('recipes'), potions: els('potions'),
         wait: els('wait'), leaveRun: els('leave-run'), log: els('log'),
         preview: els('preview'), hold: els('hold'), readyCount: els('ready-count'),
@@ -834,6 +917,8 @@
         combatName: els('combat-name'), combatMeta: els('combat-meta'),
         enemies: els('enemies'), combatPotions: els('combat-potions'),
         hand: els('hand'), deckPile: els('deck-pile'), discardPile: els('discard-pile'),
+        roster: els('roster'), deckList: els('deck-list'),
+        buildDeckPile: els('build-deck-pile'), buildDeckCount: els('build-deck-count'),
         deckCount: els('deck-count'), discardCount: els('discard-count'),
         combatWait: els('combat-wait'), combatLog: els('combat-log'),
         splash: els('splash'), splashTitle: els('splash-title'), splashSub: els('splash-sub'),
@@ -935,14 +1020,20 @@
 
       function demoEnterBuild(){
         const { terrain, nodes } = generateMap(demoRandom);
-        const start = spawnTile(terrain);
         Object.assign(room, {
           phase: PHASES.build, terrain, nodes, buildings: [], enemies: [],
           roundInfo: roundInfo(room.round),
         });
-        room.players[0].x = start.x;
-        room.players[0].y = start.y;
-        room.players[0].ready = false;
+        walking = null;
+        // Spread the party over neighbouring tiles rather than stacking them:
+        // three sprites on one square read as one sprite drawn badly.
+        room.players.forEach((player, i) => {
+          const start = spawnTile(terrain, i * 2);
+          player.x = start.x;
+          player.y = start.y;
+          player.ready = false;
+          player.intent = null;
+        });
         const cardText = phaseCard(room.round, PHASES.build);
         room.events.push({ t: 'phase', ...cardText });
       }
@@ -952,10 +1043,11 @@
         deliberate = true;                    // there is no socket to reconnect to
         demoRandom = seededRandom(seedFromCode(newCode()));
 
-        // The Wizard, because with all three verbs in the game it is the one
-        // that can walk the whole loop alone: gather, ready, burn the wave.
-        const cls = classById('wizard') || CLASSES.find(c => c.status === 'live');
+        // The whole party, one player. Every class has a verb the others do not
+        // — gather and brew, build, cast — and playing all three is the only way
+        // to walk the loop end to end without three people in the room.
         holding = null;
+        walking = null;
 
         room = {
           you: 'p1', phase: PHASES.build, round: 1, rounds: ROUNDS_BEFORE_BOSS,
@@ -963,10 +1055,16 @@
           terrain: [], nodes: [], buildings: [], enemies: [],
           stash: {}, potions: [], pages: 2, events: [],
           salvage: { ...STARTING_SALVAGE },
-          players: [{
-            id: 'p1', name: 'You', host: true, connected: true, ready: false, down: false,
-            classId: cls.id, hp: cls.hp, maxHp: cls.hp, effects: [], intent: null, x: 0, y: 0,
-          }],
+          players: playableClasses().map((cls, i) => ({
+            id: `p${i + 1}`, name: cls.name.replace(/^The /, ''),
+            host: i === 0, connected: true, ready: false, down: false,
+            classId: cls.id, hp: cls.hp, maxHp: cls.hp, effects: [], intent: null,
+            x: 0, y: 0,
+            // Built once, then kept: brewing during the build phase adds to this
+            // and a building adds to everyone's, so rebuilding it at the surge
+            // would throw away the round's whole point.
+            deck: deckFor(cls.id, []), discard: [], hand: [],
+          })),
         };
         demoEnterBuild();
 
@@ -1045,7 +1143,11 @@
       }
 
       function demoSend(msg){
-        const you = room.players[0];
+        // Whoever the roster has selected, not the first seat. One player is
+        // running the whole party here, so an intent belongs to the character
+        // they are currently holding — a hardcoded seat makes every click move
+        // the Alchemist however many portraits you press.
+        const you = room.players.find(p => p.id === room.you) || room.players[0];
         room.events = [];
 
         if(msg.t === 'ready' && room.phase === PHASES.build){
@@ -1065,9 +1167,10 @@
             // fight, not per run — for now: the cards that persist between
             // fights are the next slice.
             for(const player of room.players){
-              // deckFor, not buildDeck: what is standing on the site is dealt
-              // into everyone's deck, which is the whole two-phase loop.
-              player.deck = shuffle(deckFor(player.classId, room.buildings), demoRandom);
+              // Shuffle what the build phase left them — brewed cards, granted
+              // cards and all. Rebuilding the deck here would throw the round
+              // away, which is the bug this whole phase exists to avoid.
+              player.deck = shuffle([...player.deck, ...(player.discard || [])], demoRandom);
               player.discard = [];
               player.block = 0;
               demoDeal(player);
@@ -1092,7 +1195,9 @@
           // wait is for the other four; here it is the only way to see the
           // thing the mark is for.
           you.intent = { t: 'play', card: hand[msg.intent.index] };
-          you.discard = discardHand(you.discard, hand);
+          // Brewed cards are spent, not discarded: everything else in the hand
+          // goes face down, the consumed one leaves the deck for good.
+          you.discard = discardHand(you.discard, hand.filter(id => !(CARDS[id] || {}).consumed));
           you.hand = [];
           render();
 
@@ -1104,6 +1209,26 @@
             render();
           }, 420);
           return;
+        }else if(msg.t === 'intent' && msg.intent.t === 'moveTo'){
+          // The room's job in a real game: decide the route and where you ended
+          // up. Here it walks the sprite and lets arrive() pick anything up.
+          const steps = pathTo(room.terrain, room.buildings,
+            { x: you.x, y: you.y }, { x: msg.intent.x, y: msg.intent.y });
+          if(steps) walkTo(you, steps);
+          return render();
+        }else if(msg.t === 'intent' && msg.intent.t === 'brew'){
+          const made = brew(msg.intent.recipe, room.stash);
+          if(made){
+            room.stash = made.stash;
+            // Straight into the deck, not onto a rack. Shuffled in is the
+            // point: three Sunsalves dilute the deck they improve.
+            you.deck = [...you.deck, ...made.cards];
+            const recipe = RECIPES[msg.intent.recipe];
+            room.events.push({
+              t: 'log',
+              text: `Brewed ${recipe.makes} ${recipe.name}${recipe.makes > 1 ? 's' : ''} into the deck.`,
+            });
+          }
         }else if(msg.t === 'intent' && msg.intent.t === 'place'){
           const { building: id, x, y } = msg.intent;
           const building = BUILDINGS[id];
@@ -1111,6 +1236,11 @@
           if(building && affordable && canBuildAt(room.terrain, room.buildings, room.nodes, x, y)){
             room.salvage = spendSalvage(room.salvage, building.costs);
             room.buildings.push({ id, x, y });
+            // Into every deck, now rather than at the surge: the card is the
+            // building, and seeing it appear is what makes that legible.
+            for(const player of room.players){
+              for(const cardId of building.grants) if(CARDS[cardId]) player.deck.push(cardId);
+            }
             room.events.push({ t: 'log', text: `Raised the ${building.name}.` });
             holding = null;
           }
@@ -1118,7 +1248,6 @@
           const node = room.nodes.find(n => n.id === msg.intent.node && !n.taken);
           if(node){
             node.taken = true;
-            you.x = node.x; you.y = node.y;
             if(node.kind === 'salvage'){
               room.salvage = addSalvage(room.salvage, { [node.salvage]: CACHE_YIELD.salvage });
               room.events.push({ t: 'log', text: `Cracked a cache: ${CACHE_YIELD.salvage} ${SALVAGE[node.salvage].name}.` });
@@ -1433,6 +1562,64 @@
       }
 
       /* ---- run ------------------------------------------------------------ */
+      /* The party as a row of portraits. In a real room this is who is here; in
+         the preview it is also the switch, because one person is playing all of
+         them and a map click has to route somebody in particular. */
+      function renderRoster(){
+        ui.roster.replaceChildren();
+        for(const p of room.players){
+          const cls = classById(p.classId);
+          const el = document.createElement('button');
+          el.type = 'button';
+          el.className = 'who';
+          el.setAttribute('aria-pressed', String(p.id === room.you));
+          if(cls && HERO_ART[cls.art]) el.append(pixels(HERO_ART[cls.art].rows, 1));
+
+          const body = document.createElement('span');
+          const name = document.createElement('b');
+          name.className = 'who-name';
+          name.textContent = cls ? cls.name.replace(/^The /, '') : p.name;
+          const sub = document.createElement('span');
+          sub.className = 'who-sub';
+          sub.textContent = `${p.ready ? 'ready' : 'thinking'} · ${(p.deck || []).length} cards`;
+          body.append(name, sub);
+          el.append(body, healthBar(p));
+
+          // Only the preview lets you be somebody else; in a room you are you.
+          el.disabled = !demo;
+          el.onclick = () => { room.you = p.id; walking = null; render(); };
+          ui.roster.append(el);
+        }
+      }
+
+      /* The deck as counts, brewed cards marked. The Alchemist has to see three
+         Sunsalves appear the moment she brews them, or the walk that paid for
+         them did not visibly buy anything. */
+      function renderDeckList(you){
+        const deck = (you && you.deck) || [];
+        ui.buildDeckCount.textContent = deck.length;
+        ui.buildDeckPile.dataset.empty = String(!deck.length);
+
+        const counts = new Map();
+        for(const id of deck) counts.set(id, (counts.get(id) || 0) + 1);
+
+        ui.deckList.replaceChildren();
+        for(const [id, n] of counts){
+          const card = cardById(id);
+          if(!card) continue;
+          const el = document.createElement('span');
+          el.className = 'deck-entry';
+          el.dataset.brewed = String(!!card.brewed);
+          if(CARD_ART[card.kind]) el.append(pixels(CARD_ART[card.kind], 1));
+          el.append(document.createTextNode(card.name));
+          const count = document.createElement('b');
+          count.textContent = `x${n}`;
+          el.append(count);
+          el.title = `${card.effect.kind} ${card.effect.amount}. ${card.note}`;
+          ui.deckList.append(el);
+        }
+      }
+
       function renderRun(){
         const info = room.roundInfo;
         ui.levelName.textContent = info ? info.name : '';
@@ -1442,28 +1629,13 @@
           : '';
         ui.levelNote.textContent = info ? info.note : '';
 
-        ui.party.replaceChildren();
-        for(const p of room.players){
-          const li = document.createElement('li');
-          li.dataset.you = String(p.id === room.you);
-          li.dataset.down = String(p.down);
-          const cls = CLASSES.find(c => c.id === p.classId);
-          if(cls && HERO_ART[cls.art]) li.append(pixels(HERO_ART[cls.art].rows, 1));
-          const name = document.createElement('span');
-          name.className = 'seat-name';
-          name.textContent = p.name + (p.id === room.you ? ' (you)' : '');
-          li.append(name, healthBar(p));
-          if(p.down) li.append(tag('Down', 'down'));
-          else if(!p.connected) li.append(tag('Away', 'away'));
-          else if(p.intent) li.append(tag(p.intent.t, 'ready'));
-          for(const effect of p.effects) li.append(tag(`${effect.kind} ${effect.rounds}`, 'waiting'));
-          ui.party.append(li);
-        }
 
         const you = me();
         const acting = !!you && !you.down && isBuildPhase(room.phase);
 
         drawMap();
+        renderRoster();
+        renderDeckList(you);
 
         // The room decides when the phase turns; this only reports what it is
         // still waiting for, from the same helper the room counts with.
@@ -1474,12 +1646,16 @@
         ui.hold.textContent = you && you.ready ? 'Not ready' : 'Ready';
         ui.hold.disabled = !acting;
 
+        // Only what is still standing. This list is the keyboard path to
+        // gathering, and a picked herb left in it is a dead button somebody has
+        // to tab past — and clicking one now walks you there for nothing.
         ui.nodes.replaceChildren();
         for(const node of room.nodes){
+          if(node.taken) continue;
           const button = document.createElement('button');
           button.type = 'button';
           button.className = 'chip';
-          button.disabled = node.taken || !acting;
+          button.disabled = !acting;
           const art = node.kind === 'salvage' ? SALVAGE_ART[node.salvage]
             : node.kind === 'pages' ? PAGES_ART
             : MATERIAL_ART[node.material];
@@ -1488,7 +1664,10 @@
             : MATERIALS[node.material].name;
           if(art) button.append(pixels(art, 2));
           button.append(document.createTextNode(label));
-          button.onclick = () => send({ t: 'intent', intent: { t: 'gather', node: node.id } });
+          // Walk there, same as clicking the tile — arriving is what picks it
+          // up, so the two paths cannot disagree about whether you were close
+          // enough to reach it.
+          button.onclick = () => send({ t: 'intent', intent: { t: 'moveTo', x: node.x, y: node.y } });
           ui.nodes.append(button);
         }
         if(!room.nodes.some(n => !n.taken)){
@@ -1623,14 +1802,25 @@
             sub.className = 'card-sub';
             sub.textContent = Object.entries(recipe.costs)
               .map(([m, n]) => `${n} ${MATERIALS[m].name}`).join(' + ');
+
+            // What it puts in the deck is the reason to do it, so it goes
+            // above the flavour rather than under it.
+            const made = cardById(recipe.card || id);
+            const gives = document.createElement('span');
+            gives.className = 'card-sub';
+            gives.style.color = 'var(--accent)';
+            gives.textContent = made
+              ? `${recipe.makes} x ${made.name} — ${made.effect.kind} ${made.effect.amount}`
+              : '';
+
             const note = document.createElement('span');
             note.className = 'card-blurb';
             // "You need one more Dewglass" is the only version of this a player
             // can act on, so say that rather than greying the button in silence.
             note.textContent = missing.length ? `Short of ${missing.join(' and ')}.` : recipe.note;
-            body.append(name, sub, note);
+            body.append(name, sub, gives, note);
             card.append(body);
-            card.onclick = () => send({ t: 'intent', intent: { t: 'craft', recipe: id } });
+            card.onclick = () => send({ t: 'intent', intent: { t: 'brew', recipe: id } });
             ui.recipes.append(card);
           }
         }
@@ -1755,8 +1945,17 @@
           return;
         }
 
-        const node = nodeAt(tile.x, tile.y);
-        if(node) send({ t: 'intent', intent: { t: 'gather', node: node.id } });
+        // Otherwise the click is a destination. Route from where the sprite has
+        // actually got to, so a click mid-walk re-routes rather than teleports.
+        const you = me();
+        if(!you) return;
+        const steps = pathTo(room.terrain, room.buildings, { x: you.x, y: you.y }, tile);
+        if(steps === null){
+          notify('No way across to there.');
+          return;
+        }
+        notify('');
+        send({ t: 'intent', intent: { t: 'moveTo', x: tile.x, y: tile.y } });
       });
 
       map.addEventListener('mousemove', event => {

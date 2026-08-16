@@ -90,30 +90,45 @@ export const MATERIALS = {
    regen  { amount, rounds }    restore health at the end of each round
    ward   { amount, rounds }    absorb blight before it reaches health
 */
+/* Brewing does not fill a rack — it puts cards in the Alchemist's deck.
+ *
+ * One brew makes several copies, which is what makes the walk across the site
+ * worth the trouble: a Sunpetal you bent down for is three heals, not one. The
+ * cards it makes are `consumed`, so they leave the deck when played instead of
+ * cycling back — the Alchemist's deck is the one that changes shape every
+ * fight, against the Engineer's, which only grows.
+ *
+ * Rarity does the gating. Sunpetal is the commonest herb, so Sunsalve is the
+ * one you can nearly always make and it makes the most cards; Cellsap is the
+ * rarest at a weight of 3, so Greenfire's big hit is the one you cannot count
+ * on. Between the three, every material on the map has a use — no herb is ever
+ * pointless to bend down for.
+ *
+ *   costs   what it takes out of the shared stash
+ *   makes   how many copies of the card go into the deck
+ *   card    key into CARDS — that card must exist and be `consumed`
+ */
 export const RECIPES = {
   sunsalve: {
     name: 'Sunsalve',
     costs: { sunpetal: 2, dewglass: 1 },
-    effect: { kind: 'heal', amount: 9 },
+    makes: 3,
+    card: 'sunsalve',
     note: 'Petals crushed into clean water. Closes what the blight opens.',
-  },
-  bloomdraught: {
-    name: 'Bloomdraught',
-    costs: { copperfern: 1, rustbloom: 1 },
-    effect: { kind: 'regen', amount: 3, rounds: 3 },
-    note: 'Bitter, slow, and still working three rounds later.',
   },
   stillwater: {
     name: 'Stillwater',
-    costs: { dewglass: 2 },
-    effect: { kind: 'ward', amount: 4, rounds: 2 },
+    costs: { dewglass: 2, copperfern: 1 },
+    makes: 2,
+    card: 'stillwater',
     note: 'Drink it and the air stops biting for a while.',
   },
   greenfire: {
     name: 'Greenfire',
-    costs: { cellsap: 1, sunpetal: 1 },
-    effect: { kind: 'ward', amount: 8, rounds: 1 },
-    note: 'A whole array’s worth of stored afternoon, held for one round.',
+    costs: { cellsap: 1, rustbloom: 1 },
+    makes: 2,
+    card: 'greenfire',
+    note: 'Sap that tastes like a battery, lit and thrown. It goes up green.',
   },
 };
 
@@ -186,7 +201,19 @@ export const PAGES = {
    are the small change — crates the blight has not digested yet — while the
    after-combat payout stays the Engineer's real income. Pages are scarce on
    purpose: every fireball is a page the Wizard chose to burn. */
-export const SPAWNS = { herbs: 12, salvage: 5, pages: 3 };
+/* Herbs are deliberately scarce, and exactly one of each material.
+ *
+ * There is no move budget — a player can walk anywhere on the site and pick up
+ * everything on it — so the limit on how much the Alchemist can brew has to be
+ * how much grew, not how far she can walk.
+ *
+ * One node per material makes both halves of that structural rather than
+ * lucky. Every recipe is always *possible*, because nothing is ever missing;
+ * and no sweep ever pays for all three, because at two units a node the ten
+ * units on a site cannot cover the eleven that one of each costs. The decision
+ * is which two you walk to, not which two the dice left you.
+ */
+export const SPAWNS = { herbs: 5, salvage: 5, pages: 3 };
 
 /* What one walked-to cache yields. Rolled sizes would make gathering a
    lottery; fixed sizes make the map readable — a player can count what a
@@ -512,6 +539,33 @@ export const CARDS = {
     note: 'One page, read aloud, thrown. The blight burns like anything else.',
   },
 
+  /* --- brewed ----------------------------------------------------------
+   *
+   * Made in the build phase and shuffled into the Alchemist's deck. They are
+   * `consumed`: playing one takes it out of the deck for good rather than
+   * sending it to the discard, which is what stops a good brew from being a
+   * permanent upgrade and keeps the walk worth repeating.
+   *
+   * Each is strictly better than the basic it echoes — Tonic heals 4, Steady
+   * Hands wards 4, Acid Flask strikes 3 — because brewing should always feel
+   * like an upgrade over the card it dilutes.
+   */
+  sunsalve: {
+    name: 'Sunsalve', kind: 'heal', brewed: true, consumed: true, targetsAlly: true,
+    effect: { kind: 'heal', amount: 6 },
+    note: 'Petals crushed into clean water. Hand it to whoever is worst off.',
+  },
+  stillwater: {
+    name: 'Stillwater', kind: 'defend', brewed: true, consumed: true, targetsAlly: true,
+    effect: { kind: 'ward', amount: 6, rounds: 1 },
+    note: 'Drink it and the air stops biting. Works on anyone you can reach.',
+  },
+  greenfire: {
+    name: 'Greenfire', kind: 'attack', brewed: true, consumed: true,
+    effect: { kind: 'strike', amount: 8 },
+    note: 'A whole array’s worth of stored afternoon, lit and thrown.',
+  },
+
   /* Everyone holds one. The floor of a turn: whatever else the hand deals you,
      there is something to do with it. */
   hold: {
@@ -598,6 +652,100 @@ export function deckFor(classId, buildings = []){
     }
   }
   return cards;
+}
+
+/* Can a hero stand on this tile? Terrain has to allow it and nothing can be
+   built on it — you walk around the pylon, not through it. */
+export function walkableAt(terrain, buildings, x, y){
+  const kind = tileAt(terrain, x, y);
+  if(!kind || !TERRAIN[kind].walk) return false;
+  return !(buildings || []).some(b => b.x === x && b.y === y);
+}
+
+/* Every tile a hero standing here could walk to, as a set of indices. The same
+   flood as pathTo, kept separate because the spawner wants the whole reachable
+   set rather than one route through it. */
+export function reachableFrom(terrain, buildings, from){
+  const seen = new Set();
+  if(!from || !walkableAt(terrain, buildings, from.x, from.y)) return seen;
+
+  const start = tileIndex(from.x, from.y);
+  seen.add(start);
+  const queue = [start];
+  for(let head = 0; head < queue.length; head++){
+    const index = queue[head];
+    const x = index % MAP_W;
+    const y = Math.floor(index / MAP_W);
+    for(const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]){
+      const nx = x + dx, ny = y + dy;
+      if(!inBounds(nx, ny)) continue;
+      const next = tileIndex(nx, ny);
+      if(seen.has(next) || !walkableAt(terrain, buildings, nx, ny)) continue;
+      seen.add(next);
+      queue.push(next);
+    }
+  }
+  return seen;
+}
+
+/* Breadth-first route from one tile to another, four-way.
+ *
+ * Returns the steps *after* `from`, so an empty array means "already there" and
+ * null means there is no way across — a pond between you and the Cellsap is a
+ * real answer, not an error.
+ *
+ * BFS rather than A*: the site is 30x17, so the whole board is cheaper to flood
+ * than a heuristic is to tune, and BFS gives the shortest path without one.
+ * Pure, because the room has to be able to check that a click was reachable
+ * rather than trusting a client that says it walked there.
+ */
+export function pathTo(terrain, buildings, from, to){
+  if(!from || !to) return null;
+  if(!walkableAt(terrain, buildings, to.x, to.y)) return null;
+  if(from.x === to.x && from.y === to.y) return [];
+
+  const start = tileIndex(from.x, from.y);
+  const goal = tileIndex(to.x, to.y);
+  const cameFrom = new Map([[start, -1]]);
+  const queue = [start];
+
+  for(let head = 0; head < queue.length; head++){
+    const index = queue[head];
+    if(index === goal) break;
+    const x = index % MAP_W;
+    const y = Math.floor(index / MAP_W);
+    for(const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]){
+      const nx = x + dx, ny = y + dy;
+      if(!inBounds(nx, ny)) continue;
+      const next = tileIndex(nx, ny);
+      if(cameFrom.has(next)) continue;
+      if(!walkableAt(terrain, buildings, nx, ny)) continue;
+      cameFrom.set(next, index);
+      queue.push(next);
+    }
+  }
+
+  if(!cameFrom.has(goal)) return null;
+
+  const steps = [];
+  for(let at = goal; at !== start; at = cameFrom.get(at)){
+    steps.push({ x: at % MAP_W, y: Math.floor(at / MAP_W) });
+  }
+  return steps.reverse();
+}
+
+/* What a brew takes and what it gives. Returns null when the stash is short,
+   so a caller cannot half-apply it — the room spends and deals in one step. */
+export function brew(recipeId, stash){
+  const recipe = RECIPES[recipeId];
+  if(!recipe) return null;
+  if(!canAfford(recipe.costs, stash)) return null;
+
+  const spent = { ...stash };
+  for(const [id, n] of Object.entries(recipe.costs)) spent[id] -= n;
+
+  const cardId = recipe.card || recipeId;
+  return { stash: spent, cards: Array(recipe.makes).fill(cardId), card: cardId };
 }
 
 /* Can this card be played right now? Cost is the only thing that stops one —
@@ -1018,11 +1166,17 @@ export function largestBuildableArea(terrain){
  *   pages    { }           CACHE_YIELD.pages spell pages
  */
 export function spawnItems(terrain, random, spawns = SPAWNS){
+  // Only where a hero can actually get to. Terrain rolls islands — a pocket of
+  // grass behind a pond — and a Cellsap on one is a node the player can see,
+  // walk at, and never reach. With six herbs on a site, losing one to an
+  // island is a sixth of the round's brewing.
+  const reachable = reachableFrom(terrain, [], spawnTile(terrain));
+
   const growable = [];
   const walkable = [];
   for(let i = 0; i < terrain.length; i++){
     const tile = TERRAIN[terrain[i]];
-    if(!tile) continue;
+    if(!tile || !reachable.has(i)) continue;
     if(tile.grows) growable.push(i);
     if(tile.walk) walkable.push(i);
   }
@@ -1050,7 +1204,20 @@ export function spawnItems(terrain, random, spawns = SPAWNS){
     });
   };
 
-  for(let i = 0; i < spawns.herbs; i++) place(growable, () => ({ kind: 'herb', material: materialFor(random()) }));
+  /* Herbs cover every material before they roll for any of them.
+   *
+   * Six nodes drawn purely by weight regularly grows a site with no Dewglass
+   * and no Rustbloom on it, and every recipe needs one or the other — a round
+   * where nothing can be brewed at all, which is the worst thing scarcity can
+   * do. One of each material first, then weight for whatever is left over, so
+   * every recipe is always *possible* and never all of them affordable.
+   */
+  const herbs = Object.keys(MATERIALS);
+  const guaranteed = shuffle(herbs, random).slice(0, spawns.herbs);
+  for(let i = 0; i < spawns.herbs; i++){
+    const material = guaranteed[i] || materialFor(random());
+    place(growable, () => ({ kind: 'herb', material }));
+  }
   for(let i = 0; i < spawns.salvage; i++) place(walkable, () => ({ kind: 'salvage', salvage: salvageFor(random()) }));
   for(let i = 0; i < spawns.pages; i++) place(walkable, () => ({ kind: 'pages' }));
 

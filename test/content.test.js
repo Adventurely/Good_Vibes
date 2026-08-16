@@ -18,6 +18,7 @@ import {
   affordableBuildings, canBuildAt, salvageAfterCombat, addSalvage, spendSalvage,
   HAND_SIZE, CARDS, STARTING_DECKS, buildDeck, shuffle, draw, discardHand, cardById,
   UNIVERSAL_CARDS, deckFor, cardPlayable, COMBAT_H, generateCombatTerrain,
+  brew, pathTo, walkableAt,
 } from '../public/content.js';
 
 /* content.js is imported by the authoritative room object in Tool Haven, not
@@ -82,8 +83,7 @@ test('the roster and the open roles account for the whole party', () => {
   );
 });
 
-test('every recipe is makeable and does something the engine implements', () => {
-  const KINDS = new Set(['heal', 'regen', 'ward']);
+test('every recipe is makeable and deals a card that exists', () => {
   for (const [id, recipe] of Object.entries(RECIPES)) {
     assert.equal(typeof recipe.name, 'string', `recipe "${id}" needs a name`);
     assert.ok(Object.keys(recipe.costs).length, `recipe "${id}" costs nothing`);
@@ -91,10 +91,52 @@ test('every recipe is makeable and does something the engine implements', () => 
       assert.ok(MATERIALS[material], `recipe "${id}" needs unknown material "${material}"`);
       assert.ok(Number.isInteger(amount) && amount > 0, `recipe "${id}": bad amount for ${material}`);
     }
+    assert.ok(Number.isInteger(recipe.makes) && recipe.makes > 0,
+      `recipe "${id}" brews no cards, so it does nothing`);
+
+    const card = CARDS[recipe.card || id];
+    assert.ok(card, `recipe "${id}" makes card "${recipe.card || id}", which does not exist`);
+    assert.ok(card.consumed, `"${recipe.card || id}" is brewed, so it must be consumed on play`);
     // An unimplemented kind is the failure that looks like a working potion.
-    assert.ok(KINDS.has(recipe.effect.kind), `recipe "${id}" has effect kind "${recipe.effect.kind}"`);
-    assert.ok(recipe.effect.amount > 0, `recipe "${id}" has no effect amount`);
+    assert.ok(EFFECT_KINDS.includes(card.effect.kind),
+      `recipe "${id}" makes effect kind "${card.effect.kind}"`);
   }
+});
+
+test('brewing spends the stash and deals the cards, or does nothing at all', () => {
+  const stash = { sunpetal: 2, dewglass: 1, cellsap: 5 };
+  const out = brew('sunsalve', stash);
+  assert.deepEqual(out.cards, ['sunsalve', 'sunsalve', 'sunsalve']);
+  assert.deepEqual(out.stash, { sunpetal: 0, dewglass: 0, cellsap: 5 });
+  assert.deepEqual(stash, { sunpetal: 2, dewglass: 1, cellsap: 5 }, 'brew wrote to the stash it was given');
+
+  // Short: nothing, rather than a half-applied spend.
+  assert.equal(brew('sunsalve', { sunpetal: 1 }), null);
+  assert.equal(brew('not-a-recipe', { sunpetal: 9 }), null);
+});
+
+test('every material is worth bending down for', () => {
+  // A herb no recipe needs is a node the player learns to walk past.
+  const wanted = new Set();
+  for (const recipe of Object.values(RECIPES)) {
+    for (const id of Object.keys(recipe.costs)) wanted.add(id);
+  }
+  for (const id of Object.keys(MATERIALS)) {
+    assert.ok(wanted.has(id), `nothing brews with "${id}"`);
+  }
+});
+
+test('there is never quite enough to brew everything', () => {
+  // No move budget, so scarcity is the only limit: the map has to grow less
+  // than one of each recipe needs, or brewing stops being a choice.
+  const needed = {};
+  for (const recipe of Object.values(RECIPES)) {
+    for (const [id, n] of Object.entries(recipe.costs)) needed[id] = (needed[id] || 0) + n;
+  }
+  const totalNeeded = Object.values(needed).reduce((a, b) => a + b, 0);
+  const bestCase = SPAWNS.herbs * Math.max(...CLASSES.map((c) => c.gather));
+  assert.ok(bestCase < totalNeeded * 2,
+    `a full sweep yields ${bestCase} units against ${totalNeeded} for one of each — too generous`);
 });
 
 test('every material can be drawn and picked', () => {
@@ -577,8 +619,10 @@ test('every card is a real effect with an icon to draw it', () => {
       `${where}: effect kind "${card.effect.kind}" is not one the engine implements`);
     assert.ok(card.effect.amount > 0, `${where}: must do a positive amount`);
     // A card belongs to a class, to a building, or to everybody — exactly one.
-    const owners = [card.classId, card.fromBuilding, card.universal].filter(Boolean).length;
-    assert.equal(owners, 1, `${where}: must belong to a class, a building, or everybody — not ${owners}`);
+    const owners = [card.classId, card.fromBuilding, card.universal, card.brewed].filter(Boolean).length;
+    assert.equal(owners, 1,
+      `${where}: must come from a class, a building, a brew, or everybody — not ${owners}`);
+    if (card.brewed) assert.ok(card.consumed, `${where}: brewed cards must be consumed on play`);
     if (card.classId) assert.ok(classById(card.classId), `${where}: unknown class "${card.classId}"`);
     if (card.fromBuilding) assert.ok(BUILDINGS[card.fromBuilding], `${where}: unknown building "${card.fromBuilding}"`);
     assert.equal(typeof card.note, 'string', `${where}: needs a note`);
@@ -755,5 +799,135 @@ test('combat terrain stays inside its own shorter grid', () => {
     const terrain = generateCombatTerrain(seededRandom(seed));
     assert.equal(terrain.length, MAP_W * COMBAT_H, `seed ${seed} changed the grid size`);
     assert.equal(terrain.filter((k) => k === undefined).length, 0, `seed ${seed} left a hole`);
+  }
+});
+
+/* -------------------------------------------------------------- movement -- */
+
+/* Point, click, walk. The room has to be able to check that a click was
+ * reachable rather than trusting a client that says it walked there, so the
+ * route is a pure function over the same terrain both ends hold.
+ */
+
+const openSite = () => new Array(MAP_W * MAP_H).fill('grass');
+
+test('a route is the steps after where you stand', () => {
+  const terrain = openSite();
+  const path = pathTo(terrain, [], { x: 2, y: 2 }, { x: 5, y: 2 });
+  assert.deepEqual(path, [{ x: 3, y: 2 }, { x: 4, y: 2 }, { x: 5, y: 2 }]);
+  assert.equal(path.length, 3, 'four-way distance on open ground is the manhattan distance');
+});
+
+test('standing where you clicked is a route of no steps, not a failure', () => {
+  assert.deepEqual(pathTo(openSite(), [], { x: 4, y: 4 }, { x: 4, y: 4 }), []);
+});
+
+test('a route walks around water rather than through it', () => {
+  const terrain = openSite();
+  for (let y = 0; y < MAP_H - 1; y++) terrain[y * MAP_W + 5] = 'water';  // wall with a gap at the bottom
+  const path = pathTo(terrain, [], { x: 4, y: 0 }, { x: 6, y: 0 });
+  assert.ok(path, 'the gap at the bottom should make this reachable');
+  for (const step of path) {
+    assert.notEqual(terrain[step.y * MAP_W + step.x], 'water', 'the route crossed water');
+  }
+  assert.ok(path.length > 2, 'going around should cost more than going straight through');
+});
+
+test('no way across is null, which is an answer', () => {
+  const terrain = openSite();
+  for (let y = 0; y < MAP_H; y++) terrain[y * MAP_W + 5] = 'water';   // wall, no gap
+  assert.equal(pathTo(terrain, [], { x: 4, y: 3 }, { x: 6, y: 3 }), null);
+});
+
+test('you walk around a building, not through it', () => {
+  const terrain = openSite();
+  const buildings = [{ id: 'pylon', x: 3, y: 2 }];
+  assert.equal(walkableAt(terrain, buildings, 3, 2), false);
+  assert.equal(pathTo(terrain, buildings, { x: 2, y: 2 }, { x: 3, y: 2 }), null,
+    'a tile with a building on it is not somewhere to stand');
+  const around = pathTo(terrain, buildings, { x: 2, y: 2 }, { x: 4, y: 2 });
+  assert.ok(around.every((s) => !(s.x === 3 && s.y === 2)), 'the route went through the building');
+});
+
+test('a route refuses ground nobody can stand on, and the edge of the world', () => {
+  const terrain = openSite();
+  terrain[2 * MAP_W + 3] = 'rubble';
+  assert.equal(pathTo(terrain, [], { x: 2, y: 2 }, { x: 3, y: 2 }), null, 'routed onto rubble');
+  assert.equal(pathTo(terrain, [], { x: 2, y: 2 }, { x: -1, y: 2 }), null, 'routed off the map');
+  assert.equal(pathTo(terrain, [], { x: 2, y: 2 }, { x: MAP_W, y: 2 }), null, 'routed off the map');
+  assert.equal(pathTo(terrain, [], null, { x: 1, y: 1 }), null);
+});
+
+test('every route is a legal walk: one tile at a time, all of it walkable', () => {
+  // A path that teleports or clips a corner is the bug that looks like lag.
+  for (let seed = 1; seed <= 20; seed++) {
+    const terrain = generateTerrain(seededRandom(seed));
+    const from = spawnTile(terrain);
+    for (let i = 0; i < terrain.length; i += 37) {
+      const to = { x: i % MAP_W, y: Math.floor(i / MAP_W) };
+      const path = pathTo(terrain, [], from, to);
+      if (!path) continue;
+      let at = from;
+      for (const step of path) {
+        const jump = Math.abs(step.x - at.x) + Math.abs(step.y - at.y);
+        assert.equal(jump, 1, `seed ${seed}: route jumped ${jump} tiles`);
+        assert.ok(walkableAt(terrain, [], step.x, step.y), `seed ${seed}: route crossed bad ground`);
+        at = step;
+      }
+      assert.deepEqual(at, to, `seed ${seed}: route did not arrive`);
+    }
+  }
+});
+
+test('every herb on a generated site can actually be walked to', () => {
+  // A Cellsap on an island is a node the player can see and never reach.
+  for (let seed = 1; seed <= 30; seed++) {
+    const { terrain, nodes } = generateMap(seededRandom(seed));
+    const from = spawnTile(terrain);
+    for (const node of nodes) {
+      assert.ok(pathTo(terrain, [], from, { x: node.x, y: node.y }),
+        `seed ${seed}: ${node.material || node.kind} at ${node.x},${node.y} is unreachable from the spawn`);
+    }
+  }
+});
+
+test('every site grows something for every recipe', () => {
+  // Six nodes drawn purely by weight regularly grew a site with no Dewglass and
+  // no Rustbloom, and every recipe needs one or the other — a round where
+  // nothing can be brewed is the worst thing scarcity can do.
+  for (let seed = 1; seed <= 60; seed++) {
+    const { nodes } = generateMap(seededRandom(seed));
+    const grown = new Set(nodes.filter((n) => n.kind === 'herb').map((n) => n.material));
+    for (const [id, recipe] of Object.entries(RECIPES)) {
+      const missing = Object.keys(recipe.costs).filter((m) => !grown.has(m));
+      assert.equal(missing.length, 0,
+        `seed ${seed}: "${id}" needs ${missing.join(' and ')}, which the site did not grow`);
+    }
+  }
+});
+
+test('a site grows enough for some brewing and never all of it', () => {
+  const gather = Math.max(...CLASSES.map((c) => c.gather));
+  for (let seed = 1; seed <= 40; seed++) {
+    const { nodes } = generateMap(seededRandom(seed));
+    const stash = {};
+    for (const n of nodes.filter((x) => x.kind === 'herb')) {
+      stash[n.material] = (stash[n.material] || 0) + gather;
+    }
+    const affordable = Object.keys(RECIPES).filter((id) => brew(id, stash));
+    assert.ok(affordable.length > 0, `seed ${seed}: a full sweep brews nothing`);
+
+    // Sweeping the whole site must not pay for one of everything, or there is
+    // no decision left in which herb to walk to.
+    let pool = stash;
+    let brewed = 0;
+    for (const id of Object.keys(RECIPES)) {
+      const made = brew(id, pool);
+      if (!made) continue;
+      pool = made.stash;
+      brewed += 1;
+    }
+    assert.ok(brewed < Object.keys(RECIPES).length,
+      `seed ${seed}: a full sweep brewed all ${brewed} recipes — nothing was given up`);
   }
 });

@@ -184,15 +184,68 @@ The Wizard is the roster's glass floor and a test enforces it: strictly the
 lowest hp of any class. It has the best basic attack and the worst basic guard,
 which is the whole class in two cards.
 
-Everything gatherable stands on the build map. `SPAWNS` puts out 12 herbs, 5
+Everything gatherable stands on the build map. `SPAWNS` puts out 5 herbs, 5
 salvage caches and 3 spell pages; herbs need growable ground, caches and pages
 only need somewhere walkable. `CACHE_YIELD` is fixed rather than rolled, so a
-player can count what a trip is worth before spending the rounds to make it.
-Pages are scarce on purpose — every fireball is a page somebody chose to burn.
+player can count what a trip is worth before spending the walk. Pages are
+scarce on purpose — every fireball is a page somebody chose to burn.
+
+**Herbs are exactly one per material.** There is no move budget — you can walk
+anywhere on the site and pick up everything on it — so the limit on brewing has
+to be how much grew. One node per material makes both halves structural rather
+than lucky: every recipe is always *possible*, because nothing is ever missing,
+and no sweep ever pays for all three, because ten units on a site cannot cover
+the eleven that one of each costs. Six nodes drawn purely by weight regularly
+grew a site with no Dewglass and no Rustbloom on it — a round where nothing
+could be brewed at all, which is the worst thing scarcity can do.
 
 Salvage also arrives *after* a fight: `salvageAfterCombat` pays each Engineer a
 rolled share and each standing building a fixed one. Building is how you stop
 being at the mercy of the roll.
+
+### Brewing
+
+Brewing does not fill a rack — it puts cards in the Alchemist's deck. A recipe
+has `makes`, and one brew deals several copies, which is what makes the walk
+across the site worth the trouble: a Sunpetal you bent down for is three heals,
+not one.
+
+| Potion | Costs | Makes | The card does |
+| --- | --- | --- | --- |
+| Sunsalve | 2 Sunpetal + 1 Dewglass | 3 | heal 6 |
+| Stillwater | 2 Dewglass + 1 Copperfern | 2 | ward 6 |
+| Greenfire | 1 Cellsap + 1 Rustbloom | 2 | strike 8 |
+
+Each is strictly better than the basic it echoes — Tonic heals 4, Steady Hands
+wards 4, Acid Flask strikes 3 — because brewing should always feel like an
+upgrade over the card it dilutes. Between the three, every material on the map
+has a use, so no herb is ever pointless to bend down for.
+
+Brewed cards are **consumed**: playing one takes it out of the deck for good
+rather than sending it to the discard. That is what stops a good brew being a
+permanent upgrade, and it is why the Alchemist's deck changes shape every fight
+where the Engineer's only grows.
+
+They are shuffled in rather than kept on a tray. Three Sunsalves in a nine-card
+deck *dilute* it — you might draw healing when you needed a guard — and that
+cost is what makes gathering a decision instead of pure upside.
+
+### Moving
+
+Point, click, walk. A click on the map names a destination; `pathTo` finds the
+route with a breadth-first flood over walkable ground, and the sprite is stepped
+along it a tile at a time so distance is something the player watches rather
+than reads. Walking onto a herb picks it up — having to click it again would be
+a second click for a decision already made.
+
+Routing is pure and shared for the usual reason: the room has to be able to
+check that a click was reachable rather than trust a client that says it walked
+there. BFS rather than A* because the site is 30x17, so the whole board is
+cheaper to flood than a heuristic is to tune.
+
+The spawner uses the same flood. Terrain rolls islands — a pocket of grass
+behind a pond — and a Cellsap on one is a node the player can see, walk at, and
+never reach; `reachableFrom` keeps every node on ground a hero can get to.
 
 ### The hand
 
@@ -299,7 +352,12 @@ Honest status, so nobody discovers these at the table:
 - **The site does not persist.** Terrain is regenerated and `buildings` is reset
   every round, so the base you built in round one is gone in round two. The
   persistent site is the design; this is the gap.
-- **Decks do not persist.** Everyone reshuffles a fresh nine when a surge lands.
+- **Only the Alchemist has a mechanic of her own.** The Engineer's powered
+  weapons and the Wizard's prepared spells are designed, not written, so those
+  two currently play as decks with a different mix.
+- **Decks do not persist between rounds.** Cards brewed and granted during a
+  build phase carry into that round's fight, but the next build phase starts
+  from the same nine.
 - **Nobody can die.** Damage is clamped above zero in the preview, and there is
   no down state, no party wipe and no lose condition.
 - **Enemies only ever hit the local player** — no round-robin across a party.
@@ -335,11 +393,15 @@ scene, the palette, the page itself — works offline.
 
 **Preview the site** on the join screen is the exception, and it exists because
 none of this could otherwise be looked at until it was deployed. It generates a
-site locally and drops you in as the Wizard, alone — the one class that can walk
-the whole loop by itself: gather, ready, burn the wave. Gathering, building,
-readying up, drawing a hand and playing cards all work, so a full cycle can be
-walked through offline. Readying up switches phase because a party of one is a
-party that is entirely ready.
+site locally and gives you **the whole party — one player, three characters**.
+Click a portrait to take control of one; the map click routes whoever is
+selected. Every class has a verb the others do not — gather and brew, build,
+cast — and playing all three is the only way to walk the loop end to end
+without three people in the room.
+
+Walking, gathering, brewing, building, readying up, drawing a hand and playing
+cards all work, so a full cycle can be walked through offline. Each character
+readies separately, because that is what the room will ask for.
 
 Two deep links skip the clicking, and the screenshot tooling drives both:
 
