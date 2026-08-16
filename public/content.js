@@ -232,8 +232,9 @@ export const CACHE_YIELD = { salvage: 2, pages: 1 };
  */
 export const EFFECT_KINDS = ['heal', 'regen', 'ward', 'strike'];
 
-/* Always available, with or without a base. Combat with an empty build is
-   meant to be survivable and grim, not a screen with no buttons on it. */
+/* The cards every deck holds regardless of class, by id. Kept as its own
+   export because the Tool Haven room imports it; UNIVERSAL_CARDS derives the
+   same list from the card table and is what the client reads. */
 export const BASE_ACTIONS = ['hold'];
 
 /* COMBAT_ACTIONS is now the card table, aliased below where CARDS is defined.
@@ -255,61 +256,94 @@ export const BASE_ACTIONS = ['hold'];
  *   art     key into BUILDING_ART — client-only, like every art key here
  */
 export const BUILDINGS = {
+  panel: {
+    name: 'Solar Panel',
+    costs: { screw: 3, plating: 2 },
+    power: 1,
+    income: {},
+    note: 'Cracked, half-blind, and still tracking the sun. One panel, one shot.',
+    art: 'panel',
+  },
   workbench: {
     name: 'Workbench',
-    tier: 1,
     costs: { screw: 4, pipe: 3 },
-    grants: ['patch'],
+    power: 0,
+    max: 1,
     income: { screw: 2, pipe: 1 },
-    note: 'A vice, a flat surface, and somewhere to put the thing down. Pays for itself.',
+    note: 'A vice, a flat surface, and somewhere to put the gun down and open it up.',
     art: 'workbench',
-  },
-  pylon: {
-    name: 'Arc Pylon',
-    tier: 1,
-    costs: { screw: 3, pipe: 2, plating: 2 },
-    grants: ['arc'],
-    income: { screw: 1 },
-    note: 'Stores an afternoon and spends it in a second. The first thing here that hits back.',
-    art: 'pylon',
-  },
-  condenser: {
-    name: 'Condenser',
-    tier: 2,
-    costs: { pipe: 4, plating: 3, coil: 1 },
-    grants: ['douse'],
-    income: { pipe: 1 },
-    note: 'Pulls water out of bad air, which turns out to be two useful things at once.',
-    art: 'condenser',
-  },
-  bulwark: {
-    name: 'Bulwark',
-    tier: 2,
-    costs: { screw: 4, plating: 5 },
-    grants: ['brace'],
-    income: {},
-    note: 'Panel steel stacked two deep. Nothing clever, and it does not have to be.',
-    art: 'bulwark',
-  },
-  rig: {
-    name: 'Salvage Rig',
-    tier: 2,
-    costs: { screw: 6, pipe: 5, coil: 2 },
-    grants: [],
-    income: { screw: 3, pipe: 2, plating: 1 },
-    note: 'Strips a ruin faster than hands can. Adds nothing to a fight but pays for what does.',
-    art: 'rig',
   },
 };
 
-/* What the party starts a site with.
+/* How many can stand at once. Only the Workbench is capped: a second one would
+   not give the Engineer anything a first one does not, and a row of them would
+   be a tile sink with no decision in it. Panels are the opposite — every one is
+   another shot, so building more is the whole point. */
+export const buildingsOf = (buildings, id) =>
+  (buildings || []).filter(b => b.id === id).length;
+
+export function canBuildMore(id, buildings){
+  const building = BUILDINGS[id];
+  if(!building) return false;
+  return building.max === undefined || buildingsOf(buildings, id) < building.max;
+}
+
+/* ============================================================== upgrades === */
+
+/* What the Workbench is for: salvage spent on the bolt gun rather than on more
+ * ground. Both are repeatable, and both get dearer each time — an Engineer who
+ * never stops upgrading should be feeling the cost, not compounding for free.
  *
- * Tuned so the opening is a real decision: this affords the Workbench or the
- * Arc Pylon and never both, and nothing in tier 2 at all. Economy or teeth,
- * pick one, live with it for a cycle. test/content.test.js pins that property
- * so a later balance pass cannot quietly make the first move free.
+ *   costs  base price; every level already bought adds `step` again
+ *   adds   'card' puts another bolt gun in the deck, 'damage' makes them all hit harder
  */
-export const STARTING_SALVAGE = { screw: 6, pipe: 4, plating: 2, coil: 0 };
+export const UPGRADES = {
+  barrel: {
+    name: 'Second Barrel',
+    adds: 'card',
+    costs: { screw: 3, pipe: 2 },
+    step: { screw: 2, pipe: 1 },
+    note: 'Another barrel, another bolt in the deck. It is not elegant.',
+  },
+  coilwind: {
+    name: 'Overcharged Coil',
+    adds: 'damage',
+    costs: { plating: 2, coil: 1 },
+    step: { plating: 1, coil: 1 },
+    note: 'Wind the coil tighter. Every bolt hits harder and the gun gets warm.',
+  },
+};
+
+/* What the next level of an upgrade costs, given how many are already bought. */
+export function upgradeCost(id, level = 0){
+  const upgrade = UPGRADES[id];
+  if(!upgrade) return null;
+  const costs = {};
+  for(const [resource, base] of Object.entries(upgrade.costs)){
+    costs[resource] = base + level * ((upgrade.step || {})[resource] || 0);
+  }
+  return costs;
+}
+
+/* Power is the Engineer's other pool, and the only one that is not carried:
+ * it is whatever the panels make, refilled at the start of every fight and
+ * gone at the end of it. Hoarding is not a strategy — you either spent the
+ * sunlight this round or you did not.
+ */
+export const powerFrom = buildings =>
+  (buildings || []).reduce((sum, b) => sum + ((BUILDINGS[b.id] || {}).power || 0), 0);
+
+/* What the party starts a run with.
+ *
+ * It must cover a Solar Panel on the first build phase — an Engineer who
+ * cannot make power on round one has a bolt gun and no way to fire it, which
+ * is a dead card in an opening hand.
+ *
+ * It also covers a Workbench, and deliberately not both: power now or upgrades
+ * later is the Engineer's opening decision, and a test pins it so a balance
+ * pass cannot quietly make the first move free.
+ */
+export const STARTING_SALVAGE = { screw: 5, pipe: 3, plating: 2, coil: 0 };
 
 /* ============================================================== classes === */
 
@@ -566,6 +600,25 @@ export const CARDS = {
     note: 'A whole array’s worth of stored afternoon, lit and thrown.',
   },
 
+  /* --- the Engineer's --------------------------------------------------
+   *
+   * The bolt gun is the only card in the game that costs power, and power is
+   * the only pool that is not carried: panels make it, a fight spends it, and
+   * whatever is left evaporates. So a bolt gun in hand with no panel behind it
+   * is a card you built wrong three minutes ago.
+   *
+   * It is not consumed — the gun is a gun, not a potion. What changes is how
+   * many of them are in the deck and how hard they hit, both bought at the
+   * workbench, which is why `upgradedBy` points at an upgrade rather than the
+   * effect being a fixed number.
+   */
+  boltgun: {
+    name: 'Bolt Gun', kind: 'attack', classId: 'engineer', powerCost: 1,
+    upgradedBy: 'coilwind', upgradeStep: 3,
+    effect: { kind: 'strike', amount: 9 },
+    note: 'A captive bolt driver on a battery. Loud, ugly, and it goes through.',
+  },
+
   /* Everyone holds one. The floor of a turn: whatever else the hand deals you,
      there is something to do with it. */
   hold: {
@@ -577,26 +630,6 @@ export const CARDS = {
   /* Granted by a standing building, to everyone's deck — the site fires the
      pylon, not the person. This is the two-phase loop's point of contact:
      what you built is literally what you draw. */
-  patch: {
-    name: 'Patch', kind: 'heal', fromBuilding: 'workbench',
-    effect: { kind: 'heal', amount: 5 },
-    note: 'Tape, wire, and a flat sheet of plating over the worst of it.',
-  },
-  arc: {
-    name: 'Arc', kind: 'attack', fromBuilding: 'pylon',
-    effect: { kind: 'strike', amount: 6 },
-    note: 'The pylon dumps its charge into the nearest thing that is spreading.',
-  },
-  douse: {
-    name: 'Douse', kind: 'defend', fromBuilding: 'condenser',
-    effect: { kind: 'ward', amount: 5, rounds: 2 },
-    note: 'Clean water, under pressure, straight up into the bad air.',
-  },
-  brace: {
-    name: 'Brace', kind: 'defend', fromBuilding: 'bulwark',
-    effect: { kind: 'ward', amount: 8, rounds: 1 },
-    note: 'Get everyone behind the wall before it lands.',
-  },
 };
 
 /* What each class opens with. Eight cards: at three drawn and three discarded
@@ -604,7 +637,7 @@ export const CARDS = {
    thing roughly twice and a player learns what is in theirs. */
 export const STARTING_DECKS = {
   alchemist: { flask: 3, steady: 3, tonic: 2 },
-  engineer: { wrench: 4, shore: 4 },
+  engineer: { wrench: 3, shore: 4, boltgun: 1 },
   wizard: { spark: 4, sign: 2, fireball: 2 },
 };
 
@@ -635,23 +668,41 @@ export function buildDeck(classId){
   return cards;
 }
 
-/* The deck a player actually takes into a fight: their class cards, the
- * universal one, and a copy of whatever every standing building grants.
+/* The deck a player takes into a run: their class cards and the universal one.
  *
- * Building cards go to everybody. The pylon belongs to the site, not to the
- * Engineer who bolted it down, and a party where only one player could fire it
- * would make the build phase his hobby rather than the party's plan.
+ * Built once and then kept. Everything after this adds to it in place — the
+ * Alchemist brewing, the Engineer buying a barrel — because a deck rebuilt at
+ * the surge would throw away the build phase that paid for it.
  */
-export function deckFor(classId, buildings = []){
-  const cards = [...buildDeck(classId), ...UNIVERSAL_CARDS];
-  for(const placed of buildings){
-    const building = BUILDINGS[placed && placed.id];
-    if(!building) continue;
-    for(const cardId of building.grants){
-      if(CARDS[cardId]) cards.push(cardId);
-    }
-  }
-  return cards;
+export function deckFor(classId){
+  return [...buildDeck(classId), ...UNIVERSAL_CARDS];
+}
+
+/* What a card does right now, upgrades applied.
+ *
+ * CARDS stays declarative and the bolt gun's damage lives here instead, because
+ * the alternative is rewriting the card table when somebody buys a coil — and
+ * then the client and the room disagree about how hard a bolt hits.
+ */
+export function cardEffect(cardId, upgrades = {}){
+  const card = CARDS[cardId];
+  if(!card) return null;
+  const levels = card.upgradedBy ? (upgrades[card.upgradedBy] || 0) : 0;
+  if(!levels) return card.effect;
+  return { ...card.effect, amount: card.effect.amount + levels * (card.upgradeStep || 0) };
+}
+
+/* Buy the next level of an upgrade. Returns the spent pool and what it did, or
+   null when the salvage is short — the caller cannot half-apply it. */
+export function buyUpgrade(id, level, salvage){
+  const upgrade = UPGRADES[id];
+  if(!upgrade) return null;
+  const costs = upgradeCost(id, level);
+  if(!canAfford(costs, salvage)) return null;
+
+  const spent = { ...salvage };
+  for(const [resource, n] of Object.entries(costs)) spent[resource] -= n;
+  return { salvage: spent, adds: upgrade.adds, level: level + 1 };
 }
 
 /* Can a hero stand on this tile? Terrain has to allow it and nothing can be
@@ -750,11 +801,12 @@ export function brew(recipeId, stash){
 
 /* Can this card be played right now? Cost is the only thing that stops one —
    the room checks this too, so a disabled button is politeness, not authority. */
-export function cardPlayable(cardId, { pages = 0, classId = null } = {}){
+export function cardPlayable(cardId, { pages = 0, power = 0, classId = null } = {}){
   const card = CARDS[cardId];
   if(!card) return false;
   if(card.classId && classId && card.classId !== classId) return false;
   if(card.pageCost && pages < card.pageCost) return false;
+  if(card.powerCost && power < card.powerCost) return false;
   return true;
 }
 
@@ -892,24 +944,6 @@ export function canBuildAt(terrain, buildings, nodes, x, y){
   return true;
 }
 
-/* Every combat action the party has, given what it has built.
- *
- * This is the two-phase loop's whole point of contact: what you can do in a
- * fight is decided by what you put on the map beforehand. Returned as ids in a
- * stable order — base actions first, then buildings in BUILDINGS order — so
- * the buttons do not reshuffle between rounds.
- */
-export function combatOptions(buildings){
-  const standing = new Set((buildings || []).map(b => b.id));
-  const ids = [...BASE_ACTIONS];
-  for(const [id, building] of Object.entries(BUILDINGS)){
-    if(!standing.has(id)) continue;
-    for(const action of building.grants){
-      if(!ids.includes(action)) ids.push(action);
-    }
-  }
-  return ids.filter(id => CARDS[id]);
-}
 
 /* Salvage drawn once a fight is over: what the crew picks up, plus what the
  * standing buildings produced while it happened.

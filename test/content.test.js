@@ -14,10 +14,11 @@ import {
   seededRandom, seedFromCode, generateTerrain, spawnHerbs, generateMap,
   spawnTile, tileAt, inBounds, BASE_ROOM, largestBuildableArea,
   SALVAGE, salvageFor, BUILDINGS, STARTING_SALVAGE, COMBAT_ACTIONS,
-  BASE_ACTIONS, EFFECT_KINDS, combatOptions, missingForBuilding, canAfford,
+  BASE_ACTIONS, EFFECT_KINDS, missingForBuilding, canAfford,
   affordableBuildings, canBuildAt, salvageAfterCombat, addSalvage, spendSalvage,
   HAND_SIZE, CARDS, STARTING_DECKS, buildDeck, shuffle, draw, discardHand, cardById,
   UNIVERSAL_CARDS, deckFor, cardPlayable, COMBAT_H, generateCombatTerrain,
+  UPGRADES, upgradeCost, buyUpgrade, cardEffect, powerFrom, canBuildMore, buildingsOf,
   brew, pathTo, walkableAt,
 } from '../public/content.js';
 
@@ -457,31 +458,6 @@ test('the two resource pools do not overlap', () => {
   }
 });
 
-test('every building is buildable, draws, and grants real actions', () => {
-  for (const [id, building] of Object.entries(BUILDINGS)) {
-    const where = `building "${id}"`;
-    assert.equal(typeof building.name, 'string', `${where}: needs a name`);
-    assert.ok([1, 2].includes(building.tier), `${where}: tier must be 1 or 2`);
-    assert.ok(BUILDING_ART[building.art], `${where}: art "${building.art}" does not exist`);
-    assert.ok(Object.keys(building.costs).length, `${where}: must cost something`);
-
-    for (const [resource, n] of Object.entries(building.costs)) {
-      assert.ok(SALVAGE[resource], `${where}: costs "${resource}", which is not salvage`);
-      assert.ok(Number.isInteger(n) && n > 0, `${where}: cost of ${resource} must be a positive integer`);
-    }
-    for (const [resource, n] of Object.entries(building.income)) {
-      assert.ok(SALVAGE[resource], `${where}: pays "${resource}", which is not salvage`);
-      assert.ok(Number.isInteger(n) && n > 0, `${where}: income of ${resource} must be a positive integer`);
-    }
-    for (const action of building.grants) {
-      assert.ok(COMBAT_ACTIONS[action], `${where}: grants "${action}", which is not a combat action`);
-    }
-
-    // A building that neither pays nor arms is a tile you spent for nothing.
-    assert.ok(building.grants.length || Object.keys(building.income).length,
-      `${where}: grants nothing and pays nothing`);
-  }
-});
 
 test('every combat action does something the engine implements', () => {
   for (const [id, action] of Object.entries(COMBAT_ACTIONS)) {
@@ -495,38 +471,7 @@ test('every combat action does something the engine implements', () => {
   }
 });
 
-test('the opening is a choice: starting salvage affords one tier-1 building, never both', () => {
-  // This is the design, pinned. A balance pass that makes the first move free
-  // takes the decision out of the opening, and should fail here first.
-  const openers = Object.entries(BUILDINGS).filter(([, b]) => b.tier === 1);
-  assert.ok(openers.length >= 2, 'there must be at least two things to choose between');
 
-  for (const [id, building] of openers) {
-    assert.ok(canAfford(building.costs, STARTING_SALVAGE),
-      `"${id}" is tier 1 but cannot be afforded at the start`);
-
-    const after = spendSalvage(STARTING_SALVAGE, building.costs);
-    for (const [other, rival] of openers) {
-      if (other === id) continue;
-      assert.ok(!canAfford(rival.costs, after),
-        `building "${id}" first still leaves enough for "${other}" — the opening is not a choice`);
-    }
-  }
-
-  for (const [id, building] of Object.entries(BUILDINGS)) {
-    if (building.tier === 1) continue;
-    assert.ok(!canAfford(building.costs, STARTING_SALVAGE),
-      `tier-2 "${id}" is affordable from the start`);
-  }
-});
-
-test('affordableBuildings agrees with what can be paid for', () => {
-  assert.deepEqual(
-    affordableBuildings(STARTING_SALVAGE).sort(),
-    Object.entries(BUILDINGS).filter(([, b]) => b.tier === 1).map(([id]) => id).sort(),
-  );
-  assert.deepEqual(affordableBuildings({}), []);
-});
 
 test('missingForBuilding reports the shortfall, not just that there is one', () => {
   assert.deepEqual(missingForBuilding('workbench', { screw: 4, pipe: 3 }), {});
@@ -534,27 +479,7 @@ test('missingForBuilding reports the shortfall, not just that there is one', () 
   assert.equal(missingForBuilding('not-a-building', {}), null);
 });
 
-test('combat options come from what is standing', () => {
-  assert.deepEqual(combatOptions([]), BASE_ACTIONS,
-    'with nothing built there should still be something to do');
 
-  const withPylon = combatOptions([{ id: 'pylon', x: 1, y: 1 }]);
-  assert.ok(withPylon.includes('arc'), 'a pylon should arm the party');
-  assert.ok(withPylon.includes('hold'), 'base actions do not go away');
-
-  // Two of the same building is one option, not two buttons that do the same.
-  const doubled = combatOptions([{ id: 'pylon', x: 1, y: 1 }, { id: 'pylon', x: 2, y: 1 }]);
-  assert.equal(new Set(doubled).size, doubled.length);
-  assert.deepEqual(doubled, withPylon);
-
-  assert.deepEqual(combatOptions([{ id: 'not-a-building', x: 0, y: 0 }]), BASE_ACTIONS);
-});
-
-test('the two openers lead to different fights, which is the point', () => {
-  const bench = combatOptions([{ id: 'workbench', x: 1, y: 1 }]);
-  const pylon = combatOptions([{ id: 'pylon', x: 1, y: 1 }]);
-  assert.notDeepEqual(bench, pylon, 'both openings produce the same combat');
-});
 
 test('canBuildAt refuses water, rubble, occupied tiles and standing herbs', () => {
   const terrain = new Array(MAP_W * MAP_H).fill('grass');
@@ -580,13 +505,13 @@ test('salvage after combat pays the crew and the buildings', () => {
     { classId: 'engineer', down: false },
     { classId: 'alchemist', down: false },
   ];
-  const drawn = salvageAfterCombat(players, [{ id: 'rig', x: 1, y: 1 }], seededRandom(3));
+  const drawn = salvageAfterCombat(players, [{ id: 'workbench', x: 1, y: 1 }], seededRandom(3));
 
   const total = Object.values(drawn).reduce((a, b) => a + b, 0);
-  const rig = BUILDINGS.rig.income;
-  const fromRig = Object.values(rig).reduce((a, b) => a + b, 0);
-  assert.equal(total, classById('engineer').salvage + fromRig,
-    'the draw should be the engineer’s share plus the rig’s output');
+  const bench = BUILDINGS.workbench.income;
+  const fromBench = Object.values(bench).reduce((a, b) => a + b, 0);
+  assert.equal(total, classById('engineer').salvage + fromBench,
+    'the draw should be the engineer’s share plus what the bench turned out');
   for (const id of Object.keys(drawn)) assert.ok(SALVAGE[id], `drew "${id}", which is not salvage`);
 });
 
@@ -741,30 +666,7 @@ test('cardById refuses nonsense', () => {
   assert.equal(cardById('not-a-card'), null);
 });
 
-test('what you built is what you draw', () => {
-  // The two-phase loop's whole point of contact, now literal: a building puts
-  // a card in the deck rather than a button in a second list.
-  const bare = deckFor('engineer');
-  const withPylon = deckFor('engineer', [{ id: 'pylon', x: 1, y: 1 }]);
-  assert.equal(withPylon.length, bare.length + 1, 'the pylon added no card');
-  assert.ok(withPylon.includes('arc'), 'the pylon should deal an Arc');
-  assert.ok(!bare.includes('arc'), 'an unbuilt pylon dealt an Arc anyway');
 
-  // Two pylons, two Arcs: a second one is a thicker deck, not a dead duplicate.
-  const two = deckFor('engineer', [{ id: 'pylon', x: 1, y: 1 }, { id: 'pylon', x: 2, y: 1 }]);
-  assert.equal(two.filter((id) => id === 'arc').length, 2);
-
-  assert.deepEqual(deckFor('engineer', [{ id: 'not-a-building' }]), bare);
-});
-
-test('the site deals to everyone, not just the builder', () => {
-  // The pylon belongs to the site. A party where only the Engineer could fire
-  // it would make the build phase his hobby rather than the party's plan.
-  for (const cls of playableClasses()) {
-    assert.ok(deckFor(cls.id, [{ id: 'pylon', x: 0, y: 0 }]).includes('arc'),
-      `"${cls.id}" was left out of what the site grants`);
-  }
-});
 
 test('every deck holds the universal cards', () => {
   assert.ok(UNIVERSAL_CARDS.length, 'nothing is universal, so a deck could have no floor');
@@ -929,5 +831,152 @@ test('a site grows enough for some brewing and never all of it', () => {
     }
     assert.ok(brewed < Object.keys(RECIPES).length,
       `seed ${seed}: a full sweep brewed all ${brewed} recipes — nothing was given up`);
+  }
+});
+
+/* ------------------------------------------------------------ the engineer */
+
+/* Two buildings and one gun. Power is what a panel makes, a fight spends and
+ * the end of it throws away; the workbench turns salvage into a better gun
+ * rather than more ground.
+ */
+
+test('every building is buildable and gives something for the tile', () => {
+  for (const [id, building] of Object.entries(BUILDINGS)) {
+    const where = `building "${id}"`;
+    assert.equal(typeof building.name, 'string', `${where}: needs a name`);
+    assert.ok(BUILDING_ART[building.art], `${where}: art "${building.art}" does not exist`);
+    assert.ok(Object.keys(building.costs).length, `${where}: must cost something`);
+
+    for (const [resource, n] of Object.entries(building.costs)) {
+      assert.ok(SALVAGE[resource], `${where}: costs "${resource}", which is not salvage`);
+      assert.ok(Number.isInteger(n) && n > 0, `${where}: cost of ${resource} must be positive`);
+    }
+    for (const [resource, n] of Object.entries(building.income)) {
+      assert.ok(SALVAGE[resource], `${where}: pays "${resource}", which is not salvage`);
+    }
+
+    // A building that makes no power, pays nothing and unlocks nothing is a
+    // tile you spent for the view.
+    const gives = (building.power || 0) > 0
+      || Object.keys(building.income).length > 0
+      || id === 'workbench';
+    assert.ok(gives, `${where}: gives nothing back`);
+  }
+});
+
+test('the engineer can always make power on the first build phase', () => {
+  // A bolt gun with no panel behind it is a dead card in an opening hand.
+  assert.ok(canAfford(BUILDINGS.panel.costs, STARTING_SALVAGE),
+    'a Solar Panel must be affordable from the starting salvage');
+});
+
+test('the opening is a choice: panel or workbench, never both', () => {
+  const ids = Object.keys(BUILDINGS);
+  for (const id of ids) {
+    assert.ok(canAfford(BUILDINGS[id].costs, STARTING_SALVAGE), `"${id}" is unaffordable at the start`);
+    const after = spendSalvage(STARTING_SALVAGE, BUILDINGS[id].costs);
+    for (const other of ids) {
+      if (other === id) continue;
+      assert.ok(!canAfford(BUILDINGS[other].costs, after),
+        `building "${id}" first still leaves enough for "${other}" — the opening is not a choice`);
+    }
+  }
+});
+
+test('only the workbench is capped, and panels are not', () => {
+  assert.equal(BUILDINGS.workbench.max, 1);
+  assert.equal(BUILDINGS.panel.max, undefined, 'every panel is another shot, so they must not be capped');
+
+  const one = [{ id: 'workbench', x: 1, y: 1 }];
+  assert.equal(canBuildMore('workbench', []), true);
+  assert.equal(canBuildMore('workbench', one), false, 'a second workbench should be refused');
+  assert.equal(canBuildMore('panel', [{ id: 'panel', x: 0, y: 0 }, { id: 'panel', x: 2, y: 0 }]), true);
+  assert.equal(canBuildMore('not-a-building', []), false);
+  assert.equal(buildingsOf(one, 'workbench'), 1);
+});
+
+test('power is what the panels make, and nothing else makes it', () => {
+  assert.equal(powerFrom([]), 0);
+  assert.equal(powerFrom([{ id: 'panel' }]), 1);
+  assert.equal(powerFrom([{ id: 'panel' }, { id: 'panel' }, { id: 'panel' }]), 3);
+  assert.equal(powerFrom([{ id: 'workbench' }]), 0, 'the workbench is not a generator');
+  assert.equal(powerFrom([{ id: 'not-a-building' }]), 0);
+});
+
+test('the bolt gun costs power, is not consumed, and only the engineer holds it', () => {
+  const bolt = CARDS.boltgun;
+  assert.equal(bolt.classId, 'engineer');
+  assert.equal(bolt.powerCost, 1);
+  assert.ok(!bolt.consumed, 'the gun is a gun, not a potion — it must cycle back');
+  assert.ok(bolt.effect.amount > CARDS.wrench.effect.amount, 'the bolt gun should out-hit the basic');
+  assert.ok(STARTING_DECKS.engineer.boltgun >= 1, 'the engineer must open holding one');
+
+  assert.equal(cardPlayable('boltgun', { power: 0, classId: 'engineer' }), false, 'fired with no power');
+  assert.equal(cardPlayable('boltgun', { power: 1, classId: 'engineer' }), true);
+  assert.equal(cardPlayable('boltgun', { power: 9, classId: 'wizard' }), false, 'the wizard picked up the gun');
+});
+
+test('upgrades cost more each time and do what they say', () => {
+  for (const [id, upgrade] of Object.entries(UPGRADES)) {
+    assert.ok(['card', 'damage'].includes(upgrade.adds), `upgrade "${id}" adds "${upgrade.adds}"`);
+    for (const resource of Object.keys(upgrade.costs)) {
+      assert.ok(SALVAGE[resource], `upgrade "${id}" costs "${resource}", which is not salvage`);
+    }
+    const first = upgradeCost(id, 0);
+    const third = upgradeCost(id, 2);
+    const sum = (c) => Object.values(c).reduce((a, b) => a + b, 0);
+    assert.ok(sum(third) > sum(first), `upgrade "${id}" never gets dearer, so buying it is free money`);
+  }
+  assert.equal(upgradeCost('not-an-upgrade', 0), null);
+});
+
+test('buying an upgrade spends the salvage, or does nothing at all', () => {
+  const salvage = { screw: 9, pipe: 9, plating: 9, coil: 9 };
+  const bought = buyUpgrade('barrel', 0, salvage);
+  assert.equal(bought.adds, 'card');
+  assert.equal(bought.level, 1);
+  assert.equal(bought.salvage.screw, 9 - UPGRADES.barrel.costs.screw);
+  assert.deepEqual(salvage, { screw: 9, pipe: 9, plating: 9, coil: 9 }, 'it wrote to the pool it was given');
+
+  assert.equal(buyUpgrade('barrel', 0, { screw: 1 }), null);
+  assert.equal(buyUpgrade('coilwind', 9, salvage), null, 'level nine should be far out of reach');
+  assert.equal(buyUpgrade('not-an-upgrade', 0, salvage), null);
+});
+
+test('the coil upgrade makes every bolt hit harder', () => {
+  const base = cardEffect('boltgun').amount;
+  assert.equal(cardEffect('boltgun', {}).amount, base);
+  assert.ok(cardEffect('boltgun', { coilwind: 1 }).amount > base);
+  assert.equal(cardEffect('boltgun', { coilwind: 2 }).amount, base + 2 * CARDS.boltgun.upgradeStep);
+
+  // Untouched cards are untouched, and the table itself is never rewritten.
+  assert.equal(cardEffect('wrench', { coilwind: 5 }).amount, CARDS.wrench.effect.amount);
+  assert.equal(CARDS.boltgun.effect.amount, base, 'cardEffect mutated the card table');
+  assert.equal(cardEffect('not-a-card'), null);
+});
+
+test('a deck keeps its size across a fight, hand included', () => {
+  // A fight can end with cards still in hand. Reshuffling only the deck and the
+  // discard deletes them, and the loss compounds every round.
+  const owned = deckFor('engineer');
+  const random = seededRandom(11);
+  let deck = shuffle(owned, random);
+  let discard = [];
+  let hand = [];
+
+  for (let round = 0; round < 3; round++) {
+    for (let turn = 0; turn < 4; turn++) {
+      const dealt = draw(deck, discard, random);
+      deck = dealt.deck;
+      discard = discardHand(dealt.discard, hand);
+      hand = dealt.hand;
+    }
+    // The surge: everything the player owns goes back in the deck.
+    deck = shuffle([...deck, ...discard, ...hand], random);
+    discard = [];
+    hand = [];
+    assert.equal(deck.length, owned.length,
+      `round ${round + 1}: the deck went from ${owned.length} to ${deck.length}`);
   }
 });

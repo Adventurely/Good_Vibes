@@ -261,10 +261,9 @@ waiting for a setup the other four cannot see coming.
 A deck is nine cards — eight class cards plus the universal `hold` — so at three
 a turn it cycles about every three turns and a fight sees the whole thing twice.
 
-`deckFor(classId, buildings)` is the two-phase loop's point of contact, and it
-is literal: **what you built is what you draw.** Every standing building deals a
-copy of what it `grants` into *everyone's* deck, because the pylon belongs to
-the site and not to whoever bolted it down.
+`deckFor(classId)` builds the opening deck once, and everything after that adds
+to it in place — the Alchemist brewing, the Engineer buying a barrel. A deck
+rebuilt at the surge would throw away the build phase that paid for it.
 
 Shuffling and dealing are pure functions taking the generator, like everything
 else that rolls here. A client that shuffled for itself would hold cards the
@@ -308,14 +307,43 @@ committed and three dots over each one still deciding — the same mark answers
 Map generation is seeded — `seededRandom(seedFromCode(code))` — so a room code
 is a ruin, the same one on the server, in the client, and in the tests.
 
-### Buildings
+### Buildings, power and the bolt gun
 
-A building is a tile you spent and a card the whole party draws afterwards. The
-opening is deliberately a decision: `STARTING_SALVAGE` affords the Workbench
-*or* the Arc Pylon and never both, and nothing in tier 2 at all — economy or
-teeth, pick one, live with it for a cycle. That property is pinned by a test
-rather than left to a comment, so a later balance pass cannot quietly make the
-first move free.
+Two buildings, and they are the Engineer's whole mechanic.
+
+| | Costs | Gives |
+| --- | --- | --- |
+| **Solar Panel** | 3 Screws + 2 Plating | +1 power a fight. Build as many as you like |
+| **Workbench** | 4 Screws + 3 Pipe | Upgrades the bolt gun. Max one |
+
+**Power is the only pool nobody carries.** Panels make it, a fight spends it,
+and whatever is left at the end evaporates — `powerFrom` recomputes it at every
+surge. Hoarding is not a strategy; you either spent the sunlight this round or
+you did not. It is also the only pool that is *hidden from the rest of the
+party*, because nobody else can spend it and a number you cannot use is one you
+learn to skip past.
+
+The Engineer opens holding one **Bolt Gun**: 1 power for a strike of 9, the
+hardest hit in any opening deck. It is not consumed — the gun is a gun, not a
+potion — so it cycles back through the discard like any basic. What changes is
+how many there are and how hard they hit, and both are bought at the workbench:
+
+| Upgrade | Base cost | Does |
+| --- | --- | --- |
+| **Second Barrel** | 3 Screws + 2 Pipe | another Bolt Gun into the deck |
+| **Overcharged Coil** | 2 Plating + 1 Coil | every bolt hits for 3 more |
+
+Both repeat, and both get dearer each time by `step` — an Engineer who never
+stops upgrading should feel the cost rather than compound for free.
+`cardEffect(id, upgrades)` is what applies the damage, so `CARDS` stays
+declarative and the client and the room cannot disagree about how hard a bolt
+hits.
+
+The opening is a decision. `STARTING_SALVAGE` covers a Solar Panel *or* a
+Workbench and deliberately not both — power now against upgrades later — and
+two tests pin it: one that the panel is always affordable on round one, because
+a bolt gun with nothing to draw on is a dead card in an opening hand, and one
+that buying either leaves the other out of reach.
 
 ### The surge
 
@@ -352,9 +380,11 @@ Honest status, so nobody discovers these at the table:
 - **The site does not persist.** Terrain is regenerated and `buildings` is reset
   every round, so the base you built in round one is gone in round two. The
   persistent site is the design; this is the gap.
-- **Only the Alchemist has a mechanic of her own.** The Engineer's powered
-  weapons and the Wizard's prepared spells are designed, not written, so those
-  two currently play as decks with a different mix.
+- **Only the Wizard is still a deck with a different mix.** Prepared spells are
+  designed, not written; the Alchemist brews and the Engineer builds power.
+- **The Overcharged Coil may be out of reach in a short run.** It needs Coil,
+  the rarest salvage at a weight of 3, and a three-round game may never turn one
+  up.
 - **Decks do not persist between rounds.** Cards brewed and granted during a
   build phase carry into that round's fight, but the next build phase starts
   from the same nine.

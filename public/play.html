@@ -451,6 +451,18 @@
         <p id="build-hint" style="margin-bottom:0.6rem"></p>
         <div class="grid" id="buildings"></div>
 
+        <!-- The Engineer's own readouts. Power is hidden from everyone else:
+             nobody but the Engineer can spend it, and a number you cannot use
+             is a number you learn to ignore. -->
+        <div id="engineer-only" hidden>
+          <h2 style="margin-top:1.4rem">Power</h2>
+          <p id="power-line" style="margin-bottom:0.6rem"></p>
+
+          <h2 style="margin-top:1.4rem">The workbench</h2>
+          <p id="bench-hint" style="margin-bottom:0.6rem"></p>
+          <div class="grid" id="upgrades"></div>
+        </div>
+
         <!-- The same herbs as the map, as buttons. A canvas cannot be tabbed
              through, so this is the keyboard path to the identical intents —
              not a duplicate feature, the accessible one. -->
@@ -488,6 +500,8 @@
 
         <canvas id="combat-map" width="480" height="144"
                 aria-label="The surge. The wave advances from the right toward the party."></canvas>
+
+        <div class="roster" id="combat-roster"></div>
 
         <!-- Aim and play, adjacent. Picking a target and playing the card at it
              is one decision, and it used to be split across two places you
@@ -551,6 +565,7 @@
         generateMap, generateCombatTerrain, seededRandom, seedFromCode, spawnTile, tileAt,
         ROUNDS_BEFORE_BOSS, BOSS_ROUND, roundInfo, phaseCard, PARTY_SIZE, classById,
         SALVAGE, BUILDINGS, STARTING_SALVAGE, CACHE_YIELD, PAGES,
+        UPGRADES, upgradeCost, buyUpgrade, cardEffect, powerFrom, canBuildMore, buildingsOf,
         ENEMIES, waveFor, COMBAT_H,
         HAND_SIZE, CARDS, deckFor, shuffle, draw, discardHand, cardById, cardPlayable,
         missingForBuilding, canBuildAt,
@@ -913,11 +928,13 @@
         preview: els('preview'), hold: els('hold'), readyCount: els('ready-count'),
         combat: els('combat'), combatParty: els('combat-party'), leaveCombat: els('leave-combat'),
         salvage: els('salvage'), buildings: els('buildings'), buildHint: els('build-hint'),
+        engineerOnly: els('engineer-only'), powerLine: els('power-line'),
+        benchHint: els('bench-hint'), upgrades: els('upgrades'),
         library: els('library'),
         combatName: els('combat-name'), combatMeta: els('combat-meta'),
         enemies: els('enemies'), combatPotions: els('combat-potions'),
         hand: els('hand'), deckPile: els('deck-pile'), discardPile: els('discard-pile'),
-        roster: els('roster'), deckList: els('deck-list'),
+        roster: els('roster'), combatRoster: els('combat-roster'), deckList: els('deck-list'),
         buildDeckPile: els('build-deck-pile'), buildDeckCount: els('build-deck-count'),
         deckCount: els('deck-count'), discardCount: els('discard-count'),
         combatWait: els('combat-wait'), combatLog: els('combat-log'),
@@ -1054,7 +1071,7 @@
           bossRound: BOSS_ROUND, maxPlayers: PARTY_SIZE,
           terrain: [], nodes: [], buildings: [], enemies: [],
           stash: {}, potions: [], pages: 2, events: [],
-          salvage: { ...STARTING_SALVAGE },
+          salvage: { ...STARTING_SALVAGE }, upgrades: {}, power: 0,
           players: playableClasses().map((cls, i) => ({
             id: `p${i + 1}`, name: cls.name.replace(/^The /, ''),
             host: i === 0, connected: true, ready: false, down: false,
@@ -1063,7 +1080,7 @@
             // Built once, then kept: brewing during the build phase adds to this
             // and a building adds to everyone's, so rebuilding it at the surge
             // would throw away the round's whole point.
-            deck: deckFor(cls.id, []), discard: [], hand: [],
+            deck: deckFor(cls.id), discard: [], hand: [],
           })),
         };
         demoEnterBuild();
@@ -1157,6 +1174,9 @@
           if(readyState(room.players).all){
             room.phase = PHASES.combat;
             room.terrain = generateCombatTerrain(demoRandom);
+            // Panels charge at the start of a fight and are flat by the end of
+            // it: whatever the sun made this round is what there is.
+            room.power = powerFrom(room.buildings);
             room.enemies = waveFor(room.round).map((type, i) => {
               const def = ENEMIES[type];
               return { id: `e${i}`, type, name: def.name, art: def.art,
@@ -1170,8 +1190,14 @@
               // Shuffle what the build phase left them — brewed cards, granted
               // cards and all. Rebuilding the deck here would throw the round
               // away, which is the bug this whole phase exists to avoid.
-              player.deck = shuffle([...player.deck, ...(player.discard || [])], demoRandom);
+              // Hand included: a fight can end with cards still held, and
+              // shuffling only deck and discard would delete them.
+              player.deck = shuffle(
+                [...player.deck, ...(player.discard || []), ...(player.hand || [])],
+                demoRandom,
+              );
               player.discard = [];
+              player.hand = [];
               player.block = 0;
               demoDeal(player);
             }
@@ -1186,10 +1212,11 @@
           // into that position.
           if(!card || hand[msg.intent.index] !== msg.intent.card) return render();
           if(!cardPlayable(hand[msg.intent.index], {
-            pages: room.pages || 0, classId: you.classId,
+            pages: room.pages || 0, power: room.power || 0, classId: you.classId,
           })) return render();
 
           if(card.pageCost) room.pages -= card.pageCost;
+          if(card.powerCost) room.power -= card.powerCost;
 
           // Commit, show the mark, then resolve on a beat. In a real room the
           // wait is for the other four; here it is the only way to see the
@@ -1204,7 +1231,7 @@
           clearTimeout(demoBeat);
           demoBeat = setTimeout(() => {
             you.intent = null;
-            demoTurn(you, card.effect, card.name, msg.intent.target);
+            demoTurn(you, cardEffect(hand[msg.intent.index], room.upgrades), card.name, msg.intent.target);
             if(room.phase === PHASES.combat) demoDeal(you);
             render();
           }, 420);
@@ -1229,19 +1256,43 @@
               text: `Brewed ${recipe.makes} ${recipe.name}${recipe.makes > 1 ? 's' : ''} into the deck.`,
             });
           }
+        }else if(msg.t === 'intent' && msg.intent.t === 'upgrade'){
+          const id = msg.intent.upgrade;
+          const level = (room.upgrades || {})[id] || 0;
+          const bought = buyUpgrade(id, level, room.salvage);
+          if(bought){
+            room.salvage = bought.salvage;
+            room.upgrades = { ...room.upgrades, [id]: bought.level };
+            const upgrade = UPGRADES[id];
+            if(bought.adds === 'card'){
+              // Straight into the deck, like a brew: the point of the barrel is
+              // another bolt to draw, and it should appear when it is paid for.
+              you.deck = [...you.deck, 'boltgun'];
+              room.events.push({ t: 'log', text: `${upgrade.name}: another Bolt Gun in the deck.` });
+            }else{
+              room.events.push({
+                t: 'log',
+                text: `${upgrade.name}: bolts now hit for ${cardEffect('boltgun', room.upgrades).amount}.`,
+              });
+            }
+          }
         }else if(msg.t === 'intent' && msg.intent.t === 'place'){
           const { building: id, x, y } = msg.intent;
           const building = BUILDINGS[id];
           const affordable = building && Object.keys(missingForBuilding(id, room.salvage)).length === 0;
-          if(building && affordable && canBuildAt(room.terrain, room.buildings, room.nodes, x, y)){
+          if(building && affordable && canBuildMore(id, room.buildings)
+             && canBuildAt(room.terrain, room.buildings, room.nodes, x, y)){
             room.salvage = spendSalvage(room.salvage, building.costs);
             room.buildings.push({ id, x, y });
-            // Into every deck, now rather than at the surge: the card is the
-            // building, and seeing it appear is what makes that legible.
-            for(const player of room.players){
-              for(const cardId of building.grants) if(CARDS[cardId]) player.deck.push(cardId);
-            }
-            room.events.push({ t: 'log', text: `Raised the ${building.name}.` });
+            // Buildings no longer deal cards — a panel makes power and a bench
+            // opens the gun up. Say which, so the tile reads as having bought
+            // something rather than just standing there.
+            room.events.push({
+              t: 'log',
+              text: building.power
+                ? `Raised the ${building.name}. ${powerFrom(room.buildings)} power a fight now.`
+                : `Raised the ${building.name}.`,
+            });
             holding = null;
           }
         }else if(msg.t === 'intent' && msg.intent.t === 'gather'){
@@ -1415,6 +1466,7 @@
           if(!card) return;
           const playable = cardPlayable(cardId, {
             pages: room.pages || 0,
+            power: room.power || 0,
             classId: cls ? cls.id : null,
           });
 
@@ -1433,7 +1485,9 @@
 
           const amount = document.createElement('span');
           amount.className = 'pcard-amount';
-          amount.textContent = card.effect.amount;
+          // The upgraded number, not the printed one: a coil-wound bolt gun
+          // that still says 9 on the card is a lie the player acts on.
+          amount.textContent = cardEffect(cardId, room.upgrades).amount;
 
           const kind = document.createElement('span');
           kind.className = 'pcard-kind';
@@ -1443,11 +1497,15 @@
           // Where the card came from, and what it costs. A Fireball with an
           // empty library still gets dealt — it just says why it is greyed.
           const source = document.createElement('span');
-          source.className = card.pageCost ? 'pcard-cost' : 'pcard-source';
+          source.className = (card.pageCost || card.powerCost) ? 'pcard-cost' : 'pcard-source';
           if(card.pageCost){
             source.textContent = playable
               ? `${card.pageCost} page · ${room.pages || 0} left`
               : 'no pages left';
+          }else if(card.powerCost){
+            source.textContent = playable
+              ? `${card.powerCost} power · ${room.power || 0} left`
+              : 'no power left';
           }else if(card.fromBuilding){
             source.textContent = BUILDINGS[card.fromBuilding]
               ? `from the ${BUILDINGS[card.fromBuilding].name}` : '';
@@ -1485,6 +1543,7 @@
         const you = me();
         const acting = !!you && !you.down && room.phase === PHASES.combat;
 
+        renderRoster(ui.combatRoster);
         renderHand(you, acting);
 
         // The wave, as cards: clicking one aims the next strike at it. The
@@ -1565,8 +1624,8 @@
       /* The party as a row of portraits. In a real room this is who is here; in
          the preview it is also the switch, because one person is playing all of
          them and a map click has to route somebody in particular. */
-      function renderRoster(){
-        ui.roster.replaceChildren();
+      function renderRoster(target){
+        target.replaceChildren();
         for(const p of room.players){
           const cls = classById(p.classId);
           const el = document.createElement('button');
@@ -1581,14 +1640,16 @@
           name.textContent = cls ? cls.name.replace(/^The /, '') : p.name;
           const sub = document.createElement('span');
           sub.className = 'who-sub';
-          sub.textContent = `${p.ready ? 'ready' : 'thinking'} · ${(p.deck || []).length} cards`;
+          sub.textContent = isBuildPhase(room.phase)
+            ? `${p.ready ? 'ready' : 'thinking'} · ${(p.deck || []).length} cards`
+            : `${p.intent ? 'committed' : 'thinking'} · ${(p.hand || []).length} in hand`;
           body.append(name, sub);
           el.append(body, healthBar(p));
 
           // Only the preview lets you be somebody else; in a room you are you.
           el.disabled = !demo;
           el.onclick = () => { room.you = p.id; walking = null; render(); };
-          ui.roster.append(el);
+          target.append(el);
         }
       }
 
@@ -1596,7 +1657,10 @@
          Sunsalves appear the moment she brews them, or the walk that paid for
          them did not visibly buy anything. */
       function renderDeckList(you){
-        const deck = (you && you.deck) || [];
+        // Deck plus discard plus hand. Between fights the three piles are one
+        // deck, and showing only the undrawn part means a card brewed last
+        // round quietly disappears from the list that is meant to prove it.
+        const deck = you ? [...(you.deck || []), ...(you.discard || []), ...(you.hand || [])] : [];
         ui.buildDeckCount.textContent = deck.length;
         ui.buildDeckPile.dataset.empty = String(!deck.length);
 
@@ -1620,6 +1684,72 @@
         }
       }
 
+      /* Power and the workbench, and only for the Engineer.
+       *
+       * Nobody else can spend power or buy an upgrade, and a readout you cannot
+       * act on is one you learn to skip past — so the whole panel is hidden
+       * rather than greyed for the other two.
+       */
+      function renderEngineer(you, acting, canBuild){
+        ui.engineerOnly.hidden = !canBuild;
+        if(!canBuild) return;
+
+        const panels = buildingsOf(room.buildings, 'panel');
+        const power = powerFrom(room.buildings);
+        ui.powerLine.textContent = panels
+          ? `${panels} panel${panels === 1 ? '' : 's'} — ${power} power a fight, ` +
+            `enough for ${power} bolt${power === 1 ? '' : 's'}. It does not carry over.`
+          : 'No panels. The bolt gun has nothing to draw on — build one.';
+
+        const bench = buildingsOf(room.buildings, 'workbench') > 0;
+        ui.benchHint.textContent = bench
+          ? 'Salvage into a better gun rather than more ground.'
+          : 'Build the Workbench to open the gun up.';
+
+        ui.upgrades.replaceChildren();
+        for(const [id, upgrade] of Object.entries(UPGRADES)){
+          const level = (room.upgrades || {})[id] || 0;
+          const costs = upgradeCost(id, level);
+          const short = shortfallOf(costs, room.salvage || {});
+          const card = document.createElement('button');
+          card.type = 'button';
+          card.className = 'card';
+          card.disabled = !acting || !bench || short.length > 0;
+
+          const body = document.createElement('span');
+          body.className = 'card-body';
+          const name = document.createElement('b');
+          name.className = 'card-name';
+          name.textContent = level ? `${upgrade.name} ${level + 1}` : upgrade.name;
+
+          const sub = document.createElement('span');
+          sub.className = 'card-sub';
+          sub.textContent = Object.entries(costs).map(([r, n]) => `${n} ${SALVAGE[r].name}`).join(' + ');
+
+          const gives = document.createElement('span');
+          gives.className = 'card-sub';
+          gives.style.color = 'var(--accent)';
+          gives.textContent = upgrade.adds === 'card'
+            ? 'One more Bolt Gun in the deck'
+            : `Bolts hit for ${cardEffect('boltgun', { ...room.upgrades, [id]: level + 1 }).amount}`;
+
+          const note = document.createElement('span');
+          note.className = 'card-blurb';
+          note.textContent = !bench ? 'Needs a Workbench.'
+            : short.length ? `Short of ${short.join(' and ')}.`
+            : upgrade.note;
+
+          body.append(name, sub, gives, note);
+          card.append(body);
+          card.onclick = () => send({ t: 'intent', intent: { t: 'upgrade', upgrade: id } });
+          ui.upgrades.append(card);
+        }
+      }
+
+      const shortfallOf = (costs, pool) => Object.entries(costs)
+        .filter(([r, n]) => (pool[r] || 0) < n)
+        .map(([r, n]) => `${n - (pool[r] || 0)} ${SALVAGE[r].name}`);
+
       function renderRun(){
         const info = room.roundInfo;
         ui.levelName.textContent = info ? info.name : '';
@@ -1634,7 +1764,7 @@
         const acting = !!you && !you.down && isBuildPhase(room.phase);
 
         drawMap();
-        renderRoster();
+        renderRoster(ui.roster);
         renderDeckList(you);
 
         // The room decides when the phase turns; this only reports what it is
@@ -1740,10 +1870,11 @@
           for(const [id, building] of Object.entries(BUILDINGS)){
             const short = missingForBuilding(id, room.salvage || {});
             const missing = Object.entries(short).map(([r, n]) => `${n} ${SALVAGE[r].name}`);
+            const capped = !canBuildMore(id, room.buildings);
             const card = document.createElement('button');
             card.type = 'button';
             card.className = 'card';
-            card.disabled = !acting || missing.length > 0;
+            card.disabled = !acting || capped || missing.length > 0;
             card.setAttribute('aria-pressed', String(holding === id));
             if(BUILDING_ART[building.art]) card.append(pixels(BUILDING_ART[building.art], 2));
 
@@ -1762,16 +1893,18 @@
             const gives = document.createElement('span');
             gives.className = 'card-sub';
             gives.style.color = 'var(--accent)';
-            const grants = building.grants.map(a => CARDS[a].name);
             const income = Object.entries(building.income).map(([r, n]) => `+${n} ${SALVAGE[r].name}`);
             gives.textContent = [
-              grants.length ? `In combat: ${grants.join(', ')}` : '',
+              building.power ? `+${building.power} power a fight` : '',
+              id === 'workbench' ? 'Upgrades the bolt gun' : '',
               income.length ? `Each fight: ${income.join(', ')}` : '',
             ].filter(Boolean).join(' · ');
 
             const note = document.createElement('span');
             note.className = 'card-blurb';
-            note.textContent = missing.length ? `Short of ${missing.join(' and ')}.` : building.note;
+            note.textContent = capped ? 'Already standing. One is all it takes.'
+              : missing.length ? `Short of ${missing.join(' and ')}.`
+              : building.note;
 
             body.append(name, sub, gives, note);
             card.append(body);
@@ -1779,6 +1912,8 @@
             ui.buildings.append(card);
           }
         }
+
+        renderEngineer(you, acting, canBuild);
 
         const canBrew = you && CLASSES.find(c => c.id === you.classId)?.craft;
         ui.recipes.replaceChildren();
