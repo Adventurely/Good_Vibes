@@ -657,6 +657,39 @@ export const UNIVERSAL_CARDS = Object.entries(CARDS)
  */
 export const COMBAT_ACTIONS = CARDS;
 
+/* ================================================== compatibility shims === */
+
+/* Everything below exists for one reason: this module is imported by the Tool
+ * Haven Worker, and an import of a name that is not exported is a throw at the
+ * top of that Worker — which takes the whole site down, sign-in included.
+ *
+ * Nobody here can read that Worker's source, so removing an export is a bet on
+ * what it does not use. These are the bet declined. They are the only two names
+ * this module has ever exported and then dropped, found by diffing the export
+ * list across every commit; keep that true by shimming rather than deleting.
+ *
+ * Each returns something harmless and correctly shaped rather than something
+ * pretending to still work. Delete them only once you have read the Worker and
+ * know it does not import them — see the note at the top of the README.
+ */
+
+/* Was: the actions a party had, given what it had built. Buildings grant power
+   and upgrades now rather than cards, so there is nothing to add — but the
+   shape is still an array of ids that exist in CARDS. */
+export function combatOptions(){
+  return [...BASE_ACTIONS].filter(id => CARDS[id]);
+}
+
+/* Was: the five levels of a run, before a run became rounds and a boss. ROUNDS
+   is the live table; this keeps the old shape, `nodes` included, so anything
+   reading LEVELS[n].name or .blight still reads a number rather than a crash. */
+export const LEVELS = ROUNDS.map(round => ({
+  name: round.name,
+  blight: round.blight,
+  nodes: SPAWNS.herbs,
+  note: round.note,
+}));
+
 /* The deck as a flat list of card ids, unshuffled. Order is the caller's
    problem, because the shuffle needs the room's generator. */
 export function buildDeck(classId){

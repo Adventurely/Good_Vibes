@@ -1,5 +1,85 @@
 # Good Vibes
 
+> ## ⚠️ Read this before pushing to `main`
+>
+> **Pushing to `main` publishes `public/` to Tool Haven and redeploys the live
+> site.** The game now has a server, and that server is **not** in `public/` —
+> so a deploy ships a client that talks a protocol the deployed site does not
+> answer. Worse, `public/content.js` is imported by Tool Haven's Worker, where a
+> missing export is a top-level throw that takes the **whole site down,
+> sign-in included**.
+>
+> Nobody working in this repository can read the Worker's source. The steps
+> below are written so none of them require guessing what it contains.
+
+### What is true here, and what nobody here can check
+
+| | |
+| --- | --- |
+| ✅ Verified in this repo | `public/` is browser-safe: no Node imports, no `process`, no `Buffer` |
+| ✅ Verified in this repo | Every name `content.js` has ever exported is still exported (a test pins it) |
+| ✅ Verified in this repo | The workflow copies **only** `source/public/.` — `src/` never leaves |
+| ❓ Cannot be checked here | What Tool Haven's Worker imports from `content.js` |
+| ❓ Cannot be checked here | What its room object does with those imports |
+| ❓ Cannot be checked here | Whether the `TOOL_HAVEN_TOKEN` secret exists |
+
+### Steps before a deploy
+
+1. **Run `npm test`.** The publish workflow runs it too and will not sync a
+   failing build. The `published contract` test is the one that matters here:
+   it asserts every name this module has ever exported still resolves.
+2. **Open Tool Haven and read what it imports from `tools/good-vibes/content.js`
+   or `src/game/good-vibes.js`.** Write the list down. That is the only way to
+   turn the ❓ rows above into ✅ rows.
+3. **For each imported name, check it against this repo.** Two things changed
+   shape without changing name, and neither throws — they return `undefined`,
+   which is harder to spot than a crash:
+   - `COMBAT_ACTIONS` is now an alias of `CARDS`. A card's owner field is
+     `classId`; it used to be `classOnly`.
+   - The ids `patch`, `arc`, `douse`, `brace` (cards) and `pylon`, `condenser`,
+     `bulwark`, `rig` (buildings) no longer exist.
+4. **Expect the deployed rooms to be broken until the Worker is updated.** The
+   client sends `moveTo`, `gather`, `brew`, `place`, `upgrade`, `play` and a
+   seat `token`; it expects `{t:'state', state}` back with per-player hands.
+   Until the Worker speaks that, *Preview the site* is the only thing on the
+   deployed page that will work — and it does work, with no socket at all.
+
+### Adding multiplayer to the deployed site
+
+`src/rooms.js` is a complete, working implementation of the authoritative
+model, and it imports nothing Node-specific — only `public/content.js` and
+plain JavaScript. Porting it is mostly moving it:
+
+1. Read `src/rooms.js` and `src/server.js` here. `rooms.js` is the state and
+   the rules; `server.js` is 40 lines of socket plumbing around it.
+2. In Tool Haven, put the `Room` class inside the Durable Object. Replace the
+   `player.socket.send(...)` calls with that platform's WebSocket send, and the
+   `server.on('upgrade')` handler with its fetch/upgrade path. Nothing else in
+   `rooms.js` should need to change.
+3. Keep the seat contract: a client joins with `?code=...&token=...`, the token
+   identifies the seat across reconnects, and a class is claimed once per room.
+4. Keep hands private. `viewFor(player)` is built per socket for that reason —
+   your own `deck`/`discard`/`hand` as arrays, everybody else as counts. Do not
+   replace it with one broadcast state.
+5. Keep the room's seeded generator and the per-player streams. Determinism is
+   what lets two clients replay the same round, and `streamFor` exists so one
+   player drawing cannot shift another's draw.
+6. **Persistence beyond a run is not built anywhere.** `rooms.js` holds state
+   in memory and drops the room when the last player disconnects. A Durable
+   Object can outlive that; if you want a run to survive a reload, serialise
+   the `Room` fields listed in `reset()` plus `site`, `buildings` and each
+   player's `deck`/`discard`/`hand`, and restore them on wake.
+
+### If the site is already down
+
+The cause is almost certainly a missing export. Add it back to `content.js` as
+a shim returning something harmless and correctly shaped — see the
+`compatibility shims` section at the bottom of that file for the two that exist
+— add its name to `PUBLISHED` in `test/content.test.js`, and push.
+
+---
+
+
 A co-op solarpunk roguelike, and the pixel art page it grew out of. No
 dependencies anywhere — just the Node standard library and a browser.
 
@@ -388,8 +468,8 @@ nothing in a real room. Known gap, held open by a test.
 Honest status, so nobody discovers these at the table:
 
 - **Tool Haven has none of this.** The server here is a Node process; the
-  deployed site's Durable Object still implements none of the two-phase loop.
-  Publishing `public/` will sync the client and it will have nothing to talk to.
+  deployed site's Durable Object implements none of it. See the deployment note
+  at the top of this file before pushing to `main`.
 - **Only the Wizard is still a deck with a different mix.** Prepared spells are
   designed, not written; the Alchemist brews and the Engineer builds power.
 - **The Overcharged Coil may be out of reach in a short run.** It needs Coil,

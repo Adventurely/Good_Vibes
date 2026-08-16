@@ -19,7 +19,7 @@ import {
   HAND_SIZE, CARDS, STARTING_DECKS, buildDeck, shuffle, draw, discardHand, cardById,
   UNIVERSAL_CARDS, deckFor, cardPlayable, COMBAT_H, generateCombatTerrain,
   UPGRADES, upgradeCost, buyUpgrade, cardEffect, powerFrom, canBuildMore, buildingsOf,
-  brew, pathTo, walkableAt, respawnItems,
+  brew, pathTo, walkableAt, respawnItems, combatOptions, LEVELS,
 } from '../public/content.js';
 
 /* content.js is imported by the authoritative room object in Tool Haven, not
@@ -1046,5 +1046,63 @@ test('everything on a persisted site is still reachable around the buildings', (
       assert.ok(pathTo(terrain, buildings, from, { x: node.x, y: node.y }),
         `seed ${seed}: ${node.kind} at ${node.x},${node.y} was walled off`);
     }
+  }
+});
+
+/* ------------------------------------------------- the published contract -- */
+
+/* This module is imported by the Tool Haven Worker, and an import of a name
+ * that is not exported is a throw at the top of that Worker — which takes the
+ * whole site down, sign-in included.
+ *
+ * Nobody working in this repository can read that Worker's source, so removing
+ * an export is a bet on what it does not use. This list is the bet declined:
+ * every name this module has ever exported. Add to it, never take away, and
+ * shim anything the game outgrows.
+ */
+const PUBLISHED = [
+  // tables
+  'PARTY_SIZE', 'MATERIALS', 'RECIPES', 'SALVAGE', 'PAGES', 'CLASSES', 'OPEN_ROLES',
+  'BUILDINGS', 'UPGRADES', 'CARDS', 'COMBAT_ACTIONS', 'ENEMIES', 'ROUNDS', 'LEVELS',
+  'TERRAIN', 'PHASES', 'EFFECT_KINDS', 'BASE_ACTIONS', 'UNIVERSAL_CARDS',
+  'STARTING_SALVAGE', 'STARTING_DECKS', 'SPAWNS', 'CACHE_YIELD',
+  // numbers
+  'MAP_W', 'MAP_H', 'COMBAT_H', 'BASE_ROOM', 'HERB_COUNT', 'HAND_SIZE',
+  'ROUNDS_BEFORE_BOSS', 'BOSS_ROUND',
+  // lookups and rules
+  'classById', 'playableClasses', 'cardById', 'cardEffect', 'cardPlayable',
+  'materialFor', 'salvageFor', 'missingFor', 'missingForBuilding', 'shortfall',
+  'canAfford', 'affordableBuildings', 'canBuildAt', 'canBuildMore', 'buildingsOf',
+  'powerFrom', 'upgradeCost', 'buyUpgrade', 'brew', 'combatOptions',
+  'deckFor', 'buildDeck', 'shuffle', 'draw', 'discardHand',
+  'roundInfo', 'phaseCard', 'waveFor', 'readyState', 'isBuildPhase',
+  'salvageAfterCombat', 'addSalvage', 'spendSalvage',
+  // the map
+  'generateTerrain', 'generateMap', 'generateCombatTerrain', 'spawnItems',
+  'spawnHerbs', 'respawnItems', 'spawnTile', 'tileAt', 'tileIndex', 'inBounds',
+  'walkableAt', 'reachableFrom', 'pathTo', 'largestBuildableArea',
+  'seededRandom', 'seedFromCode',
+];
+
+test('every name this module has ever published is still exported', async () => {
+  const content = await import('../public/content.js');
+  const missing = PUBLISHED.filter((name) => content[name] === undefined);
+  assert.deepEqual(missing, [],
+    `dropped from the published contract: ${missing.join(', ')}. `
+    + 'The Tool Haven Worker imports this module and a missing export is a throw '
+    + 'at the top of it, which takes the whole site down. Shim it instead.');
+});
+
+test('the shims are shaped like the things they replace', () => {
+  // Harmless and correctly shaped, rather than pretending to still work.
+  assert.ok(Array.isArray(combatOptions()), 'combatOptions must still return a list of ids');
+  for (const id of combatOptions()) assert.ok(CARDS[id], `combatOptions returned "${id}"`);
+  assert.ok(Array.isArray(combatOptions([{ id: 'panel' }])), 'it must tolerate the old argument');
+
+  assert.ok(Array.isArray(LEVELS) && LEVELS.length, 'LEVELS must still be a non-empty array');
+  for (const level of LEVELS) {
+    assert.equal(typeof level.name, 'string');
+    assert.equal(typeof level.blight, 'number');
+    assert.equal(typeof level.nodes, 'number');
   }
 });
