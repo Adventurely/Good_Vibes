@@ -3,3 +3,4 @@ npm-debug.log*
 .env
 .env.local
 .DS_Store
+dist/
