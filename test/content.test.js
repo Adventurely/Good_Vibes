@@ -24,7 +24,7 @@ import {
   STAT_KEYS, STAT_LABELS, STAT_SHORT, blankStats, runHighlights,
   SPELLS, MODIFIERS, MODIFIER_WEIGHTS, SPELL_SLOTS, PAGES_PER_ROUND,
   WIZARD_BASE_KIT, freshSpellbook, composeSpell, rollOffers, takeOffer,
-  moveModifier, wizardCombatDeck,
+  moveModifier, wizardCombatDeck, ownedModifiers, draftableCount,
   POT_COUNT, potYield, potStage, plantPot, harvestPot, growPots,
 } from '../public/content.js';
 
@@ -302,7 +302,7 @@ test('a Splitting Sigil turns a strike into the whole lane, for less each', () =
   assert.equal(composeSpell('nova', ['split']).verb, 'strikeAll');
 });
 
-test('the draft is seeded, distinct, and never offers what she knows', () => {
+test('the draft is seeded, distinct, and never offers what she knows or owns', () => {
   const book = freshSpellbook();
   const first = rollOffers(seededRandom(42), book);
   const again = rollOffers(seededRandom(42), book);
@@ -317,6 +317,32 @@ test('the draft is seeded, distinct, and never offers what she knows', () => {
       assert.ok(MODIFIERS[offer.id], `offered modifier "${offer.id}" does not exist`);
     }
   }
+
+  // Each modifier exists once: owning it — socketed or in the satchel —
+  // takes it off the table, so the worked example's 30 is a ceiling and a
+  // third Kindling cannot double past it.
+  const owned = {
+    known: ['fireball'],
+    satchel: ['kindling'],
+    slots: { fireball: ['twin'] },
+  };
+  for (let seed = 1; seed <= 30; seed++) {
+    for (const offer of rollOffers(seededRandom(seed), owned)) {
+      assert.ok(!(offer.type === 'mod' && ['kindling', 'twin'].includes(offer.id)),
+        'a modifier she owns is not an offer');
+    }
+  }
+
+  // And a book that holds everything has nothing left to draft — the count
+  // the room and the button both read before letting a page be spent.
+  const everything = {
+    known: Object.keys(SPELLS),
+    satchel: Object.keys(MODIFIERS),
+    slots: Object.fromEntries(Object.keys(SPELLS).map((id) => [id, []])),
+  };
+  assert.equal(draftableCount(everything), 0);
+  assert.deepEqual(rollOffers(seededRandom(1), everything), [], 'an empty pool offers nothing');
+  assert.ok(draftableCount(freshSpellbook()) > 0);
 });
 
 test('the bench refuses what the book cannot hold', () => {
@@ -1434,6 +1460,7 @@ const PUBLISHED = [
   'SPELLS', 'MODIFIERS', 'MODIFIER_WEIGHTS', 'SPELL_SLOTS', 'SPELL_OFFER_WEIGHT',
   'PAGES_PER_ROUND', 'WIZARD_BASE_KIT', 'freshSpellbook', 'composeSpell',
   'rollOffers', 'takeOffer', 'moveModifier', 'wizardCombatDeck',
+  'ownedModifiers', 'draftableCount',
   // the garden
   'POT_COUNT', 'potYield', 'potStage', 'plantPot', 'harvestPot', 'growPots',
 ];

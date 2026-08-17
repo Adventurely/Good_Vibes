@@ -213,7 +213,7 @@ export const PAGES = {
  * units on a site cannot cover the eleven that one of each costs. The decision
  * is which two you walk to, not which two the dice left you.
  */
-export const SPAWNS = { herbs: 5, salvage: 5, pages: 3 };
+export const SPAWNS = { herbs: 5, salvage: 5, pages: 1 };
 
 /* What one walked-to cache yields. Rolled sizes would make gathering a
    lottery; fixed sizes make the map readable — a player can count what a
@@ -471,7 +471,11 @@ export const BUILDINGS = {
     costs: { screw: 4, pipe: 3 },
     power: 0,
     max: 1,
-    income: { screw: 2, pipe: 1 },
+    // Coil is the rarest salvage and the Overcharged Coil needs one per
+    // level; on a short run the roll could simply never produce it. A
+    // standing bench guarantees the coil economy exists, so the upgrade it
+    // exists to sell is always reachable.
+    income: { screw: 2, pipe: 1, coil: 1 },
     note: 'A vice, a flat surface, and somewhere to put the gun down and open it up.',
     art: 'workbench',
   },
@@ -775,11 +779,14 @@ export const CARDS = {
     note: 'Across the chest, and mind your hands. Somebody has to get them up.',
   },
 
-  /* --- the Wizard: the best basic attack and the worst basic guard, which
-         is the whole class in two cards --- */
+  /* --- the Wizard: a floor of a basic and the worst basic guard, which is
+         the whole class in two cards — everything she is, she writes at the
+         bench. The spark used to be the best basic attack in the game, and
+         that was the wrong place for her power to live once the spells were
+         hers to build. --- */
   spark: {
     name: 'Spark', kind: 'attack', classId: 'wizard',
-    effect: { kind: 'strike', amount: 5 },
+    effect: { kind: 'strike', amount: 3 },
     note: 'No page needed. Barely a spell. Still hurts.',
   },
   sign: {
@@ -1258,7 +1265,7 @@ export const SPELLS = {
     note: 'One page, read aloud, thrown. The margins are where you make it yours.',
   },
   nova: {
-    name: 'Cinder Nova', kind: 'attack', verb: 'strikeAll', amount: 5, charges: 2,
+    name: 'Cinder Nova', kind: 'attack', verb: 'strikeAll', amount: 4, charges: 2,
     note: 'A page burned all at once instead of read. It reaches everything in the lane.',
   },
   channel: {
@@ -1384,10 +1391,18 @@ export function composeSpell(spellId, modIds = []){
            targetsAlly: !!spell.targetsAlly, effect, flags };
 }
 
+/* Every modifier the book holds, wherever it is sitting. */
+export const ownedModifiers = spellbook => [
+  ...(spellbook.satchel || []),
+  ...Object.values(spellbook.slots || {}).flat(),
+];
+
 /* The draft a page turns over: three distinct options from what she does not
- * know and what the list can still surprise her with. Spells she has not
- * learned are weighted like an uncommon find; modifiers by their rarity.
- * The generator is the room's, as everywhere — a draft that rolled
+ * know and does not own. Each modifier exists once — the worked example's 30
+ * is the ceiling a Fireball can reach, not the floor a lucky third Kindling
+ * doubles past — and it keeps every draft a draft of new things. Spells she
+ * has not learned are weighted like an uncommon find; modifiers by their
+ * rarity. The generator is the room's, as everywhere — a draft that rolled
  * differently on a replay would be a draft the room cannot stand behind.
  */
 export const SPELL_OFFER_WEIGHT = 3;
@@ -1397,8 +1412,9 @@ export function rollOffers(random, spellbook, count = 3){
   for(const id of Object.keys(SPELLS)){
     if(!(spellbook.known || []).includes(id)) pool.push({ type: 'spell', id, weight: SPELL_OFFER_WEIGHT });
   }
+  const owned = ownedModifiers(spellbook);
   for(const [id, mod] of Object.entries(MODIFIERS)){
-    pool.push({ type: 'mod', id, weight: MODIFIER_WEIGHTS[mod.rarity] || 1 });
+    if(!owned.includes(id)) pool.push({ type: 'mod', id, weight: MODIFIER_WEIGHTS[mod.rarity] || 1 });
   }
 
   const offers = [];
@@ -1415,6 +1431,13 @@ export function rollOffers(random, spellbook, count = 3){
   }
   return offers;
 }
+
+/* How much the library can still surprise her with: spells unlearned plus
+   modifiers unowned. Zero means a page has nothing left to open, and both
+   the room and the button read this so neither can spend one on nothing. */
+export const draftableCount = spellbook =>
+  Object.keys(SPELLS).filter(id => !(spellbook.known || []).includes(id)).length +
+  Object.keys(MODIFIERS).filter(id => !ownedModifiers(spellbook).includes(id)).length;
 
 /* Take one offer into the book. Returns the next spellbook, or null if the
    index is not an offer — the caller cannot half-apply a pick. */
@@ -1539,7 +1562,7 @@ export const ENEMIES = {
  * Both are per *extra* player, so ENEMIES holds the solo fight and this holds
  * how it grows.
  */
-export const BOSS_SCALING = { hp: 18, hits: 2 };
+export const BOSS_SCALING = { hp: 22, hits: 3 };
 
 /* An enemy's numbers for this table. Everything but the boss is what the table
    says it is; levelling the rest is waveFor's job and doing it twice would
@@ -1585,10 +1608,12 @@ export function ailmentOnHit(type, landed){
  * side of the equation climbs too — the Alchemist has brewed by round two and
  * the Engineer has a panel behind the bolt gun.
  *
- * These are measured, not guessed. test/balance.mjs plays eight hundred whole
- * runs per table size against them and reports the win rate; at the numbers
- * below it lands 57% / 65% / 59% for one, two and three players, against a
- * target of 60. Change them with that harness open rather than by eye — the
+ * These are measured, not guessed. test/balance.mjs plays whole runs per
+ * table size against them and reports the win rate; at the numbers below it
+ * lands 69% / 63% / 78% for one, two and three players, against a target of
+ * 60. The full table runs friendliest on purpose: it is the only one with a
+ * Wizard, she is the party's damage by design, and the harness plays her
+ * bench well. Change these with that harness open rather than by eye — the
  * threat values are coarse (1, 2, 3.5), so a tenth of a point here can flip a
  * whole enemy into or out of a wave and move a win rate forty points.
  *
@@ -1613,7 +1638,7 @@ export const THREAT_PER_PLAYER = [2.5, 3.4, 4.2, 2.9];
  * number is measured, not reasoned: it is what closes the gap between the
  * table sizes in test/balance.mjs.
  */
-export const PARTY_SYNERGY = 0.25;
+export const PARTY_SYNERGY = 0.35;
 
 /* How much blight a table of this size meets this round. */
 export function threatBudget(round, partySize = PARTY_SIZE){

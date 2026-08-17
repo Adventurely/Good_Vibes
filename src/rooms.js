@@ -26,7 +26,7 @@ import {
   CARDS, cardById, cardEffect, cardPlayable, deckFor, shuffle, draw, discardHand,
   HAND_SIZE, RECIPES, brew, missingForBuilding, canBuildAt,
   SPELLS, MODIFIERS, PAGES_PER_ROUND, freshSpellbook, composeSpell,
-  rollOffers, takeOffer, moveModifier, wizardCombatDeck,
+  rollOffers, takeOffer, moveModifier, wizardCombatDeck, draftableCount,
   POT_COUNT, plantPot, harvestPot, growPots,
   generateMap, generateCombatTerrain, respawnItems, spawnTile, pathTo,
   seededRandom, seedFromCode, readyState,
@@ -567,6 +567,7 @@ class Room {
   openPage(player, cls){
     if(!cls || !cls.cast) return;
     if(this.offers || this.pages < 1) return;
+    if(!draftableCount(this.spellbook)) return;   // she has read everything
     this.pages -= 1;
     this.offers = rollOffers(this.random, this.spellbook);
     this.log(`${player.name} opens a page. Three ways to read it.`);

@@ -738,6 +738,7 @@
         salvageAfterCombat, addSalvage, spendSalvage,
         SPELLS, MODIFIERS, SPELL_SLOTS, PAGES_PER_ROUND, freshSpellbook,
         composeSpell, rollOffers, takeOffer, moveModifier, wizardCombatDeck,
+        draftableCount,
         POT_COUNT, potYield, potStage, plantPot, harvestPot, growPots,
       } from './content.js';
       import { createAudio } from './audio.js';
@@ -2511,7 +2512,7 @@
           // The scriptorium, behind the same helpers the room uses, so the
           // preview's drafts cannot drift from a real room's.
           const cls = classById(you.classId);
-          if(cls?.cast && !room.offers && (room.pages || 0) >= 1){
+          if(cls?.cast && !room.offers && (room.pages || 0) >= 1 && draftableCount(room.spellbook)){
             room.pages -= 1;
             room.offers = rollOffers(demoRandom, room.spellbook);
             room.events.push({ t: 'log', text: 'A page opens. Three ways to read it.' });
@@ -3360,13 +3361,16 @@
         chip.append(n);
         ui.library.append(chip);
 
+        const draftable = draftableCount(book);
         ui.studyHint.textContent = room.offers
           ? 'Three ways to read it. Keep one.'
-          : (room.pages || 0) > 0
-            ? `Each page opens a draft: a spell to learn, or a modifier to socket into one.`
-            : `No pages. The library gives up ${PAGES_PER_ROUND} a round, and the map holds a few.`;
+          : !draftable
+            ? 'She has read everything the library holds. The bench is what is left to arrange.'
+            : (room.pages || 0) > 0
+              ? `Each page opens a draft: a spell to learn, or a modifier to socket into one.`
+              : `No pages. The library gives up ${PAGES_PER_ROUND} a round, and the map holds a few.`;
 
-        ui.openPage.disabled = !acting || !!room.offers || !(room.pages > 0);
+        ui.openPage.disabled = !acting || !!room.offers || !(room.pages > 0) || !draftable;
         ui.openPage.textContent = room.offers ? 'A draft is open' : 'Open a page';
         ui.openPage.onclick = () => { audio.sfx('brew'); send({ t: 'intent', intent: { t: 'page' } }); };
 

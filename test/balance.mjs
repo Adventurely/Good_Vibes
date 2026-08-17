@@ -23,6 +23,7 @@ import { roomFor } from '../src/rooms.js';
 import {
   PHASES, BOSS_ROUND, CARDS, cardEffect, cardPlayable, playableClasses,
   RECIPES, BUILDINGS, UPGRADES, upgradeCost, canAfford, pathTo, hasEffect,
+  MODIFIERS, SPELL_SLOTS,
 } from '../public/content.js';
 
 const RUNS = Number(process.argv[2]) || 400;
@@ -92,16 +93,65 @@ function playBuild(room){
     }
   }
 
-  // Brew everything affordable, cheapest first, so one expensive recipe cannot
-  // eat a stash that would have made two cards.
+  // The scriptorium: pages are crafting currency now, so spend every one.
+  // Picks by rarity (a spell counts between uncommon and rare), then sockets
+  // greedily — additive damage in front of multipliers, because the model
+  // should at least know which order the arithmetic runs in.
+  const wizard = seated.find(p => p.classId === 'wizard');
+  if(wizard){
+    const cls = { cast: true };
+    const rank = { rare: 3, uncommon: 2, common: 1 };
+    for(let i = 0; i < 12 && room.pages >= 1; i++){
+      room.openPage(wizard, cls);
+      if(!room.offers) break;
+      const pick = room.offers
+        .map((offer, index) => ({
+          index,
+          score: offer.type === 'spell' ? 2.5 : rank[MODIFIERS[offer.id].rarity] || 1,
+        }))
+        .sort((a, b) => b.score - a.score)[0];
+      room.pickOffer(wizard, cls, { index: pick.index });
+    }
+    for(let i = 0; i < 12; i++){
+      const satchel = room.spellbook.satchel;
+      if(!satchel.length) break;
+      const mod = satchel[0];
+      const op = MODIFIERS[mod].op || {};
+      const spellId = (room.spellbook.known || [])
+        .find(s => ((room.spellbook.slots || {})[s] || []).length < SPELL_SLOTS);
+      if(!spellId) break;
+      const before = JSON.stringify(room.spellbook);
+      room.moveMod(wizard, cls, { mod, spell: spellId, pos: op.amount ? 0 : SPELL_SLOTS });
+      if(JSON.stringify(room.spellbook) === before) break;   // refused; stop asking
+    }
+  }
+
+  // The garden, then the brewing it feeds. Harvest what has grown — all of it
+  // on the boss round, the mature earlier — and plant surplus while there are
+  // rounds left for a cutting to pay.
   const alchemist = seated.find(p => p.classId === 'alchemist');
   if(alchemist){
+    const cls = { craft: true };
+    (room.pots || []).forEach((pot, index) => {
+      if(pot && (room.round >= BOSS_ROUND || pot.age >= 2)) room.harvest(alchemist, cls, { pot: index });
+    });
+    if(room.round < BOSS_ROUND){
+      (room.pots || []).forEach((pot, index) => {
+        if(pot) return;
+        const surplus = Object.entries(room.stash)
+          .filter(([, n]) => n > 1)
+          .sort((a, b) => b[1] - a[1])[0];
+        if(surplus) room.plant(alchemist, cls, { pot: index, herb: surplus[0] });
+      });
+    }
+    // Brew everything affordable, cheapest first, so one expensive recipe
+    // cannot eat a stash that would have made two cards.
     for(let i = 0; i < 12; i++){
       const id = Object.keys(RECIPES)
         .filter(r => canAfford(RECIPES[r].costs, room.stash))
         .sort((a, b) => cost(RECIPES[a].costs) - cost(RECIPES[b].costs))[0];
       if(!id) break;
-      room.brew(alchemist, { craft: true }, { recipe: id });
+      room.brew(alchemist, cls, { recipe: id });
     }
   }
 
@@ -134,11 +184,16 @@ function freeTile(room){
  * players who are worse than the people who will eventually play this.
  */
 function pickCard(room, player){
+  // A crafted spell reads its numbers off the book and costs nothing to play;
+  // everything else answers to the card table and its costs.
   const hand = player.hand
-    .map((id, index) => ({ id, index, card: CARDS[id], effect: cardEffect(id, room.upgrades) }))
-    .filter(c => c.card && cardPlayable(c.id, {
+    .map((id, index) => {
+      const spell = room.spellFor(player, id);
+      return { id, index, card: CARDS[id], effect: spell ? spell.effect : cardEffect(id, room.upgrades), spell };
+    })
+    .filter(c => c.card && (c.spell || cardPlayable(c.id, {
       pages: room.pages, power: room.power, classId: player.classId,
-    }));
+    })));
   if(!hand.length) return null;
 
   const alive = room.enemies.filter(e => e.hp > 0);
@@ -232,7 +287,11 @@ function playRun(code, size){
       room.commit(player, choice || { t: 'wait' });
     }
   }
-  return { outcome: room.outcome || 'stalled', round: Math.min(room.round, BOSS_ROUND) };
+  return {
+    outcome: room.outcome || 'stalled',
+    round: Math.min(room.round, BOSS_ROUND),
+    stats: room.players.filter(p => p.classId).map(p => ({ classId: p.classId, ...p.stats })),
+  };
 }
 
 /* ------------------------------------------------------------------ report --- */
@@ -244,10 +303,18 @@ let worst = 0;
 for(const size of sizes){
   let wins = 0;
   const lostOn = {};
+  const byClass = {};
   for(let i = 0; i < RUNS; i++){
-    const { outcome, round } = playRun(`BAL${size}X${i}`, size);
+    const { outcome, round, stats } = playRun(`BAL${size}X${i}`, size);
     if(outcome === 'won') wins += 1;
     else lostOn[round] = (lostOn[round] || 0) + 1;
+    for(const row of stats){
+      const bucket = byClass[row.classId] || (byClass[row.classId] = { damage: 0, taken: 0, mended: 0, guard: 0 });
+      bucket.damage += row.damage || 0;
+      bucket.taken += row.taken || 0;
+      bucket.mended += row.mended || 0;
+      bucket.guard += row.guard || 0;
+    }
   }
   const rate = wins / RUNS;
   worst = Math.max(worst, Math.abs(rate - 0.6));
@@ -259,6 +326,13 @@ for(const size of sizes){
     `${size} player${size > 1 ? 's' : ''}  ${(rate * 100).toFixed(1).padStart(5)}%  ` +
     `${'#'.repeat(Math.round(rate * 40)).padEnd(40)} ${breakdown}`,
   );
+  // Who is carrying it, as per-run means — the composition question behind
+  // every table-size number.
+  for(const [classId, s] of Object.entries(byClass)){
+    console.log(`    ${classId.padEnd(10)} dmg ${(s.damage / RUNS).toFixed(1).padStart(6)}  ` +
+      `taken ${(s.taken / RUNS).toFixed(1).padStart(5)}  mended ${(s.mended / RUNS).toFixed(1).padStart(5)}  ` +
+      `guard ${(s.guard / RUNS).toFixed(1).padStart(5)}`);
+  }
 }
 
 console.log(`\nfurthest any table size sits from the target: ${(worst * 100).toFixed(1)} points`);
