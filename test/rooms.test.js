@@ -18,6 +18,7 @@ import { fxStyles, styleFor, soundFor, FX_SOUND } from '../public/fx.js';
 import {
   CARDS, EFFECT_KINDS, PHASES, BOSS_ROUND, classById, cardEffect,
   AILMENTS, addAilment, hasEffect, effectName, waveFor, enemyStats, ENEMIES,
+  runHighlights, STAT_KEYS, blankStats,
 } from '../public/content.js';
 
 /* The client's own dispatch, imported rather than re-implemented. That is the
@@ -384,4 +385,107 @@ test('a bigger table meets a bigger fight', () => {
   assert.ok(full.hits > solo.hits, 'including what it swings for');
   assert.deepEqual(enemyStats('sporeling', 5), enemyStats('sporeling', 1),
     'everything else is levelled by the wave table, and must not be scaled twice');
+});
+
+/* ---- how a run ends ------------------------------------------------------ */
+
+/* Losing used to be a state the client had no screen for: `over` fell through
+ * to the build screen, which drew round 4 of 3 over a combat lane and gave you
+ * nothing to click. These pin the half of that the room owns — that a wipe
+ * really does end the run, that the record is worth showing, and that there is
+ * a way out of the end screen other than reloading the page.
+ */
+
+test('a wipe ends the run rather than rolling into another round', () => {
+  const { room, player, socket } = fightWith('hold', 'wizard');
+  for(const enemy of room.enemies){ enemy.dist = 0; enemy.hits = 99; }
+
+  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'hold' } });
+
+  assert.equal(room.phase, PHASES.over, 'the last player going down is the end of the run');
+  assert.equal(room.outcome, 'lost');
+  assert.ok(player.down, 'and the player is down, not merely unlucky');
+
+  // The client reads the outcome off the view, so it has to be on the view.
+  const state = JSON.parse(socket.sent[socket.sent.length - 1]).state;
+  assert.equal(state.phase, PHASES.over);
+  assert.equal(state.outcome, 'lost');
+});
+
+test('the run keeps a record, and the record can name who did what', () => {
+  const { room, player } = fightWith('strike', 'engineer');
+  const target = room.enemies[0];
+  target.dist = 9;
+  target.hp = 99;
+
+  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'strike', target: target.id } });
+  assert.equal(player.stats.damage, CARDS.strike.effect.amount, 'a swing should be counted');
+
+  player.hand = ['hold', 'hold', 'hold'];
+  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'hold' } });
+  assert.equal(player.stats.guard, CARDS.hold.effect.amount, 'so should guard');
+
+  const rows = runHighlights(room.players);
+  const damage = rows.find(r => r.key === 'damage');
+  assert.ok(damage, 'somebody dealt damage, so the medal should exist');
+  assert.equal(damage.player.id, player.id);
+  assert.equal(rows.some(r => r.key === 'revived'), false,
+    'nobody was picked up, so no medal is awarded for zero');
+});
+
+test('overkill is not credited, or aiming a Fireball at a Sporeling wins the run', () => {
+  const { room, player } = fightWith('fireball', 'wizard');
+  const target = room.enemies[0];
+  target.dist = 9;
+  target.hp = 2;
+
+  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'fireball', target: target.id } });
+  assert.equal(player.stats.damage, 2, 'only what actually landed counts');
+  assert.equal(player.stats.kills, 1);
+});
+
+test('another run keeps the crew and changes the ruin', () => {
+  const { room, player } = fightWith('hold', 'wizard');
+  for(const enemy of room.enemies){ enemy.dist = 0; enemy.hits = 99; }
+  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'hold' } });
+  assert.equal(room.phase, PHASES.over);
+
+  const wasSeed = room.seed;
+  const wasSite = room.site.join('');
+  room.handle(player, { t: 'restart' });
+
+  assert.equal(room.phase, PHASES.lobby, 'a restart goes back to the lobby');
+  assert.equal(room.outcome, null);
+  assert.equal(room.round, 1);
+  assert.equal(player.classId, 'wizard', 'the seat is kept — re-picking is a menu, not a decision');
+  assert.equal(player.down, false);
+  assert.equal(player.stats.damage, 0, 'the record starts empty');
+  assert.notEqual(room.seed, wasSeed, 'a second attempt must not be a memory test');
+
+  room.handle(player, { t: 'start' });
+  assert.equal(room.phase, PHASES.build);
+  assert.notEqual(room.site.join(''), wasSite, 'and the new run is a different ruin');
+});
+
+test('only the host starts another run, and only from the end of one', () => {
+  const room = roomFor(`again-${++codes}`);
+  const seats = ['engineer', 'alchemist'].map((classId, i) => {
+    const player = room.join(`again-token-${codes}-${i}`, fakeSocket());
+    room.handle(player, { t: 'class', classId });
+    return player;
+  });
+  room.handle(seats[0], { t: 'start' });
+  assert.equal(room.phase, PHASES.build);
+
+  // Mid-run: a restart would throw away four rounds of everybody else's work.
+  room.handle(seats[0], { t: 'restart' });
+  assert.equal(room.phase, PHASES.build, 'a run in progress cannot be restarted');
+
+  room.phase = PHASES.over;
+  room.outcome = 'lost';
+  room.handle(seats[1], { t: 'restart' });
+  assert.equal(room.phase, PHASES.over, 'a guest cannot restart for everybody');
+
+  room.handle(seats[0], { t: 'restart' });
+  assert.equal(room.phase, PHASES.lobby, 'the host can');
 });

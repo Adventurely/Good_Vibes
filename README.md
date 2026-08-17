@@ -681,6 +681,38 @@ purpose — a card you hold every other turn is a rotation, not a moment.
 Only one of them could have been dead weight solo, and it is not: with nobody
 down, Jumper Cables jolts whoever is worst off instead of doing nothing.
 
+#### Ending
+
+A run ends on the `over` phase, and `over` is its own screen. It was nobody's
+screen for a while: the build view was whatever was left after lobby and combat
+had been ruled out, so a party wiped at the boss landed on the build screen
+showing round 4 of 3, drawn over a combat lane the map could not read, with
+nothing on it that did anything. It reads as the game breaking rather than as
+the game ending, which is exactly what it was.
+
+What it shows now is the record. Every seat accumulates six numbers across the
+whole run — `damage`, `kills`, `guard`, `mended`, `revived`, `taken` — and the
+end screen shows them twice: medals for who led each column, and the full grid
+underneath for anyone who wants to argue with the medals. `runHighlights()` in
+`content.js` picks the leaders, drops columns nobody scored on so a run where
+nobody healed does not award Health Restored for zero, and breaks ties toward
+the earlier seat. Overkill is not credited — a Fireball into a Sporeling on two
+health is two points of damage, or the scoreboard rewards bad aim.
+
+The screen is worth reaching while working on it, so there are two deep links
+that go straight there with a plausible record on them:
+
+```
+play.html?preview=lost
+play.html?preview=won
+```
+
+**Another run** (`{t:'restart'}`, host-only, `over`-phase-only) takes the party
+back to the lobby with seats and classes kept and everything a run accumulated
+dropped. The seed moves with a run counter — `seedFromCode(`${code}#${run}`)` —
+because a second attempt on the same site is a memory test rather than a second
+attempt.
+
 #### Dying visibly
 
 A kill emits `{t:'fx', kind:'slain', target, enemy, last}`, and `last` marks the

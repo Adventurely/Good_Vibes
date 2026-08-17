@@ -83,8 +83,9 @@ ported `handle()` untouched.
 Build-phase intents: `moveTo {x,y}` (pathfinds; refused if unreachable),
 `gather {node}`, `brew {recipe}` (Alchemist), `place {building,x,y}` and
 `upgrade {upgrade}` (Engineer). Combat intents: `play {card,index,target}`
-and `wait`. All validation is server-side; an illegal intent is simply not
-applied.
+and `wait`. `{t:'restart'}` takes a finished run back to the lobby — host-only,
+`over`-phase-only, seats and classes kept. All validation is server-side; an
+illegal intent is simply not applied.
 
 **Server → client:**
 
@@ -157,6 +158,18 @@ because both are counters the fight reads rather than state the fight sets:
   cadence is arithmetic on this counter rather than a roll, so it has to
   survive a wake or a Rust Hulk starts counting again every time the room
   sleeps.
+- `players[].stats` — the run's record (`damage`, `kills`, `guard`, `mended`,
+  `revived`, `taken`), also public, and what the end screen is built from.
+
+And one at the top level:
+
+- `run` / `seed` — the room's seed is `seedFromCode(code)` on the first run and
+  `seedFromCode(`${code}#${run}`)` after a restart, so a party that loses and
+  goes again does not get handed the same ruin. That makes `seed` the one piece
+  of room state that **cannot be rebuilt from the room's name**: `restore()` has
+  to read it back and call `reseed()` before replaying `rngCalls`, or a room
+  hibernating during run two wakes up in run one's site. There is a test for
+  exactly this in the port's suite.
 
 ### What that means in practice
 
@@ -182,7 +195,11 @@ because both are counters the fight reads rather than state the fight sets:
 Everything random — site generation, item spawns, salvage rolls — comes from
 one seeded generator owned by the room. A generator is a closure and cannot
 be stored, so the room stores **the seed plus how many draws have happened**
-and replays that many draws on wake. The port's test suite proves a restored
+and replays that many draws on wake. Both sides build that generator in one
+method, `reseed()`, which is a documented seam: the local room's is a one-liner
+and the deployed one's wraps the generator in the call counter. Anything that
+needs a fresh stream — the constructor, a restart — goes through it, so there is
+one line to keep different rather than three. The port's test suite proves a restored
 generator continues the exact stream the stored one would have produced.
 Per-player shuffle streams (`streamFor`) need no such treatment: they are
 recreated fresh per operation and are pure functions of `(seed, player id)`.

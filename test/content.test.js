@@ -21,6 +21,7 @@ import {
   UPGRADES, upgradeCost, buyUpgrade, cardEffect, powerFrom, canBuildMore, buildingsOf,
   brew, pathTo, walkableAt, respawnItems, combatOptions, LEVELS,
   CAMP_X, CAMP_Y, CAMP_RADIUS, TENT_Y, inCamp,
+  STAT_KEYS, STAT_LABELS, STAT_SHORT, blankStats, runHighlights,
 } from '../public/content.js';
 
 /* content.js is imported by the authoritative room object in Tool Haven, not
@@ -1303,4 +1304,42 @@ test('the shims are shaped like the things they replace', () => {
     assert.equal(typeof level.blight, 'number');
     assert.equal(typeof level.nodes, 'number');
   }
+});
+
+/* ---------------------------------------------------- the end of a run */
+
+test('the record has a label for every column and starts at zero', () => {
+  for (const key of STAT_KEYS) {
+    assert.equal(typeof STAT_LABELS[key], 'string', `"${key}" has no label`);
+    assert.ok(STAT_LABELS[key].length, `"${key}" has an empty label`);
+    assert.ok(STAT_SHORT[key] && STAT_SHORT[key].length <= 10,
+      `"${key}" needs a short column heading that fits a table`);
+  }
+  const blank = blankStats();
+  assert.deepEqual(Object.keys(blank), STAT_KEYS);
+  assert.ok(STAT_KEYS.every((key) => blank[key] === 0));
+});
+
+test('runHighlights names a leader per column and skips the empty ones', () => {
+  const seat = (id, classId, stats) => ({ id, classId, name: id, stats: { ...blankStats(), ...stats } });
+  const rows = runHighlights([
+    seat('a', 'alchemist', { damage: 10, mended: 40 }),
+    seat('b', 'engineer', { damage: 25, guard: 12 }),
+    seat('c', 'wizard', { damage: 25 }),
+  ]);
+
+  const by = Object.fromEntries(rows.map((r) => [r.key, r]));
+  assert.equal(by.damage.player.id, 'b', 'a tie goes to the earlier seat, not the later one');
+  assert.equal(by.damage.value, 25);
+  assert.equal(by.mended.player.id, 'a');
+  assert.equal(by.guard.player.id, 'b');
+  // Nobody revived anybody and nobody took a hit, so those are not medals.
+  assert.equal(by.revived, undefined, 'a column nobody scored on must not award a medal for zero');
+  assert.equal(by.taken, undefined);
+
+  // The shape has to survive the states it will actually meet.
+  assert.deepEqual(runHighlights([]), []);
+  assert.deepEqual(runHighlights([{ id: 'x', classId: null, stats: blankStats() }]), []);
+  assert.deepEqual(runHighlights([{ id: 'y', classId: 'wizard' }]), [],
+    'a seat from a save written before the record existed must not throw');
 });

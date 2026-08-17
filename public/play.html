@@ -382,6 +382,72 @@
       .level-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
       .level-head b { font-weight: 400; color: var(--sun); }
 
+      /* ---- the end of a run ----------------------------------------------
+         Deliberately the quietest screen in the game. Everything else is
+         competing for a glance mid-turn; this one is the only thing on the
+         page and the reader has stopped. So: one column, wide leading, and
+         the numbers doing the talking. */
+      .over-card {
+        max-width: 42rem; margin: 2rem auto 0; text-align: center;
+        border: 2px solid var(--line); border-radius: 6px;
+        padding: 2rem 1.6rem; background: #191009;
+        animation: over-in 0.6s ease-out both;
+      }
+      #over-card[data-outcome='lost'] { border-color: var(--bad); }
+      #over-card[data-outcome='won'] { border-color: var(--accent); }
+      @keyframes over-in {
+        from { opacity: 0; transform: translateY(14px); }
+        to { opacity: 1; transform: none; }
+      }
+      /* The title lands after the card does, so the two read as one beat
+         rather than arriving together and cancelling each other out. */
+      #over-title {
+        border: 0; margin: 1rem 0 0.4rem; padding: 0;
+        font-size: 1.5rem; letter-spacing: 0.06em; text-transform: uppercase;
+        animation: over-in 0.5s 0.35s ease-out both;
+      }
+      #over-card[data-outcome='lost'] #over-title { color: var(--bad); }
+      #over-card[data-outcome='won'] #over-title { color: var(--sun); }
+      #over-sub { color: var(--muted); margin: 0 0 1.8rem; line-height: 1.7; }
+      #over-mark { image-rendering: pixelated; display: block; margin: 0 auto; max-width: 100%; }
+      .over-heading {
+        border: 0; padding: 0; margin: 0 0 0.8rem;
+        font-size: 0.68rem; color: var(--muted);
+        text-transform: uppercase; letter-spacing: 0.14em;
+      }
+      /* One line per thing somebody led. Rows nobody scored on are dropped, so
+         a run where nobody healed does not hand out a medal for zero. */
+      .over-medals { list-style: none; margin: 0 0 1.6rem; padding: 0; display: grid; gap: 0.4rem; }
+      .over-medals li {
+        display: flex; align-items: center; gap: 0.6rem;
+        border: 1px solid var(--line); border-radius: 4px;
+        padding: 0.45rem 0.7rem; text-align: left;
+      }
+      .over-medals canvas { image-rendering: pixelated; flex: none; }
+      .over-medal-label { flex: 1; min-width: 0; font-size: 0.68rem; color: var(--muted);
+        text-transform: uppercase; letter-spacing: 0.08em; }
+      .over-medal-who { color: var(--text); }
+      .over-medal-value { color: var(--sun); font-variant-numeric: tabular-nums; }
+      /* The full grid under the medals, for anyone who wants to argue with
+         them. Scrolls in its own box rather than pushing the page wide. */
+      .over-table-wrap { overflow-x: auto; }
+      .over-table { width: 100%; border-collapse: collapse; font-size: 0.72rem; }
+      .over-table th, .over-table td {
+        padding: 0.35rem 0.5rem; text-align: right; white-space: nowrap;
+        border-bottom: 1px solid var(--line);
+      }
+      .over-table th:first-child, .over-table td:first-child { text-align: left; }
+      .over-table th {
+        color: var(--muted); font-weight: 400;
+        text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.6rem;
+      }
+      .over-table td { color: var(--text); font-variant-numeric: tabular-nums; }
+      .over-table td[data-zero='true'] { color: var(--muted); opacity: 0.5; }
+      .over-table tr[data-down='true'] td:first-child { color: var(--bad); }
+      @media (prefers-reduced-motion: reduce) {
+        .over-card, #over-title { animation: none; }
+      }
+
       [hidden] { display: none !important; }
       a { color: var(--accent); text-underline-offset: 3px; }
       footer { text-align: center; font-size: 0.7rem; color: var(--muted); }
@@ -563,6 +629,35 @@
         </details>
       </section>
 
+      <!-- How a run ends.
+           Its own section rather than a splash card, because the numbers on it
+           are the point: a co-op run is a story about who did what, and the log
+           that would tell you scrolled past three rounds ago. Before this the
+           `over` phase fell through to the build screen, which showed round 4
+           of 3 over a combat lane it could not draw and nothing to click. -->
+      <section id="over" hidden>
+        <div class="over-card" id="over-card">
+          <canvas id="over-mark" width="264" height="96" aria-hidden="true"></canvas>
+          <h2 id="over-title"></h2>
+          <p id="over-sub"></p>
+
+          <h3 class="over-heading">The party</h3>
+          <ul class="over-medals" id="over-medals"></ul>
+
+          <div class="over-table-wrap">
+            <table class="over-table">
+              <thead><tr id="over-head"></tr></thead>
+              <tbody id="over-rows"></tbody>
+            </table>
+          </div>
+
+          <div class="actions" style="margin-top:1.4rem">
+            <button type="button" id="over-again">Another run</button>
+            <button type="button" id="over-leave">Leave</button>
+          </div>
+        </div>
+      </section>
+
       <!-- The animated card at each phase turn: Round One — Build Phase, the
            surge, the boss. aria-live so a reader hears the turn too. -->
       <div class="splash" id="splash" data-show="false" aria-live="polite">
@@ -593,6 +688,7 @@
         UPGRADES, upgradeCost, buyUpgrade, cardEffect, powerFrom, canBuildMore, buildingsOf,
         ENEMIES, waveFor, enemyStats, COMBAT_H,
         AILMENTS, effectName, effectLabel, hasEffect, strikePower, ailmentOnHit,
+        STAT_KEYS, STAT_LABELS, STAT_SHORT, blankStats, runHighlights,
         addAilment, tickEffects, effectAmount, clearAilments,
         HAND_SIZE, CARDS, deckFor, shuffle, draw, discardHand, cardById, cardPlayable,
         missingForBuilding, canBuildAt,
@@ -1654,6 +1750,10 @@
         deckCount: els('deck-count'), discardCount: els('discard-count'),
         combatWait: els('combat-wait'), combatLog: els('combat-log'),
         splash: els('splash'), splashTitle: els('splash-title'), splashSub: els('splash-sub'),
+        over: els('over'), overCard: els('over-card'), overMark: els('over-mark'),
+        overTitle: els('over-title'), overSub: els('over-sub'),
+        overMedals: els('over-medals'), overHead: els('over-head'), overRows: els('over-rows'),
+        overAgain: els('over-again'), overLeave: els('over-leave'),
       };
 
       /* ---- connection ---------------------------------------------------- */
@@ -1859,6 +1959,7 @@
             id: `p${i + 1}`, name: cls.name.replace(/^The /, ''),
             host: i === 0, connected: true, ready: false, down: false,
             classId: cls.id, hp: cls.hp, maxHp: cls.hp, effects: [], intent: null,
+            stats: blankStats(),
             x: 0, y: 0,
             // Built once, then kept: brewing during the build phase adds to this
             // and a building adds to everyone's, so rebuilding it at the surge
@@ -1903,9 +2004,11 @@
         // preview has to set it for the same reason the room does.
         const swing = (target, amount) => {
           fx({ kind: cardId || 'strike', player: you.id, target: target.id });
+          score(you, 'damage', Math.min(amount, target.hp));
           target.hp = Math.max(0, target.hp - amount);
           room.events.push({ t: 'log', text: `${label} hits the ${target.name} for ${amount}.` });
           if(target.hp > 0) return;
+          score(you, 'kills', 1);
           room.events.push({ t: 'log', text: `The ${target.name} comes apart.` });
           fx({ kind: 'slain', player: you.id, target: target.id, enemy: target.type,
                last: room.enemies.every(e => e.hp <= 0) });
@@ -1925,10 +2028,12 @@
           const who = ally();
           fx({ kind: 'ward', player: who.id });
           who.block = (who.block || 0) + effect.amount;
+          score(you, 'guard', effect.amount);
           room.events.push({ t: 'log', text: `${label} — ${effect.amount} of guard up.` });
         }else if(effect.kind === 'wardAll'){
           for(const who of party()){
             who.block = (who.block || 0) + effect.amount;
+            score(you, 'guard', effect.amount);
             fx({ kind: 'ward', player: who.id });
           }
           room.events.push({ t: 'log', text: `${label} — ${effect.amount} of guard on the party.` });
@@ -1941,11 +2046,14 @@
             total += p.hp - before;
             fx({ kind: 'heal', player: p.id });
           }
+          score(you, 'mended', total);
           room.events.push({ t: 'log', text: `${label} mends ${total}.` });
         }else if(effect.kind === 'cleanse'){
           const who = ally();
           who.effects = clearAilments(who.effects);
-          who.hp = Math.min(who.maxHp, who.hp + effect.amount);
+          const mended = Math.min(who.maxHp, who.hp + effect.amount) - who.hp;
+          who.hp += mended;
+          score(you, 'mended', mended);
           fx({ kind: 'cleanse', player: who.id });
           room.events.push({ t: 'log', text: `${label} clears the air around ${who.name}.` });
         }else if(effect.kind === 'might' || effect.kind === 'regen'){
@@ -1956,11 +2064,21 @@
           room.events.push({ t: 'log', text: `${label} on ${who.name}.` });
         }else if(effect.kind === 'revive'){
           // Nobody stays down in the preview, so this is always the jolt.
-          const who = [...party()].sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0] || you;
+          const down = room.players.filter(p => p.classId && p.down);
+          const who = down[0] || [...party()].sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0] || you;
           const before = who.hp;
-          who.hp = Math.min(who.maxHp, who.hp + effect.amount);
+          if(who.down){
+            who.down = false;
+            who.hp = Math.min(who.maxHp, effect.amount);
+            who.effects = clearAilments(who.effects);
+            demoDeal(who);
+            score(you, 'revived', 1);
+          }else{
+            who.hp = Math.min(who.maxHp, who.hp + effect.amount);
+            score(you, 'mended', who.hp - before);
+          }
           fx({ kind: 'heal', player: who.id });
-          room.events.push({ t: 'log', text: `${label} jolts ${who.hp - before} back into ${who.name}.` });
+          room.events.push({ t: 'log', text: `${label} brings ${who.name} back to ${who.hp}.` });
         }
 
         // Ailments bite and age before the wave lands new ones, in the room's
@@ -1968,10 +2086,12 @@
         // order the room resolves in.
         for(const p of room.players){
           const rot = effectAmount(p.effects, 'rot');
-          if(rot){
-            p.hp = Math.max(1, p.hp - rot);           // the preview never kills you
+          if(rot && !p.down){
+            score(p, 'taken', Math.min(rot, p.hp));
+            p.hp = Math.max(0, p.hp - rot);
             fx({ kind: 'rot', player: p.id });
             room.events.push({ t: 'log', text: `Blightrot takes ${rot} out of ${p.name}.` });
+            demoDownIf(p);
           }
           const mend = effectAmount(p.effects, 'regen');
           if(mend) p.hp = Math.min(p.maxHp, p.hp + mend);
@@ -1986,7 +2106,10 @@
           const blocked = Math.min(you.block || 0, enemy.hits);
           you.block = (you.block || 0) - blocked;
           const through = enemy.hits - blocked;
-          if(through > 0) you.hp = Math.max(1, you.hp - through);   // the preview never kills you
+          if(through > 0){
+            score(you, 'taken', Math.min(through, you.hp));
+            you.hp = Math.max(0, you.hp - through);
+          }
           fx({ kind: 'hit', player: you.id, from: enemy.id });
           room.events.push({
             t: 'log',
@@ -2003,8 +2126,19 @@
               room.events.push({ t: 'log', text: `${you.name} is ${effectName(ail)}.` });
             }
           }
+          demoDownIf(you);
         }
         you.block = 0;
+
+        // The preview used to floor everyone at one health, which made it a
+        // place where the defeat screen could never be looked at. It can lose
+        // now, and losing shows the same screen a real room shows.
+        if(room.players.filter(p => p.classId).every(p => p.down)){
+          room.phase = PHASES.over;
+          room.outcome = 'lost';
+          room.events.push({ t: 'log', text: 'The blight closes over the site.' });
+          return;
+        }
 
         if(!room.enemies.every(e => e.hp <= 0)) return;
 
@@ -2029,6 +2163,24 @@
         holdTimer = setTimeout(() => { holdTimer = 0; finish(); render(); }, FINISH_MS);
       }
 
+      /* The preview's two bookkeeping helpers, matching the room's `score` and
+         `downIf` so the numbers on the end screen mean the same thing whichever
+         side produced them. */
+      const score = (player, key, amount) => {
+        if(!player || !(amount > 0)) return;
+        if(!player.stats) player.stats = blankStats();
+        player.stats[key] = (player.stats[key] || 0) + amount;
+      };
+
+      function demoDownIf(player){
+        if(player.hp > 0 || player.down) return;
+        player.down = true;
+        player.hand = [];
+        player.intent = null;
+        const cls = classById(player.classId);
+        room.events.push({ t: 'log', text: cls ? `${player.name}: "${cls.downLine}"` : `${player.name} goes down.` });
+      }
+
       function demoSend(msg){
         // Whoever the roster has selected, not the first seat. One player is
         // running the whole party here, so an intent belongs to the character
@@ -2036,6 +2188,13 @@
         // the Alchemist however many portraits you press.
         const you = room.players.find(p => p.id === room.you) || room.players[0];
         room.events = [];
+
+        if(msg.t === 'restart'){
+          // The preview owns its whole world, so going again is simply building
+          // it again — a fresh seed included, as the room does.
+          clearTimeout(holdTimer); holdTimer = 0;
+          return startPreview();
+        }
 
         if(msg.t === 'ready' && room.phase === PHASES.build){
           you.ready = !!msg.ready;
@@ -2110,6 +2269,25 @@
             you.intent = null;
             demoTurn(you, cardEffect(hand[msg.intent.index], room.upgrades), card.name,
               msg.intent.target, hand[msg.intent.index]);
+            if(room.phase === PHASES.combat) demoDeal(you);
+            render();
+          }, 420);
+          return;
+        }else if(msg.t === 'intent' && msg.intent.t === 'wait' && room.phase === PHASES.combat){
+          /* "Do nothing" is still a turn, and the preview had no branch for it
+             at all — the button was live and inert, so the wave never closed
+             and a player who only ever waited could not lose, or finish, or
+             see what waiting costs. It costs the hand and the ground the wave
+             covers, exactly as it does in a room. */
+          you.intent = { t: 'wait' };
+          you.discard = discardHand(you.discard, (you.hand || []).filter(id => !(CARDS[id] || {}).consumed));
+          you.hand = [];
+          render();
+
+          clearTimeout(demoBeat);
+          demoBeat = setTimeout(() => {
+            you.intent = null;
+            demoTurn(you, { kind: 'wait', amount: 0 }, 'Waiting', null, null);
             if(room.phase === PHASES.combat) demoDeal(you);
             render();
           }, 420);
@@ -2482,6 +2660,166 @@
 
         ui.combatLog.replaceChildren();
         for(const line of logLines) ui.combatLog.append(Object.assign(document.createElement('div'), { textContent: line }));
+      }
+
+      /* ---- the end of a run ----------------------------------------------- */
+
+      /* What a run is remembered as.
+       *
+       * Losing at the boss used to put you on the build screen with the round
+       * counter reading 4 of 3 and nothing on it that did anything, which reads
+       * as the game breaking rather than as the game ending. It ends properly
+       * now, and it ends with the numbers — in a co-op game the interesting
+       * question after a loss is not "did we lose", which everyone watched, but
+       * who was carrying what while it happened.
+       *
+       * Two passes at the same data: medals for who led each column, and the
+       * full grid underneath for anyone who wants to argue with the medals.
+       */
+      function renderOver(){
+        const lost = room.outcome !== 'won';
+        const boss = room.round >= (room.bossRound || BOSS_ROUND);
+        ui.overCard.dataset.outcome = lost ? 'lost' : 'won';
+
+        // A phase card left up from the round that just ended would dim this
+        // whole screen and cover the medals. The run is over; there is no next
+        // phase for it to announce.
+        clearTimeout(splashTimer);
+        ui.splash.dataset.show = 'false';
+
+        ui.overTitle.textContent = lost ? 'You have been defeated' : 'The Array is lit';
+        ui.overSub.textContent = lost
+          ? (boss
+              // Where you fell is the only fact that changes what the line
+              // should say. Reaching the Extractor and losing to it is a
+              // different evening from being overrun in round two.
+              ? 'The Extractor works through the last of you and goes back to harvesting. The site keeps growing without anyone to tend it.'
+              : `The blight closes over the site in round ${room.round}. The ruin goes back to growing alone.`)
+          : 'Four rounds, one ruin, and the lights are on. The blight keeps growing — and so do you.';
+
+        drawOverMark(lost);
+
+        // Medals. Only the columns somebody actually scored on, so a run where
+        // nobody healed does not award Health Restored for nothing.
+        ui.overMedals.replaceChildren();
+        const highlights = runHighlights(room.players);
+        if(!highlights.length){
+          const li = document.createElement('li');
+          li.className = 'over-medal-label';
+          li.textContent = 'Nobody landed a thing. That was quick.';
+          ui.overMedals.append(li);
+        }
+        for(const row of highlights){
+          const li = document.createElement('li');
+          const cls = classById(row.player.classId);
+          if(cls && HERO_ART[cls.art]) li.append(pixels(HERO_ART[cls.art].rows, 1));
+          const label = document.createElement('span');
+          label.className = 'over-medal-label';
+          label.textContent = row.label;
+          const who = document.createElement('b');
+          who.className = 'over-medal-who';
+          who.style.fontWeight = '400';
+          who.textContent = row.player.name + (row.player.id === room.you ? ' (you)' : '');
+          const value = document.createElement('b');
+          value.className = 'over-medal-value';
+          value.style.fontWeight = '400';
+          value.textContent = row.value;
+          li.append(label, who, value);
+          ui.overMedals.append(li);
+        }
+
+        // The grid. Everyone, every column, zeroes dimmed rather than blank so
+        // the shape of a seat's run is readable across the row.
+        ui.overHead.replaceChildren();
+        const corner = document.createElement('th');
+        corner.textContent = 'Seat';
+        ui.overHead.append(corner);
+        for(const key of STAT_KEYS){
+          const th = document.createElement('th');
+          th.textContent = STAT_SHORT[key];
+          ui.overHead.append(th);
+        }
+
+        ui.overRows.replaceChildren();
+        for(const p of room.players.filter(p => p.classId)){
+          const tr = document.createElement('tr');
+          tr.dataset.down = String(!!p.down);
+          const name = document.createElement('td');
+          const cls = classById(p.classId);
+          name.textContent = (cls ? cls.name.replace(/^The /, '') : p.name)
+            + (p.id === room.you ? ' (you)' : '');
+          tr.append(name);
+          for(const key of STAT_KEYS){
+            const td = document.createElement('td');
+            const value = (p.stats || {})[key] || 0;
+            td.textContent = value;
+            td.dataset.zero = String(value === 0);
+            tr.append(td);
+          }
+          ui.overRows.append(tr);
+        }
+
+        // Going again is the host's call, as starting was. A disabled button
+        // with no reason on it is the thing players ask about in chat.
+        //
+        // Except in the preview, where you are every seat: `me()` follows the
+        // roster selection, so ending a run as the Wizard would tell the one
+        // person playing to wait for a host who is also them.
+        const you = me();
+        const host = demo || (!!you && you.host);
+        ui.overAgain.disabled = !host;
+        ui.overAgain.textContent = host ? 'Another run' : 'Waiting for the host';
+      }
+
+      /* The mark above the title: the party, drawn rather than dropped in as a
+       * glyph so it sits in the same pixel grid as the rest of the page.
+       *
+       * The whole party rather than your own sprite, because the run was the
+       * whole party's. A defeat lays them all on their side; a win stands them
+       * up. One tipped hero read as an unrecognisable horizontal blob at this
+       * size — three of them read immediately as a floor with people on it.
+       *
+       * Its own context rather than context2d(), which asks for an opaque
+       * canvas: right for a full-bleed scene, and a black rectangle when the
+       * thing is a small mark floating on a card.
+       */
+      function drawOverMark(lost){
+        const canvas = ui.overMark;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const arts = room.players
+          .filter(p => p.classId)
+          .map(p => (classById(p.classId) || {}).art)
+          .map(art => HERO_ART[art])
+          .filter(Boolean);
+        if(!arts.length) return;
+
+        const scale = 2;
+        // Tipped, a sprite lies down: it takes its height in width and its
+        // width in height. Everything below is written in unrotated pixels and
+        // the transform does the swap.
+        const cell = lost ? arts[0].rows.length : arts[0].rows[0].length;
+        const span = arts.length * (cell + 2) * scale;
+        let x = (canvas.width - span) / 2;
+
+        for(const art of arts){
+          ctx.save();
+          ctx.globalAlpha = lost ? 0.8 : 1;
+          if(lost){
+            ctx.translate(x + (cell * scale) / 2, canvas.height - 14);
+            ctx.rotate(-Math.PI / 2);
+            ctx.scale(scale, scale);
+            blit(ctx, art.rows, -art.rows[0].length / 2, -art.rows.length / 2, false, 0, art.split);
+          }else{
+            ctx.translate(x, canvas.height - art.rows.length * scale - 6);
+            ctx.scale(scale, scale);
+            blit(ctx, art.rows, 0, 0, false, 0, art.split);
+          }
+          ctx.restore();
+          x += (cell + 2) * scale;
+        }
       }
 
       /* ---- run ------------------------------------------------------------ */
@@ -2861,9 +3199,15 @@
         ui.join.hidden = true;
         const inLobby = room.phase === PHASES.lobby;
         const inCombat = room.phase === PHASES.combat;
+        // `over` is its own screen. It used to be nobody's: the build screen was
+        // whatever was left after lobby and combat had been ruled out, so a run
+        // that ended dropped you onto round 4 of 3, drawn over a combat lane the
+        // map could not read, with nothing on it to click.
+        const isOver = room.phase === PHASES.over;
         ui.lobby.hidden = !inLobby;
-        ui.run.hidden = inLobby || inCombat;
+        ui.run.hidden = inLobby || inCombat || isOver;
         ui.combat.hidden = !inCombat;
+        ui.over.hidden = !isOver;
         // The banner is the front door, not furniture. In a fight it is 200
         // pixels of title between the player and their cards, and the fold is
         // the whole budget — so it goes once play starts.
@@ -2872,13 +3216,14 @@
 
         // The page is narrow for reading and wide for playing; fit() reruns
         // because the width change moves the integer the map can scale by.
-        const view = inLobby ? 'lobby' : inCombat ? 'combat' : 'run';
+        const view = inLobby ? 'lobby' : inCombat ? 'combat' : isOver ? 'over' : 'run';
         if(document.body.dataset.view !== view){
           document.body.dataset.view = view;
           fit();
         }
         if(inLobby) renderLobby();
         else if(inCombat) renderCombat();
+        else if(isOver) renderOver();
         else renderRun();
 
         // The soundtrack follows the phase: warm for planning, driven for the
@@ -2887,7 +3232,7 @@
         else if(inCombat) audio.play('battle');
         else audio.stop();
 
-        if(room.phase === PHASES.over){
+        if(isOver){
           setStatus('open', room.outcome === 'won' ? 'The Array is lit' : 'The run is over');
           if(!render.sungOutcome){
             render.sungOutcome = true;
@@ -2919,6 +3264,8 @@
       ui.start.addEventListener('click', () => send({ t: 'start' }));
       ui.combatWait.addEventListener('click', () => send({ t: 'intent', intent: { t: 'wait' } }));
       ui.leave.addEventListener('click', () => leave());
+      ui.overAgain.addEventListener('click', () => send({ t: 'restart' }));
+      ui.overLeave.addEventListener('click', () => leave());
       ui.leaveRun.addEventListener('click', () => leave());
       ui.leaveCombat.addEventListener('click', () => leave());
 
@@ -3040,6 +3387,28 @@
             demoSend({ t: 'ready', ready: true });
           }
           room.you = held;
+          render();
+        }
+        /* ?preview=lost and ?preview=won drop straight onto the end screen with
+           a plausible record on it. A screen you only reach by losing a whole
+           run is a screen nobody looks at while building it, which is how the
+           `over` phase ended up rendering the build screen for as long as it
+           did. */
+        if(previewParam === 'lost' || previewParam === 'won'){
+          room.round = BOSS_ROUND;
+          room.phase = PHASES.over;
+          room.outcome = previewParam;
+          room.enemies = [];
+          const sample = [
+            { damage: 74, kills: 5, guard: 12, mended: 31, revived: 2, taken: 28 },
+            { damage: 51, kills: 2, guard: 44, mended: 6, revived: 1, taken: 46 },
+            { damage: 118, kills: 7, guard: 9, mended: 0, revived: 0, taken: 39 },
+          ];
+          room.players.forEach((p, i) => {
+            p.stats = { ...blankStats(), ...(sample[i] || {}) };
+            p.down = previewParam === 'lost';
+            p.hp = previewParam === 'lost' ? 0 : Math.round(p.maxHp * 0.4);
+          });
           render();
         }
       }

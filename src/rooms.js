@@ -29,7 +29,7 @@ import {
   seededRandom, seedFromCode, readyState,
   ENEMIES, waveFor, enemyStats, salvageAfterCombat, addSalvage, spendSalvage,
   AILMENTS, addEffect, addAilment, hasEffect, effectAmount, tickEffects,
-  clearAilments, strikePower, ailmentOnHit, effectName,
+  clearAilments, strikePower, ailmentOnHit, effectName, blankStats,
 } from '../public/content.js';
 
 const rooms = new Map();
@@ -47,11 +47,25 @@ let serial = 0;
 class Room {
   constructor(code){
     this.code = code;
+    /* Which run this is in this room, and the reason the seed is not simply
+       the code. A party that loses and goes again should get a different ruin;
+       reusing the code's seed would hand them the same site, the same herbs and
+       the same waves, which turns a second attempt into a memory test. */
+    this.run = 0;
     this.seed = seedFromCode(code);
-    this.random = seededRandom(this.seed);
+    this.reseed();
     this.players = [];
     this.reset();
   }
+
+  /* The generator, rebuilt from whatever this.seed currently is.
+   *
+   * A seam: the deployed room wraps this in a call counter so a hibernating
+   * Durable Object can replay its way back to the same stream. Everything that
+   * needs a fresh generator goes through here so there is one line to keep
+   * different rather than three.
+   */
+  reseed(){ this.random = seededRandom(this.seed); }
 
   reset(){
     this.phase = PHASES.lobby;
@@ -98,6 +112,7 @@ class Room {
       down: false,
       hp: 0, maxHp: 0, block: 0,
       effects: [],
+      stats: blankStats(),
       x: 0, y: 0,
       deck: [], discard: [], hand: [],
       intent: null,
@@ -160,6 +175,9 @@ class Room {
         // able to see who is rotting, and a Wizard lending a page has to know
         // it is not already lent.
         effects: p.effects || [],
+        // What this seat has done all run. Public, and the whole point: the end
+        // screen is a co-op game's only chance to say who carried it.
+        stats: p.stats || blankStats(),
         // Whether they have committed, never what they committed: a hand is
         // secret right up to the moment the round resolves.
         intent: p.intent ? { t: p.intent.t } : null,
@@ -210,6 +228,7 @@ class Room {
       p.hand = [];
       p.down = false;
       p.effects = [];
+      p.stats = blankStats();
     }
     this.round = 1;
     // The site is generated once for the whole run. Everything the party puts
@@ -305,7 +324,39 @@ class Room {
       if(player.host) this.startRun();
       return this.broadcast();
     }
+    if(msg.t === 'restart') return this.restart(player);
     if(msg.t === 'intent') return this.intent(player, msg.intent || {});
+  }
+
+  /* Back to the lobby, same crew, new ruin.
+   *
+   * Seats and names are kept and everything a run accumulated is dropped —
+   * a party that just lost together almost always wants the same seats and
+   * never wants the same site, so the seed moves on with the run counter.
+   * Host-only, for the reason `start` is: five people and one screen.
+   */
+  restart(player){
+    if(this.phase !== PHASES.over) return;
+    if(!player.host) return;
+
+    this.run += 1;
+    this.seed = seedFromCode(`${this.code}#${this.run}`);
+    this.reseed();
+    this.reset();
+
+    for(const p of this.players){
+      p.ready = false;
+      p.down = false;
+      p.intent = null;
+      p.hp = 0; p.maxHp = 0; p.block = 0;
+      p.effects = [];
+      p.stats = blankStats();
+      p.deck = []; p.discard = []; p.hand = [];
+      // The class stays. Re-picking five seats after every loss is a menu, not
+      // a decision — and anyone who does want to change has the lobby to do it.
+    }
+    this.log('A new run. Same crew, different ruin.');
+    this.broadcast();
   }
 
   pickClass(player, classId){
@@ -535,8 +586,19 @@ class Room {
      coming, and rot is already inside you. */
   hurt(player, amount){
     if(amount <= 0 || player.down) return;
+    this.score(player, 'taken', Math.min(amount, player.hp));
     player.hp = Math.max(0, player.hp - amount);
     this.downIf(player);
+  }
+
+  /* One number, added to one seat's record. Guarded rather than assumed: a
+     player restored from a save written before stats existed has none, and a
+     crash on the first swing of a resumed run would be a bad trade for a
+     scoreboard. */
+  score(player, key, amount){
+    if(!player || !(amount > 0)) return;
+    if(!player.stats) player.stats = blankStats();
+    player.stats[key] = (player.stats[key] || 0) + amount;
   }
 
   /* Out of health is out of the fight. One place, so a player felled by rot
@@ -555,9 +617,13 @@ class Room {
      what a kill announces. */
   hitEnemy(player, target, amount, label, cardId){
     this.event({ t: 'fx', kind: cardId || 'strike', player: player.id, target: target.id });
+    // Landed, not swung: overkill on a thing with two health left is two points
+    // of damage, or the end screen rewards aiming a Fireball at a Sporeling.
+    this.score(player, 'damage', Math.min(amount, target.hp));
     target.hp = Math.max(0, target.hp - amount);
     this.log(`${player.name}'s ${label} hits the ${target.name} for ${amount}.`);
     if(target.hp > 0) return;
+    this.score(player, 'kills', 1);
     this.log(`The ${target.name} comes apart.`);
     // The client holds the round open on this event so a kill is watched
     // rather than skipped past, and `last` is what tells it whether it is
@@ -589,11 +655,13 @@ class Room {
     }else if(effect.kind === 'ward'){
       const who = ally();
       who.block = (who.block || 0) + effect.amount;
+      this.score(player, 'guard', effect.amount);
       this.log(`${player.name}'s ${label} puts ${effect.amount} of guard on ${who.name}.`);
 
     }else if(effect.kind === 'wardAll'){
       for(const who of this.standing){
         who.block = (who.block || 0) + effect.amount;
+        this.score(player, 'guard', effect.amount);
         this.event({ t: 'fx', kind: 'ward', player: who.id });
       }
       this.log(`${player.name}'s ${label}: ${effect.amount} of guard on the whole party.`);
@@ -602,6 +670,7 @@ class Room {
       const who = ally();
       const before = who.hp;
       who.hp = Math.min(who.maxHp, who.hp + effect.amount);
+      this.score(player, 'mended', who.hp - before);
       this.log(`${player.name}'s ${label} mends ${who.hp - before} on ${who.name}.`);
 
     }else if(effect.kind === 'healAll'){
@@ -612,6 +681,7 @@ class Room {
         total += who.hp - before;
         this.event({ t: 'fx', kind: 'heal', player: who.id });
       }
+      this.score(player, 'mended', total);
       this.log(`${player.name}'s ${label} mends ${total} across the party.`);
 
     }else if(effect.kind === 'regen'){
@@ -630,6 +700,7 @@ class Room {
       // it rather than holding it for one that may not come.
       const before = who.hp;
       who.hp = Math.min(who.maxHp, who.hp + effect.amount);
+      this.score(player, 'mended', who.hp - before);
       this.event({ t: 'fx', kind: 'cleanse', player: who.id });
       this.log(had.length
         ? `${player.name}'s ${label} burns ${had.join(' and ')} off ${who.name}.`
@@ -650,6 +721,7 @@ class Room {
         target.down = false;
         target.hp = Math.min(target.maxHp, effect.amount);
         target.effects = clearAilments(target.effects);
+        this.score(player, 'revived', 1);
         this.deal(target);
         this.event({ t: 'fx', kind: 'heal', player: target.id });
         this.log(`${player.name}'s ${label} puts ${target.name} back on their feet.`);
@@ -659,6 +731,7 @@ class Room {
         const who = [...this.standing].sort((a, b) => (a.hp / a.maxHp) - (b.hp / b.maxHp))[0] || player;
         const before = who.hp;
         who.hp = Math.min(who.maxHp, who.hp + effect.amount);
+        this.score(player, 'mended', who.hp - before);
         this.event({ t: 'fx', kind: 'heal', player: who.id });
         this.log(`${player.name}'s ${label} jolts ${who.hp - before} back into ${who.name}.`);
       }
@@ -687,6 +760,7 @@ class Room {
         const before = player.hp;
         player.hp = Math.min(player.maxHp, player.hp + regen);
         if(player.hp > before){
+          this.score(player, 'mended', player.hp - before);
           this.event({ t: 'fx', kind: 'regen', player: player.id });
           this.log(`${player.name} mends ${player.hp - before}.`);
         }
@@ -713,7 +787,10 @@ class Room {
       const blocked = Math.min(victim.block || 0, enemy.hits);
       victim.block = (victim.block || 0) - blocked;
       const through = enemy.hits - blocked;
-      if(through > 0) victim.hp = Math.max(0, victim.hp - through);
+      if(through > 0){
+        this.score(victim, 'taken', Math.min(through, victim.hp));
+        victim.hp = Math.max(0, victim.hp - through);
+      }
 
       this.log(blocked
         ? `The ${enemy.name} hits ${victim.name} for ${enemy.hits}; guard eats ${blocked}.`

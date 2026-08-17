@@ -315,6 +315,65 @@ export const EFFECT_LABELS = {
 
 export const effectLabel = kind => EFFECT_LABELS[kind] || kind;
 
+/* ========================================================== the record === */
+
+/* What each seat did over a whole run, kept so the end of it can say
+ * something. A run that ends on "you lost" and a blank screen is a run nobody
+ * can tell a story about afterwards — and in a co-op game the story is who did
+ * what, which nobody can reconstruct from a log that scrolled past four rounds
+ * ago.
+ *
+ * Six numbers, chosen because each one is a different seat's answer to "was I
+ * useful": the Wizard's is damage, the Engineer's is guard, the Alchemist's is
+ * mending, and taken is the one nobody sets out to lead.
+ */
+export const STAT_LABELS = {
+  damage: 'Damage dealt',
+  kills: 'Blight put down',
+  guard: 'Guard raised',
+  mended: 'Health restored',
+  revived: 'Allies picked up',
+  taken: 'Damage taken',
+};
+
+/* The same six, as column headings. A medal has a whole row to itself and can
+   afford the sentence; a table of seven columns cannot, and a header that
+   wraps to three lines is worse than a short word. */
+export const STAT_SHORT = {
+  damage: 'Damage',
+  kills: 'Kills',
+  guard: 'Guard',
+  mended: 'Mended',
+  revived: 'Revives',
+  taken: 'Taken',
+};
+
+export const STAT_KEYS = Object.keys(STAT_LABELS);
+
+export const blankStats = () =>
+  Object.fromEntries(STAT_KEYS.map(key => [key, 0]));
+
+/* Who led each stat, as { key, label, player, value } rows in STAT_KEYS order.
+ *
+ * Ties go to the earlier seat and rows nobody scored on are dropped, so a solo
+ * run does not read as a leaderboard of one and a run where nobody healed does
+ * not award a Health Restored medal for zero. Shared by the end screen and the
+ * tests, because "who did the most damage" should mean one thing.
+ */
+export function runHighlights(players = []){
+  const seated = players.filter(p => p && p.classId && p.stats);
+  const rows = [];
+  for(const key of STAT_KEYS){
+    let best = null;
+    for(const p of seated){
+      const value = p.stats[key] || 0;
+      if(value > 0 && (!best || value > best.value)) best = { player: p, value };
+    }
+    if(best) rows.push({ key, label: STAT_LABELS[key], player: best.player, value: best.value });
+  }
+  return rows;
+}
+
 /* ---- the effect list a player carries -----------------------------------
  *
  * Every one of these takes the list and hands back a new one rather than
