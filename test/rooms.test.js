@@ -670,3 +670,46 @@ test('an opening word is in the opening hand', () => {
     'the first thing said when the surge arrives');
   assert.equal(room.enemies.length > 0, true);
 });
+
+/* ---- the garden ---------------------------------------------------------- */
+
+import { plantPot, potYield } from '../public/content.js';
+
+test('the pots are the alchemist\'s, they grow between rounds, and they pay on her clock', () => {
+  const room = roomFor(`pots-${++codes}`);
+  const seats = ['alchemist', 'wizard'].map((classId, i) => {
+    const player = room.join(`pots-token-${codes}-${i}`, fakeSocket());
+    room.handle(player, { t: 'class', classId });
+    return player;
+  });
+  room.handle(seats[0], { t: 'start' });
+  assert.equal(room.phase, PHASES.build);
+
+  room.stash = { sunpetal: 2 };
+  room.handle(seats[1], { t: 'intent', intent: { t: 'plant', pot: 0, herb: 'sunpetal' } });
+  assert.equal(room.pots[0], null, 'the wizard does not garden');
+
+  room.handle(seats[0], { t: 'intent', intent: { t: 'plant', pot: 0, herb: 'sunpetal' } });
+  assert.deepEqual(room.pots[0], { herb: 'sunpetal', age: 0 });
+  assert.equal(room.stash.sunpetal, 1);
+
+  // Harvesting straight away refunds the cutting — no same-round loop.
+  room.handle(seats[0], { t: 'intent', intent: { t: 'harvest', pot: 0 } });
+  assert.equal(room.stash.sunpetal, 2);
+  assert.equal(room.pots[0], null);
+
+  // Replant, fight a round, and the pot has grown by the next build phase.
+  room.handle(seats[0], { t: 'intent', intent: { t: 'plant', pot: 0, herb: 'sunpetal' } });
+  for(const p of seats) room.handle(p, { t: 'ready', ready: true });
+  assert.equal(room.phase, PHASES.combat);
+  for(const enemy of room.enemies) enemy.hp = 0;
+  seats[0].hand = ['hold', 'hold', 'hold'];
+  seats[1].hand = ['hold', 'hold', 'hold'];
+  room.handle(seats[0], { t: 'intent', intent: { t: 'play', index: 0, card: 'hold' } });
+  room.handle(seats[1], { t: 'intent', intent: { t: 'play', index: 0, card: 'hold' } });
+  assert.equal(room.phase, PHASES.build, 'an empty lane ends the round');
+  assert.equal(room.pots[0].age, 1, 'the garden grew while everyone was fighting');
+
+  room.handle(seats[0], { t: 'intent', intent: { t: 'harvest', pot: 0 } });
+  assert.equal(room.stash.sunpetal, 1 + potYield(1), 'a round of patience pays');
+});

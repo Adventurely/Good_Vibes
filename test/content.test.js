@@ -25,6 +25,7 @@ import {
   SPELLS, MODIFIERS, MODIFIER_WEIGHTS, SPELL_SLOTS, PAGES_PER_ROUND,
   WIZARD_BASE_KIT, freshSpellbook, composeSpell, rollOffers, takeOffer,
   moveModifier, wizardCombatDeck,
+  POT_COUNT, potYield, potStage, plantPot, harvestPot, growPots,
 } from '../public/content.js';
 
 /* content.js is imported by the authoritative room object in Tool Haven, not
@@ -213,6 +214,37 @@ test('exactly one class spends each pool', () => {
   assert.equal(CLASSES.filter((c) => c.craft).length, 1);
   assert.equal(CLASSES.filter((c) => c.build).length, 1);
   assert.equal(CLASSES.filter((c) => c.cast).length, 1);
+});
+
+/* ---- the garden ---------------------------------------------------------- */
+
+test('a pot pays for patience and never for a same-round loop', () => {
+  assert.equal(potYield(0), 1, 'harvesting what you just planted refunds the cutting, no more');
+  assert.ok(potYield(1) > 1, 'one round in the pot is a return');
+  assert.ok(potYield(2) > potYield(1), 'two is a better one');
+  assert.ok(potYield(3) >= potYield(2), 'the ladder tops out rather than dipping');
+  assert.equal(potYield(9), potYield(3), 'and it stays topped out');
+  for (const age of [0, 1, 2, 3, 9]) assert.ok(potStage(age), `age ${age} needs a stage name`);
+});
+
+test('planting and harvesting move whole cuttings and refuse half-moves', () => {
+  const pots = Array(POT_COUNT).fill(null);
+  assert.equal(plantPot(pots, 0, 'sunpetal', { sunpetal: 0 }), null, 'no cutting, no plant');
+  assert.equal(plantPot(pots, 9, 'sunpetal', { sunpetal: 2 }), null, 'no ninth pot');
+  assert.equal(plantPot(pots, 0, 'not-a-herb', { sunpetal: 2 }), null);
+
+  const planted = plantPot(pots, 0, 'sunpetal', { sunpetal: 2 });
+  assert.deepEqual(planted.pots[0], { herb: 'sunpetal', age: 0 });
+  assert.equal(planted.stash.sunpetal, 1, 'the cutting came out of the stash');
+  assert.equal(plantPot(planted.pots, 0, 'cellsap', { cellsap: 1 }), null, 'a pot holds one plant');
+
+  const grown = growPots(growPots(planted.pots));
+  assert.equal(grown[0].age, 2);
+  const picked = harvestPot(grown, 0, planted.stash);
+  assert.equal(picked.yielded, potYield(2));
+  assert.equal(picked.stash.sunpetal, 1 + potYield(2));
+  assert.equal(picked.pots[0], null, 'the pot is free again');
+  assert.equal(harvestPot(picked.pots, 0, picked.stash), null, 'an empty pot has nothing to give');
 });
 
 /* ---- spellcraft ---------------------------------------------------------- */
@@ -1402,6 +1434,8 @@ const PUBLISHED = [
   'SPELLS', 'MODIFIERS', 'MODIFIER_WEIGHTS', 'SPELL_SLOTS', 'SPELL_OFFER_WEIGHT',
   'PAGES_PER_ROUND', 'WIZARD_BASE_KIT', 'freshSpellbook', 'composeSpell',
   'rollOffers', 'takeOffer', 'moveModifier', 'wizardCombatDeck',
+  // the garden
+  'POT_COUNT', 'potYield', 'potStage', 'plantPot', 'harvestPot', 'growPots',
 ];
 
 test('every name this module has ever published is still exported', async () => {

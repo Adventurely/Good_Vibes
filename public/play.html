@@ -355,6 +355,7 @@
       .card-sub { display: block; font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
       .card-blurb { display: block; font-size: 0.72rem; color: var(--muted); margin-top: 0.3rem; }
       .card.locked { opacity: 0.45; cursor: not-allowed; }
+      .card[data-hot='true'] { border-color: var(--sun); }
 
       /* --- the scriptorium ------------------------------------------------- */
       /* An offer's border is its rarity — the draft reads at a glance the way
@@ -567,6 +568,10 @@
           <h2 style="margin-top:1.4rem">Stash</h2>
           <div class="chips" id="stash"></div>
 
+          <h2 style="margin-top:1.4rem">The garden</h2>
+          <p id="garden-hint" style="margin-bottom:0.6rem"></p>
+          <div class="grid" id="garden"></div>
+
           <h2 style="margin-top:1.4rem">Brewing</h2>
           <div class="grid" id="recipes"></div>
         </div>
@@ -733,6 +738,7 @@
         salvageAfterCombat, addSalvage, spendSalvage,
         SPELLS, MODIFIERS, SPELL_SLOTS, PAGES_PER_ROUND, freshSpellbook,
         composeSpell, rollOffers, takeOffer, moveModifier, wizardCombatDeck,
+        POT_COUNT, potYield, potStage, plantPot, harvestPot, growPots,
       } from './content.js';
       import { createAudio } from './audio.js';
       import { fxStyles, styleFor, soundFor, verbOf } from './fx.js';
@@ -1788,6 +1794,7 @@
         ready: els('ready'), start: els('start'), leave: els('leave'),
         run: els('run'), levelNote: els('level-note'),
         alchemistOnly: els('alchemist-only'), stash: els('stash'), recipes: els('recipes'),
+        garden: els('garden'), gardenHint: els('garden-hint'),
         leaveRun: els('leave-run'),
         preview: els('preview'), hold: els('hold'),
         combat: els('combat'), combatParty: els('combat-party'), leaveCombat: els('leave-combat'),
@@ -1988,6 +1995,8 @@
           player.ready = false;
           player.intent = null;
         });
+        // The garden grew while everyone was fighting.
+        room.pots = growPots(room.pots);
         // The library's round wage, exactly as the room pays it — the preview
         // always seats a wizard.
         room.pages += PAGES_PER_ROUND;
@@ -2017,6 +2026,7 @@
           stash: {}, pages: 2, events: [],
           salvage: { ...STARTING_SALVAGE }, upgrades: {}, power: 0,
           spellbook, offers: null,
+          pots: Array(POT_COUNT).fill(null),
           players: playableClasses().map((cls, i) => ({
             id: `p${i + 1}`, name: cls.name.replace(/^The /, ''),
             host: i === 0, connected: true, ready: false, down: false,
@@ -2480,6 +2490,22 @@
                 : `Raised the ${building.name}.`,
             });
             holding = null;
+          }
+        }else if(msg.t === 'intent' && msg.intent.t === 'plant'){
+          const cls = classById(you.classId);
+          const planted = cls?.craft && plantPot(room.pots, msg.intent.pot, msg.intent.herb, room.stash);
+          if(planted){
+            room.pots = planted.pots;
+            room.stash = planted.stash;
+            room.events.push({ t: 'log', text: `Planted a ${MATERIALS[msg.intent.herb].name} cutting.` });
+          }
+        }else if(msg.t === 'intent' && msg.intent.t === 'harvest'){
+          const cls = classById(you.classId);
+          const picked = cls?.craft && harvestPot(room.pots, msg.intent.pot, room.stash);
+          if(picked){
+            room.pots = picked.pots;
+            room.stash = picked.stash;
+            room.events.push({ t: 'log', text: `Harvested ${picked.yielded} ${MATERIALS[picked.herb].name} from the pot.` });
           }
         }else if(msg.t === 'intent' && msg.intent.t === 'page'){
           // The scriptorium, behind the same helpers the room uses, so the
@@ -3138,6 +3164,60 @@
         .filter(([r, n]) => (pool[r] || 0) < n)
         .map(([r, n]) => `${n - (pool[r] || 0)} ${SALVAGE[r].name}`);
 
+      /* ---- the garden ----------------------------------------------------- */
+
+      /* Three pots by the fire. A cutting planted now is worth nothing this
+         round; each round it waits it climbs the yield ladder — so every pot
+         is the same standing question: brew it this fight, or let it grow. */
+      function renderGarden(you, acting, canCraft){
+        if(!canCraft){
+          if(held && held.kind === 'cutting') held = null;
+          return;
+        }
+        const pots = room.pots || [];
+        ui.gardenHint.textContent = held && held.kind === 'cutting'
+          ? `Planting ${MATERIALS[held.id].name} — tap a pot.`
+          : pots.some(Boolean)
+            ? 'Each round in the pot climbs the yield. Tap a plant to harvest it.'
+            : 'Drag a herb from the stash into a pot, or tap the herb and tap the pot.';
+
+        ui.garden.replaceChildren();
+        pots.forEach((pot, index) => {
+          const card = document.createElement('button');
+          card.type = 'button';
+          card.className = 'card';
+          const body = document.createElement('span');
+          body.className = 'card-body';
+          const name = document.createElement('b');
+          name.className = 'card-name';
+          const line = document.createElement('span');
+          line.className = 'card-sub';
+          const note = document.createElement('span');
+          note.className = 'card-blurb';
+
+          if(pot){
+            name.textContent = MATERIALS[pot.herb].name;
+            line.style.color = 'var(--accent)';
+            line.textContent = `${potStage(pot.age)} · harvest for ${potYield(pot.age)}`;
+            note.textContent = potYield(pot.age + 1) > potYield(pot.age)
+              ? `Left alone: ${potYield(pot.age + 1)} next round.`
+              : 'As big as it gets. It is only getting older.';
+            card.disabled = !acting;
+            if(MATERIAL_ART[pot.herb]) card.prepend(pixels(MATERIAL_ART[pot.herb], 2));
+            card.onclick = () => { audio.sfx('brew'); send({ t: 'intent', intent: { t: 'harvest', pot: index } }); };
+          }else{
+            name.textContent = 'Empty pot';
+            line.textContent = 'holds one cutting';
+            note.textContent = held && held.kind === 'cutting' ? 'Plant it here.' : 'Soil from the clearing, still good.';
+            card.disabled = !acting || !(held && held.kind === 'cutting');
+            if(acting) placeable(card, { accept: 'cutting', pot: index });
+          }
+          body.append(name, line, note);
+          card.append(body);
+          ui.garden.append(card);
+        });
+      }
+
       /* ---- the scriptorium ------------------------------------------------ */
 
       /* The composed spell behind a card in this room, or null when it is an
@@ -3172,14 +3252,26 @@
       const spellLine = composed =>
         `${effectLabel(composed.verb)} ${composed.amount} · ${composed.charges} charge${composed.charges === 1 ? '' : 's'} a fight`;
 
-      /* The modifier being carried, by tap or by drag. One at a time: the
-         whole interaction is "this chip, that socket". */
-      let heldMod = null;
+      /* The thing being carried, by tap or by drag — a modifier bound for a
+         socket, or a herb cutting bound for a pot. One at a time: the whole
+         interaction is "this chip, that place". */
+      let held = null;                       // { kind: 'mod' | 'cutting', id }
       let dragGhost = null;
 
-      function sendMod(modId, drop){
-        heldMod = null;
-        send({ t: 'intent', intent: { t: 'mod', mod: modId, spell: drop.spell, pos: drop.pos ?? SPELL_SLOTS } });
+      const sameHeld = (a, b) => !!a && !!b && a.kind === b.kind && a.id === b.id;
+
+      /* A drop only lands on a place that accepts its kind: a cutting on a
+         socket is a cancel, not a mistake the server has to refuse. */
+      function sendDrop(carried, drop){
+        held = null;
+        if(carried.kind === 'mod' && drop.accept === 'mod'){
+          send({ t: 'intent', intent: { t: 'mod', mod: carried.id, spell: drop.spell, pos: drop.pos ?? SPELL_SLOTS } });
+        }else if(carried.kind === 'cutting' && drop.accept === 'cutting'){
+          audio.sfx('brew');
+          send({ t: 'intent', intent: { t: 'plant', pot: drop.pot, herb: carried.id } });
+        }else{
+          render();
+        }
       }
 
       /* Where a point on the screen would put a chip down. Sockets and the
@@ -3200,9 +3292,9 @@
          a drag, anything less is a tap that picks the chip up for a second tap
          to place. The preview gets played from phones, so the tap path is the
          reliable one and the drag is the delight. */
-      function grabbable(el, modId){
+      function grabbable(el, carried){
         el.classList.add('mod-chip');
-        if(heldMod === modId) el.dataset.held = 'true';
+        if(sameHeld(held, carried)) el.dataset.held = 'true';
         el.onpointerdown = e => {
           if(e.button) return;
           e.preventDefault();
@@ -3227,10 +3319,10 @@
             for(const hot of document.querySelectorAll('[data-hot]')) hot.removeAttribute('data-hot');
             if(dragging){
               const drop = dropTargetAt(ev.clientX, ev.clientY);
-              if(drop) sendMod(modId, drop);
-              else { heldMod = null; render(); }      // dropped on nothing: put it back
+              if(drop) sendDrop(carried, drop);
+              else { held = null; render(); }         // dropped on nothing: put it back
             }else{
-              heldMod = heldMod === modId ? null : modId;
+              held = sameHeld(held, carried) ? null : carried;
               render();
             }
           };
@@ -3239,19 +3331,20 @@
         };
       }
 
-      /* A tap target that places the held chip, if one is held. */
+      /* A tap target that places the held chip, if the held chip is the kind
+         of thing it takes. */
       function placeable(el, drop){
         el.dataset.drop = JSON.stringify(drop);
-        if(heldMod){
-          const holding = heldMod;
-          el.onclick = () => sendMod(holding, drop);
+        if(held && held.kind === drop.accept){
+          const carried = held;
+          el.onclick = () => sendDrop(carried, drop);
           el.style.cursor = 'copy';
         }
       }
 
       function renderWizard(you, acting, canCast){
         ui.wizardOnly.hidden = !canCast;
-        if(!canCast){ heldMod = null; return; }
+        if(!canCast){ if(held && held.kind === 'mod') held = null; return; }
         const book = room.spellbook || freshSpellbook();
         const slots = book.slots || {};
 
@@ -3321,7 +3414,7 @@
 
           const el = document.createElement('div');
           el.className = 'spell';
-          if(acting) placeable(el, { spell: spellId, pos: SPELL_SLOTS });
+          if(acting) placeable(el, { accept: 'mod', spell: spellId, pos: SPELL_SLOTS });
 
           const name = document.createElement('b');
           name.className = 'card-name';
@@ -3342,11 +3435,11 @@
             if(modId){
               socket.textContent = MODIFIERS[modId].name;
               socket.title = modLine(MODIFIERS[modId].op);
-              if(acting) grabbable(socket, modId);
+              if(acting) grabbable(socket, { kind: 'mod', id: modId });
             }else{
-              socket.textContent = heldMod ? 'set it here' : 'empty socket';
+              socket.textContent = held && held.kind === 'mod' ? 'set it here' : 'empty socket';
             }
-            if(acting) placeable(socket, { spell: spellId, pos: i });
+            if(acting) placeable(socket, { accept: 'mod', spell: spellId, pos: i });
             sockets.append(socket);
           }
           el.append(sockets);
@@ -3358,7 +3451,7 @@
           ? 'Not yet socketed. A chip out of a socket lands back here.'
           : 'Empty. What the drafts turn over waits here for a socket.';
         ui.satchel.replaceChildren();
-        if(acting) placeable(ui.satchel, { spell: null });
+        if(acting) placeable(ui.satchel, { accept: 'mod', spell: null });
         for(const [i, modId] of (book.satchel || []).entries()){
           const mod = MODIFIERS[modId];
           if(!mod) continue;
@@ -3366,10 +3459,10 @@
           chip.className = 'chip';
           chip.append(document.createTextNode(mod.name));
           chip.title = modLine(mod.op);
-          if(acting) grabbable(chip, modId);
+          if(acting) grabbable(chip, { kind: 'mod', id: modId });
           ui.satchel.append(chip);
         }
-        if(!(book.satchel || []).length && !heldMod){
+        if(!(book.satchel || []).length && !held){
           // Something for the drop zone to be, when there is nothing in it.
           ui.satchel.append(Object.assign(document.createElement('p'),
             { textContent: ' ' }));
@@ -3402,9 +3495,9 @@
         ui.alchemistOnly.hidden = !cls?.craft;
 
         ui.stash.replaceChildren();
-        const held = Object.entries(room.stash).filter(([, n]) => n > 0);
-        if(!held.length) ui.stash.append(Object.assign(document.createElement('p'), { textContent: 'Nothing gathered yet.' }));
-        for(const [material, count] of held){
+        const gathered = Object.entries(room.stash).filter(([, n]) => n > 0);
+        if(!gathered.length) ui.stash.append(Object.assign(document.createElement('p'), { textContent: 'Nothing gathered yet.' }));
+        for(const [material, count] of gathered){
           const chip = document.createElement('span');
           chip.className = 'chip';
           if(MATERIAL_ART[material]) chip.append(pixels(MATERIAL_ART[material], 2));
@@ -3413,8 +3506,12 @@
           n.className = 'count';
           n.textContent = `x${count}`;
           chip.append(n);
+          // For the Alchemist a stash chip is also a cutting: drag it to a
+          // pot, or tap it and tap the pot.
+          if(cls?.craft && acting) grabbable(chip, { kind: 'cutting', id: material });
           ui.stash.append(chip);
         }
+        renderGarden(you, acting, !!cls?.craft);
 
         renderWizard(you, acting, !!cls?.cast);
 

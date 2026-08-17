@@ -27,6 +27,7 @@ import {
   HAND_SIZE, RECIPES, brew, missingForBuilding, canBuildAt,
   SPELLS, MODIFIERS, PAGES_PER_ROUND, freshSpellbook, composeSpell,
   rollOffers, takeOffer, moveModifier, wizardCombatDeck,
+  POT_COUNT, plantPot, harvestPot, growPots,
   generateMap, generateCombatTerrain, respawnItems, spawnTile, pathTo,
   seededRandom, seedFromCode, readyState,
   ENEMIES, waveFor, enemyStats, salvageAfterCombat, addSalvage, spendSalvage,
@@ -88,6 +89,9 @@ class Room {
     // watch her work and the surge reads the arrangement.
     this.spellbook = freshSpellbook();
     this.offers = null;
+    // The Alchemist's pots, by the fire. Like the buildings, they persist
+    // across rounds — they are the part of her economy that compounds.
+    this.pots = Array(POT_COUNT).fill(null);
   }
 
   get maxPlayers(){ return Math.min(PARTY_SIZE, playableClasses().length); }
@@ -169,6 +173,7 @@ class Room {
       // secret the way a hand is.
       spellbook: this.spellbook,
       offers: this.offers,
+      pots: this.pots,
       players: this.players.map(p => ({
         id: p.id,
         name: p.name,
@@ -262,6 +267,9 @@ class Room {
     this.nodes = respawnItems(this.site, this.buildings, this.random);
     this.enemies = [];
     this.power = 0;
+
+    // The garden grew while everyone was fighting.
+    this.pots = growPots(this.pots);
 
     // The library pays out when there is somebody to read it. Income rather
     // than only foraging, because the draft is the Wizard's whole build phase
@@ -432,6 +440,8 @@ class Room {
       else if(intent.t === 'page') this.openPage(player, cls);
       else if(intent.t === 'pick') this.pickOffer(player, cls, intent);
       else if(intent.t === 'mod') this.moveMod(player, cls, intent);
+      else if(intent.t === 'plant') this.plant(player, cls, intent);
+      else if(intent.t === 'harvest') this.harvest(player, cls, intent);
       return this.broadcast();
     }
 
@@ -525,6 +535,29 @@ class Room {
     }else{
       this.log(`${UPGRADES[id].name}: bolts now hit for ${cardEffect('boltgun', this.upgrades).amount}.`);
     }
+  }
+
+  /* ---- the garden: the Alchemist's slow half -------------------------- */
+
+  /* Both gated on `craft`, like brewing: the pots are hers the way the
+     workbench is the Engineer's. The helpers refuse anything illegal, so
+     these are a move or a no-op, never a half-move. */
+  plant(player, cls, { pot, herb }){
+    if(!cls || !cls.craft) return;
+    const planted = plantPot(this.pots, pot, herb, this.stash);
+    if(!planted) return;
+    this.pots = planted.pots;
+    this.stash = planted.stash;
+    this.log(`${player.name} plants a ${MATERIALS[herb].name} cutting.`);
+  }
+
+  harvest(player, cls, { pot }){
+    if(!cls || !cls.craft) return;
+    const picked = harvestPot(this.pots, pot, this.stash);
+    if(!picked) return;
+    this.pots = picked.pots;
+    this.stash = picked.stash;
+    this.log(`${player.name} harvests ${picked.yielded} ${MATERIALS[picked.herb].name} from the pot.`);
   }
 
   /* ---- the scriptorium: the Wizard's build phase ---------------------- */
