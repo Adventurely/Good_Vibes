@@ -1,0 +1,41 @@
+# Publish public/ to GitHub Pages whenever the `preview` branch moves.
+#
+# This is the single-player preview channel: Pages is static, so the game is
+# reachable only through its offline ?preview mode — rooms and the WebSocket
+# need the real server and are not served here. The live multiplayer deploy
+# stays what it has always been: a push to main, via publish-to-tool-haven.
+#
+# public/ ships verbatim, no build step — what you push is what you play at
+#   https://adventurely.github.io/Good_Vibes/play.html?preview
+# To publish any branch's state: git push origin HEAD:preview --force
+name: preview-pages
+
+on:
+  push:
+    branches: [preview]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One preview site; a newer push simply replaces a deploy still in flight.
+concurrency:
+  group: preview-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+      - id: deployment
+        uses: actions/deploy-pages@v4
