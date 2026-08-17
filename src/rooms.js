@@ -23,11 +23,11 @@ import {
   CLASSES, classById, playableClasses,
   MATERIALS, SALVAGE, CACHE_YIELD, STARTING_SALVAGE,
   BUILDINGS, UPGRADES, upgradeCost, buyUpgrade, canBuildMore, powerFrom,
-  CARDS, cardById, cardEffect, cardPlayable, deckFor, shuffle, draw, discardHand,
+  CARDS, cardById, cardEffect, cardPlayable, shuffle, draw, discardHand,
   HAND_SIZE, RECIPES, brew, missingForBuilding, canBuildAt,
   SPELLS, MODIFIERS, PAGES_PER_ROUND, freshSpellbook, composeSpell,
   rollOffers, takeOffer, moveModifier, wizardCombatDeck, draftableCount,
-  POT_COUNT, plantPot, harvestPot, growPots,
+  POT_COUNT, plantPot, harvestPot, growPots, classKit,
   generateMap, generateCombatTerrain, respawnItems, spawnTile, pathTo,
   seededRandom, seedFromCode, readyState,
   ENEMIES, waveFor, enemyStats, salvageAfterCombat, addSalvage, spendSalvage,
@@ -240,9 +240,10 @@ class Room {
       if(!cls) continue;
       p.hp = cls.hp;
       p.maxHp = cls.hp;
-      // The Wizard's deck is the book's shadow from the first minute: what the
-      // deck list shows in a build phase is what the surge will deal.
-      p.deck = cls.cast ? wizardCombatDeck(this.spellbook) : deckFor(cls.id);
+      // Every class opens with its kit — six basics, nothing else. The
+      // Wizard's is the book's shadow from the first minute: what the deck
+      // list shows in a build phase is what the surge will deal.
+      p.deck = cls.cast ? wizardCombatDeck(this.spellbook) : classKit(cls.id);
       p.discard = [];
       p.hand = [];
       p.down = false;
@@ -276,7 +277,7 @@ class Room {
     // and a round with no page is a round spent watching.
     if(this.players.some(p => (classById(p.classId) || {}).cast)){
       this.pages += PAGES_PER_ROUND;
-      this.log(`The library gives up ${PAGES_PER_ROUND} pages.`);
+      this.log(`The library gives up ${PAGES_PER_ROUND} page${PAGES_PER_ROUND === 1 ? '' : 's'}.`);
     }
 
     this.players.forEach((p, i) => {
@@ -480,6 +481,9 @@ class Room {
     const node = this.nodes.find(n => n.x === player.x && n.y === player.y && !n.taken);
     if(!node) return;
     const cls = classById(player.classId);
+    // A herb is the Alchemist's to bend down for — anyone else walks over it
+    // and it stays where it grew. Caches and pages are for whoever gets there.
+    if(node.kind === 'herb' && !(cls && cls.craft)) return;
     node.taken = true;
 
     if(node.kind === 'herb'){

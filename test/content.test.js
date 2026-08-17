@@ -23,8 +23,8 @@ import {
   CAMP_X, CAMP_Y, CAMP_RADIUS, TENT_Y, inCamp,
   STAT_KEYS, STAT_LABELS, STAT_SHORT, blankStats, runHighlights,
   SPELLS, MODIFIERS, MODIFIER_WEIGHTS, SPELL_SLOTS, PAGES_PER_ROUND,
-  WIZARD_BASE_KIT, freshSpellbook, composeSpell, rollOffers, takeOffer,
-  moveModifier, wizardCombatDeck, ownedModifiers, draftableCount,
+  WIZARD_BASE_KIT, CLASS_KITS, classKit, freshSpellbook, composeSpell,
+  rollOffers, takeOffer, moveModifier, wizardCombatDeck, ownedModifiers, draftableCount,
   POT_COUNT, potYield, potStage, plantPot, harvestPot, growPots,
 } from '../public/content.js';
 
@@ -302,13 +302,13 @@ test('a Splitting Sigil turns a strike into the whole lane, for less each', () =
   assert.equal(composeSpell('nova', ['split']).verb, 'strikeAll');
 });
 
-test('the draft is seeded, distinct, and never offers what she knows or owns', () => {
+test('the draft is seeded, distinct within itself, and open to duplicates across drafts', () => {
   const book = freshSpellbook();
   const first = rollOffers(seededRandom(42), book);
   const again = rollOffers(seededRandom(42), book);
   assert.deepEqual(first, again, 'the same seed must turn over the same draft');
   assert.equal(first.length, 3);
-  assert.equal(new Set(first.map((o) => `${o.type}:${o.id}`)).size, 3, 'three distinct options');
+  assert.equal(new Set(first.map((o) => `${o.type}:${o.id}`)).size, 3, 'three distinct options in one draft');
   for (const offer of first) {
     if (offer.type === 'spell') {
       assert.ok(SPELLS[offer.id], `offered spell "${offer.id}" does not exist`);
@@ -318,31 +318,30 @@ test('the draft is seeded, distinct, and never offers what she knows or owns', (
     }
   }
 
-  // Each modifier exists once: owning it — socketed or in the satchel —
-  // takes it off the table, so the worked example's 30 is a ceiling and a
-  // third Kindling cannot double past it.
-  const owned = {
-    known: ['fireball'],
-    satchel: ['kindling'],
-    slots: { fireball: ['twin'] },
-  };
-  for (let seed = 1; seed <= 30; seed++) {
+  // Duplicates are a real find: a modifier she already owns can turn up
+  // again. Rares stay rare through the weights instead — pinned as a ratio
+  // so a rebalance cannot quietly make Twin Cores common.
+  const owned = { known: ['fireball'], satchel: ['kindling'], slots: { fireball: ['twin'] } };
+  const offered = new Set();
+  for (let seed = 1; seed <= 60; seed++) {
     for (const offer of rollOffers(seededRandom(seed), owned)) {
-      assert.ok(!(offer.type === 'mod' && ['kindling', 'twin'].includes(offer.id)),
-        'a modifier she owns is not an offer');
+      if (offer.type === 'mod') offered.add(offer.id);
     }
   }
+  assert.ok(offered.has('kindling'), 'an owned modifier can be drafted again');
+  assert.ok(MODIFIER_WEIGHTS.common >= MODIFIER_WEIGHTS.rare * 8,
+    'a rare should be a fraction of a common, not a peer');
 
-  // And a book that holds everything has nothing left to draft — the count
-  // the room and the button both read before letting a page be spent.
+  // A book that knows every spell still drafts modifiers — a page always has
+  // something to open.
   const everything = {
     known: Object.keys(SPELLS),
     satchel: Object.keys(MODIFIERS),
     slots: Object.fromEntries(Object.keys(SPELLS).map((id) => [id, []])),
   };
-  assert.equal(draftableCount(everything), 0);
-  assert.deepEqual(rollOffers(seededRandom(1), everything), [], 'an empty pool offers nothing');
-  assert.ok(draftableCount(freshSpellbook()) > 0);
+  assert.ok(draftableCount(everything) > 0);
+  assert.equal(rollOffers(seededRandom(1), everything).length, 3);
+  assert.ok(rollOffers(seededRandom(1), everything).every((o) => o.type === 'mod'));
 });
 
 test('the bench refuses what the book cannot hold', () => {
@@ -363,13 +362,34 @@ test('the bench refuses what the book cannot hold', () => {
 
 test('the deck the book deals is the kit plus the charges', () => {
   const fresh = wizardCombatDeck(freshSpellbook());
-  const kit = Object.values(WIZARD_BASE_KIT).reduce((a, b) => a + b, 0) + UNIVERSAL_CARDS.length;
+  const kit = Object.values(WIZARD_BASE_KIT).reduce((a, b) => a + b, 0);
   assert.equal(fresh.length, kit + SPELLS.fireball.charges);
   assert.equal(fresh.filter((id) => id === 'fireball').length, SPELLS.fireball.charges);
 
   const echoed = wizardCombatDeck({ known: ['fireball'], satchel: [], slots: { fireball: ['echo'] } });
   assert.equal(echoed.filter((id) => id === 'fireball').length, SPELLS.fireball.charges + 1,
     'an Echo Script is another copy in the deal');
+});
+
+test('every class opens with the same six basics wearing different names', () => {
+  for (const cls of playableClasses()) {
+    const kit = classKit(cls.id);
+    assert.equal(kit.length, 6, `${cls.id}: three attacks and three wards, nothing else`);
+    const attacks = kit.filter((id) => CARDS[id].kind === 'attack');
+    const defends = kit.filter((id) => CARDS[id].kind === 'defend');
+    assert.equal(attacks.length, 3, `${cls.id}: three basic attacks`);
+    assert.equal(defends.length, 3, `${cls.id}: three basic wards`);
+    for (const id of kit) {
+      assert.equal(CARDS[id].classId, cls.id, `${cls.id}: "${id}" wears the class's name`);
+      assert.equal(CARDS[id].effect.amount, 3,
+        `${cls.id}: "${id}" — the basics are identical under the rename, all at 3`);
+    }
+    // The rename is real: no two classes share a basic card id.
+    for (const other of playableClasses()) {
+      if (other.id === cls.id) continue;
+      for (const id of kit) assert.ok(!classKit(other.id).includes(id));
+    }
+  }
 });
 
 test('an invested Fireball out-hits an invested Bolt Gun', () => {
@@ -1463,6 +1483,8 @@ const PUBLISHED = [
   'ownedModifiers', 'draftableCount',
   // the garden
   'POT_COUNT', 'potYield', 'potStage', 'plantPot', 'harvestPot', 'growPots',
+  // the kits
+  'CLASS_KITS', 'classKit', 'WIZARD_BASE_KIT',
 ];
 
 test('every name this module has ever published is still exported', async () => {

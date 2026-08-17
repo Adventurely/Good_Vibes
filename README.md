@@ -396,9 +396,9 @@ for 4, 2 charges; Lend a Page, might 4, 2 charges) and `MODIFIERS` the ten
 inks, from a plain `+5 damage` to a rare `x2 damage, -1 charge`. A spell has
 **three sockets**; modifiers drag in, out, and between spells freely in any
 build phase — and their order is the arithmetic's order. Kindling into a Twin
-Core is `(10+5)x2 = 30`; the same two sockets reversed are 25. Each modifier
-exists exactly once, so that 30 is the ceiling the example promises, not a
-floor a second doubler slips past.
+Core is `(10+5)x2 = 30`; the same two sockets reversed are 25. Duplicates are
+a real find — a second Kindling can turn up, and two spells can carry the
+same ink — with rares kept genuinely rare by `MODIFIER_WEIGHTS` instead.
 
 **Charges are copies in the deck.** At every surge the Wizard's deck is
 written fresh from the book: her slim kit plus `charges` copies of each spell
@@ -424,8 +424,11 @@ a seal that pays in blood but can never take the caster's last point.
 Point, click, walk. A click on the map names a destination; `pathTo` finds the
 route with a breadth-first flood over walkable ground, and the sprite is stepped
 along it a tile at a time so distance is something the player watches rather
-than reads. Walking onto a herb picks it up — having to click it again would be
-a second click for a decision already made.
+than reads. Walking onto a node picks it up — having to click it again would be
+a second click for a decision already made. Herbs are the exception with a
+rule of their own: only the Alchemist can bend down for one; anyone else
+walks over it and it stays where it grew. Caches and pages are for whoever
+gets there.
 
 Routing is pure and shared for the usual reason: the room has to be able to
 check that a click was reachable rather than trust a client that says it walked
@@ -447,13 +450,15 @@ and a planning problem you cannot coordinate is just a wait. Discarding the
 whole hand is what keeps a turn atomic: nobody holds a card for three rounds
 waiting for a setup the other four cannot see coming.
 
-A deck is ten cards — eight class cards plus the two universals, `strike` and
-`hold` — so at three a turn it cycles about every three turns and a fight sees
-the whole thing twice. The universals are the floor of a turn rather than a
-choice: something to swing and something to duck behind, so no hand is ever
-three cards you cannot afford. Strike hits for 3, the weakest attack in the
-game on purpose — a party that spent its round on economy and drew nothing is
-still in the fight, but only just.
+Every class opens with the same six cards wearing different names: three
+basic attacks and three basic wards, all at 3 (`CLASS_KITS` — the Alchemist's
+flasks and steady hands, the Engineer's wrenches and shoring, the Wizard's
+sparks and signs). The basics are the floor of a turn and nothing more;
+everything a class actually *is* comes out of its build phase, so the deck a
+fight sees is six basics plus whatever the round paid for. At three cards a
+turn a kit cycles fast, and a player learns what is in theirs by round two.
+(`STARTING_DECKS` and the `strike`/`hold` universals still exist for the
+deployed Worker, which deals the older decks.)
 
 `deckFor(classId)` builds the opening deck once, and everything after that adds
 to it in place — the Alchemist brewing, the Engineer buying a barrel. A deck
@@ -621,10 +626,11 @@ you did not. It is also the only pool that is *hidden from the rest of the
 party*, because nobody else can spend it and a number you cannot use is one you
 learn to skip past.
 
-The Engineer opens holding one **Bolt Gun**: 1 power for a strike of 9, the
-hardest hit in any opening deck. It is not consumed — the gun is a gun, not a
-potion — so it cycles back through the discard like any basic. What changes is
-how many there are and how hard they hit, and both are bought at the workbench:
+The **Bolt Gun** — 1 power for a strike of 9 — arrives with the first Second
+Barrel: the Engineer builds her gun the way the Wizard writes her spells. It
+is not consumed — the gun is a gun, not a potion — so it cycles back through
+the discard like any basic. How many there are and how hard they hit are both
+bought at the workbench:
 
 | Upgrade | Base cost | Does |
 | --- | --- | --- |
@@ -696,14 +702,14 @@ node test/balance.mjs 1000        a tighter interval
 node test/balance.mjs 400 1       one table size
 ```
 
-The target is 60%. At the numbers currently in `content.js` it lands **69% /
-63% / 78%** for one, two and three players, and the harness prints per-class
-damage under each row so the composition behind a number is visible. The full
-table runs friendliest on purpose: it is the only one with a Wizard, she is
-the party's damage by design (about double anyone else's), and the harness
-plays her bench well. The threat values are coarse (1, 2, 3.5), so a tenth of
-a point can flip a whole enemy into or out of a wave and move a win rate forty
-points — tune with the harness open, never by eye.
+The target is 60%. At the numbers currently in `content.js` it lands **63% /
+51% / 69%** for one, two and three players, and the harness prints per-class
+damage under each row so the composition behind a number is visible. The
+two-player table is the one without a Wizard — she is the party's damage by
+design (about double anyone else's) — which is why it runs hardest. The
+threat values are coarse (1, 2, 3.5), so a tenth of a point can flip a whole
+enemy into or out of a wave and move a win rate forty points — tune with the
+harness open, never by eye.
 
 #### What the blight leaves behind
 

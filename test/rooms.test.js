@@ -713,3 +713,37 @@ test('the pots are the alchemist\'s, they grow between rounds, and they pay on h
   room.handle(seats[0], { t: 'intent', intent: { t: 'harvest', pot: 0 } });
   assert.equal(room.stash.sunpetal, 1 + potYield(1), 'a round of patience pays');
 });
+
+test('a herb stays in the ground for anyone who cannot brew', () => {
+  const room = roomFor(`herbs-${++codes}`);
+  const seats = ['wizard', 'alchemist'].map((classId, i) => {
+    const player = room.join(`herbs-token-${codes}-${i}`, fakeSocket());
+    room.handle(player, { t: 'class', classId });
+    return player;
+  });
+  room.handle(seats[0], { t: 'start' });
+
+  const herb = room.nodes.find(n => n.kind === 'herb');
+  assert.ok(herb, 'a site always grows herbs');
+
+  // The wizard walks onto it and it stays where it grew.
+  seats[0].x = herb.x; seats[0].y = herb.y;
+  room.pickUp(seats[0]);
+  assert.equal(herb.taken, false, 'the wizard does not know which end to keep');
+  assert.equal(Object.keys(room.stash).length, 0);
+
+  // The alchemist bends down for it, at her doubled yield.
+  seats[1].x = herb.x; seats[1].y = herb.y;
+  room.pickUp(seats[1]);
+  assert.equal(herb.taken, true);
+  assert.equal(room.stash[herb.material], 2);
+
+  // Pages are still anyone's to fetch.
+  const pages = room.nodes.find(n => n.kind === 'pages' && !n.taken);
+  if(pages){
+    const before = room.pages;
+    seats[0].x = pages.x; seats[0].y = pages.y;
+    room.pickUp(seats[0]);
+    assert.equal(room.pages, before + 1, 'the party carries the library');
+  }
+});

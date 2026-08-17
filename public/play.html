@@ -370,12 +370,20 @@
       .spell { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 0.6rem; }
       .sockets { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; }
       .socket {
-        min-height: 1.9rem; min-width: 6rem; padding: 0.2rem 0.5rem;
-        border: 1px dashed var(--line); border-radius: 999px;
-        display: inline-flex; align-items: center; gap: 0.3rem;
-        font-size: 0.72rem; color: var(--muted);
+        min-height: 2.4rem; min-width: 7rem; padding: 0.25rem 0.5rem;
+        border: 1px dashed var(--line); border-radius: 8px;
+        display: inline-flex; flex-direction: column; justify-content: center; gap: 0.1rem;
+        font-size: 0.72rem; color: var(--muted); text-align: left;
       }
       .socket[data-filled='true'] { border-style: solid; color: var(--text); cursor: grab; touch-action: none; }
+      /* What a socketed or satchel modifier actually does, always in view —
+         a name alone made every chip a memory test. */
+      .mod-what { display: block; font-size: 0.62rem; color: var(--muted); }
+      .mod-name { display: inline-flex; align-items: center; gap: 0.3rem; }
+      /* A card title keeps its own line even when it carries an icon. */
+      b.card-name.mod-name { display: flex; }
+      .stat-line { display: inline-flex; align-items: center; gap: 0.3rem; }
+      .stat-line b { color: var(--sun); font-variant-numeric: tabular-nums; }
       .socket[data-hot='true'] { border-color: var(--sun); color: var(--text); }
       .chip[data-held='true'], .socket[data-held='true'] { border-color: var(--sun); }
       .mod-chip { cursor: grab; touch-action: none; }
@@ -733,7 +741,7 @@
         AILMENTS, effectName, effectLabel, hasEffect, strikePower, ailmentOnHit,
         STAT_KEYS, STAT_LABELS, STAT_SHORT, blankStats, runHighlights,
         addAilment, tickEffects, effectAmount, clearAilments,
-        HAND_SIZE, CARDS, deckFor, shuffle, draw, discardHand, cardById, cardPlayable,
+        HAND_SIZE, CARDS, classKit, shuffle, draw, discardHand, cardById, cardPlayable,
         missingForBuilding, canBuildAt,
         salvageAfterCombat, addSalvage, spendSalvage,
         SPELLS, MODIFIERS, SPELL_SLOTS, PAGES_PER_ROUND, freshSpellbook,
@@ -2001,7 +2009,7 @@
         // The library's round wage, exactly as the room pays it — the preview
         // always seats a wizard.
         room.pages += PAGES_PER_ROUND;
-        room.events.push({ t: 'log', text: `The library gives up ${PAGES_PER_ROUND} pages.` });
+        room.events.push({ t: 'log', text: `The library gives up ${PAGES_PER_ROUND} page${PAGES_PER_ROUND === 1 ? '' : 's'}.` });
         const cardText = phaseCard(room.round, PHASES.build);
         room.events.push({ t: 'phase', ...cardText });
       }
@@ -2038,7 +2046,7 @@
             // and a building adds to everyone's, so rebuilding it at the surge
             // would throw away the round's whole point. The Wizard's is the
             // exception either way: hers is the book's shadow.
-            deck: cls.cast ? wizardCombatDeck(spellbook) : deckFor(cls.id), discard: [], hand: [],
+            deck: cls.cast ? wizardCombatDeck(spellbook) : classKit(cls.id), discard: [], hand: [],
           })),
         };
         demoEnterBuild();
@@ -2557,9 +2565,16 @@
               room.events.push({ t: 'log', text: `Found ${CACHE_YIELD.pages} spell page.` });
             }else{
               const cls = CLASSES.find(c => c.id === you.classId);
-              const yielded = cls ? cls.gather : 1;
-              room.stash[node.material] = (room.stash[node.material] || 0) + yielded;
-              room.events.push({ t: 'log', text: `Gathered ${yielded} ${MATERIALS[node.material].name}.` });
+              if(!cls?.craft){
+                // A herb is the Alchemist's to bend down for; anyone else
+                // walks over it and it stays where it grew.
+                node.taken = false;
+                room.events.push({ t: 'log', text: `Only the Alchemist knows which end of a ${MATERIALS[node.material].name} to keep.` });
+              }else{
+                const yielded = cls.gather;
+                room.stash[node.material] = (room.stash[node.material] || 0) + yielded;
+                room.events.push({ t: 'log', text: `Gathered ${yielded} ${MATERIALS[node.material].name}.` });
+              }
             }
           }
         }
@@ -3250,8 +3265,33 @@
         return bits.join(', ');
       }
 
-      const spellLine = composed =>
-        `${effectLabel(composed.verb)} ${composed.amount} · ${composed.charges} charge${composed.charges === 1 ? '' : 's'} a fight`;
+      /* The icon a modifier wears: what it mostly does, as the card kinds the
+         player already reads in a hand. */
+      const opIcon = op =>
+        op.leech ? 'heal'
+        : op.selfWard ? 'defend'
+        : (op.charges > 0 || op.opening) ? 'buff'
+        : 'attack';
+
+      const iconOf = kind => CARD_ART[kind] ? pixels(CARD_ART[kind], 1) : document.createTextNode('');
+
+      /* A spell's live numbers with the effect drawn, not spelled: the same
+         glyphs a hand of cards uses, so the bench reads like the fight will. */
+      function spellStats(composed){
+        const line = document.createElement('span');
+        line.className = 'card-sub stat-line';
+        line.style.color = 'var(--accent)';
+        line.append(iconOf(composed.verb === 'might' ? 'buff' : composed.kind === 'buff' ? 'buff' : 'attack'));
+        const amount = document.createElement('b');
+        amount.textContent = composed.amount;
+        line.append(amount);
+        const tail = composed.verb === 'strikeAll' ? 'to everything'
+          : composed.verb === 'might' ? 'lent'
+          : '';
+        line.append(document.createTextNode(
+          `${tail ? ` ${tail}` : ''} · x${composed.charges} a fight`));
+        return line;
+      }
 
       /* The thing being carried, by tap or by drag — a modifier bound for a
          socket, or a herb cutting bound for a pot. One at a time: the whole
@@ -3389,15 +3429,20 @@
           const body = document.createElement('span');
           body.className = 'card-body';
           const name = document.createElement('b');
-          name.className = 'card-name';
-          name.textContent = spec.name;
+          name.className = 'card-name mod-name';
+          name.append(iconOf(isSpell ? 'attack' : opIcon(spec.op)), document.createTextNode(spec.name));
           const rarity = document.createElement('span');
           rarity.className = 'rarity';
           rarity.textContent = isSpell ? 'new spell' : spec.rarity;
-          const gives = document.createElement('span');
-          gives.className = 'card-sub';
-          gives.style.color = 'var(--accent)';
-          gives.textContent = isSpell ? spellLine(composeSpell(offer.id, [])) : modLine(spec.op);
+          let gives;
+          if(isSpell){
+            gives = spellStats(composeSpell(offer.id, []));
+          }else{
+            gives = document.createElement('span');
+            gives.className = 'card-sub';
+            gives.style.color = 'var(--accent)';
+            gives.textContent = modLine(spec.op);
+          }
           const note = document.createElement('span');
           note.className = 'card-blurb';
           note.textContent = spec.note;
@@ -3423,11 +3468,7 @@
           const name = document.createElement('b');
           name.className = 'card-name';
           name.textContent = composed.name;
-          const line = document.createElement('span');
-          line.className = 'card-sub';
-          line.style.color = 'var(--accent)';
-          line.textContent = spellLine(composed);
-          el.append(name, line);
+          el.append(name, spellStats(composed));
 
           const sockets = document.createElement('span');
           sockets.className = 'sockets';
@@ -3437,8 +3478,15 @@
             socket.className = 'socket';
             socket.dataset.filled = String(!!modId);
             if(modId){
-              socket.textContent = MODIFIERS[modId].name;
-              socket.title = modLine(MODIFIERS[modId].op);
+              // Name and effect both, always: a socket the player has to
+              // hover or remember is a socket they stop reading.
+              const label = document.createElement('span');
+              label.className = 'mod-name';
+              label.append(iconOf(opIcon(MODIFIERS[modId].op)), document.createTextNode(MODIFIERS[modId].name));
+              const what = document.createElement('span');
+              what.className = 'mod-what';
+              what.textContent = modLine(MODIFIERS[modId].op);
+              socket.append(label, what);
               if(acting) grabbable(socket, { kind: 'mod', id: modId });
             }else{
               socket.textContent = held && held.kind === 'mod' ? 'set it here' : 'empty socket';
@@ -3461,8 +3509,12 @@
           if(!mod) continue;
           const chip = document.createElement('span');
           chip.className = 'chip';
-          chip.append(document.createTextNode(mod.name));
-          chip.title = modLine(mod.op);
+          chip.append(iconOf(opIcon(mod.op)), document.createTextNode(mod.name));
+          const what = document.createElement('span');
+          what.className = 'mod-what';
+          what.style.display = 'inline';
+          what.textContent = ` — ${modLine(mod.op)}`;
+          chip.append(what);
           if(acting) grabbable(chip, { kind: 'mod', id: modId });
           ui.satchel.append(chip);
         }

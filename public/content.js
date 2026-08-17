@@ -728,7 +728,7 @@ export const CARDS = {
   },
   steady: {
     name: 'Steady Hands', kind: 'defend', classId: 'alchemist',
-    effect: { kind: 'ward', amount: 4, rounds: 1 },
+    effect: { kind: 'ward', amount: 3, rounds: 1 },
     note: 'Do not spill it. Do not spill it.',
   },
   tonic: {
@@ -753,12 +753,12 @@ export const CARDS = {
   /* --- the Engineer: hits like a tool, holds like a wall --- */
   wrench: {
     name: 'Wrench', kind: 'attack', classId: 'engineer',
-    effect: { kind: 'strike', amount: 4 },
+    effect: { kind: 'strike', amount: 3 },
     note: 'Forty centimetres of drop-forged persuasion.',
   },
   shore: {
     name: 'Shore Up', kind: 'defend', classId: 'engineer',
-    effect: { kind: 'ward', amount: 5, rounds: 1 },
+    effect: { kind: 'ward', amount: 3, rounds: 1 },
     note: 'Plating, a strut, and eleven seconds. It will hold.',
   },
   /* Guard on everyone, worse per head than Shore Up on one. That trade is the
@@ -1246,11 +1246,12 @@ export const growPots = pots =>
 
 export const SPELL_SLOTS = 3;
 
-/* Pages the library yields at the start of each build phase, on top of
-   whatever the map is holding. Income rather than only foraging, because the
-   draft is the class's whole game and a round with no page is a round the
-   Wizard spent watching other people play theirs. */
-export const PAGES_PER_ROUND = 2;
+/* Pages the library yields at the start of each build phase: one directly,
+   with one more on the ground for whoever walks to it. Income rather than
+   only foraging, because the draft is the class's whole game and a round
+   with no page is a round the Wizard spent watching other people play
+   theirs. */
+export const PAGES_PER_ROUND = 1;
 
 /* The three bones every build starts from. `verb` is an EFFECT_KINDS entry —
  * the engine resolves a crafted spell exactly as it resolves a card, so a
@@ -1289,7 +1290,7 @@ export const SPELLS = {
  *   pageOnKill a kill with it puts pages back in the library
  *   opening    one copy is dealt into the surge's first hand
  */
-export const MODIFIER_WEIGHTS = { common: 5, uncommon: 3, rare: 1 };
+export const MODIFIER_WEIGHTS = { common: 8, uncommon: 4, rare: 1 };
 
 export const MODIFIERS = {
   kindling: {
@@ -1397,13 +1398,13 @@ export const ownedModifiers = spellbook => [
   ...Object.values(spellbook.slots || {}).flat(),
 ];
 
-/* The draft a page turns over: three distinct options from what she does not
- * know and does not own. Each modifier exists once — the worked example's 30
- * is the ceiling a Fireball can reach, not the floor a lucky third Kindling
- * doubles past — and it keeps every draft a draft of new things. Spells she
- * has not learned are weighted like an uncommon find; modifiers by their
- * rarity. The generator is the room's, as everywhere — a draft that rolled
- * differently on a replay would be a draft the room cannot stand behind.
+/* The draft a page turns over: three distinct options from the spells she
+ * has not learned and the whole modifier list — duplicates are allowed, so a
+ * second Kindling is a real find and two spells can carry the same ink.
+ * Unlearned spells are weighted like an uncommon find; modifiers by their
+ * rarity, and rares are genuinely rare. The generator is the room's, as
+ * everywhere — a draft that rolled differently on a replay would be a draft
+ * the room cannot stand behind.
  */
 export const SPELL_OFFER_WEIGHT = 3;
 
@@ -1412,9 +1413,8 @@ export function rollOffers(random, spellbook, count = 3){
   for(const id of Object.keys(SPELLS)){
     if(!(spellbook.known || []).includes(id)) pool.push({ type: 'spell', id, weight: SPELL_OFFER_WEIGHT });
   }
-  const owned = ownedModifiers(spellbook);
   for(const [id, mod] of Object.entries(MODIFIERS)){
-    if(!owned.includes(id)) pool.push({ type: 'mod', id, weight: MODIFIER_WEIGHTS[mod.rarity] || 1 });
+    pool.push({ type: 'mod', id, weight: MODIFIER_WEIGHTS[mod.rarity] || 1 });
   }
 
   const offers = [];
@@ -1433,11 +1433,12 @@ export function rollOffers(random, spellbook, count = 3){
 }
 
 /* How much the library can still surprise her with: spells unlearned plus
-   modifiers unowned. Zero means a page has nothing left to open, and both
-   the room and the button read this so neither can spend one on nothing. */
+   the whole modifier list, since duplicates are allowed — in practice a page
+   always has something to open, and the guard survives only for the day a
+   content change empties the pool again. */
 export const draftableCount = spellbook =>
   Object.keys(SPELLS).filter(id => !(spellbook.known || []).includes(id)).length +
-  Object.keys(MODIFIERS).filter(id => !ownedModifiers(spellbook).includes(id)).length;
+  Object.keys(MODIFIERS).length;
 
 /* Take one offer into the book. Returns the next spellbook, or null if the
    index is not an offer — the caller cannot half-apply a pick. */
@@ -1487,23 +1488,40 @@ export function moveModifier(spellbook, modId, spellId = null, pos = SPELL_SLOTS
   return { ...spellbook, satchel, slots };
 }
 
-/* The base the Wizard fights with before the book has its say. Slimmer than
-   the old fixed deck on purpose: the crafted copies are the class now, and
-   the kit is what stops a bare round-one book from being an empty hand. */
-export const WIZARD_BASE_KIT = { spark: 3, sign: 2 };
+/* Every class opens with the same six cards wearing different names: three
+ * basic attacks and three basic wards, all at 3. The basics are the floor of
+ * a turn and nothing more — everything a class actually *is* comes out of its
+ * build phase: the Alchemist's brews and garden, the Engineer's buildings
+ * and workbench (the first barrel is where her bolt gun comes from now), the
+ * Wizard's book. Local rooms and the preview deal from here; STARTING_DECKS
+ * below is kept as-is because the deployed Worker still deals from it.
+ */
+export const CLASS_KITS = {
+  alchemist: { flask: 3, steady: 3 },
+  engineer: { wrench: 3, shore: 3 },
+  wizard: { spark: 3, sign: 3 },
+};
 
-/* The deck the Wizard takes into a surge: the kit, the universals, and
- * `charges` copies of every spell in the book, as composed right now. The
- * copies are consumed when played and re-dealt here next surge — the room
- * rebuilds this at every enterCombat, which is what makes charges per-combat
- * without a counter anywhere.
+/* The kit as a flat, unshuffled list of card ids. */
+export function classKit(classId){
+  const cards = [];
+  for(const [id, n] of Object.entries(CLASS_KITS[classId] || {})){
+    for(let i = 0; i < n; i++) cards.push(id);
+  }
+  return cards;
+}
+
+/* Kept as an alias for anything already reading the Wizard's kit by name. */
+export const WIZARD_BASE_KIT = CLASS_KITS.wizard;
+
+/* The deck the Wizard takes into a surge: the kit and `charges` copies of
+ * every spell in the book, as composed right now. The copies are consumed
+ * when played and re-dealt here next surge — the room rebuilds this at every
+ * enterCombat, which is what makes charges per-combat without a counter
+ * anywhere.
  */
 export function wizardCombatDeck(spellbook){
-  const deck = [];
-  for(const [id, n] of Object.entries(WIZARD_BASE_KIT)){
-    for(let i = 0; i < n; i++) deck.push(id);
-  }
-  deck.push(...UNIVERSAL_CARDS);
+  const deck = classKit('wizard');
   for(const spellId of (spellbook && spellbook.known) || []){
     const composed = composeSpell(spellId, (spellbook.slots || {})[spellId]);
     if(!composed) continue;
@@ -1562,7 +1580,7 @@ export const ENEMIES = {
  * Both are per *extra* player, so ENEMIES holds the solo fight and this holds
  * how it grows.
  */
-export const BOSS_SCALING = { hp: 22, hits: 3 };
+export const BOSS_SCALING = { hp: 20, hits: 2 };
 
 /* An enemy's numbers for this table. Everything but the boss is what the table
    says it is; levelling the rest is waveFor's job and doing it twice would
@@ -1610,12 +1628,12 @@ export function ailmentOnHit(type, landed){
  *
  * These are measured, not guessed. test/balance.mjs plays whole runs per
  * table size against them and reports the win rate; at the numbers below it
- * lands 69% / 63% / 78% for one, two and three players, against a target of
- * 60. The full table runs friendliest on purpose: it is the only one with a
- * Wizard, she is the party's damage by design, and the harness plays her
- * bench well. Change these with that harness open rather than by eye — the
- * threat values are coarse (1, 2, 3.5), so a tenth of a point here can flip a
- * whole enemy into or out of a wave and move a win rate forty points.
+ * lands 63% / 51% / 69% for one, two and three players, against a target of
+ * 60. The harness's two-player table is the one without a Wizard — she is
+ * the party's damage by design — which is why it runs hardest. Change these
+ * with that harness open rather than by eye — the threat values are coarse
+ * (1, 2, 3.5), so a tenth of a point here can flip a whole enemy into or out
+ * of a wave and move a win rate forty points.
  *
  * Round four's number is low because it buys the boss's *escort* only; the
  * Extractor itself is outside the budget. That is also why nearly every loss

@@ -52,9 +52,10 @@ function playBuild(room){
   for(let pass = 0; pass < 40; pass++){
     let took = false;
     for(const player of seated){
-      const wants = room.nodes.filter(n => !n.taken);
-      // Herbs to whoever gathers most, everything else to whoever is nearest.
+      // Herbs are the Alchemist's alone now — anyone else walking onto one
+      // leaves it in the ground, so the model does not waste passes trying.
       const gathers = player.classId === 'alchemist';
+      const wants = room.nodes.filter(n => !n.taken && (gathers || n.kind !== 'herb'));
       const ordered = [...wants].sort((a, b) => {
         const pref = (n) => (gathers ? (n.kind === 'herb' ? 0 : 1) : (n.kind === 'herb' ? 1 : 0));
         if(pref(a) !== pref(b)) return pref(a) - pref(b);
