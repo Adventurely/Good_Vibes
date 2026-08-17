@@ -43,19 +43,26 @@ export function fxStyles(PALETTE){
     flask:    { colour: PALETTE.l, trail: PALETTE.g, size: 3, arc: true },
     wrench:   { colour: PALETTE.o, trail: PALETTE.O, size: 2 },
     greenfire:{ colour: PALETTE.l, trail: PALETTE.v, size: 3, arc: true },
+    /* The nova is a page burned all at once, and for a release it drew
+       nothing at all: no row here, and strikeAll had no fallback either. The
+       party's one signature AoE was a log line. */
+    nova:     { colour: PALETTE.o, trail: PALETTE.Y, size: 4, arc: true },
 
     /* Strike itself, and the shape every other strike-kind card falls back to:
        a short flat jab. Deliberately the plainest entry in the table — it is
        the floor of what an attack looks like, the way the card is the floor of
        what an attack does. */
     strike:   { colour: PALETTE.m, trail: PALETTE.M, size: 2 },
+    /* And the floor for anything that reaches the whole lane — one projectile
+       per thing it lands on, drawn by the same volley. */
+    strikeAll:{ colour: PALETTE.o, trail: PALETTE.Y, size: 3 },
   };
 }
 
 /* Cards that should not sound like their verb. Two, and both earn it: a page
    read aloud and thrown, and the pylon's charge going across. Everything else
    takes its verb's sound, which is why this table is short and should stay so. */
-export const FX_SOUND = { fireball: 'fireball', spark: 'arc' };
+export const FX_SOUND = { fireball: 'fireball', spark: 'arc', nova: 'fireball' };
 
 /* The style for an fx, or null if it is not the kind of thing that flies —
    a ward, a mend, or being hit, which the client draws in place instead. */
