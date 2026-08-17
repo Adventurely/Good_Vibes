@@ -94,7 +94,50 @@ const BATTLE_SONG = {
   kick: true,
 };
 
-export const SONGS = { build: BUILD_SONG, battle: BATTLE_SONG };
+/* The title theme.
+ *
+ * A title screen has about eight seconds to say what kind of game this is, and
+ * the other two tracks both say the wrong thing on their own: the build theme
+ * is somebody's afternoon, the battle theme is an emergency. This is the
+ * invitation — the brightest and busiest of the three, and the only one that
+ * is unambiguously *upbeat* rather than warm or urgent.
+ *
+ * D major, no minor chords anywhere in the loop, which is the whole trick: a
+ * borrowed sixth or a relative minor would make it wistful, and wistful is
+ * what a solarpunk game has to work hardest not to be. The lead is a square
+ * wave riding an eighth-note arpeggio with a kick under it — chiptune shape,
+ * pastoral notes — and it climbs across the eight bars rather than circling,
+ * so the loop point lands as an arrival instead of a reset.
+ */
+const TITLE_SONG = {
+  bpm: 116,
+  swing: 0.06,                    // just enough lilt to keep it off the grid
+  bars: [
+    { chord: [50, 'maj6'] }, { chord: [57, 'sus'] },
+    { chord: [55, 'maj7'] }, { chord: [50, 'maj6'] },
+    { chord: [52, 'sus'] },  { chord: [57, 'maj6'] },
+    { chord: [55, 'maj7'] }, { chord: [57, 'sus'] },
+  ],
+  lead: [
+    [0, 74, 2], [2, 78, 2], [4, 81, 3], [8, 78, 2], [10, 74, 2], [12, 76, 3],
+    [16, 76, 2], [18, 81, 2], [20, 83, 3], [24, 81, 2], [26, 78, 2], [28, 76, 3],
+    [32, 74, 2], [34, 78, 2], [36, 83, 4], [42, 81, 2], [44, 78, 3],
+    [48, 76, 2], [50, 74, 2], [52, 78, 5], [58, 81, 2], [60, 83, 3],
+    [64, 85, 3], [68, 83, 2], [70, 81, 2], [72, 78, 4],
+    [80, 81, 2], [82, 85, 2], [84, 88, 4], [90, 85, 2], [92, 83, 3],
+    [96, 81, 2], [98, 78, 2], [100, 83, 4], [106, 81, 2], [108, 78, 3],
+    [112, 76, 2], [114, 78, 2], [116, 81, 3], [120, 85, 2], [122, 88, 6],
+  ],
+  arpEvery: 2,
+  arpLevel: 0.05,
+  leadLevel: 0.095,
+  leadType: 'square',
+  bassLevel: 0.12,
+  brush: true,
+  kick: true,
+};
+
+export const SONGS = { title: TITLE_SONG, build: BUILD_SONG, battle: BATTLE_SONG };
 
 /* ------------------------------------------------------------------ engine --- */
 

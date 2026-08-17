@@ -22,11 +22,25 @@ after(async () => {
   await new Promise((resolve) => server.close(resolve));
 });
 
-test('GET / returns the hello world page', async () => {
+test('GET / returns the title screen', async () => {
   const res = await fetch(`${baseUrl}/`);
   assert.equal(res.status, 200);
   assert.match(res.headers.get('content-type'), /text\/html/);
-  assert.match(await res.text(), /Hello, world!/);
+  const html = await res.text();
+  assert.match(html, /Good Vibes/);
+  // The landing page is the title screen, and the title screen is a canvas
+  // driven by title.js — served with no <canvas> it is a paragraph of prose
+  // where a game should be.
+  assert.match(html, /<canvas[^>]*id="title"/);
+  assert.match(html, /\.\/title\.js/);
+  // And the one thing a landing page exists to do.
+  assert.match(html, /href="play\.html"/);
+});
+
+test('the title screen module is served with a JavaScript type', async () => {
+  const res = await fetch(`${baseUrl}/title.js`);
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type'), /javascript/);
 });
 
 test('the style module is served with a JavaScript type', async () => {
