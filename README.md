@@ -313,18 +313,21 @@ spend would be one class with two sprites.
 | --- | --- | --- | --- |
 | Flag | `craft` | `build` | `cast` |
 | Pool | `stash` (herbs) | `salvage` | `pages` |
-| Spends on | potions | buildings | fireballs |
+| Spends on | potions + the garden | buildings | spellcraft |
 | Health | 30 | 32 | **22** |
 
 The Wizard is the roster's glass floor and a test enforces it: strictly the
-lowest hp of any class. It has the best basic attack and the worst basic guard,
-which is the whole class in two cards.
+lowest hp of any class, with a floor of a basic attack and the worst basic
+guard. Everything she is, she writes at the bench — see
+**[The scriptorium](#the-scriptorium)**.
 
 Everything gatherable stands on the build map. `SPAWNS` puts out 5 herbs, 5
-salvage caches and 3 spell pages; herbs need growable ground, caches and pages
-only need somewhere walkable. `CACHE_YIELD` is fixed rather than rolled, so a
-player can count what a trip is worth before spending the walk. Pages are
-scarce on purpose — every fireball is a page somebody chose to burn.
+salvage caches and a spell-page cache; herbs need growable ground, caches and
+pages only need somewhere walkable. `CACHE_YIELD` is fixed rather than rolled,
+so a player can count what a trip is worth before spending the walk. The map's
+pages are the bonus — the library itself pays `PAGES_PER_ROUND` at each build
+phase while a Wizard is seated, because the draft is her whole game and a round
+with no page is a round spent watching.
 
 **Herbs are exactly one per material.** There is no move budget — you can walk
 anywhere on the site and pick up everything on it — so the limit on brewing has
@@ -366,6 +369,56 @@ They are shuffled in rather than kept on a tray. Three Sunsalves in a nine-card
 deck *dilute* it — you might draw healing when you needed a guard — and that
 cost is what makes gathering a decision instead of pure upside.
 
+### The garden
+
+Three pots by the campfire, and the Alchemist's reason to think past the round
+in front of her. Planting takes one cutting of any herb out of the stash;
+each round the cutting sits it climbs the yield ladder — `potYield` pays 2,
+then 4, then 6 of that material — and harvesting empties the pot back into the
+stash. Harvesting what you just planted refunds the cutting and nothing more,
+so a misclick is free and there is no same-round loop to farm.
+
+The pots persist across rounds the way the buildings do; they are the part of
+her economy that compounds. Every build phase asks the same quiet question of
+each pot: brew it this fight, or let it grow toward the boss — her copy of the
+Wizard's compound-or-spend tension, in soil. Drag a stash chip onto a pot, or
+tap the chip and tap the pot; tap a plant to harvest it.
+
+### The scriptorium
+
+The Wizard does not buy spells. She assembles them, and it is her whole build
+phase.
+
+A page spent turns over a **draft of three** — spells she has not learned and
+modifiers she does not own, rares weighted low — and she keeps one. `SPELLS`
+holds the three bones (Fireball, strike 10, 2 charges; Cinder Nova, the lane
+for 4, 2 charges; Lend a Page, might 4, 2 charges) and `MODIFIERS` the ten
+inks, from a plain `+5 damage` to a rare `x2 damage, -1 charge`. A spell has
+**three sockets**; modifiers drag in, out, and between spells freely in any
+build phase — and their order is the arithmetic's order. Kindling into a Twin
+Core is `(10+5)x2 = 30`; the same two sockets reversed are 25. Each modifier
+exists exactly once, so that 30 is the ceiling the example promises, not a
+floor a second doubler slips past.
+
+**Charges are copies in the deck.** At every surge the Wizard's deck is
+written fresh from the book: her slim kit plus `charges` copies of each spell
+as composed right now. A played copy is spent for the fight; the book deals it
+again next surge. That is `composeSpell`, `rollOffers`, `takeOffer`,
+`moveModifier` and `wizardCombatDeck` in `content.js` — pure, shared, and the
+reason the bench, the deck list and the surge can never disagree about what a
+Fireball has become.
+
+Some inks do more than move numbers: a ward on cast, a heal for half the
+damage dealt, a page back on a kill, a copy stacked into the opening hand, a
+strike that reaches the farthest thing in the lane instead of the nearest, and
+a seal that pays in blood but can never take the caster's last point.
+
+> **Deployed rooms don't speak this yet.** The `page`/`pick`/`mod` intents
+> (and the garden's `plant`/`harvest`) exist in `src/rooms.js` and the
+> offline preview; the Tool Haven Worker is a hand-port that predates them
+> and safely ignores them until it is re-ported. The old page-ammo wizard
+> path is untouched for exactly that reason.
+
 ### Moving
 
 Point, click, walk. A click on the map names a destination; `pathTo` finds the
@@ -404,7 +457,11 @@ still in the fight, but only just.
 
 `deckFor(classId)` builds the opening deck once, and everything after that adds
 to it in place — the Alchemist brewing, the Engineer buying a barrel. A deck
-rebuilt at the surge would throw away the build phase that paid for it.
+rebuilt at the surge would throw away the build phase that paid for it. The
+Wizard is the deliberate exception: hers is `wizardCombatDeck`, written fresh
+from the book at every surge, because for her the build phase *is* the deck
+and re-dealing it is what makes a spell's charges per-combat without a counter
+anywhere.
 
 Shuffling and dealing are pure functions taking the generator, like everything
 else that rolls here. A client that shuffled for itself would hold cards the
@@ -415,16 +472,17 @@ because two callers sharing an array is how a hand ends up in somebody else's
 deck.
 
 Cards are the *only* interface in a fight. There is no second list of things you
-can do — a card that costs pages is dealt like any other and simply greys out
-when the library is empty, which is a bad draw the player caused.
+can do — a card that costs power is dealt like any other and simply greys out
+when the pool is empty, which is a bad draw the player caused. A crafted spell
+never greys: the book already paid for it at the bench.
 
 ### The build phase
 
 **The site is generated once a run and kept.** Walking back onto the slab you
 cleared last round and finding your panel still bolted to it is the entire
 reason to build anything, so terrain and structures persist and only the crop
-is reseeded — `respawnItems` puts a fresh five herbs, five caches and three
-pages on ground that is already there.
+is reseeded — `respawnItems` puts a fresh crop of herbs and caches on ground
+that is already there. The pots and the spellbook persist with the site.
 
 That reseeding is building-aware, which does two jobs at once. Nothing sprouts
 underneath a structure, and a pocket this round's building walled off stops
@@ -520,8 +578,9 @@ itself is unwalkable, the ring is the nearest thing the ordering can offer.
 
 **One panel per class.** Below the map you get the pool you spend and the verb
 you have, and nothing belonging to somebody else's economy: the Alchemist's
-stash and recipes, the Engineer's salvage, buildings, power and workbench, the
-Wizard's library. Each is hidden whole, heading included, on the rule power was
+stash, garden and recipes, the Engineer's salvage, buildings, power and
+workbench, the Wizard's library, draft, bench and satchel. Each is hidden
+whole, heading included, on the rule power was
 already hidden by — a readout you cannot act on is one you learn to skip past,
 and a live heading over the words "only the Alchemist can brew" spends a
 section of the screen on saying no. The client branches on the `craft`, `build`
@@ -637,10 +696,14 @@ node test/balance.mjs 1000        a tighter interval
 node test/balance.mjs 400 1       one table size
 ```
 
-The target is 60%. At the numbers currently in `content.js` it lands **57% /
-65% / 59%** for one, two and three players. The threat values are coarse (1, 2,
-3.5), so a tenth of a point can flip a whole enemy into or out of a wave and
-move a win rate forty points — tune with the harness open, never by eye.
+The target is 60%. At the numbers currently in `content.js` it lands **69% /
+63% / 78%** for one, two and three players, and the harness prints per-class
+damage under each row so the composition behind a number is visible. The full
+table runs friendliest on purpose: it is the only one with a Wizard, she is
+the party's damage by design (about double anyone else's), and the harness
+plays her bench well. The threat values are coarse (1, 2, 3.5), so a tenth of
+a point can flip a whole enemy into or out of a wave and move a win rate forty
+points — tune with the harness open, never by eye.
 
 #### What the blight leaves behind
 
@@ -781,26 +844,23 @@ doing deliberately:
 
 Honest status, so nobody discovers these at the table:
 
-- **Tool Haven has none of this.** The server here is a Node process; the
-  deployed site's Durable Object implements none of it. See the deployment note
-  at the top of this file before pushing to `main`.
-- **Only the Wizard is still a deck with a different mix.** Prepared spells are
-  designed, not written; the Alchemist brews and the Engineer builds power.
-  One panel per class makes this plain rather than causing it: the Wizard's
-  build phase is walking and gathering, and its panel is a page count it cannot
-  spend until there is something to spend it on.
-- **The Overcharged Coil may be out of reach in a short run.** It needs Coil,
-  the rarest salvage at a weight of 3, and a three-round game may never turn one
-  up.
+- **The deployed Worker predates the scriptorium and the garden.** The
+  `page`/`pick`/`mod` and `plant`/`harvest` intents live in `src/rooms.js` and
+  the offline preview; the Tool Haven Durable Object safely ignores them until
+  someone with access re-ports it. Deployed rooms still run the old page-ammo
+  wizard, whose cards and costs are kept in `content.js` untouched for exactly
+  that reason.
 - **A hand of nothing but costed cards is possible late.** An Engineer with
   several Bolt Guns and no power can draw three unplayable cards; *Do nothing*
   is the way out, and it is always available.
-- **Nobody can die.** Damage is clamped above zero in the preview, and there is
-  no down state, no party wipe and no lose condition.
-- **Enemies only ever hit the local player** — no round-robin across a party.
+- **The full table runs friendliest.** 78% measured against a 60% target,
+  because the Wizard is the only pure damage seat and only the three-player
+  table has one. Levelling by composition rather than by head-count is a
+  future dial; `PARTY_SYNERGY` and `BOSS_SCALING` are the current ones.
+- **Modifier duplicates share a face.** Two of the same modifier cannot exist
+  (the draft refuses), but a modifier moved between two spells that each could
+  hold it is found satchel-first — a wart only a hand-edited book can reach.
 - **Gathering teleports you** to the node rather than walking there.
-- Per-class card systems — the Engineer's powered weapons, the Alchemist's
-  brewed one-shots, the Wizard's prepared spells — are designed, not written.
 
 ## Where the game lives
 
