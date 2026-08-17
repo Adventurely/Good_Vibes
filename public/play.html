@@ -2797,7 +2797,21 @@
       const previewParam = new URLSearchParams(location.search).get('preview');
       if(previewParam !== null && !room){
         startPreview();
-        if(previewParam === 'combat') demoSend({ t: 'ready', ready: true });
+        if(previewParam === 'combat'){
+          /* Every seat, not just the selected one. demoSend readies whoever
+             the roster is holding, and the surge only lands when readyState()
+             counts the whole party — so with three in the preview a single
+             ready left the link sitting in the build phase forever. Walk the
+             selection across the party the way the roster buttons do, then
+             put it back where it started. */
+          const held = room.you;
+          for(const p of room.players){
+            room.you = p.id;
+            demoSend({ t: 'ready', ready: true });
+          }
+          room.you = held;
+          render();
+        }
       }
     </script>
   </body>
