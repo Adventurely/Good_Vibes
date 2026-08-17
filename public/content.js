@@ -230,7 +230,146 @@ export const CACHE_YIELD = { salvage: 2, pages: 1 };
  * and shows its option and the option is inert. That is a known gap, not a
  * silent one: test/content.test.js pins every effect to this list.
  */
-export const EFFECT_KINDS = ['heal', 'regen', 'ward', 'strike'];
+export const EFFECT_KINDS = [
+  /* on one target */
+  'heal', 'regen', 'ward', 'strike',
+  /* on the whole party, or the whole wave — the multiplayer half of the table.
+     Written as their own kinds rather than a `targets: 'all'` flag on the
+     single-target ones, because "who does this land on" is the first thing a
+     player reads off a card and a flag is not something you can read. */
+  'healAll', 'wardAll', 'strikeAll',
+  /* on an ally, and only meaningful because somebody else is there:
+     cleanse pulls what a monster put on them, revive puts them back on their
+     feet, might makes their next swing land harder than yours would. */
+  'cleanse', 'revive', 'might',
+];
+
+/* ============================================================== ailments === */
+
+/* What the blight leaves on a player, as opposed to what it takes off them.
+ *
+ * Damage is a number and is over. An ailment is the same monster still costing
+ * you something three turns later, which is the only thing that makes the wave
+ * feel like it is doing something other than subtracting.
+ *
+ * Three, and each one takes a different thing away:
+ *
+ *   rot   health, every round, and guard cannot stop it — the reason to carry
+ *         a cleanse rather than another ward
+ *   weak  damage, so the fight gets longer rather than shorter
+ *   stun  the turn itself, which is the harshest and so the rarest
+ *
+ * `rounds` is how many of the player's own turns it survives. An ailment
+ * refreshes rather than stacks — two Sporelings should be twice as many things
+ * to kill, not four Blightrot ticks a round on one person.
+ */
+export const AILMENTS = {
+  rot: {
+    name: 'Blightrot', kind: 'rot', amount: 2, rounds: 2, colour: 'v',
+    note: 'Spores in the lungs. It keeps taking after the thing that gave it to you is dead.',
+  },
+  weak: {
+    name: 'Weakened', kind: 'weak', amount: 2, rounds: 2, colour: 'x',
+    note: 'Something in the sap goes for the tendons. Everything you swing lands lighter.',
+  },
+  stun: {
+    name: 'Stunned', kind: 'stun', amount: 0, rounds: 1, colour: 'Y',
+    note: 'A turn spent finding your feet. The card in your hand falls out of it.',
+  },
+};
+
+export const AILMENT_KINDS = Object.keys(AILMENTS);
+
+/* The boons a card can leave, so the client can label one without a table of
+   its own. `might` is the only one so far; `regen` is here because a potion
+   could grant it and the shape is identical. */
+export const BOONS = {
+  might: { name: 'Might', kind: 'might', colour: 'o', note: 'Lent power. The next thing you swing lands harder.' },
+  regen: { name: 'Mending', kind: 'regen', colour: 'l', note: 'Something working slowly, a little every round.' },
+};
+
+export const effectName = kind =>
+  (AILMENTS[kind] || BOONS[kind] || {}).name || kind;
+
+/* What a card's effect is called on the card. The kinds are field names —
+ * 'strikeAll' printed on a card is the schema showing through — and the party
+ * ones especially need saying in words, because "who does this land on" is the
+ * only thing separating Bulwark from Shore Up at a glance.
+ *
+ * Here rather than in the client because the client is not the only thing that
+ * has to name an effect: the deck list, the recipe rack and the card face all
+ * ask, and three copies of this table would drift.
+ */
+export const EFFECT_LABELS = {
+  strike: 'strike',
+  strikeAll: 'every enemy',
+  ward: 'ward',
+  wardAll: 'ward the party',
+  heal: 'heal',
+  healAll: 'heal the party',
+  cleanse: 'cleanse an ally',
+  revive: 'pick an ally up',
+  might: 'lend to an ally',
+  regen: 'mending',
+};
+
+export const effectLabel = kind => EFFECT_LABELS[kind] || kind;
+
+/* ---- the effect list a player carries -----------------------------------
+ *
+ * Every one of these takes the list and hands back a new one rather than
+ * editing in place, for the reason the card piles do: the room holds this
+ * state, the view is built from it, and two callers sharing an array is how a
+ * status ends up on the wrong player.
+ *
+ * `fresh` is the whole trick. Effects age once a round, at a fixed point in
+ * the turn — but an effect a player *granted* this round has not been lived
+ * through yet, and ageing it the same evening would make a one-round buff a
+ * zero-round buff. Fresh survives its first ageing and loses the flag; the
+ * ailments a monster lands arrive after the ageing and so never need it.
+ */
+export function addEffect(effects, effect){
+  const next = (effects || []).filter(e => e.kind !== effect.kind);
+  next.push({ rounds: 1, ...effect });
+  return next;
+}
+
+export function addAilment(effects, id, from = null){
+  const spec = AILMENTS[id];
+  if(!spec) return effects || [];
+  return addEffect(effects, { kind: id, amount: spec.amount, rounds: spec.rounds, from });
+}
+
+export const hasEffect = (effects, kind) => (effects || []).some(e => e.kind === kind);
+
+/* Summed rather than found, so the day two sources of Might exist the number
+   is right without this being rewritten. */
+export const effectAmount = (effects, kind) =>
+  (effects || []).filter(e => e.kind === kind).reduce((sum, e) => sum + (e.amount || 0), 0);
+
+/* One round older. Fresh effects lose the flag instead of a round; anything
+   that runs out is dropped. */
+export function tickEffects(effects){
+  const next = [];
+  for(const effect of effects || []){
+    if(effect.fresh){ next.push({ ...effect, fresh: false }); continue; }
+    const rounds = (effect.rounds ?? 1) - 1;
+    if(rounds > 0) next.push({ ...effect, rounds });
+  }
+  return next;
+}
+
+/* What a cleanse takes off: ailments only. Stripping Might off the person you
+   were trying to help would be a card that reads as support and plays as a
+   mistake. */
+export const clearAilments = effects =>
+  (effects || []).filter(e => !AILMENTS[e.kind]);
+
+/* What a strike actually lands for, once the blight and the party have both
+   had their say. Never below one: a Weakened player holding Strike should be
+   contributing badly, not contributing nothing. */
+export const strikePower = (amount, effects) =>
+  Math.max(1, amount + effectAmount(effects, 'might') - effectAmount(effects, 'weak'));
 
 /* The cards every deck holds regardless of class, by id. Kept as its own
    export because the Tool Haven room imports it; UNIVERSAL_CARDS derives the
@@ -534,6 +673,19 @@ export const CARDS = {
     effect: { kind: 'heal', amount: 4 },
     note: 'Bitter, and working before you have swallowed it.',
   },
+  /* The Alchemist's answer to the blight leaving something behind. Nothing
+     else in the game removes an ailment, which is what makes her the only
+     seat that can undo a Rust Hulk's afternoon. */
+  censer: {
+    name: 'Blight Censer', kind: 'heal', classId: 'alchemist', targetsAlly: true,
+    effect: { kind: 'cleanse', amount: 2 },
+    note: 'Smoke that the spores will not sit in. Hold it under whoever is coughing.',
+  },
+  vapours: {
+    name: 'Restorative Vapours', kind: 'heal', classId: 'alchemist',
+    effect: { kind: 'healAll', amount: 3 },
+    note: 'Poured on the fire. Everyone standing near it breathes easier.',
+  },
 
   /* --- the Engineer: hits like a tool, holds like a wall --- */
   wrench: {
@@ -545,6 +697,23 @@ export const CARDS = {
     name: 'Shore Up', kind: 'defend', classId: 'engineer',
     effect: { kind: 'ward', amount: 5, rounds: 1 },
     note: 'Plating, a strut, and eleven seconds. It will hold.',
+  },
+  /* Guard on everyone, worse per head than Shore Up on one. That trade is the
+     whole point of a party card: it is the wrong card at a table of one and
+     the best card in the deck at a table of five. */
+  bulwark: {
+    name: 'Bulwark', kind: 'defend', classId: 'engineer',
+    effect: { kind: 'wardAll', amount: 3 },
+    note: 'Plate dragged into a line and braced. Get behind it, all of you.',
+  },
+  /* The only card that undoes a death. Deliberately not dead in solo — with
+     nobody down it is a jolt to whoever is worst off — because a card that
+     does nothing at a table of one would be a card the Engineer resents
+     drawing rather than one they are pleased to be holding. */
+  jumper: {
+    name: 'Jumper Cables', kind: 'heal', classId: 'engineer', targetsAlly: true,
+    effect: { kind: 'revive', amount: 6 },
+    note: 'Across the chest, and mind your hands. Somebody has to get them up.',
   },
 
   /* --- the Wizard: the best basic attack and the worst basic guard, which
@@ -575,6 +744,24 @@ export const CARDS = {
     name: 'Fireball', kind: 'attack', classId: 'wizard', pageCost: 1,
     effect: { kind: 'strike', amount: 7 },
     note: 'One page, read aloud, thrown. The blight burns like anything else.',
+  },
+
+  /* The Wizard's two party cards, and both of them are about the fact that a
+     bigger table draws a bigger wave.
+     *
+     Lend a Page is the clearest coordination card in the game: it does no
+     damage at all, it lands on somebody else's *next* turn, and it is worth
+     playing only if that person then swings. Two people have to agree about a
+     round in advance for it to be worth a page. */
+  channel: {
+    name: 'Lend a Page', kind: 'buff', classId: 'wizard', pageCost: 1, targetsAlly: true,
+    effect: { kind: 'might', amount: 4, rounds: 1 },
+    note: 'Read over their shoulder and hold the line open. Swing on the next one.',
+  },
+  nova: {
+    name: 'Cinder Nova', kind: 'attack', classId: 'wizard', pageCost: 1,
+    effect: { kind: 'strikeAll', amount: 4 },
+    note: 'A page burned all at once instead of read. It reaches everything in the lane.',
   },
 
   /* --- brewed ----------------------------------------------------------
@@ -649,13 +836,18 @@ export const CARDS = {
      what you built is literally what you draw. */
 };
 
-/* What each class opens with. Eight cards: at three drawn and three discarded
-   a turn, the deck cycles about every three turns, so a fight sees the whole
-   thing roughly twice and a player learns what is in theirs. */
+/* What each class opens with. Ten cards, of which two are the party cards: at
+   three drawn and three discarded a turn the deck cycles about every four
+   turns, so a fight sees the whole thing twice and a player learns what is in
+   theirs.
+ *
+ * One copy each of the party cards rather than two, on purpose. They are the
+ * cards a table coordinates around, and a card you hold every other turn is
+ * not a moment — it is a rotation. */
 export const STARTING_DECKS = {
-  alchemist: { flask: 3, steady: 3, tonic: 2 },
-  engineer: { wrench: 3, shore: 4, boltgun: 1 },
-  wizard: { spark: 4, sign: 2, fireball: 2 },
+  alchemist: { flask: 3, steady: 3, tonic: 2, censer: 1, vapours: 1 },
+  engineer: { wrench: 3, shore: 4, boltgun: 1, bulwark: 1, jumper: 1 },
+  wizard: { spark: 4, sign: 2, fireball: 2, channel: 1, nova: 1 },
 };
 
 /* Cards every deck holds regardless of class. */
@@ -916,35 +1108,206 @@ export const cardById = id => CARDS[id] || null;
  * a bigger number, because "there are four of them now" is legible on a
  * screen in a way "+2 hp" never is.
  */
+/* `ability` is what this thing does to a player beyond subtracting from them,
+ * and `every` is how many of its hits have to land first — an ailment on every
+ * swing is not a threat, it is a status the player simply has. A blocked hit
+ * never counts, which is the whole reason to spend a card on guard against a
+ * Creeper rather than trading with it.
+ *
+ * `threat` is the levelling number: what one of these is worth against one
+ * player. It is what waveFor spends, so a table of four meets four players'
+ * worth of blight rather than five players' worth trimmed down to four.
+ */
 export const ENEMIES = {
   sporeling: { name: 'Sporeling', hp: 6, hits: 2, dist: 3, art: 'sporeling',
-    note: 'A puffball with intent. Pops wetly.' },
+    threat: 1, ability: { id: 'rot', every: 2 },
+    note: 'A puffball with intent. Pops wetly, and you breathe what comes out.' },
   creeper: { name: 'Creeper', hp: 10, hits: 3, dist: 4, art: 'creeper',
-    note: 'Vine over bone over something that used to be a drone.' },
+    threat: 2, ability: { id: 'weak', every: 2 },
+    note: 'Vine over bone over something that used to be a drone. The sap gets into you.' },
   hulk: { name: 'Rust Hulk', hp: 18, hits: 5, dist: 5, art: 'hulk',
-    note: 'A maintenance chassis the blight wears like a coat.' },
-  extractor: { name: 'The Extractor', hp: 46, hits: 7, dist: 5, art: 'extractor', boss: true,
-    note: 'It was built to harvest. It still is.' },
+    threat: 3.5, ability: { id: 'stun', every: 3 },
+    note: 'A maintenance chassis the blight wears like a coat. It swings like one too.' },
+  extractor: { name: 'The Extractor', hp: 33, hits: 5, dist: 5, art: 'extractor', boss: true,
+    threat: 9, ability: { id: ['weak', 'rot', 'stun'], every: 2 },
+    note: 'It was built to harvest. It still is, and it works through a crew in order.' },
 };
 
-/* The wave tables are written for a full table of five. A smaller party gets
- * a proportionally smaller wave — trimmed from the back, so the table's
- * opening enemies are the ones every party size meets — because a lone player
- * facing the five-player wave is not difficulty, it is arithmetic. The boss
- * never trims away: escorts go, the Extractor is the appointment.
+/* The boss is the one enemy the wave table cannot level, because there is
+ * always exactly one of it. Everything else scales by arriving in different
+ * numbers; the Extractor has to scale in the only direction left, which is up.
+ *
+ * Health scales because three people put out three people's damage. Damage
+ * scales for a subtler reason: a single enemy hits one player a round, so at a
+ * table of three the same number is a third of the pressure it is on a table of
+ * one. Holding per-player pressure flat means the number climbs with the table
+ * — an Extractor that hit a party of five for what it hits a solo player for
+ * would be a cutscene.
+ *
+ * Both are per *extra* player, so ENEMIES holds the solo fight and this holds
+ * how it grows.
+ */
+export const BOSS_SCALING = { hp: 18, hits: 2 };
+
+/* An enemy's numbers for this table. Everything but the boss is what the table
+   says it is; levelling the rest is waveFor's job and doing it twice would
+   compound. */
+export function enemyStats(type, partySize = PARTY_SIZE){
+  const def = ENEMIES[type];
+  if(!def) return null;
+  const extra = Math.max(0, Math.min(PARTY_SIZE, Math.max(1, partySize)) - 1);
+  return def.boss
+    ? { hp: Math.round(def.hp + BOSS_SCALING.hp * extra),
+        hits: Math.round(def.hits + BOSS_SCALING.hits * extra),
+        dist: def.dist }
+    : { hp: def.hp, hits: def.hits, dist: def.dist };
+}
+
+/* The ailment cadence, normalised: one id or a list, always a list here, so
+   the boss cycling through all three and a Sporeling doing one thing are the
+   same loop at the call site. */
+export function enemyAbility(type){
+  const spec = (ENEMIES[type] || {}).ability;
+  if(!spec) return null;
+  const ids = (Array.isArray(spec.id) ? spec.id : [spec.id]).filter(id => AILMENTS[id]);
+  if(!ids.length) return null;
+  return { ids, every: Math.max(1, spec.every || 1) };
+}
+
+/* Which ailment this enemy's nth landed hit carries, or null. Pure arithmetic
+   on a counter the room keeps, rather than a roll: a wave that surprises you
+   differently on a replay is a wave the room and the client can disagree
+   about. */
+export function ailmentOnHit(type, landed){
+  const spec = enemyAbility(type);
+  if(!spec || landed <= 0 || landed % spec.every) return null;
+  return spec.ids[(landed / spec.every - 1) % spec.ids.length];
+}
+
+/* ---- levelling the encounter to the table ------------------------------- */
+
+/* What one player is worth in blight, by round. This is the difficulty dial,
+ * and it is the only one: everything else about a wave falls out of it.
+ *
+ * Held deliberately low on round one and climbing after, because the party's
+ * side of the equation climbs too — the Alchemist has brewed by round two and
+ * the Engineer has a panel behind the bolt gun.
+ *
+ * These are measured, not guessed. test/balance.mjs plays eight hundred whole
+ * runs per table size against them and reports the win rate; at the numbers
+ * below it lands 57% / 65% / 59% for one, two and three players, against a
+ * target of 60. Change them with that harness open rather than by eye — the
+ * threat values are coarse (1, 2, 3.5), so a tenth of a point here can flip a
+ * whole enemy into or out of a wave and move a win rate forty points.
+ *
+ * Round four's number is low because it buys the boss's *escort* only; the
+ * Extractor itself is outside the budget. That is also why nearly every loss
+ * the harness reports is a round-four loss: the first three rounds rarely kill
+ * a party outright, they decide what the party brings to the appointment.
+ */
+export const THREAT_PER_PLAYER = [2.5, 3.4, 4.2, 2.9];
+
+/* A party is worth more than the players in it, and the budget has to know it.
+ *
+ * This was linear first, and the harness was blunt about it: at settings that
+ * left a solo player winning three runs in five, two players won ninety-seven.
+ * Doubling the wave does not double the difficulty, because the second player
+ * brings things a lone player has no version of — somebody to spread the
+ * round-robin over, a second class's whole verb, a card that mends a person
+ * who is not themselves, and the plain fact that a party can lose a member and
+ * keep fighting where a solo player losing one is the run.
+ *
+ * So each player after the first makes every player worth more blight. The
+ * number is measured, not reasoned: it is what closes the gap between the
+ * table sizes in test/balance.mjs.
+ */
+export const PARTY_SYNERGY = 0.25;
+
+/* How much blight a table of this size meets this round. */
+export function threatBudget(round, partySize = PARTY_SIZE){
+  const size = Math.max(1, Math.min(PARTY_SIZE, partySize));
+  const per = THREAT_PER_PLAYER[Math.min(round, BOSS_ROUND) - 1] ?? THREAT_PER_PLAYER[0];
+  return per * size * (1 + PARTY_SYNERGY * (size - 1));
+}
+
+/* What each round sends, in the order it sends it. The list is a pattern and
+   not a wave: waveFor cycles it until the budget is spent, so the composition
+   of a round is the same shape at every table size and only the amount of it
+   changes. */
+const WAVE_PATTERN = {
+  1: ['sporeling', 'sporeling', 'creeper'],
+  2: ['sporeling', 'creeper', 'creeper', 'sporeling'],
+  3: ['creeper', 'hulk', 'creeper', 'sporeling'],
+  [BOSS_ROUND]: ['creeper', 'sporeling', 'creeper', 'hulk'],
+};
+
+/* Six is what the lane can show. Beyond it the sprites share rows and the
+   wave reads as one smear, so a bigger budget makes the wave *worse* rather
+   than longer — see the upgrade pass below. */
+export const WAVE_CAP = 6;
+
+/* The ladder a leftover budget climbs. Ordered by threat, so "spend the
+   remainder on making the weakest thing here worse" is a walk down one list. */
+const TIERS = ['sporeling', 'creeper', 'hulk'];
+
+/* The wave a given table meets on a given round.
+ *
+ * Two passes, and the second one is what makes a full table harder rather than
+ * merely busier. First fill: cycle the round's pattern, adding while the
+ * budget covers the next thing and the lane has room. Then upgrade: whatever
+ * budget is left promotes the weakest enemy present up the tier ladder.
+ *
+ * So a solo player on round one meets two Sporelings; five players meet a
+ * fuller lane of worse things. Same fight, levelled — not the five-player
+ * fight with three of them deleted, which is what trimming a fixed table gave
+ * and why a lone player used to walk it.
+ *
+ * The boss is outside the budget entirely. It is the appointment, it is in
+ * every version of round four, and the budget buys its escort.
  */
 export function waveFor(round, partySize = PARTY_SIZE){
-  const waves = {
-    1: ['sporeling', 'sporeling', 'creeper'],
-    2: ['sporeling', 'sporeling', 'creeper', 'creeper'],
-    3: ['creeper', 'creeper', 'hulk', 'sporeling'],
-    [BOSS_ROUND]: ['extractor', 'creeper', 'creeper'],
-  };
-  const full = waves[Math.min(round, BOSS_ROUND)] || waves[BOSS_ROUND];
-  const size = Math.max(1, Math.min(PARTY_SIZE, partySize));
-  const count = Math.max(1, Math.ceil(full.length * size / PARTY_SIZE));
-  const wave = full.slice(0, count);
-  if(round >= BOSS_ROUND && !wave.some(t => ENEMIES[t].boss)) wave[0] = 'extractor';
+  const at = Math.min(Math.max(1, round), BOSS_ROUND);
+  const pattern = WAVE_PATTERN[at] || WAVE_PATTERN[BOSS_ROUND];
+  const boss = at >= BOSS_ROUND;
+  const wave = boss ? ['extractor'] : [];
+  const room = WAVE_CAP - wave.length;
+
+  let budget = threatBudget(at, partySize);
+  for(let i = 0; wave.length - (boss ? 1 : 0) < room; i++){
+    const type = pattern[i % pattern.length];
+    const cost = ENEMIES[type].threat;
+    if(cost > budget){
+      // Nothing in a whole pass fits: the budget is spent on filling.
+      if(pattern.every(t => ENEMIES[t].threat > budget)) break;
+      continue;
+    }
+    budget -= cost;
+    wave.push(type);
+  }
+
+  // A wave of nothing is not a round. The cheapest thing in the pattern goes
+  // in regardless — a budget too small to buy a Sporeling means the table is
+  // one person on round one, and they should still have something to fight.
+  if(!wave.length) wave.push(pattern[0]);
+
+  // The remainder, spent on quality. Weakest first and one at a time, so the
+  // lane levels evenly: five players get a Rust Hulk where one player gets the
+  // Sporeling that stood in its place, rather than one monster at the front
+  // absorbing the entire difference.
+  for(let pass = 0; pass < WAVE_CAP * TIERS.length; pass++){
+    let pick = -1, pickTier = TIERS.length;
+    for(let i = 0; i < wave.length; i++){
+      const tier = TIERS.indexOf(wave[i]);
+      if(tier < 0 || tier + 1 >= TIERS.length) continue;
+      if(ENEMIES[TIERS[tier + 1]].threat - ENEMIES[wave[i]].threat > budget) continue;
+      if(tier < pickTier){ pick = i; pickTier = tier; }
+    }
+    if(pick < 0) break;
+    const next = TIERS[pickTier + 1];
+    budget -= ENEMIES[next].threat - ENEMIES[wave[pick]].threat;
+    wave[pick] = next;
+  }
+
   return wave;
 }
 

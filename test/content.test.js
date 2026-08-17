@@ -752,10 +752,12 @@ test('every deck can attack and can defend, and is big enough to draw from', () 
 
 test('buildDeck expands the counts and refuses to invent a deck', () => {
   const deck = buildDeck('wizard');
-  assert.equal(deck.length, 8);
+  assert.equal(deck.length, 10);
   assert.equal(deck.filter((id) => id === 'spark').length, 4);
   assert.equal(deck.filter((id) => id === 'sign').length, 2);
   assert.equal(deck.filter((id) => id === 'fireball').length, 2);
+  assert.equal(deck.filter((id) => id === 'channel').length, 1);
+  assert.equal(deck.filter((id) => id === 'nova').length, 1);
   assert.deepEqual(buildDeck('nobody'), []);
 });
 
@@ -819,7 +821,7 @@ test('a played hand goes to the discard whole, unplayed cards included', () => {
 });
 
 test('a deck cycles rather than running out', () => {
-  // Eight cards, three a turn: the fight should never reach a turn with no
+  // Ten cards, three a turn: the fight should never reach a turn with no
   // hand, however long it runs.
   let deck = shuffle(buildDeck('engineer'), seededRandom(5));
   let discard = [];
@@ -829,7 +831,8 @@ test('a deck cycles rather than running out', () => {
     assert.equal(drawn.hand.length, HAND_SIZE, `turn ${turn} dealt ${drawn.hand.length} cards`);
     discard = discardHand(drawn.discard, drawn.hand);
     deck = drawn.deck;
-    assert.equal(deck.length + discard.length, 8, `turn ${turn} lost or gained a card`);
+    assert.equal(deck.length + discard.length, buildDeck('engineer').length,
+      `turn ${turn} lost or gained a card`);
   }
 });
 

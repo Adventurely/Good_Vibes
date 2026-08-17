@@ -251,9 +251,12 @@ src/ws.js           a WebSocket server, standard library only
 src/rooms.js        the authoritative game state: rooms, seats, phases
 src/server.js       http + the socket route
 test/content.test.js validates every table above and the rules over them
-test/rooms.test.js  drives a real room: what a card resolves to, and that the
-                    client has an animation and a sound for all of it
+test/rooms.test.js  drives a real room: what a card resolves to, statuses,
+                    kills, levelling, and that the client has an animation and
+                    a sound for all of it
 test/server.test.js integration tests
+test/balance.mjs    not a test — a harness. Plays whole runs at every table
+                    size and reports the win rate against the 60% target
 ```
 
 **`content.js` is the file to edit.** It is imported by the browser *and* by
@@ -599,6 +602,96 @@ things rather than the same thing with a bigger number, because "there are four
 of them now" is legible on a screen in a way "+2 hp" never is. A test proves the
 boss cannot leak into an earlier round.
 
+#### Levelling a fight to the table
+
+`waveFor(round, partySize)` spends a **threat budget** rather than trimming a
+fixed list. Each enemy carries a `threat` — what one of it is worth against one
+player — and each round carries a `THREAT_PER_PLAYER` figure. Filling cycles the
+round's pattern while the budget covers the next thing and the lane has room
+(`WAVE_CAP`, six, is what the lane can show without sprites sharing rows); the
+remainder then **promotes** the weakest enemy present up the tier ladder. So a
+bigger table meets a fuller lane *and* worse things in it, rather than the
+five-player fight with three enemies deleted.
+
+Two numbers refuse to be levelled that way and get their own treatment:
+
+- **The party is worth more than the players in it.** `PARTY_SYNERGY` makes the
+  budget superlinear. At a linear budget, settings that left a solo player
+  winning three runs in five had two players winning ninety-seven — a second
+  player brings a whole second class, somebody to spread the round-robin over,
+  and the ability to lose a member and keep fighting.
+- **The boss is always exactly one thing**, so it cannot scale by arriving in
+  different numbers. `BOSS_SCALING` grows the Extractor's health *and* what it
+  swings for. The damage matters more than it looks: a single enemy hits one
+  player a round, so at a table of three the same number is a third of the
+  pressure it is on a table of one.
+
+**These are measured, not argued.** `node test/balance.mjs` drives the real
+`Room` over the real protocol through whole runs — a build phase that gathers,
+builds and brews, then combat played by a model of somebody paying attention but
+not solving the game — and reports the win rate per table size:
+
+```
+node test/balance.mjs             400 runs per table size
+node test/balance.mjs 1000        a tighter interval
+node test/balance.mjs 400 1       one table size
+```
+
+The target is 60%. At the numbers currently in `content.js` it lands **57% /
+65% / 59%** for one, two and three players. The threat values are coarse (1, 2,
+3.5), so a tenth of a point can flip a whole enemy into or out of a wave and
+move a win rate forty points — tune with the harness open, never by eye.
+
+#### What the blight leaves behind
+
+Damage is a number and is over; an **ailment** is the same monster still costing
+you something three turns later. `AILMENTS` holds three, and each takes a
+different thing away: `rot` takes health every round and guard cannot stop it,
+`weak` takes damage off everything you swing, and `stun` takes the turn itself.
+They refresh rather than stack — two Sporelings should be twice as many things
+to kill, not four rot ticks a round on one person.
+
+An enemy's `ability` names which one it lands and `every` how many of its blows
+have to land first, counted on `enemies[].landed`. **A blow that guard swallowed
+whole never counts**, which is the reason to spend a card on a ward against a
+Creeper rather than trade with it: you are not buying health, you are buying the
+two rounds of Weakened that would have followed. The cadence is arithmetic on a
+counter rather than a roll, so a replayed room lands the same statuses.
+
+Statuses age at one fixed point in the turn — `tickAilments()`, after the cards
+resolve and *before* the wave lands new ones — so a rot dealt this round does
+not also tick this round, and a one-round stun lasts exactly the one turn it
+says it does. Effects granted by a card carry `fresh`, which survives its first
+ageing: a buff aged the same evening it was given would be a zero-round buff.
+
+#### The party cards
+
+Every class opens with two cards that are only worth holding because there is
+another seat at the table: the Alchemist's Blight Censer and Restorative
+Vapours, the Engineer's Bulwark and Jumper Cables, the Wizard's Lend a Page and
+Cinder Nova. Bulwark is the shape of all of them — guard on everyone, worse per
+head than Shore Up on one, so it is the wrong card at a table of one and the
+best card in the deck at a table of five.
+
+Lend a Page is the clearest of them: it does no damage, it lands on somebody
+else's *next* turn, and it is worth a page only if that person then swings. Two
+people have to agree about a round in advance. One copy each rather than two, on
+purpose — a card you hold every other turn is a rotation, not a moment.
+
+Only one of them could have been dead weight solo, and it is not: with nobody
+down, Jumper Cables jolts whoever is worst off instead of doing nothing.
+
+#### Dying visibly
+
+A kill emits `{t:'fx', kind:'slain', target, enemy, last}`, and `last` marks the
+one that emptied the lane. The client dissolves the body over ~900ms; on the
+last one it holds the combat board open for **1.9 seconds** before letting the
+next round's splash land, because the room ends a round the instant the wave is
+empty and sends the kill and the next phase in the same message. Without the
+hold you never saw the thing you spent four turns killing. See
+`applyState()` in `play.html`, and `docs/tool-haven-server.md` for why that is
+the only state update the client is allowed to defer.
+
 #### Effects, on screen and in the ear
 
 Resolving an effect emits an `fx` event beside the log line, and the client
@@ -615,10 +708,14 @@ would have joined it. `test/rooms.test.js` plays every attack card through a
 real room and fails if any of them resolves to no animation or no sound, which
 is why the dispatch is a module and not a block inside the page.
 
-`EFFECT_KINDS` lists what the engine implements: `heal`, `regen`, `ward`, and
-`strike`. **`strike` is implemented in the offline preview only** — the Tool
-Haven room has not grown it yet, so it works when you play the preview and does
-nothing in a real room. Known gap, held open by a test.
+`EFFECT_KINDS` lists what the engine implements, and all of it is implemented in
+the room as well as the preview: `heal`, `regen`, `ward` and `strike` on one
+target; `healAll`, `wardAll` and `strikeAll` on the whole party or the whole
+wave; and `cleanse`, `revive` and `might` on an ally. The party-wide kinds are
+written as their own kinds rather than a `targets: 'all'` flag, because "who does
+this land on" is the first thing a player reads off a card and a flag is not
+something you can read. `test/rooms.test.js` fails if any of them resolves to no
+animation or no sound.
 
 ## Multi-tile buildings (not built yet)
 

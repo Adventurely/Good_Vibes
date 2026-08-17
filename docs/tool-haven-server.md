@@ -98,6 +98,27 @@ Inside `state.events` (drained per player, delivered exactly once): `log`
 (prose), `phase` (splash card: `title`, `subtitle`), `fx` (animation:
 `kind`, `player`, `target`) and `moved` (a walk path to animate).
 
+An `fx` names a **card** when a card caused it and an **effect kind**
+otherwise; the client resolves card-first, kind-second (see `public/fx.js`),
+so a new card animates and sounds like its verb on the day it is written.
+Three `fx` kinds carry extra fields and are worth naming:
+
+| fx | extra fields | what the client does with it |
+| --- | --- | --- |
+| `slain` | `target`, `enemy`, `last` | dissolves the body over ~900ms. `last: true` means that kill emptied the lane, and the client **holds the combat board open for 1.9s** before applying the rest of the update |
+| `ail` | `ail` (`rot` / `weak` / `stun`), `from` | motes falling onto the player who was afflicted |
+| `rot` | `player` | the per-round tick of an existing Blightrot |
+
+The hold is the one place the client defers a state update. The room ends a
+round the instant the wave is empty and sends the kill and the next phase in
+the same message — correct of it, and it meant the last enemy of a round died
+on the same frame the build-phase splash covered it. `applyState()` in
+`play.html` splits that one update in two: the enemy deaths land on the board
+already on screen, and everything that follows from the round being over waits
+out the animation. Nothing is dropped and nothing is decided client-side —
+it is one update, shown in the order a person wants to watch it. Reduced
+motion skips the hold with the rest of the motion.
+
 ## Secrecy: what another player can see of you
 
 The room builds a separate view per socket — there is no broadcast state.
@@ -122,8 +143,20 @@ stash, salvage, pages, upgrades, power, — every shared pool
 players[]                               — everything per seat except the socket:
                                           token, name, class, hp, position,
                                           deck / discard / hand, block, intent,
-                                          undelivered events
+                                          effects, undelivered events
 ```
+
+Two fields in there are newer than the rest and easy to drop in a re-port,
+because both are counters the fight reads rather than state the fight sets:
+
+- `players[].effects` — the statuses a player is carrying (`rot`, `weak`,
+  `stun`, `might`, `regen`), each `{kind, amount, rounds, fresh, from}`. These
+  are **public** in the view: an Alchemist deciding whether to spend a Censer
+  has to be able to see who is rotting.
+- `enemies[].landed` — how many blows that enemy has landed. The ailment
+  cadence is arithmetic on this counter rather than a roll, so it has to
+  survive a wake or a Rust Hulk starts counting again every time the room
+  sleeps.
 
 ### What that means in practice
 

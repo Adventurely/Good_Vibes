@@ -239,6 +239,56 @@ export function createAudio(){
     heal(t){ [76, 79, 84].forEach((n, i) => voice(midi(n), t + i * 0.07, 0.16, 'sine', 0.06)); },
     ward(t){ voice(midi(64), t, 0.3, 'triangle', 0.07); voice(midi(71), t + 0.02, 0.28, 'triangle', 0.05); },
     regen(t){ [72, 76].forEach((n, i) => voice(midi(n), t + i * 0.09, 0.2, 'sine', 0.05)); },
+
+    /* The party-wide kinds. Each is its single-target sound spread across a
+       few voices rather than a new idea — the point of a Bulwark is that it is
+       Shore Up on everybody, and it should sound like that. */
+    healAll(t){ [72, 76, 79, 84].forEach((n, i) => voice(midi(n), t + i * 0.06, 0.26, 'sine', 0.055)); },
+    wardAll(t){ [52, 59, 64].forEach((n, i) => voice(midi(n), t + i * 0.04, 0.36, 'triangle', 0.055)); },
+    strikeAll(t){
+      hit(t, 0.24, 0.13, 1600, 'bandpass');
+      [0, 0.06, 0.12].forEach(d => voice(300, t + d, 0.12, 'sawtooth', 0.05, 120));
+    },
+    /* Smoke off a censer: noise pulled down through a filter rather than up.
+       The one sound in the table that is a thing leaving. */
+    cleanse(t){ hit(t, 0.34, 0.07, 1400, 'lowpass'); voice(midi(79), t + 0.04, 0.3, 'sine', 0.05, midi(72)); },
+    might(t){ [59, 66, 71].forEach((n, i) => voice(midi(n), t + i * 0.05, 0.22, 'square', 0.045)); },
+    revive(t){ hit(t, 0.05, 0.14, 4000); [55, 62, 67, 74].forEach((n, i) => voice(midi(n), t + 0.06 + i * 0.05, 0.3, 'triangle', 0.06)); },
+
+    /* ---- what the blight leaves behind ---------------------------------
+       Three ailments, three shapes, all of them descending: a status is
+       something being taken off you, and none of them should be mistakable
+       for a heal arriving. */
+    rot(t){ voice(midi(51), t, 0.34, 'sawtooth', 0.05, midi(44)); hit(t, 0.3, 0.045, 600, 'lowpass'); },
+    weak(t){ voice(midi(57), t, 0.4, 'triangle', 0.06, midi(48)); },
+    stun(t){ hit(t, 0.09, 0.13, 2200); [0.09, 0.19, 0.29].forEach(d => voice(midi(60), t + d, 0.09, 'square', 0.05, midi(55))); },
+    /* The generic one, for an ailment landing whose kind the client did not
+       recognise. Better a thud than silence. */
+    ail(t){ voice(midi(53), t, 0.3, 'sawtooth', 0.05, midi(45)); },
+
+    /* ---- a thing dying -------------------------------------------------
+     *
+     * `slain` is one enemy coming apart: a wet crack, then the body going
+     * down the register over about half a second, which is exactly as long as
+     * the sprite takes to dissolve.
+     *
+     * `finish` is the last one in the wave, and it is deliberately not a
+     * louder `slain`. It is the sound of the fight stopping — the crack, the
+     * fall, and then a rising major figure over the silence where the music
+     * used to be. The round holds open for it rather than cutting to the next
+     * splash, so it has somewhere to land.
+     */
+    slain(t){
+      hit(t, 0.1, 0.16, 1500, 'bandpass');
+      voice(190, t + 0.02, 0.42, 'sawtooth', 0.09, 48);
+      hit(t + 0.16, 0.3, 0.06, 420, 'lowpass');
+    },
+    finish(t){
+      hit(t, 0.13, 0.18, 1200, 'bandpass');
+      voice(170, t + 0.02, 0.5, 'sawtooth', 0.1, 40);
+      hit(t + 0.18, 0.44, 0.08, 380, 'lowpass');
+      [64, 71, 76, 83].forEach((n, i) => voice(midi(n), t + 0.5 + i * 0.11, 0.55, 'triangle', 0.065));
+    },
     gather(t){ voice(midi(84), t, 0.09, 'triangle', 0.07, midi(88)); },
     brew(t){ hit(t, 0.15, 0.05, 1200, 'bandpass'); voice(midi(67), t + 0.05, 0.2, 'sine', 0.06, midi(74)); },
     build(t){ hit(t, 0.05, 0.12, 3000); hit(t + 0.12, 0.05, 0.1, 2400); voice(330, t + 0.12, 0.07, 'square', 0.03); },

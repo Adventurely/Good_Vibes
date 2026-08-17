@@ -1174,6 +1174,20 @@ export const CARD_ART = {
     '..#gg#..',
     '..#gg#..'
   ],
+  /* An upward chevron: what you hand somebody else so their turn is better
+     than it was going to be. The fourth kind, and the first one that is not
+     about you — a buff card only ever reads as worth playing because there is
+     another seat at the table. */
+  buff: [
+    '...oo...',
+    '..oOOo..',
+    '.oOooOo.',
+    'oOo..oOo',
+    '..oOOo..',
+    '.oOooOo.',
+    'oOo..oOo',
+    '........'
+  ],
 };
 
 /* ============================================================ indicators === */

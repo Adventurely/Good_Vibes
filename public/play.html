@@ -591,7 +591,9 @@
         ROUNDS_BEFORE_BOSS, BOSS_ROUND, roundInfo, phaseCard, PARTY_SIZE, classById,
         SALVAGE, BUILDINGS, STARTING_SALVAGE, CACHE_YIELD, PAGES,
         UPGRADES, upgradeCost, buyUpgrade, cardEffect, powerFrom, canBuildMore, buildingsOf,
-        ENEMIES, waveFor, COMBAT_H,
+        ENEMIES, waveFor, enemyStats, COMBAT_H,
+        AILMENTS, effectName, effectLabel, hasEffect, strikePower, ailmentOnHit,
+        addAilment, tickEffects, effectAmount, clearAilments,
         HAND_SIZE, CARDS, deckFor, shuffle, draw, discardHand, cardById, cardPlayable,
         missingForBuilding, canBuildAt,
         salvageAfterCombat, addSalvage, spendSalvage,
@@ -1206,11 +1208,17 @@
           if(event.t !== 'fx') continue;
           fxQueue.push(event);
           any = true;
-          audio.sfx(soundFor(event.kind, audio.has));
+          // A kill has two sounds and they are not the same sound: one thing
+          // coming apart, and the fight stopping. The room tells us which by
+          // marking the event that emptied the lane.
+          audio.sfx(event.kind === 'slain'
+            ? (event.last ? 'finish' : 'slain')
+            : soundFor(event.kind, audio.has));
           // A hit is a thing that happens to a body, so the body reacts: the
           // struck sprite recoils and flashes for a beat. Recorded here rather
           // than drawn, because the scene is painted by the loop.
           if(event.kind === 'hit' && event.player) struck.set(event.player, now);
+          else if(event.kind === 'slain') dying.set(event.target, now);
           else if(event.target) struck.set(event.target, now);
         }
         if(any && !volley) startVolley();
@@ -1224,12 +1232,24 @@
          picture should agree. */
       let volley = null;
 
+      /* How long a death is watched for. The dissolve runs the whole span, and
+         the last one of a round runs longer still — that is the beat the round
+         holds open for, so a kill is a thing you saw rather than the frame
+         before a splash. */
+      const DEATH_MS = 900;
+      const FINISH_MS = 1900;
+
       function startVolley(){
         if(!fxQueue.length || room?.phase !== PHASES.combat){ fxQueue.length = 0; volley = null; return; }
+        const events = fxQueue.splice(0, fxQueue.length);
+        // A volley that killed something has to outlast the dissolve, or the
+        // loop stops asking for frames halfway through a body coming apart.
+        const slain = events.filter(e => e.kind === 'slain');
+        const held = !slain.length ? 0 : slain.some(e => e.last) ? FINISH_MS : DEATH_MS;
         volley = {
-          events: fxQueue.splice(0, fxQueue.length),
+          events,
           started: now,
-          duration: stillness() ? 120 : 620,
+          duration: stillness() ? 120 : Math.max(620, held),
         };
       }
 
@@ -1268,7 +1288,7 @@
                   cctx.fillRect((to.x + Math.cos(a) * r) | 0, (to.y + Math.sin(a) * r) | 0, 2, 2);
                 }
               }
-            }else if(['heal', 'regen', 'ward'].includes(verbOf(fx.kind))){
+            }else if(['heal', 'regen', 'ward', 'cleanse'].includes(verbOf(fx.kind))){
               const colour = verbOf(fx.kind) === 'ward' ? PALETTE.c : PALETTE.l;
               cctx.fillStyle = colour;
               for(let k = 0; k < 6; k++){
@@ -1276,6 +1296,54 @@
                 const dx = (seed % 21) - 10;
                 const rise = t * 18 + (seed % 5);
                 cctx.fillRect((from.x + dx) | 0, (from.y - 6 - rise) | 0, 2, 2);
+              }
+            }else if(fx.kind === 'slain'){
+              /* What a thing coming apart looks like: a ring of spores thrown
+                 out of where it stood, falling as they go. Drawn from the
+                 target rather than the actor because by now the actor has
+                 nothing to do with it — this is the body, not the blow.
+                 The sprite's own dissolve runs underneath, on the same clock. */
+              const at = stagePos.enemies.get(fx.target);
+              if(at){
+                const count = fx.last ? 22 : 14;
+                for(let k = 0; k < count; k++){
+                  const seed = hash2(k, (fx.target || '').length + k * 7);
+                  const a = (seed % 360) * Math.PI / 180;
+                  const speed = 10 + (seed % 17);
+                  const px = at.x + Math.cos(a) * speed * t;
+                  // Thrown up, then down: gravity is what makes it debris
+                  // rather than a firework.
+                  const py = at.y + Math.sin(a) * speed * t + t * t * 34;
+                  cctx.globalAlpha = Math.max(0, 1 - t * 1.1);
+                  cctx.fillStyle = (k & 1) ? PALETTE.v : PALETTE.g;
+                  cctx.fillRect(px | 0, py | 0, 2, 2);
+                }
+                // The last one of a round gets a flash off the ground as well,
+                // so the end of a fight reads differently from the middle of it.
+                if(fx.last && t < 0.3){
+                  cctx.globalAlpha = 0.5 - t;
+                  cctx.fillStyle = PALETTE.w;
+                  cctx.fillRect(0, HEADER, MAP_PX_W, COMBAT_PX_H);
+                }
+                cctx.globalAlpha = 1;
+              }
+            }else if(fx.kind === 'rot' || fx.kind === 'weak' || fx.kind === 'stun' || fx.kind === 'ail'){
+              /* An ailment landing: motes falling *onto* the player rather
+                 than rising off them, which is the whole difference between
+                 this and a heal at a glance. */
+              cctx.fillStyle = fx.kind === 'stun' ? PALETTE.Y
+                : fx.kind === 'weak' ? PALETTE.x : PALETTE.v;
+              for(let k = 0; k < 7; k++){
+                const seed = hash2(k, (fx.player || '').length + k * 3);
+                const dx = (seed % 19) - 9;
+                const fall = (1 - t) * 20;
+                cctx.fillRect((from.x + dx) | 0, (from.y - 12 + fall) | 0, 2, 2);
+              }
+            }else if(fx.kind === 'might'){
+              cctx.fillStyle = PALETTE.o;
+              for(let k = 0; k < 5; k++){
+                const seed = hash2(k, (fx.player || '').length + k);
+                cctx.fillRect((from.x + (seed % 15) - 7) | 0, (from.y - 4 - t * 22) | 0, 2, 3);
               }
             }else if(fx.kind === 'hit'){
               if(t < 0.4){
@@ -1466,7 +1534,11 @@
           // because the recoil clears itself long before the dissolve is done.
           const gone = enemy.hp <= 0;
           if(gone && !dying.has(enemy.id)) dying.set(enemy.id, now);
-          const fade = gone ? (now - dying.get(enemy.id)) / 460 : 0;
+          // The dissolve runs over DEATH_MS rather than the old fifth of a
+          // second, and the body stays on the field for all of it — that span
+          // and the round's hold are the same number on purpose, so the last
+          // thing to die is still coming apart when the fight ends.
+          const fade = gone ? (now - dying.get(enemy.id)) / DEATH_MS : 0;
           if(gone && fade >= 1) return;
 
           const kick = Math.round(recoil(enemy.id) * 6);   // knocked back, away from the party
@@ -1628,7 +1700,7 @@
         socket.addEventListener('message', event => {
           let msg;
           try{ msg = JSON.parse(event.data); }catch{ return; }
-          if(msg.t === 'state'){ room = msg.state; render(); }
+          if(msg.t === 'state'){ applyState(msg.state); }
           else if(msg.t === 'error') notify(msg.message);
           else if(msg.t === 'rejected'){
             deliberate = true;                 // a refused join would only be refused again
@@ -1648,6 +1720,58 @@
         });
       }
 
+      /* The beat between a fight ending and the next round starting.
+       *
+       * The room finishes a round the instant the wave is empty, and it sends
+       * the kill and the next phase in the same breath — which is correct of
+       * it, and which meant the last enemy of a round died on the same frame
+       * the build-phase splash covered the screen. You never saw the thing you
+       * had spent four turns killing.
+       *
+       * So the client holds. The kill is applied to the board that is already
+       * on screen — the enemies die, the health bars empty, the volley plays —
+       * and everything that follows from the round being over waits out the
+       * animation before it lands. Nothing is dropped and nothing is decided
+       * here: this is one state update, shown in two parts, in the order a
+       * person would want to watch it.
+       *
+       * Reduced motion skips the hold with the rest of the motion.
+       */
+      let holdTimer = 0;
+
+      function applyState(next){
+        clearTimeout(holdTimer);
+        holdTimer = 0;
+
+        const events = next.events || [];
+        const finisher = events.some(e => e.t === 'fx' && e.kind === 'slain' && e.last);
+        const leavingCombat = room && room.phase === PHASES.combat && next.phase !== PHASES.combat;
+
+        if(!finisher || !leavingCombat || stillness()){
+          room = next;
+          render();
+          return;
+        }
+
+        // Part two first, so the hand is already greyed by the time part one
+        // draws: renderCombat reads holdTimer to decide whether the cards are
+        // live, and a card played into a round the room has finished is an
+        // intent it will drop on the floor.
+        next.events = events.filter(e => e.t !== 'fx');
+        holdTimer = setTimeout(() => {
+          holdTimer = 0;
+          room = next;
+          render();
+        }, FINISH_MS);
+
+        // Part one, on the board we are already looking at: the wave, dead.
+        // Only the fx events come through now — the log lines and the phase
+        // card belong to the round that is starting, not the one ending.
+        room.enemies = next.enemies;
+        room.events = events.filter(e => e.t === 'fx');
+        render();
+      }
+
       const send = msg => {
         if(demo) return demoSend(msg);
         if(socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(msg));
@@ -1657,6 +1781,8 @@
         deliberate = true;
         demo = false;
         clearInterval(keepalive);
+        clearTimeout(holdTimer);       // or a held round lands in an empty page
+        holdTimer = 0;
         if(socket) socket.close();
         socket = null; room = null; code = null; attempt = 0;
         history.replaceState(null, '', location.pathname);
@@ -1772,25 +1898,84 @@
         // how you play this without a room at all.
         const fx = event => room.events.push({ t: 'fx', ...event });
 
+        // One swing, and the announcement if it was the last one this thing
+        // takes. `last` is what makes the client hold the round open, so the
+        // preview has to set it for the same reason the room does.
+        const swing = (target, amount) => {
+          fx({ kind: cardId || 'strike', player: you.id, target: target.id });
+          target.hp = Math.max(0, target.hp - amount);
+          room.events.push({ t: 'log', text: `${label} hits the ${target.name} for ${amount}.` });
+          if(target.hp > 0) return;
+          room.events.push({ t: 'log', text: `The ${target.name} comes apart.` });
+          fx({ kind: 'slain', player: you.id, target: target.id, enemy: target.type,
+               last: room.enemies.every(e => e.hp <= 0) });
+        };
+        const alive = () => room.enemies.filter(e => e.hp > 0);
+        const party = () => room.players.filter(p => p.classId && !p.down);
+        const ally = () => room.players.find(p => p.id === targetId && p.classId) || you;
+        const power = amount => strikePower(amount, you.effects);
+
         if(effect.kind === 'strike'){
-          const alive = room.enemies.filter(e => e.hp > 0);
-          const target = alive.find(e => e.id === targetId) ||
-            [...alive].sort((a, b) => a.dist - b.dist)[0];
-          if(target){
-            fx({ kind: cardId || 'strike', player: you.id, target: target.id });
-            target.hp = Math.max(0, target.hp - effect.amount);
-            room.events.push({ t: 'log', text: `${label} hits the ${target.name} for ${effect.amount}.` });
-            if(target.hp <= 0) room.events.push({ t: 'log', text: `The ${target.name} comes apart.` });
-          }
+          const target = alive().find(e => e.id === targetId) ||
+            [...alive()].sort((a, b) => a.dist - b.dist)[0];
+          if(target) swing(target, power(effect.amount));
+        }else if(effect.kind === 'strikeAll'){
+          for(const target of [...alive()].sort((a, b) => a.dist - b.dist)) swing(target, power(effect.amount));
         }else if(effect.kind === 'ward'){
-          fx({ kind: effect.kind, player: you.id });
-          you.block = (you.block || 0) + effect.amount;
+          const who = ally();
+          fx({ kind: 'ward', player: who.id });
+          who.block = (who.block || 0) + effect.amount;
           room.events.push({ t: 'log', text: `${label} — ${effect.amount} of guard up.` });
-        }else if(effect.kind === 'heal'){
-          fx({ kind: effect.kind, player: you.id });
-          const before = you.hp;
-          you.hp = Math.min(you.maxHp, you.hp + effect.amount);
-          room.events.push({ t: 'log', text: `${label} mends ${you.hp - before}.` });
+        }else if(effect.kind === 'wardAll'){
+          for(const who of party()){
+            who.block = (who.block || 0) + effect.amount;
+            fx({ kind: 'ward', player: who.id });
+          }
+          room.events.push({ t: 'log', text: `${label} — ${effect.amount} of guard on the party.` });
+        }else if(effect.kind === 'heal' || effect.kind === 'healAll'){
+          const who = effect.kind === 'healAll' ? party() : [ally()];
+          let total = 0;
+          for(const p of who){
+            const before = p.hp;
+            p.hp = Math.min(p.maxHp, p.hp + effect.amount);
+            total += p.hp - before;
+            fx({ kind: 'heal', player: p.id });
+          }
+          room.events.push({ t: 'log', text: `${label} mends ${total}.` });
+        }else if(effect.kind === 'cleanse'){
+          const who = ally();
+          who.effects = clearAilments(who.effects);
+          who.hp = Math.min(who.maxHp, who.hp + effect.amount);
+          fx({ kind: 'cleanse', player: who.id });
+          room.events.push({ t: 'log', text: `${label} clears the air around ${who.name}.` });
+        }else if(effect.kind === 'might' || effect.kind === 'regen'){
+          const who = ally();
+          who.effects = [...(who.effects || []).filter(e => e.kind !== effect.kind),
+            { kind: effect.kind, amount: effect.amount, rounds: effect.rounds ?? 1, fresh: true }];
+          fx({ kind: effect.kind, player: who.id });
+          room.events.push({ t: 'log', text: `${label} on ${who.name}.` });
+        }else if(effect.kind === 'revive'){
+          // Nobody stays down in the preview, so this is always the jolt.
+          const who = [...party()].sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0] || you;
+          const before = who.hp;
+          who.hp = Math.min(who.maxHp, who.hp + effect.amount);
+          fx({ kind: 'heal', player: who.id });
+          room.events.push({ t: 'log', text: `${label} jolts ${who.hp - before} back into ${who.name}.` });
+        }
+
+        // Ailments bite and age before the wave lands new ones, in the room's
+        // order — the preview is how this gets looked at, so it has to be the
+        // order the room resolves in.
+        for(const p of room.players){
+          const rot = effectAmount(p.effects, 'rot');
+          if(rot){
+            p.hp = Math.max(1, p.hp - rot);           // the preview never kills you
+            fx({ kind: 'rot', player: p.id });
+            room.events.push({ t: 'log', text: `Blightrot takes ${rot} out of ${p.name}.` });
+          }
+          const mend = effectAmount(p.effects, 'regen');
+          if(mend) p.hp = Math.min(p.maxHp, p.hp + mend);
+          p.effects = tickEffects(p.effects);
         }
 
         // The wave closes, then whatever arrived hits. Guard is spent absorbing
@@ -1809,12 +1994,27 @@
               ? `The ${enemy.name} hits for ${enemy.hits}; guard eats ${blocked}.`
               : `The ${enemy.name} hits you for ${enemy.hits}.`,
           });
+          if(through > 0){
+            enemy.landed = (enemy.landed || 0) + 1;
+            const ail = ailmentOnHit(enemy.type, enemy.landed);
+            if(ail){
+              you.effects = addAilment(you.effects, ail, enemy.id);
+              fx({ kind: 'ail', ail, player: you.id, from: enemy.id });
+              room.events.push({ t: 'log', text: `${you.name} is ${effectName(ail)}.` });
+            }
+          }
         }
         you.block = 0;
 
-        if(room.enemies.every(e => e.hp <= 0)){
+        if(!room.enemies.every(e => e.hp <= 0)) return;
+
+        // The round is over, but the last thing to die is still coming apart.
+        // Same hold the real client puts on a finished round, for the same
+        // reason: the preview is where this animation gets looked at.
+        const finish = () => {
           const drawn = salvageAfterCombat(room.players, room.buildings, demoRandom);
           room.salvage = addSalvage(room.salvage, drawn);
+          for(const p of room.players) p.effects = [];
           if(room.round >= BOSS_ROUND){
             room.phase = PHASES.over;
             room.outcome = 'won';
@@ -1823,7 +2023,10 @@
             room.pages += 1;                          // stand-in for the walk
             demoEnterBuild();
           }
-        }
+        };
+        if(stillness()) return finish();
+        clearTimeout(holdTimer);
+        holdTimer = setTimeout(() => { holdTimer = 0; finish(); render(); }, FINISH_MS);
       }
 
       function demoSend(msg){
@@ -1844,10 +2047,16 @@
             // Panels charge at the start of a fight and are flat by the end of
             // it: whatever the sun made this round is what there is.
             room.power = powerFrom(room.buildings);
-            room.enemies = waveFor(room.round).map((type, i) => {
+            // Levelled to the seats the preview is holding, like the room does
+            // it — the preview runs the whole party, so it should meet the
+            // whole party's wave.
+            const seats = room.players.filter(p => p.classId).length || 1;
+            room.enemies = waveFor(room.round, seats).map((type, i) => {
               const def = ENEMIES[type];
+              const stats = enemyStats(type, seats);
               return { id: `e${i}`, type, name: def.name, art: def.art,
-                       hp: def.hp, maxHp: def.hp, dist: def.dist, hits: def.hits };
+                       hp: stats.hp, maxHp: stats.hp, dist: stats.dist, hits: stats.hits,
+                       landed: 0 };
             });
 
             // Everyone shuffles and draws as the fight opens. A deck is per
@@ -1866,6 +2075,7 @@
               player.discard = [];
               player.hand = [];
               player.block = 0;
+              player.effects = [];        // a fight starts clean, as in the room
               demoDeal(player);
             }
 
@@ -2152,7 +2362,7 @@
 
           const kind = document.createElement('span');
           kind.className = 'pcard-kind';
-          kind.textContent = card.effect.kind
+          kind.textContent = effectLabel(card.effect.kind)
             + (card.effect.rounds > 1 ? ` · ${card.effect.rounds} rounds` : '');
 
           // Where the card came from, and what it costs. A Fireball with an
@@ -2202,7 +2412,10 @@
         schedule();
 
         const you = me();
-        const acting = !!you && !you.down && room.phase === PHASES.combat;
+        // Not while the round is holding open on a death: the room has already
+        // moved to the next phase and would drop the intent on the floor, so
+        // the cards stay live-looking and do nothing. Better to grey them.
+        const acting = !!you && !you.down && room.phase === PHASES.combat && !holdTimer;
 
         renderRoster(ui.combatRoster);
         renderHand(you, acting);
@@ -2248,7 +2461,16 @@
           li.append(name, healthBar(p));
           if(p.down) li.append(tag('Down', 'down'));
           else if(p.intent) li.append(tag(p.intent.t === 'act' ? p.intent.action : p.intent.t, 'ready'));
-          for(const effect of p.effects) li.append(tag(`${effect.kind} ${effect.rounds ?? ''}`, 'waiting'));
+          if(p.block) li.append(tag(`Guard ${p.block}`, 'ready'));
+          // What the blight left on them, and what the party put back. Named
+          // rather than keyed — "Blightrot 2" is something a player can act on,
+          // "rot 2" is a field name that leaked. Ailments read as trouble and
+          // boons read as help, which is the only distinction that matters at a
+          // glance while four other people are choosing.
+          for(const effect of p.effects || []){
+            const rounds = effect.rounds ? ` ${effect.rounds}` : '';
+            li.append(tag(`${effectName(effect.kind)}${rounds}`, AILMENTS[effect.kind] ? 'down' : 'ready'));
+          }
           ui.combatParty.append(li);
         }
 
@@ -2328,7 +2550,7 @@
           const count = document.createElement('b');
           count.textContent = `x${n}`;
           el.append(count);
-          el.title = `${card.effect.kind} ${card.effect.amount}. ${card.note}`;
+          el.title = `${effectLabel(card.effect.kind)} ${card.effect.amount}. ${card.note}`;
           ui.deckList.append(el);
         }
       }
@@ -2561,7 +2783,7 @@
             gives.className = 'card-sub';
             gives.style.color = 'var(--accent)';
             gives.textContent = made
-              ? `${recipe.makes} x ${made.name} — ${made.effect.kind} ${made.effect.amount}`
+              ? `${recipe.makes} x ${made.name} — ${effectLabel(made.effect.kind)} ${made.effect.amount}`
               : '';
 
             const note = document.createElement('span');
@@ -2598,6 +2820,14 @@
 
       function render(){
         if(!room) return;
+        // Enemy ids restart at e0 every fight, so a dissolve left over from
+        // last round's e0 would make this round's first enemy vanish before it
+        // ever moved. Both records are about bodies on a specific board.
+        if(room.phase !== render.lastPhase){
+          dying.clear();
+          struck.clear();
+          render.lastPhase = room.phase;
+        }
         queueFx(room.events || []);
         for(const event of room.events || []){
           if(event.t === 'log'){
