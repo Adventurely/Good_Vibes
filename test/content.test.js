@@ -1281,6 +1281,10 @@ const PUBLISHED = [
   'seededRandom', 'seedFromCode',
   // the camp
   'CAMP_X', 'CAMP_Y', 'CAMP_RADIUS', 'TENT_Y', 'inCamp',
+  // spellcraft
+  'SPELLS', 'MODIFIERS', 'MODIFIER_WEIGHTS', 'SPELL_SLOTS', 'SPELL_OFFER_WEIGHT',
+  'PAGES_PER_ROUND', 'WIZARD_BASE_KIT', 'freshSpellbook', 'composeSpell',
+  'rollOffers', 'takeOffer', 'moveModifier', 'wizardCombatDeck',
 ];
 
 test('every name this module has ever published is still exported', async () => {
