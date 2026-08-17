@@ -22,6 +22,9 @@ import {
   brew, pathTo, walkableAt, respawnItems, combatOptions, LEVELS,
   CAMP_X, CAMP_Y, CAMP_RADIUS, TENT_Y, inCamp,
   STAT_KEYS, STAT_LABELS, STAT_SHORT, blankStats, runHighlights,
+  SPELLS, MODIFIERS, MODIFIER_WEIGHTS, SPELL_SLOTS, PAGES_PER_ROUND,
+  WIZARD_BASE_KIT, freshSpellbook, composeSpell, rollOffers, takeOffer,
+  moveModifier, wizardCombatDeck,
 } from '../public/content.js';
 
 /* content.js is imported by the authoritative room object in Tool Haven, not
@@ -210,6 +213,120 @@ test('exactly one class spends each pool', () => {
   assert.equal(CLASSES.filter((c) => c.craft).length, 1);
   assert.equal(CLASSES.filter((c) => c.build).length, 1);
   assert.equal(CLASSES.filter((c) => c.cast).length, 1);
+});
+
+/* ---- spellcraft ---------------------------------------------------------- */
+
+/* The op keys composeSpell understands. Pinned here so a modifier authored
+   with a typo — `amonut: 5` — fails this file instead of silently doing
+   nothing at the bench. */
+const MODIFIER_OPS = new Set([
+  'amount', 'mult', 'charges', 'aoe', 'selfWard', 'leech', 'hpCost',
+  'farthest', 'pageOnKill', 'opening',
+]);
+
+test('every spell and every modifier is well-formed', () => {
+  assert.ok(Object.keys(SPELLS).length >= 3, 'three bones at least');
+  for (const [id, spell] of Object.entries(SPELLS)) {
+    const where = `spell "${id}"`;
+    assert.ok(EFFECT_KINDS.includes(spell.verb), `${where}: verb must be an effect kind`);
+    assert.ok(Number.isInteger(spell.amount) && spell.amount > 0, `${where}: amount`);
+    assert.ok(Number.isInteger(spell.charges) && spell.charges > 0, `${where}: charges`);
+    assert.ok(spell.name && spell.note, `${where}: needs a face`);
+  }
+  for (const [id, mod] of Object.entries(MODIFIERS)) {
+    const where = `modifier "${id}"`;
+    assert.ok(MODIFIER_WEIGHTS[mod.rarity], `${where}: rarity "${mod.rarity}" has no draft weight`);
+    assert.ok(mod.name && mod.note, `${where}: needs a face`);
+    const keys = Object.keys(mod.op || {});
+    assert.ok(keys.length, `${where}: an op that does nothing is not a modifier`);
+    for (const key of keys) assert.ok(MODIFIER_OPS.has(key), `${where}: op "${key}" is not one composeSpell reads`);
+  }
+});
+
+test('sockets fold in order: the 30 the example asks for, and the 25 it is not', () => {
+  // The design's own worked example: Fireball 10, +5, then a doubler.
+  const forward = composeSpell('fireball', ['kindling', 'twin']);
+  assert.equal(forward.amount, 30, '(10 + 5) x 2');
+  assert.equal(forward.charges, 1, 'the doubler costs a charge');
+  // The same two sockets the other way round are a different spell.
+  const reversed = composeSpell('fireball', ['twin', 'kindling']);
+  assert.equal(reversed.amount, 25, '(10 x 2) + 5 — rearranging is a real decision');
+});
+
+test('no arrangement of sockets can craft a spell out of existing', () => {
+  const drained = composeSpell('fireball', ['twin', 'twin']);
+  assert.equal(drained.charges, 1, 'charges clamp at one');
+  const echoes = composeSpell('nova', ['echo', 'echo', 'echo']);
+  assert.equal(echoes.amount, 1, 'amount clamps at one');
+  assert.equal(echoes.charges, 5, 'and the copies still arrive');
+});
+
+test('a Splitting Sigil turns a strike into the whole lane, for less each', () => {
+  const split = composeSpell('fireball', ['split']);
+  assert.equal(split.verb, 'strikeAll');
+  assert.equal(split.amount, Math.ceil(SPELLS.fireball.amount * 0.6));
+  // On a spell that already reaches everything it is only the discount.
+  assert.equal(composeSpell('nova', ['split']).verb, 'strikeAll');
+});
+
+test('the draft is seeded, distinct, and never offers what she knows', () => {
+  const book = freshSpellbook();
+  const first = rollOffers(seededRandom(42), book);
+  const again = rollOffers(seededRandom(42), book);
+  assert.deepEqual(first, again, 'the same seed must turn over the same draft');
+  assert.equal(first.length, 3);
+  assert.equal(new Set(first.map((o) => `${o.type}:${o.id}`)).size, 3, 'three distinct options');
+  for (const offer of first) {
+    if (offer.type === 'spell') {
+      assert.ok(SPELLS[offer.id], `offered spell "${offer.id}" does not exist`);
+      assert.ok(!book.known.includes(offer.id), 'a spell she knows is not an offer');
+    } else {
+      assert.ok(MODIFIERS[offer.id], `offered modifier "${offer.id}" does not exist`);
+    }
+  }
+});
+
+test('the bench refuses what the book cannot hold', () => {
+  let book = { known: ['fireball'], satchel: ['kindling', 'echo', 'emberward', 'siphon'], slots: { fireball: [] } };
+  for (const mod of ['kindling', 'echo', 'emberward']) {
+    book = moveModifier(book, mod, 'fireball');
+    assert.ok(book, `socketing ${mod} should be legal`);
+  }
+  assert.equal(book.slots.fireball.length, SPELL_SLOTS);
+  assert.equal(moveModifier(book, 'siphon', 'fireball'), null, 'a fourth socket does not exist');
+  assert.equal(moveModifier(book, 'twin', 'fireball'), null, 'she does not own a Twin Core');
+  assert.equal(moveModifier(book, 'kindling', 'nova'), null, 'she has not learned Cinder Nova');
+  // Out again is always legal, and the satchel gets it back.
+  const returned = moveModifier(book, 'echo', null);
+  assert.ok(returned.satchel.includes('echo'));
+  assert.equal(returned.slots.fireball.length, SPELL_SLOTS - 1);
+});
+
+test('the deck the book deals is the kit plus the charges', () => {
+  const fresh = wizardCombatDeck(freshSpellbook());
+  const kit = Object.values(WIZARD_BASE_KIT).reduce((a, b) => a + b, 0) + UNIVERSAL_CARDS.length;
+  assert.equal(fresh.length, kit + SPELLS.fireball.charges);
+  assert.equal(fresh.filter((id) => id === 'fireball').length, SPELLS.fireball.charges);
+
+  const echoed = wizardCombatDeck({ known: ['fireball'], satchel: [], slots: { fireball: ['echo'] } });
+  assert.equal(echoed.filter((id) => id === 'fireball').length, SPELLS.fireball.charges + 1,
+    'an Echo Script is another copy in the deal');
+});
+
+test('an invested Fireball out-hits an invested Bolt Gun', () => {
+  // The Wizard is the heavy hitter the party built around; the Engineer's
+  // ceiling is real but hers is higher. Two sockets against two coil levels.
+  const hers = composeSpell('fireball', ['kindling', 'twin']).amount;
+  const his = cardEffect('boltgun', { coilwind: 2 }).amount;
+  assert.ok(hers > his, `Fireball at ${hers} must clear the bolt gun at ${his}`);
+});
+
+test('the library pays a round wage and the bench has three sockets', () => {
+  assert.ok(PAGES_PER_ROUND >= 1, 'a round with no page is a round spent watching');
+  assert.equal(SPELL_SLOTS, 3);
+  const book = freshSpellbook();
+  assert.deepEqual(book.known, ['fireball'], 'she opens knowing the one spell the example is about');
 });
 
 test('a build site spawns all three kinds of node, each on its own legal tile', () => {

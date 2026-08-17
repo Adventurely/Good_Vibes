@@ -91,7 +91,12 @@ test('every strike card resolves the way the Strike action did', () => {
     assert.ok(fx, `"${id}" resolved without an fx event, so it is silent and invisible`);
     assert.equal(fx.player, player.id);
     assert.equal(fx.target, target.id, `"${id}" must say which enemy it hit`);
-    assert.equal(target.hp, Math.max(0, before - cardEffect(id, room.upgrades).amount),
+    // A card the Wizard's book knows resolves from the book, not the card
+    // table — Fireball is a crafted spell in her hands and a legacy card in
+    // the deployed room's.
+    const spell = room.spellFor(player, id);
+    const amount = spell ? spell.amount : cardEffect(id, room.upgrades).amount;
+    assert.equal(target.hp, Math.max(0, before - amount),
       `"${id}" announced one thing and did another`);
 
     // The point of the whole exercise: the client can draw it and play it,
@@ -488,4 +493,180 @@ test('only the host starts another run, and only from the end of one', () => {
 
   room.handle(seats[0], { t: 'restart' });
   assert.equal(room.phase, PHASES.lobby, 'the host can');
+});
+
+/* ---- the scriptorium ----------------------------------------------------- */
+
+/* The Wizard's build phase: pages open drafts, picks fill the book, sockets
+ * rearrange it, and the surge deals what the book says. These drive the real
+ * room through real intents, because the client is only ever a renderer of
+ * what these paths produce.
+ */
+
+import {
+  SPELLS, MODIFIERS, composeSpell, freshSpellbook, wizardCombatDeck,
+} from '../public/content.js';
+
+/* A room parked in the build phase with one seated wizard. */
+function scriptorium(){
+  const room = roomFor(`study-${++codes}`);
+  const socket = fakeSocket();
+  const player = room.join(`study-token-${codes}`, socket);
+  room.handle(player, { t: 'class', classId: 'wizard' });
+  room.handle(player, { t: 'start' });
+  assert.equal(room.phase, PHASES.build);
+  return { room, player, socket };
+}
+
+/* Straight to a fight with a hand-authored book, no drafting involved. */
+function surgeWith(slots, hand){
+  const { room, player } = scriptorium();
+  room.spellbook = { known: Object.keys(slots), satchel: [], slots };
+  room.handle(player, { t: 'ready', ready: true });
+  assert.equal(room.phase, PHASES.combat);
+  if(hand) player.hand = hand;
+  return { room, player };
+}
+
+test('a page opens a draft, a pick closes it, and nobody else can touch either', () => {
+  const { room, player } = scriptorium();
+  const pages = room.pages;
+  assert.ok(pages >= 1, 'the library owes her an opening page');
+
+  room.handle(player, { t: 'intent', intent: { t: 'page' } });
+  assert.equal(room.pages, pages - 1, 'the draft costs the page');
+  assert.equal(room.offers.length, 3, 'three ways to read it');
+
+  // A second page while the draft is open buys nothing.
+  room.handle(player, { t: 'intent', intent: { t: 'page' } });
+  assert.equal(room.pages, pages - 1, 'one draft on the table at a time');
+
+  const offer = room.offers[0];
+  const before = JSON.parse(JSON.stringify(room.spellbook));
+  room.handle(player, { t: 'intent', intent: { t: 'pick', index: 0 } });
+  assert.equal(room.offers, null, 'the pick closes the draft');
+  if(offer.type === 'spell'){
+    assert.ok(room.spellbook.known.includes(offer.id));
+    assert.ok(!before.known.includes(offer.id));
+  }else{
+    assert.equal(room.spellbook.satchel.filter(m => m === offer.id).length,
+      before.satchel.filter(m => m === offer.id).length + 1);
+  }
+});
+
+test('the pages are the party pool but the pen is the wizard alone', () => {
+  const room = roomFor(`pen-${++codes}`);
+  const seats = ['engineer', 'wizard'].map((classId, i) => {
+    const player = room.join(`pen-token-${codes}-${i}`, fakeSocket());
+    room.handle(player, { t: 'class', classId });
+    return player;
+  });
+  room.handle(seats[1], { t: 'start' });
+  const pages = room.pages;
+
+  room.handle(seats[0], { t: 'intent', intent: { t: 'page' } });
+  assert.equal(room.offers, null, 'the engineer cannot open a draft');
+  assert.equal(room.pages, pages, 'or spend a page trying');
+
+  room.spellbook = { known: ['fireball'], satchel: ['kindling'], slots: { fireball: [] } };
+  room.handle(seats[0], { t: 'intent', intent: { t: 'mod', mod: 'kindling', spell: 'fireball' } });
+  assert.equal(room.spellbook.slots.fireball.length, 0, 'or set a socket');
+});
+
+test('sockets move through real intents and the deck list follows the book', () => {
+  const { room, player } = scriptorium();
+  room.spellbook = { known: ['fireball'], satchel: ['kindling', 'twin', 'echo', 'siphon'], slots: { fireball: [] } };
+
+  for(const mod of ['kindling', 'twin', 'echo']){
+    room.handle(player, { t: 'intent', intent: { t: 'mod', mod, spell: 'fireball' } });
+  }
+  assert.deepEqual(room.spellbook.slots.fireball, ['kindling', 'twin', 'echo']);
+  room.handle(player, { t: 'intent', intent: { t: 'mod', mod: 'siphon', spell: 'fireball' } });
+  assert.equal(room.spellbook.slots.fireball.length, 3, 'a fourth socket does not exist');
+
+  // (10+5)x2-3 = 27, and 1-1+1 = 1 charge... charges: 2-1+1 = 2.
+  const composed = composeSpell('fireball', room.spellbook.slots.fireball);
+  assert.equal(player.deck.filter(id => id === 'fireball').length, composed.charges,
+    'the deck list is the book\'s shadow, updated the moment the book is');
+
+  // Reordering: pull one out, put it back in front.
+  room.handle(player, { t: 'intent', intent: { t: 'mod', mod: 'kindling', spell: null } });
+  room.handle(player, { t: 'intent', intent: { t: 'mod', mod: 'kindling', spell: 'fireball', pos: 99 } });
+  assert.deepEqual(room.spellbook.slots.fireball, ['twin', 'echo', 'kindling'],
+    'pos places a socket exactly where the drag dropped it');
+});
+
+test('a crafted Twin Core Fireball lands for 30 and costs the pool nothing', () => {
+  const { room, player } = surgeWith({ fireball: ['kindling', 'twin'] }, ['fireball', 'hold', 'hold']);
+  const target = room.enemies[0];
+  target.hp = 99; target.dist = 9;
+  const pages = room.pages;
+
+  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'fireball', target: target.id } });
+  assert.equal(target.hp, 99 - 30, 'the worked example, through the whole engine');
+  assert.equal(room.pages, pages, 'the book already paid — no page leaves the pool');
+});
+
+test('charges are per combat: spent when played, dealt again next surge', () => {
+  const { room, player } = surgeWith({ fireball: [] });
+  const counts = () => [...player.deck, ...player.discard, ...player.hand]
+    .filter(id => id === 'fireball').length;
+  assert.equal(counts(), SPELLS.fireball.charges, 'the book dealt the charges');
+
+  for(const enemy of room.enemies) enemy.dist = 9;
+  player.hand = ['fireball', 'fireball', 'hold'];
+  player.deck = player.deck.filter(id => id !== 'fireball');
+  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'fireball' } });
+  assert.equal(counts(), 1, 'the played copy is spent; the unplayed one only discards');
+
+  // The next surge deals from the book again, not from what is left.
+  room.phase = PHASES.build;
+  room.handle(player, { t: 'ready', ready: true });
+  assert.equal(counts(), SPELLS.fireball.charges, 'a charge is a per-combat thing');
+});
+
+test('the bloodpact cannot take the last point, and the siphon gives some back', () => {
+  const bled = surgeWith({ fireball: ['bloodpact'] }, ['fireball', 'hold', 'hold']);
+  for(const enemy of bled.room.enemies){ enemy.hp = 99; enemy.dist = 9; }
+  bled.player.hp = 2;
+  bled.room.handle(bled.player, { t: 'intent', intent: { t: 'play', index: 0, card: 'fireball' } });
+  assert.equal(bled.player.hp, 1, 'the seal takes what it can and stops at the last point');
+
+  const fed = surgeWith({ fireball: ['siphon'] }, ['fireball', 'hold', 'hold']);
+  for(const enemy of fed.room.enemies){ enemy.hp = 99; enemy.dist = 9; }
+  fed.player.hp = 5;
+  fed.room.handle(fed.player, { t: 'intent', intent: { t: 'play', index: 0, card: 'fireball' } });
+  assert.equal(fed.player.hp, 5 + Math.ceil(SPELLS.fireball.amount / 2),
+    'half of what it took out of them finds its way back');
+});
+
+test('farsight snipes the back of the lane when she does not aim', () => {
+  const { room, player } = surgeWith({ fireball: ['farsight'] }, ['fireball', 'hold', 'hold']);
+  room.enemies = [
+    { id: 'near', type: 'sporeling', name: 'Sporeling', art: 'sporeling', hp: 50, maxHp: 50, dist: 1, hits: 0, landed: 0 },
+    { id: 'far', type: 'creeper', name: 'Creeper', art: 'creeper', hp: 50, maxHp: 50, dist: 5, hits: 0, landed: 0 },
+  ];
+  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'fireball' } });
+  assert.equal(room.enemies[0].hp, 50, 'the nearest is not the one it lands on');
+  assert.ok(room.enemies[1].hp < 50, 'it lands all the way back');
+});
+
+test('a gilded kill pays pages back to the library', () => {
+  const { room, player } = surgeWith({ fireball: ['gilded'] }, ['fireball', 'hold', 'hold']);
+  // A second enemy stays standing, so the round does not end and pay its own
+  // build-phase page income on top of the margin's.
+  room.enemies = [
+    { id: 'e0', type: 'sporeling', name: 'Sporeling', art: 'sporeling', hp: 1, maxHp: 6, dist: 9, hits: 0, landed: 0 },
+    { id: 'e1', type: 'creeper', name: 'Creeper', art: 'creeper', hp: 50, maxHp: 50, dist: 9, hits: 0, landed: 0 },
+  ];
+  const pages = room.pages;
+  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'fireball', target: 'e0' } });
+  assert.equal(room.pages, pages + 1, 'a kill worth writing down pays for the paper');
+});
+
+test('an opening word is in the opening hand', () => {
+  const { room, player } = surgeWith({ fireball: ['opening'] });
+  assert.ok(player.hand.includes('fireball'),
+    'the first thing said when the surge arrives');
+  assert.equal(room.enemies.length > 0, true);
 });
