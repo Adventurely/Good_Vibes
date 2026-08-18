@@ -22,6 +22,7 @@
 | ✅ Documented | What the Worker imports and what its room does with it — see [docs/tool-haven-server.md](docs/tool-haven-server.md) |
 | ✅ Done | The Worker runs a port of `src/rooms.js` and speaks this client's protocol |
 | ❓ Cannot be checked here | Whether the `TOOL_HAVEN_TOKEN` secret exists (manual sync until it does) |
+| ❌ Not set up | GitHub Pages, which the `preview` branch publishes to — see [The preview channel](#the-preview-channel) |
 
 ### Steps before a deploy
 
@@ -220,6 +221,25 @@ step, and nothing reaches the site.
 Haven's `data/manifest.json`, which is what puts a card on its homepage. Adding
 a second page there is a one-time manual edit in that repo. `good-vibes` is
 already registered.
+
+### The preview channel
+
+There is a second, lesser publishing path for looking at the game without a
+server: pushing anything to the `preview` branch sends `public/` verbatim to
+GitHub Pages, where the client's offline `?preview` mode plays a single-seat
+run against a fake room. It is the phone-testing URL, and it deliberately
+cannot host a real game — rooms and the socket need Tool Haven.
+
+    git push origin HEAD:preview        # publish whatever you are looking at
+
+**One-time setup, and it has not been done.** Pages must be switched on for
+the repository by hand: Settings → Pages → Build and deployment → Source:
+**GitHub Actions**. Until then `preview-pages` fails at its first step with
+"Get Pages site failed … Not Found", which is not a fault in the branch or
+the artifact — there is simply no site to publish to. The workflow cannot do
+this for itself: creating a Pages site takes repository admin, which the
+`GITHUB_TOKEN` a workflow runs under does not have and cannot grant itself.
+Note too that Pages on a private repository needs a paid plan.
 
 ## Requirements
 
