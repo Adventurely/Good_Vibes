@@ -33,13 +33,19 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      # `enablement` turns Pages on for the repository the first time this
-      # runs, instead of failing with "Get Pages site failed" until somebody
-      # goes and flips the switch in Settings by hand. It is a no-op once the
-      # site exists, so it can simply stay here.
+      # Pages has to be switched on by hand, once, before this step can do
+      # anything: Settings -> Pages -> Build and deployment -> Source: GitHub
+      # Actions. Until then every run of this workflow dies right here with
+      # "Get Pages site failed ... Not Found", and the branch is fine — there
+      # is simply no site to publish to.
+      #
+      # The action's `enablement: true` does not help. It asks the API to
+      # create the site using the workflow's GITHUB_TOKEN, and that token
+      # cannot: creating a Pages site needs admin on the repository, which no
+      # `permissions:` block can grant itself. It comes back "Resource not
+      # accessible by integration". Note also that Pages on a private
+      # repository needs a paid plan.
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: public
