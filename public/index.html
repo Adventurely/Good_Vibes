@@ -3,42 +3,42 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Hello, world! — Good Vibes pixel art</title>
+    <title>Good Vibes — a co-op solarpunk roguelike</title>
     <meta
       name="description"
-      content="A pixel art hello world scene rendered on a 320x180 canvas, with the palette and sprite specs it was built from."
+      content="Walk a ruin, gather what grew in it, and hold the site when the blight surges. A co-op solarpunk deckbuilding roguelike for up to three players, in the browser."
     />
     <style>
+      /* The page is the frame; the canvas is the game. Everything here is
+         quiet on purpose — a landing page that competes with the art it is
+         framing is a landing page nobody looks past. */
       :root {
         color-scheme: dark;
-        --ink: #0d0b1f;
-        --panel: #16132b;
-        --line: #2b2450;
-        --text: #fdf6e3;
-        --muted: #8f86bf;
-        --accent: #4fc4d3;
+        --ink: #140c06;
+        --panel: #1d130a;
+        --line: #4a3320;
+        --text: #f3e4c8;
+        --muted: #a58a68;
+        --accent: #6cc24a;
+        --sun: #f2b134;
       }
 
-      * {
-        box-sizing: border-box;
-      }
+      * { box-sizing: border-box; }
 
       body {
         margin: 0;
-        padding: 2rem 1rem 3rem;
+        padding: 1.5rem 1rem 3rem;
         background: var(--ink);
-        background-image: radial-gradient(circle at 50% -10%, #241a3a 0%, #0d0b1f 65%);
+        /* Warm from the middle out, like the fire in the scene. */
+        background-image: radial-gradient(circle at 50% 18%, #33200f 0%, #140c06 62%);
         color: var(--text);
         font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         line-height: 1.6;
       }
 
-      .wrap {
-        max-width: 60rem;
-        margin: 0 auto;
-      }
+      .wrap { max-width: 62rem; margin: 0 auto; }
 
-      /* --- the screen ------------------------------------------------- */
+      /* --- the screen ---------------------------------------------------- */
 
       .screen {
         position: relative;
@@ -48,607 +48,454 @@
         border: 2px solid var(--line);
         border-radius: 6px;
         background: #000;
-        box-shadow: 0 0 0 4px #0d0b1f, 0 18px 50px rgb(0 0 0 / 0.6);
+        box-shadow: 0 0 0 4px #140c06, 0 22px 60px rgb(0 0 0 / 0.65);
         overflow: hidden;
+        /* The whole screen breathes in on load, once. */
+        animation: rise 0.7s ease-out both;
+      }
+      @keyframes rise {
+        from { opacity: 0; transform: translateY(12px); }
+        to { opacity: 1; transform: none; }
       }
 
       canvas {
         display: block;
-        /* Nearest-neighbour upscaling — the whole point of pixel art. */
         image-rendering: pixelated;
         image-rendering: crisp-edges;
       }
 
-      /* CRT overlay: scanlines + a soft vignette, purely decorative. */
+      /* Scanlines. Faint enough to read as a screen rather than as a filter,
+         and off entirely when the visitor has asked for less motion — a fixed
+         overlay is not motion, but it is exactly the kind of visual noise the
+         same people are usually asking to be spared. */
       .crt {
         position: absolute;
         inset: 0;
         pointer-events: none;
-        background:
-          radial-gradient(ellipse at center, rgb(0 0 0 / 0) 55%, rgb(0 0 0 / 0.45) 100%),
-          repeating-linear-gradient(
-            to bottom,
-            rgb(0 0 0 / 0.22) 0px,
-            rgb(0 0 0 / 0.22) 1px,
-            rgb(0 0 0 / 0) 1px,
-            rgb(0 0 0 / 0) 3px
-          );
-        transition: opacity 120ms linear;
+        background: repeating-linear-gradient(
+          to bottom,
+          rgb(0 0 0 / 0.16) 0px,
+          rgb(0 0 0 / 0.16) 1px,
+          transparent 1px,
+          transparent 3px
+        );
+        opacity: 0.55;
       }
+      .screen[data-crt='off'] .crt { display: none; }
 
-      .screen[data-crt='off'] .crt {
-        opacity: 0;
-      }
+      /* --- the call to action -------------------------------------------- */
 
-      /* --- controls ---------------------------------------------------- */
-
-      .controls {
+      .cta {
         display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
+        gap: 0.7rem;
         justify-content: center;
-        margin: 1.25rem 0 0;
+        align-items: stretch;
+        flex-wrap: wrap;
+        margin: 1.4rem auto 0;
+      }
+
+      .play {
+        display: block;
+        text-decoration: none;
+        padding: 0.85rem 2.4rem;
+        border: 2px solid var(--accent);
+        border-radius: 5px;
+        background: #23331a;
+        color: var(--text);
+        text-align: center;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        font-size: 0.95rem;
+        transition: transform 0.12s ease, background 0.12s ease;
+      }
+      .play:hover, .play:focus-visible { background: #2e4322; transform: translateY(-2px); }
+      .play small {
+        display: block;
+        margin-top: 0.2rem;
+        letter-spacing: 0.06em;
+        text-transform: none;
+        font-size: 0.68rem;
+        color: var(--muted);
       }
 
       button {
         font: inherit;
-        font-size: 0.8rem;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
         color: var(--text);
         background: var(--panel);
         border: 2px solid var(--line);
-        border-radius: 4px;
-        padding: 0.4rem 0.9rem;
+        border-radius: 5px;
+        padding: 0.55rem 1rem;
         cursor: pointer;
-      }
-
-      button:hover,
-      button:focus-visible {
-        border-color: var(--accent);
-        color: var(--accent);
-      }
-
-      button[aria-pressed='true'] {
-        background: #1f1a3d;
-      }
-
-      /* --- style guide -------------------------------------------------- */
-
-      header,
-      section {
-        margin-top: 2.5rem;
-      }
-
-      h1 {
-        font-size: 1rem;
-        letter-spacing: 0.28em;
+        letter-spacing: 0.06em;
+        font-size: 0.72rem;
         text-transform: uppercase;
-        color: var(--accent);
-        margin: 0 0 0.35rem;
       }
+      button:hover, button:focus-visible { border-color: var(--sun); }
+      button[aria-pressed='false'] { opacity: 0.55; }
+
+      .controls {
+        display: flex;
+        gap: 0.5rem;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-top: 0.8rem;
+      }
+
+      /* --- what the game is ---------------------------------------------- */
+
+      .pitch {
+        max-width: 44rem;
+        margin: 2.6rem auto 0;
+        text-align: center;
+        color: var(--muted);
+      }
+      .pitch b { color: var(--text); font-weight: 400; }
+
+      .roles {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+        gap: 0.7rem;
+        margin: 2rem 0 0;
+        padding: 0;
+        list-style: none;
+      }
+      .role {
+        display: flex;
+        gap: 0.7rem;
+        align-items: flex-start;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        padding: 0.7rem 0.8rem;
+        background: rgb(29 19 10 / 0.6);
+      }
+      .role canvas { image-rendering: pixelated; flex: none; }
+      .role b { display: block; color: var(--text); font-weight: 400; }
+      .role span {
+        display: block;
+        font-size: 0.66rem;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+      }
+      .role p { margin: 0.35rem 0 0; font-size: 0.76rem; color: var(--muted); line-height: 1.55; }
+      .role[data-locked='true'] { opacity: 0.45; }
 
       h2 {
-        font-size: 0.78rem;
-        letter-spacing: 0.22em;
+        font-size: 0.72rem;
+        letter-spacing: 0.16em;
         text-transform: uppercase;
         color: var(--muted);
-        margin: 0 0 0.9rem;
-        padding-bottom: 0.5rem;
+        font-weight: 400;
         border-bottom: 1px solid var(--line);
+        padding-bottom: 0.5rem;
+        margin: 3rem 0 1rem;
       }
 
-      p {
+      .loop {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+        gap: 0.8rem;
+        padding: 0;
         margin: 0;
+        list-style: none;
+      }
+      .loop li {
+        border: 1px solid var(--line);
+        border-left: 3px solid var(--accent);
+        border-radius: 4px;
+        padding: 0.7rem 0.9rem;
+        font-size: 0.78rem;
         color: var(--muted);
-        font-size: 0.85rem;
+        line-height: 1.6;
       }
+      .loop b { display: block; color: var(--text); font-weight: 400; margin-bottom: 0.2rem; }
 
-      header {
-        margin-top: 0;
-        margin-bottom: 1.75rem;
-        text-align: center;
+      details { margin-top: 2.5rem; }
+      summary {
+        cursor: pointer;
+        color: var(--muted);
+        font-size: 0.72rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
       }
-
       .swatches {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
-        gap: 0.6rem;
-        list-style: none;
+        grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+        gap: 0.4rem;
         padding: 0;
-        margin: 0;
-      }
-
-      .swatches li {
-        display: flex;
-        align-items: center;
-        gap: 0.6rem;
-        padding: 0.45rem;
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 4px;
-        font-size: 0.72rem;
-      }
-
-      .chip {
-        width: 1.6rem;
-        height: 1.6rem;
-        flex: none;
-        border-radius: 2px;
-        border: 1px solid rgb(255 255 255 / 0.15);
-      }
-
-      .chip-name {
-        display: block;
-        color: var(--text);
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-      }
-
-      .chip-hex {
-        display: block;
-        color: var(--muted);
-      }
-
-      .specs {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
-        gap: 0.6rem;
+        margin: 1rem 0 0;
         list-style: none;
-        padding: 0;
-        margin: 0;
       }
-
-      .specs li {
-        padding: 0.7rem 0.85rem;
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 4px;
-        font-size: 0.78rem;
-      }
-
-      .specs b {
-        display: block;
-        color: var(--accent);
-        font-weight: 400;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-        font-size: 0.68rem;
-        margin-bottom: 0.15rem;
-      }
-
-      code {
-        color: var(--accent);
-        font-size: 0.95em;
-      }
-
-      /* The one thing anyone opening this page actually wants. It sits directly
-         under the screen rather than below the style guide, because a button
-         you have to scroll past two reference sections to find is a button
-         nobody finds. */
-      .play {
-        display: block;
-        width: 100%;
-        max-width: 24rem;
-        margin: 2rem auto 0;
-        padding: 1rem 1.5rem;
-        text-align: center;
-        text-decoration: none;
-        font-size: 1.05rem;
-        letter-spacing: 0.2em;
-        text-transform: uppercase;
-        color: var(--ink);
-        background: var(--accent);
-        border: 2px solid var(--accent);
-        border-radius: 6px;
-        /* A chunky drop shadow rather than a flat fill: it reads as a physical
-           button, which is the right idiom on the way into a game. */
-        box-shadow: 0 6px 0 #2b7f8a;
-        transition: transform 80ms linear, box-shadow 80ms linear;
-      }
-
-      .play:hover,
-      .play:focus-visible {
-        color: var(--ink);
-        transform: translateY(2px);
-        box-shadow: 0 4px 0 #2b7f8a;
-      }
-
-      .play:active {
-        transform: translateY(6px);
-        box-shadow: 0 0 0 #2b7f8a;
-      }
-
-      .play small {
-        display: block;
-        margin-top: 0.4rem;
-        font-size: 0.62rem;
-        letter-spacing: 0.1em;
-        text-transform: none;
-        opacity: 0.8;
-      }
-
-      @media (prefers-reduced-motion: reduce) {
-        .play {
-          transition: none;
-        }
-      }
-
-      a {
-        color: var(--accent);
-        text-decoration-thickness: 1px;
-        text-underline-offset: 3px;
-      }
-
-      a:hover,
-      a:focus-visible {
-        color: var(--text);
-      }
+      .swatches li { display: flex; align-items: center; gap: 0.5rem; font-size: 0.68rem; }
+      .chip { width: 1.5rem; height: 1.5rem; border-radius: 3px; border: 1px solid var(--line); flex: none; }
+      .chip-name { display: block; color: var(--text); }
+      .chip-hex { display: block; color: var(--muted); font-size: 0.6rem; }
 
       footer {
-        margin-top: 2.5rem;
+        margin-top: 3rem;
         text-align: center;
-        font-size: 0.72rem;
+        font-size: 0.7rem;
         color: var(--muted);
+      }
+      a { color: var(--accent); text-underline-offset: 3px; }
+
+      @media (prefers-reduced-motion: reduce) {
+        .screen { animation: none; }
+        .play { transition: none; }
       }
     </style>
   </head>
   <body>
     <div class="wrap">
-      <header>
-        <h1>Good Vibes</h1>
-        <p>Pixel art hello world — 320&times;180, 16 colours, everything drawn from data.</p>
-      </header>
-
+      <!-- The title screen is a canvas because it is the game: the site under
+           the logo is generated by content.js and the party walking it is
+           routed by the same pathfinder the build phase uses. -->
       <div class="screen" id="screen" data-crt="on">
-        <canvas id="stage" width="320" height="180" aria-label="Pixel art scene: the words HELLO WORLD over a sunset landscape with an adventurer and a slime."></canvas>
+        <canvas
+          id="title"
+          aria-label="Good Vibes — the title screen. A generated solarpunk ruin seen from above, with a camp and fire at its centre and three heroes walking to gather herbs, salvage and spell pages."
+        ></canvas>
         <div class="crt"></div>
       </div>
 
-      <div class="controls">
-        <button type="button" id="toggle-crt" aria-pressed="true">CRT filter</button>
-        <button type="button" id="toggle-motion" aria-pressed="true">Motion</button>
+      <div class="cta">
+        <a class="play" href="play.html">
+          Play Good Vibes
+          <small>Free · in the browser · up to three players</small>
+        </a>
       </div>
 
-      <a class="play" href="play.html">
-        Play Good Vibes
-        <small>Five levels down &middot; up to five players</small>
-      </a>
+      <div class="controls">
+        <button type="button" id="sound" aria-pressed="false">Music off</button>
+        <button type="button" id="reroll">New ruin</button>
+        <button type="button" id="crt" aria-pressed="true">Scanlines</button>
+      </div>
 
       <noscript>
-        <p style="text-align: center; margin-top: 1rem">
-          This scene is rendered with JavaScript on a canvas — enable it to see the art.
+        <p style="text-align:center;margin-top:1rem">
+          The title screen is drawn with JavaScript on a canvas, and so is the
+          game — enable it to see either.
         </p>
       </noscript>
 
-      <section>
-        <h2>Palette — Good Vibes 16</h2>
+      <p class="pitch">
+        The lights went out, the ruins kept growing, and somebody has to tend
+        them. <b>Walk the site, gather what grew in it, build what you can
+        afford</b> — then hold the ground when the blight surges. Four rounds,
+        a fresh ruin every run, and a boss at the end of it that has been
+        harvesting since long before you arrived.
+      </p>
+
+      <ul class="roles" id="roles"></ul>
+
+      <h2>A round, in two halves</h2>
+      <ul class="loop">
+        <li>
+          <b>Build</b>
+          A generated site, seen from above. Walk to the herbs, the salvage
+          crates and the spell pages, brew what the stash covers, and put down
+          what the Engineer can pay for. Nobody has a move budget — the limit is
+          what grew, not how far you can walk.
+        </li>
+        <li>
+          <b>Surge</b>
+          The blight arrives on a different ground, and everything the build
+          phase bought is a card in somebody's hand. Everyone commits at once,
+          three cards drawn a turn, and what the wave leaves on you — rot,
+          weakness, a lost turn — outlasts the thing that landed it.
+        </li>
+        <li>
+          <b>Together</b>
+          Every class opens with two cards that are only worth holding because
+          somebody else is at the table: guard on the whole party, a page lent
+          to whoever hits hardest, cables across the chest of an ally who went
+          down. The fight levels itself to how many of you turned up.
+        </li>
+      </ul>
+
+      <details>
+        <summary>For builders — the palette</summary>
+        <p style="font-size:0.78rem;color:var(--muted);margin-top:0.9rem">
+          Everything on this page and in the game is drawn from data: sprites
+          are arrays of strings, one character per pixel, each character a key
+          into the palette below. Nothing is an image file. The tables live in
+          <code>public/art.js</code>, the rules in <code>public/content.js</code>,
+          and the same modules are imported by the browser and by the
+          authoritative room on the server, so the two ends cannot disagree
+          about what a potion does.
+        </p>
         <ul class="swatches" id="swatches"></ul>
-      </section>
+      </details>
 
-      <section>
-        <h2>Specs</h2>
-        <ul class="specs">
-          <li><b>Resolution</b>320 &times; 180, integer-scaled</li>
-          <li><b>Scaling</b>Nearest neighbour, no smoothing</li>
-          <li><b>Font</b>5 &times; 7 bitmap, 1px letter spacing</li>
-          <li><b>Hero sprite</b>12 &times; 16, 2-frame walk cycle</li>
-          <li><b>Gradients</b>4 &times; 4 ordered (Bayer) dither</li>
-          <li><b>Dependencies</b>None — the palette and font are in <code>pixel.js</code></li>
-        </ul>
-      </section>
-
-      <footer>Tool Haven &middot; a starting point for the game</footer>
+      <footer>Good Vibes &middot; hosted on Tool Haven</footer>
     </div>
 
     <script type="module">
-      import {
-        PALETTE, hex, GLYPH_W, TRACKING,
-        textWidth, drawTextOutlined, drawSprite,
-        fitCanvas, context2d,
-      } from './pixel.js';
+      import { createTitleScene, SCENE_W, SCENE_H } from './title.js';
+      import { createAudio } from './audio.js';
+      import { fitCanvas } from './pixel.js';
+      import { PALETTE, HERO_ART } from './art.js';
+      import { CLASSES, OPEN_ROLES, playableClasses } from './content.js';
 
-      /* The scene. The palette, the font and the drawing routines come from
-         pixel.js so this page and the game cannot drift apart; what lives here
-         is only what is particular to this picture. */
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+      const reducedMotion = () => reduce.matches;
 
-      // ---- sprites -------------------------------------------------------
-      // Each string is one row; each character is a palette key ('.' = clear).
-      const HERO_HEAD = [
-        '....kkkk....',
-        '...kyyyyk...',
-        '.kkyyyyyykk.',
-        '..knnnnnnk..',
-        '..knknnknk..',
-        '..knnnnnnk..',
-        '..knnNNnnk..',
-        '...knnnnk...',
-        '.kkrrrrrrkk.',
-        'krkrryyrrkrk',
-        'krkrryyrrkrk',
-        'knkrryyrrknk',
-        '.kkrryyrrkk.',
-      ];
-      // Two leg frames share the head and torso above — the whole walk cycle.
-      const HERO_LEGS = [
-        ['..kbbbbbbk..', '..kbbkkbbk..', '..kkk..kkk..'],
-        ['..kbbbbbbk..', '.kbbk..kbbk.', '.kkk....kkk.'],
-      ];
-      const HERO = HERO_LEGS.map(legs => HERO_HEAD.concat(legs));
+      /* ---- the scene ------------------------------------------------------ */
 
-      const SLIME = [
-        '..kkkk..',
-        '.kttttk.',
-        'ktccccck',
-        'kckcckck',
-        'kcccccck',
-        'kcckkcck',
-        'kcccccck',
-        '.kkkkkk.',
-      ];
-
-      const TREE = [
-        '....k....',
-        '...kgk...',
-        '..kgGgk..',
-        '.kgGGGgk.',
-        '..kgGgk..',
-        '.kgGGGgk.',
-        'kgGGGGGgk',
-        '.kgGGGgk.',
-        'kgGGGGGgk',
-        '...kNk...',
-        '...kNk...',
-        '..kNNNk..',
-      ];
-
-      // High dusk clouds: a plum rim catching the last light, slate body,
-      // violet underside. Muted on purpose — they sit in the darkest sky band.
-      const CLOUD = [
-        '....pppp........',
-        '..ppssssss..ss..',
-        '.ssssssssssssss.',
-        'ssssssssssssssss',
-        '.vvvvvvvvvvvvvv.',
-        '....vvvv...vv...',
-      ];
-
-      // ---- canvas --------------------------------------------------------
-      const W = 320;
-      const H = 180;
-      const HORIZON = 104;
-      const GROUND = 110;
-
-      const canvas = document.getElementById('stage');
-      const ctx = context2d(canvas);
-
-      const px = (x, y, key, wide = 1, tall = 1) => {
-        ctx.fillStyle = hex(key);
-        ctx.fillRect(x | 0, y | 0, wide, tall);
-      };
-
-      const centered = (str, scale) => Math.round((W - textWidth(str, scale)) / 2);
-
-      // ---- deterministic noise -------------------------------------------
-      // A tiny LCG so the stars land in the same place every load — pixel art
-      // should not shimmer between refreshes.
-      function rng(seed){
-        let s = seed >>> 0;
-        return () => {
-          s = (s * 1664525 + 1013904223) >>> 0;
-          return s / 4294967296;
-        };
-      }
-
-      const BAYER = [
-        [0, 8, 2, 10],
-        [12, 4, 14, 6],
-        [3, 11, 1, 9],
-        [15, 7, 13, 5],
-      ];
-
-      // ---- static background ---------------------------------------------
-      // Sky, sun, mountains and ground never change, so they are drawn once
-      // into an offscreen canvas and blitted each frame.
-      const bg = document.createElement('canvas');
-      bg.width = W;
-      bg.height = H;
-
-      const STARS = [];
-
-      function buildBackground(){
-        const bctx = bg.getContext('2d');
-        // Everything is rounded: a fractional fillRect gets antialiased, and a
-        // soft edge is instantly visible once the canvas is scaled up 3x.
-        const bpx = (x, y, key, wide = 1, tall = 1) => {
-          bctx.fillStyle = hex(key);
-          bctx.fillRect(Math.round(x), Math.round(y), Math.round(wide), Math.round(tall));
-        };
-
-        // Sky: an 8-stop ramp, dithered between stops so the bands stay chunky
-        // instead of going smooth and un-pixel-like.
-        const ramp = ['k', 'd', 'v', 's', 'p', 'r', 'o', 'y'];
-        for(let y = 0; y < HORIZON; y++){
-          const t = (y / (HORIZON - 1)) * (ramp.length - 1);
-          const i = Math.min(ramp.length - 2, Math.floor(t));
-          const frac = t - i;
-          for(let x = 0; x < W; x++){
-            bpx(x, y, frac > BAYER[y & 3][x & 3] / 16 ? ramp[i + 1] : ramp[i]);
-          }
-        }
-
-        // Retro sun, sinking into the horizon with cut-out stripes.
-        const sunX = 160;
-        const sunY = 100;
-        const sunR = 30;
-        for(let y = sunY - sunR; y <= sunY + sunR; y++){
-          if(y < 0 || y >= HORIZON) continue;
-          const half = Math.floor(Math.sqrt(sunR * sunR - (y - sunY) * (y - sunY)));
-          const band = y - (sunY - sunR);
-          // Stripes widen going down — the classic synthwave sun.
-          if(band > 34 && band % 6 < 3) continue;
-          bpx(sunX - half, y, y < sunY - 6 ? 'y' : 'o', half * 2 + 1, 1);
-        }
-
-        // Two mountain ridges. Summed sines give a believable skyline without
-        // hand-placing a single peak.
-        for(let x = 0; x < W; x++){
-          const far = Math.round(
-            HORIZON -
-              (16 + 9 * Math.sin(x * 0.031) + 5 * Math.sin(x * 0.017 + 1.3) + 3 * Math.sin(x * 0.09 + 2.1)),
-          );
-          bpx(x, far, 's', 1, HORIZON - far);
-          if(far < HORIZON - 22) bpx(x, far, 'w', 1, 2);
-        }
-        for(let x = 0; x < W; x++){
-          const near = Math.round(
-            GROUND - (10 + 7 * Math.sin(x * 0.041 + 2.7) + 4 * Math.sin(x * 0.023 + 0.4)),
-          );
-          bpx(x, near, 'd', 1, GROUND - near);
-        }
-
-        // Ground: a lit rim, a dithered transition, then solid pine.
-        bpx(0, GROUND, 'g', W, 3);
-        for(let y = GROUND + 3; y < GROUND + 12; y++){
-          const frac = (y - GROUND - 3) / 9;
-          for(let x = 0; x < W; x++){
-            bpx(x, y, frac > BAYER[y & 3][x & 3] / 16 ? 'G' : 'g');
-          }
-        }
-        bpx(0, GROUND + 12, 'G', W, H - GROUND - 12);
-
-        const rand = rng(20260815);
-
-        for(let i = 0; i < 70; i++){
-          STARS.push({
-            x: Math.floor(rand() * W),
-            y: Math.floor(rand() * 62),
-            phase: rand() * Math.PI * 2,
-            key: rand() > 0.75 ? 'c' : 'w',
-          });
-        }
-
-        // Trees line the treeline on both sides, framing the clearing.
-        for(const x of [12, 34, 52, 246, 268, 292]){
-          drawSprite(bctx, TREE, x, GROUND - 4);
-        }
-
-        // Foreground grass blades, darkening toward the bottom of the frame.
-        for(let i = 0; i < 150; i++){
-          const x = Math.floor(rand() * W);
-          const y = GROUND + 20 + Math.floor(rand() * (H - GROUND - 24));
-          bpx(x, y, y > 150 ? 'd' : 'G', 1, 2 + Math.floor(rand() * 3));
-        }
-      }
-
-      buildBackground();
-
-      // ---- frame ---------------------------------------------------------
-      const CLOUDS = [
-        { x: 20, y: 24, speed: 3 },
-        { x: 150, y: 14, speed: 4.5 },
-        { x: 250, y: 36, speed: 2.2 },
-      ];
-
-      const TITLE = 'HELLO WORLD';
-      const TITLE_SCALE = 3;
-      const TITLE_X = centered(TITLE, TITLE_SCALE);
-
-      function drawFrame(time){
-        ctx.drawImage(bg, 0, 0);
-
-        // Stars twinkle on a slow sine, each with its own phase offset.
-        for(const star of STARS){
-          if(Math.sin(time * 2.4 + star.phase) > 0.25) px(star.x, star.y, star.key);
-        }
-
-        for(const cloud of CLOUDS){
-          const x = Math.round(((cloud.x + time * cloud.speed) % (W + 40)) - 20);
-          drawSprite(ctx, CLOUD, x, cloud.y);
-        }
-
-        // Birds: three pixels each, which is all a bird needs at this scale.
-        for(let i = 0; i < 3; i++){
-          const bx = Math.round(((time * 9 + i * 46) % (W + 30)) - 15);
-          const by = 54 + i * 7 + Math.round(Math.sin(time * 1.6 + i) * 2);
-          const flap = Math.sin(time * 7 + i) > 0 ? 1 : 0;
-          px(bx, by, 'd');
-          px(bx - 1, by - flap, 'd');
-          px(bx + 1, by - flap, 'd');
-        }
-
-        // The hero paces the clearing; the slime trails a beat behind.
-        const span = 210;
-        const cycle = (time * 26) % (span * 2);
-        const walkingRight = cycle < span;
-        const heroX = Math.round(52 + (walkingRight ? cycle : span * 2 - cycle));
-        const step = Math.floor(time * 7) % 2;
-        drawSprite(ctx, HERO[step], heroX, 136 + (step === 0 ? 0 : 1), !walkingRight);
-
-        const hop = Math.abs(Math.sin(time * 4.2));
-        drawSprite(ctx, SLIME, heroX + (walkingRight ? -22 : 22), 146 - Math.round(hop * 5));
-
-        // Title, bobbing letter by letter on a travelling sine.
-        for(let i = 0; i < TITLE.length; i++){
-          const lift = Math.round(Math.sin(time * 2.6 - i * 0.45) * 2);
-          const x = TITLE_X + i * (GLYPH_W + TRACKING) * TITLE_SCALE;
-          drawTextOutlined(ctx, TITLE[i], x, 24 + lift, 'y', TITLE_SCALE);
-        }
-
-        const subtitle = 'PIXEL ART STARTER KIT';
-        drawTextOutlined(ctx, subtitle, centered(subtitle, 1), 58, 'c', 1);
-
-        if(Math.sin(time * 3.4) > -0.2){
-          const prompt = 'PRESS START';
-          drawTextOutlined(ctx, prompt, centered(prompt, 1), 158, 'w', 1);
-        }
-
-        drawTextOutlined(ctx, 'TOOL HAVEN', 6, 6, 'c', 1);
-        const version = 'V1.0';
-        drawTextOutlined(ctx, version, W - textWidth(version, 1) - 6, 6, 's', 1);
-      }
-
-      // ---- loop ----------------------------------------------------------
-      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-      let animating = !reduceMotion.matches;
-      let raf = 0;
-      const FROZEN_AT = 1.2;          // a pose worth looking at when motion is off
-
-      function loop(now){
-        drawFrame(now / 1000);
-        raf = requestAnimationFrame(loop);
-      }
+      const canvas = document.getElementById('title');
+      const scene = createTitleScene(canvas, { reducedMotion });
+      scene.start();
 
       const screen = document.getElementById('screen');
-      const crtButton = document.getElementById('toggle-crt');
-      const motionButton = document.getElementById('toggle-motion');
+      if(reducedMotion()) screen.dataset.crt = 'off';
 
-      function setAnimating(on){
-        animating = on;
-        motionButton.setAttribute('aria-pressed', String(on));
-        cancelAnimationFrame(raf);
-        if(on) raf = requestAnimationFrame(loop);
-        else drawFrame(FROZEN_AT);
+      /* fitCanvas only scales by whole numbers and never below 1x, which is
+         right everywhere the game draws — at 2.5x some pixels land on two
+         screen pixels and others on three, and it reads as a rendering fault.
+         But this canvas is 480 wide and a phone is not, and the frame clips
+         rather than scrolls, so a narrow screen would simply lose the right
+         half of the logo. Below 1x the choice is between a fractional scale and
+         a cropped title screen; the fractional scale wins, and `pixelated`
+         keeps the downscale from going soft. */
+      const wrap = document.querySelector('.wrap');
+      function fit(){
+        if(wrap.clientWidth >= SCENE_W){
+          canvas.style.height = '';
+          fitCanvas(canvas, SCENE_W, SCENE_H, { container: wrap, maxHeightFraction: 0.68 });
+          return;
+        }
+        canvas.style.width = '100%';
+        canvas.style.height = 'auto';
       }
-
-      crtButton.addEventListener('click', () => {
-        const on = screen.dataset.crt !== 'on';
-        screen.dataset.crt = on ? 'on' : 'off';
-        crtButton.setAttribute('aria-pressed', String(on));
-      });
-
-      motionButton.addEventListener('click', () => setAnimating(!animating));
-      reduceMotion.addEventListener('change', event => setAnimating(!event.matches));
-
-      setAnimating(animating);
-
-      const fit = () => fitCanvas(canvas, W, H, { container: document.querySelector('.wrap') });
       window.addEventListener('resize', fit);
       fit();
 
-      // ---- style guide ----------------------------------------------------
+      // A tab that comes back should not resume from the frame it left on, and
+      // a tab in the background should not be animating a title screen at all.
+      document.addEventListener('visibilitychange', () => {
+        if(document.hidden) scene.stop();
+        else if(!reducedMotion()) scene.start();
+      });
+      reduce.addEventListener?.('change', () => location.reload());
+
+      /* ---- the theme ------------------------------------------------------ */
+
+      /* Autoplay policy decides when sound starts, not us: the context cannot
+         exist until a gesture, so the button reflects intent and the first
+         click on anything is what actually opens it. The choice persists per
+         browser, in the same key the game uses, so turning the music off here
+         does not mean turning it on again inside a fight. */
+      const audio = createAudio();
+      const soundButton = document.getElementById('sound');
+
+      const syncSound = () => {
+        const on = !audio.isMuted();
+        soundButton.textContent = on ? 'Music on' : 'Music off';
+        soundButton.setAttribute('aria-pressed', String(on));
+      };
+
+      audio.play('title');
+      syncSound();
+
+      const unlockOnce = () => {
+        audio.unlock();
+        removeEventListener('pointerdown', unlockOnce);
+        removeEventListener('keydown', unlockOnce);
+      };
+      addEventListener('pointerdown', unlockOnce);
+      addEventListener('keydown', unlockOnce);
+
+      soundButton.addEventListener('click', () => {
+        audio.setMuted(!audio.isMuted());
+        audio.unlock();
+        syncSound();
+      });
+
+      // Leaving for the game should not leave a theme playing behind it.
+      addEventListener('pagehide', () => audio.stop());
+
+      /* ---- the controls --------------------------------------------------- */
+
+      document.getElementById('reroll').addEventListener('click', () => scene.reroll());
+
+      const crtButton = document.getElementById('crt');
+      const syncCrt = () => {
+        const on = screen.dataset.crt === 'on';
+        crtButton.setAttribute('aria-pressed', String(on));
+      };
+      crtButton.addEventListener('click', () => {
+        screen.dataset.crt = screen.dataset.crt === 'on' ? 'off' : 'on';
+        syncCrt();
+      });
+      syncCrt();
+
+      /* ---- the roster ----------------------------------------------------- */
+
+      /* Read off CLASSES rather than written out here, so a class the
+         collaborator adds appears on the landing page the moment it goes live
+         — and the two seats still open show as locked rather than as an
+         absence nobody can explain. */
+      function portrait(art, scale = 1){
+        const rows = art.rows;
+        const el = document.createElement('canvas');
+        el.width = rows[0].length * scale;
+        el.height = rows.length * scale;
+        const ctx = el.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        for(let r = 0; r < rows.length; r++){
+          for(let c = 0; c < rows[r].length; c++){
+            const key = rows[r][c];
+            if(key === '.' || key === ' ') continue;
+            ctx.fillStyle = PALETTE[key];
+            ctx.fillRect(c * scale, r * scale, scale, scale);
+          }
+        }
+        return el;
+      }
+
+      const roles = document.getElementById('roles');
+      for(const cls of playableClasses()){
+        const li = document.createElement('li');
+        li.className = 'role';
+        if(HERO_ART[cls.art]) li.append(portrait(HERO_ART[cls.art]));
+        const body = document.createElement('div');
+        const name = document.createElement('b');
+        name.textContent = cls.name;
+        const role = document.createElement('span');
+        role.textContent = cls.archetype;
+        const blurb = document.createElement('p');
+        blurb.textContent = cls.blurb;
+        body.append(name, role, blurb);
+        li.append(body);
+        roles.append(li);
+      }
+      for(const open of OPEN_ROLES){
+        const li = document.createElement('li');
+        li.className = 'role';
+        li.dataset.locked = 'true';
+        const body = document.createElement('div');
+        const name = document.createElement('b');
+        name.textContent = `Seat ${open.slot}`;
+        const role = document.createElement('span');
+        role.textContent = 'Not designed yet';
+        const blurb = document.createElement('p');
+        blurb.textContent = open.suggestion;
+        body.append(name, role, blurb);
+        li.append(body);
+        roles.append(li);
+      }
+
+      /* ---- the palette, for anyone who opens the drawer -------------------- */
+
       const swatches = document.getElementById('swatches');
-      for(const [, [value, name]] of Object.entries(PALETTE)){
+      const NAMES = {
+        k: 'Ink', w: 'Bone', s: 'Skin', S: 'Shade', y: 'Sun', Y: 'Gold',
+        o: 'Ember', r: 'Rust', e: 'Blood', g: 'Leaf', G: 'Canopy', l: 'Shoot',
+        c: 'Dew', b: 'Deep', v: 'Bloom', p: 'Petal', P: 'Plum', m: 'Steel',
+        M: 'Panel', x: 'Slag', t: 'Loam', T: 'Spoil', n: 'Bark', N: 'Root',
+        d: 'Dusk', D: 'Night', f: 'Flame', F: 'Coal',
+      };
+      for(const [key, value] of Object.entries(PALETTE)){
         const li = document.createElement('li');
         const chip = document.createElement('span');
         chip.className = 'chip';
@@ -656,13 +503,14 @@
         const label = document.createElement('span');
         const nameEl = document.createElement('span');
         nameEl.className = 'chip-name';
-        nameEl.textContent = name;
+        nameEl.textContent = NAMES[key] || key;
         const hexEl = document.createElement('span');
         hexEl.className = 'chip-hex';
-        hexEl.textContent = value;
+        hexEl.textContent = `${key} · ${value}`;
         label.append(nameEl, hexEl);
         li.append(chip, label);
         swatches.append(li);
-      }    </script>
+      }
+    </script>
   </body>
 </html>

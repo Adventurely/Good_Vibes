@@ -68,25 +68,45 @@ a shim returning something harmless and correctly shaped — see the
 ---
 
 
-A co-op solarpunk roguelike, and the pixel art page it grew out of. No
-dependencies anywhere — just the Node standard library and a browser.
+A co-op solarpunk roguelike. No dependencies anywhere — just the Node standard
+library and a browser.
 
+- **`public/index.html`** is the title screen: a generated ruin with the party
+  walking it, a theme, and a way in.
 - **`public/play.html`** is the game: lobby, build phase, and the surge.
-- **`public/index.html`** is the hello world page and the style guide the whole
-  thing is drawn from.
 - `npm start` serves both. See [Playing locally](#playing-locally) — the game's
   server half lives in another repo, so a room needs the deployed site.
 
-## The page
+## The title screen
 
-`public/index.html` is a single self-contained file: a 320&times;180 canvas
-scene, upscaled by an integer factor with nearest-neighbour filtering. There are
-no images and no font files — the bitmap font, the sprites, the sky gradient and
-the landscape are all drawn from data in the page itself, so the whole thing is
-portable anywhere a browser runs.
+`public/index.html` is the landing page, and the thing on it is
+`public/title.js`: a 480&times;262 canvas showing a solarpunk ruin from above,
+with a camp in the middle of it and the party walking around gathering what
+grew there. It upscales by an integer factor with nearest-neighbour filtering,
+and there are no images and no font files anywhere in it.
 
-Below the scene the page prints the style guide it was built from: the 16-colour
-palette with hex values, and the sizes everything is authored at.
+**It is not an illustration of the game — it is the game, running.** The site
+comes out of `generateTerrain`, the herbs and salvage out of `spawnItems`, and
+the heroes walk to them along routes `pathTo` found, which is the same
+pathfinder the build phase uses. That is the point: a hand-drawn title screen
+goes stale the first time somebody adds a class, and this one cannot. A new
+class appears on it, a new terrain kind appears under it, a new material
+appears in somebody's hands, all without anyone remembering to update a
+mock-up. The sky above the horizon is the only thing drawn just for this page —
+the ground is pushed down to make room for it, because the camp is stamped at
+the centre of every map and the first cut put the logo directly over the
+nicest thing in the scene.
+
+The theme is a third song in `audio.js` (`SONGS.title`), synthesised like the
+other two: D major, no minor chord anywhere in the loop, a square lead over an
+eighth-note arpeggio with a kick under it. Nothing plays until a gesture,
+because autoplay policy decides that and not us, and the mute choice is stored
+in the same key the game reads — turning the music off here does not mean
+turning it back on inside a fight.
+
+Below the screen the page says what the game is, lists the classes straight out
+of `CLASSES` (locked seats included, so the party reads as incomplete rather
+than as three), and keeps the palette in a drawer for anyone who opens it.
 
 ### Art conventions
 
@@ -223,7 +243,7 @@ PORT=8080 HOST=127.0.0.1 npm start
 
 | Route      | Response                          |
 | ---------- | --------------------------------- |
-| `/`        | The pixel art hello world page    |
+| `/`        | The title screen                  |
 | `/healthz` | `{"status":"ok"}`                 |
 | anything else | `404 Not Found`                |
 
@@ -242,10 +262,13 @@ public/art.js       the palette, the tiles and their cuts, the props, and every
                     sprite, as text
 public/fx.js        what a resolved effect looks and sounds like, card first
                     and effect kind second, so nothing lands silently
-public/audio.js     the two phase tracks and every sound, synthesised
+public/audio.js     the three tracks — title, build, surge — and every sound,
+                    synthesised, no files
 public/play.html    the game: lobby, build phase, the surge, the hand
 public/pixel.js     bitmap font and canvas helpers, shared by both pages
-public/index.html   the pixel art hello world page and its style guide
+public/title.js     the title screen: a real generated site with the real party
+                    walking it, drawn from the same modules the game uses
+public/index.html   the landing page the title screen is mounted in
 src/app.js          static files out of public/
 src/ws.js           a WebSocket server, standard library only
 src/rooms.js        the authoritative game state: rooms, seats, phases

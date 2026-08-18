@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { roomFor, dropIfEmpty } from '../src/rooms.js';
-import { createAudio } from '../public/audio.js';
+import { createAudio, SONGS } from '../public/audio.js';
 import { fxStyles, styleFor, soundFor, FX_SOUND } from '../public/fx.js';
 import {
   CARDS, EFFECT_KINDS, PHASES, BOSS_ROUND, classById, cardEffect,
@@ -745,5 +745,40 @@ test('a herb stays in the ground for anyone who cannot brew', () => {
     seats[0].x = pages.x; seats[0].y = pages.y;
     room.pickUp(seats[0]);
     assert.equal(room.pages, before + 1, 'the party carries the library');
+  }
+});
+
+/* ---- the soundtrack ------------------------------------------------------ */
+
+/* A song is data driven through a scheduler that reads it every sixteenth of a
+ * bar, and every way of getting it wrong fails the same silent way: the
+ * scheduler throws inside a setInterval, the exception goes to the console
+ * nobody has open, and the page is simply quiet. So the shape is checked here
+ * rather than by listening.
+ */
+test('every song is playable data rather than a silent typo', () => {
+  const QUALITIES = ['maj6', 'maj7', 'min7', 'min', 'sus'];
+  assert.ok(SONGS.title, 'the title screen needs a theme of its own');
+
+  for(const [name, song] of Object.entries(SONGS)){
+    const where = `song "${name}"`;
+    assert.ok(song.bpm > 40 && song.bpm < 220, `${where}: ${song.bpm} bpm is not a tempo`);
+    assert.ok(Array.isArray(song.bars) && song.bars.length, `${where}: no bars`);
+    assert.ok(song.arpEvery >= 1, `${where}: the arpeggio would divide by zero`);
+
+    for(const bar of song.bars){
+      const [root, quality] = bar.chord;
+      // An unknown quality is `undefined` where a list of intervals should be,
+      // and the scheduler dies on the first beat of that bar.
+      assert.ok(QUALITIES.includes(quality), `${where}: unknown chord quality "${quality}"`);
+      assert.ok(root > 20 && root < 100, `${where}: root ${root} is off the keyboard`);
+    }
+
+    const steps = song.bars.length * 16;
+    for(const [at, note, len] of song.lead){
+      assert.ok(at >= 0 && at < steps, `${where}: a note at step ${at} never plays (${steps} steps)`);
+      assert.ok(note > 20 && note < 120, `${where}: note ${note} is off the keyboard`);
+      assert.ok(len > 0, `${where}: a note of length ${len} is silence`);
+    }
   }
 });
