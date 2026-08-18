@@ -298,6 +298,35 @@ export function createAudio(){
     might(t){ [59, 66, 71].forEach((n, i) => voice(midi(n), t + i * 0.05, 0.22, 'square', 0.045)); },
     revive(t){ hit(t, 0.05, 0.14, 4000); [55, 62, 67, 74].forEach((n, i) => voice(midi(n), t + 0.06 + i * 0.05, 0.3, 'triangle', 0.06)); },
 
+    /* ---- what seats four and five brought -------------------------------
+       Two of these are the sound of a cost being paid, which is the Hauler in
+       one idea; canker is the only damage in the game you hear twice, once
+       when it is cut and again every round it comes off. */
+    heft(t){
+      // Weight settling: a low note that arrives rather than decays.
+      voice(midi(40), t, 0.32, 'triangle', 0.11, midi(47));
+      hit(t + 0.02, 0.09, 0.1, 900, 'lowpass');
+    },
+    cover(t){
+      // Boots planting, then a wall.
+      hit(t, 0.07, 0.15, 1100, 'lowpass');
+      [45, 52].forEach((n, i) => voice(midi(n), t + 0.05 + i * 0.05, 0.34, 'square', 0.06));
+    },
+    canker(t){
+      // A cut, then something closing over it wrong.
+      hit(t, 0.06, 0.12, 3200);
+      voice(midi(58), t + 0.03, 0.36, 'sawtooth', 0.055, midi(50));
+    },
+    cankerAll(t){
+      hit(t, 0.1, 0.12, 2600);
+      [58, 55, 51].forEach((n, i) => voice(midi(n), t + 0.04 + i * 0.07, 0.34, 'sawtooth', 0.05, midi(n - 8)));
+    },
+    graft(t){
+      // Binding something on: a wrap, and a note handed upward.
+      hit(t, 0.12, 0.06, 1800, 'bandpass');
+      [67, 74].forEach((n, i) => voice(midi(n), t + 0.06 + i * 0.08, 0.26, 'triangle', 0.06));
+    },
+
     /* ---- what the blight leaves behind ---------------------------------
        Three ailments, three shapes, all of them descending: a status is
        something being taken off you, and none of them should be mistakable

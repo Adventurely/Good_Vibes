@@ -19,6 +19,8 @@ import {
   CARDS, EFFECT_KINDS, PHASES, BOSS_ROUND, classById, cardEffect,
   AILMENTS, addAilment, hasEffect, effectName, waveFor, enemyStats, ENEMIES,
   runHighlights, STAT_KEYS, blankStats,
+  intentOf, waveTargets, effectAmount, strikePower, cardPlayable,
+  playableClasses, PARTY_SIZE,
 } from '../public/content.js';
 
 /* The client's own dispatch, imported rather than re-implemented. That is the
@@ -70,6 +72,15 @@ function fightWith(cardId, classId = 'wizard'){
   socket.sent.length = 0;                 // everything before the turn under test
   return { room, player, socket };
 }
+
+
+/* The wave, present but not swinging.
+ *
+ * Enemies used to be parked out of reach with `dist = 9` when a test was about
+ * something else. Nothing is out of reach any more — a standoff has everything
+ * on the field from the first turn — so "do not interfere" is now a swing of
+ * zero rather than a distance. */
+const mute = room => { for(const enemy of room.enemies) enemy.hits = 0; };
 
 /* Every card that hits, from the fist to the bolt gun. */
 const strikeCards = Object.entries(CARDS)
@@ -136,7 +147,6 @@ test('a strike fx arrives before the damage that follows it', () => {
 test('being hit is its own effect, on the victim', () => {
   const { room, player, socket } = fightWith('hold', 'engineer');
   // Walk the wave into contact so somebody actually gets hit this turn.
-  for(const enemy of room.enemies) enemy.dist = 0;
   room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'hold' } });
 
   const hit = fxIn(socket).find(e => e.kind === 'hit');
@@ -175,7 +185,7 @@ test('a monster ailment lands on its cadence, and only on a hit that got through
   const { room, player } = fightWith('hold', 'engineer');
   // One Sporeling, in contact, and no guard to eat what it swings.
   room.enemies = [{ id: 'e0', type: 'sporeling', name: 'Sporeling', art: 'sporeling',
-                    hp: 20, maxHp: 20, dist: 0, hits: 2, landed: 0 }];
+                    hp: 20, maxHp: 20, hits: 2, landed: 0 }];
 
   player.hand = ['strike', 'hold', 'hold'];
   room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'strike' } });
@@ -199,7 +209,7 @@ test('a monster ailment lands on its cadence, and only on a hit that got through
 test('blightrot keeps taking, then stops', () => {
   const { room, player } = fightWith('hold', 'engineer');
   room.enemies = [{ id: 'e0', type: 'creeper', name: 'Creeper', art: 'creeper',
-                    hp: 99, maxHp: 99, dist: 9, hits: 3, landed: 0 }];   // out of reach
+                    hp: 99, maxHp: 99, hits: 0, landed: 0 }];   // present, not swinging
   player.effects = addAilment([], 'rot');
   const rounds = AILMENTS.rot.rounds;
   const damage = AILMENTS.rot.amount;
@@ -222,7 +232,7 @@ test('stun costs the turn and weakness costs the swing', () => {
   const { room, player } = fightWith('strike', 'engineer');
   const target = room.enemies[0];
   target.hp = 99;
-  target.dist = 9;                                  // nothing lands back this turn
+  mute(room);                                       // nothing lands back this turn
 
   const stunned = target.hp;
   player.effects = addAilment([], 'stun');
@@ -268,17 +278,17 @@ test('the party cards land on the party, not on the player who spent them', () =
   for(const p of seats) room.handle(p, { t: 'ready', ready: true });
   assert.equal(room.phase, PHASES.combat);
 
-  for(const enemy of room.enemies) enemy.dist = 9;   // nothing hits back this turn
+  mute(room);                                       // nothing hits back this turn
   for(const p of seats) p.hp = 10;
   room.pages = 5;
   room.power = 5;
 
   seats[0].hand = ['vapours', 'hold', 'hold'];
   seats[1].hand = ['bulwark', 'hold', 'hold'];
-  seats[2].hand = ['channel', 'hold', 'hold'];
+  seats[2].hand = ['rune', 'hold', 'hold'];
   room.handle(seats[0], { t: 'intent', intent: { t: 'play', index: 0, card: 'vapours' } });
   room.handle(seats[1], { t: 'intent', intent: { t: 'play', index: 0, card: 'bulwark' } });
-  room.handle(seats[2], { t: 'intent', intent: { t: 'play', index: 0, card: 'channel', target: seats[1].id } });
+  room.handle(seats[2], { t: 'intent', intent: { t: 'play', index: 0, card: 'rune', target: seats[1].id } });
 
   for(const p of seats){
     assert.equal(p.hp, 10 + CARDS.vapours.effect.amount, `${p.classId} should have been mended`);
@@ -291,7 +301,7 @@ test('the party cards land on the party, not on the player who spent them', () =
 
 test('a cleanse takes the ailments off and leaves the boons on', () => {
   const { room, player } = fightWith('censer', 'alchemist');
-  for(const enemy of room.enemies) enemy.dist = 9;
+  mute(room);
   player.effects = [
     ...addAilment([], 'rot'),
     { kind: 'might', amount: 4, rounds: 3 },
@@ -310,7 +320,7 @@ test('jumper cables pick an ally up, and are not a dead card alone', () => {
   });
   room.handle(seats[0], { t: 'start' });
   for(const p of seats) room.handle(p, { t: 'ready', ready: true });
-  for(const enemy of room.enemies) enemy.dist = 9;
+  mute(room);
 
   seats[1].down = true;
   seats[1].hp = 0;
@@ -335,8 +345,8 @@ test('a kill is announced, and the last kill of a round says so', () => {
   const { room, player, socket } = fightWith('strike', 'engineer');
   // Two enemies, both one hit from dead, so the first kill is not the last.
   room.enemies = [
-    { id: 'e0', type: 'sporeling', name: 'Sporeling', art: 'sporeling', hp: 1, maxHp: 6, dist: 9, hits: 2, landed: 0 },
-    { id: 'e1', type: 'sporeling', name: 'Sporeling', art: 'sporeling', hp: 1, maxHp: 6, dist: 9, hits: 2, landed: 0 },
+    { id: 'e0', type: 'sporeling', name: 'Sporeling', art: 'sporeling', hp: 1, maxHp: 6, hits: 0, landed: 0 },
+    { id: 'e1', type: 'sporeling', name: 'Sporeling', art: 'sporeling', hp: 1, maxHp: 6, hits: 0, landed: 0 },
   ];
 
   player.hand = ['strike', 'hold', 'hold'];
@@ -356,7 +366,7 @@ test('a kill is announced, and the last kill of a round says so', () => {
 test('a nova kills the whole lane and only the last one ends the round', () => {
   const { room, player, socket } = fightWith('nova', 'wizard');
   room.enemies = room.enemies.map((e, i) =>
-    ({ ...e, hp: 1, dist: i, landed: 0 }));
+    ({ ...e, hp: 1, hits: 0, landed: 0 }));
   const count = room.enemies.length;
 
   room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'nova' } });
@@ -398,7 +408,7 @@ test('a bigger table meets a bigger fight', () => {
 
 test('a wipe ends the run rather than rolling into another round', () => {
   const { room, player, socket } = fightWith('hold', 'wizard');
-  for(const enemy of room.enemies){ enemy.dist = 0; enemy.hits = 99; }
+  for(const enemy of room.enemies) enemy.hits = 99;
 
   room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'hold' } });
 
@@ -415,7 +425,7 @@ test('a wipe ends the run rather than rolling into another round', () => {
 test('the run keeps a record, and the record can name who did what', () => {
   const { room, player } = fightWith('strike', 'engineer');
   const target = room.enemies[0];
-  target.dist = 9;
+  mute(room);
   target.hp = 99;
 
   room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'strike', target: target.id } });
@@ -436,7 +446,7 @@ test('the run keeps a record, and the record can name who did what', () => {
 test('overkill is not credited, or aiming a Fireball at a Sporeling wins the run', () => {
   const { room, player } = fightWith('fireball', 'wizard');
   const target = room.enemies[0];
-  target.dist = 9;
+  mute(room);
   target.hp = 2;
 
   room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'fireball', target: target.id } });
@@ -446,7 +456,7 @@ test('overkill is not credited, or aiming a Fireball at a Sporeling wins the run
 
 test('another run keeps the crew and changes the ruin', () => {
   const { room, player } = fightWith('hold', 'wizard');
-  for(const enemy of room.enemies){ enemy.dist = 0; enemy.hits = 99; }
+  for(const enemy of room.enemies) enemy.hits = 99;
   room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'hold' } });
   assert.equal(room.phase, PHASES.over);
 
@@ -523,4 +533,191 @@ test('every song is playable data rather than a silent typo', () => {
       assert.ok(len > 0, `${where}: a note of length ${len} is silence`);
     }
   }
+});
+
+/* ---- the standoff -------------------------------------------------------- */
+
+/* A surge used to be a chase: enemies carried a `dist` and only swung once it
+ * reached zero. Everything below is a property of the standoff that replaced
+ * it, and every one of them is a rule the old model made impossible to state.
+ */
+
+test('everything on the field swings from the first turn', () => {
+  const { room, player } = fightWith('hold', 'engineer');
+  const before = player.hp;
+  player.hand = ['hold', 'hold', 'hold'];
+  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'hold' } });
+  // Guard eats some of it; what matters is that the wave acted at all on turn
+  // one, which under the approach model it could not have.
+  const incoming = room.enemies.reduce((sum, e) => sum + e.hits, 0);
+  assert.ok(incoming > 0, 'the wave has to be able to do something');
+  assert.ok(player.hp < before || player.block === 0,
+    'the wave swung on the opening turn');
+});
+
+test('the telegraph says what is coming and who it is coming for', () => {
+  const { room, player, socket } = fightWith('hold', 'engineer');
+  room.broadcast();
+  const state = JSON.parse(socket.sent[socket.sent.length - 1]).state;
+
+  for(const enemy of state.enemies){
+    assert.ok(enemy.intent, 'a living enemy must publish an intent');
+    assert.equal(enemy.intent.damage, enemy.hits, 'the telegraph is the real number');
+    assert.equal(enemy.intent.at, player.id, 'and it names the seat it is aimed at');
+  }
+  // The lookahead is a lookahead, not a second copy: it names the ailment the
+  // NEXT landed blow would leave, read off the same counter advanceWave uses.
+  const sporeling = room.enemies.find(e => e.type === 'sporeling');
+  if(sporeling){
+    sporeling.landed = 1;
+    assert.equal(intentOf(sporeling).ail, 'rot',
+      'the second landed blow rots, and the telegraph should say so before it lands');
+  }
+});
+
+test('the wave rotates which seat it opens on', () => {
+  // Two enemies and three seats: without a rotation seat three is never hit,
+  // every round, for the whole fight.
+  const seats = [
+    { id: 'p1', effects: [], block: 0 },
+    { id: 'p2', effects: [], block: 0 },
+    { id: 'p3', effects: [], block: 0 },
+  ];
+  const wave = [{ id: 'e0', hp: 5, hits: 2 }, { id: 'e1', hp: 5, hits: 2 }];
+  const hitBy = new Set();
+  for(let round = 0; round < 3; round++){
+    for(const who of waveTargets(wave, seats, round).values()) hitBy.add(who);
+  }
+  assert.equal(hitBy.size, 3, 'every seat should come up inside three rounds');
+});
+
+test('cover puts the wave on the coverer for as much guard as it has', () => {
+  const wave = [{ id: 'e0', hp: 9, hits: 4 }, { id: 'e1', hp: 9, hits: 4 }, { id: 'e2', hp: 9, hits: 4 }];
+  const seats = [
+    { id: 'p1', effects: [{ kind: 'cover', amount: 6 }], block: 6 },
+    { id: 'p2', effects: [], block: 0 },
+  ];
+  // Six guard against fours: the first two blows land on the coverer and the
+  // third finds the guard gone. The number on the card is literally how much
+  // wave it buys, and no more.
+  const at = waveTargets(wave, seats, 1);
+  assert.equal(at.get('e0'), 'p1');
+  assert.equal(at.get('e1'), 'p1');
+  assert.equal(at.get('e2'), 'p2', 'once the guard is spent the wave moves on');
+
+  // And with no guard behind it, cover buys nothing — the effect is not the
+  // thing that redirects, the block is.
+  const spent = waveTargets(wave, [{ ...seats[0], block: 0 }, seats[1]], 1);
+  assert.notEqual(spent.get('e0'), 'p1', 'a coverer with no guard left covers nothing');
+});
+
+/* ---- seats four and five ------------------------------------------------- */
+
+test('heft is bought once and kept for the fight', () => {
+  const { room, player } = fightWith('setfeet', 'hauler');
+  mute(room);
+  const target = room.enemies[0];
+  target.hp = 99;
+
+  const before = player.hp;
+  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'setfeet' } });
+  assert.equal(player.hp, before - CARDS.setfeet.hpCost, 'it is paid for in health');
+  assert.equal(effectAmount(player.effects, 'heft'), CARDS.setfeet.effect.amount);
+
+  // Three turns later it is still there — the only effect in the game that
+  // does not age.
+  for(let turn = 0; turn < 3; turn++){
+    player.hand = ['shoulder', 'hold', 'hold'];
+    room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'shoulder', target: target.id } });
+  }
+  assert.equal(effectAmount(player.effects, 'heft'), CARDS.setfeet.effect.amount,
+    'heft is bought for the fight, not rented for a round');
+  assert.equal(strikePower(CARDS.shoulder.effect.amount, player.effects),
+    CARDS.shoulder.effect.amount + CARDS.setfeet.effect.amount,
+    'and it is a term in every swing after it');
+});
+
+test('a card can never be the thing that kills you', () => {
+  const { room, player } = fightWith('setfeet', 'hauler');
+  player.hp = CARDS.setfeet.hpCost;
+  assert.equal(cardPlayable('setfeet', { classId: 'hauler', hp: player.hp }), false,
+    'at the cost exactly it must be refused');
+  assert.equal(cardPlayable('setfeet', { classId: 'hauler', hp: player.hp + 1 }), true,
+    'and allowed one point above it');
+});
+
+test('canker keeps coming off after the card, and refreshes rather than stacks', () => {
+  const { room, player } = fightWith('ringbark', 'grafter');
+  mute(room);
+  const target = room.enemies[0];
+  target.hp = 99;
+  const amount = CARDS.ringbark.effect.amount;
+
+  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'ringbark', target: target.id } });
+  assert.equal(target.canker, amount, 'the ring is cut this round');
+  assert.equal(player.stats.damage, 0, 'and pays nothing on the round it was cut');
+
+  // A second ring on the same target is still one ring — additive would pay
+  // out triangularly and three of them would be forty-five damage.
+  player.hand = ['ringbark', 'hold', 'hold'];
+  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'ringbark', target: target.id } });
+  assert.ok(target.canker <= amount, 'canker refreshes rather than stacks');
+
+  // It comes off on its own, smaller each round, whether or not she acts.
+  const hp = target.hp;
+  player.hand = ['hold', 'hold', 'hold'];
+  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'hold' } });
+  assert.ok(target.hp < hp, 'canker arrives without a card being played at it');
+  assert.ok(player.stats.damage > 0, 'and is credited to whoever cut the ring');
+});
+
+test('a stun cannot take canker off the table', () => {
+  const { room, player } = fightWith('ringbark', 'grafter');
+  mute(room);
+  const target = room.enemies[0];
+  target.hp = 99;
+  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'ringbark', target: target.id } });
+
+  const hp = target.hp;
+  player.effects = addAilment([], 'stun');
+  player.hand = ['hook', 'hold', 'hold'];
+  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'hook', target: target.id } });
+  assert.ok(target.hp < hp, 'the ring keeps closing while she is finding her feet');
+});
+
+test('a graft is in the ally hand next round, and nowhere else', () => {
+  const room = roomFor(`graft-${++codes}`);
+  const seats = ['grafter', 'hauler'].map((classId, i) => {
+    const player = room.join(`graft-token-${codes}-${i}`, fakeSocket());
+    room.handle(player, { t: 'class', classId });
+    return player;
+  });
+  room.handle(seats[0], { t: 'start' });
+  for(const p of seats) room.handle(p, { t: 'ready', ready: true });
+  mute(room);
+
+  seats[0].hand = ['scion', 'hold', 'hold'];
+  seats[1].hand = ['hold', 'hold', 'hold'];
+  room.handle(seats[0], { t: 'intent', intent: { t: 'play', index: 0, card: 'scion', target: seats[1].id } });
+  room.handle(seats[1], { t: 'intent', intent: { t: 'play', index: 0, card: 'hold' } });
+
+  assert.ok(seats[1].hand.includes('cutting'),
+    'a cutting posted this round is in that hand the next one');
+  assert.equal(seats[0].hand.includes('cutting'), false, 'and not in the grafter\'s');
+  // It is a strike, so whatever the arm is carrying counts.
+  assert.equal(CARDS.cutting.effect.kind, 'strike');
+  assert.ok(CARDS.cutting.consumed, 'and it leaves the deck rather than clogging it');
+});
+
+test('the roster is full and every seat can be taken', () => {
+  assert.equal(playableClasses().length, PARTY_SIZE, 'five seats, five classes');
+  const room = roomFor(`full-${++codes}`);
+  const taken = playableClasses().map((cls, i) => {
+    const player = room.join(`full-token-${codes}-${i}`, fakeSocket());
+    room.handle(player, { t: 'class', classId: cls.id });
+    return player.classId;
+  });
+  assert.deepEqual(taken, playableClasses().map(c => c.id),
+    'every live class should be claimable at one table');
+  assert.equal(room.maxPlayers, PARTY_SIZE);
 });

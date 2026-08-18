@@ -99,6 +99,13 @@ Inside `state.events` (drained per player, delivered exactly once): `log`
 (prose), `phase` (splash card: `title`, `subtitle`), `fx` (animation:
 `kind`, `player`, `target`) and `moved` (a walk path to animate).
 
+Each entry in `state.enemies` also carries an **`intent`**: `{damage, ail, at}`
+— what it will hit for, the ailment its next landed blow would leave, and the
+id of the seat it is aimed at. It is derived in `viewFor` from `waveTargets` and
+`intentOf` rather than stored, so the telegraph and `advanceWave` cannot
+disagree about who gets hit. There is no `dist` any more: a surge is a standoff,
+everything is present from the first turn, and nothing on the field moves.
+
 An `fx` names a **card** when a card caused it and an **effect kind**
 otherwise; the client resolves card-first, kind-second (see `public/fx.js`),
 so a new card animates and sounds like its verb on the day it is written.
@@ -109,6 +116,8 @@ Three `fx` kinds carry extra fields and are worth naming:
 | `slain` | `target`, `enemy`, `last` | dissolves the body over ~900ms. `last: true` means that kill emptied the lane, and the client **holds the combat board open for 1.9s** before applying the rest of the update |
 | `ail` | `ail` (`rot` / `weak` / `stun`), `from` | motes falling onto the player who was afflicted |
 | `rot` | `player` | the per-round tick of an existing Blightrot |
+| `canker` | `player`, `target` | a ring cut in an enemy, and every round it comes off |
+| `cover`, `heft`, `graft` | `player` | seats four and five; drawn in place, nothing flies |
 
 The hold is the one place the client defers a state update. The room ends a
 round the instant the wave is empty and sends the kill and the next phase in
@@ -160,6 +169,12 @@ because both are counters the fight reads rather than state the fight sets:
   sleeps.
 - `players[].stats` — the run's record (`damage`, `kills`, `guard`, `mended`,
   `revived`, `taken`), also public, and what the end screen is built from.
+- `enemies[].canker` / `cankerFrom` / `cankerFresh` — the Grafter's delayed
+  damage: how much comes off next round, who is credited for it, and whether it
+  was cut this round (in which case it does not pay yet).
+- `waveTurn` — which seat the wave opens its round-robin on. Reset per fight and
+  advanced per round; without it seat one takes the first blow of every round
+  for the whole fight.
 
 And one at the top level:
 

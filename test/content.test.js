@@ -186,7 +186,9 @@ test('every wave is made of real enemies, and the boss round has the boss', () =
 test('every enemy can be drawn and can arrive', () => {
   for (const [id, enemy] of Object.entries(ENEMIES)) {
     assert.ok(enemy.hp > 0 && enemy.hits > 0, `enemy "${id}" cannot fight`);
-    assert.ok(enemy.dist >= 1, `enemy "${id}" would spawn already adjacent`);
+    // Nothing approaches any more — a surge is a standoff — so what matters is
+    // that everything on the field can actually do something on turn one.
+    assert.ok(enemy.hits >= 1, `enemy "${id}" arrives unable to hurt anybody`);
     assert.ok(ENEMY_ART[enemy.art], `enemy "${id}" has no art key "${enemy.art}"`);
   }
 });
@@ -717,7 +719,9 @@ test('every card is a real effect with an icon to draw it', () => {
       `${where}: effect kind "${card.effect.kind}" is not one the engine implements`);
     assert.ok(card.effect.amount > 0, `${where}: must do a positive amount`);
     // A card belongs to a class, to a building, or to everybody — exactly one.
-    const owners = [card.classId, card.fromBuilding, card.universal, card.brewed].filter(Boolean).length;
+    // `granted` is the fifth owner flag: a card that is never dealt by a class
+    // and never starts in a deck, only put into one by another card.
+    const owners = [card.classId, card.fromBuilding, card.universal, card.brewed, card.granted].filter(Boolean).length;
     assert.equal(owners, 1,
       `${where}: must come from a class, a building, a brew, or everybody — not ${owners}`);
     if (card.brewed) assert.ok(card.consumed, `${where}: brewed cards must be consumed on play`);
@@ -757,7 +761,7 @@ test('buildDeck expands the counts and refuses to invent a deck', () => {
   assert.equal(deck.filter((id) => id === 'spark').length, 4);
   assert.equal(deck.filter((id) => id === 'sign').length, 2);
   assert.equal(deck.filter((id) => id === 'fireball').length, 2);
-  assert.equal(deck.filter((id) => id === 'channel').length, 1);
+  assert.equal(deck.filter((id) => id === 'rune').length, 1);
   assert.equal(deck.filter((id) => id === 'nova').length, 1);
   assert.deepEqual(buildDeck('nobody'), []);
 });

@@ -220,6 +220,23 @@ export const SPAWNS = { herbs: 5, salvage: 5, pages: 3 };
    trip is worth before spending the rounds to make it. */
 export const CACHE_YIELD = { salvage: 2, pages: 1 };
 
+/* What a site puts out with this particular party standing on it.
+ *
+ * SPAWNS itself is untouched, so every caller and every test that reads it
+ * directly still reads the same numbers; this is the party-aware wrapper the
+ * room uses.
+ *
+ * Salvage and pages only — never herbs. The herb count is the one number the
+ * whole scarcity design rests on: five nodes at two units each is ten against
+ * the eleven that one of each recipe costs, so a full sweep can never pay for
+ * everything. A sixth node would quietly delete that, and a test pins it.
+ */
+export function spawnsFor(players){
+  const extra = (players || []).reduce(
+    (n, p) => n + ((classById(p.classId) || {}).scout || 0), 0);
+  return { ...SPAWNS, salvage: SPAWNS.salvage + extra, pages: SPAWNS.pages + extra };
+}
+
 /* ====================================================== combat actions === */
 
 /* What a player can do when the blight surges.
@@ -242,6 +259,17 @@ export const EFFECT_KINDS = [
      cleanse pulls what a monster put on them, revive puts them back on their
      feet, might makes their next swing land harder than yours would. */
   'cleanse', 'revive', 'might',
+  /* on the wave, and the first things in this list that are not a strike:
+     canker is damage already inside the thing when the round ends. It never
+     goes near strikePower, so nothing buffs it and nothing weakens it. */
+  'canker', 'cankerAll',
+  /* on yourself, and bought with health — see `hpCost`. `cover` is the only
+     card that decides *who* a blow lands on; `heft` is the only buff that
+     outlives the round that granted it. */
+  'heft', 'cover',
+  /* into an ally's deck. The only effect that changes what somebody else will
+     be holding next round. */
+  'graft',
 ];
 
 /* ============================================================== ailments === */
@@ -286,10 +314,21 @@ export const AILMENT_KINDS = Object.keys(AILMENTS);
 export const BOONS = {
   might: { name: 'Might', kind: 'might', colour: 'o', note: 'Lent power. The next thing you swing lands harder.' },
   regen: { name: 'Mending', kind: 'regen', colour: 'l', note: 'Something working slowly, a little every round.' },
+  heft: { name: 'Heft', kind: 'heft', colour: 'o', note: 'Weight already moving. It does not wear off before the fight does.' },
+  cover: { name: 'Covering', kind: 'cover', colour: 'b', note: 'Standing in front. The wave comes here while the guard holds.' },
+};
+
+/* What the party leaves on the wave, as opposed to what it takes off it.
+ * AILMENTS with the arrow reversed, and so far there is exactly one. Kept as a
+ * table rather than a special case so effectName() can name it and the client
+ * can draw a pip on an enemy the way it draws one on a player. */
+export const BLIGHTS = {
+  canker: { name: 'Canker', kind: 'canker', colour: 'v',
+    note: 'A ring cut in it that will not close. It is not finished with it yet.' },
 };
 
 export const effectName = kind =>
-  (AILMENTS[kind] || BOONS[kind] || {}).name || kind;
+  (AILMENTS[kind] || BOONS[kind] || BLIGHTS[kind] || {}).name || kind;
 
 /* What a card's effect is called on the card. The kinds are field names —
  * 'strikeAll' printed on a card is the schema showing through — and the party
@@ -311,6 +350,11 @@ export const EFFECT_LABELS = {
   revive: 'pick an ally up',
   might: 'lend to an ally',
   regen: 'mending',
+  canker: 'canker one',
+  cankerAll: 'canker every enemy',
+  heft: 'heft, for the fight',
+  cover: 'take the hits',
+  graft: 'deal an ally a card',
 };
 
 export const effectLabel = kind => EFFECT_LABELS[kind] || kind;
@@ -412,6 +456,13 @@ export function tickEffects(effects){
   const next = [];
   for(const effect of effects || []){
     if(effect.fresh){ next.push({ ...effect, fresh: false }); continue; }
+    /* Bought for the fight rather than rented for a round, and so far only
+       Heft is — which is why Heft costs health and nothing else does.
+       enterCombat empties every player's effects, so "for the fight" is
+       literally true and needs no expiry number to stay honest. Stored with no
+       `rounds` rather than a large one, because the client prints the number
+       beside the name and a chip reading "Heft 99" is a leak. */
+    if(effect.lasting){ next.push(effect); continue; }
     const rounds = (effect.rounds ?? 1) - 1;
     if(rounds > 0) next.push({ ...effect, rounds });
   }
@@ -428,7 +479,10 @@ export const clearAilments = effects =>
    had their say. Never below one: a Weakened player holding Strike should be
    contributing badly, not contributing nothing. */
 export const strikePower = (amount, effects) =>
-  Math.max(1, amount + effectAmount(effects, 'might') - effectAmount(effects, 'weak'));
+  Math.max(1, amount
+    + effectAmount(effects, 'might')
+    + effectAmount(effects, 'heft')
+    - effectAmount(effects, 'weak'));
 
 /* The cards every deck holds regardless of class, by id. Kept as its own
    export because the Tool Haven room imports it; UNIVERSAL_CARDS derives the
@@ -602,6 +656,61 @@ export const CLASSES = [
     salvage: 0,
     cast: true,
   },
+
+  /* Seat four, and the first body in this party anyone can hide behind.
+   *
+   * Two verbs, and they are the same sentence twice: health is a currency.
+   * Heft buys damage with it, one point for one, and does not expire before
+   * the fight does; cover buys somebody else a round by putting the blow on
+   * the largest pool at the table. Everything the party had before this was
+   * rented — a lent page is one round, a ward is one round, power evaporates
+   * when the fight ends. This is the seat that banks.
+   */
+  {
+    id: 'hauler',
+    name: 'The Hauler',
+    archetype: 'Front line · takes the hits and gets heavier',
+    status: 'live',
+    hp: 38,
+    colour: '#3fa9dd',
+    blurb:
+      'Carried whatever the pumps could not reach up eleven flights, twice a day, for six years. ' +
+      'Knows to within a kilo what they can take, and takes that much.',
+    downLine: 'Somebody take the other end.',
+    art: 'hauler',
+    gather: 1,
+    craft: false,
+    build: false,
+    salvage: 1,
+  },
+
+  /* Seat five. The open role said "finds what a site is hiding", and this is
+   * that in both halves of a round: `scout` deepens what a site puts out, and
+   * canker is damage she put in a thing two rounds before it kills it.
+   *
+   * She is also the first seat the party can hand a good card to and be wrong.
+   * Might and Heft are terms inside strikePower; canker never goes near it. A
+   * lent page is worth nothing on her, and Graft is her answer — she cannot
+   * use the table's buffs, so she posts a cutting into an arm that can.
+   */
+  {
+    id: 'grafter',
+    name: 'The Grafter',
+    archetype: 'Scout · sets the rot going and lets it work',
+    status: 'live',
+    hp: 26,
+    colour: '#b39a63',
+    blurb:
+      'Kept the block\u2019s orchard on a roof that was never built to hold soil. ' +
+      'Learned what the blight does to a tree by doing it to a tree on purpose, to save the row behind it.',
+    downLine: 'Mind the row. It spreads.',
+    art: 'grafter',
+    gather: 1,
+    craft: false,
+    build: false,
+    salvage: 1,
+    scout: 1,
+  },
 ];
 
 /* The two seats still to be designed.
@@ -617,10 +726,18 @@ export const CLASSES = [
  * site is hiding. Ignore them freely — the only hard requirement is that
  * CLASSES ends up with PARTY_SIZE entries.
  */
-export const OPEN_ROLES = [
-  { slot: 4, suggestion: 'Front line — stands in the blight so the builders do not have to' },
-  { slot: 5, suggestion: 'Scout — finds the salvage and the survivors a site is hiding' },
-];
+/* Nothing, now: the roster is five of five.
+ *
+ * Kept as an export rather than deleted, for the reason everything at the foot
+ * of this file is kept — the Tool Haven Worker imports this module and a name
+ * that is not exported is a throw at the top of it. The lobby and the landing
+ * page both iterate it, and both render nothing when it is empty, which is the
+ * correct thing for them to render.
+ *
+ * If a sixth seat is ever wanted it needs PARTY_SIZE moved first; the test
+ * pins CLASSES.length + OPEN_ROLES.length against it.
+ */
+export const OPEN_ROLES = [];
 
 /* ================================================================ phases === */
 
@@ -808,14 +925,21 @@ export const CARDS = {
   /* The Wizard's two party cards, and both of them are about the fact that a
      bigger table draws a bigger wave.
      *
-     Lend a Page is the clearest coordination card in the game: it does no
-     damage at all, it lands on somebody else's *next* turn, and it is worth
-     playing only if that person then swings. Two people have to agree about a
-     round in advance for it to be worth a page. */
-  channel: {
-    name: 'Lend a Page', kind: 'buff', classId: 'wizard', pageCost: 1, targetsAlly: true,
+     This one was called Lend a Page, and it did not make sense: a page is the
+     Wizard's resource, `cast` is the Wizard's flag, and handing one to an
+     Engineer who cannot read a word of it was a cost with no fiction under it.
+     The mechanic was always right — spend your resource, somebody else swings
+     harder — so what changed is who does the reading. The Wizard burns the
+     page. The ally gets the thing the page was holding.
+
+     It is still the clearest coordination card in the game: no damage at all,
+     it lands on somebody else's *next* turn, and it is worth a page only if
+     that person then swings. Two people have to agree about a round in
+     advance. */
+  rune: {
+    name: 'Ember Rune', kind: 'buff', classId: 'wizard', pageCost: 1, targetsAlly: true,
     effect: { kind: 'might', amount: 4, rounds: 1 },
-    note: 'Read over their shoulder and hold the line open. Swing on the next one.',
+    note: 'A page burned down to its ash and drawn along somebody else\u2019s blade. It stays lit for one swing.',
   },
   nova: {
     name: 'Cinder Nova', kind: 'attack', classId: 'wizard', pageCost: 1,
@@ -869,6 +993,101 @@ export const CARDS = {
     note: 'A captive bolt driver on a battery. Loud, ugly, and it goes through.',
   },
 
+  /* --- the Hauler: the only seat that buys with health ------------------
+   *
+   * Two of these cost health and both say so on their face — `hpCost` sits
+   * beside pageCost and powerCost, so cardPlayable refuses the one that would
+   * take the last point, and the end screen scores it as Damage Taken. The
+   * Hauler leads that column every run. That is the seat, not a failure.
+   */
+  shoulder: {
+    name: 'Shoulder', kind: 'attack', classId: 'hauler',
+    effect: { kind: 'strike', amount: 4 },
+    note: 'Get under it and drive with the legs. It is how you move anything, a Rust Hulk included.',
+  },
+  /* The same numbers as Shore Up, deliberately. The Engineer's is guard he can
+     put on a seat that needs it; this is the floor under the seat the wave is
+     already aimed at — and it is the card the Hauler plays on the rounds he is
+     not covering, because cover spends the very same pool. */
+  weight: {
+    name: 'Take the Weight', kind: 'defend', classId: 'hauler',
+    effect: { kind: 'ward', amount: 5, rounds: 1 },
+    note: 'Feet planted, arms locked, and do not think about it. Thinking about it is how you drop things.',
+  },
+  setfeet: {
+    name: 'Set Your Feet', kind: 'buff', classId: 'hauler', hpCost: 2,
+    effect: { kind: 'heft', amount: 2 },
+    note: 'Two of your own, for two on every swing after it. You will feel both of them.',
+  },
+  /* One copy, for the reason every party card gets one: a card you hold every
+     other turn is a rotation, not a moment. Alone it is a plain ward with no
+     special case at all, because the coverer is the only seat standing. */
+  behind: {
+    name: 'Get Behind Me', kind: 'defend', classId: 'hauler',
+    effect: { kind: 'cover', amount: 6 },
+    note: 'You are not faster than it. You are just closer.',
+  },
+  /* Heft is a term inside strikePower, so this is worth nothing at all on the
+     Grafter — the first good card in this game the table can hand to the wrong
+     person, which is a decision rather than a formality. */
+  legup: {
+    name: 'Leg Up', kind: 'buff', classId: 'hauler', hpCost: 3, targetsAlly: true,
+    effect: { kind: 'heft', amount: 3 },
+    note: 'Laced fingers, their boot, and up. Three off you and three onto them, for the rest of the fight.',
+  },
+
+  /* --- the Grafter: damage that arrives after the card ------------------
+   *
+   * Canker is the only damage in the game that is not a strike, and every
+   * consequence falls out of that one fact. It never touches strikePower, so
+   * Might, Heft and Weakened are all irrelevant to it in both directions. It
+   * ticks inside the round whether or not she acted, so a stun cannot take it
+   * off the table, and it keeps arriving after she goes down.
+   */
+  hook: {
+    name: 'Pruning Hook', kind: 'attack', classId: 'grafter',
+    effect: { kind: 'strike', amount: 3 },
+    note: 'Curved, and sharpened on the inside. Made for taking a thing off at the joint rather than going through it.',
+  },
+  /* Three across three rounds, so it is worth six and reads as three. Two of
+     these on one target is still six — canker refreshes rather than stacks,
+     exactly as an ailment does, or three of them on one Hulk would pay out
+     forty-five. Two of these on two targets is twelve, which is the class. */
+  ringbark: {
+    name: 'Ringbark', kind: 'attack', classId: 'grafter',
+    effect: { kind: 'canker', amount: 4 },
+    note: 'A ring cut the whole way round. It stands there looking fine for a week, and then it does not.',
+  },
+  bramble: {
+    name: 'Bramble', kind: 'defend', classId: 'grafter',
+    effect: { kind: 'ward', amount: 4, rounds: 1 },
+    note: 'Cut most of the way through, bent over, and laid along the gap. It has held a field before now.',
+  },
+  season: {
+    name: 'Bad Season', kind: 'attack', classId: 'grafter',
+    effect: { kind: 'cankerAll', amount: 3 },
+    note: 'It gets into the whole row at once. Nothing dies today. Most of it dies.',
+  },
+  /* A cutting is a strike, so it lands for four plus whatever Heft or Might
+     the holder is carrying — posted into a Hauler mid-ramp it is worth roughly
+     double what it is worth in her own hand, which is the whole card. */
+  scion: {
+    name: 'Graft', kind: 'buff', classId: 'grafter', targetsAlly: true,
+    effect: { kind: 'graft', amount: 1 },
+    note: 'A live shoot, bound and waxed onto somebody else\u2019s arm. It lands as hard as the arm does, so pick the arm.',
+  },
+
+  /* Put into somebody's deck by a card rather than dealt by a class — the
+     fifth owner flag. Owned by nobody, so the class check passes for whoever
+     is holding it, and consumed so it leaves the deck rather than clogging it.
+     Deliberately in no starting deck: the only way to hold one is to be given
+     one. */
+  cutting: {
+    name: 'Cutting', kind: 'attack', granted: true, consumed: true,
+    effect: { kind: 'strike', amount: 4 },
+    note: 'Taken off something that met the ruin and won. Swing it once and it is gone.',
+  },
+
   /* --- universal -------------------------------------------------------
    *
    * The two everybody holds, one to swing and one to duck behind, so whatever
@@ -906,7 +1125,9 @@ export const CARDS = {
 export const STARTING_DECKS = {
   alchemist: { flask: 3, steady: 3, tonic: 2, censer: 1, vapours: 1 },
   engineer: { wrench: 3, shore: 4, boltgun: 1, bulwark: 1, jumper: 1 },
-  wizard: { spark: 4, sign: 2, fireball: 2, channel: 1, nova: 1 },
+  wizard: { spark: 4, sign: 2, fireball: 2, rune: 1, nova: 1 },
+  hauler: { shoulder: 3, weight: 3, setfeet: 2, behind: 1, legup: 1 },
+  grafter: { hook: 3, ringbark: 3, bramble: 2, season: 1, scion: 1 },
 };
 
 /* Cards every deck holds regardless of class. */
@@ -1102,12 +1323,18 @@ export function brew(recipeId, stash){
 
 /* Can this card be played right now? Cost is the only thing that stops one —
    the room checks this too, so a disabled button is politeness, not authority. */
-export function cardPlayable(cardId, { pages = 0, power = 0, classId = null } = {}){
+export function cardPlayable(cardId, { pages = 0, power = 0, classId = null, hp = Infinity } = {}){
   const card = CARDS[cardId];
   if(!card) return false;
   if(card.classId && classId && card.classId !== classId) return false;
   if(card.pageCost && pages < card.pageCost) return false;
   if(card.powerCost && power < card.powerCost) return false;
+  /* Strictly greater, so a card can never be the thing that kills you. The
+     Hauler pays for damage in health and should be able to spend down to one,
+     never through it — a deck that can lose you the run on a legal play is a
+     deck nobody reads twice. `hp` defaults to Infinity so every caller that
+     predates the Hauler is unaffected. */
+  if(card.hpCost && hp <= card.hpCost) return false;
   return true;
 }
 
@@ -1158,12 +1385,25 @@ export const cardById = id => CARDS[id] || null;
 
 /* ============================================================== enemies === */
 
-/* What comes out of the blight when it surges. An enemy is authored by its
- * distance and its damage: `dist` is how many combat rounds the party has
- * before it arrives, and `hits` is what each of them costs once it does.
+/* What comes out of the blight when it surges.
+ *
+ * An enemy is authored by its health and its damage, and it is *there*. There
+ * used to be a `dist` as well — a count of rounds before it arrived — and the
+ * fight was a lane the wave walked down while the party shot at it. That made
+ * the opening turns free and the closing turns crowded, and it meant the most
+ * interesting decision in a fight was often "which of these is closest".
+ *
+ * A surge is a standoff now, the way Slay the Spire's fights are: the party on
+ * one side, the wave on the other, everything present from the first turn and
+ * everything acting on every one of them. Nothing on the field moves, so
+ * everything that happens on it is a card somebody played.
+ *
+ * What replaced the tension of an approach is the telegraph — see `intentOf`.
+ * You cannot see a monster coming any more; you can see what it is about to do,
+ * which is a decision rather than a countdown.
  *
  * The wave tables are per round, boss last. Composition over stat scaling —
- * a later round sends more and faster things rather than the same thing with
+ * a later round sends more and worse things rather than the same thing with
  * a bigger number, because "there are four of them now" is legible on a
  * screen in a way "+2 hp" never is.
  */
@@ -1178,16 +1418,16 @@ export const cardById = id => CARDS[id] || null;
  * worth of blight rather than five players' worth trimmed down to four.
  */
 export const ENEMIES = {
-  sporeling: { name: 'Sporeling', hp: 6, hits: 2, dist: 3, art: 'sporeling',
+  sporeling: { name: 'Sporeling', hp: 6, hits: 2, art: 'sporeling',
     threat: 1, ability: { id: 'rot', every: 2 },
     note: 'A puffball with intent. Pops wetly, and you breathe what comes out.' },
-  creeper: { name: 'Creeper', hp: 10, hits: 3, dist: 4, art: 'creeper',
+  creeper: { name: 'Creeper', hp: 10, hits: 3, art: 'creeper',
     threat: 2, ability: { id: 'weak', every: 2 },
     note: 'Vine over bone over something that used to be a drone. The sap gets into you.' },
-  hulk: { name: 'Rust Hulk', hp: 18, hits: 5, dist: 5, art: 'hulk',
+  hulk: { name: 'Rust Hulk', hp: 18, hits: 5, art: 'hulk',
     threat: 3.5, ability: { id: 'stun', every: 3 },
     note: 'A maintenance chassis the blight wears like a coat. It swings like one too.' },
-  extractor: { name: 'The Extractor', hp: 33, hits: 5, dist: 5, art: 'extractor', boss: true,
+  extractor: { name: 'The Extractor', hp: 31, hits: 3, art: 'extractor', boss: true,
     threat: 9, ability: { id: ['weak', 'rot', 'stun'], every: 2 },
     note: 'It was built to harvest. It still is, and it works through a crew in order.' },
 };
@@ -1206,7 +1446,7 @@ export const ENEMIES = {
  * Both are per *extra* player, so ENEMIES holds the solo fight and this holds
  * how it grows.
  */
-export const BOSS_SCALING = { hp: 18, hits: 2 };
+export const BOSS_SCALING = { hp: 18, hits: 1.6 };
 
 /* An enemy's numbers for this table. Everything but the boss is what the table
    says it is; levelling the rest is waveFor's job and doing it twice would
@@ -1217,9 +1457,77 @@ export function enemyStats(type, partySize = PARTY_SIZE){
   const extra = Math.max(0, Math.min(PARTY_SIZE, Math.max(1, partySize)) - 1);
   return def.boss
     ? { hp: Math.round(def.hp + BOSS_SCALING.hp * extra),
-        hits: Math.round(def.hits + BOSS_SCALING.hits * extra),
-        dist: def.dist }
-    : { hp: def.hp, hits: def.hits, dist: def.dist };
+        hits: Math.round(def.hits + BOSS_SCALING.hits * extra) }
+    : { hp: def.hp, hits: def.hits };
+}
+
+/* ---- the telegraph ------------------------------------------------------
+ *
+ * What this enemy will do at the end of this round, so a player can decide
+ * against it rather than guess.
+ *
+ * This is Slay the Spire's intent, and it is what a standoff needs in place of
+ * an approach. When the wave walked toward you, the interesting information was
+ * spatial and free — you could see the Rust Hulk was two rounds out. Standing
+ * still it has no way to tell you anything, and a fight where every turn is the
+ * same unreadable exchange is a fight you play by arithmetic.
+ *
+ * Derived, never stored: it is `hits` plus whatever the *next* landed blow
+ * would leave behind, read off the same counter advanceWave uses. So the
+ * telegraph cannot drift from what actually happens — there is no second copy
+ * of the rule, only a lookahead on the first one.
+ *
+ * `ail` is what that blow lands *if it gets through*. Guard eating the blow
+ * whole is what stops it, which is exactly the decision the telegraph exists to
+ * offer: this one is about to weaken somebody, and a ward is how you refuse.
+ */
+export function intentOf(enemy, targets){
+  if(!enemy || enemy.hp <= 0) return null;
+  return {
+    damage: enemy.hits,
+    ail: ailmentOnHit(enemy.type, (enemy.landed || 0) + 1),
+    at: targets ? (targets.get(enemy.id) || null) : null,
+  };
+}
+
+/* Who each living enemy is about to hit.
+ *
+ * The round-robin was always deterministic — enemy i takes standing[i % n] —
+ * but until the Hauler there was nothing anybody could do about it, so it was
+ * never worth printing. Cover changes that, and the moment two rules could
+ * disagree about who gets hit they have to become one rule: advanceWave walks
+ * this list rather than keeping a counter of its own.
+ *
+ * `offset` rotates the starting seat each round. Without it seat one takes the
+ * first blow of every round for the whole fight, which was invisible while the
+ * wave arrived a piece at a time and is glaring now that all of it swings at
+ * once — with two enemies and three seats, seat three was never hit.
+ *
+ * The coverer's guard is spent as the loop goes, exactly as the wave spends
+ * it, so the telegraph tells the truth about where cover stops holding.
+ */
+export function waveTargets(enemies, standing, offset = 0){
+  const at = new Map();
+  const live = (standing || []).filter(p => !p.down);
+  if(!live.length) return at;
+
+  const coverer = live.find(p => hasEffect(p.effects, 'cover'));
+  let guard = coverer ? (coverer.block || 0) : 0;
+  let turn = offset;
+
+  for(const enemy of enemies || []){
+    if(enemy.hp <= 0) continue;
+    if(coverer && guard > 0){
+      at.set(enemy.id, coverer.id);
+      guard -= Math.min(guard, enemy.hits);
+      continue;
+    }
+    /* The counter does not advance while somebody is covering, so when the
+       guard breaks the wave picks up where it left off rather than skipping
+       the seats it never reached. */
+    at.set(enemy.id, live[(turn++ % live.length + live.length) % live.length].id);
+  }
+  return at;
 }
 
 /* The ailment cadence, normalised: one id or a list, always a list here, so
@@ -1252,19 +1560,46 @@ export function ailmentOnHit(type, landed){
  * side of the equation climbs too — the Alchemist has brewed by round two and
  * the Engineer has a panel behind the bolt gun.
  *
- * These are measured, not guessed. test/balance.mjs plays eight hundred whole
+ * These are measured, not guessed. test/balance.mjs plays four hundred whole
  * runs per table size against them and reports the win rate; at the numbers
- * below it lands 57% / 65% / 59% for one, two and three players, against a
- * target of 60. Change them with that harness open rather than by eye — the
- * threat values are coarse (1, 2, 3.5), so a tenth of a point here can flip a
- * whole enemy into or out of a wave and move a win rate forty points.
+ * below it lands
+ *
+ *     1 player  67%   2 players  84%   3 players  96%
+ *     4 players 63%   5 players  49%
+ *
+ * against a target of 60. One, four and five sit on it; two and three run
+ * easy. That shape is measured rather than mysterious, and it has two causes:
+ *
+ *   `waveTargets` rotates which seat the wave opens on each round, and that
+ *   rotation is worth most to a party with a handful of seats and few enemies
+ *   — nobody gets focused down any more. It is worth nothing to a solo player
+ *   and little at five, where there are more enemies than seats either way.
+ *
+ *   Total party health rises linearly with the table while the boss round's
+ *   total damage rises slightly faster, so the big tables are genuinely the
+ *   tightest fights and the middle ones the loosest.
+ *
+ * Closing it needs a difficulty curve with a bump in the middle, and none of
+ * THREAT_PER_PLAYER, PARTY_SYNERGY or BOSS_SCALING can make one — they are all
+ * monotone in table size. Every attempt measured worse overall than this:
+ * BOSS_SCALING 16/1.3 gives 66/100/98/88/69, 17/1.45 gives 67/100/97/82/52,
+ * and PARTY_SYNERGY 0.16 takes five players to under 1%. Recorded so the next
+ * pass starts from the cause rather than from the symptom — and note that some
+ * of the spread is the harness's own model, which plays some class mixes
+ * better than others.
+ *
+ * Change them with the harness open rather than by eye — the threat values are
+ * coarse (1, 2, 3.5), so a tenth of a point here can flip a whole enemy into or
+ * out of a wave and move a win rate forty points. Measured, repeatedly: 1.9 to
+ * 2.0 on round two takes solo from 65% to 23%.
  *
  * Round four's number is low because it buys the boss's *escort* only; the
- * Extractor itself is outside the budget. That is also why nearly every loss
- * the harness reports is a round-four loss: the first three rounds rarely kill
- * a party outright, they decide what the party brings to the appointment.
+ * Extractor itself is outside the budget and scales on BOSS_SCALING instead.
+ * That is also why nearly every loss the harness reports is a round-four loss:
+ * the first three rounds rarely kill a party outright, they decide what the
+ * party brings to the appointment.
  */
-export const THREAT_PER_PLAYER = [2.5, 3.4, 4.2, 2.9];
+export const THREAT_PER_PLAYER = [1.5, 1.9, 2.2, 1.0];
 
 /* A party is worth more than the players in it, and the budget has to know it.
  *
@@ -1280,7 +1615,7 @@ export const THREAT_PER_PLAYER = [2.5, 3.4, 4.2, 2.9];
  * number is measured, not reasoned: it is what closes the gap between the
  * table sizes in test/balance.mjs.
  */
-export const PARTY_SYNERGY = 0.25;
+export const PARTY_SYNERGY = 0.08;
 
 /* How much blight a table of this size meets this round. */
 export function threatBudget(round, partySize = PARTY_SIZE){

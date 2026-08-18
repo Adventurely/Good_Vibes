@@ -291,9 +291,10 @@ workflow will sync anything.
 
 Adding a class is a block in `CLASSES`, a deck in `STARTING_DECKS`, and a sprite
 in `art.js`. Every field is documented above the array, and the test names the
-one you missed. Two seats are still open; `OPEN_ROLES` says what the party is
-short of and the lobby shows them as locked rather than pretending the roster is
-full.
+one you missed. The roster is **five of five** — Alchemist, Engineer, Wizard,
+Hauler, Grafter — so `OPEN_ROLES` is empty; it is kept as an export because the
+Worker imports this module, and a sixth seat would need `PARTY_SIZE` moved
+first, which a test pins.
 
 `COMBAT_ACTIONS` is a **deprecated alias of `CARDS`**, kept only because the
 Tool Haven room imports this module and a missing export there is a throw at the
@@ -609,18 +610,41 @@ that buying either leaves the other out of reach.
 
 ### The surge
 
-Combat is a **lane, not a field**: `COMBAT_H` is eight rows of the map's width,
-because the wave closes from one side and a full-height board spent most of its
-pixels on ground nobody crosses. It generates its own terrain and is a diorama
-of the numbers — everything clickable is in the wave row and the hand below it.
+Combat is a **standoff**, in the shape of a Slay the Spire fight: the party on
+the left facing right, the wave on the right facing left, both stood on one
+ground line, everything present from the first turn and everything acting on
+every one of them. `COMBAT_H` is eight rows of the map's width, which is the
+band the fight fits in; it still generates its own terrain, and the Engineer's
+standing buildings are drawn along the horizon behind it, so the half of the
+round you spent building is visible in the half you spent it for.
 
-An enemy is authored by its distance and its damage. `dist` is how many turns
-the party has before it arrives; `hits` is what each turn costs once it does.
-Every resolved action closes the whole wave by one stride, so there is no free
-action — a heal is a turn you did not spend on something still walking toward
-you. Strikes hit the enemy you aimed at, or the nearest one if you did not.
+It was a lane before this. Enemies carried a `dist` — a count of rounds before
+they arrived — and the wave walked down the board while the party shot at it.
+That made the opening turns of every fight free, the closing turns crowded, and
+the most interesting question on the board "which of these is nearest", which is
+not an interesting question. **`dist` is gone.** An enemy is authored by its
+health and its damage, and it is *there*.
 
-Waves scale by **composition, not stats**: a later round sends more and faster
+What replaced the tension of watching something walk at you is the **telegraph**
+(`intentOf`): every living enemy publishes what it is about to do — the damage,
+the ailment its next landed blow would leave, and **which seat it is aimed at**.
+It is derived, never stored, off the same counters `advanceWave` reads, so there
+is no second copy of the rule to drift. You cannot see a monster coming any
+more; you can see what it is about to do, which is a decision rather than a
+countdown.
+
+Who each blow lands on is one function, `waveTargets`, shared by the engine and
+the telegraph — the moment a card could *change* the answer, two copies of that
+rule would have been a bug waiting. It also rotates the opening seat each round:
+deterministic round-robin was invisible while the wave arrived a piece at a
+time, and glaring once all of it swings at once, because with two enemies and
+three seats the third was never hit.
+
+A round opens with the phase card, then the two sides **walk onto the field**,
+and the cards go live once everybody is in place. Three beats: what this is, who
+is here, go.
+
+Waves scale by **composition, not stats**: a later round sends more and worse
 things rather than the same thing with a bigger number, because "there are four
 of them now" is legible on a screen in a way "+2 hp" never is. A test proves the
 boss cannot leak into an earlier round.
@@ -687,16 +711,54 @@ not also tick this round, and a one-round stun lasts exactly the one turn it
 says it does. Effects granted by a card carry `fresh`, which survives its first
 ageing: a buff aged the same evening it was given would be a zero-round buff.
 
+#### Seats four and five
+
+**The Hauler** is the only seat that buys with health. `hpCost` sits beside
+`pageCost` and `powerCost`, and `cardPlayable` refuses the play that would take
+the last point — a card must never be the thing that kills you. It buys two
+things: `heft`, the only buff in the game that does not expire before the fight
+does (it is a term inside `strikePower`, so it multiplies everything that seat
+swings), and `cover`, the only card that changes *who* a blow lands on. Cover
+has no charge counter: the number on the card is literally how much wave it
+buys, a point of guard per point of damage, because the redirect ends when the
+guard runs out. Which means the Engineer warding the Hauler is the Hauler
+covering for longer, with nothing added to make it so.
+
+**The Grafter** deals `canker` — the only damage that is not a strike. It never
+routes through `strikePower`, so Might, Heft and Weakened are all irrelevant to
+it in both directions; it ticks inside the round whether or not she acted, so a
+stun cannot take it off the table; and it keeps arriving after she goes down.
+A ring cut for 3 pays 3, then 2, then 1 — six across three rounds, starting the
+round *after* it was cut. It refreshes rather than stacks, for the reason an
+ailment does: additive would pay out triangularly and three rings on one Rust
+Hulk would be forty-five damage. Her `scout` flag also deepens what a site puts
+out — salvage and pages, never herbs, because the herb count is the one number
+scarcity rests on.
+
+`Graft` is the only effect that changes what somebody else will be holding: it
+puts a Cutting on the top of an ally's deck, which means it is in their hand
+next round, guaranteed. A Cutting is a strike, so it lands for four plus
+whatever that arm is carrying.
+
+#### Aiming at your own side
+
+`targetsAlly` had been on five cards for a while and the client never read it,
+so every one of them silently landed on whoever played it. Combat has an **ally
+row** now, beside the wave row, and which row a card aims from is keyed off its
+**effect kind** and never its icon — Bramble is a `defend` that hits nothing,
+Graft is a `buff` that lands on somebody else, and Get Behind Me is a `defend`
+that must not be aimable at all.
+
 #### The party cards
 
-Every class opens with two cards that are only worth holding because there is
+Every class opens with cards that are only worth holding because there is
 another seat at the table: the Alchemist's Blight Censer and Restorative
-Vapours, the Engineer's Bulwark and Jumper Cables, the Wizard's Lend a Page and
-Cinder Nova. Bulwark is the shape of all of them — guard on everyone, worse per
+Vapours, the Engineer's Bulwark and Jumper Cables, the Wizard's Ember Rune and
+Cinder Nova, the Hauler's Get Behind Me and Leg Up, the Grafter's Graft. Bulwark is the shape of all of them — guard on everyone, worse per
 head than Shore Up on one, so it is the wrong card at a table of one and the
 best card in the deck at a table of five.
 
-Lend a Page is the clearest of them: it does no damage, it lands on somebody
+Ember Rune is the clearest of them: it does no damage, it lands on somebody
 else's *next* turn, and it is worth a page only if that person then swings. Two
 people have to agree about a round in advance. One copy each rather than two, on
 purpose — a card you hold every other turn is a rotation, not a moment.

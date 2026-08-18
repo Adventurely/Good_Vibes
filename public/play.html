@@ -130,6 +130,8 @@
 
       .enemy[data-dead='true'] { opacity: 0.35; }
       .enemy[data-here='true'] { border-color: var(--bad); }
+      /* An intent that carries an ailment is the one worth reading twice. */
+      .enemy-dist[data-ail='true'] { color: var(--bad); }
 
       .enemy-dist {
         font-size: 0.62rem;
@@ -598,6 +600,11 @@
         <!-- Aim and play, adjacent. Picking a target and playing the card at it
              is one decision, and it used to be split across two places you
              could not see at the same time. -->
+        <!-- Who you can aim a card at, both directions. The wave was always
+             clickable; the party was not, which meant five cards that say
+             `targetsAlly` in the data had no way to be aimed and quietly
+             landed on whoever played them. -->
+        <div class="enemy-row" id="allies"></div>
         <div class="enemy-row" id="enemies"></div>
 
         <div class="table">
@@ -672,7 +679,7 @@
     </div>
 
     <script type="module">
-      import { drawTextOutlined, textWidth, fitCanvas, context2d } from './pixel.js';
+      import { drawText, drawTextOutlined, textWidth, fitCanvas, context2d } from './pixel.js';
       import {
         PALETTE, HERO_ART, MATERIAL_ART, TERRAIN_ART, BUILDING_ART, SALVAGE_ART,
         PAGES_ART, ENEMY_ART, CARD_ART, MARK_ART, TILE,
@@ -687,7 +694,8 @@
         SALVAGE, BUILDINGS, STARTING_SALVAGE, CACHE_YIELD, PAGES,
         UPGRADES, upgradeCost, buyUpgrade, cardEffect, powerFrom, canBuildMore, buildingsOf,
         ENEMIES, waveFor, enemyStats, COMBAT_H,
-        AILMENTS, effectName, effectLabel, hasEffect, strikePower, ailmentOnHit,
+        AILMENTS, BLIGHTS, effectName, effectLabel, hasEffect, strikePower, ailmentOnHit, intentOf,
+        waveTargets,
         STAT_KEYS, STAT_LABELS, STAT_SHORT, blankStats, runHighlights,
         addAilment, tickEffects, effectAmount, clearAilments,
         HAND_SIZE, CARDS, deckFor, shuffle, draw, discardHand, cardById, cardPlayable,
@@ -1556,6 +1564,151 @@
         }
       }
 
+      /* ---- the battlefield ------------------------------------------------
+       *
+       * A surge is a standoff, not a chase.
+       *
+       * It used to be a lane: the wave entered from the right and each point of
+       * an enemy's `dist` was a stride of ground it crossed on its way in. That
+       * made the first turns of a fight free — you were shooting at things too
+       * far away to shoot back — and it made "which of these is nearest" the
+       * question the board answered, which is not an interesting question.
+       *
+       * Now everybody is here from the first turn: party on the left facing
+       * right, wave on the right facing left, both stood on one ground line,
+       * and nothing on the field moves except when something is struck. The
+       * whole picture is a Slay the Spire fight — what changes is what is
+       * *shown* rather than where anyone is, so every change on screen is a
+       * card somebody played.
+       *
+       * The two things that carry the reading are the intent over each enemy's
+       * head, which is what replaced the tension of watching something walk at
+       * you, and the ranks: the party stands in two, so five people read as a
+       * group rather than as a column.
+       */
+
+      // The line everybody stands on, and how far apart. Deliberately low in
+      // the frame: the sky, the treeline and the buildings need the top half,
+      // and a fight staged across the middle of a band reads as floating.
+      const GROUND_Y = () => HEADER + COMBAT_PX_H - 8;
+      const RANK_DROP = 9;          // how far every other seat sits up the field
+      const PARTY_STEP = 33;        // between neighbours, left to right
+      const WAVE_GAP = 8;           // between enemies, edge to edge
+
+      /* Where each combatant stands, resolved once per frame.
+       *
+       * Positions are pure functions of the roster and the wave — no state, no
+       * animation in here — so the entrance can interpolate toward them and
+       * everything else can simply use them.
+       */
+      function battleStations(){
+        const stations = { party: [], wave: [] };
+
+        const standing = room.players.filter(p => p.classId);
+        standing.forEach((p, i) => {
+          const cls = CLASSES.find(c => c.id === p.classId);
+          const art = cls && HERO_ART[cls.art];
+          if(!art) return;
+          // One line, left to right, with every other seat a few pixels up the
+          // field. A hero is thirty-two pixels on a step of thirty-three, so
+          // they stand shoulder to shoulder without eating each other; the
+          // stagger is what stops five silhouettes at one height reading as a
+          // fence. Depth sorting turns the small overlap into depth.
+          stations.party.push({
+            p, art: art.rows, split: art.split,
+            x: 4 + i * PARTY_STEP,
+            ground: GROUND_Y() - (i % 2) * RANK_DROP,
+          });
+        });
+
+        // The wave, packed in from the right edge. Widths differ — a Sporeling
+        // is sixteen pixels and the Extractor is twenty-four — so this walks
+        // right to left accumulating actual widths rather than assuming a step,
+        // which is what keeps a full lane of six from overlapping.
+        let right = MAP_PX_W - 6;
+        room.enemies.forEach((enemy, i) => {
+          const art = ENEMY_ART[enemy.art];
+          if(!art) return;
+          const rank = i % 2;
+          stations.wave.push({
+            enemy, art,
+            x: right - art[0].length,
+            ground: GROUND_Y() - rank * RANK_DROP,
+          });
+          right -= art[0].length + WAVE_GAP;
+        });
+
+        return stations;
+      }
+
+      /* The walk-on.
+       *
+       * The party and the wave arrive from opposite edges and take their places,
+       * and the fight does not start until they have. It is the one moment in a
+       * round where the two sides are looked at rather than played, and without
+       * it the surge cut from a build map straight to two rows of people already
+       * standing in position, which reads as a scene change rather than as an
+       * arrival.
+       *
+       * `entrance` is set when the phase turns over and cleared when it ends;
+       * `entranceHold()` is what the rest of the client asks to know whether the
+       * cards are live yet.
+       */
+      /* The order of a surge: the card, then the walk-on, then the fight.
+       *
+       * They ran together at first and the card won — it is a full-width
+       * overlay and the walk-on happened behind it. Sequenced, the round reads
+       * as three beats: what this is, who is here, go.
+       */
+      const SPLASH_BEFORE_ENTRANCE = 1300;
+      const ENTRANCE_DELAY = 1100;      // a little under, so the card is still fading
+      const ENTRANCE_MS = 1500;
+      /* Far enough that the widest sprite on each side clears the frame before
+         it starts walking. Equal for everybody, so the two sides cross the same
+         ground and the arrival reads as one movement rather than five. */
+      const ENTER_FROM = 200;
+      let entrance = null;
+      let entranceTimer = 0;
+
+      function beginEntrance(){
+        clearTimeout(entranceTimer);
+        entranceTimer = 0;
+        if(stillness()){ entrance = null; return; }
+        // performance.now(), not `now`: `now` is the last frame's timestamp and
+        // is still 0 the first time a phase change renders, which would date
+        // the entrance to the epoch and skip it entirely.
+        entrance = { started: performance.now() + ENTRANCE_DELAY, duration: ENTRANCE_MS };
+        // The canvas is on the frame loop, but the cards are DOM and only
+        // redraw when render() runs — so the end of the entrance has to say so
+        // out loud, or the hand stays greyed until the next state arrives.
+        entranceTimer = setTimeout(() => {
+          entranceTimer = 0;
+          entrance = null;
+          render();
+        }, ENTRANCE_DELAY + ENTRANCE_MS);
+        schedule();
+      }
+
+      const entranceHold = () => !!entrance;
+
+      /* 0 while everyone is still off the field, 1 once everybody is in place.
+         Eased so they decelerate into position rather than stopping dead. */
+      function entranceAt(){
+        if(!entrance) return 1;
+        const t = (now - entrance.started) / entrance.duration;
+        if(t <= 0) return 0;                    // still waiting behind the card
+        if(t >= 1){ entrance = null; return 1; }
+        // Quadratic rather than cubic: a cube is most of the way there in the
+        // first third, which is a slide rather than a walk.
+        return 1 - Math.pow(1 - Math.max(0, t), 2);
+      }
+
+      /* Each side gets its own slice of the entrance: the party walks on first
+         and the wave follows, so the two arrivals read as an answer to each
+         other rather than as one shuffle. */
+      const stagger = (t, from, to) =>
+        Math.max(0, Math.min(1, (t - from) / (to - from)));
+
       function drawCombat(){
         cctx.fillStyle = '#241a10';
         cctx.fillRect(0, 0, MAP_PX_W, HEADER + COMBAT_PX_H);
@@ -1564,8 +1717,8 @@
         const title = room.round >= (room.bossRound || 4) ? 'THE ARRAY WAKES' : 'THE SURGE';
         const right = info ? info.name.toUpperCase() : '';
 
-        // Same rule as the map: the lane is clipped to below the strip, because
-        // the party's top row and its ready marks reach above it.
+        // Same rule as the map: clipped to below the strip, because the party's
+        // top row and its ready marks reach above it.
         cctx.save();
         cctx.beginPath();
         cctx.rect(0, HEADER, MAP_PX_W, COMBAT_PX_H);
@@ -1573,103 +1726,214 @@
 
         cctx.drawImage(groundFor(room.terrain, COMBAT_H, 'floor', room.round || 1), 0, HEADER);
         backdrop(cctx, room.round || 1);
+        skyline(cctx);
 
-        /* The party, holding the left of the lane and facing the wave.
-         *
-         * Three rows two apart, then a step back for anyone past the third: a
-         * hero is forty pixels on a sixteen-pixel row, so evenly dividing the
-         * lane by the party size stacked them into one another and five people
-         * became a single unreadable column. Two rows apart still overlaps a
-         * little, which is what a group of people standing together looks like,
-         * and the depth sort makes the overlap read as depth.
-         */
+        const t = entranceAt();
+        const partyIn = stagger(t, 0, 0.72);
+        const waveIn = stagger(t, 0.28, 1);
+        const stations = battleStations();
+
         stagePos.players.clear();
-        const standing = room.players.filter(p => !p.down);
-        const placed = standing.map((p, i) => {
-          const cls = CLASSES.find(c => c.id === p.classId);
-          const art = cls && HERO_ART[cls.art];
-          if(!art) return null;
-          // From row 2, never row 1: a sprite on the top row puts its ready
-          // mark up inside the header strip, over the round title.
-          const row = 2 + (i % 3) * 2;
-          const rank = Math.floor(i / 3);
-          return { p, art, row, ground: HEADER + (row + 1) * TILE, x: 2 * TILE - rank * 13 };
-        }).filter(Boolean);
+        stagePos.enemies.clear();
 
-        placed.sort((a, b) => a.ground - b.ground);
-        for(const { p, art, ground, x: baseX } of placed){
-          const top = ground - art.rows.length;
-          const kick = Math.round(recoil(p.id) * -5);      // knocked back, away from the wave
-          const x = baseX + kick;
-          stagePos.players.set(p.id, { x: x + 14, y: top + 20 });
-          shadow(cctx, x + art.rows[0].length / 2, ground - 1, art.rows[0].length);
-          blit(cctx, art.rows, x, top, false, breath(p.id), art.split);
-          if(struck.has(p.id)) flash(cctx, art.rows, x, top);
-          // Who has locked a card in. With five people choosing at once this is
-          // the only thing on screen that answers "are we waiting on you".
-          drawMark(cctx, p, baseX, top);
+        /* One list, sorted by ground line, so the back rank paints behind the
+           front one and a hero standing in front of another overlaps them the
+           way a person would. */
+        const field = [];
+
+        for(const station of stations.party){
+          const { p, art, split } = station;
+          if(p.down) continue;                      // the fallen are off the field
+          const kick = Math.round(recoil(p.id) * -5);   // knocked back, away from the wave
+          // Off the left edge at the start of the entrance, in place at the end.
+          const x = Math.round(station.x - (1 - partyIn) * ENTER_FROM) + kick;
+          field.push({ ...station, x, art, split, side: 'party' });
         }
 
-        // The wave. dist 0 stands one stride from the party; the spawn edge is
-        // the right side of the map. Dead enemies leave the field.
-        // The lane runs the width of the board: dist 0 is a stride off the
-        // party, the furthest an enemy can start is the right edge. Scaling to
-        // the widest dist in ENEMIES rather than a fixed stride is what keeps
-        // the wave using the whole picture instead of huddling on the left.
-        stagePos.enemies.clear();
-        const maxDist = Math.max(...Object.values(ENEMIES).map(e => e.dist));
-        const laneFrom = 5 * TILE;
-        const laneTo = MAP_PX_W - 3 * TILE;
-        room.enemies.forEach((enemy, i) => {
-          const art = ENEMY_ART[enemy.art];
-          if(!art) return;
-
-          // A thing that dies should be seen dying. Dead enemies used to stop
-          // being drawn between one frame and the next, which reads as a
-          // rendering fault rather than as a kill. Deaths get their own record
-          // because the recoil clears itself long before the dissolve is done.
+        for(const station of stations.wave){
+          const { enemy, art } = station;
           const gone = enemy.hp <= 0;
           if(gone && !dying.has(enemy.id)) dying.set(enemy.id, now);
-          // The dissolve runs over DEATH_MS rather than the old fifth of a
-          // second, and the body stays on the field for all of it — that span
-          // and the round's hold are the same number on purpose, so the last
-          // thing to die is still coming apart when the fight ends.
+          // The dissolve runs over DEATH_MS and the body stays on the field for
+          // all of it — that span and the round's hold are the same number, so
+          // the last thing to die is still coming apart when the fight ends.
           const fade = gone ? (now - dying.get(enemy.id)) / DEATH_MS : 0;
-          if(gone && fade >= 1) return;
+          if(gone && fade >= 1) continue;
 
           const kick = Math.round(recoil(enemy.id) * 6);   // knocked back, away from the party
-          const x = laneFrom + Math.round((enemy.dist / maxDist) * (laneTo - laneFrom)) + kick;
-          // Two rows apart: sprites are taller than a tile, so neighbouring
-          // lanes overlap and two enemies read as one with a strange outline.
-          const lanes = Math.max(1, Math.floor((COMBAT_H - 2) / 2));
-          // A slow bob out of phase per enemy, so the wave is a set of things
-          // breathing rather than a row of decals sliding down a lane.
-          const bob = stillness() ? 0 : Math.round(Math.sin(now / 420 + i * 1.7));
-          const y = HEADER + (2 + (i % lanes) * 2 + 1) * TILE - art.length + bob;
-          stagePos.enemies.set(enemy.id, { x: x + art[0].length / 2, y: y + art.length / 2 });
+          const x = Math.round(station.x + (1 - waveIn) * ENTER_FROM) + kick;
+          field.push({ ...station, x, art, fade, gone, side: 'wave' });
+        }
 
-          shadow(cctx, x + art[0].length / 2, HEADER + (2 + (i % lanes) * 2 + 2) * TILE - 1, art[0].length);
-          // The wave comes from the right, so it faces left to meet the party.
-          blit(cctx, dissolve(art, fade), x, y, true);
-          if(!gone && struck.has(enemy.id)) flash(cctx, art, x, y);
-          if(gone) return;
+        field.sort((a, b) => a.ground - b.ground);
 
-          // A health bar over each head beats a number in a list. Three pixels
-          // with a dark bed under it, or it vanishes against a grass tile.
-          const share = enemy.hp / enemy.maxHp;
-          cctx.fillStyle = '#241a10';
-          cctx.fillRect(x - 1, y - 6, art[0].length + 2, 5);
-          cctx.fillStyle = '#3a2418';
-          cctx.fillRect(x, y - 5, art[0].length, 3);
-          cctx.fillStyle = share > 0.4 ? PALETTE.g : PALETTE.e;
-          cctx.fillRect(x, y - 5, Math.max(1, Math.round(art[0].length * share)), 3);
-        });
+        for(const thing of field){
+          const art = thing.art;
+          const top = thing.ground - art.length;
+          // A walk is a sprite bobbing on a beat. During the entrance everyone
+          // is walking; afterwards only the living breathe.
+          const walking = t < 1;
+          const lift = thing.side === 'party'
+            ? (walking ? (Math.floor(now / 150) % 2) : breath(thing.p.id))
+            : 0;
+          const bob = thing.side === 'wave' && !walking && !stillness()
+            ? Math.round(Math.sin(now / 420 + thing.x) )
+            : 0;
+
+          shadow(cctx, thing.x + art[0].length / 2, thing.ground - 1, art[0].length);
+
+          if(thing.side === 'party'){
+            stagePos.players.set(thing.p.id, { x: thing.x + 14, y: top + 20 });
+            blit(cctx, art, thing.x, top, false, lift, thing.split);
+            if(struck.has(thing.p.id)) flash(cctx, art, thing.x, top);
+            drawMark(cctx, thing.p, thing.x + (art[0].length - TILE) / 2, top);
+          }else{
+            const y = top + bob;
+            stagePos.enemies.set(thing.enemy.id, { x: thing.x + art[0].length / 2, y: y + art.length / 2 });
+            // The wave faces left to meet the party.
+            blit(cctx, dissolve(art, thing.fade), thing.x, y, true);
+            if(!thing.gone && struck.has(thing.enemy.id)) flash(cctx, art, thing.x, y);
+            if(!thing.gone && t >= 1) enemyPlate(thing.enemy, thing.x, y, art);
+          }
+        }
 
         cctx.restore();
 
         // The strip last, over the top of everything the clip held back.
         drawTextOutlined(cctx, title, 2, 4, 'y', 1);
         drawTextOutlined(cctx, right, MAP_PX_W - textWidth(right, 1) - 2, 4, 'c', 1);
+      }
+
+      /* What is standing behind the fight: whatever the Engineer put down.
+       *
+       * The build phase is where a party spends its round, and until now none of
+       * it was visible in the half of the round it was spent for — you raised a
+       * Solar Panel and then fought on ground with no panel on it. The site the
+       * party is holding is the site they built, so it stands on the horizon
+       * behind them, silhouetted into the treeline rather than drawn in full:
+       * this is the back of the field, and a fully lit workbench back there
+       * would pull the eye off the fight in front of it.
+       */
+      function skyline(ctx){
+        const built = room.buildings || [];
+        if(!built.length) return;
+
+        /* Spread across the width rather than at their map coordinates: the
+           combat ground is not the site's ground, so a map position here would
+           be a coincidence pretending to be a fact. Order is preserved, so the
+           row reads as the order they were raised in. */
+        const line = HEADER + HORIZON + 9;
+        const shown = built.slice(0, 5);
+        const step = shown.length > 1 ? (MAP_PX_W - 96) / (shown.length - 1) : 0;
+
+        shown.forEach((placed, i) => {
+          const building = BUILDINGS[placed.id];
+          if(!building) return;
+          const art = PROP_ART[building.art] || BUILDING_ART[building.art];
+          if(!art) return;
+          const x = Math.round(48 + i * step - art[0].length / 2);
+          const top = line - art.length;
+
+          /* Three tones instead of the palette: far enough back to be scenery,
+             near enough to be recognisably the thing you paid for. Keyed off
+             the original — outlines stay outlines, shadow keys stay shadows —
+             so the silhouette and the shading both survive the flattening, and
+             a Solar Panel still reads as a Solar Panel from the back of the
+             field. Drawn flat rather than blended because a blend would be the
+             only alpha on this canvas and the palette is the whole style. */
+          for(let r = 0; r < art.length; r++){
+            for(let c = 0; c < art[r].length; c++){
+              const key = art[r][c];
+              if(key === '.' || key === ' ') continue;
+              ctx.fillStyle = (key === '#' || key === '=') ? '#1b2b1e'
+                : key === key.toUpperCase() ? '#33553a'
+                : '#4e7a51';
+              ctx.fillRect(x + c, top + r, 1, 1);
+            }
+          }
+          // Standing on something. Without a footing they float off the
+          // treeline like decals.
+          ctx.fillStyle = '#1b2b1e';
+          ctx.fillRect(x - 1, line, art[0].length + 2, 2);
+        });
+      }
+
+      /* The intent, over an enemy's head: health, then what it is about to do.
+       *
+       * This is the information the approach used to carry. When the wave walked
+       * at you, "how much trouble am I in" was answered by looking at the board;
+       * standing still it has to be written down. A number and a pip, on a dark
+       * plate so it survives whatever tile is behind it.
+       */
+      function enemyPlate(enemy, x, y, art){
+        const w = art[0].length;
+
+        // Health first, right under the intent, because it is the thing read
+        // most often and the eye should not have to hunt for it.
+        const share = enemy.hp / enemy.maxHp;
+        cctx.fillStyle = '#241a10';
+        cctx.fillRect(x - 1, y - 6, w + 2, 5);
+        cctx.fillStyle = '#3a2418';
+        cctx.fillRect(x, y - 5, w, 3);
+        cctx.fillStyle = share > 0.4 ? PALETTE.g : PALETTE.e;
+        cctx.fillRect(x, y - 5, Math.max(1, Math.round(w * share)), 3);
+
+        // A ring already cut in it, and how much is still to come off. Drawn
+        // under the health bar rather than over it, so the two numbers on an
+        // enemy read top-down as "what it will do" then "what is already
+        // happening to it".
+        if(enemy.canker > 0){
+          const spec = BLIGHTS.canker;
+          cctx.fillStyle = '#241a10';
+          cctx.fillRect(x - 1, y - 1, 7, 7);
+          cctx.fillStyle = PALETTE[(spec && spec.colour) || 'v'];
+          cctx.fillRect(x, y, 5, 1);
+          cctx.fillRect(x, y + 4, 5, 1);
+          cctx.fillRect(x, y + 1, 1, 3);
+          cctx.fillRect(x + 4, y + 1, 1, 3);
+          drawText(cctx, String(enemy.canker), x + 8, y - 1, 'v', 1);
+        }
+
+        const intent = enemy.intent;
+        if(!intent) return;
+
+        const label = String(intent.damage);
+        const width = textWidth(label, 1) + 6 + (intent.ail ? 4 : 0);
+        const px = Math.round(x + w / 2 - width / 2);
+        const py = y - 16;
+
+        cctx.fillStyle = '#241a10';
+        cctx.fillRect(px - 1, py - 1, width + 2, 9);
+
+        // A blade, four pixels of it, which at this size is all a sword can be.
+        cctx.fillStyle = PALETTE.e;
+        cctx.fillRect(px, py + 1, 1, 4);
+        cctx.fillRect(px + 1, py, 1, 6);
+        cctx.fillRect(px + 2, py + 1, 1, 4);
+
+        drawText(cctx, label, px + 5, py, 'w', 1);
+
+        // Who it is going for, in that seat's own colour. This is the half of
+        // the telegraph the Hauler exists to change: a Rust Hulk lining up on
+        // the Wizard is a fact you can do something about, and could not see
+        // at all while the wave was still walking.
+        if(intent.at){
+          const who = (room.players || []).find(p => p.id === intent.at);
+          const wcls = who && classById(who.classId);
+          if(wcls){
+            cctx.fillStyle = wcls.colour;
+            cctx.fillRect(px + 1, py + 8, width - 2, 1);
+          }
+        }
+
+        // And a pip in the ailment's own colour when the next blow through
+        // guard would leave something behind.
+        if(intent.ail){
+          const spec = AILMENTS[intent.ail];
+          cctx.fillStyle = PALETTE[(spec && spec.colour) || 'v'];
+          cctx.fillRect(px + width - 3, py + 1, 3, 3);
+          cctx.fillRect(px + width - 2, py + 4, 1, 2);
+        }
       }
 
       /* A struck sprite goes white for a beat. Painted as its own silhouette
@@ -1738,6 +2002,7 @@
         leaveRun: els('leave-run'),
         preview: els('preview'), hold: els('hold'),
         combat: els('combat'), combatParty: els('combat-party'), leaveCombat: els('leave-combat'),
+        allies: els('allies'),
         salvage: els('salvage'), buildings: els('buildings'), buildHint: els('build-hint'),
         engineerOnly: els('engineer-only'), powerLine: els('power-line'),
         benchHint: els('bench-hint'), upgrades: els('upgrades'),
@@ -1883,6 +2148,9 @@
         clearInterval(keepalive);
         clearTimeout(holdTimer);       // or a held round lands in an empty page
         holdTimer = 0;
+        clearTimeout(entranceTimer);
+        entranceTimer = 0;
+        entrance = null;
         if(socket) socket.close();
         socket = null; room = null; code = null; attempt = 0;
         history.replaceState(null, '', location.pathname);
@@ -2019,11 +2287,10 @@
         const power = amount => strikePower(amount, you.effects);
 
         if(effect.kind === 'strike'){
-          const target = alive().find(e => e.id === targetId) ||
-            [...alive()].sort((a, b) => a.dist - b.dist)[0];
+          const target = alive().find(e => e.id === targetId) || alive()[0];
           if(target) swing(target, power(effect.amount));
         }else if(effect.kind === 'strikeAll'){
-          for(const target of [...alive()].sort((a, b) => a.dist - b.dist)) swing(target, power(effect.amount));
+          for(const target of alive()) swing(target, power(effect.amount));
         }else if(effect.kind === 'ward'){
           const who = ally();
           fx({ kind: 'ward', player: who.id });
@@ -2062,6 +2329,35 @@
             { kind: effect.kind, amount: effect.amount, rounds: effect.rounds ?? 1, fresh: true }];
           fx({ kind: effect.kind, player: who.id });
           room.events.push({ t: 'log', text: `${label} on ${who.name}.` });
+        }else if(effect.kind === 'heft'){
+          const who = ally();
+          const total = effectAmount(who.effects, 'heft') + effect.amount;
+          who.effects = [...(who.effects || []).filter(e => e.kind !== 'heft'),
+            { kind: 'heft', amount: total, rounds: 0, lasting: true }];
+          fx({ kind: 'heft', player: who.id });
+          room.events.push({ t: 'log', text: `${label}: ${who.name} swings for ${total} more.` });
+        }else if(effect.kind === 'cover'){
+          you.block = (you.block || 0) + effect.amount;
+          you.effects = [...(you.effects || []).filter(e => e.kind !== 'cover'),
+            { kind: 'cover', amount: effect.amount, rounds: 1, fresh: true }];
+          fx({ kind: 'cover', player: you.id });
+          room.events.push({ t: 'log', text: `${you.name} steps in front.` });
+        }else if(effect.kind === 'canker' || effect.kind === 'cankerAll'){
+          const hit = effect.kind === 'cankerAll'
+            ? alive()
+            : [alive().find(e => e.id === targetId) || alive()[0]].filter(Boolean);
+          for(const target of hit){
+            target.canker = Math.max(target.canker || 0, effect.amount);
+            target.cankerFrom = you.id;
+            target.cankerFresh = true;
+            fx({ kind: 'canker', player: you.id, target: target.id });
+          }
+          if(hit.length) room.events.push({ t: 'log', text: `${label} cuts a ring in ${hit.length > 1 ? 'the whole row' : `the ${hit[0].name}`}.` });
+        }else if(effect.kind === 'graft'){
+          const who = ally();
+          for(let i = 0; i < effect.amount; i++) who.deck.unshift('cutting');
+          fx({ kind: 'graft', player: who.id });
+          room.events.push({ t: 'log', text: `${label}: a cutting on top of ${who.name}'s deck.` });
         }else if(effect.kind === 'revive'){
           // Nobody stays down in the preview, so this is always the jolt.
           const down = room.players.filter(p => p.classId && p.down);
@@ -2081,6 +2377,16 @@
           room.events.push({ t: 'log', text: `${label} brings ${who.name} back to ${who.hp}.` });
         }
 
+        // Canker between the statuses and the wave, exactly as the room does
+        // it — the preview is how this gets looked at, so the order has to be
+        // the order the room resolves in.
+        for(const enemy of room.enemies){
+          if(enemy.hp <= 0 || !enemy.canker) continue;
+          if(enemy.cankerFresh){ enemy.cankerFresh = false; continue; }
+          swing(enemy, enemy.canker);
+          enemy.canker -= 1;
+        }
+
         // Ailments bite and age before the wave lands new ones, in the room's
         // order — the preview is how this gets looked at, so it has to be the
         // order the room resolves in.
@@ -2098,11 +2404,16 @@
           p.effects = tickEffects(p.effects);
         }
 
-        // The wave closes, then whatever arrived hits. Guard is spent absorbing
-        // it and does not carry — a ward is for the blow you saw coming.
+        // The wave swings. Guard is spent absorbing it and does not carry — a
+        // ward is for the blow you saw coming.
+        //
+        // The preview runs one seat at a time, so the blow lands on whoever is
+        // holding the controls rather than on the round-robin's pick; what it
+        // does share is the rule about cover, because that is the thing worth
+        // looking at.
+        room.waveTurn = (room.waveTurn || 0) + 1;
         for(const enemy of room.enemies){
           if(enemy.hp <= 0) continue;
-          if(enemy.dist > 0){ enemy.dist -= 1; continue; }
           const blocked = Math.min(you.block || 0, enemy.hits);
           you.block = (you.block || 0) - blocked;
           const through = enemy.hits - blocked;
@@ -2129,6 +2440,7 @@
           demoDownIf(you);
         }
         you.block = 0;
+        demoIntents();
 
         // The preview used to floor everyone at one health, which made it a
         // place where the defeat screen could never be looked at. It can lose
@@ -2170,6 +2482,16 @@
         if(!player || !(amount > 0)) return;
         if(!player.stats) player.stats = blankStats();
         player.stats[key] = (player.stats[key] || 0) + amount;
+      };
+
+      /* The telegraph, recomputed from the same helper the room uses. */
+      const demoIntents = () => {
+        const at = waveTargets(
+          room.enemies || [],
+          (room.players || []).filter(p => p.classId && !p.down),
+          room.waveTurn || 0,
+        );
+        for(const enemy of room.enemies || []) enemy.intent = intentOf(enemy, at);
       };
 
       function demoDownIf(player){
@@ -2214,9 +2536,12 @@
               const def = ENEMIES[type];
               const stats = enemyStats(type, seats);
               return { id: `e${i}`, type, name: def.name, art: def.art,
-                       hp: stats.hp, maxHp: stats.hp, dist: stats.dist, hits: stats.hits,
-                       landed: 0 };
+                       hp: stats.hp, maxHp: stats.hp, hits: stats.hits,
+                       landed: 0, intent: null };
             });
+            // The room publishes the telegraph in viewFor; the preview has no
+            // viewFor, so it publishes its own from the same helper.
+            demoIntents();
 
             // Everyone shuffles and draws as the fight opens. A deck is per
             // fight, not per run — for now: the cards that persist between
@@ -2248,7 +2573,7 @@
           // into that position.
           if(!card || hand[msg.intent.index] !== msg.intent.card) return render();
           if(!cardPlayable(hand[msg.intent.index], {
-            pages: room.pages || 0, power: room.power || 0, classId: you.classId,
+            pages: room.pages || 0, power: room.power || 0, classId: you.classId, hp: you.hp,
           })) return render();
 
           if(card.pageCost) room.pages -= card.pageCost;
@@ -2482,7 +2807,28 @@
       /* The target for the next strike. Local pointer state, like `holding`:
          which enemy you are aiming at is not a fact about the room until the
          intent is sent. */
-      let aimAt = null;
+      let aimAt = null;        // the enemy a strike is pointed at
+      let aimAlly = null;      // the ally a support card is pointed at
+
+      /* Which row a card is aimed from.
+       *
+       * Keyed off the effect kind and never the card's icon: Bramble is a
+       * `defend` that hits nothing, Graft is a `buff` that lands on somebody
+       * else, and Get Behind Me is a `defend` that must not be aimable at all.
+       * The icon is for reading a hand at a glance; this is for where the card
+       * goes, and they are not the same question.
+       */
+      const AIMS_ENEMY = new Set(['strike', 'canker']);
+      const AIMS_ALLY = new Set(['cleanse', 'revive', 'might', 'heft', 'graft']);
+
+      function aimsAt(cardId){
+        const card = CARDS[cardId];
+        if(!card) return 'none';
+        const kind = card.effect.kind;
+        if(AIMS_ENEMY.has(kind)) return 'enemy';
+        if(AIMS_ALLY.has(kind) || card.targetsAlly) return 'ally';
+        return 'none';
+      }
 
       /* The hand, the deck and the discard.
        *
@@ -2513,10 +2859,15 @@
         hand.forEach((cardId, index) => {
           const card = cardById(cardId);
           if(!card) return;
+          const points = aimsAt(cardId);
           const playable = cardPlayable(cardId, {
             pages: room.pages || 0,
             power: room.power || 0,
             classId: cls ? cls.id : null,
+            // The Hauler pays for damage in health, and a card must never be
+            // the thing that kills you — so the cost is a playability rule,
+            // exactly like a page or a charge.
+            hp: you ? you.hp : Infinity,
           });
 
           const el = document.createElement('button');
@@ -2546,8 +2897,12 @@
           // Where the card came from, and what it costs. A Fireball with an
           // empty library still gets dealt — it just says why it is greyed.
           const source = document.createElement('span');
-          source.className = (card.pageCost || card.powerCost) ? 'pcard-cost' : 'pcard-source';
-          if(card.pageCost){
+          source.className = (card.pageCost || card.powerCost || card.hpCost) ? 'pcard-cost' : 'pcard-source';
+          if(card.hpCost){
+            source.textContent = playable
+              ? `${card.hpCost} health · ${you ? you.hp : 0} left`
+              : 'not enough health';
+          }else if(card.pageCost){
             source.textContent = playable
               ? `${card.pageCost} page · ${room.pages || 0} left`
               : 'no pages left';
@@ -2564,16 +2919,33 @@
 
           const note = document.createElement('span');
           note.className = 'pcard-note';
-          note.textContent = card.effect.kind === 'strike' && aimAt
-            ? `${card.note}  —  aimed at the ${room.enemies.find(x => x.id === aimAt)?.name}.`
-            : card.note;
+          // Say where it is going, in the same breath as what it is. A card
+          // that lands on somebody else and does not say so is the bug this
+          // whole row exists to fix.
+          const at = points === 'enemy' ? (room.enemies.find(x => x.id === aimAt) || {}).name
+            : points === 'ally' ? (() => {
+                const who = room.players.find(x => x.id === aimAlly);
+                if(!who) return null;
+                const wcls = classById(who.classId);
+                return wcls ? wcls.name.replace(/^The /, '') : who.name;
+              })()
+            : null;
+          note.textContent = at ? `${card.note}  —  aimed at the ${at}.` : card.note;
 
           el.append(name, amount, kind, source, note);
           // The index, not the id: a hand can hold two of the same card and
           // the room has to know which one was played.
           el.onclick = () => send({
             t: 'intent',
-            intent: { t: 'play', card: cardId, index, target: aimAt || null },
+            intent: {
+              t: 'play', card: cardId, index,
+              // An ally card unaimed falls back to the caster, which is what
+              // the room does anyway — but sending it explicitly means the
+              // room and the card face agree about who it landed on.
+              target: points === 'ally' ? (aimAlly || (you && you.id) || null)
+                : points === 'enemy' ? (aimAt || null)
+                : null,
+            },
           });
           ui.hand.append(el);
         });
@@ -2593,13 +2965,69 @@
         // Not while the round is holding open on a death: the room has already
         // moved to the next phase and would drop the intent on the floor, so
         // the cards stay live-looking and do nothing. Better to grey them.
-        const acting = !!you && !you.down && room.phase === PHASES.combat && !holdTimer;
+        // Not while the round is holding open on a death, and not while the
+        // two sides are still walking on: the room would drop the intent in the
+        // first case and the player has not been shown the board yet in the
+        // second.
+        const acting = !!you && !you.down && room.phase === PHASES.combat
+          && !holdTimer && !entranceHold();
 
-        renderRoster(ui.combatRoster);
+        // The roster is how the preview lets one person be five; in a real
+        // room it said the same things the ally row below now says, in a
+        // second row directly above it.
+        ui.combatRoster.hidden = !demo;
+        if(demo) renderRoster(ui.combatRoster);
         renderHand(you, acting);
 
         // The wave, as cards: clicking one aims the next strike at it. The
         // scene above is the picture; this is the interface.
+        /* The party, as somewhere to point a card.
+         *
+         * Every seat, standing or down, because Jumper Cables exists to be
+         * aimed at somebody on the floor. The pip on the right is the wave's
+         * telegraph read the other way round: not what each enemy will do, but
+         * who it will do it to — which is the question cover exists to change
+         * the answer to, and the reason it is worth printing at all.
+         */
+        ui.allies.replaceChildren();
+        const seated = room.players.filter(p => p.classId);
+        if(aimAlly && !seated.some(p => p.id === aimAlly)) aimAlly = null;
+        for(const p of seated){
+          const el = document.createElement('button');
+          el.type = 'button';
+          el.className = 'enemy';
+          el.dataset.dead = String(p.down);
+          el.disabled = !acting;
+          el.setAttribute('aria-pressed', String(aimAlly === p.id));
+          if(aimAlly === p.id) el.style.borderColor = 'var(--sun)';
+          const cls = classById(p.classId);
+          if(cls && HERO_ART[cls.art]) el.append(pixels(HERO_ART[cls.art].rows, 1));
+          const body = document.createElement('span');
+          const name = document.createElement('b');
+          name.className = 'card-name';
+          name.textContent = (cls ? cls.name.replace(/^The /, '') : p.name)
+            + (p.id === room.you ? ' (you)' : '');
+          const line = document.createElement('span');
+          line.className = 'enemy-dist';
+          const incoming = (room.enemies || [])
+            .filter(e => e.hp > 0 && e.intent && e.intent.at === p.id)
+            .reduce((sum, e) => sum + e.intent.damage, 0);
+          line.textContent = p.down ? 'down'
+            : incoming ? `taking ${incoming}`
+            : 'clear';
+          if(incoming) line.dataset.ail = 'true';
+          // Whether they have chosen yet — the thing five people at one table
+          // need to know and the only thing the roster row was still for.
+          const state = document.createElement('span');
+          state.className = 'enemy-dist';
+          state.textContent = p.down ? '' : p.intent ? 'committed' : 'thinking';
+          body.append(name, document.createElement('br'), line,
+            document.createElement('br'), state);
+          el.append(body, healthBar(p));
+          el.onclick = () => { aimAlly = aimAlly === p.id ? null : p.id; render(); };
+          ui.allies.append(el);
+        }
+
         ui.enemies.replaceChildren();
         if(aimAt && !room.enemies.some(e => e.id === aimAt && e.hp > 0)) aimAt = null;
         for(const enemy of room.enemies){
@@ -2607,7 +3035,7 @@
           el.type = 'button';
           el.className = 'enemy';
           el.dataset.dead = String(enemy.hp <= 0);
-          el.dataset.here = String(enemy.hp > 0 && enemy.dist === 0);
+          el.dataset.here = String(enemy.hp > 0 && !!(enemy.intent && enemy.intent.ail));
           el.disabled = enemy.hp <= 0 || !acting;
           el.setAttribute('aria-pressed', String(aimAt === enemy.id));
           if(aimAt === enemy.id) el.style.borderColor = 'var(--sun)';
@@ -2616,11 +3044,15 @@
           const name = document.createElement('b');
           name.className = 'card-name';
           name.textContent = enemy.name;
-          const dist = document.createElement('span');
-          dist.className = 'enemy-dist';
-          dist.textContent = enemy.hp <= 0 ? 'down'
-            : enemy.dist === 0 ? 'HERE' : `${enemy.dist} away`;
-          body.append(name, document.createElement('br'), dist);
+          // What it is about to do, not where it is: nothing is anywhere but
+          // here now, so the only thing worth printing is the intent.
+          const intent = document.createElement('span');
+          intent.className = 'enemy-dist';
+          intent.textContent = enemy.hp <= 0 ? 'down'
+            : !enemy.intent ? ''
+            : `hits ${enemy.intent.damage}${enemy.intent.ail ? ` · ${effectName(enemy.intent.ail)}` : ''}`;
+          if(enemy.intent && enemy.intent.ail) intent.dataset.ail = 'true';
+          body.append(name, document.createElement('br'), intent);
           el.append(body, healthBar({ hp: enemy.hp, maxHp: enemy.maxHp }));
           el.onclick = () => { aimAt = aimAt === enemy.id ? null : enemy.id; render(); };
           ui.enemies.append(el);
@@ -3145,7 +3577,7 @@
          enough to read, and never stacked — a new card replaces the last
          rather than queueing behind it. */
       let splashTimer = 0;
-      function showSplash(title, subtitle){
+      function showSplash(title, subtitle, hold = 2400){
         ui.splashTitle.textContent = title;
         ui.splashSub.textContent = subtitle || '';
         // Re-trigger the entry animation even if the card is already up.
@@ -3153,7 +3585,7 @@
         void ui.splash.offsetWidth;
         ui.splash.dataset.show = 'true';
         clearTimeout(splashTimer);
-        splashTimer = setTimeout(() => { ui.splash.dataset.show = 'false'; }, 2400);
+        splashTimer = setTimeout(() => { ui.splash.dataset.show = 'false'; }, hold);
       }
 
       function render(){
@@ -3164,6 +3596,12 @@
         if(room.phase !== render.lastPhase){
           dying.clear();
           struck.clear();
+          // Walking on is the first thing a surge does. Started here rather
+          // than off the 'phase' event, because a client that reconnects into
+          // a fight in progress gets no phase event and would otherwise find
+          // the field empty and the cards dead.
+          if(room.phase === PHASES.combat) beginEntrance();
+          else entrance = null;
           render.lastPhase = room.phase;
         }
         queueFx(room.events || []);
@@ -3175,7 +3613,12 @@
           if(event.t === 'started') logLines.unshift('The run begins.');
           if(event.t === 'phase'){
             logLines.unshift(`${event.title}. ${event.subtitle || ''}`);
-            showSplash(event.title, event.subtitle);
+            // A surge holds its card for less time than a build phase does,
+            // because something else is queued behind it: the card says which
+            // round this is, and then the two sides walk on. Both at once was
+            // a full-width overlay dimming the only thing worth watching.
+            showSplash(event.title, event.subtitle,
+              room.phase === PHASES.combat ? SPLASH_BEFORE_ENTRANCE : 2400);
             audio.sfx('phase');
           }
           // The room walked them; this walks the sprite. The state already

@@ -23,6 +23,7 @@ import { roomFor } from '../src/rooms.js';
 import {
   PHASES, BOSS_ROUND, CARDS, cardEffect, cardPlayable, playableClasses,
   RECIPES, BUILDINGS, UPGRADES, upgradeCost, canAfford, pathTo, hasEffect,
+  effectAmount,
 } from '../public/content.js';
 
 const RUNS = Number(process.argv[2]) || 400;
@@ -129,7 +130,7 @@ function freeTile(room){
  * an ailment that is killing somebody, then hit the thing you can kill.
  *
  * Deliberately not optimal. It does not hold a Cinder Nova for a full lane or
- * chain Lend a Page into a Bolt Gun, both of which a real table learns to do —
+ * chain an Ember Rune into a Bolt Gun, both of which a real table learns to do —
  * so a win rate measured here is a floor, and the 60% target is set against
  * players who are worse than the people who will eventually play this.
  */
@@ -137,12 +138,13 @@ function pickCard(room, player){
   const hand = player.hand
     .map((id, index) => ({ id, index, card: CARDS[id], effect: cardEffect(id, room.upgrades) }))
     .filter(c => c.card && cardPlayable(c.id, {
-      pages: room.pages, power: room.power, classId: player.classId,
+      pages: room.pages, power: room.power, classId: player.classId, hp: player.hp,
     }));
   if(!hand.length) return null;
 
   const alive = room.enemies.filter(e => e.hp > 0);
-  const here = alive.filter(e => e.dist === 0);
+  // Everything alive is here: a standoff has no far side.
+  const here = alive;
   const party = room.players.filter(p => p.classId);
   const standing = party.filter(p => !p.down);
   const down = party.filter(p => p.down);
@@ -194,12 +196,56 @@ function pickCard(room, player){
     if(ally) return aim(might, ally.id);
   }
 
+  /* Seats four and five, whose whole kits score zero on `damage` above and
+     would otherwise only ever be played as the unaimed fallback at the foot of
+     this function. Each of these is the obvious line rather than the best one,
+     which is the standard the rest of the model is written to. */
+
+  // Canker is the only damage that pays for being early, so it goes on the
+  // biggest thing that has not got a ring in it yet.
+  const canker = find('canker');
+  if(canker){
+    const fresh = [...alive].filter(e => !e.canker).sort((a, b) => b.hp - a.hp)[0];
+    if(fresh) return aim(canker, fresh.id);
+  }
+  const cankerAll = find('cankerAll');
+  if(cankerAll && alive.filter(e => !e.canker).length >= 2) return aim(cankerAll, null);
+
+  // Cover when the lane outnumbers the party, which is when a redirect buys
+  // more than a ward on one head.
+  const cover = find('cover');
+  if(cover && here.length > standing.length) return aim(cover, player.id);
+
+  // Heft is bought early or not at all — it pays back over the rounds left —
+  // and never with health the fight is about to need.
+  const heft = find('heft');
+  if(heft && player.hp / player.maxHp > 0.55 && totalHp(alive) > 20){
+    const card = CARDS[heft.id];
+    if(card.targetsAlly){
+      // Onto whoever swings, never onto the Grafter: heft is a strike term and
+      // canker is not a strike.
+      const arm = standing.find(p => p.id !== player.id && p.classId !== 'grafter');
+      if(arm) return aim(heft, arm.id);
+    }else{
+      return aim(heft, player.id);
+    }
+  }
+
+  // A cutting is worth most in the arm carrying the most already.
+  const graft = find('graft');
+  if(graft && standing.length > 1){
+    const arm = [...standing]
+      .filter(p => p.id !== player.id && p.classId !== 'grafter')
+      .sort((a, b) => (effectAmount(b.effects, 'heft') + effectAmount(b.effects, 'might'))
+                    - (effectAmount(a.effects, 'heft') + effectAmount(a.effects, 'might')))[0];
+    if(arm) return aim(graft, arm.id);
+  }
+
   if(damage(best) > 0){
     // Finish something if this card can; otherwise hit what arrives first.
     const killable = alive.filter(e => e.hp <= best.effect.amount)
       .sort((a, b) => b.hp - a.hp)[0];
-    const nearest = [...alive].sort((a, b) => a.dist - b.dist)[0];
-    return aim(best, (killable || nearest || {}).id || null);
+    return aim(best, (killable || alive[0] || {}).id || null);
   }
   return aim(best, player.id);
 }
@@ -237,7 +283,7 @@ function playRun(code, size){
 
 /* ------------------------------------------------------------------ report --- */
 
-const sizes = (process.argv[3] || '1,2,3').split(',').map(Number);
+const sizes = (process.argv[3] || '1,2,3,4,5').split(',').map(Number);
 console.log(`Good Vibes balance — ${RUNS} runs per table size, target 60% wins\n`);
 
 let worst = 0;

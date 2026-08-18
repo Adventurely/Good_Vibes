@@ -29,7 +29,8 @@ import {
   seededRandom, seedFromCode, readyState,
   ENEMIES, waveFor, enemyStats, salvageAfterCombat, addSalvage, spendSalvage,
   AILMENTS, addEffect, addAilment, hasEffect, effectAmount, tickEffects,
-  clearAilments, strikePower, ailmentOnHit, effectName, blankStats,
+  clearAilments, strikePower, ailmentOnHit, effectName, blankStats, intentOf,
+  waveTargets, spawnsFor,
 } from '../public/content.js';
 
 const rooms = new Map();
@@ -40,7 +41,13 @@ const streamFor = (seed, id) => seededRandom(seedFromCode(`${seed}:${id}`));
 
 /* Effect kinds that post their own fx events, one per thing they landed on.
    Everything else gets one generic event from resolve(). */
-const SELF_DRAWN = new Set(['strike', 'strikeAll', 'wardAll', 'healAll', 'cleanse', 'might', 'revive']);
+const SELF_DRAWN = new Set([
+  'strike', 'strikeAll', 'wardAll', 'healAll', 'cleanse', 'might', 'revive',
+  // The wave-facing kinds are here for a second reason as well: the generic
+  // emitter looks its target up among the *players*, so an enemy id would fall
+  // through to the caster and draw the effect on the wrong body.
+  'canker', 'cankerAll', 'heft', 'cover', 'graft',
+]);
 
 let serial = 0;
 
@@ -150,7 +157,12 @@ class Room {
       terrain: this.terrain,
       nodes: this.nodes,
       buildings: this.buildings,
-      enemies: this.enemies,
+      // The wave, each with what it is about to do. Derived here rather than
+      // stored, so the telegraph cannot drift from the rule it reads.
+      enemies: (() => {
+        const at = waveTargets(this.enemies, this.standing, this.waveTurn || 0);
+        return this.enemies.map(e => ({ ...e, intent: intentOf(e, at) }));
+      })(),
       stash: this.stash,
       salvage: this.salvage,
       pages: this.pages,
@@ -245,7 +257,7 @@ class Room {
     // walking back onto the slab you cleared last round and finding your panel
     // still bolted to it is the point of a build phase.
     this.terrain = this.site;
-    this.nodes = respawnItems(this.site, this.buildings, this.random);
+    this.nodes = respawnItems(this.site, this.buildings, this.random, spawnsFor(this.players));
     this.enemies = [];
     this.power = 0;
 
@@ -264,6 +276,9 @@ class Room {
   enterCombat(){
     this.phase = PHASES.combat;
     this.terrain = generateCombatTerrain(this.random);
+    // Which seat the wave opens its round-robin on. Reset per fight, so a
+    // rotation carried out of the last one cannot decide who opens this one.
+    this.waveTurn = 0;
     this.power = powerFrom(this.buildings);
     const partySize = Math.max(1, this.players.filter(p => p.classId && p.connected).length);
     this.enemies = waveFor(this.round, partySize).map((type, i) => {
@@ -273,7 +288,7 @@ class Room {
       // here instead. Everything else comes back unchanged.
       const stats = enemyStats(type, partySize);
       return { id: `e${i}`, type, name: def.name, art: def.art,
-               hp: stats.hp, maxHp: stats.hp, dist: stats.dist, hits: stats.hits,
+               hp: stats.hp, maxHp: stats.hp, hits: stats.hits,
                // How many blows this one has landed. The ailment cadence reads
                // it, so it has to live on the enemy and survive hibernation
                // rather than be recomputed from a log nobody keeps.
@@ -538,6 +553,16 @@ class Room {
       if(!card) continue;
       if(card.pageCost) this.pages -= card.pageCost;
       if(card.powerCost) this.power -= card.powerCost;
+      if(card.hpCost){
+        // Not through hurt(): hurt() can put a player down, and a card must
+        // never be the thing that kills you. cardPlayable refuses the play at
+        // or below the cost and this clamp is the second belt. Scored as taken
+        // on purpose — the run record should show who bled, and the Hauler
+        // bleeds deliberately.
+        const paid = Math.min(card.hpCost, player.hp - 1);
+        player.hp -= paid;
+        this.score(player, 'taken', paid);
+      }
 
       const effect = cardEffect(intent.card, this.upgrades);
       // The party-wide and targeted kinds emit an fx per person they land on,
@@ -564,6 +589,7 @@ class Room {
     // round does not also tick this round and a stun lasts exactly the one turn
     // it says it does.
     this.tickAilments();
+    this.tickCanker();
     this.advanceWave();
 
     if(this.enemies.every(e => e.hp <= 0)) return this.winRound();
@@ -638,16 +664,18 @@ class Room {
     const ally = () => this.players.find(p => p.id === targetId && p.classId) || player;
 
     if(effect.kind === 'strike'){
+      // Aimed, or the first thing still standing. There is no "nearest" any
+      // more — nothing approaches — so the default is the order the wave is
+      // drawn in, which is the order the player reads it in.
       const alive = this.enemies.filter(e => e.hp > 0);
-      const target = alive.find(e => e.id === targetId)
-        || [...alive].sort((a, b) => a.dist - b.dist)[0];
+      const target = alive.find(e => e.id === targetId) || alive[0];
       if(!target) return;
       this.hitEnemy(player, target, strikePower(effect.amount, player.effects), label, cardId);
 
     }else if(effect.kind === 'strikeAll'){
-      // Nearest first, so the order a nova kills things in matches the order
-      // the lane reads left to right.
-      const alive = this.enemies.filter(e => e.hp > 0).sort((a, b) => a.dist - b.dist);
+      // Wave order, so the order a nova kills things in is the order the
+      // player sees them standing in.
+      const alive = this.enemies.filter(e => e.hp > 0);
       if(!alive.length) return;
       const amount = strikePower(effect.amount, player.effects);
       for(const target of alive) this.hitEnemy(player, target, amount, label, cardId);
@@ -714,6 +742,70 @@ class Room {
       this.event({ t: 'fx', kind: 'might', player: who.id });
       this.log(`${player.name}'s ${label}: ${who.name} swings for ${effect.amount} more next round.`);
 
+    }else if(effect.kind === 'heft'){
+      // Summed and re-added rather than pushed: addEffect replaces by kind, so
+      // a second Set Your Feet has to arrive already carrying the first.
+      const who = ally();
+      const total = effectAmount(who.effects, 'heft') + effect.amount;
+      who.effects = addEffect(who.effects, {
+        kind: 'heft', amount: total, rounds: 0, lasting: true,
+      });
+      this.event({ t: 'fx', kind: 'heft', player: who.id });
+      this.log(`${player.name}'s ${label}: ${who.name} swings for ${total} more for the rest of the fight.`);
+
+    }else if(effect.kind === 'cover'){
+      // `player`, never ally(): you cannot volunteer somebody else.
+      //
+      // There is no charge counter and no second field. The number on the card
+      // is literally how much of the wave is being bought, a point of guard per
+      // point of damage, because the redirect ends the moment the guard runs
+      // out — and block is zeroed at the foot of resolve() so it cannot leak
+      // into next round. Which also means the Engineer warding the Hauler is
+      // the Hauler covering for longer, with nothing added to make it so.
+      player.block = (player.block || 0) + effect.amount;
+      player.effects = addEffect(player.effects, {
+        kind: 'cover', amount: effect.amount, rounds: 1, fresh: true,
+      });
+      this.score(player, 'guard', effect.amount);
+      this.event({ t: 'fx', kind: 'cover', player: player.id });
+      this.log(`${player.name} steps in front. ${effect.amount} of guard, and the wave comes here while it holds.`);
+
+    }else if(effect.kind === 'canker' || effect.kind === 'cankerAll'){
+      const alive = this.enemies.filter(e => e.hp > 0);
+      const hit = effect.kind === 'cankerAll'
+        ? alive
+        : [alive.find(e => e.id === targetId) || alive[0]].filter(Boolean);
+      if(!hit.length) return;
+      for(const target of hit){
+        // Refreshed, not stacked, for the reason an ailment is: additive would
+        // pay out triangularly and three Ringbarks on one Hulk would be
+        // forty-five damage rather than six.
+        target.canker = Math.max(target.canker || 0, effect.amount);
+        target.cankerFrom = player.id;
+        /* Cut this round, paying from the next one — the same discipline
+           `fresh` gives an effect on a player, and for the same reason. Without
+           it tickCanker runs later in this very resolve() and a ring pays out
+           the instant it is cut, which is a strike with extra steps and not the
+           card the Grafter is holding. It stands there looking fine for a week,
+           and then it does not. */
+        target.cankerFresh = true;
+        this.event({ t: 'fx', kind: 'canker', player: player.id, target: target.id });
+      }
+      this.log(hit.length > 1
+        ? `${player.name}'s ${label} gets into the whole row: ${effect.amount} on every one of them.`
+        : `${player.name}'s ${label} cuts a ring in the ${hit[0].name}. It has ${hit[0].canker} coming.`);
+
+    }else if(effect.kind === 'graft'){
+      /* Onto the top of the deck rather than into the discard, because resolve
+         runs apply, then discards, then deals — and draw() takes from the
+         front. So a cutting posted this round is in that ally's hand next
+         round, guaranteed. The certainty is what makes it a coordination card
+         rather than a lottery ticket: both players know what happens next. */
+      const who = ally();
+      for(let i = 0; i < effect.amount; i++) who.deck.unshift('cutting');
+      this.event({ t: 'fx', kind: 'graft', player: who.id });
+      this.log(`${player.name} binds a cutting to ${who.name}'s arm. It is the next thing they draw.`);
+
     }else if(effect.kind === 'revive'){
       const down = this.party.filter(p => p.down);
       const target = down.find(p => p.id === targetId) || down[0];
@@ -735,6 +827,26 @@ class Room {
         this.event({ t: 'fx', kind: 'heal', player: who.id });
         this.log(`${player.name}'s ${label} jolts ${who.hp - before} back into ${who.name}.`);
       }
+    }
+  }
+
+  /* Canker comes off in the quiet gap: after the statuses, before the wave.
+   *
+   * Routed through hitEnemy rather than subtracting, so the damage stat, the
+   * overkill trim, the kill credit, the comes-apart line and the slain fx with
+   * its `last` flag all come out right with no second copy of any of them.
+   *
+   * Three, then two, then one: six across three rounds, and the wave has to
+   * survive all three to stop paying. Credited to whoever cut the ring even if
+   * they are on the floor by the time it lands, which is the point of it.
+   */
+  tickCanker(){
+    for(const enemy of this.enemies){
+      if(enemy.hp <= 0 || !enemy.canker) continue;
+      if(enemy.cankerFresh){ enemy.cankerFresh = false; continue; }
+      const from = this.party.find(p => p.id === enemy.cankerFrom) || this.party[0];
+      if(from) this.hitEnemy(from, enemy, enemy.canker, 'Canker', 'canker');
+      enemy.canker -= 1;
     }
   }
 
@@ -770,19 +882,25 @@ class Room {
     }
   }
 
-  /* The wave closes, and whatever arrived hits somebody. Round-robin across
-     the standing party rather than always the same person, so a five-player
-     fight does not quietly gang up on seat one. */
+  /* The wave's turn. Everything still standing swings, every round, because
+     nothing on this field is anywhere but here — that is the whole of the
+     standoff. Round-robin across the standing party rather than always the
+     same person, so a five-player fight does not quietly gang up on seat one.
+
+     Kept under the old name because the call site, the tests and the ported
+     copy all say advanceWave, and renaming it would be a diff about a word. */
   advanceWave(){
     const standing = this.standing;
     if(!standing.length) return;
-    let turn = 0;
+    // One copy of the targeting rule, shared with the telegraph the client
+    // draws, so what a player was promised is what lands.
+    const at = waveTargets(this.enemies, standing, this.waveTurn || 0);
+    this.waveTurn = (this.waveTurn || 0) + 1;
 
     for(const enemy of this.enemies){
       if(enemy.hp <= 0) continue;
-      if(enemy.dist > 0){ enemy.dist -= 1; continue; }
 
-      const victim = standing[turn++ % standing.length];
+      const victim = standing.find(p => p.id === at.get(enemy.id)) || standing[0];
       this.event({ t: 'fx', kind: 'hit', player: victim.id, from: enemy.id });
       const blocked = Math.min(victim.block || 0, enemy.hits);
       victim.block = (victim.block || 0) - blocked;

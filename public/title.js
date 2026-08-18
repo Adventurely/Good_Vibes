@@ -527,7 +527,7 @@ export function createTitleScene(canvas, { reducedMotion = () => false } = {}){
       // Separated with dashes rather than a middle dot: the 5x7 font has no
       // glyph for one and falls back to a question mark, which turns the tag
       // line into a quiz.
-      const call = 'THREE CLASSES - FOUR ROUNDS - ONE RUIN';
+      const call = 'FIVE CLASSES - FOUR ROUNDS - ONE RUIN';
       drawTextOutlined(ctx, call, Math.round((SCENE_W - textWidth(call, 1)) / 2), SCENE_H - 12, 'y', 1);
     }
   }
