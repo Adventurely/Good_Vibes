@@ -357,6 +357,40 @@
       .card-sub { display: block; font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
       .card-blurb { display: block; font-size: 0.72rem; color: var(--muted); margin-top: 0.3rem; }
       .card.locked { opacity: 0.45; cursor: not-allowed; }
+      .card[data-hot='true'] { border-color: var(--sun); }
+
+      /* --- the scriptorium ------------------------------------------------- */
+      /* An offer's border is its rarity — the draft reads at a glance the way
+         the deck list's brewed border does. */
+      .card[data-rarity='uncommon'] { border-color: var(--accent); }
+      .card[data-rarity='rare'] { border-color: var(--sun); }
+      .rarity { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+      .card[data-rarity='uncommon'] .rarity { color: var(--accent); }
+      .card[data-rarity='rare'] .rarity { color: var(--sun); }
+
+      /* A spell on the bench: its live numbers and its three sockets. */
+      .spell { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 0.6rem; }
+      .sockets { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; }
+      .socket {
+        min-height: 2.4rem; min-width: 7rem; padding: 0.25rem 0.5rem;
+        border: 1px dashed var(--line); border-radius: 8px;
+        display: inline-flex; flex-direction: column; justify-content: center; gap: 0.1rem;
+        font-size: 0.72rem; color: var(--muted); text-align: left;
+      }
+      .socket[data-filled='true'] { border-style: solid; color: var(--text); cursor: grab; touch-action: none; }
+      /* What a socketed or satchel modifier actually does, always in view —
+         a name alone made every chip a memory test. */
+      .mod-what { display: block; font-size: 0.62rem; color: var(--muted); }
+      .mod-name { display: inline-flex; align-items: center; gap: 0.3rem; }
+      /* A card title keeps its own line even when it carries an icon. */
+      b.card-name.mod-name { display: flex; }
+      .stat-line { display: inline-flex; align-items: center; gap: 0.3rem; }
+      .stat-line b { color: var(--sun); font-variant-numeric: tabular-nums; }
+      .socket[data-hot='true'] { border-color: var(--sun); color: var(--text); }
+      .chip[data-held='true'], .socket[data-held='true'] { border-color: var(--sun); }
+      .mod-chip { cursor: grab; touch-action: none; }
+      /* The chip riding the pointer mid-drag. */
+      .drag-ghost { position: fixed; pointer-events: none; z-index: 90; opacity: 0.9; transform: translate(-50%, -120%); }
 
       .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
       .chip {
@@ -544,6 +578,10 @@
           <h2 style="margin-top:1.4rem">Stash</h2>
           <div class="chips" id="stash"></div>
 
+          <h2 style="margin-top:1.4rem">The garden</h2>
+          <p id="garden-hint" style="margin-bottom:0.6rem"></p>
+          <div class="grid" id="garden"></div>
+
           <h2 style="margin-top:1.4rem">Brewing</h2>
           <div class="grid" id="recipes"></div>
         </div>
@@ -567,6 +605,19 @@
         <div id="wizard-only" hidden>
           <h2 style="margin-top:1.4rem">The library</h2>
           <div class="chips" id="library"></div>
+          <p id="study-hint" style="margin:0.6rem 0 0.4rem"></p>
+          <div class="actions" style="margin-bottom:0.6rem">
+            <button type="button" id="open-page">Open a page</button>
+          </div>
+          <div class="grid" id="offers"></div>
+
+          <h2 style="margin-top:1.4rem">The spell bench</h2>
+          <p id="bench-line" style="margin-bottom:0.6rem"></p>
+          <div class="grid" id="spells"></div>
+
+          <h2 style="margin-top:1.4rem">The satchel</h2>
+          <p id="satchel-hint" style="margin-bottom:0.6rem"></p>
+          <div class="chips" id="satchel"></div>
         </div>
 
         <h2 style="margin-top:1.4rem">Your deck</h2>
@@ -698,9 +749,13 @@
         waveTargets,
         STAT_KEYS, STAT_LABELS, STAT_SHORT, blankStats, runHighlights,
         addAilment, tickEffects, effectAmount, clearAilments,
-        HAND_SIZE, CARDS, deckFor, shuffle, draw, discardHand, cardById, cardPlayable,
+        HAND_SIZE, CARDS, classKit, shuffle, draw, discardHand, cardById, cardPlayable,
         missingForBuilding, canBuildAt,
         salvageAfterCombat, addSalvage, spendSalvage,
+        SPELLS, MODIFIERS, SPELL_SLOTS, PAGES_PER_ROUND, freshSpellbook,
+        composeSpell, rollOffers, takeOffer, moveModifier, wizardCombatDeck,
+        draftableCount,
+        POT_COUNT, potYield, potStage, plantPot, harvestPot, growPots,
       } from './content.js';
       import { createAudio } from './audio.js';
       import { fxStyles, styleFor, soundFor, verbOf } from './fx.js';
@@ -1372,24 +1427,37 @@
             const from = stagePos.players.get(fx.player) || { x: 2 * TILE + 12, y: HEADER + 5 * TILE };
             const style = styleFor(FX_STYLE, fx.kind);
             if(style){
+              // The show is sized to the swing: a thirty-point crafted
+              // Fireball fills more sky than a three-point Strike, from the
+              // amount the room sent along with the event.
+              const boost = Math.min(4, Math.floor((fx.amount || 0) / 8));
+              const size = style.size + boost;
               const to = stagePos.enemies.get(fx.target) || { x: MAP_PX_W - 3 * TILE, y: HEADER + 5 * TILE };
               if(t < 0.75){
                 const p = t / 0.75;
                 const x = from.x + (to.x - from.x) * p;
                 let y = from.y + (to.y - from.y) * p;
-                if(style.arc) y -= Math.sin(p * Math.PI) * 26;
+                if(style.arc) y -= Math.sin(p * Math.PI) * (26 + boost * 4);
                 if(style.jagged) y += Math.sin(p * 40) * 3;
                 cctx.fillStyle = style.trail;
-                cctx.fillRect((x - (to.x - from.x) * 0.06) | 0, y | 0, Math.max(1, style.size - 1), Math.max(1, style.size - 1));
+                cctx.fillRect((x - (to.x - from.x) * 0.06) | 0, y | 0, Math.max(1, size - 1), Math.max(1, size - 1));
                 cctx.fillStyle = style.colour;
-                cctx.fillRect(x | 0, (y - style.size / 2) | 0, style.size, style.size);
+                cctx.fillRect(x | 0, (y - size / 2) | 0, size, size);
               }else{
                 const p = (t - 0.75) / 0.25;
                 cctx.fillStyle = p < 0.5 ? style.colour : style.trail;
-                for(let k = 0; k < 8; k++){
-                  const a = k * Math.PI / 4;
-                  const r = 2 + p * 10;
+                for(let k = 0; k < 8 + boost * 3; k++){
+                  const a = k * Math.PI / (4 + boost * 1.5);
+                  const r = 2 + p * (10 + boost * 5);
                   cctx.fillRect((to.x + Math.cos(a) * r) | 0, (to.y + Math.sin(a) * r) | 0, 2, 2);
+                }
+                // A haymaker whitens the lane for a frame or two — the cheap
+                // half of "designed to impress".
+                if(boost >= 2 && p < 0.3){
+                  cctx.globalAlpha = 0.35 - p;
+                  cctx.fillStyle = PALETTE.Y;
+                  cctx.fillRect(0, HEADER, MAP_PX_W, COMBAT_PX_H);
+                  cctx.globalAlpha = 1;
                 }
               }
             }else if(['heal', 'regen', 'ward', 'cleanse'].includes(verbOf(fx.kind))){
@@ -1999,6 +2067,7 @@
         ready: els('ready'), start: els('start'), leave: els('leave'),
         run: els('run'), levelNote: els('level-note'),
         alchemistOnly: els('alchemist-only'), stash: els('stash'), recipes: els('recipes'),
+        garden: els('garden'), gardenHint: els('garden-hint'),
         leaveRun: els('leave-run'),
         preview: els('preview'), hold: els('hold'),
         combat: els('combat'), combatParty: els('combat-party'), leaveCombat: els('leave-combat'),
@@ -2007,6 +2076,9 @@
         engineerOnly: els('engineer-only'), powerLine: els('power-line'),
         benchHint: els('bench-hint'), upgrades: els('upgrades'),
         wizardOnly: els('wizard-only'), library: els('library'),
+        studyHint: els('study-hint'), openPage: els('open-page'), offers: els('offers'),
+        benchLine: els('bench-line'), spells: els('spells'),
+        satchelHint: els('satchel-hint'), satchel: els('satchel'),
         combatName: els('combat-name'), combatMeta: els('combat-meta'),
         enemies: els('enemies'),
         hand: els('hand'), deckPile: els('deck-pile'), discardPile: els('discard-pile'),
@@ -2200,6 +2272,12 @@
           player.ready = false;
           player.intent = null;
         });
+        // The garden grew while everyone was fighting.
+        room.pots = growPots(room.pots);
+        // The library's round wage, exactly as the room pays it — the preview
+        // always seats a wizard.
+        room.pages += PAGES_PER_ROUND;
+        room.events.push({ t: 'log', text: `The library gives up ${PAGES_PER_ROUND} page${PAGES_PER_ROUND === 1 ? '' : 's'}.` });
         const cardText = phaseCard(room.round, PHASES.build);
         room.events.push({ t: 'phase', ...cardText });
       }
@@ -2217,12 +2295,15 @@
         holding = null;
         walking = null;
 
+        const spellbook = freshSpellbook();
         room = {
           you: 'p1', phase: PHASES.build, round: 1, rounds: ROUNDS_BEFORE_BOSS,
           bossRound: BOSS_ROUND, maxPlayers: PARTY_SIZE,
           site, terrain: site, nodes: [], buildings: [], enemies: [],
           stash: {}, pages: 2, events: [],
           salvage: { ...STARTING_SALVAGE }, upgrades: {}, power: 0,
+          spellbook, offers: null,
+          pots: Array(POT_COUNT).fill(null),
           players: playableClasses().map((cls, i) => ({
             id: `p${i + 1}`, name: cls.name.replace(/^The /, ''),
             host: i === 0, connected: true, ready: false, down: false,
@@ -2231,8 +2312,9 @@
             x: 0, y: 0,
             // Built once, then kept: brewing during the build phase adds to this
             // and a building adds to everyone's, so rebuilding it at the surge
-            // would throw away the round's whole point.
-            deck: deckFor(cls.id), discard: [], hand: [],
+            // would throw away the round's whole point. The Wizard's is the
+            // exception either way: hers is the book's shadow.
+            deck: cls.cast ? wizardCombatDeck(spellbook) : classKit(cls.id), discard: [], hand: [],
           })),
         };
         demoEnterBuild();
@@ -2260,22 +2342,30 @@
        * building, so both paths land here rather than growing two copies that
        * drift.
        */
-      function demoTurn(you, effect, label, targetId, cardId){
+      function demoTurn(you, effect, label, targetId, cardId, spell = null){
         // The same fx events the room emits, in the same shape and at the same
         // point in the turn. Without them the preview is the one screen where
         // cards resolve in silence against a still board — and the preview is
         // how you play this without a room at all.
         const fx = event => room.events.push({ t: 'fx', ...event });
 
+        // What this turn's swings landed and killed, for the sockets that pay
+        // on either — the room reads the same numbers off its stat deltas.
+        let landedThisTurn = 0;
+        let killsThisTurn = 0;
+
         // One swing, and the announcement if it was the last one this thing
         // takes. `last` is what makes the client hold the round open, so the
         // preview has to set it for the same reason the room does.
         const swing = (target, amount) => {
-          fx({ kind: cardId || 'strike', player: you.id, target: target.id });
-          score(you, 'damage', Math.min(amount, target.hp));
+          fx({ kind: cardId || 'strike', player: you.id, target: target.id, amount });
+          const landed = Math.min(amount, target.hp);
+          landedThisTurn += landed;
+          score(you, 'damage', landed);
           target.hp = Math.max(0, target.hp - amount);
           room.events.push({ t: 'log', text: `${label} hits the ${target.name} for ${amount}.` });
           if(target.hp > 0) return;
+          killsThisTurn += 1;
           score(you, 'kills', 1);
           room.events.push({ t: 'log', text: `The ${target.name} comes apart.` });
           fx({ kind: 'slain', player: you.id, target: target.id, enemy: target.type,
@@ -2387,6 +2477,26 @@
           enemy.canker -= 1;
         }
 
+        // The sockets that pay after the cast: the siphon on what landed, the
+        // margin on what died. Before the wave answers, as the room does it.
+        if(spell){
+          if(spell.flags.leech && landedThisTurn > 0){
+            const back = Math.ceil(landedThisTurn * spell.flags.leech);
+            const before = you.hp;
+            you.hp = Math.min(you.maxHp, you.hp + back);
+            if(you.hp > before){
+              score(you, 'mended', you.hp - before);
+              fx({ kind: 'heal', player: you.id });
+              room.events.push({ t: 'log', text: `The glyph siphons ${you.hp - before} back into ${you.name}.` });
+            }
+          }
+          if(spell.flags.pageOnKill && killsThisTurn > 0){
+            const paid = spell.flags.pageOnKill * killsThisTurn;
+            room.pages += paid;
+            room.events.push({ t: 'log', text: `The margin pays out: ${paid} page${paid === 1 ? '' : 's'}.` });
+          }
+        }
+
         // Ailments bite and age before the wave lands new ones, in the room's
         // order — the preview is how this gets looked at, so it has to be the
         // order the room resolves in.
@@ -2466,8 +2576,7 @@
             room.outcome = 'won';
           }else{
             room.round += 1;
-            room.pages += 1;                          // stand-in for the walk
-            demoEnterBuild();
+            demoEnterBuild();                         // pays the library's wage
           }
         };
         if(stillness()) return finish();
@@ -2552,10 +2661,21 @@
               // away, which is the bug this whole phase exists to avoid.
               // Hand included: a fight can end with cards still held, and
               // shuffling only deck and discard would delete them.
-              player.deck = shuffle(
-                [...player.deck, ...(player.discard || []), ...(player.hand || [])],
-                demoRandom,
-              );
+              // The Wizard is the exception, as in the room: her deck is
+              // written fresh from the book, which is what charges are.
+              const cls = classById(player.classId);
+              const owned = cls && cls.cast
+                ? wizardCombatDeck(room.spellbook)
+                : [...player.deck, ...(player.discard || []), ...(player.hand || [])];
+              player.deck = shuffle(owned, demoRandom);
+              if(cls && cls.cast){
+                for(const spellId of room.spellbook.known){
+                  const composed = composeSpell(spellId, room.spellbook.slots[spellId]);
+                  if(!composed || !composed.flags.opening) continue;
+                  const at = player.deck.indexOf(spellId);
+                  if(at > 0){ player.deck.splice(at, 1); player.deck.unshift(spellId); }
+                }
+              }
               player.discard = [];
               player.hand = [];
               player.block = 0;
@@ -2567,33 +2687,62 @@
           }
         }else if(msg.t === 'intent' && msg.intent.t === 'play' && room.phase === PHASES.combat){
           const hand = you.hand || [];
-          const card = cardById(hand[msg.intent.index]);
+          const cardId = hand[msg.intent.index];
+          const card = cardById(cardId);
           // The id has to match the slot as well as exist: a click that landed
           // after the hand was redealt would otherwise play whatever moved
           // into that position.
-          if(!card || hand[msg.intent.index] !== msg.intent.card) return render();
-          if(!cardPlayable(hand[msg.intent.index], {
+          if(!card || cardId !== msg.intent.card) return render();
+          const spell = spellForCard(you, cardId);
+          if(!spell && !cardPlayable(cardId, {
             pages: room.pages || 0, power: room.power || 0, classId: you.classId, hp: you.hp,
           })) return render();
 
-          if(card.pageCost) room.pages -= card.pageCost;
-          if(card.powerCost) room.power -= card.powerCost;
+          if(!spell){
+            if(card.pageCost) room.pages -= card.pageCost;
+            if(card.powerCost) room.power -= card.powerCost;
+          }else{
+            // The cast's own costs and covers, before it flies — the same
+            // order the room resolves them in.
+            if(spell.flags.hpCost){
+              const paid = Math.min(spell.flags.hpCost, you.hp - 1);
+              if(paid > 0){
+                score(you, 'taken', paid);
+                you.hp -= paid;
+                room.events.push({ t: 'log', text: `${you.name} pays ${paid} health to the seal.` });
+              }
+            }
+            if(spell.flags.selfWard){
+              you.block = (you.block || 0) + spell.flags.selfWard;
+              score(you, 'guard', spell.flags.selfWard);
+            }
+          }
 
           // Commit, show the mark, then resolve on a beat. In a real room the
           // wait is for the other four; here it is the only way to see the
           // thing the mark is for.
-          you.intent = { t: 'play', card: hand[msg.intent.index] };
+          you.intent = { t: 'play', card: cardId };
           // Brewed cards are spent, not discarded: everything else in the hand
-          // goes face down, the consumed one leaves the deck for good.
-          you.discard = discardHand(you.discard, hand.filter(id => !(CARDS[id] || {}).consumed));
+          // goes face down, the consumed one leaves the deck for good. A
+          // played spell copy is spent too — the book deals it again next
+          // surge — but an unplayed copy only discards.
+          const rest = hand.filter((id, at) => !(spell && at === msg.intent.index));
+          you.discard = discardHand(you.discard, rest.filter(id => !(CARDS[id] || {}).consumed));
           you.hand = [];
           render();
+
+          // Farsight aims at the back of the lane unless she aimed herself.
+          let target = msg.intent.target;
+          if(spell && spell.flags.farthest && !target && spell.effect.kind === 'strike'){
+            const far = [...room.enemies].filter(e => e.hp > 0).sort((a, b) => b.dist - a.dist)[0];
+            if(far) target = far.id;
+          }
 
           clearTimeout(demoBeat);
           demoBeat = setTimeout(() => {
             you.intent = null;
-            demoTurn(you, cardEffect(hand[msg.intent.index], room.upgrades), card.name,
-              msg.intent.target, hand[msg.intent.index]);
+            demoTurn(you, spell ? spell.effect : cardEffect(cardId, room.upgrades), card.name,
+              target, cardId, spell);
             if(room.phase === PHASES.combat) demoDeal(you);
             render();
           }, 420);
@@ -2676,6 +2825,59 @@
             });
             holding = null;
           }
+        }else if(msg.t === 'intent' && msg.intent.t === 'plant'){
+          const cls = classById(you.classId);
+          const planted = cls?.craft && plantPot(room.pots, msg.intent.pot, msg.intent.herb, room.stash);
+          if(planted){
+            room.pots = planted.pots;
+            room.stash = planted.stash;
+            room.events.push({ t: 'log', text: `Planted a ${MATERIALS[msg.intent.herb].name} cutting.` });
+          }
+        }else if(msg.t === 'intent' && msg.intent.t === 'harvest'){
+          const cls = classById(you.classId);
+          const picked = cls?.craft && harvestPot(room.pots, msg.intent.pot, room.stash);
+          if(picked){
+            room.pots = picked.pots;
+            room.stash = picked.stash;
+            room.events.push({ t: 'log', text: `Harvested ${picked.yielded} ${MATERIALS[picked.herb].name} from the pot.` });
+          }
+        }else if(msg.t === 'intent' && msg.intent.t === 'page'){
+          // The scriptorium, behind the same helpers the room uses, so the
+          // preview's drafts cannot drift from a real room's.
+          const cls = classById(you.classId);
+          if(cls?.cast && !room.offers && (room.pages || 0) >= 1 && draftableCount(room.spellbook)){
+            room.pages -= 1;
+            room.offers = rollOffers(demoRandom, room.spellbook);
+            room.events.push({ t: 'log', text: 'A page opens. Three ways to read it.' });
+          }
+        }else if(msg.t === 'intent' && msg.intent.t === 'pick'){
+          const cls = classById(you.classId);
+          const offer = (room.offers || [])[msg.intent.index];
+          const next = cls?.cast && takeOffer(room.spellbook, room.offers, msg.intent.index);
+          if(next){
+            room.spellbook = next;
+            room.offers = null;
+            you.deck = wizardCombatDeck(room.spellbook);
+            you.discard = []; you.hand = [];
+            room.events.push({ t: 'log', text: offer.type === 'spell'
+              ? `Learned ${SPELLS[offer.id].name}.`
+              : `Inscribed ${MODIFIERS[offer.id].name}.` });
+          }
+        }else if(msg.t === 'intent' && msg.intent.t === 'mod'){
+          const cls = classById(you.classId);
+          const next = cls?.cast && moveModifier(room.spellbook, msg.intent.mod, msg.intent.spell, msg.intent.pos);
+          if(next){
+            room.spellbook = next;
+            you.deck = wizardCombatDeck(room.spellbook);
+            you.discard = []; you.hand = [];
+            if(msg.intent.spell){
+              const composed = composeSpell(msg.intent.spell, next.slots[msg.intent.spell]);
+              room.events.push({ t: 'log', text:
+                `${MODIFIERS[msg.intent.mod].name} set into ${SPELLS[msg.intent.spell].name}: ` +
+                `${composed.amount} ${composed.verb === 'might' ? 'lent' : 'damage'}, ` +
+                `${composed.charges} charge${composed.charges === 1 ? '' : 's'}.` });
+            }
+          }
         }else if(msg.t === 'intent' && msg.intent.t === 'gather'){
           const node = room.nodes.find(n => n.id === msg.intent.node && !n.taken);
           if(node){
@@ -2688,9 +2890,16 @@
               room.events.push({ t: 'log', text: `Found ${CACHE_YIELD.pages} spell page.` });
             }else{
               const cls = CLASSES.find(c => c.id === you.classId);
-              const yielded = cls ? cls.gather : 1;
-              room.stash[node.material] = (room.stash[node.material] || 0) + yielded;
-              room.events.push({ t: 'log', text: `Gathered ${yielded} ${MATERIALS[node.material].name}.` });
+              if(!cls?.craft){
+                // A herb is the Alchemist's to bend down for; anyone else
+                // walks over it and it stays where it grew.
+                node.taken = false;
+                room.events.push({ t: 'log', text: `Only the Alchemist knows which end of a ${MATERIALS[node.material].name} to keep.` });
+              }else{
+                const yielded = cls.gather;
+                room.stash[node.material] = (room.stash[node.material] || 0) + yielded;
+                room.events.push({ t: 'log', text: `Gathered ${yielded} ${MATERIALS[node.material].name}.` });
+              }
             }
           }
         }
@@ -2860,8 +3069,10 @@
           const card = cardById(cardId);
           if(!card) return;
           const points = aimsAt(cardId);
-          const playable = cardPlayable(cardId, {
-            pages: room.pages || 0,
+          // A crafted spell is always castable — the book already paid — and
+          // its numbers are the bench's, not the card table's.
+          const spell = spellForCard(you, cardId);
+          const playable = !!spell || cardPlayable(cardId, {            pages: room.pages || 0,
             power: room.power || 0,
             classId: cls ? cls.id : null,
             // The Hauler pays for damage in health, and a card must never be
@@ -2883,22 +3094,28 @@
           name.className = 'pcard-name';
           name.textContent = card.name;
 
+          const effect = spell ? spell.effect : cardEffect(cardId, room.upgrades);
+
           const amount = document.createElement('span');
           amount.className = 'pcard-amount';
           // The upgraded number, not the printed one: a coil-wound bolt gun
-          // that still says 9 on the card is a lie the player acts on.
-          amount.textContent = cardEffect(cardId, room.upgrades).amount;
+          // that still says 9 on the card is a lie the player acts on — and a
+          // crafted Fireball shows what the bench made of it.
+          amount.textContent = effect.amount;
 
           const kind = document.createElement('span');
           kind.className = 'pcard-kind';
-          kind.textContent = effectLabel(card.effect.kind)
-            + (card.effect.rounds > 1 ? ` · ${card.effect.rounds} rounds` : '');
+          kind.textContent = effectLabel(effect.kind)
+            + (effect.rounds > 1 ? ` · ${effect.rounds} rounds` : '');
 
           // Where the card came from, and what it costs. A Fireball with an
           // empty library still gets dealt — it just says why it is greyed.
           const source = document.createElement('span');
-          source.className = (card.pageCost || card.powerCost || card.hpCost) ? 'pcard-cost' : 'pcard-source';
-          if(card.hpCost){
+          source.className = (!spell && (card.pageCost || card.powerCost || card.hpCost))
+            ? 'pcard-cost' : 'pcard-source';
+          if(spell){
+            source.textContent = 'from the book · once a fight';
+          }else if(card.hpCost){
             source.textContent = playable
               ? `${card.hpCost} health · ${you ? you.hp : 0} left`
               : 'not enough health';
@@ -2920,8 +3137,8 @@
           const note = document.createElement('span');
           note.className = 'pcard-note';
           // Say where it is going, in the same breath as what it is. A card
-          // that lands on somebody else and does not say so is the bug this
-          // whole row exists to fix.
+          // that lands on somebody else and does not say so is the bug the ally
+          // row exists to fix.
           const at = points === 'enemy' ? (room.enemies.find(x => x.id === aimAt) || {}).name
             : points === 'ally' ? (() => {
                 const who = room.players.find(x => x.id === aimAlly);
@@ -3312,15 +3529,19 @@
         for(const [id, n] of counts){
           const card = cardById(id);
           if(!card) continue;
+          // A crafted spell wears the brewed border and the bench's numbers:
+          // the deck list is where a socketed Twin Core has to show its work.
+          const spell = spellForCard(you, id);
           const el = document.createElement('span');
           el.className = 'deck-entry';
-          el.dataset.brewed = String(!!card.brewed);
+          el.dataset.brewed = String(!!card.brewed || !!spell);
           if(CARD_ART[card.kind]) el.append(pixels(CARD_ART[card.kind], 1));
           el.append(document.createTextNode(card.name));
           const count = document.createElement('b');
           count.textContent = `x${n}`;
           el.append(count);
-          el.title = `${effectLabel(card.effect.kind)} ${card.effect.amount}. ${card.note}`;
+          const effect = spell ? spell.effect : card.effect;
+          el.title = `${effectLabel(effect.kind)} ${effect.amount}. ${card.note}`;
           ui.deckList.append(el);
         }
       }
@@ -3391,6 +3612,351 @@
         .filter(([r, n]) => (pool[r] || 0) < n)
         .map(([r, n]) => `${n - (pool[r] || 0)} ${SALVAGE[r].name}`);
 
+      /* ---- the garden ----------------------------------------------------- */
+
+      /* Three pots by the fire. A cutting planted now is worth nothing this
+         round; each round it waits it climbs the yield ladder — so every pot
+         is the same standing question: brew it this fight, or let it grow. */
+      function renderGarden(you, acting, canCraft){
+        if(!canCraft){
+          if(held && held.kind === 'cutting') held = null;
+          return;
+        }
+        const pots = room.pots || [];
+        ui.gardenHint.textContent = held && held.kind === 'cutting'
+          ? `Planting ${MATERIALS[held.id].name} — tap a pot.`
+          : pots.some(Boolean)
+            ? 'Each round in the pot climbs the yield. Tap a plant to harvest it.'
+            : 'Drag a herb from the stash into a pot, or tap the herb and tap the pot.';
+
+        ui.garden.replaceChildren();
+        pots.forEach((pot, index) => {
+          const card = document.createElement('button');
+          card.type = 'button';
+          card.className = 'card';
+          const body = document.createElement('span');
+          body.className = 'card-body';
+          const name = document.createElement('b');
+          name.className = 'card-name';
+          const line = document.createElement('span');
+          line.className = 'card-sub';
+          const note = document.createElement('span');
+          note.className = 'card-blurb';
+
+          if(pot){
+            name.textContent = MATERIALS[pot.herb].name;
+            line.style.color = 'var(--accent)';
+            line.textContent = `${potStage(pot.age)} · harvest for ${potYield(pot.age)}`;
+            note.textContent = potYield(pot.age + 1) > potYield(pot.age)
+              ? `Left alone: ${potYield(pot.age + 1)} next round.`
+              : 'As big as it gets. It is only getting older.';
+            card.disabled = !acting;
+            if(MATERIAL_ART[pot.herb]) card.prepend(pixels(MATERIAL_ART[pot.herb], 2));
+            card.onclick = () => { audio.sfx('brew'); send({ t: 'intent', intent: { t: 'harvest', pot: index } }); };
+          }else{
+            name.textContent = 'Empty pot';
+            line.textContent = 'holds one cutting';
+            note.textContent = held && held.kind === 'cutting' ? 'Plant it here.' : 'Soil from the clearing, still good.';
+            card.disabled = !acting || !(held && held.kind === 'cutting');
+            if(acting) placeable(card, { accept: 'cutting', pot: index });
+          }
+          body.append(name, line, note);
+          card.append(body);
+          ui.garden.append(card);
+        });
+      }
+
+      /* ---- the scriptorium ------------------------------------------------ */
+
+      /* The composed spell behind a card in this room, or null when it is an
+         ordinary card. Mirrors the room's spellFor: a deployed room that never
+         sends a spellbook never takes this path, so the old page-ammo wizard
+         still renders as printed. */
+      function spellForCard(you, cardId){
+        if(!room || !room.spellbook) return null;
+        const cls = you && classById(you.classId);
+        if(!cls || !cls.cast) return null;
+        if(!(room.spellbook.known || []).includes(cardId)) return null;
+        return composeSpell(cardId, (room.spellbook.slots || {})[cardId]);
+      }
+
+      /* A modifier's op, in card text. Generated from the op so a rebalanced
+         table never needs its blurbs rewritten by hand. */
+      function modLine(op){
+        const bits = [];
+        if(op.amount) bits.push(`${op.amount > 0 ? '+' : ''}${op.amount} damage`);
+        if(op.mult) bits.push(`x${op.mult} damage`);
+        if(op.charges) bits.push(`${op.charges > 0 ? '+' : ''}${op.charges} charge${Math.abs(op.charges) === 1 ? '' : 's'}`);
+        if(op.aoe) bits.push('reaches everything');
+        if(op.selfWard) bits.push(`ward ${op.selfWard} on cast`);
+        if(op.leech) bits.push(`heals ${Math.round(op.leech * 100)}% of the damage`);
+        if(op.hpCost) bits.push(`costs ${op.hpCost} health`);
+        if(op.farthest) bits.push('hits the farthest');
+        if(op.pageOnKill) bits.push(`+${op.pageOnKill} page on a kill`);
+        if(op.opening) bits.push('opens in hand');
+        return bits.join(', ');
+      }
+
+      /* The icon a modifier wears: what it mostly does, as the card kinds the
+         player already reads in a hand. */
+      const opIcon = op =>
+        op.leech ? 'heal'
+        : op.selfWard ? 'defend'
+        : (op.charges > 0 || op.opening) ? 'buff'
+        : 'attack';
+
+      const iconOf = kind => CARD_ART[kind] ? pixels(CARD_ART[kind], 1) : document.createTextNode('');
+
+      /* A spell's live numbers with the effect drawn, not spelled: the same
+         glyphs a hand of cards uses, so the bench reads like the fight will. */
+      function spellStats(composed){
+        const line = document.createElement('span');
+        line.className = 'card-sub stat-line';
+        line.style.color = 'var(--accent)';
+        line.append(iconOf(composed.verb === 'might' ? 'buff' : composed.kind === 'buff' ? 'buff' : 'attack'));
+        const amount = document.createElement('b');
+        amount.textContent = composed.amount;
+        line.append(amount);
+        const tail = composed.verb === 'strikeAll' ? 'to everything'
+          : composed.verb === 'might' ? 'lent'
+          : '';
+        line.append(document.createTextNode(
+          `${tail ? ` ${tail}` : ''} · x${composed.charges} a fight`));
+        return line;
+      }
+
+      /* The thing being carried, by tap or by drag — a modifier bound for a
+         socket, or a herb cutting bound for a pot. One at a time: the whole
+         interaction is "this chip, that place". */
+      let held = null;                       // { kind: 'mod' | 'cutting', id }
+      let dragGhost = null;
+
+      const sameHeld = (a, b) => !!a && !!b && a.kind === b.kind && a.id === b.id;
+
+      /* A drop only lands on a place that accepts its kind: a cutting on a
+         socket is a cancel, not a mistake the server has to refuse. */
+      function sendDrop(carried, drop){
+        held = null;
+        if(carried.kind === 'mod' && drop.accept === 'mod'){
+          send({ t: 'intent', intent: { t: 'mod', mod: carried.id, spell: drop.spell, pos: drop.pos ?? SPELL_SLOTS } });
+        }else if(carried.kind === 'cutting' && drop.accept === 'cutting'){
+          audio.sfx('brew');
+          send({ t: 'intent', intent: { t: 'plant', pot: drop.pot, herb: carried.id } });
+        }else{
+          render();
+        }
+      }
+
+      /* Where a point on the screen would put a chip down. Sockets and the
+         bench cards carry their own address; the satchel is "out". */
+      const dropTargetAt = (x, y) => {
+        const el = document.elementFromPoint(x, y);
+        const target = el && el.closest('[data-drop]');
+        return target ? JSON.parse(target.dataset.drop) : null;
+      };
+      const heatDropAt = (x, y) => {
+        const el = document.elementFromPoint(x, y);
+        const target = el && el.closest('[data-drop]');
+        for(const hot of document.querySelectorAll('[data-hot]')) hot.removeAttribute('data-hot');
+        if(target) target.dataset.hot = 'true';
+      };
+
+      /* Drag with a tap fallback, on the same pointer: six pixels of travel is
+         a drag, anything less is a tap that picks the chip up for a second tap
+         to place. The preview gets played from phones, so the tap path is the
+         reliable one and the drag is the delight. */
+      function grabbable(el, carried){
+        el.classList.add('mod-chip');
+        if(sameHeld(held, carried)) el.dataset.held = 'true';
+        el.onpointerdown = e => {
+          if(e.button) return;
+          e.preventDefault();
+          const startX = e.clientX, startY = e.clientY;
+          let dragging = false;
+          const move = ev => {
+            if(!dragging && Math.hypot(ev.clientX - startX, ev.clientY - startY) < 6) return;
+            if(!dragging){
+              dragging = true;
+              dragGhost = el.cloneNode(true);
+              dragGhost.classList.add('drag-ghost');
+              document.body.append(dragGhost);
+            }
+            dragGhost.style.left = `${ev.clientX}px`;
+            dragGhost.style.top = `${ev.clientY}px`;
+            heatDropAt(ev.clientX, ev.clientY);
+          };
+          const up = ev => {
+            removeEventListener('pointermove', move);
+            removeEventListener('pointerup', up);
+            if(dragGhost){ dragGhost.remove(); dragGhost = null; }
+            for(const hot of document.querySelectorAll('[data-hot]')) hot.removeAttribute('data-hot');
+            if(dragging){
+              const drop = dropTargetAt(ev.clientX, ev.clientY);
+              if(drop) sendDrop(carried, drop);
+              else { held = null; render(); }         // dropped on nothing: put it back
+            }else{
+              held = sameHeld(held, carried) ? null : carried;
+              render();
+            }
+          };
+          addEventListener('pointermove', move);
+          addEventListener('pointerup', up);
+        };
+      }
+
+      /* A tap target that places the held chip, if the held chip is the kind
+         of thing it takes. */
+      function placeable(el, drop){
+        el.dataset.drop = JSON.stringify(drop);
+        if(held && held.kind === drop.accept){
+          const carried = held;
+          el.onclick = () => sendDrop(carried, drop);
+          el.style.cursor = 'copy';
+        }
+      }
+
+      function renderWizard(you, acting, canCast){
+        ui.wizardOnly.hidden = !canCast;
+        if(!canCast){ if(held && held.kind === 'mod') held = null; return; }
+        const book = room.spellbook || freshSpellbook();
+        const slots = book.slots || {};
+
+        // --- the library: the pages held --------------------------------
+        ui.library.replaceChildren();
+        const chip = document.createElement('span');
+        chip.className = 'chip';
+        chip.append(pixels(PAGES_ART, 2));
+        chip.append(document.createTextNode(PAGES.name));
+        const n = document.createElement('b');
+        n.className = 'count';
+        n.textContent = `x${room.pages || 0}`;
+        chip.append(n);
+        ui.library.append(chip);
+
+        const draftable = draftableCount(book);
+        ui.studyHint.textContent = room.offers
+          ? 'Three ways to read it. Keep one.'
+          : !draftable
+            ? 'She has read everything the library holds. The bench is what is left to arrange.'
+            : (room.pages || 0) > 0
+              ? `Each page opens a draft: a spell to learn, or a modifier to socket into one.`
+              : `No pages. The library gives up ${PAGES_PER_ROUND} a round, and the map holds a few.`;
+
+        ui.openPage.disabled = !acting || !!room.offers || !(room.pages > 0) || !draftable;
+        ui.openPage.textContent = room.offers ? 'A draft is open' : 'Open a page';
+        ui.openPage.onclick = () => { audio.sfx('brew'); send({ t: 'intent', intent: { t: 'page' } }); };
+
+        // --- the draft ---------------------------------------------------
+        ui.offers.replaceChildren();
+        for(const [index, offer] of (room.offers || []).entries()){
+          const isSpell = offer.type === 'spell';
+          const spec = isSpell ? SPELLS[offer.id] : MODIFIERS[offer.id];
+          if(!spec) continue;
+          const card = document.createElement('button');
+          card.type = 'button';
+          card.className = 'card';
+          card.disabled = !acting;
+          card.dataset.rarity = isSpell ? 'uncommon' : spec.rarity;
+
+          const body = document.createElement('span');
+          body.className = 'card-body';
+          const name = document.createElement('b');
+          name.className = 'card-name mod-name';
+          name.append(iconOf(isSpell ? 'attack' : opIcon(spec.op)), document.createTextNode(spec.name));
+          const rarity = document.createElement('span');
+          rarity.className = 'rarity';
+          rarity.textContent = isSpell ? 'new spell' : spec.rarity;
+          let gives;
+          if(isSpell){
+            gives = spellStats(composeSpell(offer.id, []));
+          }else{
+            gives = document.createElement('span');
+            gives.className = 'card-sub';
+            gives.style.color = 'var(--accent)';
+            gives.textContent = modLine(spec.op);
+          }
+          const note = document.createElement('span');
+          note.className = 'card-blurb';
+          note.textContent = spec.note;
+          body.append(name, rarity, gives, note);
+          card.append(body);
+          card.onclick = () => { audio.sfx('brew'); send({ t: 'intent', intent: { t: 'pick', index } }); };
+          ui.offers.append(card);
+        }
+
+        // --- the bench ---------------------------------------------------
+        ui.benchLine.textContent =
+          'Sockets fold left to right — "+5 then x2" is not "x2 then +5". Drag a chip onto a socket, or tap it and tap where it goes.';
+        ui.spells.replaceChildren();
+        for(const spellId of book.known || []){
+          const socketed = slots[spellId] || [];
+          const composed = composeSpell(spellId, socketed);
+          if(!composed) continue;
+
+          const el = document.createElement('div');
+          el.className = 'spell';
+          if(acting) placeable(el, { accept: 'mod', spell: spellId, pos: SPELL_SLOTS });
+
+          const name = document.createElement('b');
+          name.className = 'card-name';
+          name.textContent = composed.name;
+          el.append(name, spellStats(composed));
+
+          const sockets = document.createElement('span');
+          sockets.className = 'sockets';
+          for(let i = 0; i < SPELL_SLOTS; i++){
+            const modId = socketed[i];
+            const socket = document.createElement('span');
+            socket.className = 'socket';
+            socket.dataset.filled = String(!!modId);
+            if(modId){
+              // Name and effect both, always: a socket the player has to
+              // hover or remember is a socket they stop reading.
+              const label = document.createElement('span');
+              label.className = 'mod-name';
+              label.append(iconOf(opIcon(MODIFIERS[modId].op)), document.createTextNode(MODIFIERS[modId].name));
+              const what = document.createElement('span');
+              what.className = 'mod-what';
+              what.textContent = modLine(MODIFIERS[modId].op);
+              socket.append(label, what);
+              if(acting) grabbable(socket, { kind: 'mod', id: modId });
+            }else{
+              socket.textContent = held && held.kind === 'mod' ? 'set it here' : 'empty socket';
+            }
+            if(acting) placeable(socket, { accept: 'mod', spell: spellId, pos: i });
+            sockets.append(socket);
+          }
+          el.append(sockets);
+          ui.spells.append(el);
+        }
+
+        // --- the satchel -------------------------------------------------
+        ui.satchelHint.textContent = (book.satchel || []).length
+          ? 'Not yet socketed. A chip out of a socket lands back here.'
+          : 'Empty. What the drafts turn over waits here for a socket.';
+        ui.satchel.replaceChildren();
+        if(acting) placeable(ui.satchel, { accept: 'mod', spell: null });
+        for(const [i, modId] of (book.satchel || []).entries()){
+          const mod = MODIFIERS[modId];
+          if(!mod) continue;
+          const chip = document.createElement('span');
+          chip.className = 'chip';
+          chip.append(iconOf(opIcon(mod.op)), document.createTextNode(mod.name));
+          const what = document.createElement('span');
+          what.className = 'mod-what';
+          what.style.display = 'inline';
+          what.textContent = ` — ${modLine(mod.op)}`;
+          chip.append(what);
+          if(acting) grabbable(chip, { kind: 'mod', id: modId });
+          ui.satchel.append(chip);
+        }
+        if(!(book.satchel || []).length && !held){
+          // Something for the drop zone to be, when there is nothing in it.
+          ui.satchel.append(Object.assign(document.createElement('p'),
+            { textContent: ' ' }));
+        }
+      }
+
       function renderRun(){
         const info = room.roundInfo;
         // The name, the round and the ready count are drawn into the canvas
@@ -3415,12 +3981,11 @@
         // on the site is on the map: it is the only place herbs are listed,
         // and walking onto one is what picks it up.
         ui.alchemistOnly.hidden = !cls?.craft;
-        ui.wizardOnly.hidden = !cls?.cast;
 
         ui.stash.replaceChildren();
-        const held = Object.entries(room.stash).filter(([, n]) => n > 0);
-        if(!held.length) ui.stash.append(Object.assign(document.createElement('p'), { textContent: 'Nothing gathered yet.' }));
-        for(const [material, count] of held){
+        const gathered = Object.entries(room.stash).filter(([, n]) => n > 0);
+        if(!gathered.length) ui.stash.append(Object.assign(document.createElement('p'), { textContent: 'Nothing gathered yet.' }));
+        for(const [material, count] of gathered){
           const chip = document.createElement('span');
           chip.className = 'chip';
           if(MATERIAL_ART[material]) chip.append(pixels(MATERIAL_ART[material], 2));
@@ -3429,25 +3994,14 @@
           n.className = 'count';
           n.textContent = `x${count}`;
           chip.append(n);
+          // For the Alchemist a stash chip is also a cutting: drag it to a
+          // pot, or tap it and tap the pot.
+          if(cls?.craft && acting) grabbable(chip, { kind: 'cutting', id: material });
           ui.stash.append(chip);
         }
+        renderGarden(you, acting, !!cls?.craft);
 
-        // --- the library ----------------------------------------------------
-        ui.library.replaceChildren();
-        if(!room.pages){
-          ui.library.append(Object.assign(document.createElement('p'),
-            { textContent: 'No pages. They turn up on the map, when they turn up at all.' }));
-        }else{
-          const chip = document.createElement('span');
-          chip.className = 'chip';
-          chip.append(pixels(PAGES_ART, 2));
-          chip.append(document.createTextNode(PAGES.name));
-          const n = document.createElement('b');
-          n.className = 'count';
-          n.textContent = `x${room.pages}`;
-          chip.append(n);
-          ui.library.append(chip);
-        }
+        renderWizard(you, acting, !!cls?.cast);
 
         // --- salvage, and what it can be turned into -----------------------
         ui.salvage.replaceChildren();

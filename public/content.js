@@ -213,7 +213,7 @@ export const PAGES = {
  * units on a site cannot cover the eleven that one of each costs. The decision
  * is which two you walk to, not which two the dice left you.
  */
-export const SPAWNS = { herbs: 5, salvage: 5, pages: 3 };
+export const SPAWNS = { herbs: 5, salvage: 5, pages: 1 };
 
 /* What one walked-to cache yields. Rolled sizes would make gathering a
    lottery; fixed sizes make the map readable — a player can count what a
@@ -525,7 +525,11 @@ export const BUILDINGS = {
     costs: { screw: 4, pipe: 3 },
     power: 0,
     max: 1,
-    income: { screw: 2, pipe: 1 },
+    // Coil is the rarest salvage and the Overcharged Coil needs one per
+    // level; on a short run the roll could simply never produce it. A
+    // standing bench guarantees the coil economy exists, so the upgrade it
+    // exists to sell is always reachable.
+    income: { screw: 2, pipe: 1, coil: 1 },
     note: 'A vice, a flat surface, and somewhere to put the gun down and open it up.',
     art: 'workbench',
   },
@@ -841,7 +845,7 @@ export const CARDS = {
   },
   steady: {
     name: 'Steady Hands', kind: 'defend', classId: 'alchemist',
-    effect: { kind: 'ward', amount: 4, rounds: 1 },
+    effect: { kind: 'ward', amount: 3, rounds: 1 },
     note: 'Do not spill it. Do not spill it.',
   },
   tonic: {
@@ -866,12 +870,12 @@ export const CARDS = {
   /* --- the Engineer: hits like a tool, holds like a wall --- */
   wrench: {
     name: 'Wrench', kind: 'attack', classId: 'engineer',
-    effect: { kind: 'strike', amount: 4 },
+    effect: { kind: 'strike', amount: 3 },
     note: 'Forty centimetres of drop-forged persuasion.',
   },
   shore: {
     name: 'Shore Up', kind: 'defend', classId: 'engineer',
-    effect: { kind: 'ward', amount: 5, rounds: 1 },
+    effect: { kind: 'ward', amount: 3, rounds: 1 },
     note: 'Plating, a strut, and eleven seconds. It will hold.',
   },
   /* Guard on everyone, worse per head than Shore Up on one. That trade is the
@@ -892,11 +896,14 @@ export const CARDS = {
     note: 'Across the chest, and mind your hands. Somebody has to get them up.',
   },
 
-  /* --- the Wizard: the best basic attack and the worst basic guard, which
-         is the whole class in two cards --- */
+  /* --- the Wizard: a floor of a basic and the worst basic guard, which is
+         the whole class in two cards — everything she is, she writes at the
+         bench. The spark used to be the best basic attack in the game, and
+         that was the wrong place for her power to live once the spells were
+         hers to build. --- */
   spark: {
     name: 'Spark', kind: 'attack', classId: 'wizard',
-    effect: { kind: 'strike', amount: 5 },
+    effect: { kind: 'strike', amount: 3 },
     note: 'No page needed. Barely a spell. Still hurts.',
   },
   sign: {
@@ -1002,7 +1009,7 @@ export const CARDS = {
    */
   shoulder: {
     name: 'Shoulder', kind: 'attack', classId: 'hauler',
-    effect: { kind: 'strike', amount: 4 },
+    effect: { kind: 'strike', amount: 3 },
     note: 'Get under it and drive with the legs. It is how you move anything, a Rust Hulk included.',
   },
   /* The same numbers as Shore Up, deliberately. The Engineer's is guard he can
@@ -1011,7 +1018,7 @@ export const CARDS = {
      not covering, because cover spends the very same pool. */
   weight: {
     name: 'Take the Weight', kind: 'defend', classId: 'hauler',
-    effect: { kind: 'ward', amount: 5, rounds: 1 },
+    effect: { kind: 'ward', amount: 3, rounds: 1 },
     note: 'Feet planted, arms locked, and do not think about it. Thinking about it is how you drop things.',
   },
   setfeet: {
@@ -1060,7 +1067,7 @@ export const CARDS = {
   },
   bramble: {
     name: 'Bramble', kind: 'defend', classId: 'grafter',
-    effect: { kind: 'ward', amount: 4, rounds: 1 },
+    effect: { kind: 'ward', amount: 3, rounds: 1 },
     note: 'Cut most of the way through, bent over, and laid along the gap. It has held a field before now.',
   },
   season: {
@@ -1383,6 +1390,396 @@ export const discardHand = (discard, hand) => [...(discard || []), ...(hand || [
 
 export const cardById = id => CARDS[id] || null;
 
+/* =========================================================== the garden === */
+
+/* Three pots by the campfire, and the Alchemist's reason to think past the
+ * round in front of her. A cutting planted this round is worth nothing yet;
+ * left alone it doubles, then doubles the doubling — so every build phase
+ * asks the same quiet question of each pot: brew it this fight, or let it
+ * grow toward the boss.
+ *
+ * The pots are the Alchemist's mirror of the site itself: they persist
+ * across rounds the way the Engineer's buildings do, and they are the only
+ * part of her economy that compounds.
+ */
+export const POT_COUNT = 3;
+
+/* What a pot gives back, by how many rounds the cutting has sat in it.
+ * Age zero — planted this very round — refunds the cutting and nothing
+ * more, so replanting a misclick is free and farming a same-round loop is
+ * pointless. The ladder tops out rather than climbing forever: a run is
+ * four rounds long, and the top rung is the boss-round payoff.
+ */
+export const potYield = age =>
+  age <= 0 ? 1 : [2, 4, 6][Math.min(age - 1, 2)];
+
+/* One name per rung, for the pot card and the log. */
+export const potStage = age =>
+  age <= 0 ? 'sprouting' : age === 1 ? 'growing' : age === 2 ? 'flourishing' : 'in bloom';
+
+/* Plant one cutting from the stash. Returns { pots, stash } or null when the
+   pot is missing, occupied, or the stash has none of the herb — the caller
+   cannot half-plant. */
+export function plantPot(pots, index, herb, stash){
+  if(!MATERIALS[herb]) return null;
+  if(index < 0 || index >= (pots || []).length || pots[index]) return null;
+  if(((stash || {})[herb] || 0) < 1) return null;
+  const next = [...pots];
+  next[index] = { herb, age: 0 };
+  return { pots: next, stash: { ...stash, [herb]: stash[herb] - 1 } };
+}
+
+/* Pull a pot's crop into the stash. Returns { pots, stash, herb, yielded }
+   or null on an empty pot. */
+export function harvestPot(pots, index, stash){
+  const pot = (pots || [])[index];
+  if(!pot) return null;
+  const next = [...pots];
+  next[index] = null;
+  const yielded = potYield(pot.age);
+  return {
+    pots: next,
+    stash: { ...stash, [pot.herb]: ((stash || {})[pot.herb] || 0) + yielded },
+    herb: pot.herb,
+    yielded,
+  };
+}
+
+/* One round older, every planted pot. Called as the build phase opens. */
+export const growPots = pots =>
+  (pots || []).map(pot => (pot ? { ...pot, age: pot.age + 1 } : null));
+
+/* =========================================================== spellcraft === */
+
+/* The Wizard's build phase: she does not buy spells, she assembles them.
+ *
+ * A page spent in the build phase turns over a draft of three — spells she has
+ * not learned and modifiers from the list below — and she keeps one. Modifiers
+ * socket into a spell, up to SPELL_SLOTS each, and can be pulled out and
+ * rearranged freely between fights. The order of the sockets is the order the
+ * arithmetic runs in: +5 into a doubler is 30, a doubler into +5 is 25, and
+ * which one you meant is the whole game of holding the pieces.
+ *
+ * A spell's `charges` is how many copies of it enter her deck at the surge.
+ * The copies are spent when played — the brew machinery, reused — and come
+ * back at the next surge, because the spell is written down and a page read
+ * aloud is not a page destroyed. So a crafted spell is permanent the way the
+ * Engineer's barrel is, and bounded the way the Alchemist's brews are.
+ *
+ * These tables are deliberately the swappable layer. The machinery —
+ * composeSpell, the draft, the sockets — does not know what a modifier is
+ * beyond its `op`, so rebalancing or replacing the whole list is data entry.
+ */
+
+export const SPELL_SLOTS = 3;
+
+/* Pages the library yields at the start of each build phase: one directly,
+   with one more on the ground for whoever walks to it. Income rather than
+   only foraging, because the draft is the class's whole game and a round
+   with no page is a round the Wizard spent watching other people play
+   theirs. */
+export const PAGES_PER_ROUND = 1;
+
+/* The three bones every build starts from. `verb` is an EFFECT_KINDS entry —
+ * the engine resolves a crafted spell exactly as it resolves a card, so a
+ * spell cannot do anything a card could not.
+ *
+ *   amount   what it lands for, before the sockets have their say
+ *   charges  copies dealt into the deck each surge, before the sockets
+ */
+export const SPELLS = {
+  fireball: {
+    name: 'Fireball', kind: 'attack', verb: 'strike', amount: 10, charges: 2,
+    note: 'One page, read aloud, thrown. The margins are where you make it yours.',
+  },
+  nova: {
+    name: 'Cinder Nova', kind: 'attack', verb: 'strikeAll', amount: 4, charges: 2,
+    note: 'A page burned all at once instead of read. It reaches everything in the lane.',
+  },
+  channel: {
+    name: 'Lend a Page', kind: 'buff', verb: 'might', amount: 4, charges: 2, targetsAlly: true,
+    note: 'Read over their shoulder and hold the line open. Swing on the next one.',
+  },
+};
+
+/* What a draft can turn over, beside a spell. An `op` is folded into the
+ * spell's numbers in socket order; the flag ops do not care about order and
+ * simply accumulate.
+ *
+ *   amount     added to what it lands for
+ *   mult       what it lands for, multiplied (rounded up — the fun direction)
+ *   charges    added to the copies dealt each surge
+ *   aoe        a single-target spell reaches the whole lane
+ *   selfWard   the caster gains this much guard when it is cast
+ *   leech      the caster heals this fraction of the damage it deals
+ *   hpCost     casting costs this much health — it cannot take the last point
+ *   farthest   it lands on the farthest enemy instead of the nearest
+ *   pageOnKill a kill with it puts pages back in the library
+ *   opening    one copy is dealt into the surge's first hand
+ */
+export const MODIFIER_WEIGHTS = { common: 8, uncommon: 4, rare: 1 };
+
+export const MODIFIERS = {
+  kindling: {
+    name: 'Kindling Script', rarity: 'common', op: { amount: 5 },
+    note: 'Re-inked hotter. The simplest thing to do to a spell, and never wrong.',
+  },
+  echo: {
+    name: 'Echo Script', rarity: 'common', op: { charges: 1, amount: -3 },
+    note: 'Copied in a hurry. More of it, less of each.',
+  },
+  emberward: {
+    name: 'Ember Ward', rarity: 'common', op: { selfWard: 3 },
+    note: 'The heat that comes off the reading, kept close instead of wasted.',
+  },
+  siphon: {
+    name: 'Siphon Glyph', rarity: 'uncommon', op: { leech: 0.5 },
+    note: 'What it takes out of them, half finds its way back to you.',
+  },
+  farsight: {
+    name: 'Farsight Ink', rarity: 'uncommon', op: { amount: 2, farthest: true },
+    note: 'It lands where you are looking, and you can look all the way back.',
+  },
+  gilded: {
+    name: 'Gilded Margin', rarity: 'uncommon', op: { pageOnKill: 1 },
+    note: 'A kill worth writing down pays for the paper it is written on.',
+  },
+  opening: {
+    name: 'Opening Word', rarity: 'uncommon', op: { opening: true },
+    note: 'The first thing said when the surge arrives. It is in your opening hand.',
+  },
+  twin: {
+    name: 'Twin Core', rarity: 'rare', op: { mult: 2, charges: -1 },
+    note: 'Two readings folded into one breath. Twice the spell, and fewer of it.',
+  },
+  split: {
+    name: 'Splitting Sigil', rarity: 'rare', op: { aoe: true, mult: 0.6 },
+    note: 'The spell forgets how to miss anyone. It also forgets how to focus.',
+  },
+  bloodpact: {
+    name: 'Bloodpact Seal', rarity: 'rare', op: { amount: 8, hpCost: 2 },
+    note: 'Signed in the only ink that never runs out. It runs out.',
+  },
+};
+
+/* A fresh spellbook: Fireball known and bare, nothing in the satchel.
+ *
+ *   known   spell ids, in the order learned
+ *   satchel modifier ids owned and not socketed (duplicates allowed — two
+ *           Kindlings are two sockets' worth)
+ *   slots   spellId -> [modifier ids], the sockets in arithmetic order
+ */
+export const freshSpellbook = () => ({
+  known: ['fireball'],
+  satchel: [],
+  slots: { fireball: [] },
+});
+
+/* What a spell does with these sockets, resolved. This is to spellcraft what
+ * cardEffect is to upgrades: CARDS and SPELLS stay declarative and the live
+ * numbers happen here, on both sides of the wire, so the bench and the surge
+ * can never disagree about what a Fireball has become.
+ *
+ * Folded left to right. Multiplication rounds up, and the clamps run last:
+ * a spell always lands for at least 1 and always deals at least 1 copy, so
+ * no arrangement of sockets can craft a spell out of existing.
+ */
+export function composeSpell(spellId, modIds = []){
+  const spell = SPELLS[spellId];
+  if(!spell) return null;
+
+  let amount = spell.amount;
+  let charges = spell.charges;
+  let verb = spell.verb;
+  const flags = { selfWard: 0, leech: 0, hpCost: 0, pageOnKill: 0, farthest: false, opening: false };
+
+  for(const modId of modIds){
+    const op = (MODIFIERS[modId] || {}).op;
+    if(!op) continue;
+    if(op.amount) amount += op.amount;
+    if(op.mult) amount = Math.ceil(amount * op.mult);
+    if(op.charges) charges += op.charges;
+    if(op.aoe && verb === 'strike') verb = 'strikeAll';
+    if(op.selfWard) flags.selfWard += op.selfWard;
+    if(op.leech) flags.leech += op.leech;
+    if(op.hpCost) flags.hpCost += op.hpCost;
+    if(op.pageOnKill) flags.pageOnKill += op.pageOnKill;
+    if(op.farthest) flags.farthest = true;
+    if(op.opening) flags.opening = true;
+  }
+
+  amount = Math.max(1, amount);
+  charges = Math.max(1, charges);
+
+  const effect = verb === 'might'
+    ? { kind: verb, amount, rounds: 1 }
+    : { kind: verb, amount };
+
+  return { id: spellId, name: spell.name, kind: spell.kind, verb, amount, charges,
+           targetsAlly: !!spell.targetsAlly, effect, flags };
+}
+
+/* Every modifier the book holds, wherever it is sitting. */
+export const ownedModifiers = spellbook => [
+  ...(spellbook.satchel || []),
+  ...Object.values(spellbook.slots || {}).flat(),
+];
+
+/* The draft a page turns over: three distinct options from the spells she
+ * has not learned and the whole modifier list — duplicates are allowed, so a
+ * second Kindling is a real find and two spells can carry the same ink.
+ * Unlearned spells are weighted like an uncommon find; modifiers by their
+ * rarity, and rares are genuinely rare. The generator is the room's, as
+ * everywhere — a draft that rolled differently on a replay would be a draft
+ * the room cannot stand behind.
+ */
+export const SPELL_OFFER_WEIGHT = 3;
+
+export function rollOffers(random, spellbook, count = 3){
+  const pool = [];
+  for(const id of Object.keys(SPELLS)){
+    if(!(spellbook.known || []).includes(id)) pool.push({ type: 'spell', id, weight: SPELL_OFFER_WEIGHT });
+  }
+  for(const [id, mod] of Object.entries(MODIFIERS)){
+    pool.push({ type: 'mod', id, weight: MODIFIER_WEIGHTS[mod.rarity] || 1 });
+  }
+
+  const offers = [];
+  for(let i = 0; i < count && pool.length; i++){
+    const total = pool.reduce((sum, option) => sum + option.weight, 0);
+    let point = random() * total;
+    let at = pool.length - 1;
+    for(let j = 0; j < pool.length; j++){
+      point -= pool[j].weight;
+      if(point <= 0){ at = j; break; }
+    }
+    const [option] = pool.splice(at, 1);
+    offers.push({ type: option.type, id: option.id });
+  }
+  return offers;
+}
+
+/* How much the library can still surprise her with: spells unlearned plus
+   the whole modifier list, since duplicates are allowed — in practice a page
+   always has something to open, and the guard survives only for the day a
+   content change empties the pool again. */
+export const draftableCount = spellbook =>
+  Object.keys(SPELLS).filter(id => !(spellbook.known || []).includes(id)).length +
+  Object.keys(MODIFIERS).length;
+
+/* Take one offer into the book. Returns the next spellbook, or null if the
+   index is not an offer — the caller cannot half-apply a pick. */
+export function takeOffer(spellbook, offers, index){
+  const offer = (offers || [])[index];
+  if(!offer) return null;
+  if(offer.type === 'spell'){
+    if((spellbook.known || []).includes(offer.id)) return null;
+    return {
+      ...spellbook,
+      known: [...spellbook.known, offer.id],
+      slots: { ...spellbook.slots, [offer.id]: [] },
+    };
+  }
+  return { ...spellbook, satchel: [...spellbook.satchel, offer.id] };
+}
+
+/* Move one modifier: out of wherever it is, into a socket or back to the
+ * satchel (spellId null). `pos` is the socket it lands in front of, so the
+ * arithmetic order is the player's to arrange. Returns the next spellbook or
+ * null when the move is not legal — an unknown spell, a full bench, a
+ * modifier she does not own.
+ */
+export function moveModifier(spellbook, modId, spellId = null, pos = SPELL_SLOTS){
+  if(!MODIFIERS[modId]) return null;
+  if(spellId !== null && !(spellbook.known || []).includes(spellId)) return null;
+
+  // Pull one copy from the satchel or from whichever spell holds it.
+  let satchel = [...(spellbook.satchel || [])];
+  const slots = Object.fromEntries(
+    Object.entries(spellbook.slots || {}).map(([id, mods]) => [id, [...mods]]));
+  const inSatchel = satchel.indexOf(modId);
+  if(inSatchel >= 0) satchel.splice(inSatchel, 1);
+  else {
+    const holder = Object.keys(slots).find(id => slots[id].includes(modId));
+    if(!holder) return null;
+    slots[holder].splice(slots[holder].indexOf(modId), 1);
+  }
+
+  if(spellId === null){
+    satchel.push(modId);
+  }else{
+    const bench = slots[spellId] || (slots[spellId] = []);
+    if(bench.length >= SPELL_SLOTS) return null;
+    bench.splice(Math.max(0, Math.min(bench.length, pos)), 0, modId);
+  }
+  return { ...spellbook, satchel, slots };
+}
+
+/* Every class opens with the same six cards wearing different names: three
+ * basic attacks and three basic wards, all at 3. The basics are the floor of
+ * a turn and nothing more — everything a class actually *is* comes out of its
+ * build phase: the Alchemist's brews and garden, the Engineer's buildings
+ * and workbench (the first barrel is where her bolt gun comes from now), the
+ * Wizard's book. Local rooms and the preview deal from here; STARTING_DECKS
+ * below is kept as-is because the deployed Worker still deals from it.
+ */
+export const CLASS_KITS = {
+  alchemist: { flask: 3, steady: 3 },
+  engineer: { wrench: 3, shore: 3 },
+  wizard: { spark: 3, sign: 3 },
+  hauler: { shoulder: 3, weight: 3 },
+  grafter: { hook: 3, bramble: 3 },
+};
+
+/* What a class opens with *beyond* the six, and why only two seats have any.
+ *
+ * The basics are identical under the rename because class identity is supposed
+ * to come out of the build phase: the Alchemist brews her deck, the Engineer
+ * buys his, the Wizard writes hers. Those three each have a pool to spend and a
+ * verb to spend it with.
+ *
+ * The Hauler and the Grafter have neither — no craft, no build, no cast — so a
+ * six-card kit would make them the two seats whose deck never changes and whose
+ * build phase is a walk. Their identity is dealt instead of earned, and this is
+ * the table that deals it. If either ever grows an economy of its own, this is
+ * the thing to empty.
+ */
+export const CLASS_EXTRAS = {
+  hauler: { setfeet: 2, behind: 1, legup: 1 },
+  grafter: { ringbark: 3, season: 1, scion: 1 },
+};
+
+/* The kit as a flat, unshuffled list of card ids: the six basics, then whatever
+   that seat opens with on top of them. */
+export function classKit(classId){
+  const cards = [];
+  for(const table of [CLASS_KITS, CLASS_EXTRAS]){
+    for(const [id, n] of Object.entries(table[classId] || {})){
+      for(let i = 0; i < n; i++) cards.push(id);
+    }
+  }
+  return cards;
+}
+
+/* Kept as an alias for anything already reading the Wizard's kit by name. */
+export const WIZARD_BASE_KIT = CLASS_KITS.wizard;
+
+/* The deck the Wizard takes into a surge: the kit and `charges` copies of
+ * every spell in the book, as composed right now. The copies are consumed
+ * when played and re-dealt here next surge — the room rebuilds this at every
+ * enterCombat, which is what makes charges per-combat without a counter
+ * anywhere.
+ */
+export function wizardCombatDeck(spellbook){
+  const deck = classKit('wizard');
+  for(const spellId of (spellbook && spellbook.known) || []){
+    const composed = composeSpell(spellId, (spellbook.slots || {})[spellId]);
+    if(!composed) continue;
+    for(let i = 0; i < composed.charges; i++) deck.push(spellId);
+  }
+  return deck;
+}
+
 /* ============================================================== enemies === */
 
 /* What comes out of the blight when it surges.
@@ -1427,7 +1824,7 @@ export const ENEMIES = {
   hulk: { name: 'Rust Hulk', hp: 18, hits: 5, art: 'hulk',
     threat: 3.5, ability: { id: 'stun', every: 3 },
     note: 'A maintenance chassis the blight wears like a coat. It swings like one too.' },
-  extractor: { name: 'The Extractor', hp: 31, hits: 3, art: 'extractor', boss: true,
+  extractor: { name: 'The Extractor', hp: 22, hits: 2, art: 'extractor', boss: true,
     threat: 9, ability: { id: ['weak', 'rot', 'stun'], every: 2 },
     note: 'It was built to harvest. It still is, and it works through a crew in order.' },
 };
@@ -1446,7 +1843,7 @@ export const ENEMIES = {
  * Both are per *extra* player, so ENEMIES holds the solo fight and this holds
  * how it grows.
  */
-export const BOSS_SCALING = { hp: 18, hits: 1.6 };
+export const BOSS_SCALING = { hp: 24, hits: 2.1 };
 
 /* An enemy's numbers for this table. Everything but the boss is what the table
    says it is; levelling the rest is waveFor's job and doing it twice would
@@ -1560,46 +1957,42 @@ export function ailmentOnHit(type, landed){
  * side of the equation climbs too — the Alchemist has brewed by round two and
  * the Engineer has a panel behind the bolt gun.
  *
- * These are measured, not guessed. test/balance.mjs plays four hundred whole
+ * These are measured, not guessed. test/balance.mjs plays five hundred whole
  * runs per table size against them and reports the win rate; at the numbers
  * below it lands
  *
- *     1 player  67%   2 players  84%   3 players  96%
- *     4 players 63%   5 players  49%
+ *     1 player  53%   2 players  65%   3 players  61%
+ *     4 players 54%   5 players  62%
  *
- * against a target of 60. One, four and five sit on it; two and three run
- * easy. That shape is measured rather than mysterious, and it has two causes:
+ * against a target of 60 — every size inside seven points of it.
  *
- *   `waveTargets` rotates which seat the wave opens on each round, and that
- *   rotation is worth most to a party with a handful of seats and few enemies
- *   — nobody gets focused down any more. It is worth nothing to a solo player
- *   and little at five, where there are more enemies than seats either way.
- *
- *   Total party health rises linearly with the table while the boss round's
- *   total damage rises slightly faster, so the big tables are genuinely the
- *   tightest fights and the middle ones the loosest.
- *
- * Closing it needs a difficulty curve with a bump in the middle, and none of
- * THREAT_PER_PLAYER, PARTY_SYNERGY or BOSS_SCALING can make one — they are all
- * monotone in table size. Every attempt measured worse overall than this:
- * BOSS_SCALING 16/1.3 gives 66/100/98/88/69, 17/1.45 gives 67/100/97/82/52,
- * and PARTY_SYNERGY 0.16 takes five players to under 1%. Recorded so the next
- * pass starts from the cause rather than from the symptom — and note that some
- * of the spread is the harness's own model, which plays some class mixes
- * better than others.
+ * That is a better number than it looks, and the reason is worth keeping. The
+ * harness used to seat the first N classes in roster order, so every
+ * three-player measurement was the Alchemist, the Engineer and the Wizard, and
+ * every two-player one was the two of them without her — and she is the party's
+ * damage by design. The curve it drew was mostly a picture of who happened to
+ * be sitting down: two read hardest and three easiest at every setting, however
+ * these dials moved, and a whole tuning pass can be spent chasing that and
+ * finding nothing. It rotates the roster by the run index now, so each size
+ * averages over every composition, and the number means what it says.
  *
  * Change them with the harness open rather than by eye — the threat values are
  * coarse (1, 2, 3.5), so a tenth of a point here can flip a whole enemy into or
- * out of a wave and move a win rate forty points. Measured, repeatedly: 1.9 to
- * 2.0 on round two takes solo from 65% to 23%.
+ * out of a wave and move a win rate forty points. Measured, repeatedly.
  *
+ * The Extractor's own `hits` is the sharpest edge in the file: at a table of
+ * one it is the only thing swinging, so three to four took solo from 72% to 6%.
  * Round four's number is low because it buys the boss's *escort* only; the
- * Extractor itself is outside the budget and scales on BOSS_SCALING instead.
- * That is also why nearly every loss the harness reports is a round-four loss:
- * the first three rounds rarely kill a party outright, they decide what the
- * party brings to the appointment.
+ * Extractor is outside the budget and scales on BOSS_SCALING instead. That is
+ * also why nearly every loss the harness reports is a round-four loss — the
+ * first three rounds rarely kill a party outright, they decide what the party
+ * brings to the appointment.
+ *
+ * One shape to know before touching anything: `waveTargets` rotates which seat
+ * the wave opens on each round, and that rotation is worth most to a party with
+ * a handful of seats and few enemies. It is worth nothing to a solo player.
  */
-export const THREAT_PER_PLAYER = [1.5, 1.9, 2.2, 1.0];
+export const THREAT_PER_PLAYER = [1.4, 1.8, 2.1, 1.0];
 
 /* A party is worth more than the players in it, and the budget has to know it.
  *
@@ -1615,7 +2008,7 @@ export const THREAT_PER_PLAYER = [1.5, 1.9, 2.2, 1.0];
  * number is measured, not reasoned: it is what closes the gap between the
  * table sizes in test/balance.mjs.
  */
-export const PARTY_SYNERGY = 0.08;
+export const PARTY_SYNERGY = 0.10;
 
 /* How much blight a table of this size meets this round. */
 export function threatBudget(round, partySize = PARTY_SIZE){

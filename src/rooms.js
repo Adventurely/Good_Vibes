@@ -23,8 +23,11 @@ import {
   CLASSES, classById, playableClasses,
   MATERIALS, SALVAGE, CACHE_YIELD, STARTING_SALVAGE,
   BUILDINGS, UPGRADES, upgradeCost, buyUpgrade, canBuildMore, powerFrom,
-  CARDS, cardById, cardEffect, cardPlayable, deckFor, shuffle, draw, discardHand,
+  CARDS, cardById, cardEffect, cardPlayable, shuffle, draw, discardHand,
   HAND_SIZE, RECIPES, brew, missingForBuilding, canBuildAt,
+  SPELLS, MODIFIERS, PAGES_PER_ROUND, freshSpellbook, composeSpell,
+  rollOffers, takeOffer, moveModifier, wizardCombatDeck, draftableCount,
+  POT_COUNT, plantPot, harvestPot, growPots, classKit,
   generateMap, generateCombatTerrain, respawnItems, spawnTile, pathTo,
   seededRandom, seedFromCode, readyState,
   ENEMIES, waveFor, enemyStats, salvageAfterCombat, addSalvage, spendSalvage,
@@ -88,6 +91,14 @@ class Room {
     this.upgrades = {};
     this.power = 0;
     this.outcome = null;
+    // The Wizard's book: what she knows, what she owns, and how it is
+    // arranged. Room state like the buildings are, because the party can
+    // watch her work and the surge reads the arrangement.
+    this.spellbook = freshSpellbook();
+    this.offers = null;
+    // The Alchemist's pots, by the fire. Like the buildings, they persist
+    // across rounds — they are the part of her economy that compounds.
+    this.pots = Array(POT_COUNT).fill(null);
   }
 
   get maxPlayers(){ return Math.min(PARTY_SIZE, playableClasses().length); }
@@ -169,6 +180,12 @@ class Room {
       upgrades: this.upgrades,
       power: this.power,
       outcome: this.outcome,
+      // The book and the open draft are public: a draft the table can lean
+      // over and argue about is the fun of it, and nothing in either is a
+      // secret the way a hand is.
+      spellbook: this.spellbook,
+      offers: this.offers,
+      pots: this.pots,
       players: this.players.map(p => ({
         id: p.id,
         name: p.name,
@@ -235,7 +252,10 @@ class Room {
       if(!cls) continue;
       p.hp = cls.hp;
       p.maxHp = cls.hp;
-      p.deck = deckFor(cls.id);
+      // Every class opens with its kit — six basics, nothing else. The
+      // Wizard's is the book's shadow from the first minute: what the deck
+      // list shows in a build phase is what the surge will deal.
+      p.deck = cls.cast ? wizardCombatDeck(this.spellbook) : classKit(cls.id);
       p.discard = [];
       p.hand = [];
       p.down = false;
@@ -260,6 +280,17 @@ class Room {
     this.nodes = respawnItems(this.site, this.buildings, this.random, spawnsFor(this.players));
     this.enemies = [];
     this.power = 0;
+
+    // The garden grew while everyone was fighting.
+    this.pots = growPots(this.pots);
+
+    // The library pays out when there is somebody to read it. Income rather
+    // than only foraging, because the draft is the Wizard's whole build phase
+    // and a round with no page is a round spent watching.
+    if(this.players.some(p => (classById(p.classId) || {}).cast)){
+      this.pages += PAGES_PER_ROUND;
+      this.log(`The library gives up ${PAGES_PER_ROUND} page${PAGES_PER_ROUND === 1 ? '' : 's'}.`);
+    }
 
     this.players.forEach((p, i) => {
       const start = spawnTile(this.site, i * 2, this.buildings);
@@ -297,9 +328,24 @@ class Room {
 
     for(const p of this.players){
       if(!p.classId) continue;
+      const cls = classById(p.classId);
       // Everything the player owns goes back in: a hand held when the last wave
-      // broke is still theirs.
-      p.deck = shuffle([...p.deck, ...p.discard, ...p.hand], streamFor(this.seed, p.id));
+      // broke is still theirs. The Wizard's deck is the exception — hers is
+      // written fresh from the book each surge, which is what makes a spell's
+      // charges per-combat without a counter anywhere.
+      const owned = cls && cls.cast
+        ? wizardCombatDeck(this.spellbook)
+        : [...p.deck, ...p.discard, ...p.hand];
+      p.deck = shuffle(owned, streamFor(this.seed, p.id));
+      // An Opening Word puts one copy of its spell into the first deal.
+      if(cls && cls.cast){
+        for(const spellId of this.spellbook.known){
+          const composed = composeSpell(spellId, this.spellbook.slots[spellId]);
+          if(!composed || !composed.flags.opening) continue;
+          const at = p.deck.indexOf(spellId);
+          if(at > 0){ p.deck.splice(at, 1); p.deck.unshift(spellId); }
+        }
+      }
       p.discard = [];
       p.hand = [];
       p.block = 0;
@@ -407,6 +453,11 @@ class Room {
       else if(intent.t === 'brew') this.brew(player, cls, intent);
       else if(intent.t === 'place') this.place(player, cls, intent);
       else if(intent.t === 'upgrade') this.upgrade(player, cls, intent);
+      else if(intent.t === 'page') this.openPage(player, cls);
+      else if(intent.t === 'pick') this.pickOffer(player, cls, intent);
+      else if(intent.t === 'mod') this.moveMod(player, cls, intent);
+      else if(intent.t === 'plant') this.plant(player, cls, intent);
+      else if(intent.t === 'harvest') this.harvest(player, cls, intent);
       return this.broadcast();
     }
 
@@ -445,6 +496,9 @@ class Room {
     const node = this.nodes.find(n => n.x === player.x && n.y === player.y && !n.taken);
     if(!node) return;
     const cls = classById(player.classId);
+    // A herb is the Alchemist's to bend down for — anyone else walks over it
+    // and it stays where it grew. Caches and pages are for whoever gets there.
+    if(node.kind === 'herb' && !(cls && cls.craft)) return;
     node.taken = true;
 
     if(node.kind === 'herb'){
@@ -502,6 +556,92 @@ class Room {
     }
   }
 
+  /* ---- the garden: the Alchemist's slow half -------------------------- */
+
+  /* Both gated on `craft`, like brewing: the pots are hers the way the
+     workbench is the Engineer's. The helpers refuse anything illegal, so
+     these are a move or a no-op, never a half-move. */
+  plant(player, cls, { pot, herb }){
+    if(!cls || !cls.craft) return;
+    const planted = plantPot(this.pots, pot, herb, this.stash);
+    if(!planted) return;
+    this.pots = planted.pots;
+    this.stash = planted.stash;
+    this.log(`${player.name} plants a ${MATERIALS[herb].name} cutting.`);
+  }
+
+  harvest(player, cls, { pot }){
+    if(!cls || !cls.craft) return;
+    const picked = harvestPot(this.pots, pot, this.stash);
+    if(!picked) return;
+    this.pots = picked.pots;
+    this.stash = picked.stash;
+    this.log(`${player.name} harvests ${picked.yielded} ${MATERIALS[picked.herb].name} from the pot.`);
+  }
+
+  /* ---- the scriptorium: the Wizard's build phase ---------------------- */
+
+  /* Spend a page, turn over a draft of three. One draft open at a time — the
+     choice on the table has to be settled before the next page buys another. */
+  openPage(player, cls){
+    if(!cls || !cls.cast) return;
+    if(this.offers || this.pages < 1) return;
+    if(!draftableCount(this.spellbook)) return;   // she has read everything
+    this.pages -= 1;
+    this.offers = rollOffers(this.random, this.spellbook);
+    this.log(`${player.name} opens a page. Three ways to read it.`);
+  }
+
+  pickOffer(player, cls, { index }){
+    if(!cls || !cls.cast) return;
+    const offer = (this.offers || [])[index];
+    const next = takeOffer(this.spellbook, this.offers, index);
+    if(!next) return;
+    this.spellbook = next;
+    this.offers = null;
+    this.refreshBook(player);
+    this.log(offer.type === 'spell'
+      ? `${player.name} learns ${SPELLS[offer.id].name}.`
+      : `${player.name} inscribes ${MODIFIERS[offer.id].name}.`);
+  }
+
+  /* Rearranging is free and build-phase only — a spell is edited at the desk,
+     not mid-surge. The helper refuses anything illegal, so this is a move or
+     a no-op, never a half-move. */
+  moveMod(player, cls, { mod, spell = null, pos }){
+    if(!cls || !cls.cast) return;
+    const next = moveModifier(this.spellbook, mod, spell, pos);
+    if(!next) return;
+    this.spellbook = next;
+    this.refreshBook(player);
+    if(spell){
+      const composed = composeSpell(spell, next.slots[spell]);
+      this.log(`${MODIFIERS[mod].name} set into ${SPELLS[spell].name}: ` +
+        `${composed.amount} ${composed.verb === 'might' ? 'lent' : 'damage'}, ` +
+        `${composed.charges} charge${composed.charges === 1 ? '' : 's'}.`);
+    }
+  }
+
+  /* The deck list is the book's shadow, and it updates the moment the book
+     does — an Echo Script socketed in a build phase shows its extra copy
+     right away, not at the surge. Build phase only; a fight in progress
+     keeps the deck it was dealt. */
+  refreshBook(player){
+    if(this.phase !== PHASES.build) return;
+    player.deck = wizardCombatDeck(this.spellbook);
+    player.discard = [];
+    player.hand = [];
+  }
+
+  /* The composed spell behind a card in this room, or null when the card is
+     an ordinary card — the one test for "does the new path apply". */
+  spellFor(player, cardId){
+    const cls = classById(player.classId);
+    if(!cls || !cls.cast) return null;
+    if(!(this.spellbook.known || []).includes(cardId)) return null;
+    return composeSpell(cardId, this.spellbook.slots[cardId]);
+  }
+
   /* ---- combat, resolved when the last commitment is in ---------------- */
 
   commit(player, intent){
@@ -510,7 +650,9 @@ class Room {
     if(intent.t === 'play'){
       const cardId = player.hand[intent.index];
       if(!cardId || cardId !== intent.card) return this.broadcast();
-      if(!cardPlayable(cardId, {
+      // A crafted spell has no play cost — the book already paid for it. Only
+      // ordinary cards answer to pageCost and powerCost.
+      if(!this.spellFor(player, cardId) && !cardPlayable(cardId, {
         pages: this.pages, power: this.power, classId: player.classId,
       })) return this.broadcast();
       player.intent = { t: 'play', card: cardId, index: intent.index, target: intent.target || null };
@@ -551,27 +693,86 @@ class Room {
 
       const card = cardById(intent.card);
       if(!card) continue;
-      if(card.pageCost) this.pages -= card.pageCost;
-      if(card.powerCost) this.power -= card.powerCost;
-      if(card.hpCost){
-        // Not through hurt(): hurt() can put a player down, and a card must
-        // never be the thing that kills you. cardPlayable refuses the play at
-        // or below the cost and this clamp is the second belt. Scored as taken
-        // on purpose — the run record should show who bled, and the Hauler
-        // bleeds deliberately.
-        const paid = Math.min(card.hpCost, player.hp - 1);
-        player.hp -= paid;
-        this.score(player, 'taken', paid);
+      // A crafted spell resolves from the book, not the card table, and the
+      // book already paid: no page or power leaves the pools for one.
+      const spell = this.spellFor(player, intent.card);
+      if(!spell){
+        if(card.pageCost) this.pages -= card.pageCost;
+        if(card.powerCost) this.power -= card.powerCost;
+        if(card.hpCost){
+          // The Hauler's price, and the same rule the Bloodpact keeps below:
+          // not through hurt(), because hurt() can put a player down and a card
+          // must never be the thing that kills you. cardPlayable refuses the
+          // play at or below the cost; this clamp is the second belt. Scored as
+          // taken on purpose — the record should show who bled, and the Hauler
+          // bleeds deliberately.
+          const paid = Math.min(card.hpCost, player.hp - 1);
+          player.hp -= paid;
+          this.score(player, 'taken', paid);
+        }
       }
 
-      const effect = cardEffect(intent.card, this.upgrades);
+      if(spell){
+        // The Bloodpact is paid on the cast, and it cannot take the last
+        // point — a spell that kills its own caster is a trap, not a trade.
+        if(spell.flags.hpCost){
+          const paid = Math.min(spell.flags.hpCost, player.hp - 1);
+          if(paid > 0){
+            this.score(player, 'taken', paid);
+            player.hp -= paid;
+            this.log(`${player.name} pays ${paid} health to the seal.`);
+          }
+        }
+        if(spell.flags.selfWard){
+          player.block = (player.block || 0) + spell.flags.selfWard;
+          this.score(player, 'guard', spell.flags.selfWard);
+          this.event({ t: 'fx', kind: 'ward', player: player.id });
+        }
+      }
+
+      const effect = spell ? spell.effect : cardEffect(intent.card, this.upgrades);
+      // Farsight reaches the back of the lane. Nothing is any distance away on
+      // a standoff field, so "farthest" is the far end of the row as drawn —
+      // the last of the wave, which is where the client paints it.
+      let target = intent.target;
+      if(spell && spell.flags.farthest && !target && effect.kind === 'strike'){
+        const standing = this.enemies.filter(e => e.hp > 0);
+        const far = standing[standing.length - 1];
+        if(far) target = far.id;
+      }
+
       // The party-wide and targeted kinds emit an fx per person they land on,
       // from inside apply(); only the plain single-target ones need one posting
       // here. Emitting both would draw the sparkle twice on one head.
       if(!SELF_DRAWN.has(effect.kind)){
-        this.event({ t: 'fx', kind: effect.kind, player: (this.players.find(p => p.id === intent.target) || player).id });
+        this.event({ t: 'fx', kind: effect.kind, player: (this.players.find(p => p.id === target) || player).id });
       }
-      this.apply(player, effect, card.name, intent.target, intent.card);
+      const killsBefore = (player.stats && player.stats.kills) || 0;
+      const landed = this.apply(player, effect, card.name, target, intent.card) || 0;
+
+      if(spell){
+        if(spell.flags.leech && landed > 0){
+          const back = Math.ceil(landed * spell.flags.leech);
+          const before = player.hp;
+          player.hp = Math.min(player.maxHp, player.hp + back);
+          if(player.hp > before){
+            this.score(player, 'mended', player.hp - before);
+            this.event({ t: 'fx', kind: 'heal', player: player.id });
+            this.log(`The glyph siphons ${player.hp - before} back into ${player.name}.`);
+          }
+        }
+        const kills = ((player.stats && player.stats.kills) || 0) - killsBefore;
+        if(spell.flags.pageOnKill && kills > 0){
+          const paid = spell.flags.pageOnKill * kills;
+          this.pages += paid;
+          this.log(`The margin pays out: ${paid} page${paid === 1 ? '' : 's'} back to the library.`);
+        }
+        // The played copy is spent — pulled from the hand so it cannot cycle
+        // back through the discard. The book deals fresh copies next surge,
+        // which is what a charge is. The unplayed rest of the hand discards
+        // normally, so drawing both copies never quietly burns one.
+        player.hand.splice(intent.index, 1);
+      }
     }
 
     // Hands down: the played card and the two that were not, minus anything
@@ -642,13 +843,16 @@ class Room {
      Cinder Nova is this same thing several times and the two must not drift on
      what a kill announces. */
   hitEnemy(player, target, amount, label, cardId){
-    this.event({ t: 'fx', kind: cardId || 'strike', player: player.id, target: target.id });
+    // `amount` rides along so the client can size the show to the swing — a
+    // thirty-point Fireball should not draw the same orb a three-point Strike does.
+    this.event({ t: 'fx', kind: cardId || 'strike', player: player.id, target: target.id, amount });
     // Landed, not swung: overkill on a thing with two health left is two points
     // of damage, or the end screen rewards aiming a Fireball at a Sporeling.
-    this.score(player, 'damage', Math.min(amount, target.hp));
+    const landed = Math.min(amount, target.hp);
+    this.score(player, 'damage', landed);
     target.hp = Math.max(0, target.hp - amount);
     this.log(`${player.name}'s ${label} hits the ${target.name} for ${amount}.`);
-    if(target.hp > 0) return;
+    if(target.hp > 0) return landed;
     this.score(player, 'kills', 1);
     this.log(`The ${target.name} comes apart.`);
     // The client holds the round open on this event so a kill is watched
@@ -658,6 +862,7 @@ class Room {
       t: 'fx', kind: 'slain', player: player.id, target: target.id,
       enemy: target.type, last: this.enemies.every(e => e.hp <= 0),
     });
+    return landed;
   }
 
   apply(player, effect, label, targetId, cardId){
@@ -668,17 +873,22 @@ class Room {
       // more — nothing approaches — so the default is the order the wave is
       // drawn in, which is the order the player reads it in.
       const alive = this.enemies.filter(e => e.hp > 0);
+      // Aimed, or the first thing still standing. There is no "nearest" any
+      // more — nothing approaches — so the default is the order the wave is
+      // drawn in, which is the order the player reads it in.
       const target = alive.find(e => e.id === targetId) || alive[0];
-      if(!target) return;
-      this.hitEnemy(player, target, strikePower(effect.amount, player.effects), label, cardId);
+      if(!target) return 0;
+      return this.hitEnemy(player, target, strikePower(effect.amount, player.effects), label, cardId);
 
     }else if(effect.kind === 'strikeAll'){
       // Wave order, so the order a nova kills things in is the order the
       // player sees them standing in.
       const alive = this.enemies.filter(e => e.hp > 0);
-      if(!alive.length) return;
+      if(!alive.length) return 0;
       const amount = strikePower(effect.amount, player.effects);
-      for(const target of alive) this.hitEnemy(player, target, amount, label, cardId);
+      let landed = 0;
+      for(const target of alive) landed += this.hitEnemy(player, target, amount, label, cardId);
+      return landed;
 
     }else if(effect.kind === 'ward'){
       const who = ally();
