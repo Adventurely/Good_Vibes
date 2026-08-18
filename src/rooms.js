@@ -496,9 +496,19 @@ class Room {
     const node = this.nodes.find(n => n.x === player.x && n.y === player.y && !n.taken);
     if(!node) return;
     const cls = classById(player.classId);
-    // A herb is the Alchemist's to bend down for — anyone else walks over it
-    // and it stays where it grew. Caches and pages are for whoever gets there.
-    if(node.kind === 'herb' && !(cls && cls.craft)) return;
+    /* Anyone can bend down.
+     *
+     * A herb used to be the Alchemist's alone: everybody else walked over it
+     * and it stayed where it grew. That made four of the five seats walk past
+     * the thing the build phase is mostly made of, and it made a party without
+     * her unable to brew at all — which is not scarcity, it is a locked door.
+     *
+     * She is still the best at it and by a wide margin: `gather` is 2 on her
+     * and 1 on everybody else, so the same node is worth twice as much when
+     * she is the one who stoops. The difference is a reason to send her rather
+     * than a rule about who is allowed. Caches and pages were always for
+     * whoever got there first.
+     */
     node.taken = true;
 
     if(node.kind === 'herb'){

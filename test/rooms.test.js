@@ -730,7 +730,7 @@ test('the pots are the alchemist\'s, they grow between rounds, and they pay on h
   assert.equal(room.stash.sunpetal, 1 + potYield(1), 'a round of patience pays');
 });
 
-test('a herb stays in the ground for anyone who cannot brew', () => {
+test('anyone can bend down for a herb, and the Alchemist is worth two of them', () => {
   const room = roomFor(`herbs-${++codes}`);
   const seats = ['wizard', 'alchemist'].map((classId, i) => {
     const player = room.join(`herbs-token-${codes}-${i}`, fakeSocket());
@@ -739,20 +739,31 @@ test('a herb stays in the ground for anyone who cannot brew', () => {
   });
   room.handle(seats[0], { t: 'start' });
 
-  const herb = room.nodes.find(n => n.kind === 'herb');
-  assert.ok(herb, 'a site always grows herbs');
+  const herbs = room.nodes.filter(n => n.kind === 'herb');
+  assert.ok(herbs.length >= 2, 'a site always grows herbs');
 
-  // The wizard walks onto it and it stays where it grew.
-  seats[0].x = herb.x; seats[0].y = herb.y;
+  /* This used to be a rule about permission — a herb was the Alchemist's alone
+   * and everybody else walked over it. That left four of the five seats with
+   * nothing to do with the thing the build phase is mostly made of, and a party
+   * without her could not brew at all. It is a rule about *yield* now: she is
+   * twice the gatherer anybody else is, which is a reason to send her rather
+   * than a door that is locked to everyone else.
+   */
+  seats[0].x = herbs[0].x; seats[0].y = herbs[0].y;
   room.pickUp(seats[0]);
-  assert.equal(herb.taken, false, 'the wizard does not know which end to keep');
-  assert.equal(Object.keys(room.stash).length, 0);
+  assert.equal(herbs[0].taken, true, 'the wizard can pick a herb up');
+  assert.equal(room.stash[herbs[0].material], classById('wizard').gather);
 
-  // The alchemist bends down for it, at her doubled yield.
-  seats[1].x = herb.x; seats[1].y = herb.y;
+  seats[1].x = herbs[1].x; seats[1].y = herbs[1].y;
   room.pickUp(seats[1]);
-  assert.equal(herb.taken, true);
-  assert.equal(room.stash[herb.material], 2);
+  assert.equal(herbs[1].taken, true);
+  const gathered = herbs[0].material === herbs[1].material
+    ? room.stash[herbs[1].material] - classById('wizard').gather
+    : room.stash[herbs[1].material];
+  assert.equal(gathered, classById('alchemist').gather,
+    'and she is worth two of him doing it');
+  assert.ok(classById('alchemist').gather > classById('wizard').gather,
+    'which is the whole of the difference');
 
   // Pages are still anyone's to fetch.
   const pages = room.nodes.find(n => n.kind === 'pages' && !n.taken);

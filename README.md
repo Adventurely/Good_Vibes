@@ -176,7 +176,7 @@ There is one loop now, driving both canvases:
 | Facing | `blit` mirrors at read time, so the cast walks the way it looks |
 | Campfire | three frames, plus a pool of light dithered onto the ground |
 | Footprints | a few seconds of prints behind a walking hero, on soft ground only |
-| Combat | enemy idle bob, hit recoil and flash, a death dissolve, a parallax treeline |
+| Combat | enemy idle bob, hit recoil and flash, a death dissolve, drifting seeds and turning turbines |
 
 It is only affordable because **the ground is cached**. `drawTerrain` is about
 130,000 `fillRect`s for the build map and it used to run on every hover twitch;
@@ -260,6 +260,8 @@ public/content.js   the game as data — classes, cards, resources, buildings,
                     enemies, rounds, and the pure functions over them
 public/art.js       the palette, the tiles and their cuts, the props, and every
                     sprite, as text
+public/stage.js     the surge's backdrop, painted rather than tiled: sky,
+                    skyline, hedge, and a plaza with a sun laid into it
 public/fx.js        what a resolved effect looks and sounds like, card first
                     and effect kind second, so nothing lands silently
 public/audio.js     the three tracks — title, build, surge — and every sound,
@@ -312,7 +314,7 @@ is growing with it; you have three rounds to make the site defensible before the
 Extractor wakes up in the fourth.
 
 **A round is two phases.** You build on a site, everyone readies up, and the
-blight surges onto a combat map of its own. Clear the wave and the next round
+blight surges onto a painted stage of its own. Clear the wave and the next round
 begins. `phaseCard()` names each turn — "Round One — Build Phase / The party
 plans." — from content rather than the client, so the screen animates words it
 cannot misquote.
@@ -449,10 +451,16 @@ Point, click, walk. A click on the map names a destination; `pathTo` finds the
 route with a breadth-first flood over walkable ground, and the sprite is stepped
 along it a tile at a time so distance is something the player watches rather
 than reads. Walking onto a node picks it up — having to click it again would be
-a second click for a decision already made. Herbs are the exception with a
-rule of their own: only the Alchemist can bend down for one; anyone else
-walks over it and it stays where it grew. Caches and pages are for whoever
-gets there.
+a second click for a decision already made, and **anyone can pick up anything**:
+herbs, caches and pages are all for whoever gets there.
+
+Herbs used to be the Alchemist's alone — everybody else walked over one and it
+stayed where it grew. That made four of the five seats walk past the thing the
+build phase is mostly made of, and it made a party without her unable to brew at
+all, which is not scarcity but a locked door. She is still far and away the best
+at it: `gather` is 2 on her and 1 on everybody else, so the same node is worth
+twice as much when she is the one who stoops. It is a reason to send her rather
+than a rule about who is allowed.
 
 Routing is pure and shared for the usual reason: the room has to be able to
 check that a click was reachable rather than trust a client that says it walked
@@ -679,9 +687,27 @@ Combat is a **standoff**, in the shape of a Slay the Spire fight: the party on
 the left facing right, the wave on the right facing left, both stood on one
 ground line, everything present from the first turn and everything acting on
 every one of them. `COMBAT_H` is eight rows of the map's width, which is the
-band the fight fits in; it still generates its own terrain, and the Engineer's
-standing buildings are drawn along the horizon behind it, so the half of the
-round you spent building is visible in the half you spent it for.
+band the fight fits in, and the Engineer's standing buildings are drawn along
+the hedge line behind it, so the half of the round you spent building is visible
+in the half you spent it for.
+
+**The stage is painted, not generated** (`public/stage.js`). The fight was drawn
+out of the same tile set as the build map — `generateCombatTerrain` rolled the
+board and the same grass, water and rubble were stamped across it — so the most
+dramatic screen in the game looked like a smaller copy of the least dramatic
+one. Nothing on a standoff field is walked on, stood in, built on or gathered
+from, so the ground has no rules left to carry and does not need to be made of
+tiles: `paintStage` draws a sky in three dithered stops, a solarpunk skyline of
+terraced towers, canopied domes, turning turbines and ivied chimneys, a hedge
+for them to stand behind, and a plaza in one-point perspective with a twelve-
+spoked sun mosaic inlaid at its centre. One palette per round takes the run from
+full afternoon through low gold and dusk to the Array after dark, where the
+floor goes dim and the mosaic is the thing that glows. Everything is hashed off
+its coordinates rather than rolled, so the whole backdrop bakes to one offscreen
+canvas per round and never shimmers; the only live layer over it is a couple of
+dozen drifting seeds, which is what keeps a standoff from looking like a paused
+game. The room still generates the combat terrain — it is a frozen export and
+part of the seeded stream — the client simply no longer draws it.
 
 It was a lane before this. Enemies carried a `dist` — a count of rounds before
 they arrived — and the wave walked down the board while the party shot at it.

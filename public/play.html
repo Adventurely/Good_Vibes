@@ -759,6 +759,7 @@
       } from './content.js';
       import { createAudio } from './audio.js';
       import { fxStyles, styleFor, soundFor, verbOf } from './fx.js';
+      import { paintStage, driftSeeds, hourFor, stageHedgeFoot } from './stage.js';
 
       const audio = createAudio();
       // Browsers only allow sound after a gesture; the first one unlocks it.
@@ -1600,36 +1601,39 @@
         return (1 - t) * Math.cos(t * 18);
       }
 
-      /* The sky behind the lane.
+      /* The stage, painted once and kept.
        *
-       * The fight used to happen on a strip of texture with nothing behind it,
-       * which is most of why it read as a diagram. Two bands and a treeline
-       * give it a somewhere, and both drift with the wave's progress so the
-       * party reads as holding ground rather than standing on a conveyor.
+       * It is about sixty thousand fillRects — a sky, a skyline, a floor in
+       * perspective and everything growing through it — and none of it changes
+       * between frames, so it is baked to an offscreen canvas keyed by the
+       * round. The turbines on the horizon are the exception and they turn
+       * slowly enough that a repaint every few seconds is invisible; anything
+       * that has to move per frame is drawn over the top instead.
        */
-      const HORIZON = 30;                 // how much of the lane is sky
+      const stageCache = { key: null, canvas: null, painted: 0 };
 
-      function backdrop(ctx, round){
-        // The sky goes over the ground rather than under it: terrain tiles are
-        // fully opaque, so a backdrop painted first would simply be covered.
-        // This band is the top of the lane, and the ground starts below it.
-        const sky = ['#3fa9dd', '#20629f', '#8a5bb8', '#3b2b5a'];
-        ctx.fillStyle = sky[Math.min(sky.length - 1, Math.max(0, round - 1))];
-        ctx.fillRect(0, HEADER, MAP_PX_W, HORIZON);
+      function stageFor(round){
+        // The blades advance in steps rather than continuously: a repaint is
+        // the cost, and a step every eighth of a turn reads as rotation while
+        // costing one repaint every couple of seconds.
+        const spinStep = stillness() ? 0 : Math.floor(now / 260) % 24;
+        const key = `${round}:${spinStep}`;
+        if(stageCache.key === key) return stageCache.canvas;
 
-        // A far ridge and a nearer treeline, each on its own parallax offset,
-        // so the wave reads as crossing ground rather than riding a conveyor.
-        const drift = stillness() ? 0 : now / 110;
-        for(const [depth, colour, height] of [[0.18, '#245c2c', 17], [0.42, '#1b3a24', 11]]){
-          ctx.fillStyle = colour;
-          for(let x = 0; x < MAP_PX_W; x++){
-            const wx = Math.round(x + drift * depth);
-            const h = height
-              + Math.round(Math.sin(wx / 27) * 3)
-              + (hash2(wx >> 3, Math.round(depth * 10)) & 3);
-            ctx.fillRect(x, HEADER + HORIZON - h, 1, h);
-          }
-        }
+        const canvas = stageCache.canvas || Object.assign(document.createElement('canvas'), {
+          width: MAP_PX_W, height: COMBAT_PX_H,
+        });
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        paintStage(ctx, {
+          width: MAP_PX_W, height: COMBAT_PX_H, round,
+          spin: (spinStep / 24) * Math.PI * 2,
+        });
+
+        stageCache.key = key;
+        stageCache.canvas = canvas;
+        return canvas;
       }
 
       /* ---- the battlefield ------------------------------------------------
@@ -1792,9 +1796,16 @@
         cctx.rect(0, HEADER, MAP_PX_W, COMBAT_PX_H);
         cctx.clip();
 
-        cctx.drawImage(groundFor(room.terrain, COMBAT_H, 'floor', room.round || 1), 0, HEADER);
-        backdrop(cctx, room.round || 1);
+        // The stage, not the site. The build map is a grid because every rule
+        // it carries is about neighbours; nothing on a standoff field is walked
+        // on, built on or gathered from, so the ground here is painted in bands
+        // at the scale of the picture instead. See stage.js.
+        cctx.drawImage(stageFor(room.round || 1), 0, HEADER);
         skyline(cctx);
+        if(!stillness()) driftSeeds(cctx, {
+          width: MAP_PX_W, height: COMBAT_PX_H, round: room.round || 1,
+          now, top: HEADER,
+        });
 
         const t = entranceAt();
         const partyIn = stagger(t, 0, 0.72);
@@ -1890,7 +1901,10 @@
            combat ground is not the site's ground, so a map position here would
            be a coincidence pretending to be a fact. Order is preserved, so the
            row reads as the order they were raised in. */
-        const line = HEADER + HORIZON + 9;
+        // On the hedge's feet, at the back of the stage — the one line in the
+        // picture that things standing at the back stand on.
+        const hour = hourFor(room.round || 1);
+        const line = HEADER + stageHedgeFoot(COMBAT_PX_H);
         const shown = built.slice(0, 5);
         const step = shown.length > 1 ? (MAP_PX_W - 96) / (shown.length - 1) : 0;
 
@@ -1913,15 +1927,18 @@
             for(let c = 0; c < art[r].length; c++){
               const key = art[r][c];
               if(key === '.' || key === ' ') continue;
-              ctx.fillStyle = (key === '#' || key === '=') ? '#1b2b1e'
-                : key === key.toUpperCase() ? '#33553a'
-                : '#4e7a51';
+              // Three tones out of the hour's own palette, so the buildings
+              // sit in the same light as everything around them rather than
+              // being a fixed green against four different skies.
+              ctx.fillStyle = (key === '#' || key === '=') ? hour.mid
+                : key === key.toUpperCase() ? hour.hedge
+                : hour.moss;
               ctx.fillRect(x + c, top + r, 1, 1);
             }
           }
-          // Standing on something. Without a footing they float off the
-          // treeline like decals.
-          ctx.fillStyle = '#1b2b1e';
+          // Standing on something. Without a footing they float off the hedge
+          // like decals.
+          ctx.fillStyle = hour.mid;
           ctx.fillRect(x - 1, line, art[0].length + 2, 2);
         });
       }
@@ -2889,17 +2906,12 @@
               room.pages += CACHE_YIELD.pages;
               room.events.push({ t: 'log', text: `Found ${CACHE_YIELD.pages} spell page.` });
             }else{
+              // Anyone can bend down; the Alchemist is simply worth two of
+              // anybody else doing it, because `gather` says so.
               const cls = CLASSES.find(c => c.id === you.classId);
-              if(!cls?.craft){
-                // A herb is the Alchemist's to bend down for; anyone else
-                // walks over it and it stays where it grew.
-                node.taken = false;
-                room.events.push({ t: 'log', text: `Only the Alchemist knows which end of a ${MATERIALS[node.material].name} to keep.` });
-              }else{
-                const yielded = cls.gather;
-                room.stash[node.material] = (room.stash[node.material] || 0) + yielded;
-                room.events.push({ t: 'log', text: `Gathered ${yielded} ${MATERIALS[node.material].name}.` });
-              }
+              const yielded = (cls && cls.gather) || 1;
+              room.stash[node.material] = (room.stash[node.material] || 0) + yielded;
+              room.events.push({ t: 'log', text: `Gathered ${yielded} ${MATERIALS[node.material].name}.` });
             }
           }
         }
