@@ -33,7 +33,13 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      # `enablement` turns Pages on for the repository the first time this
+      # runs, instead of failing with "Get Pages site failed" until somebody
+      # goes and flips the switch in Settings by hand. It is a no-op once the
+      # site exists, so it can simply stay here.
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: public
