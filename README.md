@@ -22,7 +22,7 @@
 | ✅ Documented | What the Worker imports and what its room does with it — see [docs/tool-haven-server.md](docs/tool-haven-server.md) |
 | ✅ Done | The Worker runs a port of `src/rooms.js` and speaks this client's protocol |
 | ❓ Cannot be checked here | Whether the `TOOL_HAVEN_TOKEN` secret exists (manual sync until it does) |
-| ❌ Not set up | GitHub Pages, which the `preview` branch publishes to — see [The preview channel](#the-preview-channel) |
+| ⚠️ Half set up | GitHub Pages is on, but the repo's default branch is not `main`, which blocks it — see [The preview channel](#the-preview-channel) |
 
 ### Steps before a deploy
 
@@ -232,14 +232,26 @@ cannot host a real game — rooms and the socket need Tool Haven.
 
     git push origin HEAD:preview        # publish whatever you are looking at
 
-**One-time setup, and it has not been done.** Pages must be switched on for
-the repository by hand: Settings → Pages → Build and deployment → Source:
-**GitHub Actions**. Until then `preview-pages` fails at its first step with
-"Get Pages site failed … Not Found", which is not a fault in the branch or
-the artifact — there is simply no site to publish to. The workflow cannot do
-this for itself: creating a Pages site takes repository admin, which the
-`GITHUB_TOKEN` a workflow runs under does not have and cannot grant itself.
-Note too that Pages on a private repository needs a paid plan.
+Pages is switched on and its source is GitHub Actions, so the workflow itself
+is in order. The workflow follows both `main` and `preview`, so the site keeps
+up with the branch the repo actually lives on and `preview` is the extra
+channel for publishing something that is not on `main` yet.
+
+**What is still in the way: the default branch.** It is
+`claude/node-server-hello-world-28lx0w` — the three-file hello world from the
+first session — and not `main`. That breaks the deploy, because the
+`github-pages` environment accepts deployments only from the **default
+branch** unless somebody widens it. A run from `main` or `preview` is
+therefore refused before its job starts: it fails in about a second with no
+runner, no steps and no logs, which reads like a broken workflow and is not
+one. Nothing in a workflow file can lift this; the environment gate sits
+above it.
+
+The fix is Settings → General → Default branch → `main`, which is worth doing
+on its own account now the repo is public — the default branch is what a
+visitor lands on, and right now that is a hello world, not the game. To keep
+`preview` publishing too, also add it under Settings → Environments →
+`github-pages` → Deployment branches and tags.
 
 ## Requirements
 

@@ -1,4 +1,14 @@
-# Publish public/ to GitHub Pages whenever the `preview` branch moves.
+# Publish public/ to GitHub Pages whenever `main` or `preview` moves.
+#
+# If the deploy job fails in about a second with no logs and no steps at all,
+# nothing here is wrong: GitHub rejected the deployment before the job could
+# start. The `github-pages` environment only accepts deployments from the
+# repository's **default branch** unless somebody widens it, so a run from any
+# other branch dies at the gate with nothing written down. Either make the
+# branch the default (Settings -> General -> Default branch) or allow it in
+# Settings -> Environments -> github-pages -> Deployment branches and tags.
+# That is also why `main` is listed above: it is the branch this repo actually
+# lives on, so publishing follows it by default and `preview` is the extra.
 #
 # This is the single-player preview channel: Pages is static, so the game is
 # reachable only through its offline ?preview mode — rooms and the WebSocket
@@ -12,7 +22,7 @@ name: preview-pages
 
 on:
   push:
-    branches: [preview]
+    branches: [main, preview]
   workflow_dispatch:
 
 permissions:
@@ -33,18 +43,6 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      # Pages has to be switched on by hand, once, before this step can do
-      # anything: Settings -> Pages -> Build and deployment -> Source: GitHub
-      # Actions. Until then every run of this workflow dies right here with
-      # "Get Pages site failed ... Not Found", and the branch is fine — there
-      # is simply no site to publish to.
-      #
-      # The action's `enablement: true` does not help. It asks the API to
-      # create the site using the workflow's GITHUB_TOKEN, and that token
-      # cannot: creating a Pages site needs admin on the repository, which no
-      # `permissions:` block can grant itself. It comes back "Resource not
-      # accessible by integration". Note also that Pages on a private
-      # repository needs a paid plan.
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
