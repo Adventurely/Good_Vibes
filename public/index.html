@@ -1,516 +1,314 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Good Vibes — a co-op solarpunk roguelike</title>
-    <meta
-      name="description"
-      content="Walk a ruin, gather what grew in it, and hold the site when the blight surges. A co-op solarpunk deckbuilding roguelike for up to five players, in the browser."
-    />
-    <style>
-      /* The page is the frame; the canvas is the game. Everything here is
-         quiet on purpose — a landing page that competes with the art it is
-         framing is a landing page nobody looks past. */
-      :root {
-        color-scheme: dark;
-        --ink: #140c06;
-        --panel: #1d130a;
-        --line: #4a3320;
-        --text: #f3e4c8;
-        --muted: #a58a68;
-        --accent: #6cc24a;
-        --sun: #f2b134;
-      }
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Good Vibe Games</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%231a1310'/%3E%3Ccircle cx='8' cy='8' r='4' fill='%23ffd23f'/%3E%3Cpath d='M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.5 1.5M11.5 11.5L13 13M13 3l-1.5 1.5M4.5 11.5L3 13' stroke='%23f59a2e' stroke-width='1.4'/%3E%3C/svg%3E">
+<meta name="description" content="Two co-op deck-building games you play with friends in a browser. No install, no account — share a room code.">
+<style>
+  /* The palette is the games' own: warm dark ground, sunlight, leaf green.
+     Nothing here is loaded from anywhere — no fonts, no images, no scripts but
+     the games' own art modules. The thumbnails are drawn, not photographed. */
+  :root{
+    --ink:      #1a1310;
+    --ink-soft: #241c17;
+    --edge:     #3a2418;
+    --paper:    #f5ead6;
+    --muted:    #b9a68c;
+    --sun:      #ffd23f;
+    --sun-deep: #f59a2e;
+    --leaf:     #6cc24a;
+    --leaf-deep:#3f8f38;
+    --sky:      #3fa9dd;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: var(--ink);
+    color: var(--paper);
+    font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+    /* A low sun behind everything, so the page has the same light the games do. */
+    background-image:
+      radial-gradient(120% 80% at 50% 0%, #2b2119 0%, var(--ink) 62%),
+      linear-gradient(180deg, rgba(255,210,63,.06), transparent 40%);
+  }
 
-      * { box-sizing: border-box; }
+  header{ text-align:center; padding: clamp(2.5rem, 7vw, 5rem) 1.25rem 0; }
+  h1{
+    margin:0;
+    font-size: clamp(2rem, 7vw, 3.5rem);
+    letter-spacing: .02em;
+    font-weight: 800;
+    background: linear-gradient(180deg, var(--sun) 0%, var(--sun-deep) 100%);
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent;
+  }
+  header p{
+    margin: .9rem auto 0; max-width: 46ch;
+    color: var(--muted); font-size: clamp(.95rem, 2.4vw, 1.1rem);
+  }
 
-      body {
-        margin: 0;
-        padding: 1.5rem 1rem 3rem;
-        background: var(--ink);
-        /* Warm from the middle out, like the fire in the scene. */
-        background-image: radial-gradient(circle at 50% 18%, #33200f 0%, #140c06 62%);
-        color: var(--text);
-        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        line-height: 1.6;
-      }
+  main{
+    flex: 1;
+    width: min(1080px, 100%);
+    margin-inline: auto;
+    padding: clamp(2rem, 5vw, 3.5rem) 1.25rem clamp(3rem, 6vw, 5rem);
+    display: grid; gap: clamp(1.5rem, 3.5vw, 2.5rem);
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    align-content: start;
+  }
 
-      .wrap { max-width: 62rem; margin: 0 auto; }
+  .game{
+    display: block; text-decoration: none; color: inherit;
+    background: var(--ink-soft);
+    border: 2px solid var(--edge);
+    border-radius: 14px;
+    overflow: hidden;
+    transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+  }
+  .game:hover, .game:focus-visible{
+    transform: translateY(-4px);
+    border-color: var(--sun-deep);
+    box-shadow: 0 12px 30px -12px rgba(0,0,0,.8);
+    outline: none;
+  }
+  .game:focus-visible{ border-color: var(--sun); }
 
-      /* --- the screen ---------------------------------------------------- */
+  /* The thumbnail is a 320x190 pixel canvas blown up by the browser. Nearest
+     neighbour, because smoothing a pixel drawing is the one thing that makes it
+     stop looking drawn. */
+  .shot{ display:block; width:100%; height:auto; aspect-ratio: 320 / 190;
+         image-rendering: pixelated; background: var(--edge);
+         border-bottom: 2px solid var(--edge); }
 
-      .screen {
-        position: relative;
-        margin: 0 auto;
-        width: max-content;
-        max-width: 100%;
-        border: 2px solid var(--line);
-        border-radius: 6px;
-        background: #000;
-        box-shadow: 0 0 0 4px #140c06, 0 22px 60px rgb(0 0 0 / 0.65);
-        overflow: hidden;
-        /* The whole screen breathes in on load, once. */
-        animation: rise 0.7s ease-out both;
-      }
-      @keyframes rise {
-        from { opacity: 0; transform: translateY(12px); }
-        to { opacity: 1; transform: none; }
-      }
+  .about{ padding: 1.1rem 1.25rem 1.35rem; }
+  .about h2{ margin:0 0 .35rem; font-size: 1.4rem; letter-spacing:.01em; }
+  .about p{ margin:0 0 .85rem; color: var(--muted); font-size: .95rem; }
+  .tags{ display:flex; flex-wrap:wrap; gap:.4rem; list-style:none; margin:0; padding:0; }
+  .tags li{
+    font-size:.75rem; letter-spacing:.04em; text-transform:uppercase;
+    color: var(--leaf); border:1px solid var(--leaf-deep);
+    border-radius:999px; padding:.15rem .6rem;
+  }
+  .tags li.sun{ color: var(--sun); border-color: var(--sun-deep); }
+  .tags li.sky{ color: var(--sky); border-color: #20629f; }
 
-      canvas {
-        display: block;
-        image-rendering: pixelated;
-        image-rendering: crisp-edges;
-      }
+  footer{
+    text-align:center; padding: 0 1.25rem 2.5rem;
+    color:#6f6155; font-size:.85rem;
+  }
 
-      /* Scanlines. Faint enough to read as a screen rather than as a filter,
-         and off entirely when the visitor has asked for less motion — a fixed
-         overlay is not motion, but it is exactly the kind of visual noise the
-         same people are usually asking to be spared. */
-      .crt {
-        position: absolute;
-        inset: 0;
-        pointer-events: none;
-        background: repeating-linear-gradient(
-          to bottom,
-          rgb(0 0 0 / 0.16) 0px,
-          rgb(0 0 0 / 0.16) 1px,
-          transparent 1px,
-          transparent 3px
-        );
-        opacity: 0.55;
-      }
-      .screen[data-crt='off'] .crt { display: none; }
+  @media (prefers-reduced-motion: reduce){
+    .game{ transition: none; }
+    .game:hover, .game:focus-visible{ transform:none; }
+  }
+</style>
+</head>
+<body>
 
-      /* --- the call to action -------------------------------------------- */
+<header>
+  <h1>Good Vibe Games</h1>
+  <p>Two co-op games about growing something back. Share a room code, take a
+     seat, play in the browser — no install and no account.</p>
+</header>
 
-      .cta {
-        display: flex;
-        gap: 0.7rem;
-        justify-content: center;
-        align-items: stretch;
-        flex-wrap: wrap;
-        margin: 1.4rem auto 0;
-      }
-
-      .play {
-        display: block;
-        text-decoration: none;
-        padding: 0.85rem 2.4rem;
-        border: 2px solid var(--accent);
-        border-radius: 5px;
-        background: #23331a;
-        color: var(--text);
-        text-align: center;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        font-size: 0.95rem;
-        transition: transform 0.12s ease, background 0.12s ease;
-      }
-      .play:hover, .play:focus-visible { background: #2e4322; transform: translateY(-2px); }
-      .play small {
-        display: block;
-        margin-top: 0.2rem;
-        letter-spacing: 0.06em;
-        text-transform: none;
-        font-size: 0.68rem;
-        color: var(--muted);
-      }
-
-      button {
-        font: inherit;
-        color: var(--text);
-        background: var(--panel);
-        border: 2px solid var(--line);
-        border-radius: 5px;
-        padding: 0.55rem 1rem;
-        cursor: pointer;
-        letter-spacing: 0.06em;
-        font-size: 0.72rem;
-        text-transform: uppercase;
-      }
-      button:hover, button:focus-visible { border-color: var(--sun); }
-      button[aria-pressed='false'] { opacity: 0.55; }
-
-      .controls {
-        display: flex;
-        gap: 0.5rem;
-        justify-content: center;
-        flex-wrap: wrap;
-        margin-top: 0.8rem;
-      }
-
-      /* --- what the game is ---------------------------------------------- */
-
-      .pitch {
-        max-width: 44rem;
-        margin: 2.6rem auto 0;
-        text-align: center;
-        color: var(--muted);
-      }
-      .pitch b { color: var(--text); font-weight: 400; }
-
-      .roles {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-        gap: 0.7rem;
-        margin: 2rem 0 0;
-        padding: 0;
-        list-style: none;
-      }
-      .role {
-        display: flex;
-        gap: 0.7rem;
-        align-items: flex-start;
-        border: 1px solid var(--line);
-        border-radius: 5px;
-        padding: 0.7rem 0.8rem;
-        background: rgb(29 19 10 / 0.6);
-      }
-      .role canvas { image-rendering: pixelated; flex: none; }
-      .role b { display: block; color: var(--text); font-weight: 400; }
-      .role span {
-        display: block;
-        font-size: 0.66rem;
-        color: var(--muted);
-        text-transform: uppercase;
-        letter-spacing: 0.07em;
-      }
-      .role p { margin: 0.35rem 0 0; font-size: 0.76rem; color: var(--muted); line-height: 1.55; }
-      .role[data-locked='true'] { opacity: 0.45; }
-
-      h2 {
-        font-size: 0.72rem;
-        letter-spacing: 0.16em;
-        text-transform: uppercase;
-        color: var(--muted);
-        font-weight: 400;
-        border-bottom: 1px solid var(--line);
-        padding-bottom: 0.5rem;
-        margin: 3rem 0 1rem;
-      }
-
-      .loop {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-        gap: 0.8rem;
-        padding: 0;
-        margin: 0;
-        list-style: none;
-      }
-      .loop li {
-        border: 1px solid var(--line);
-        border-left: 3px solid var(--accent);
-        border-radius: 4px;
-        padding: 0.7rem 0.9rem;
-        font-size: 0.78rem;
-        color: var(--muted);
-        line-height: 1.6;
-      }
-      .loop b { display: block; color: var(--text); font-weight: 400; margin-bottom: 0.2rem; }
-
-      details { margin-top: 2.5rem; }
-      summary {
-        cursor: pointer;
-        color: var(--muted);
-        font-size: 0.72rem;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-      }
-      .swatches {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
-        gap: 0.4rem;
-        padding: 0;
-        margin: 1rem 0 0;
-        list-style: none;
-      }
-      .swatches li { display: flex; align-items: center; gap: 0.5rem; font-size: 0.68rem; }
-      .chip { width: 1.5rem; height: 1.5rem; border-radius: 3px; border: 1px solid var(--line); flex: none; }
-      .chip-name { display: block; color: var(--text); }
-      .chip-hex { display: block; color: var(--muted); font-size: 0.6rem; }
-
-      footer {
-        margin-top: 3rem;
-        text-align: center;
-        font-size: 0.7rem;
-        color: var(--muted);
-      }
-      a { color: var(--accent); text-underline-offset: 3px; }
-
-      @media (prefers-reduced-motion: reduce) {
-        .screen { animation: none; }
-        .play { transition: none; }
-      }
-    </style>
-  </head>
-  <body>
-    <div class="wrap">
-      <!-- The title screen is a canvas because it is the game: the site under
-           the logo is generated by content.js and the party walking it is
-           routed by the same pathfinder the build phase uses. -->
-      <div class="screen" id="screen" data-crt="on">
-        <canvas
-          id="title"
-          aria-label="Good Vibes — the title screen. A generated solarpunk ruin seen from above, with a camp and fire at its centre and three heroes walking to gather herbs, salvage and spell pages."
-        ></canvas>
-        <div class="crt"></div>
-      </div>
-
-      <div class="cta">
-        <a class="play" href="play.html">
-          Play Good Vibes
-          <small>Free · in the browser · up to five players</small>
-        </a>
-      </div>
-
-      <div class="controls">
-        <button type="button" id="sound" aria-pressed="false">Music off</button>
-        <button type="button" id="reroll">New ruin</button>
-        <button type="button" id="crt" aria-pressed="true">Scanlines</button>
-      </div>
-
-      <noscript>
-        <p style="text-align:center;margin-top:1rem">
-          The title screen is drawn with JavaScript on a canvas, and so is the
-          game — enable it to see either.
-        </p>
-      </noscript>
-
-      <p class="pitch">
-        The lights went out, the ruins kept growing, and somebody has to tend
-        them. <b>Walk the site, gather what grew in it, build what you can
-        afford</b> — then hold the ground when the blight surges. Four rounds,
-        a fresh ruin every run, and a boss at the end of it that has been
-        harvesting since long before you arrived.
-      </p>
-
-      <ul class="roles" id="roles"></ul>
-
-      <h2>A round, in two halves</h2>
-      <ul class="loop">
-        <li>
-          <b>Build</b>
-          A generated site, seen from above. Walk to the herbs, the salvage
-          crates and the spell pages, brew what the stash covers, and put down
-          what the Engineer can pay for. Nobody has a move budget — the limit is
-          what grew, not how far you can walk.
-        </li>
-        <li>
-          <b>Surge</b>
-          The blight arrives on a different ground, and everything the build
-          phase bought is a card in somebody's hand. Everyone commits at once,
-          three cards drawn a turn, and what the wave leaves on you — rot,
-          weakness, a lost turn — outlasts the thing that landed it.
-        </li>
-        <li>
-          <b>Together</b>
-          Every class opens with two cards that are only worth holding because
-          somebody else is at the table: guard on the whole party, a page lent
-          to whoever hits hardest, cables across the chest of an ally who went
-          down. The fight levels itself to how many of you turned up.
-        </li>
+<main>
+  <a class="game" href="/good-vibes/">
+    <canvas class="shot" id="shot-gv" width="320" height="190"
+            aria-label="A solarpunk plaza at low sun: terraced towers and turning turbines behind a hedge, a sun mosaic laid into the stone, and a party facing two creatures across it."></canvas>
+    <div class="about">
+      <h2>Good Vibes</h2>
+      <p>Build a garden by day, hold the line at night. Five classes, one deck
+         each, three rounds and a boss.</p>
+      <ul class="tags">
+        <li>2&ndash;5 players</li>
+        <li class="sun">Deck-builder</li>
+        <li class="sky">Co-op</li>
       </ul>
-
-      <details>
-        <summary>For builders — the palette</summary>
-        <p style="font-size:0.78rem;color:var(--muted);margin-top:0.9rem">
-          Everything on this page and in the game is drawn from data: sprites
-          are arrays of strings, one character per pixel, each character a key
-          into the palette below. Nothing is an image file. The tables live in
-          <code>public/art.js</code>, the rules in <code>public/content.js</code>,
-          and the same modules are imported by the browser and by the
-          authoritative room on the server, so the two ends cannot disagree
-          about what a potion does.
-        </p>
-        <ul class="swatches" id="swatches"></ul>
-      </details>
-
-      <footer>Good Vibes &middot; good-vibe-games.com</footer>
     </div>
+  </a>
 
-    <script type="module">
-      import { createTitleScene, SCENE_W, SCENE_H } from './title.js';
-      import { createAudio } from './audio.js';
-      import { fitCanvas } from './pixel.js';
-      import { PALETTE, HERO_ART } from './art.js';
-      import { CLASSES, OPEN_ROLES, playableClasses } from './content.js';
+  <a class="game" href="/solarium/">
+    <canvas class="shot" id="shot-ss" width="320" height="190"
+            aria-label="The rustlands under a hazy sky: glasshouses and wind turbines over a ruined city, with two salvagers facing down scrap creatures."></canvas>
+    <div class="about">
+      <h2>Save Solarium</h2>
+      <p>Fight through the rustlands and take the Extractor apart before it
+         finishes with what is left.</p>
+      <ul class="tags">
+        <li>2&ndash;5 players</li>
+        <li class="sun">Deck-builder</li>
+        <li class="sky">Roguelite</li>
+      </ul>
+    </div>
+  </a>
+</main>
 
-      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
-      const reducedMotion = () => reduce.matches;
+<footer>good-vibe-games.com</footer>
 
-      /* ---- the scene ------------------------------------------------------ */
+<script type="module">
+/* The thumbnails are painted by each game's own renderer, at the size the game
+ * draws at. That is the point: what you see on the card is the thing you get,
+ * generated here and now rather than a screenshot that quietly goes out of date
+ * the next time somebody repaints a sky.
+ */
 
-      const canvas = document.getElementById('title');
-      const scene = createTitleScene(canvas, { reducedMotion });
-      scene.start();
+import { paintStage, driftSeeds, stageHedgeFoot } from './good-vibes/stage.js';
+import { PALETTE as GV_PAL, HERO_ART as GV_HERO, ENEMY_ART as GV_ENEMY } from './good-vibes/art.js';
 
-      const screen = document.getElementById('screen');
-      if(reducedMotion()) screen.dataset.crt = 'off';
+import { buildScene, paintScene } from './solarium/scene.js';
+import { PALETTE as SS_PAL, HERO_ART as SS_HERO, ENEMY_ART as SS_ENEMY } from './solarium/art.js';
 
-      /* fitCanvas only scales by whole numbers and never below 1x, which is
-         right everywhere the game draws — at 2.5x some pixels land on two
-         screen pixels and others on three, and it reads as a rendering fault.
-         But this canvas is 480 wide and a phone is not, and the frame clips
-         rather than scrolls, so a narrow screen would simply lose the right
-         half of the logo. Below 1x the choice is between a fractional scale and
-         a cropped title screen; the fractional scale wins, and `pixelated`
-         keeps the downscale from going soft. */
-      const wrap = document.querySelector('.wrap');
-      function fit(){
-        if(wrap.clientWidth >= SCENE_W){
-          canvas.style.height = '';
-          fitCanvas(canvas, SCENE_W, SCENE_H, { container: wrap, maxHeightFraction: 0.68 });
-          return;
-        }
-        canvas.style.width = '100%';
-        canvas.style.height = 'auto';
-      }
-      window.addEventListener('resize', fit);
-      fit();
+const W = 320, H = 190;
+const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-      // A tab that comes back should not resume from the frame it left on, and
-      // a tab in the background should not be animating a title screen at all.
-      document.addEventListener('visibilitychange', () => {
-        if(document.hidden) scene.stop();
-        else if(!reducedMotion()) scene.start();
-      });
-      reduce.addEventListener?.('change', () => location.reload());
+/* One blitter for both games. Their sprite tables grew up apart and disagree
+   about the wrapper — heroes are { rows }, some enemies are the bare array —
+   so take either, and take the palette as an argument rather than importing a
+   winner. */
+function blit(ctx, art, pal, x, y, { flip = false, scale = 1 } = {}){
+  const rows = art && (art.rows || art);
+  if(!rows || !rows.length) return;
+  const w = rows[0].length;
+  for(let r = 0; r < rows.length; r++){
+    for(let c = 0; c < w; c++){
+      const key = rows[r][flip ? w - 1 - c : c];
+      if(key === '.' || key === ' ') continue;
+      const hue = pal[key];
+      if(!hue) continue;
+      ctx.fillStyle = Array.isArray(hue) ? hue[0] : hue;
+      ctx.fillRect(x + c * scale, y + r * scale, scale, scale);
+    }
+  }
+}
 
-      /* ---- the theme ------------------------------------------------------ */
+/* A soft shadow under whoever is standing there, so nobody floats. */
+function footing(ctx, x, y, w){
+  ctx.fillStyle = 'rgba(0,0,0,0.22)';
+  for(let i = 0; i < w; i++){
+    const t = Math.abs(i - w / 2) / (w / 2);
+    if(t > 0.92) continue;
+    ctx.fillRect(x + i, y, 1, t > 0.6 ? 1 : 2);
+  }
+}
 
-      /* Autoplay policy decides when sound starts, not us: the context cannot
-         exist until a gesture, so the button reflects intent and the first
-         click on anything is what actually opens it. The choice persists per
-         browser, in the same key the game uses, so turning the music off here
-         does not mean turning it on again inside a fight. */
-      const audio = createAudio();
-      const soundButton = document.getElementById('sound');
+/* ---- Good Vibes: the surge, at low gold -------------------------------- */
 
-      const syncSound = () => {
-        const on = !audio.isMuted();
-        soundButton.textContent = on ? 'Music on' : 'Music off';
-        soundButton.setAttribute('aria-pressed', String(on));
-      };
+const gv = document.getElementById('shot-gv').getContext('2d', { alpha: false });
 
-      audio.play('title');
-      syncSound();
+// Round two, because its palette is the one that flatters the plaza most: the
+// sun is low, the mosaic still catches it, and the hedge is not yet in silhouette.
+const GV_ROUND = 2;
+const gvFloor = stageHedgeFoot(H);
 
-      const unlockOnce = () => {
-        audio.unlock();
-        removeEventListener('pointerdown', unlockOnce);
-        removeEventListener('keydown', unlockOnce);
-      };
-      addEventListener('pointerdown', unlockOnce);
-      addEventListener('keydown', unlockOnce);
+// A standoff, which is what the game looks like when it is at its most itself:
+// the party on one side, the wave on the other, the mosaic between them.
+const gvParty = ['hauler', 'alchemist', 'wizard'];
+const gvWave = [['creeper', 2], ['sporeling', 2]];
 
-      soundButton.addEventListener('click', () => {
-        audio.setMuted(!audio.isMuted());
-        audio.unlock();
-        syncSound();
-      });
+function paintGoodVibes(now){
+  const spin = still ? 0 : Math.floor(now / 260) % 24;
+  paintStage(gv, { width: W, height: H, round: GV_ROUND, spin });
 
-      // Leaving for the game should not leave a theme playing behind it.
-      addEventListener('pagehide', () => audio.stop());
+  gvParty.forEach((who, i) => {
+    const art = GV_HERO[who];
+    if(!art) return;
+    const x = 18 + i * 30;
+    // Staggered depth: the further back, the higher the feet sit.
+    const feet = H - 16 - (gvParty.length - 1 - i) * 5;
+    const rows = (art.rows || art).length;
+    footing(gv, x + 8, feet, 16);
+    blit(gv, art, GV_PAL, x, feet - rows, { flip: false });
+  });
 
-      /* ---- the controls --------------------------------------------------- */
+  gvWave.forEach(([who, scale], i) => {
+    const art = GV_ENEMY[who];
+    if(!art) return;
+    const rows = (art.rows || art);
+    const x = W - 96 + i * 44;
+    const feet = H - 18 - i * 6;
+    footing(gv, x + 6, feet, rows[0].length * scale - 12);
+    blit(gv, art, GV_PAL, x, feet - rows.length * scale, { flip: true, scale });
+  });
 
-      document.getElementById('reroll').addEventListener('click', () => scene.reroll());
+  if(!still) driftSeeds(gv, { width: W, height: H, round: GV_ROUND, now, top: 0, count: 14 });
+}
 
-      const crtButton = document.getElementById('crt');
-      const syncCrt = () => {
-        const on = screen.dataset.crt === 'on';
-        crtButton.setAttribute('aria-pressed', String(on));
-      };
-      crtButton.addEventListener('click', () => {
-        screen.dataset.crt = screen.dataset.crt === 'on' ? 'off' : 'on';
-        syncCrt();
-      });
-      syncCrt();
+/* ---- Save Solarium: the rustlands -------------------------------------- */
 
-      /* ---- the roster ----------------------------------------------------- */
+const ssCanvas = document.getElementById('shot-ss');
+const ss = ssCanvas.getContext('2d', { alpha: false });
 
-      /* Read off CLASSES rather than written out here, so a class the
-         collaborator adds appears on the landing page the moment it goes live
-         — and the two seats still open show as locked rather than as an
-         absence nobody can explain. */
-      function portrait(art, scale = 1){
-        const rows = art.rows;
-        const el = document.createElement('canvas');
-        el.width = rows[0].length * scale;
-        el.height = rows.length * scale;
-        const ctx = el.getContext('2d');
-        ctx.imageSmoothingEnabled = false;
-        for(let r = 0; r < rows.length; r++){
-          for(let c = 0; c < rows[r].length; c++){
-            const key = rows[r][c];
-            if(key === '.' || key === ' ') continue;
-            ctx.fillStyle = PALETTE[key];
-            ctx.fillRect(c * scale, r * scale, scale, scale);
-          }
-        }
-        return el;
-      }
+// The city is painted here at its own size, then cropped onto the card.
+const ssBuf = document.createElement('canvas');
+ssBuf.width = W; ssBuf.height = H;
 
-      const roles = document.getElementById('roles');
-      for(const cls of playableClasses()){
-        const li = document.createElement('li');
-        li.className = 'role';
-        if(HERO_ART[cls.art]) li.append(portrait(HERO_ART[cls.art]));
-        const body = document.createElement('div');
-        const name = document.createElement('b');
-        name.textContent = cls.name;
-        const role = document.createElement('span');
-        role.textContent = cls.archetype;
-        const blurb = document.createElement('p');
-        blurb.textContent = cls.blurb;
-        body.append(name, role, blurb);
-        li.append(body);
-        roles.append(li);
-      }
-      for(const open of OPEN_ROLES){
-        const li = document.createElement('li');
-        li.className = 'role';
-        li.dataset.locked = 'true';
-        const body = document.createElement('div');
-        const name = document.createElement('b');
-        name.textContent = `Seat ${open.slot}`;
-        const role = document.createElement('span');
-        role.textContent = 'Not designed yet';
-        const blurb = document.createElement('p');
-        blurb.textContent = open.suggestion;
-        body.append(name, role, blurb);
-        li.append(body);
-        roles.append(li);
-      }
+// The lower middle of the scene: the skyline and the ground it stands on.
+const CROP = { x: (W - W / 2) / 2, y: H - H / 2 };
 
-      /* ---- the palette, for anyone who opens the drawer -------------------- */
+/* Level one: hazed over and thinning out, but the trees are still there. The
+   restored bloom is prettier and is the wrong picture — a game called Save
+   Solarium should not open on the city already saved. The seed is fixed so the
+   card is the same image every visit; a storefront that reshuffles itself is a
+   storefront nobody recognises. */
+const ssScene = buildScene(1, 20260819, { restored: false });
 
-      const swatches = document.getElementById('swatches');
-      const NAMES = {
-        k: 'Ink', w: 'Bone', s: 'Skin', S: 'Shade', y: 'Sun', Y: 'Gold',
-        o: 'Ember', r: 'Rust', e: 'Blood', g: 'Leaf', G: 'Canopy', l: 'Shoot',
-        c: 'Dew', b: 'Deep', v: 'Bloom', p: 'Petal', P: 'Plum', m: 'Steel',
-        M: 'Panel', x: 'Slag', t: 'Loam', T: 'Spoil', n: 'Bark', N: 'Root',
-        d: 'Dusk', D: 'Night', f: 'Flame', F: 'Coal',
-      };
-      for(const [key, value] of Object.entries(PALETTE)){
-        const li = document.createElement('li');
-        const chip = document.createElement('span');
-        chip.className = 'chip';
-        chip.style.background = value;
-        const label = document.createElement('span');
-        const nameEl = document.createElement('span');
-        nameEl.className = 'chip-name';
-        nameEl.textContent = NAMES[key] || key;
-        const hexEl = document.createElement('span');
-        hexEl.className = 'chip-hex';
-        hexEl.textContent = `${key} · ${value}`;
-        label.append(nameEl, hexEl);
-        li.append(chip, label);
-        swatches.append(li);
-      }
-    </script>
-  </body>
+// Drawn at double size and standing in front of the skyline rather than in it.
+// At native scale the salvagers were specks among the buildings, which made the
+// card a picture of a city instead of a picture of a game.
+const SS_SCALE = 2;
+const ssParty = ['engineal', 'mistypalm'];
+const ssWave = ['scraphound', 'rustmite'];
+
+function paintSolarium(now){
+  // Paint the city at its own size first, into a buffer.
+  paintScene(ssBuf, ssScene, still ? 0 : now / 1400);
+
+  /* Then crop into it at double size. The scene is drawn for a whole screen, so
+     most of its height is sky — at thumbnail size that reads as an empty card
+     with a strip of buildings along the bottom. Taking the lower middle and
+     blowing it up twice puts the skyline at the height the figures are drawn at
+     and loses nothing but blank air. Twice, exactly: at any other factor some
+     pixels land on two screen pixels and others on three, and a pixel drawing
+     that scales unevenly stops reading as drawn and starts reading as broken. */
+  ss.imageSmoothingEnabled = false;
+  ss.drawImage(ssBuf, CROP.x, CROP.y, W / 2, H / 2, 0, 0, W, H);
+
+  ssParty.forEach((who, i) => {
+    const art = SS_HERO[who];
+    if(!art) return;
+    const rows = art.rows || art;
+    const x = 8 + i * 46;
+    const feet = H - 8 - i * 7;
+    footing(ss, x + 10, feet, 28);
+    blit(ss, art, SS_PAL, x, feet - rows.length * SS_SCALE, { scale: SS_SCALE });
+  });
+
+  ssWave.forEach((who, i) => {
+    const art = SS_ENEMY[who];
+    if(!art) return;
+    const rows = art.rows || art;
+    const x = W - 104 + i * 46;
+    const feet = H - 10 - i * 7;
+    footing(ss, x + 10, feet, 28);
+    blit(ss, art, SS_PAL, x, feet - rows.length * SS_SCALE, { flip: true, scale: SS_SCALE });
+  });
+}
+
+/* One loop for both cards. Nothing here is the game, so it can afford to be
+   lazy: the turbines and the seeds are the only things that move. */
+function frame(now){
+  paintGoodVibes(now);
+  paintSolarium(now);
+  if(!still) requestAnimationFrame(frame);
+}
+
+/* Painted once even when motion is off, so the cards are never blank. */
+requestAnimationFrame(frame);
+</script>
+
+</body>
 </html>

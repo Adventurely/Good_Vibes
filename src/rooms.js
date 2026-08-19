@@ -34,7 +34,7 @@ import {
   AILMENTS, addEffect, addAilment, hasEffect, effectAmount, tickEffects,
   clearAilments, strikePower, ailmentOnHit, effectName, blankStats, intentOf,
   waveTargets, spawnsFor,
-} from '../public/content.js';
+} from '../public/good-vibes/content.js';
 
 const rooms = new Map();
 

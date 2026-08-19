@@ -24,7 +24,7 @@ import {
   PHASES, BOSS_ROUND, CARDS, cardEffect, cardPlayable, playableClasses,
   RECIPES, BUILDINGS, UPGRADES, upgradeCost, canAfford, pathTo, hasEffect,
   effectAmount, MODIFIERS, SPELL_SLOTS,
-} from '../public/content.js';
+} from '../public/good-vibes/content.js';
 
 const RUNS = Number(process.argv[2]) || 400;
 

@@ -13,15 +13,15 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { roomFor, dropIfEmpty } from '../src/rooms.js';
-import { createAudio, SONGS } from '../public/audio.js';
-import { fxStyles, styleFor, soundFor, FX_SOUND } from '../public/fx.js';
+import { createAudio, SONGS } from '../public/good-vibes/audio.js';
+import { fxStyles, styleFor, soundFor, FX_SOUND } from '../public/good-vibes/fx.js';
 import {
   CARDS, EFFECT_KINDS, PHASES, BOSS_ROUND, classById, cardEffect,
   AILMENTS, addAilment, hasEffect, effectName, waveFor, enemyStats, ENEMIES,
   runHighlights, STAT_KEYS, blankStats,
   intentOf, waveTargets, effectAmount, strikePower, cardPlayable,
   playableClasses, PARTY_SIZE,
-} from '../public/content.js';
+} from '../public/good-vibes/content.js';
 
 /* The client's own dispatch, imported rather than re-implemented. That is the
  * whole reason fx.js exists: a test that reasoned about the tables itself would
@@ -515,7 +515,7 @@ test('only the host starts another run, and only from the end of one', () => {
 
 import {
   SPELLS, MODIFIERS, composeSpell, freshSpellbook, wizardCombatDeck,
-} from '../public/content.js';
+} from '../public/good-vibes/content.js';
 
 /* A room parked in the build phase with one seated wizard. */
 function scriptorium(){
@@ -689,7 +689,7 @@ test('an opening word is in the opening hand', () => {
 
 /* ---- the garden ---------------------------------------------------------- */
 
-import { plantPot, potYield } from '../public/content.js';
+import { plantPot, potYield } from '../public/good-vibes/content.js';
 
 test('the pots are the alchemist\'s, they grow between rounds, and they pay on her clock', () => {
   const room = roomFor(`pots-${++codes}`);
@@ -1006,7 +1006,7 @@ test('the roster is full and every seat can be taken', () => {
    production. Hence pinning it here, where it is cheap to notice. */
 
 import { Room } from '../src/rooms.js';
-import { POT_COUNT } from '../public/content.js';
+import { POT_COUNT } from '../public/good-vibes/content.js';
 
 // What a wake actually does: store, evict, rebuild, re-attach sockets.
 const cycle = (room) => {

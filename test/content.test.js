@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import {
   PALETTE, HERO_ART, MATERIAL_ART, TERRAIN_ART, TERRAIN_VARIANTS, BUILDING_ART,
   SALVAGE_ART, ENEMY_ART, PAGES_ART, CARD_ART, TILE, PROP_ART, TREE_ART, FIRE_ART,
-} from '../public/art.js';
+} from '../public/good-vibes/art.js';
 import {
   PARTY_SIZE, CLASSES, OPEN_ROLES, MATERIALS, RECIPES,
   ROUNDS, ROUNDS_BEFORE_BOSS, BOSS_ROUND, roundInfo, phaseCard,
@@ -26,7 +26,7 @@ import {
   WIZARD_BASE_KIT, CLASS_KITS, classKit, freshSpellbook, composeSpell,
   rollOffers, takeOffer, moveModifier, wizardCombatDeck, ownedModifiers, draftableCount,
   POT_COUNT, potYield, potStage, plantPot, harvestPot, growPots,
-} from '../public/content.js';
+} from '../public/good-vibes/content.js';
 
 /* content.js is imported by the authoritative room object as well as the browser, not
  * only by this page. A class with a missing field or an art key that does not
@@ -1498,7 +1498,7 @@ const PUBLISHED = [
 ];
 
 test('every name this module has ever published is still exported', async () => {
-  const content = await import('../public/content.js');
+  const content = await import('../public/good-vibes/content.js');
   const missing = PUBLISHED.filter((name) => content[name] === undefined);
   assert.deepEqual(missing, [],
     `dropped from the published contract: ${missing.join(', ')}. `

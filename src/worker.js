@@ -13,11 +13,19 @@
  */
 
 import { GameRoom } from './room-do.js';
+import { SolariumRoom } from './solarium-do.js';
 
-export { GameRoom };
+export { GameRoom, SolariumRoom };
 
 const WS_PATH = '/api/good-vibes/ws';
+const SOLARIUM_WS = '/api/solarium/ws';
 const CODE_RE = /^[A-Z0-9]{4,6}$/;
+
+// Where the root used to be a single game, before there were two of them.
+const MOVED = {
+  '/play.html': '/good-vibes/play.html',
+  '/title.js': '/good-vibes/title.js',
+};
 
 export default {
   async fetch(request, env){
@@ -42,6 +50,26 @@ export default {
       const id = env.ROOM.idFromName(`${code}`);
       return env.ROOM.get(id).fetch(new Request(url.toString(), request));
     }
+
+    /* Save Solarium, the other game. Same shape and a separate object class, so
+       the two never share a room even if somebody uses the same four letters
+       for both — which is exactly what a memorable code invites. */
+    if(url.pathname === SOLARIUM_WS){
+      if(request.headers.get('Upgrade') !== 'websocket'){
+        return new Response('Expected a WebSocket.', { status: 426 });
+      }
+      const code = (url.searchParams.get('code') || '').toUpperCase();
+      if(!CODE_RE.test(code)) return new Response('Bad room code.', { status: 400 });
+
+      const id = env.SOLARIUM.idFromName(`${code}`);
+      return env.SOLARIUM.get(id).fetch(new Request(url.toString(), request));
+    }
+
+    /* The game used to be the whole site, so its pages sat at the root. Anyone
+       who kept a link from that week should land on the game rather than on a
+       404 they cannot interpret. */
+    const moved = MOVED[url.pathname];
+    if(moved) return Response.redirect(new URL(moved, url).toString(), 301);
 
     // Anything that was not a file and is not the socket. The asset store
     // answers with its own 404 rather than this Worker inventing one.

@@ -22,38 +22,70 @@ after(async () => {
   await new Promise((resolve) => server.close(resolve));
 });
 
-test('GET / returns the title screen', async () => {
+test('GET / returns the shelf, not a game', async () => {
   const res = await fetch(`${baseUrl}/`);
   assert.equal(res.status, 200);
   assert.match(res.headers.get('content-type'), /text\/html/);
   const html = await res.text();
-  assert.match(html, /Good Vibes/);
-  // The landing page is the title screen, and the title screen is a canvas
-  // driven by title.js — served with no <canvas> it is a paragraph of prose
-  // where a game should be.
-  assert.match(html, /<canvas[^>]*id="title"/);
-  assert.match(html, /\.\/title\.js/);
-  // And the one thing a landing page exists to do.
-  assert.match(html, /href="play\.html"/);
+  assert.match(html, /Good Vibe Games/);
+  // Both games, both reachable. A landing page that lists one of them is a
+  // landing page that has quietly lost the other.
+  assert.match(html, /href="\/good-vibes\/"/);
+  assert.match(html, /href="\/solarium\/"/);
+  // The thumbnails are canvases painted by the games' own renderers, so an
+  // import that stops resolving should fail here rather than on the page.
+  assert.match(html, /id="shot-gv"/);
+  assert.match(html, /id="shot-ss"/);
 });
 
-test('the title screen module is served with a JavaScript type', async () => {
-  const res = await fetch(`${baseUrl}/title.js`);
-  assert.equal(res.status, 200);
-  assert.match(res.headers.get('content-type'), /javascript/);
+test('a directory is served as its index', async () => {
+  /* Cloudflare's asset store does this in production. Without the same rule
+     locally, /good-vibes/ is a 404 on a laptop and a game everywhere else —
+     the kind of difference that gets found by somebody else, later. */
+  for(const dir of ['/good-vibes/', '/solarium/']){
+    const res = await fetch(`${baseUrl}${dir}`);
+    assert.equal(res.status, 200, `${dir} returned ${res.status}`);
+    assert.match(res.headers.get('content-type'), /text\/html/);
+  }
 });
 
-test('the style module is served with a JavaScript type', async () => {
-  const res = await fetch(`${baseUrl}/pixel.js`);
-  assert.equal(res.status, 200);
+test('each game is a title screen with a way in', async () => {
+  const gv = await (await fetch(`${baseUrl}/good-vibes/`)).text();
+  assert.match(gv, /<canvas[^>]*id="title"/);
+  assert.match(gv, /\.\/title\.js/);
+  assert.match(gv, /href="play\.html"/);
+
+  const ss = await (await fetch(`${baseUrl}/solarium/`)).text();
+  assert.match(ss, /Save Solarium/);
+  // It came from another site and used to link back to it two levels up.
+  assert.doesNotMatch(ss, /Tool Haven/);
+});
+
+test('each game keeps its own modules', async () => {
+  /* Both games ship a content.js and an art.js. They are different files with
+     different tables, and the only thing keeping them apart is the directory —
+     so check the right one answers on each path. */
+  const gv = await fetch(`${baseUrl}/good-vibes/content.js`);
+  assert.equal(gv.status, 200);
+  assert.match(gv.headers.get('content-type'), /javascript/);
+  assert.match(await gv.text(), /RECIPES|BUILDINGS/);
+
+  const ss = await fetch(`${baseUrl}/solarium/content.js`);
+  assert.equal(ss.status, 200);
+  assert.match(await ss.text(), /SOLAR_PER_ROUND|buildEncounter/);
+});
+
+test('modules are served with a JavaScript type', async () => {
   // A module served as text/plain is refused by the browser, and the page then
   // fails with nothing drawn and nothing obviously wrong.
+  const res = await fetch(`${baseUrl}/good-vibes/pixel.js`);
+  assert.equal(res.status, 200);
   assert.match(res.headers.get('content-type'), /javascript/);
   assert.match(await res.text(), /export const PALETTE/);
 });
 
 test('the lobby page is served', async () => {
-  const res = await fetch(`${baseUrl}/play.html`);
+  const res = await fetch(`${baseUrl}/good-vibes/play.html`);
   assert.equal(res.status, 200);
   assert.match(res.headers.get('content-type'), /text\/html/);
 });

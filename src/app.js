@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -21,8 +21,20 @@ const TYPES = {
  * the URL for '..' before joining looks equivalent and is not. */
 async function readPublic(pathname) {
   const relative = pathname === '/' ? 'index.html' : decodeURIComponent(pathname).replace(/^\/+/, '');
-  const file = path.resolve(publicDir, relative);
+  let file = path.resolve(publicDir, relative);
   if (!file.startsWith(publicDir)) return null;
+
+  /* A directory means its index, which is what every static host does and what
+   * Cloudflare's asset store does in production. Without this, /good-vibes/ is
+   * a 404 locally and a game everywhere else — the sort of difference that gets
+   * found by someone else, later. */
+  if (relative === '' || relative.endsWith('/')) {
+    file = path.join(file, 'index.html');
+  } else {
+    try {
+      if ((await stat(file)).isDirectory()) file = path.join(file, 'index.html');
+    } catch { /* not there at all; the read below reports it */ }
+  }
 
   // Read every time. This server exists so you can edit a file and reload, and
   // an in-memory cache turns that into "edit, reload, see the old one, and
@@ -39,8 +51,9 @@ async function readPublic(pathname) {
 /**
  * Request handler for the Good Vibes dev server.
  *
- * GET /        -> public/index.html
- * GET /<file>  -> that file from public/
+ * GET /         -> public/index.html
+ * GET /<dir>/    -> that directory's index.html
+ * GET /<file>    -> that file from public/
  * GET /healthz -> {"status":"ok"}
  * anything else -> 404
  *

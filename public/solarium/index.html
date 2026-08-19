@@ -1,0 +1,1579 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Save Solarium — a co-op deck-building roguelite</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%23b4671a'/><text x='32' y='44' text-anchor='middle' font-family='sans-serif' font-size='30' font-weight='700' fill='%23fff'>SS</text></svg>">
+<style>
+/* The Solarium is worth saving, so it is bright. Warm cream panels, a sky that
+   actually looks like daylight, dark-brown ink instead of black. */
+:root{
+  --sky-1:#8fd6f0; --sky-2:#c9ecf7; --sky-3:#fdf0cf;
+  --ink:#3a2418; --ink-2:#6b5340; --muted:#8a7660;
+  --paper:#fff8e8; --paper-2:#f6e7c8; --line:#d9bf94; --line-2:#b99a67;
+  --sun:#ffcb2e; --sun-deep:#f09022; --leaf:#5aab3c; --leaf-2:#3f8f38;
+  --sky-blue:#3fa9dd; --hurt:#e04a34; --shield:#4f9fd8; --violet:#8a5bb8;
+  --radius:12px;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --shadow:0 2px 0 var(--line-2), 0 8px 18px -10px rgba(58,36,24,.5);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;color:var(--ink);overflow-x:hidden;
+  font:15px/1.55 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  background:linear-gradient(180deg,var(--sky-1) 0%,var(--sky-2) 42%,var(--sky-3) 100%);
+  background-attachment:fixed}
+canvas{image-rendering:pixelated}
+
+/* ---------- world backdrop ----------
+   The stage skyline sits behind the entire page, anchored to the bottom so the
+   horizon lands where a horizon should and the sky fills whatever is above. */
+#worldbg{position:fixed;inset:0;width:100vw;height:100vh;z-index:-2;pointer-events:none;
+  object-fit:cover;object-position:center bottom;image-rendering:pixelated}
+#motes{position:fixed;inset:0;z-index:-1;pointer-events:none}
+
+.wrap{max-width:1180px;margin:0 auto;padding:0 16px;position:relative}
+
+.top{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:2px solid var(--line)}
+.top h1{margin:0;font-size:19px;letter-spacing:-.01em;font-weight:800}
+.top .back{color:var(--ink-2);text-decoration:none;font-size:13px}
+.top .back:hover{color:var(--sun-deep)}
+.roomcode{margin-left:auto;font-family:var(--mono);font-size:13px;color:var(--ink-2)}
+.roomcode b{color:var(--sun-deep);letter-spacing:.18em;font-size:17px}
+
+.screen{padding:16px 0 12px}
+h2{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--ink-2);margin:0 0 12px;font-weight:800}
+
+.btn{font:inherit;font-size:14px;padding:9px 16px;border-radius:9px;cursor:pointer;
+  background:var(--paper);border:2px solid var(--line-2);color:var(--ink);font-weight:600;
+  box-shadow:0 2px 0 var(--line-2);transition:transform .08s}
+.btn:hover:not(:disabled){background:#fffdf6;transform:translateY(-1px)}
+.btn:active:not(:disabled){transform:translateY(1px);box-shadow:none}
+.btn:disabled{opacity:.5;cursor:not-allowed;box-shadow:none}
+.btn-go{background:var(--sun);border-color:var(--sun-deep);box-shadow:0 2px 0 var(--sun-deep)}
+.btn-go:hover:not(:disabled){background:#ffd95c}
+input[type=text]{font:inherit;font-size:14px;padding:9px 11px;border-radius:9px;background:#fffdf6;
+  border:2px solid var(--line-2);color:var(--ink);width:100%}
+input[type=text]:focus{outline:2px solid var(--sun-deep);outline-offset:-2px}
+
+.panel{background:var(--paper);border:2px solid var(--line-2);border-radius:var(--radius);
+  padding:18px;box-shadow:var(--shadow)}
+
+/* ---------- landing ---------- */
+.hero{text-align:center;max-width:620px;margin:0 auto}
+.logo{font-size:52px;letter-spacing:-.03em;font-weight:900;line-height:.98;margin:18px 0 4px;
+  color:var(--sun);-webkit-text-stroke:3px var(--ink);paint-order:stroke fill;
+  text-shadow:0 5px 0 var(--sun-deep)}
+.tag{color:var(--ink-2);margin:10px 0 22px;font-size:15px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row>*{flex:1;min-width:150px}
+.sep{display:flex;align-items:center;gap:12px;color:var(--ink-2);font-size:12px;margin:15px 0}
+.sep::before,.sep::after{content:"";height:2px;background:var(--line);flex:1;border-radius:2px}
+.err{background:#ffe0d8;border:2px solid #e08a76;color:#8d2f1c;border-radius:9px;padding:9px 12px;
+  font-size:13px;margin-top:12px}
+
+/* ---------- lobby ---------- */
+.picks{display:grid;grid-template-columns:repeat(auto-fit,minmax(196px,1fr));gap:12px}
+.pick{background:var(--paper);border:3px solid var(--line);border-radius:var(--radius);padding:14px 12px;
+  cursor:pointer;text-align:center;color:inherit;font:inherit;transition:transform .12s,border-color .12s;
+  box-shadow:var(--shadow)}
+.pick:hover:not(.taken){transform:translateY(-4px)}
+.pick[aria-pressed="true"]{border-color:var(--sun-deep);background:#fffbe9}
+.pick.taken{opacity:.45;cursor:not-allowed}
+.pick .nm{font-weight:800;font-size:16px;margin-top:4px;-webkit-text-stroke:.6px var(--ink)}
+.pick .arch{font-size:10.5px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.07em}
+.pick .bl{font-size:12px;color:var(--ink-2);margin-top:7px;line-height:1.4}
+.pick .hp{font-family:var(--mono);font-size:11px;color:var(--leaf-2);margin-top:5px;font-weight:700}
+.seats{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.seat{background:var(--paper);border:2px solid var(--line);border-radius:99px;padding:5px 13px;font-size:13px;
+  display:flex;align-items:center;gap:7px;font-weight:600}
+.seat i{width:9px;height:9px;border-radius:50%;background:var(--line-2);display:inline-block}
+.seat.rdy i{background:var(--leaf);box-shadow:0 0 6px var(--leaf)}
+.seat.off{opacity:.45}
+
+/* ---------- battle: the party on the left, trouble on the right ---------- */
+/* Plain beige: the fight needs a calm surface, and the world outside the panel
+   is doing the scene-setting. */
+.arena{position:relative;display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:stretch;
+  background:var(--paper-2);
+  border:2px solid var(--line-2);border-radius:var(--radius);padding:10px 10px;margin-bottom:10px;
+  box-shadow:var(--shadow);overflow:hidden}
+.stagename{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink-2)}
+@media (max-width:820px){.arena{grid-template-columns:1fr;gap:4px}}
+.side{display:flex;flex-direction:column;gap:4px;justify-content:center;min-height:190px}
+.side.foes{align-items:flex-end}
+.side.party{align-items:flex-start}
+/* The rank holds the line. Five standing figures stacked in one column is 535px
+   of sprite before anything else, which pushes the hand off the screen, so they
+   flow into a second column after three. One column stays calmer when the side
+   is small enough to fit it. */
+.rank{display:grid;grid-auto-flow:column;grid-template-rows:repeat(3,auto);gap:2px 6px;
+  align-content:center}
+.rank.few{grid-auto-flow:row;grid-template-rows:none}
+.side.foes .rank{justify-items:end}
+.side.party .rank{justify-items:start}
+@media (max-width:820px){.rank{display:flex;flex-wrap:wrap;justify-content:center}
+  .side{flex-direction:row;flex-wrap:wrap;justify-content:center}
+  .side.foes,.side.party{align-items:center;justify-items:center}}
+.midline{width:2px;background:repeating-linear-gradient(180deg,var(--line) 0 6px,transparent 6px 12px);
+  border-radius:2px;align-self:stretch}
+@media (max-width:820px){.midline{display:none}}
+.sidelab{font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-2);
+  font-weight:800;opacity:.75}
+
+/* a unit is a row now: sprite beside its readout */
+.unit{position:relative;display:flex;align-items:flex-end;gap:7px;background:none;border:0;color:inherit;
+  font:inherit;padding:0 4px 2px;border-radius:10px;cursor:default;max-width:255px;width:100%}
+.side.foes .unit{flex-direction:row-reverse;text-align:right}
+.unit .info{min-width:0;flex:1;padding-bottom:14px}
+.side.foes .spr{transform:scaleX(-1)}   /* enemies look back across the line */
+.unit.pickable{cursor:crosshair}
+.unit.pickable::after{content:"";position:absolute;inset:-5px;border:2px dashed var(--sun-deep);
+  border-radius:10px;animation:pick 1s linear infinite;pointer-events:none}
+@keyframes pick{to{background-position:14px 0}}
+.unit.pickable:hover .shadow{transform:translateX(-50%) scaleX(.8)}
+/* Downed, not deleted: still readable, and the X on the eyes has to survive. */
+.unit.dead{opacity:.62;filter:grayscale(.55)}
+.unit.dead .spr{transform:rotate(-7deg) translateY(3px)}
+.side.foes .unit.dead .spr{transform:scaleX(-1) rotate(7deg) translateY(3px)}
+.lastwords{position:absolute;left:50%;bottom:-4px;transform:translateX(-50%);white-space:nowrap;
+  font-size:10.5px;font-weight:700;font-style:italic;color:var(--paper);background:rgba(58,36,24,.9);
+  padding:2px 8px;border-radius:99px;z-index:7;animation:eulogy .5s ease-out both;pointer-events:none;
+  max-width:300px;overflow:hidden;text-overflow:ellipsis}
+@keyframes eulogy{from{opacity:0;transform:translate(-50%,7px)}to{opacity:1;transform:translate(-50%,0)}}
+.spr{display:block;margin:0 auto;position:relative;transition:transform .1s}
+.shadow{position:absolute;left:50%;transform:translateX(-50%);width:46px;height:8px;border-radius:50%;
+  background:rgba(58,36,24,.24);filter:blur(1px);transition:transform .25s}
+.nm{font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pname{font-size:10.5px;color:var(--ink-2);font-weight:600;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;margin-top:-1px}
+
+/* The shield stands in front of whoever is holding it — on the outside edge,
+   which is the side the other line is on. */
+.shieldfx{position:absolute;bottom:2px;right:-9px;width:26px;height:31px;pointer-events:none;
+  animation:shimmer 2.1s ease-in-out infinite;filter:drop-shadow(0 0 4px rgba(80,180,240,.65))}
+.side.foes .shieldfx{right:auto;left:-9px;transform:scaleX(-1)}
+@keyframes shimmer{0%,100%{opacity:.85}50%{opacity:1}}
+
+/* ---------- other players' pointers ---------- */
+.cursors{position:absolute;inset:0;pointer-events:none;z-index:8}
+.ghost{position:absolute;transform:translate(-3px,-2px);transition:left .09s linear,top .09s linear;
+  will-change:left,top}
+.ghost svg{display:block;filter:drop-shadow(0 1px 1px rgba(58,36,24,.5))}
+.ghost b{display:block;margin:1px 0 0 12px;font-size:10.5px;font-weight:800;padding:1px 7px;
+  border-radius:99px;background:var(--paper);border:1.5px solid currentColor;white-space:nowrap}
+/* The card they are lining up, carried on their pointer. */
+.ghost b i{font-style:normal;font-weight:700;color:var(--ink);opacity:.75;
+  border-left:1.5px solid currentColor;margin-left:5px;padding-left:5px}
+/* Enemy fire, crossing the line. */
+.shot{position:absolute;width:11px;height:11px;border-radius:50%;
+  background:radial-gradient(circle at 35% 35%,#ffe0d2,#f2593a 55%,#901f10);
+  box-shadow:0 0 10px #ef5a45,0 0 3px #fff;transform:translate(-50%,-50%)}
+.shot::after{content:"";position:absolute;inset:-4px;border-radius:50%;
+  background:radial-gradient(circle,rgba(239,90,69,.35),transparent 70%)}
+@keyframes impact{0%{opacity:.95;transform:translate(-50%,-50%) scale(.3)}
+  100%{opacity:0;transform:translate(-50%,-50%) scale(2.4)}}
+.boom{position:absolute;width:26px;height:26px;border-radius:50%;
+  border:3px solid #ef5a45;animation:impact .3s ease-out forwards;pointer-events:none}
+
+/* ---------- deaths ----------
+   A death is a beat, not a state change. Everything here ends on `forwards` so
+   the pose holds until the board is re-rendered, and the flipped variants exist
+   because .side.foes .spr already owns transform and an animation would drop
+   the flip halfway through the fall. */
+@keyframes slain{
+  0%  {transform:none;filter:none}
+  10% {transform:scale(1.08) translateY(-2px);filter:brightness(3.2) saturate(.15)}
+  22% {transform:scale(1.02);filter:brightness(1.5)}
+  100%{transform:translateY(10px) rotate(16deg) scale(.82);opacity:0;filter:brightness(.65)}
+}
+@keyframes slainFoe{
+  0%  {transform:scaleX(-1);filter:none}
+  10% {transform:scaleX(-1) scale(1.08) translateY(-2px);filter:brightness(3.2) saturate(.15)}
+  22% {transform:scaleX(-1) scale(1.02);filter:brightness(1.5)}
+  100%{transform:scaleX(-1) translateY(10px) rotate(16deg) scale(.82);opacity:0;filter:brightness(.65)}
+}
+.unit.slain .spr{animation:slain .8s cubic-bezier(.32,.06,.5,1) forwards}
+.side.foes .unit.slain .spr{animation-name:slainFoe}
+
+/* The Extractor does not get to fall over quietly. */
+@keyframes bossdie{
+  0%          {transform:scaleX(-1);filter:none}
+  8%,24%,40%  {transform:scaleX(-1) scale(1.06);filter:brightness(3.6) saturate(0)}
+  16%,32%,48% {transform:scaleX(-1) scale(1);filter:none}
+  72%         {transform:scaleX(-1) translateY(7px) rotate(6deg) scale(.94);filter:brightness(.8)}
+  100%        {transform:scaleX(-1) translateY(22px) rotate(20deg) scale(.66);opacity:0;filter:brightness(.45)}
+}
+.side.foes .unit.slain.bossfall .spr{animation:bossdie 1.7s ease-in-out forwards}
+@keyframes quake{0%,100%{transform:none}
+  20%{transform:translate(-3px,2px)}40%{transform:translate(3px,-2px)}
+  60%{transform:translate(-2px,-1px)}80%{transform:translate(2px,1px)}}
+.arena.quake{animation:quake .42s ease-in-out 4}
+
+/* A hero stays on the field — the X on the eyes has to remain readable. */
+@keyframes fell{
+  0%  {transform:none;filter:none}
+  12% {transform:scale(1.06);filter:brightness(2.6) saturate(.2)}
+  34% {transform:translateY(1px) rotate(-3deg)}
+  72% {transform:translateY(5px) rotate(-9deg)}
+  100%{transform:translateY(3px) rotate(-7deg)}
+}
+.unit.falling .spr{animation:fell .95s cubic-bezier(.3,.6,.4,1) forwards}
+
+.mote{position:absolute;width:4px;height:4px;border-radius:1px;pointer-events:none;z-index:9}
+
+/* Dev controls. Deliberately ugly — it should never be mistaken for the game. */
+.devbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:10px;padding:7px 10px;
+  border:2px dashed #a8551f;border-radius:10px;background:#fff2c9;font-size:12px;color:#6f4318}
+.devbar b{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;background:#a8551f;color:#fff2c9;
+  padding:2px 6px;border-radius:4px}
+.devbar .btn{padding:3px 9px;font-size:12px}
+.devbar .btn[aria-pressed="true"]{background:#a8551f;color:#fff2c9;border-color:#a8551f}
+.devbar .devgap{flex:1}
+.devopt{display:flex;align-items:center;gap:7px;margin-top:9px;font-size:12.5px;color:var(--ink-2);
+  cursor:pointer}
+.devopt input{width:15px;height:15px;cursor:pointer}
+
+/* Somebody else's salvager. Still fully readable — name, health and pips are
+   untouched — but smaller and a shade back, so the seat you are actually
+   playing is the one your eye lands on, and four of them cost less room. */
+.side.party .unit.other{max-width:216px}
+.side.party .unit.other .spr{transform:scale(.78);transform-origin:bottom center}
+.side.party .unit.other .info{opacity:.82}
+.side.party .unit.other .nm{font-size:12px}
+
+/* A damage figure that is not the printed one. */
+.pcard .mod{font-weight:800;padding:0 3px;border-radius:4px}
+.pcard .mod.up{color:#1d6b3f;background:#d6f0dd}
+.pcard .mod.down{color:#8f3f1a;background:#fadfd0}
+
+/* ---------- piles ---------- */
+.pilebtn{display:inline-flex;align-items:center;gap:5px;font:inherit;font-size:11.5px;font-weight:700;
+  font-family:var(--mono);color:var(--ink-2);background:var(--paper);border:2px solid var(--line-2);
+  border-radius:8px;padding:3px 9px;cursor:pointer}
+.pilebtn:hover{border-color:var(--sun-deep);color:var(--ink)}
+.pico{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}
+
+.sheetwrap{position:fixed;inset:0;z-index:60;background:rgba(58,36,24,.55);display:flex;
+  align-items:center;justify-content:center;padding:22px}
+.sheet{background:var(--paper);border:3px solid var(--line-2);border-radius:14px;padding:16px 18px;
+  max-width:760px;width:100%;max-height:82vh;display:flex;flex-direction:column;box-shadow:var(--shadow)}
+.sheethead{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.sheethead b{font-size:16px}
+.sheethead .cnt{font-family:var(--mono);font-size:12px;color:var(--ink-2)}
+.sheethead .btn{margin-left:auto;padding:5px 13px;font-size:13px}
+.sheetnote{margin:0 0 12px;font-size:12.5px;color:var(--ink-2);line-height:1.5}
+.sheetempty{color:var(--ink-2);font-size:13.5px;margin:6px 0}
+.sheetcards{display:flex;flex-wrap:wrap;gap:9px;overflow:auto;padding:2px}
+.pcard.mini{width:118px;cursor:default;box-shadow:none;transform:none}
+.pcard.mini .cn{font-size:12px}
+.pcard.mini .ct{font-size:10.5px}
+/* The character saying it, kept clearly apart from what it does — under
+   pressure the rules have to be the thing the eye lands on. */
+.cv{margin-top:5px;padding-top:4px;border-top:1.5px dashed var(--line-2);
+  font-size:9.5px;line-height:1.35;font-style:italic;color:var(--ink-2);opacity:.9}
+.pcard.mini .cv{font-size:9px}
+.pcard .xn{position:absolute;top:-9px;right:-7px;background:var(--ink);color:var(--paper);
+  font-family:var(--mono);font-size:11px;font-weight:800;border-radius:99px;padding:1px 7px}
+
+.resnote{margin:0 0 12px;font-size:12px;color:var(--ink-2);line-height:1.55}
+.linkish{background:none;border:0;padding:0;font:inherit;font-size:12px;color:var(--sun-deep);
+  text-decoration:underline;cursor:pointer}
+
+.unit.aimed{box-shadow:inset 0 0 0 3px currentColor;border-radius:10px}
+.aimtag{position:absolute;top:-7px;right:6px;font-size:9.5px;font-weight:800;padding:0 5px;
+  border-radius:99px;background:currentColor;color:var(--paper)}
+.bar{height:9px;background:#e9d6ae;border:2px solid var(--ink);border-radius:5px;overflow:hidden;
+  margin-top:3px;box-shadow:inset 0 1px 0 rgba(255,255,255,.4)}
+.bar i{display:block;height:100%;background:linear-gradient(180deg,#8ce062,var(--leaf-2));
+  transition:width .3s cubic-bezier(.2,.8,.3,1)}
+.bar.foe i{background:linear-gradient(180deg,#f08a72,#c33a22)}
+.hpnum{font-family:var(--mono);font-size:10.5px;color:var(--ink-2);font-weight:700}
+.pips{display:flex;gap:3px;justify-content:center;flex-wrap:wrap;margin-top:3px;min-height:16px}
+.pip{font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:99px;background:var(--paper-2);
+  border:1.5px solid var(--line-2);font-weight:700}
+.pip.sh{color:var(--shield)} .pip.in{color:var(--sun-deep);background:#fff2c9}
+.pip.rs{color:#a8551f} .pip.rg{color:var(--leaf-2)} .pip.we{color:var(--violet)}
+.pip.mi{color:var(--sun-deep)} .pip.tn{color:var(--sky-blue)}
+.unit.me .nm{color:var(--sun-deep)}
+.unit.ended{opacity:.66}
+
+.float{position:absolute;left:50%;top:10px;transform:translateX(-50%);font-family:var(--mono);
+  font-weight:800;font-size:17px;pointer-events:none;animation:rise .9s ease-out forwards;z-index:6;
+  -webkit-text-stroke:3px var(--ink);paint-order:stroke fill}
+.float.dmg{color:#ff7a5f} .float.heal{color:#8ce062} .float.shl{color:#9fd6ff}
+/* Blocked damage rises on the other side so it never sits on the health hit. */
+.float.blk{color:#bfe6ff;left:26%;font-size:14px}
+@keyframes rise{0%{opacity:0;transform:translate(-50%,8px) scale(.6)}
+  25%{opacity:1;transform:translate(-50%,-6px) scale(1.25)}
+  100%{opacity:0;transform:translate(-50%,-38px) scale(1)}}
+@keyframes shakeA{0%,100%{transform:translateX(0)}18%{transform:translateX(-6px)}
+  42%{transform:translateX(5px)}68%{transform:translateX(-3px)}}
+.shake{animation:shakeA .32s}
+@keyframes lungeA{0%,100%{transform:translateY(0)}38%{transform:translateY(-14px) scale(1.1)}}
+.lunge{animation:lungeA .3s}
+@keyframes popin{from{opacity:0;transform:translateY(10px) scale(.94)}to{opacity:1;transform:none}}
+
+/* hand */
+/* min-height used to reserve a full card's worth of empty space under the
+   arena whether or not there were cards in it. The row is only as tall as the
+   hand now, which is most of the gap the player was looking at. */
+.hand{display:flex;gap:9px;justify-content:center;flex-wrap:wrap;align-items:flex-end;
+  min-height:150px;padding-top:8px}
+/* No animation by default. The whole screen is rebuilt on every server
+   message, so animating the hand meant your cards flashed every time anybody
+   else did anything — which read as your own hand changing when it had not.
+   Only a genuine deal gets the animation, via .deal below. */
+.pcard{width:134px;background:var(--paper);border:3px solid var(--line-2);border-radius:11px;padding:8px;
+  cursor:pointer;text-align:center;color:inherit;font:inherit;position:relative;
+  transition:transform .14s,border-color .14s,box-shadow .14s;
+  box-shadow:var(--shadow)}
+.pcard.deal{animation:popin .22s backwards}
+.pcard:hover:not(:disabled){transform:translateY(-10px) rotate(-1deg);border-color:var(--sun-deep)}
+.pcard[aria-pressed="true"]{border-color:var(--sun-deep);transform:translateY(-12px);
+  box-shadow:0 0 0 3px var(--sun),var(--shadow)}
+.pcard:disabled{opacity:.5;cursor:not-allowed;box-shadow:none}
+.pcard .cost{position:absolute;top:-10px;left:-10px;width:27px;height:27px;border-radius:50%;
+  background:var(--sun);color:var(--ink);font-weight:900;font-size:14px;display:grid;place-items:center;
+  border:3px solid var(--ink);font-family:var(--mono)}
+.pcard .icon{display:block;margin:2px auto 4px}
+.pcard .cn{font-weight:800;font-size:12.5px;line-height:1.2;margin:1px 0 4px}
+.pcard .ct{font-size:11px;color:var(--ink-2);line-height:1.35;min-height:44px}
+.pcard.atk{background:linear-gradient(180deg,#fff2ea,var(--paper))}
+.pcard.skl{background:linear-gradient(180deg,#eaf6ff,var(--paper))}
+.pcard.pwr{background:linear-gradient(180deg,#f4ecff,var(--paper))}
+
+.hud{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:4px 0}
+/* The sound and music switches say what they are in words. Smaller than End
+   turn, because they are settings sitting beside the one button that matters. */
+.hud .btn-toggle{padding:5px 11px;font-size:12px;font-weight:700}
+.solar{display:flex;gap:5px;align-items:center}
+.sunpip{width:22px;height:22px;border-radius:50%;background:radial-gradient(circle,#fff3b0,var(--sun));
+  border:2px solid var(--ink);box-shadow:0 0 10px var(--sun);animation:popin .22s}
+.sunpip.spent{background:#e0d3b4;box-shadow:none}
+.hudlab{font-size:11.5px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.08em;font-weight:800}
+.piles{font-family:var(--mono);font-size:12px;color:var(--ink-2);display:flex;gap:14px;font-weight:700}
+.hint{font-size:13px;color:var(--sun-deep);font-weight:700;min-height:20px}
+
+.rewards{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin:18px 0}
+.rw{width:178px;background:var(--paper);border:3px solid var(--line-2);border-radius:12px;padding:13px;
+  cursor:pointer;text-align:center;color:inherit;font:inherit;transition:transform .14s,border-color .14s;
+  box-shadow:var(--shadow)}
+.rw:hover:not(:disabled){transform:translateY(-8px);border-color:var(--sun-deep)}
+.rw:disabled{opacity:.5;cursor:default}
+.big{text-align:center;padding:32px 0}
+/* A heavy outline on a long headline turns the letterforms to mush. Solid ink
+   on a coloured plate reads instantly at any size. */
+.big .t{display:inline-block;font-size:30px;font-weight:900;letter-spacing:-.01em;line-height:1.15;
+  padding:12px 24px;border:3px solid var(--ink);border-radius:14px;max-width:min(92vw,760px)}
+.big .t.win{color:#2c1d08;background:var(--sun);box-shadow:0 5px 0 var(--sun-deep)}
+.big .t.lose{color:#fff2ec;background:#a8412c;box-shadow:0 5px 0 #6d2417}
+@media (max-width:620px){.big .t{font-size:22px;padding:10px 16px}}
+.saved{font-size:23px;font-weight:900;color:var(--leaf-2)}
+.eulogies{display:flex;flex-direction:column;gap:8px;max-width:480px;margin:0 auto;text-align:left}
+.eulogy{display:flex;align-items:center;gap:12px;background:var(--paper);border:2px solid var(--line);
+  border-radius:10px;padding:7px 12px;animation:eulogy .45s ease-out both}
+.eulogy:nth-child(2){animation-delay:.16s} .eulogy:nth-child(3){animation-delay:.32s}
+.eulogy:nth-child(4){animation-delay:.48s} .eulogy:nth-child(5){animation-delay:.64s}
+.eulogy b{display:block;font-size:13px}
+.eulogy i{font-size:12.5px;color:var(--ink-2)}
+.eulogy .spr{filter:grayscale(.5);opacity:.85}
+/* Pushed well down the page so the skyline has room to be looked at. The rules
+   are reference material, not something you read during a fight. */
+.foot{color:var(--ink-2);font-size:12.5px;border-top:2px solid var(--line);
+  margin-top:clamp(160px,34vh,380px);padding:14px 0 34px}
+.foot ul{padding-left:18px;margin:6px 0 0}
+</style>
+</head>
+<body>
+
+<canvas id="worldbg" aria-hidden="true"></canvas>
+<canvas id="motes"></canvas>
+
+<div class="wrap">
+  <div class="top">
+    <a class="back" href="/">← Good Vibe Games</a>
+    <h1>Save Solarium</h1>
+    <span class="roomcode" id="roomcode"></span>
+  </div>
+  <div id="app"><div class="screen"><p class="hint">Loading…</p></div></div>
+
+  <footer class="foot">
+    <b>How a round works.</b>
+    <ul>
+      <li>Everyone acts at the same time — no turn order. The enemies move once every player has ended.</li>
+      <li><b>3 Solar</b> and <b>4 cards</b> a round. Neither carries over.</li>
+      <li>Your hand is discarded at end of round; when the draw pile empties, the discard shuffles back in.</li>
+      <li>Shield is a stance, not a bank — it clears at the start of your next round.</li>
+      <li>Three fights, then the Extractor. Win one and everyone picks a card and patches up.</li>
+    </ul>
+  </footer>
+</div>
+
+<script type="module">
+import { CLASSES, CARDS } from './content.js';
+import { PALETTE, HERO_ART, ENEMY_ART, ICON_ART } from './art.js';
+import { buildScene, paintScene, STAGE_NAMES, RESTORED_NAME } from './scene.js';
+import { createMusic } from './music.js';
+
+const $ = id => document.getElementById(id);
+const app = $('app');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// Seeds the skyline from the room code, so a party's city is their own.
+const hashCode = s => { let h = 1; for(const ch of String(s || 'x')) h = (h * 31 + ch.charCodeAt(0)) | 0; return Math.abs(h); };
+
+const store = {
+  /* A run is already safe on the server — the Durable Object holds it and a seat
+     is kept by pid — so "saving" is really remembering which door to go back
+     through. Everyone rejoins on the same code and finds their own deck, health
+     and place in the run exactly as they left it. */
+  get saved(){ try{ return JSON.parse(localStorage.getItem('sol.run') || 'null'); }catch{ return null; } },
+  set saved(v){ v ? localStorage.setItem('sol.run', JSON.stringify(v)) : localStorage.removeItem('sol.run'); },
+  get name(){ return localStorage.getItem('sol.name') || ''; },
+  set name(v){ localStorage.setItem('sol.name', v); },
+  get pid(){
+    let v = localStorage.getItem('sol.pid');
+    if(!v){ v = crypto.randomUUID(); localStorage.setItem('sol.pid', v); }
+    return v;
+  }
+};
+
+let ws = null, S = null, error = '', selected = null, rejected = null;
+let cursors = {};          // pid -> {x, y, target, at}
+
+/* ================================================================ sound ===
+ * Synthesised, not sampled: no audio files to fetch, nothing to load, and the
+ * whole kit is a few hundred bytes of maths. Sounds are triggered from the
+ * server's event feed rather than from the click that caused them, so all five
+ * players hear the same hit at the same time — including the four who did not
+ * throw it. */
+const audio = {
+  ctx: null,
+  get muted(){ return localStorage.getItem('sol.mute') === '1'; },
+  set muted(v){ localStorage.setItem('sol.mute', v ? '1' : '0'); },
+
+  wake(){
+    if(!this.ctx){
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if(!AC) return null;
+      this.ctx = new AC();
+    }
+    if(this.ctx.state === 'suspended') this.ctx.resume();
+    return this.ctx;
+  },
+
+  // One voice: an oscillator through its own gain envelope.
+  tone(freq, { type = 'square', dur = 0.12, vol = 0.16, slide = 0, delay = 0 } = {}){
+    const ctx = this.ctx;
+    if(!ctx || this.muted) return;
+    const t0 = ctx.currentTime + delay;
+    const osc = ctx.createOscillator(), g = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t0);
+    if(slide) osc.frequency.exponentialRampToValueAtTime(Math.max(40, freq + slide), t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(g).connect(ctx.destination);
+    osc.start(t0); osc.stop(t0 + dur + 0.02);
+  },
+
+  // Filtered noise, for impacts and anything airy.
+  noise({ dur = 0.16, vol = 0.14, from = 1800, to = 300, delay = 0 } = {}){
+    const ctx = this.ctx;
+    if(!ctx || this.muted) return;
+    const t0 = ctx.currentTime + delay;
+    const n = Math.floor(ctx.sampleRate * dur);
+    const buf = ctx.createBuffer(1, n, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for(let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const f = ctx.createBiquadFilter(); f.type = 'lowpass';
+    f.frequency.setValueAtTime(from, t0);
+    f.frequency.exponentialRampToValueAtTime(Math.max(60, to), t0 + dur);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(vol, t0);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    src.connect(f).connect(g).connect(ctx.destination);
+    src.start(t0);
+  },
+
+  card(){ this.tone(520, { type: 'triangle', dur: 0.07, vol: .1, slide: 260 }); this.noise({ dur: .07, vol: .05 }); },
+  select(){ this.tone(760, { type: 'square', dur: .05, vol: .07 }); },
+  hit(big){
+    this.noise({ dur: big ? .26 : .15, vol: big ? .2 : .13, from: big ? 1400 : 2400, to: 160 });
+    this.tone(big ? 92 : 150, { type: 'sawtooth', dur: big ? .2 : .11, vol: .13, slide: -60 });
+  },
+  heal(){ [523, 659, 784].forEach((f, i) => this.tone(f, { type: 'sine', dur: .2, vol: .1, delay: i * .055 })); },
+  shield(){ this.noise({ dur: .22, vol: .09, from: 400, to: 1800 }); this.tone(330, { type: 'sine', dur: .18, vol: .07, slide: 180 }); },
+  die(){ this.tone(220, { type: 'sawtooth', dur: .42, vol: .14, slide: -170 }); this.noise({ dur: .34, vol: .12 }); },
+
+  /* A hero going down gets its own moment: a stinger, a long sagging tone and
+     a low swell underneath. Deliberately heavier and slower than an enemy
+     dying, because it should stop the table talking. */
+  down(){
+    this.tone(392, { type: 'square', dur: .1, vol: .13 });
+    this.tone(311, { type: 'square', dur: .12, vol: .13, delay: .1 });
+    this.tone(233, { type: 'sawtooth', dur: .95, vol: .16, slide: -150, delay: .22 });
+    this.tone(58,  { type: 'sine', dur: 1.3, vol: .2, delay: .22 });
+    this.noise({ dur: .9, vol: .1, from: 900, to: 90, delay: .24 });
+  },
+  enemy(){ this.tone(120, { type: 'square', dur: .1, vol: .08, slide: -40 }); },
+  win(){ [523, 659, 784, 1047].forEach((f, i) => this.tone(f, { type: 'triangle', dur: .3, vol: .12, delay: i * .1 })); },
+  lose(){ [392, 349, 294, 220].forEach((f, i) => this.tone(f, { type: 'sawtooth', dur: .34, vol: .11, delay: i * .13 })); }
+};
+const music = createMusic(() => audio.ctx);
+const musicOn = {
+  get value(){ return localStorage.getItem('sol.music') !== '0'; },
+  set value(v){ localStorage.setItem('sol.music', v ? '1' : '0'); }
+};
+
+/* Browsers refuse to start audio without a gesture, so the first click both
+   wakes the context and, if music is wanted, starts the loop. */
+addEventListener('pointerdown', () => {
+  audio.wake();
+  if(musicOn.value && !audio.muted && !music.playing) music.start();
+});
+
+function syncMusic(){
+  if(!S) return;
+  music.setStage(Math.min(3, S.level || 0));
+  const wanted = musicOn.value && !audio.muted && S.phase !== 'lobby';
+  if(wanted && !music.playing && audio.ctx) music.start();
+  if(!wanted && music.playing) music.stop();
+}
+
+/* ===================================================== sprite rendering ===
+   Two frames are baked per sprite: the base, and a "breath" where everything
+   above the split row drops a pixel. Baking beats redrawing 600 rectangles a
+   frame, and gives real frame animation without hand-drawing a second pose
+   for every character. */
+const frameCache = new Map();
+
+function bakeFrame(artKey, scale, frame, down){
+  const key = artKey + ':' + scale + ':' + frame + (down ? ':x' : '');
+  if(frameCache.has(key)) return frameCache.get(key);
+
+  const def = HERO_ART[artKey] || ENEMY_ART[artKey];
+  const rows = def.rows, w = rows[0].length, h = rows.length;
+  const c = document.createElement('canvas');
+  c.width = w * scale; c.height = (h + 1) * scale;
+  const g = c.getContext('2d');
+
+  for(let y = 0; y < h; y++){
+    // Breath: the head and torso settle by one pixel, the legs stay planted.
+    const dy = (frame === 1 && y < def.split) ? 1 : 0;
+    const row = rows[y];
+    for(let x = 0; x < w; x++){
+      const ch = row[x];
+      if(ch === '.' || ch === ' ') continue;
+      const col = PALETTE[ch];
+      if(!col) continue;
+      g.fillStyle = col;
+      g.fillRect(x * scale, (y + dy) * scale, scale, scale);
+    }
+  }
+
+  /* Down: a cross over each eye, drawn from coordinates stored with the sprite
+     rather than guessed, so it lands on the face of every character. */
+  if(down && def.eyes){
+    const dy = (frame === 1) ? 1 : 0;
+    for(const [ex, ey] of def.eyes){
+      for(const [ox, oy] of [[-1,-1],[0,0],[1,1],[1,-1],[-1,1]]){
+        g.fillStyle = PALETTE['#'];
+        g.fillRect((ex + ox) * scale, (ey + oy + dy) * scale, scale, scale);
+      }
+      for(const [ox, oy] of [[-1,-1],[1,1],[1,-1],[-1,1]]){
+        g.fillStyle = PALETTE.e;
+        g.fillRect((ex + ox) * scale + Math.floor(scale/4), (ey + oy + dy) * scale + Math.floor(scale/4),
+                   Math.max(1, scale - Math.floor(scale/2)), Math.max(1, scale - Math.floor(scale/2)));
+      }
+    }
+  }
+
+  frameCache.set(key, c);
+  return c;
+}
+
+function iconCanvas(name, scale){
+  const rows = ICON_ART[name] || ICON_ART.gear;
+  const c = document.createElement('canvas');
+  c.width = rows[0].length * scale; c.height = rows.length * scale;
+  const g = c.getContext('2d');
+  rows.forEach((row, y) => [...row].forEach((ch, x) => {
+    if(ch === '.' || ch === ' ') return;
+    const col = PALETTE[ch];
+    if(!col) return;
+    g.fillStyle = col;
+    g.fillRect(x * scale, y * scale, scale, scale);
+  }));
+  return c;
+}
+
+/* One animation loop for the whole page. Each sprite carries its own phase
+   offset so the party does not breathe in military lockstep. */
+function animateSprites(now){
+  for(const el of document.querySelectorAll('canvas[data-art]')){
+    const art = el.dataset.art, scale = +el.dataset.scale;
+    const seed = +el.dataset.seed || 0;
+    const down = el.dataset.down === '1';
+    // The fallen do not breathe.
+    const frame = down ? 0 : Math.floor(now / 460 + seed) % 2;
+    const stamp = frame + (down ? 'x' : '');
+    if(el.dataset.frame === stamp) continue;            // only redraw on change
+    el.dataset.frame = stamp;
+    const g = el.getContext('2d');
+    g.clearRect(0, 0, el.width, el.height);
+    g.drawImage(bakeFrame(art, scale, frame, down), 0, 0);
+  }
+  requestAnimationFrame(animateSprites);
+}
+requestAnimationFrame(animateSprites);
+
+function mountSprites(root){
+  for(const holder of (root || document).querySelectorAll('.spr[data-art]')){
+    const art = holder.dataset.art, scale = Number(holder.dataset.scale) || 4;
+    holder.innerHTML = '';
+    const c = document.createElement('canvas');
+    const def = HERO_ART[art] || ENEMY_ART[art];
+    c.width = def.rows[0].length * scale;
+    c.height = (def.rows.length + 1) * scale;
+    c.dataset.art = art; c.dataset.scale = scale;
+    c.dataset.seed = (art.charCodeAt(0) % 7) / 7;
+    // Paint frame 0 straight away. Waiting for the animation loop leaves a
+    // blank hole on load, and a backgrounded tab never gets that frame at all.
+    const down = holder.dataset.down === '1';
+    c.dataset.down = down ? '1' : '0';
+    c.dataset.frame = '0' + (down ? 'x' : '');
+    c.getContext('2d').drawImage(bakeFrame(art, scale, 0, down), 0, 0);
+    holder.appendChild(c);
+    const sh = holder.parentElement && holder.parentElement.querySelector('.shadow');
+    if(sh) sh.style.bottom = '4px';
+  }
+}
+
+/* ----------------------------------------------------- the world behind --
+   One canvas fixed behind the whole page. It only changes when the party moves
+   to a new stage, so it is drawn on demand rather than every frame. Before a
+   run starts, the Glasshouse Quarter stands in. */
+const worldbg = $('worldbg');
+let world = null, worldKey = '', bgSeed = 1, spin = 0;
+
+function paintWorld(level, seed, restored){
+  const lv = Math.max(0, Math.min(3, level | 0));
+  if(seed) bgSeed = seed;
+  const key = (restored ? 'restored' : lv) + ':' + bgSeed;
+  if(worldKey === key) return;
+  worldKey = key;
+  world = buildScene(lv, bgSeed, { restored: !!restored });
+  paintScene(worldbg, world, spin);
+}
+paintWorld(0);
+
+/* The Solarium coming back.
+ *
+ * Green spreads out from the middle of the skyline rather than cutting to the
+ * finished picture, because the turning is the point of the run — the player
+ * should watch it happen, not be handed the result. Both skylines are baked to
+ * their own canvas once and the growing circle just clips between them, so the
+ * whole thing is two blits a frame however long it runs. */
+let restoring = false;
+function restoreWorld(seed, done){
+  const from = world;
+  if(!from || !worldbg){ done(); return; }
+  const to = buildScene(3, seed, { restored: true });
+  const w = worldbg.width, h = worldbg.height;
+  const bake = built => {
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    paintScene(c, built, spin);
+    return c;
+  };
+  const before = bake(from), after = bake(to);
+  const g = worldbg.getContext('2d');
+  const R = Math.hypot(w, h) * 0.62, DUR = 2600, t0 = performance.now();
+  restoring = true;
+
+  /* The run has to end even if nobody is watching it end.
+     requestAnimationFrame does not fire in a background tab, so hanging the
+     victory screen off the last frame means a player who looks away during the
+     boss kill comes back to a board frozen on a fight they already won. The
+     guard finishes the job on a timer whatever the compositor is doing. */
+  let settled = false;
+  const finish = () => {
+    if(settled) return;
+    settled = true;
+    clearTimeout(guard);
+    restoring = false;
+    world = to;
+    worldKey = 'restored:' + seed;
+    paintScene(worldbg, world, spin);
+    done();
+  };
+  const guard = setTimeout(finish, DUR + 1200);
+
+  (function step(now){
+    if(settled) return;
+    const k = Math.min(1, (now - t0) / DUR);
+    const e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+    g.clearRect(0, 0, w, h);
+    g.drawImage(before, 0, 0);
+    g.save();
+    g.beginPath();
+    g.arc(w / 2, h * 0.62, R * e, 0, Math.PI * 2);
+    g.clip();
+    g.drawImage(after, 0, 0);
+    g.restore();
+    if(k < 1){ requestAnimationFrame(step); return; }
+    finish();
+  })(t0);
+}
+
+/* The city is baked; only the blades move, so this costs one blit and about a
+   thousand pixels. Every third frame is plenty for a turning turbine. */
+let bladeTick = 0;
+function turnBlades(t){
+  // Stand off while the restoration owns the canvas.
+  if(!restoring && world && (bladeTick++ % 3 === 0)){
+    spin = t / 900;
+    paintScene(worldbg, world, spin);
+  }
+  requestAnimationFrame(turnBlades);
+}
+requestAnimationFrame(turnBlades);
+
+/* -------------------------------------------------------- pollen motes --- */
+const motes = $('motes');
+const mg = motes.getContext('2d');
+let mote = [];
+function sizeMotes(){
+  motes.width = innerWidth; motes.height = innerHeight;
+  // Scaled to the viewport so a wide screen is not sparser than a narrow one.
+  const count = Math.round(58 * Math.min(1.6, Math.max(0.6, innerWidth / 1200)));
+  mote = Array.from({ length: count }, () => ({
+    x: Math.random() * innerWidth, y: Math.random() * innerHeight,
+    r: 1 + Math.random() * 2.8, sp: 5 + Math.random() * 18,
+    drift: Math.random() * Math.PI * 2, a: .22 + Math.random() * .5
+  }));
+}
+addEventListener('resize', sizeMotes); sizeMotes();
+
+let lastT = 0;
+function driftMotes(t){
+  const dt = Math.min(0.05, (t - lastT) / 1000); lastT = t;
+  mg.clearRect(0, 0, motes.width, motes.height);
+  for(const m of mote){
+    m.y -= m.sp * dt;
+    m.drift += dt * 0.8;
+    m.x += Math.sin(m.drift) * 9 * dt;
+    if(m.y < -6){ m.y = motes.height + 6; m.x = Math.random() * motes.width; }
+    mg.globalAlpha = m.a;
+    mg.fillStyle = '#fff6c8';
+    mg.beginPath(); mg.arc(m.x, m.y, m.r, 0, 7); mg.fill();
+  }
+  mg.globalAlpha = 1;
+  requestAnimationFrame(driftMotes);
+}
+requestAnimationFrame(driftMotes);
+
+/* --------------------------------------------------------------- socket */
+function connect(code, create, dev){
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const q = new URLSearchParams({ code, name: store.name || 'Player', pid: store.pid,
+    create: create ? '1' : '0', dev: dev ? '1' : '0' });
+  ws = new WebSocket(`${proto}//${location.host}/api/solarium/ws?${q}`);
+  ws.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if(m.t === 'error'){ error = m.message; render(); return; }
+    if(m.t === 'rejected'){
+      // Could not take a seat — a rule, not a network fault. Say which.
+      rejected = m.message;
+      error = m.message;
+      render();
+      return;
+    }
+    if(m.t === 'cursor'){
+      cursors[m.pid] = { x: m.x, y: m.y, target: m.target, card: m.card, at: performance.now() };
+      drawCursors();
+      return;                                   // never re-renders the board
+    }
+    if(m.t === 'state') applyState(m.state);
+  };
+  ws.onclose = ev => {
+    if(rejected) return;                       // already explained properly
+    if(S && S.phase !== 'won' && S.phase !== 'lost'){
+      // Carry the close code and any reason through, so a genuine drop can be
+      // told apart from a rule and from a tab that simply went to sleep.
+      const why = ev.reason ? ` — ${ev.reason}` : (ev.code ? ` (code ${ev.code})` : '');
+      error = `Connection lost${why}. Refresh to rejoin — your seat is held.`;
+    }
+    render();
+  };
+  ws.onerror = () => { error = 'Could not reach the room.'; render(); };
+  setInterval(() => { if(ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'ping' })); }, 45000);
+}
+let holdToken = 0;
+
+/* Taking a new state from the server, which is not always the same as showing
+   it immediately.
+ *
+ * A fight that ends arrives already in the next phase, so rendering it straight
+ * away swaps the board for the reward screen while the last enemy is still
+ * mid-explosion — the death the player earned never gets seen. When the phase
+ * turns over on a death, the state is taken but the phase is held back on the
+ * fight it just finished, long enough for the beat to land. The boss holds
+ * longer still, and hands over to the world coming back before the victory
+ * screen is allowed to appear. */
+function applyState(next){
+  const events = next.events || [];
+  error = '';
+
+  // Remember a run in progress; forget one that has finished.
+  if(next.phase === 'won' || next.phase === 'lost') store.saved = null;
+  else if(next.phase !== 'lobby'){
+    store.saved = { code: next.code, at: Date.now(), level: next.level,
+      party: next.players.map(p => p.name), dev: !!next.dev };
+  }
+
+  const ends = S && S.phase === 'playing' && next.phase !== 'playing'
+    && events.some(e => e.type === 'die' || e.type === 'down');
+
+  if(!ends){
+    holdToken++;                                  // cancel any pending hold
+    S = next;
+    // Winning does not just end the run — it puts the Solarium back.
+    paintWorld(S.level || 0, hashCode(S.code), S.phase === 'won');
+    render();
+    if(events.length) playEvents(events);
+    return 0;
+  }
+
+  const beatBoss = next.phase === 'won';
+  const mine = ++holdToken;
+  // level has already advanced on the server; the backdrop stays on the stage
+  // the fight was actually fought in.
+  S = { ...next, phase: 'playing' };
+  paintWorld(Math.max(0, (S.level || 0) - 1), hashCode(S.code), false);
+  render();
+  playEvents(events);
+
+  // Long enough to read the last death and take a breath before the next screen.
+  const wait = beatBoss ? 3450 : 2400;
+  setTimeout(() => {
+    if(mine !== holdToken) return;                // a newer state overtook us
+    const land = () => {
+      if(mine !== holdToken) return;
+      S = next;
+      paintWorld(S.level || 0, hashCode(S.code), S.phase === 'won');
+      render();
+    };
+    if(beatBoss) restoreWorld(hashCode(next.code), land);
+    else land();
+  }, wait);
+  return wait;
+}
+
+const send = msg => { if(ws && ws.readyState === 1) ws.send(JSON.stringify(msg)); };
+
+/* ------------------------------------------------------------ animation */
+const unitEl = id => document.querySelector(`[data-unit="${CSS.escape(id)}"]`);
+
+function float(el, text, cls){
+  if(!el) return;
+  const d = document.createElement('div');
+  d.className = 'float ' + cls;
+  d.textContent = text;
+  el.appendChild(d);
+  setTimeout(() => d.remove(), 950);
+}
+function bump(el, cls){
+  if(!el) return;
+  const spr = el.querySelector('.spr') || el;
+  spr.classList.remove(cls); void spr.offsetWidth; spr.classList.add(cls);
+}
+
+/* A shot fired across the line, so an attack has a direction and a moment of
+   travel rather than a number appearing out of nowhere. Returns the flight
+   time so the impact can be timed to actually land. */
+const FLIGHT = 210;
+function projectile(fromId, toId){
+  const layer = $('fxlayer'), arena = $('arena');
+  const a = unitEl(fromId), b = unitEl(toId);
+  if(!layer || !arena || !a || !b) return 0;
+
+  const ar = arena.getBoundingClientRect();
+  const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+  const x1 = ra.left + ra.width / 2 - ar.left, y1 = ra.top + ra.height / 2 - ar.top;
+  const x2 = rb.left + rb.width / 2 - ar.left, y2 = rb.top + rb.height / 2 - ar.top;
+
+  const dot = document.createElement('div');
+  dot.className = 'shot';
+  dot.style.left = x1 + 'px';
+  dot.style.top = y1 + 'px';
+  layer.appendChild(dot);
+
+  dot.animate([
+    { transform: 'translate(-50%,-50%) scale(.55)' },
+    { transform: `translate(calc(-50% + ${x2 - x1}px), calc(-50% + ${y2 - y1}px)) scale(1)` }
+  ], { duration: FLIGHT, easing: 'cubic-bezier(.3,.05,.6,1)' });
+
+  setTimeout(() => {
+    dot.remove();
+    const boom = document.createElement('div');
+    boom.className = 'boom';
+    boom.style.left = (x2 - 13) + 'px';
+    boom.style.top = (y2 - 13) + 'px';
+    layer.appendChild(boom);
+    setTimeout(() => boom.remove(), 320);
+  }, FLIGHT);
+
+  return FLIGHT;
+}
+
+const isEnemyId = id => !!(S && S.enemies.some(e => e.uid === id));
+const isBossId  = id => !!(S && S.enemies.some(e => e.uid === id && e.boss));
+
+const RUST = ['#d4702f', '#8f3f1a', '#b39a63', '#5b6a72', '#e2e9ec'];
+const DUST = ['#d8ccb4', '#b39a63', '#6f5c34', '#fffaf0'];
+
+/* Whatever a thing was made of, coming apart. Motes are thrown from the middle
+   of the unit and left to the compositor, so a boss exploding costs the same
+   main-thread work as a rust mite doing it. */
+function burst(el, colours, n, spread){
+  const layer = $('fxlayer'), arena = $('arena');
+  if(!layer || !arena || !el) return;
+  const ar = arena.getBoundingClientRect(), r = el.getBoundingClientRect();
+  const cx = r.left + r.width / 2 - ar.left, cy = r.top + r.height / 2 - ar.top;
+  for(let i = 0; i < n; i++){
+    const m = document.createElement('div');
+    m.className = 'mote';
+    m.style.background = colours[i % colours.length];
+    m.style.left = cx + 'px';
+    m.style.top = cy + 'px';
+    layer.appendChild(m);
+    const a = Math.random() * Math.PI * 2, d = 12 + Math.random() * spread;
+    m.animate([
+      { transform: 'translate(-50%,-50%) scale(1)', opacity: 1 },
+      { transform: `translate(calc(-50% + ${Math.cos(a) * d}px), calc(-50% + ${Math.sin(a) * d - 12}px)) scale(.25)`,
+        opacity: 0 }
+    ], { duration: 520 + Math.random() * 520, easing: 'cubic-bezier(.2,.7,.4,1)' });
+    setTimeout(() => m.remove(), 1100);
+  }
+}
+
+/* Animation and sound are driven off the same server event feed, so every
+   client plays the same beats in the same order — the four people who did not
+   swing still hear and see the swing. */
+function playEvents(events){
+  let delay = 0;
+  for(const e of events){
+    const at = delay;
+    if(e.type === 'play'){
+      setTimeout(() => { bump(unitEl(e.player), 'lunge'); audio.card(); }, at); delay += 90;
+    }else if(e.type === 'damage'){
+      // Enemy fire gets a visible shot; the impact waits for it to arrive.
+      const shot = isEnemyId(e.source) && !isEnemyId(e.target);
+      if(shot) setTimeout(() => projectile(e.source, e.target), at);
+      setTimeout(() => {
+        const t = unitEl(e.target);
+        bump(t, 'shake');
+        // Only what reached health is damage. What the shield ate is shown as
+        // a blocked figure, so the number always matches the bar that moved.
+        if(e.absorbed > 0) float(t, '✦ ' + e.absorbed, 'blk');
+        if(e.amount > 0) float(t, '-' + e.amount, 'dmg');
+        audio.hit(e.amount >= 12);
+      }, at + (shot ? FLIGHT : 0));
+      delay += shot ? 105 + FLIGHT * 0.55 : 105;
+    }else if(e.type === 'heal'){
+      setTimeout(() => { float(unitEl(e.target), '+' + e.amount, 'heal'); audio.heal(); }, at); delay += 85;
+    }else if(e.type === 'shield'){
+      setTimeout(() => { float(unitEl(e.target), '+' + e.amount, 'shl'); audio.shield(); }, at); delay += 75;
+    }else if(e.type === 'down'){
+      // A hero falling: the stinger, and room for it to land.
+      setTimeout(() => {
+        const t = unitEl(e.target);
+        audio.down();
+        if(t){ t.classList.add('falling'); burst(t, DUST, 11, 20); }
+      }, at);
+      delay += 640;
+    }else if(e.type === 'die'){
+      const boss = isBossId(e.target);
+      setTimeout(() => {
+        const t = unitEl(e.target);
+        audio.die();
+        if(!t) return;
+        t.classList.add('slain');
+        if(boss){
+          t.classList.add('bossfall');
+          const ar = $('arena');
+          if(ar){ ar.classList.add('quake'); setTimeout(() => ar.classList.remove('quake'), 1700); }
+          // Three waves, so the thing comes apart rather than popping.
+          burst(t, RUST, 26, 46);
+          setTimeout(() => burst(t, RUST, 22, 70), 380);
+          setTimeout(() => burst(t, RUST, 26, 96), 820);
+        }else{
+          burst(t, RUST, 16, 26);
+        }
+      }, at);
+      delay += boss ? 1750 : 760;
+    }else if(e.type === 'enemyPhase'){
+      setTimeout(() => audio.enemy(), at); delay += 130;
+    }else if(e.type === 'runWon'){
+      setTimeout(() => audio.win(), at); delay += 60;
+    }else if(e.type === 'runLost'){
+      setTimeout(() => audio.lose(), at); delay += 60;
+    }
+  }
+}
+
+/* ------------------------------------------------------- shared pointers */
+const CURSOR_TTL = 4000;
+
+function drawCursors(){
+  const layer = $('cursors');
+  if(!layer || !S) return;
+  const now = performance.now();
+  const parts = [];
+  for(const [pid, c] of Object.entries(cursors)){
+    if(now - c.at > CURSOR_TTL){ delete cursors[pid]; continue; }
+    const p = S.players.find(x => x.id === pid);
+    if(!p || pid === S.you) continue;
+    const colour = (CLASSES.find(k => k.id === p.classId) || {}).colour || '#8a7660';
+    parts.push(`<div class="ghost" style="left:${(c.x * 100).toFixed(2)}%;top:${(c.y * 100).toFixed(2)}%;color:${colour}">
+      <svg width="15" height="19" viewBox="0 0 15 19" aria-hidden="true">
+        <path d="M1 1 L1 15 L5 11.4 L7.6 17.4 L10.4 16.2 L7.9 10.4 L13 10.2 Z"
+              fill="${colour}" stroke="#3a2418" stroke-width="1.4" stroke-linejoin="round"/>
+      </svg>
+      <b>${esc(p.name)}${c.card ? `<i>${esc(c.card)}</i>` : ''}</b></div>`);
+  }
+  layer.innerHTML = parts.join('');
+}
+setInterval(drawCursors, 1000);   // expire stale pointers even when nobody moves
+
+let lastSent = 0, lastPos = null, lastOver = null;
+
+function sendCursor(force){
+  if(!lastPos) return;
+  const now = performance.now();
+  if(!force && now - lastSent < 65) return;     // ~15/s is plenty to read
+  lastSent = now;
+  const me = driving();
+  const card = selected !== null && me && me.hand ? CARDS[me.hand[selected]] : null;
+  send({ t: 'cursor', x: lastPos.x, y: lastPos.y,
+    target: card && lastOver ? lastOver : null,
+    card: card ? card.name : null });
+}
+
+function watchPointer(){
+  const arena = $('arena');
+  if(!arena) return;
+  arena.addEventListener('pointermove', e => {
+    const r = arena.getBoundingClientRect();
+    lastPos = { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height };
+    const over = e.target.closest && e.target.closest('.unit');
+    lastOver = over ? over.dataset.target : null;
+    sendCursor(false);
+  });
+}
+
+/* ---------------------------------------------------------------- views */
+function render(){
+  if(!S){ app.innerHTML = landing(); wireLanding(); return; }
+  $('roomcode').innerHTML = S.code ? `room <b>${esc(S.code)}</b>` : '';
+  if(S.phase === 'lobby'){ app.innerHTML = lobby(); wireLobby(); }
+  else if(S.phase === 'reward'){ app.innerHTML = rewardView(); wireReward(); }
+  else if(S.phase === 'won' || S.phase === 'lost'){ app.innerHTML = endView(); wireEnd(); }
+  else { app.innerHTML = battle(); wireBattle(); }
+  mountSprites(app);
+}
+
+function resumeBlock(){
+  const r = store.saved;
+  if(!r) return '';
+  const ago = Math.round((Date.now() - r.at) / 60000);
+  return `<button class="btn btn-go" id="resume" style="width:100%;font-size:15px;margin-bottom:9px">
+      Resume run &middot; ${esc(r.code)}</button>
+    <p class="resnote">${r.level >= 3 ? 'The Extractor' : 'Fight ' + (r.level + 1) + ' of 4'}
+      &middot; ${esc(r.party.join(', '))} &middot; saved ${ago < 1 ? 'just now' : ago + ' min ago'}.<br>
+      Share the code again &mdash; everyone gets their own seat back.
+      <button class="linkish" id="forget">Forget this run</button></p>`;
+}
+
+function landing(){
+  return `<div class="screen"><div class="hero">
+    <div class="logo">SAVE<br>SOLARIUM</div>
+    <p class="tag">Five salvagers, one dying greenhouse world, and a machine that wants the rest of it.
+      Build a deck, take three fights, then meet the Extractor.</p>
+    <div class="panel">
+      <div style="margin-bottom:12px"><input type="text" id="nm" maxlength="14" placeholder="Your name"
+        value="${esc(store.name)}"></div>
+      ${resumeBlock()}
+      <button class="btn btn-go" id="create" style="width:100%;font-size:15px">Create a room</button>
+      <label class="devopt"><input type="checkbox" id="devmode"> Dev mode — drive the whole party,
+        skip fights, jump back</label>
+      <div class="sep">or join one</div>
+      <div class="row">
+        <input type="text" id="code" maxlength="6" placeholder="CODE" style="text-transform:uppercase;
+          font-family:var(--mono);letter-spacing:.2em;text-align:center">
+        <button class="btn" id="join">Join</button>
+      </div>
+      ${error ? `<div class="err">${esc(error)}</div>` : ''}
+    </div>
+    <p style="margin-top:14px;font-size:12.5px;color:var(--ink-2)">Share the code with up to four friends.</p>
+  </div></div>`;
+}
+
+function wireLanding(){
+  const go = create => {
+    store.name = ($('nm').value || 'Player').trim().slice(0, 14) || 'Player';
+    const code = create
+      ? Array.from({ length: 4 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('')
+      : ($('code').value || '').toUpperCase().trim();
+    if(!/^[A-Z0-9]{4,6}$/.test(code)){ error = 'A room code is 4–6 letters or digits.'; render(); return; }
+    history.replaceState(null, '', '?room=' + code);
+    connect(code, create, create && $('devmode') && $('devmode').checked);
+  };
+  $('create').onclick = () => go(true);
+  $('join').onclick = () => go(false);
+  if($('resume')) $('resume').onclick = () => {
+    const r = store.saved;
+    if(!r) return;
+    store.name = ($('nm').value || store.name || 'Player').trim().slice(0, 14) || 'Player';
+    history.replaceState(null, '', '?room=' + r.code);
+    connect(r.code, false, r.dev);
+  };
+  if($('forget')) $('forget').onclick = () => { store.saved = null; render(); };
+  $('code').onkeydown = e => { if(e.key === 'Enter') go(false); };
+}
+
+function lobby(){
+  const me = S.players.find(p => p.id === S.you);
+  const isHost = S.host === S.you;
+  const allReady = S.players.length > 0 && S.players.every(p => p.classId && p.ready);
+  return `<div class="screen">
+    <h2>Party — ${S.players.length} of 5</h2>
+    <div class="seats">${S.players.map(p => `
+      <span class="seat ${p.ready ? 'rdy' : ''} ${p.connected ? '' : 'off'}"><i></i>${esc(p.name)}${
+        p.classId ? ' · ' + esc(CLASSES.find(c => c.id === p.classId).name) : ' · choosing'}${
+        p.id === S.host ? ' (host)' : ''}</span>`).join('')}</div>
+    <h2>Pick your salvager</h2>
+    <div class="picks">${CLASSES.map(c => {
+      const taken = S.players.find(p => p.classId === c.id && p.id !== S.you);
+      const mine = me && me.classId === c.id;
+      return `<button class="pick ${taken ? 'taken' : ''}" data-cls="${c.id}"
+          aria-pressed="${mine}" ${taken ? 'disabled' : ''}>
+        <div class="spr" data-art="${c.id}" data-scale="3"></div>
+        <div class="nm" style="color:${c.colour}">${esc(c.name)}</div>
+        <div class="arch">${esc(c.archetype)}</div>
+        <div class="hp">${c.hp} HP</div>
+        <div class="bl">${esc(c.blurb)}</div>
+      </button>`;
+    }).join('')}</div>
+    <div class="row" style="margin-top:18px;max-width:520px">
+      <button class="btn ${me && me.ready ? '' : 'btn-go'}" id="ready" ${me && me.classId ? '' : 'disabled'}>
+        ${me && me.ready ? 'Not ready' : 'Ready'}</button>
+      ${isHost ? `<button class="btn btn-go" id="start" ${allReady ? '' : 'disabled'}>
+        ${allReady ? 'Start the run' : 'Waiting for everyone'}</button>` : ''}
+    </div>
+    ${S.dev ? `<div class="devbar">
+      <b>DEV</b>
+      <button class="btn" id="devfill">Fill all 5 seats</button>
+      <span>Every unclaimed class becomes a seat you drive yourself.</span>
+    </div>` : ''}
+    ${error ? `<div class="err">${esc(error)}</div>` : ''}
+  </div>`;
+}
+
+function wireLobby(){
+  document.querySelectorAll('.pick').forEach(b => b.onclick = () => {
+    const me = S.players.find(p => p.id === S.you);
+    send({ t: 'class', classId: me && me.classId === b.dataset.cls ? null : b.dataset.cls });
+  });
+  const me = S.players.find(p => p.id === S.you);
+  if($('ready')) $('ready').onclick = () => send({ t: 'ready', ready: !(me && me.ready) });
+  if($('start')) $('start').onclick = () => send({ t: 'start' });
+  if($('devfill')) $('devfill').onclick = () => send({ t: 'dev', cmd: 'fill' });
+}
+
+function intentText(m){
+  if(m.kind === 'attack') return `attacks ${m.v}${m.times ? ' x' + m.times : ''}`;
+  if(m.kind === 'attackAll') return `hits all ${m.v}`;
+  if(m.kind === 'shield') return `shields ${m.v}`;
+  if(m.kind === 'rustAll') return 'weakens all';
+  return 'weakens';
+}
+
+/* What a card will actually do, rather than what is printed on it.
+   Might and weaken are applied to damage at the moment of play, so a hand full
+   of "Deal 6" while you are sitting on +4 Might is telling the player something
+   untrue at the exact moment they are doing the arithmetic. */
+function cardText(c, p){
+  const bonus = (p ? p.might || 0 : 0) - (p ? p.weaken || 0 : 0);
+  let text = esc(c.text);
+  if(!bonus || !c.fx) return text;
+  for(const fx of c.fx){
+    const bases = fx.op === 'damage' || fx.op === 'damageAll' ? [fx.v]
+                : fx.op === 'damageRusted' ? [fx.v, fx.v2] : [];
+    for(const base of bases){
+      if(base == null) continue;
+      const real = Math.max(0, base + bonus);
+      if(real === base) continue;
+      // Once each, in the order the effects read, and never inside a figure
+      // already rewritten.
+      const re = new RegExp('(?<![\d>])' + base + '(?![\d<])');
+      if(re.test(text)) text = text.replace(re, `<b class="mod ${real > base ? 'up' : 'down'}">${real}</b>`);
+    }
+  }
+  return text;
+}
+
+const PILE_ICON = '<svg class="pico" viewBox="0 0 16 16" aria-hidden="true">' +
+  '<rect x="2.5" y="4.5" width="8.5" height="10" rx="1.6"/>' +
+  '<path d="M5.6 2.5h6a1.4 1.4 0 0 1 1.4 1.4v8.2"/></svg>';
+
+const PILE_LABEL = { draw: 'Draw pile', discard: 'Discard pile', deck: 'Your deck' };
+const PILE_NOTE = {
+  draw: 'Sorted, not in order — what is still to come is fair to know, the order it arrives in is not.',
+  discard: 'Everything played this fight. It is reshuffled into your draw pile when that runs out.',
+  deck: 'Every card you own, wherever it happens to be right now.'
+};
+
+/* A deckbuilder you cannot count is a memory test. This opens over the board
+   rather than replacing it, so a pile can be read against what is on the table. */
+function pileView(){
+  const me = driving();
+  const list = me && me.piles ? me.piles[openPile] || [] : [];
+  const counts = {};
+  for(const id of list) counts[id] = (counts[id] || 0) + 1;
+  const rows = Object.entries(counts)
+    .sort((a, b) => CARDS[a[0]].name.localeCompare(CARDS[b[0]].name));
+  return `<div class="sheetwrap" id="sheetwrap">
+    <div class="sheet" role="dialog" aria-label="${esc(PILE_LABEL[openPile])}">
+      <div class="sheethead">
+        <b>${esc(PILE_LABEL[openPile])}</b>
+        <span class="cnt">${list.length} card${list.length === 1 ? '' : 's'}</span>
+        <button class="btn" id="sheetclose">Close</button>
+      </div>
+      <p class="sheetnote">${esc(PILE_NOTE[openPile])}</p>
+      <div class="sheetcards">${rows.length ? rows.map(([id, n]) => {
+        const c = CARDS[id];
+        const kind = c.kind === 'attack' ? 'atk' : c.kind === 'power' ? 'pwr' : 'skl';
+        return `<div class="pcard ${kind} mini">
+          <span class="cost">${c.cost}</span>
+          ${n > 1 ? `<span class="xn">&times;${n}</span>` : ''}
+          <span class="icon" data-icon="${esc(c.art || 'gear')}"></span>
+          <div class="cn">${esc(c.name)}</div>
+          <div class="ct">${cardText(c, me)}</div>
+          ${c.voice ? `<div class="cv">${esc(c.voice)}</div>` : ''}
+        </div>`;
+      }).join('') : '<p class="sheetempty">Nothing in here.</p>'}</div>
+    </div></div>`;
+}
+
+function unitHTML(u, pickable){
+  const isEnemy = !!u.uid;
+  const id = isEnemy ? u.uid : u.id;
+  const art = isEnemy ? u.art : u.classId;
+  const cls = isEnemy ? null : CLASSES.find(c => c.id === u.classId);
+  const pips = [];
+  if(u.shield > 0) pips.push(`<span class="pip sh">shield ${u.shield}</span>`);
+  if(isEnemy){
+    if(u.rust > 0) pips.push(`<span class="pip rs">rust ${u.rust}</span>`);
+    if(u.intent) pips.push(`<span class="pip in">${intentText(u.intent)}</span>`);
+  }else{
+    if(u.regen > 0) pips.push(`<span class="pip rg">regrow ${u.regen}</span>`);
+    if(u.might > 0) pips.push(`<span class="pip mi">might ${u.might}</span>`);
+    if(u.weaken > 0) pips.push(`<span class="pip we">weak ${u.weaken}</span>`);
+    if(u.thorns > 0) pips.push(`<span class="pip tn">thorns ${u.thorns}</span>`);
+    if(u.taunt) pips.push(`<span class="pip tn">guarding</span>`);
+  }
+  const pct = Math.max(0, Math.round((u.hp / u.maxHp) * 100));
+  // Whoever else is currently aiming here, drawn in their own colour.
+  const aimers = Object.entries(cursors)
+    .filter(([, c]) => c.target === id)
+    .map(([pid]) => S.players.find(p => p.id === pid))
+    .filter(Boolean);
+  const aim = aimers[0] ? (CLASSES.find(c => c.id === aimers[0].classId) || {}).colour : null;
+
+  const mine = !isEnemy && u.id === drivingId();
+  return `<button class="unit ${pickable ? 'pickable' : ''} ${u.hp <= 0 ? 'dead' : ''}
+      ${mine ? 'me' : ''} ${!isEnemy && !mine ? 'other' : ''} ${!isEnemy && u.ended ? 'ended' : ''}
+      ${aim ? 'aimed' : ''}" ${aim ? `style="color:${aim}"` : ''}
+      data-unit="${esc(id)}" data-target="${esc(id)}" ${pickable ? '' : 'disabled'}>
+    ${aimers.length ? `<span class="aimtag">${esc(aimers.map(a => a.name).join(', '))}</span>` : ''}
+    <div style="position:relative;flex:none">
+      <div class="shadow"></div>
+      <div class="spr" data-art="${esc(art)}" data-scale="${u.boss ? 4 : 3}"
+           data-down="${u.hp <= 0 ? '1' : '0'}"></div>
+      ${u.shield > 0 && u.hp > 0 ? `<svg class="shieldfx" viewBox="0 0 20 24" aria-hidden="true">
+        <path d="M10 1 L19 5 V12 C19 18 14.6 21.6 10 23 C5.4 21.6 1 18 1 12 V5 Z"
+              fill="rgba(120,205,245,.42)" stroke="#2f8fd0" stroke-width="1.6" stroke-linejoin="round"/>
+        <path d="M10 4 L16 6.6 V12 C16 16.2 13 19 10 20.2 Z" fill="rgba(190,235,255,.5)"/>
+      </svg>` : ''}
+    </div>
+    ${!isEnemy && u.hp <= 0 && cls && cls.downLine
+      ? `<span class="lastwords">${esc(cls.downLine)}</span>` : ''}
+    <div class="info">
+      <div class="nm" style="${cls ? 'color:' + cls.colour : ''}">${esc(cls ? cls.name : u.name)}</div>
+      ${cls ? `<div class="pname">${esc(u.name)}${u.id === S.you ? ' (you)' : ''}</div>` : ''}
+      <div class="bar ${isEnemy ? 'foe' : ''}"><i style="width:${pct}%"></i></div>
+      <div class="hpnum">${u.hp}/${u.maxHp}</div>
+      <div class="pips">${pips.join('')}</div>
+    </div>
+  </button>`;
+}
+
+/* Cards animate in only when they were actually dealt — a new round, or a
+   fresh fight. Any other render is somebody else acting, and your hand should
+   sit perfectly still through it. */
+let lastDeal = null;
+
+/* In a dev room one client drives the whole party, so "me" stops meaning "the
+   seat I joined on" and starts meaning "the seat I am holding right now".
+   Everywhere outside a dev room devSeat stays null and this is a no-op. */
+let devSeat = null;
+let openPile = null;
+const drivingId = () => (S && S.dev && devSeat) || (S && S.you);
+const driving = () => S && S.players.find(p => p.id === drivingId());
+function battle(){
+  const me = driving();
+  const dealKey = S.level + ':' + S.round;
+  const dealing = dealKey !== lastDeal;
+  lastDeal = dealKey;
+  const card = selected !== null && me && me.hand ? CARDS[me.hand[selected]] : null;
+  const needEnemy = card && card.target === 'enemy';
+  const needAlly = card && card.target === 'ally';
+  return `<div class="screen">
+    <div class="hud">
+      <span class="hudlab">${S.level >= 3 ? 'The Extractor' : 'Fight ' + (S.level + 1) + ' of 4'}</span>
+      <span class="stagename">${esc(STAGE_NAMES[Math.min(3, S.level)] || '')}</span>
+      <span class="hudlab">Round ${S.round}</span>
+      <span style="margin-left:auto" class="piles">
+        <button class="pilebtn" data-pile="draw" title="What is still to come">
+          ${PILE_ICON}draw ${me ? me.drawCount : 0}</button>
+        <button class="pilebtn" data-pile="discard" title="What you have played">
+          ${PILE_ICON}discard ${me ? me.discardCount : 0}</button>
+        <button class="pilebtn" data-pile="deck" title="Every card you own">
+          ${PILE_ICON}deck ${me ? me.deckSize : 0}</button></span>
+    </div>
+    <div class="arena" id="arena">
+      <div class="side party">
+        <span class="sidelab">Your side</span>
+        <div class="rank${S.players.length <= 3 ? ' few' : ''}">
+          ${S.players.map(p => unitHTML(p, needAlly && p.hp > 0)).join('')}
+        </div>
+      </div>
+      <div class="midline"></div>
+      <div class="side foes">
+        <span class="sidelab">The rust</span>
+        <div class="rank${S.enemies.length <= 3 ? ' few' : ''}">
+          ${S.enemies.map(e => unitHTML(e, needEnemy && e.hp > 0)).join('')}
+        </div>
+      </div>
+      <div class="cursors" id="cursors"></div>
+      <div class="cursors" id="fxlayer"></div>
+    </div>
+    ${S.dev ? `<div class="devbar">
+      <b>DEV</b>
+      <span>Playing as</span>
+      ${S.players.map(p => `<button class="btn devseat" data-seat="${esc(p.id)}"
+        aria-pressed="${p.id === drivingId()}" ${p.hp > 0 ? '' : 'disabled'}
+        >${esc(p.name)}${p.classId ? ' · ' + esc((CLASSES.find(c => c.id === p.classId) || {}).name || '') : ''}</button>`).join('')}
+      <span class="devgap"></span>
+      <button class="btn" id="devskip">Skip this fight</button>
+      <span>Jump to</span>
+      ${[0,1,2,3].map(i => `<button class="btn devgo" data-lv="${i}"
+        aria-pressed="${i === S.level}">${i === 3 ? 'Boss' : 'Fight ' + (i + 1)}</button>`).join('')}
+    </div>` : ''}
+    <div class="hud">
+      <span class="hudlab">Solar</span>
+      <span class="solar">${Array.from({ length: Math.max(5, me ? me.solar : 0) }, (_, i) =>
+        `<span class="sunpip ${me && i < me.solar ? '' : 'spent'}"></span>`).join('')}</span>
+      <span class="hint">${card ? (needEnemy ? 'Pick an enemy.' : needAlly ? 'Pick an ally.' : '')
+        : (me && me.ended ? 'Waiting for the others…' : '')}</span>
+      <button class="btn btn-toggle" id="musictoggle" style="margin-left:auto" title="Background music"
+        aria-pressed="${musicOn.value ? 'true' : 'false'}">Music ${musicOn.value ? 'on' : 'off'}</button>
+      <button class="btn btn-toggle" id="mute" title="Sound effects"
+        aria-pressed="${audio.muted ? 'false' : 'true'}">Sound ${audio.muted ? 'off' : 'on'}</button>
+      <button class="btn ${me && me.ended ? '' : 'btn-go'}" id="endturn"
+        ${me && me.hp <= 0 ? 'disabled' : ''}>${me && me.ended ? 'Take it back' : 'End turn'}</button>
+    </div>
+    <div class="hand">${me && me.hand ? me.hand.map((cid, i) => {
+      const c = CARDS[cid];
+      const kind = c.kind === 'attack' ? 'atk' : c.kind === 'power' ? 'pwr' : 'skl';
+      const ok = me.solar >= c.cost && !me.ended && me.hp > 0;
+      return `<button class="pcard ${kind} ${dealing ? 'deal' : ''}" data-i="${i}"
+          style="${dealing ? `animation-delay:${i * 45}ms` : ''}"
+          aria-pressed="${selected === i}" ${ok ? '' : 'disabled'}>
+        <span class="cost">${c.cost}</span>
+        <span class="icon" data-icon="${esc(c.art || 'gear')}"></span>
+        <div class="cn">${esc(c.name)}</div>
+        <div class="ct">${cardText(c, me)}</div>
+        ${c.voice ? `<div class="cv">${esc(c.voice)}</div>` : ''}
+      </button>`;
+    }).join('') : ''}</div>
+    ${error ? `<div class="err">${esc(error)}</div>` : ''}
+    ${openPile ? pileView() : ''}
+  </div>`;
+}
+
+function wireBattle(){
+  document.querySelectorAll('.pilebtn').forEach(b => b.onclick = () => {
+    openPile = openPile === b.dataset.pile ? null : b.dataset.pile;
+    render();
+  });
+  if($('sheetclose')) $('sheetclose').onclick = () => { openPile = null; render(); };
+  if($('sheetwrap')) $('sheetwrap').onclick = e => {
+    if(e.target.id === 'sheetwrap'){ openPile = null; render(); }
+  };
+  document.querySelectorAll('.devseat').forEach(b => b.onclick = () => {
+    devSeat = b.dataset.seat === S.you ? null : b.dataset.seat;
+    selected = null;
+    render();
+  });
+  if($('devskip')) $('devskip').onclick = () => send({ t: 'dev', cmd: 'skip' });
+  document.querySelectorAll('.devgo').forEach(b => b.onclick = () =>
+    send({ t: 'dev', cmd: 'goto', arg: +b.dataset.lv }));
+  for(const el of document.querySelectorAll('[data-icon]')){
+    el.innerHTML = ''; el.appendChild(iconCanvas(el.dataset.icon, 2));
+  }
+  /* The seat being driven, not the seat this browser joined on.
+     battle() renders from driving() but this read S.you, so in a dev room every
+     card was looked up in the wrong hand: the target requirement came from your
+     own card at that index, which is why playing an attack asked for an ally,
+     and why an index past the end of your hand did nothing at all. */
+  const me = driving();
+  document.querySelectorAll('.pcard').forEach(b => b.onclick = () => {
+    const i = Number(b.dataset.i);
+    const c = me && me.hand ? CARDS[me.hand[i]] : null;
+    if(!c) return;
+    audio.wake(); audio.select();
+    if(c.target === 'enemy' || c.target === 'ally'){
+      selected = selected === i ? null : i;
+      sendCursor(true);                          // tell the table straight away
+      render();
+    }
+    else { send({ t: 'play', index: i, target: null, as: devSeat }); selected = null; sendCursor(true); }
+  });
+  document.querySelectorAll('.unit.pickable').forEach(b => b.onclick = () => {
+    if(selected === null) return;
+    send({ t: 'play', index: selected, target: b.dataset.target, as: devSeat });
+    selected = null;
+    sendCursor(true);                            // clear the card off my pointer
+  });
+  $('endturn').onclick = () => {
+    selected = null;
+    // Same button both ways: ending is a decision, and until the round turns
+    // over it should be one you can change your mind about.
+    const who = driving();
+    send({ t: who && who.ended ? 'unend' : 'end', as: devSeat });
+  };
+  $('mute').onclick = () => {
+    audio.muted = !audio.muted;
+    audio.wake();
+    if(audio.muted) music.stop();
+    render();
+  };
+  $('musictoggle').onclick = () => {
+    musicOn.value = !musicOn.value;
+    audio.wake();
+    if(!musicOn.value) music.stop();
+    render();
+  };
+
+  syncMusic();
+  watchPointer();
+  drawCursors();
+}
+
+function rewardView(){
+  const r = S.rewards || { options: [], chosen: null, waiting: [] };
+  return `<div class="screen">
+    <div class="big"><div class="t win">Fight won</div>
+      <p style="color:var(--ink-2)">Take one card into your deck. The party patches up before the next one.</p></div>
+    <div class="rewards">${r.options.map(cid => {
+      const c = CARDS[cid];
+      return `<button class="rw" data-card="${cid}" ${r.chosen ? 'disabled' : ''}>
+        <span class="icon" data-icon="${esc(c.art || 'gear')}"></span>
+        <div style="font-family:var(--mono);color:var(--sun-deep);font-size:12px;font-weight:700">
+          ${c.cost} solar · ${c.kind}</div>
+        <div style="font-weight:800;margin:4px 0 5px">${esc(c.name)}</div>
+        <div style="font-size:12px;color:var(--ink-2)">${esc(c.text)}</div>
+      </button>`;
+    }).join('')}</div>
+    <div style="text-align:center">
+      <button class="btn" id="skip" ${r.chosen ? 'disabled' : ''}>Skip</button>
+      <p class="hint" style="margin-top:12px">${r.chosen
+        ? (r.waiting.length ? 'Waiting for ' + r.waiting.map(esc).join(', ') : 'Starting the next fight…') : ''}</p>
+    </div>
+  </div>`;
+}
+
+function wireReward(){
+  for(const el of document.querySelectorAll('[data-icon]')){
+    el.innerHTML = ''; el.appendChild(iconCanvas(el.dataset.icon, 3));
+  }
+  document.querySelectorAll('.rw').forEach(b => b.onclick = () => send({ t: 'reward', card: b.dataset.card }));
+  $('skip').onclick = () => send({ t: 'reward', card: null });
+}
+
+function endView(){
+  const won = S.phase === 'won';
+  // On a loss, everyone's last words — each class says its own thing.
+  const roll = !won ? S.players.map(p => {
+    const c = CLASSES.find(k => k.id === p.classId);
+    if(!c) return '';
+    return `<div class="eulogy">
+      <div class="spr" data-art="${esc(c.id)}" data-scale="3" data-down="1"></div>
+      <div><b style="color:${c.colour}">${esc(c.name)}</b>
+        <i>${esc(c.downLine)}</i></div>
+    </div>`;
+  }).join('') : '';
+
+  return `<div class="screen"><div class="big">
+    <div class="t ${won ? 'win' : 'lose'}">${won
+      ? 'THE EXTRACTOR WILL PILLAGE NO MORE!'
+      : 'THE LIGHTS GO OUT'}</div>
+    <p class="${won ? 'saved' : ''}" style="max-width:520px;margin:12px auto 18px">${won
+      ? 'You’ve saved the Solarium!'
+      : 'The drills keep turning. The glass goes dark one pane at a time.'}</p>
+    ${won ? `<p style="color:var(--ink-2);max-width:460px;margin:0 auto 18px">
+      The turbines are turning again over ${esc(RESTORED_NAME)}.</p>` : ''}
+    ${roll ? `<div class="eulogies">${roll}</div>` : ''}
+    <button class="btn btn-go" id="again" style="margin-top:20px">Run it again</button>
+  </div></div>`;
+}
+function wireEnd(){
+  $('again').onclick = () => send({ t: 'again' });
+  if(S.phase === 'lost') audio.down();
+  else if(S.phase === 'won') audio.win();
+  music.stop();
+}
+
+/* Local-only hook so screens can be driven without a server. Guarded by
+   hostname: on the deployed site this never exists. */
+if(location.hostname === 'localhost' || location.hostname === '127.0.0.1'){
+  window.__dev = {
+    render: s => { S = s; render(); },
+    get state(){ return S; },
+    audio, music, buildScene, paintScene, paintWorld, play: playEvents,
+    mountSprites, bakeFrame, restoreWorld, burst, applyState,
+    cursor: (pid, x, y, target, card) => {
+      cursors[pid] = { x, y, target: target || null, card: card || null, at: performance.now() };
+      render();
+    }
+  };
+}
+
+/* ------------------------------------------------------------------ boot */
+const fromUrl = new URLSearchParams(location.search).get('room');
+if(fromUrl && store.name) connect(fromUrl.toUpperCase(), false);
+else render();
+</script>
+</body>
+</html>

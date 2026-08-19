@@ -1,10 +1,14 @@
-# Good Vibes
+# Good Vibe Games
 
-> ## Pushing to `main` deploys the game
+Two games and the site that serves them: **Good Vibes**, built here, and
+**Save Solarium**, which moved in from another repo. One Worker, one domain,
+one deploy.
+
+> ## Pushing to `main` deploys both games
 >
-> `main` builds and deploys **good-vibe-games.com**. Client and rules ship in
-> the same Worker from the same commit, so they cannot end up disagreeing with
-> each other — which is the whole reason the game moved onto its own domain.
+> `main` builds and deploys **good-vibe-games.com**. Each game's client and its
+> rules ship in the same Worker from the same commit, so they cannot end up
+> disagreeing with each other — which is the whole reason the games live here.
 >
 > `npm test` before you push. Nothing else is required, and nothing in this
 > repository can take another site down any more.
@@ -15,6 +19,7 @@
 | --- | --- |
 | ✅ Verified in this repo | `public/` is browser-safe: no Node imports, no `process`, no `Buffer` |
 | ✅ Verified in this repo | `src/rooms.js` runs on Workers: no `node:` built-ins, and no `Date.now()` or `Math.random()` |
+| ✅ Verified in this repo | Both games answer on their own paths, and each keeps its own `content.js` |
 | ✅ Verified in this repo | Every name `content.js` has ever exported is still exported (a test pins it) |
 | ✅ Verified in this repo | A room survives eviction — `serialize`/`restore`, including the generator's draw count |
 | ✅ Verified in this repo | The Worker builds, binds and bundles — `npm run check` |
@@ -27,8 +32,8 @@ the latest deployment. A build that failed leaves the previous one serving, so
 "my change is not there" and "the site is down" are different problems.
 
 If the pages load but no room will connect, the socket is the thing to look at
-— `/api/good-vibes/ws` in `src/worker.js`, and the Durable Object binding in
-`wrangler.jsonc`. If a room connects but comes back empty after being left
+— `/api/good-vibes/ws` or `/api/solarium/ws` in `src/worker.js`, and the two
+Durable Object bindings in `wrangler.jsonc`. If a room connects but comes back empty after being left
 alone, that is `serialize()` in `rooms.js` missing a field, which the
 hibernation tests exist to catch before it ships.
 
@@ -161,46 +166,45 @@ to read apart at a glance converge on the same dim brown.
 
 ## Hosting
 
-The game has its own Worker and its own domain: **good-vibe-games.com**, built
-from this repo. `wrangler.jsonc`, `src/worker.js` and `src/room-do.js` are the
-whole of it.
+One Worker on **good-vibe-games.com** serves the shelf and both games.
 
     good-vibe-games.com
-      ├── /                    public/, served by Cloudflare's asset store
-      └── /api/good-vibes/ws   src/worker.js  →  one Durable Object per code
+      ├── /                    the shelf: public/index.html
+      ├── /good-vibes/         Good Vibes
+      ├── /solarium/           Save Solarium
+      ├── /api/good-vibes/ws   src/worker.js → GameRoom,     one per room code
+      └── /api/solarium/ws     src/worker.js → SolariumRoom, one per room code
 
 `public/` ships verbatim, no build step. The Worker is not invoked for files at
-all — assets are matched first, so the client costs zero Worker calls and the
-socket costs one. Because the game sits at the root of its own domain, every
-relative path resolves exactly as it does under `npm start`; the subdirectory
-the game used to live in was the only thing that made those two differ.
+all — assets are matched first — so the clients cost zero Worker calls and each
+socket costs one.
 
-**The rules exist once.** `src/room-do.js` imports `Room` from `src/rooms.js` —
-the same module the local server runs and the tests drive. This is the point of
-the move. Previously the deployed rules were a 1,200-line hand-written port
-that had to be edited in step with every change here, by hand, and any drift
-between them was a bug nobody could see from either side.
+**Each game keeps its own directory**, and it has to: both ship a `content.js`
+and an `art.js`, they are entirely different tables, and the directory is the
+only thing keeping them apart. A test asserts each path answers with its own.
 
-What the Durable Object adds, and all it adds, is the two things a room needs to
-survive being evicted when it goes quiet: `serialize()` and `Room.restore()`,
-both in `rooms.js` and both pinned by tests. A room in a fight comes back in the
-same fight, and — because the generator's draw count is stored and replayed —
-holding the same cards it would have drawn had nobody left.
+**The rules exist once per game.** `src/room-do.js` imports `Room` from
+`src/rooms.js`, and `src/solarium-do.js` imports `src/solarium.js`, which in
+turn reads `public/solarium/content.js` — the same module its browser imports.
+The alternative, which both games have lived through, is a hand-written copy of
+the rules on the server that has to be edited in step with every change and
+drifts silently when it is not.
+
+**The two games never share a room.** They are separate Durable Object classes,
+so a Good Vibes party and a Solarium party that both pick `RUST` get separate
+rooms. Memorable codes invite exactly that collision.
 
 There is no sign-in, by choice: the room code is the secret. That is how you
 hand a game to four friends in a message instead of in an onboarding flow, and
 the cost is that a short code is a guessable code. The answer to that is a
 longer code, not an account.
 
-**Deploys** are Workers Builds: connect this repo once in the Cloudflare
-dashboard and every push to `main` redeploys. Nothing here needs a token or a
-secret.
+**`npm start` serves all of it** — the shelf, both games, and both sockets.
+Rooms live in a Map locally and in a Durable Object in production; the rules
+module is the same either way.
 
-**One-time setup.** In the Cloudflare dashboard: create the Worker from this
-repo (Workers & Pages → Create → connect `Adventurely/Good_Vibes`, branch
-`main`), then bind the domain under the Worker's Settings → Domains & Routes.
-Durable Objects need no plan upgrade — the SQLite-backed class this uses is on
-the free tier.
+**Deploys** are Workers Builds: every push to `main` redeploys. No token, no
+secret, nothing to remember.
 
 ### The preview channel
 
@@ -268,7 +272,7 @@ npm test
 ## Layout
 
 ```
-public/content.js   the game as data — classes, cards, resources, buildings,
+public/good-vibes/content.js  the game as data — classes, cards, resources, buildings,
                     enemies, rounds, and the pure functions over them
 public/art.js       the palette, the tiles and their cuts, the props, and every
                     sprite, as text
@@ -283,11 +287,16 @@ public/pixel.js     bitmap font and canvas helpers, shared by both pages
 public/title.js     the title screen: a real generated site with the real party
                     walking it, drawn from the same modules the game uses
 public/index.html   the landing page the title screen is mounted in
-src/rooms.js        the authoritative game state: rooms, seats, phases — and
-                    the only copy of it, imported by both servers below
-src/worker.js       the deployed front door: assets, and the socket route
-src/room-do.js      one Durable Object per room code — sockets and hibernation,
-                    no rules
+src/rooms.js        Good Vibes' authoritative game state: rooms, seats, phases
+                    — and the only copy of it, imported by both servers below
+src/solarium.js     Save Solarium's rules engine: pure functions over a state
+                    object, ported from the repo the game came from
+src/worker.js       the deployed front door: assets, and both socket routes
+src/room-do.js      one Durable Object per Good Vibes room code
+src/solarium-do.js  one Durable Object per Save Solarium room code
+public/index.html   the shelf: both games, thumbnails painted by their own
+                    renderers rather than screenshotted
+public/solarium/    Save Solarium, client and content
 wrangler.jsonc      what Cloudflare builds and what it binds
 src/server.js       the local server: http + the socket route
 src/app.js          static files out of public/, for local work only
