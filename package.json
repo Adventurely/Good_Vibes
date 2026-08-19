@@ -9,6 +9,7 @@
   },
   "scripts": {
     "start": "node src/server.js",
+    "build": "echo 'No build step: public/ ships verbatim.'",
     "test": "node --test",
     "check": "npx wrangler deploy --dry-run",
     "deploy": "npx wrangler deploy"
