@@ -1,15 +1,16 @@
 {
-  "name": "good-vibes",
-  "version": "1.0.0",
-  "description": "A minimal Node.js HTTP server serving a hello world page.",
+  "name": "game-server",
+  "version": "2.0.0",
+  "description": "A stand-alone Node server with a game selection menu. Ships with Good Vibes.",
   "type": "module",
-  "main": "src/server.js",
+  "main": "src/main.js",
   "engines": {
     "node": ">=18"
   },
   "scripts": {
-    "start": "node src/server.js",
-    "test": "node --test"
+    "start": "node src/main.js",
+    "test": "node --test",
+    "preview": "node tools/preview-artifact.mjs"
   },
   "license": "MIT"
 }

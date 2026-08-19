@@ -1,4 +1,4 @@
-# Publish public/ to GitHub Pages whenever `main` or `preview` moves.
+# Publish the Good Vibes client to GitHub Pages whenever `main` or `preview` moves.
 #
 # If the deploy job fails in about a second with no logs and no steps at all,
 # nothing here is wrong: GitHub rejected the deployment before the job could
@@ -12,10 +12,11 @@
 #
 # This is the single-player preview channel: Pages is static, so the game is
 # reachable only through its offline ?preview mode — rooms and the WebSocket
-# need the real server and are not served here. The live multiplayer deploy
-# stays what it has always been: a push to main, via publish-to-tool-haven.
+# need the server in src/, which Pages cannot run. To play multiplayer, clone
+# the repo and `npm start`.
 #
-# public/ ships verbatim, no build step — what you push is what you play at
+# The game's public/ ships verbatim, no build step — what you push is what you
+# play at
 #   https://adventurely.github.io/Good_Vibes/play.html?preview
 # To publish any branch's state: git push origin HEAD:preview --force
 name: preview-pages
@@ -46,6 +47,6 @@ jobs:
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: public
+          path: games/good-vibes/public
       - id: deployment
         uses: actions/deploy-pages@v4

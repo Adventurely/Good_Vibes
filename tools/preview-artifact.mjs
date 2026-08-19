@@ -4,7 +4,7 @@
  * The artifact host wraps whatever it is given in its own <!doctype>/<head>/
  * <body> skeleton and its CSP blocks every network request — so the page must
  * carry everything: no module imports to fetch, no server to reach. This
- * script takes public/play.html, inlines its five ES-module imports with
+ * script takes the game's play.html, inlines its five ES-module imports with
  * esbuild, forces the client's own offline preview mode (the ?preview path,
  * which never opens the WebSocket), and emits a fragment: title, style, body
  * markup, and one dependency-free script.
@@ -19,7 +19,8 @@ import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const outFile = resolve(process.argv[2] || join(root, 'dist', 'preview.html'));
-const html = readFileSync(join(root, 'public', 'play.html'), 'utf8');
+const gameDir = join(root, 'games', 'good-vibes', 'public');
+const html = readFileSync(join(gameDir, 'play.html'), 'utf8');
 
 /* Pull the three pieces out of the full document. Anchored, and they throw
    when the anchor moves, because a bundle built from a half-matched page
@@ -43,9 +44,10 @@ const bootLine = "new URLSearchParams(location.search).get('preview');";
 if(!entry.includes(bootLine)) throw new Error('play.html: preview boot line moved; update this script to match');
 entry = entry.replace(bootLine, "new URLSearchParams(location.search).get('preview') ?? '';");
 
-/* Bundle from inside public/ so the ./content.js-style imports resolve. IIFE
-   output, so the inlined result asks the page to fetch nothing. */
-const entryFile = join(root, 'public', '.preview-entry.mjs');
+/* Bundle from inside the game's public/ so the ./shared/index.js-style imports
+   resolve the same way they do in the browser. IIFE output, so the inlined
+   result asks the page to fetch nothing. */
+const entryFile = join(gameDir, '.preview-entry.mjs');
 writeFileSync(entryFile, entry);
 let js;
 try {
