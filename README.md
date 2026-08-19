@@ -203,8 +203,37 @@ longer code, not an account.
 Rooms live in a Map locally and in a Durable Object in production; the rules
 module is the same either way.
 
-**Deploys** are Workers Builds: every push to `main` redeploys. No token, no
-secret, nothing to remember.
+**Deploys are GitHub Actions**, not Cloudflare's Workers Builds:
+`.github/workflows/deploy.yml` runs the tests, builds the Worker with
+`wrangler deploy --dry-run`, and — only then, and only on `main` — uploads it.
+One `wrangler deploy` ships the Worker, both room classes and the whole of
+`public/` together, so a client and the socket it talks to can never be
+different ages.
+
+Keeping it here rather than in the dashboard buys two things: a pull request
+gets the same verdict a push does, from a job that holds no credentials; and a
+build that fails is a red check next to the commit rather than a state of the
+site nobody was told about. **Do not also connect Workers Builds** — two
+services watching `main` is two deploys per push, racing to be last.
+
+**One-time setup**, all of it outside this repo:
+
+1. **An API token.** Cloudflare dashboard → My Profile → API Tokens → Create,
+   from the **Edit Cloudflare Workers** template. That template already carries
+   the `Workers Scripts: Edit` permission an upload needs; Durable Objects need
+   nothing beyond it.
+2. **Two repository secrets** (Settings → Secrets and variables → Actions):
+   `CLOUDFLARE_API_TOKEN` from step 1, and `CLOUDFLARE_ACCOUNT_ID`, which is in
+   the right-hand column of Workers & Pages → Overview.
+3. **The domain.** After the first successful deploy the Worker exists but
+   answers on nothing; bind `good-vibe-games.com` under its Settings → Domains
+   & Routes. If another service still holds that hostname it has to release it
+   first — one hostname, one service.
+
+Durable Objects need no plan upgrade: the SQLite-backed classes this uses are
+on the free tier. Nothing about the deploy depends on the repository's default
+branch — `on: push: branches: [main]` is enough on its own, which is the one
+way it is easier than the Pages channel below.
 
 ### The preview channel
 
@@ -314,8 +343,8 @@ test/balance.mjs    not a test — a harness. Plays whole runs at every table
 the authoritative room, which is what stops the rules and the UI ever
 disagreeing about what a potion does. It is also why the file stays
 declarative — a throw at its top level would take the Worker down — and
-why `test/content.test.js` checks the shape of every class before the publish
-workflow will sync anything.
+why `test/content.test.js` checks the shape of every class before the deploy
+workflow will ship anything.
 
 Adding a class is a block in `CLASSES`, a deck in `STARTING_DECKS`, and a sprite
 in `art.js`. Every field is documented above the array, and the test names the
