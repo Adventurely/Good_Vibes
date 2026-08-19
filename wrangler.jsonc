@@ -1,12 +1,11 @@
 {
   // Good Vibes on its own domain.
   //
-  // This repo used to have no wrangler config on purpose, because the only
-  // deployed copy of the game lived inside Tool Haven and a stray `deploy` from
-  // here would either make a second worker or, with the wrong name, overwrite
-  // that one. The game has its own Worker and its own domain now, so the danger
-  // is gone — but the name below still matters for exactly that reason. It is
-  // `good-vibes`, and it is not `tool-haven`.
+  // This repo had no wrangler config for a long time on purpose: the only
+  // deployed copy of the game lived inside another site's Worker, and a stray
+  // `deploy` from here would either make a second worker or, with the wrong
+  // name, overwrite that one. The game has its own Worker and its own domain
+  // now, so that danger is gone.
   "name": "good-vibes",
   "main": "src/worker.js",
   "compatibility_date": "2026-08-01",

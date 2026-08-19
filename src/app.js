@@ -44,8 +44,9 @@ async function readPublic(pathname) {
  * GET /healthz -> {"status":"ok"}
  * anything else -> 404
  *
- * On Tool Haven the same files are served by Cloudflare's asset store, so this
- * exists for local work only — keep it boring, and keep it matching.
+ * In production the same files come out of Cloudflare's asset store without the
+ * Worker running at all, so this exists for local work only — keep it boring,
+ * and keep it matching.
  */
 export async function handleRequest(req, res) {
   const { pathname } = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`);

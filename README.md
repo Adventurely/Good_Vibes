@@ -1,77 +1,36 @@
 # Good Vibes
 
-> ## ⚠️ Read this before pushing to `main`
+> ## Pushing to `main` deploys the game
 >
-> The game is moving to its own domain, **good-vibe-games.com**, served by the
-> Worker in this repo. Until that is proven and Tool Haven's copy is retired,
-> **two** deployments exist and a push to `main` reaches both:
+> `main` builds and deploys **good-vibe-games.com**. Client and rules ship in
+> the same Worker from the same commit, so they cannot end up disagreeing with
+> each other — which is the whole reason the game moved onto its own domain.
 >
-> - **This repo's Worker** imports `src/rooms.js` directly, so client and rules
->   ship together and cannot disagree. Nothing below applies to it.
-> - **Tool Haven** still runs a *hand-written port* of `src/rooms.js`, and still
->   imports `public/content.js` directly — where a missing export is a top-level
->   throw that takes **that whole site down, sign-in included**. It also has no
->   automatic sync, so its client only changes when somebody copies it across.
->
-> The steps below exist for Tool Haven and end when it does. Nobody working in
-> this repository can read its Worker's source, so none of them require
-> guessing what it contains.
+> `npm test` before you push. Nothing else is required, and nothing in this
+> repository can take another site down any more.
 
-### What is true here, and what is documented from the other side
+### What is checked here, and what is not
 
 | | |
 | --- | --- |
 | ✅ Verified in this repo | `public/` is browser-safe: no Node imports, no `process`, no `Buffer` |
+| ✅ Verified in this repo | `src/rooms.js` runs on Workers: no `node:` built-ins, and no `Date.now()` or `Math.random()` |
 | ✅ Verified in this repo | Every name `content.js` has ever exported is still exported (a test pins it) |
-| ✅ Verified in this repo | The workflow copies **only** `source/public/.` — `src/` never leaves |
-| ✅ Documented | What the Worker imports and what its room does with it — see [docs/tool-haven-server.md](docs/tool-haven-server.md) |
-| ✅ Done | Tool Haven's Worker runs a port of `src/rooms.js` and speaks this client's protocol |
-| ✅ Verified in this repo | This repo's own Worker builds, binds and bundles — `npx wrangler deploy --dry-run` |
-| ❓ Cannot be checked here | Whether the `TOOL_HAVEN_TOKEN` secret exists (manual sync until it does) |
-| ❓ Cannot be checked here | Whether `good-vibe-games.com` is bound to the Worker yet — see [Hosting](#hosting) |
+| ✅ Verified in this repo | A room survives eviction — `serialize`/`restore`, including the generator's draw count |
+| ✅ Verified in this repo | The Worker builds, binds and bundles — `npm run check` |
 | ⚠️ Half set up | GitHub Pages is on, but the `github-pages` environment only allows the default branch — see [The preview channel](#the-preview-channel) |
 
-### Steps before a deploy
+### If the site is down
 
-1. **Run `npm test`.** The publish workflow runs it too and will not sync a
-   failing build. The `published contract` test is the one that matters here:
-   it asserts every name this module has ever exported still resolves.
-2. **Check the import list in [docs/tool-haven-server.md](docs/tool-haven-server.md)
-   still matches what you changed.** The Worker's imports from `content.js`
-   are documented there now; if you renamed or removed anything it lists,
-   that is a shim-and-re-port situation, not a push.
-3. **For each name that changed shape, check it against this repo.** Two things changed
-   shape without changing name, and neither throws — they return `undefined`,
-   which is harder to spot than a crash:
-   - `COMBAT_ACTIONS` is now an alias of `CARDS`. A card's owner field is
-     `classId`; it used to be `classOnly`.
-   - The ids `patch`, `arc`, `douse`, `brace` (cards) and `pylon`, `condenser`,
-     `bulwark`, `rig` (buildings) no longer exist.
-4. **The deployed rooms speak this client's protocol.** The porting guide
-   that used to live here has been executed: Tool Haven's Durable Object runs
-   a port of `src/rooms.js` (same rules, same views, same messages), with the
-   signed-in session as the seat token and full mid-run persistence. The
-   complete reference for how the deployed server behaves — identity,
-   protocol, persistence, hibernation, and every difference from
-   `node src/server.js` — is **[docs/tool-haven-server.md](docs/tool-haven-server.md)**.
+Check the build first: Cloudflare's dashboard, Workers & Pages → good-vibes →
+the latest deployment. A build that failed leaves the previous one serving, so
+"my change is not there" and "the site is down" are different problems.
 
-### Changing the game vs changing the server
-
-`src/rooms.js` stays the source of truth for the rules, and the deployed
-Worker runs a port of it. The split that keeps the two honest:
-
-- **Rules and content change here**, with tests. `content.js` ships as-is to
-  the Worker; `rooms.js` changes need re-porting by someone with Tool Haven
-  access (the ported file is marked with exactly what its seams are).
-- **Deploy order is Worker first, then `public/`** whenever the protocol
-  grows — the client must never talk a protocol the live server does not.
-
-### If the site is already down
-
-The cause is almost certainly a missing export. Add it back to `content.js` as
-a shim returning something harmless and correctly shaped — see the
-`compatibility shims` section at the bottom of that file for the two that exist
-— add its name to `PUBLISHED` in `test/content.test.js`, and push.
+If the pages load but no room will connect, the socket is the thing to look at
+— `/api/good-vibes/ws` in `src/worker.js`, and the Durable Object binding in
+`wrangler.jsonc`. If a room connects but comes back empty after being left
+alone, that is `serialize()` in `rooms.js` missing a field, which the
+hibernation tests exist to catch before it ships.
 
 ---
 
@@ -82,8 +41,7 @@ library and a browser.
 - **`public/index.html`** is the title screen: a generated ruin with the party
   walking it, a theme, and a way in.
 - **`public/play.html`** is the game: lobby, build phase, and the surge.
-- `npm start` serves both. See [Playing locally](#playing-locally) — the game's
-  server half lives in another repo, so a room needs the deployed site.
+- `npm start` serves both, socket included. See [Playing locally](#playing-locally).
 
 ## The title screen
 
@@ -244,39 +202,13 @@ repo (Workers & Pages → Create → connect `Adventurely/Good_Vibes`, branch
 Durable Objects need no plan upgrade — the SQLite-backed class this uses is on
 the free tier.
 
-### Tool Haven, until it is retired
-
-The game also still runs inside
-[Tool Haven](https://github.com/Adventurely/Tool-Haven) at `/tools/good-vibes/`,
-behind that site's Cloudflare Access sign-in. That copy is on its way out and
-should be removed once good-vibe-games.com has hosted a real multiplayer game.
-
-Until then it costs what it has always cost: `.github/workflows/publish-to-tool-haven.yml`
-is supposed to copy `public/` across on every push to `main`, but it needs a
-`TOOL_HAVEN_TOKEN` secret that does not exist, so the copy is manual. And its
-server is a *separate hand-written port* of `src/rooms.js` living at
-`src/game/good-vibes.js` in that repo — so a rules change is not done until it
-has been made twice. Retiring it is what collects the prize.
-
-**One-time setup.** The workflow needs push access to the other repo, which a
-`GITHUB_TOKEN` does not have. Create a fine-grained personal access token
-scoped to `Adventurely/Tool-Haven` with **Contents: read and write**, then add
-it to this repo as a secret named `TOOL_HAVEN_TOKEN` (Settings → Secrets and
-variables → Actions). Until that exists the workflow fails at the checkout
-step, and nothing reaches the site.
-
-**Registering a new slug.** The workflow syncs files but does not touch Tool
-Haven's `data/manifest.json`, which is what puts a card on its homepage. Adding
-a second page there is a one-time manual edit in that repo. `good-vibes` is
-already registered.
-
 ### The preview channel
 
 There is a second, lesser publishing path for looking at the game without a
 server: pushing anything to the `preview` branch sends `public/` verbatim to
 GitHub Pages, where the client's offline `?preview` mode plays a single-seat
 run against a fake room. It is the phone-testing URL, and it deliberately
-cannot host a real game — rooms and the socket need Tool Haven.
+cannot host a real game — rooms and the socket need the deployed Worker.
 
     git push origin HEAD:preview        # publish whatever you are looking at
 
@@ -370,9 +302,9 @@ test/balance.mjs    not a test — a harness. Plays whole runs at every table
 ```
 
 **`content.js` is the file to edit.** It is imported by the browser *and* by
-the authoritative room object in Tool Haven, which is what stops the rules and
-the UI ever disagreeing about what a potion does. It is also why the file stays
-declarative — a throw at its top level would take the whole Worker down — and
+the authoritative room, which is what stops the rules and the UI ever
+disagreeing about what a potion does. It is also why the file stays
+declarative — a throw at its top level would take the Worker down — and
 why `test/content.test.js` checks the shape of every class before the publish
 workflow will sync anything.
 
@@ -383,10 +315,11 @@ Hauler, Grafter — so `OPEN_ROLES` is empty; it is kept as an export because th
 Worker imports this module, and a sixth seat would need `PARTY_SIZE` moved
 first, which a test pins.
 
-`COMBAT_ACTIONS` is a **deprecated alias of `CARDS`**, kept only because the
-Tool Haven room imports this module and a missing export there is a throw at the
-top of the Worker — which takes the whole site down, sign-in included. Delete it
-once the room reads `CARDS`.
+`COMBAT_ACTIONS` is a **deprecated alias of `CARDS`**. It was kept because a
+second repo imported this module and a missing export there was a throw at the
+top of somebody else's Worker. That repo no longer imports anything from here,
+so the alias is now deletable: drop it, and drop its name from `PUBLISHED` in
+`test/content.test.js` in the same commit.
 
 **`art.js` is client-only** — the engine references an art key by name and
 never reads a sprite. A mistake in there can break a picture but not the
@@ -523,12 +456,6 @@ Some inks do more than move numbers: a ward on cast, a heal for half the
 damage dealt, a page back on a kill, a copy stacked into the opening hand, a
 strike that reaches the farthest thing in the lane instead of the nearest, and
 a seal that pays in blood but can never take the caster's last point.
-
-> **Deployed rooms don't speak this yet.** The `page`/`pick`/`mod` intents
-> (and the garden's `plant`/`harvest`) exist in `src/rooms.js` and the
-> offline preview; the Tool Haven Worker is a hand-port that predates them
-> and safely ignores them until it is re-ported. The old page-ammo wizard
-> path is untouched for exactly that reason.
 
 ### Moving
 
@@ -995,8 +922,8 @@ last one it holds the combat board open for **1.9 seconds** before letting the
 next round's splash land, because the room ends a round the instant the wave is
 empty and sends the kill and the next phase in the same message. Without the
 hold you never saw the thing you spent four turns killing. See
-`applyState()` in `play.html`, and `docs/tool-haven-server.md` for why that is
-the only state update the client is allowed to defer.
+`applyState()` in `play.html`: it is the only state update the client is
+allowed to defer, because everything else the room sends is authoritative.
 
 #### Effects, on screen and in the ear
 
@@ -1030,9 +957,8 @@ away without this because terrain is per-cell already — nine cells of `tent` a
 nine solid cells for free — but a *building* is one record with one `x,y`, and
 every rule reads it that way.
 
-Doing it properly is a `content.js` signature change, and that makes
-`src/rooms.js` a re-port for someone with Tool Haven access. Worth doing, worth
-doing deliberately:
+Doing it properly is a `content.js` signature change, and `src/rooms.js`
+follows it. Worth doing, worth doing deliberately:
 
 - `BUILDINGS` entries gain `w`/`h`.
 - `canBuildAt(terrain, buildings, nodes, x, y, buildingId)` has to learn what is
@@ -1046,21 +972,15 @@ doing deliberately:
   `canBuildMore` and `salvageAfterCombat` all count array entries, so storing a
   2&times;2 panel as four records would pay four power, count four toward `max`,
   and pay income four times.
-- The `{id, x, y}` record is a **persistence** contract — Tool Haven stores it
-  and mid-run rooms survive redeploys, so a stored room can come back holding
-  the old shape after a new deploy.
+- The `{id, x, y}` record is a **persistence** contract — the Durable Object
+  stores it and mid-run rooms survive redeploys, so a stored room can come back
+  holding the old shape after a new deploy.
 - The hover ghost and the placement preview in `play.html` outline one tile.
 
 ## What is not built yet
 
 Honest status, so nobody discovers these at the table:
 
-- **The deployed Worker predates the scriptorium and the garden.** The
-  `page`/`pick`/`mod` and `plant`/`harvest` intents live in `src/rooms.js` and
-  the offline preview; the Tool Haven Durable Object safely ignores them until
-  someone with access re-ports it. Deployed rooms still run the old page-ammo
-  wizard, whose cards and costs are kept in `content.js` untouched for exactly
-  that reason.
 - **A hand of nothing but costed cards is possible late.** An Engineer with
   several Bolt Guns and no power can draw three unplayable cards; *Do nothing*
   is the way out, and it is always available.

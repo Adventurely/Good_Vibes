@@ -1,6 +1,6 @@
 /* Good Vibes — game content.
  *
- * Everything here is data. It is imported by the room object in Tool Haven,
+ * Everything here is data. It is imported by the authoritative room object,
  * which is authoritative, and by the browser for rendering — so it must not
  * depend on anything that exists on only one side. No DOM, no storage, no
  * clock, no randomness at load time. Pure values.
@@ -485,8 +485,9 @@ export const strikePower = (amount, effects) =>
     - effectAmount(effects, 'weak'));
 
 /* The cards every deck holds regardless of class, by id. Kept as its own
-   export because the Tool Haven room imports it; UNIVERSAL_CARDS derives the
-   same list from the card table and is what the client reads.
+   export for the reason everything at the foot of this file is kept — see the
+   note there; UNIVERSAL_CARDS derives the same list from the card table and is
+   what the client reads.
 
    Strike is here rather than in a class deck for the reason it exists at all:
    a party that built economy and drew no attack still has hands, and a fight
@@ -733,8 +734,8 @@ export const CLASSES = [
 /* Nothing, now: the roster is five of five.
  *
  * Kept as an export rather than deleted, for the reason everything at the foot
- * of this file is kept — the Tool Haven Worker imports this module and a name
- * that is not exported is a throw at the top of it. The lobby and the landing
+ * of this file is kept — this module is imported at the top of the Worker, so a
+ * name that is not exported is a throw before anything serves. The lobby and the landing
  * page both iterate it, and both render nothing when it is empty, which is the
  * correct thing for them to render.
  *
@@ -1142,9 +1143,10 @@ export const UNIVERSAL_CARDS = Object.entries(CARDS)
   .filter(([, card]) => card.universal)
   .map(([id]) => id);
 
-/* Deprecated alias, kept because the Tool Haven room imports this module and a
- * missing export there is a throw at the top of the Worker — which takes the
- * whole site down, sign-in included. Cards carry the same { name, effect, note }
+/* Deprecated alias. It was kept because a second repo imported this module and
+ * a missing export was a throw at the top of somebody else's Worker; that repo
+ * is gone, so this is now safe to delete along with its entry in PUBLISHED.
+ * Cards carry the same { name, effect, note }
  * shape the actions did, so anything reading it still works.
  *
  * Delete once the room has been updated to read CARDS. It must stay below the

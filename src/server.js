@@ -21,7 +21,7 @@ const server = http.createServer((req, res) => {
 });
 
 /* The socket half. Same route the deployed site uses, so the client does not
- * care whether it is talking to this or to Tool Haven.
+ * care whether it is talking to this or to the deployed Worker.
  *
  * The token in the query string is the seat, not the connection: a dropped
  * socket comes back to the character it was playing rather than to a new one.

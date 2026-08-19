@@ -2254,9 +2254,9 @@
 
       /* ---- offline preview ------------------------------------------------ */
 
-      /* npm start serves these files but not the socket — /api/good-vibes/ws
-       * only exists on Tool Haven — so without this the map could not be looked
-       * at until it was deployed.
+      /* A single-seat run against a fake room, so the drawing can be looked at
+       * without a second person and without a deploy — and so the pages stay
+       * useful anywhere they are served from, socket or no socket.
        *
        * This is the one place the client writes game state, and it is fenced
        * off behind `demo` for exactly that reason: in a real room every one of

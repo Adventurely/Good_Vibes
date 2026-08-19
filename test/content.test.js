@@ -28,7 +28,7 @@ import {
   POT_COUNT, potYield, potStage, plantPot, harvestPot, growPots,
 } from '../public/content.js';
 
-/* content.js is imported by the authoritative room object in Tool Haven, not
+/* content.js is imported by the authoritative room object as well as the browser, not
  * only by this page. A class with a missing field or an art key that does not
  * exist would reach the server, and the first anyone heard of it would be a
  * run failing at the table.
@@ -1453,7 +1453,7 @@ test('everything on a persisted site is still reachable around the buildings', (
 
 /* ------------------------------------------------- the published contract -- */
 
-/* This module is imported by the Tool Haven Worker, and an import of a name
+/* This module is imported at the top of the Worker, and an import of a name
  * that is not exported is a throw at the top of that Worker — which takes the
  * whole site down, sign-in included.
  *
@@ -1502,7 +1502,7 @@ test('every name this module has ever published is still exported', async () => 
   const missing = PUBLISHED.filter((name) => content[name] === undefined);
   assert.deepEqual(missing, [],
     `dropped from the published contract: ${missing.join(', ')}. `
-    + 'The Tool Haven Worker imports this module and a missing export is a throw '
+    + 'The Worker imports this module at its top level and a missing export is a throw '
     + 'at the top of it, which takes the whole site down. Shim it instead.');
 });
 
