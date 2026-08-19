@@ -996,3 +996,120 @@ test('the roster is full and every seat can be taken', () => {
     'every live class should be claimable at one table');
   assert.equal(room.maxPlayers, PARTY_SIZE);
 });
+
+/* ---- hibernation ------------------------------------------------------- */
+
+/* The deployed room is a Durable Object, so it is evicted whenever it goes
+   quiet and rebuilt from `serialize()` when somebody comes back. Nothing on the
+   dev server exercises that — rooms there live in a Map and are never written
+   down — which makes this the one part of the room that can only break in
+   production. Hence pinning it here, where it is cheap to notice. */
+
+import { Room } from '../src/rooms.js';
+import { POT_COUNT } from '../public/content.js';
+
+// What a wake actually does: store, evict, rebuild, re-attach sockets.
+const cycle = (room) => {
+  const woken = Room.restore(JSON.parse(JSON.stringify(room.serialize())));
+  for(const p of woken.players) p.socket = fakeSocket();
+  return woken;
+};
+
+test('a room in a fight wakes up in the same fight', () => {
+  const room = roomFor(`wake-${++codes}`);
+  const seats = ['a', 'b'].map((who, i) => {
+    const player = room.join(`wake-token-${codes}-${who}`, fakeSocket());
+    room.handle(player, { t: 'class', classId: playableClasses()[i].id });
+    return player;
+  });
+  room.handle(seats[0], { t: 'start' });
+  for(const p of seats) room.handle(p, { t: 'ready', ready: true });
+
+  const woken = cycle(room);
+
+  assert.equal(woken.phase, room.phase, 'the phase survives');
+  assert.equal(woken.round, room.round, 'and the round');
+  assert.equal(woken.code, room.code);
+  assert.deepEqual(woken.enemies, room.enemies,
+    'every enemy, including its landed-hit count — the ailment cadence is state');
+  assert.deepEqual(woken.terrain, room.terrain, 'and the ground they stand on');
+  assert.deepEqual(
+    woken.players.map(p => [p.id, p.classId, p.hp, p.hand, p.deck, p.discard]),
+    room.players.map(p => [p.id, p.classId, p.hp, p.hand, p.deck, p.discard]),
+    'and each seat, down to the cards it is holding');
+});
+
+test('a woken room deals the same cards the sleeping one would have', () => {
+  const room = roomFor(`stream-${++codes}`);
+  const player = room.join(`stream-token-${codes}`, fakeSocket());
+  room.handle(player, { t: 'class', classId: 'wizard' });
+  room.handle(player, { t: 'start' });
+
+  /* The generator is a closure and cannot be stored, so `restore` replays it:
+     same seed, same number of draws. If that count were dropped the party
+     would quietly get a different game after every eviction — which is the
+     kind of bug nobody reports, because nobody can see it happen. */
+  const woken = cycle(room);
+  assert.equal(woken.rngCalls, room.rngCalls, 'the draw count comes back');
+  assert.equal(woken.seed, room.seed, 'and the seed it was drawing from');
+
+  const before = Array.from({ length: 12 }, () => room.random());
+  const after = Array.from({ length: 12 }, () => woken.random());
+  assert.deepEqual(after, before, 'so the stream continues rather than forking');
+});
+
+test('a run that restarted does not wake up in the run before it', () => {
+  const room = roomFor(`rerun-${++codes}`);
+  const player = room.join(`rerun-token-${codes}`, fakeSocket());
+  room.handle(player, { t: 'class', classId: 'wizard' });
+  room.handle(player, { t: 'start' });
+  const firstSite = JSON.stringify(room.site);
+
+  room.phase = PHASES.over;
+  room.handle(player, { t: 'restart' });
+  room.handle(player, { t: 'start' });
+
+  assert.ok(room.run > 0, 'a restart moves the run counter');
+  const woken = cycle(room);
+  assert.equal(woken.run, room.run, 'which is stored');
+  assert.equal(JSON.stringify(woken.site), JSON.stringify(room.site),
+    'so the second run wakes into the second ruin');
+  assert.notEqual(JSON.stringify(woken.site), firstSite,
+    'and not back into the first, which rebuilding from the code alone would do');
+});
+
+test('a stored room from before the scriptorium still wakes', () => {
+  const room = roomFor(`old-${++codes}`);
+  room.join(`old-token-${codes}`, fakeSocket());
+  const stored = room.serialize();
+  // Exactly what an object written by an older deploy looks like.
+  delete stored.spellbook;
+  delete stored.pots;
+  delete stored.offers;
+
+  const woken = Room.restore(stored);
+  assert.ok(woken.spellbook, 'a missing spellbook is replaced, not inherited as undefined');
+  assert.equal(woken.pots.length, POT_COUNT, 'and the garden comes back empty rather than absent');
+  assert.equal(woken.offers, null);
+});
+
+test('ids are unique inside a room without a counter shared between rooms', () => {
+  /* The counter used to be a module global, which a Durable Object does not
+     have: each room is its own isolate, woken from storage, with no memory of
+     any other. Per room is the only version that survives that. */
+  const one = roomFor(`ids-a-${++codes}`);
+  const two = roomFor(`ids-b-${codes}`);
+  const seats = [
+    one.join(`ids-${codes}-1`, fakeSocket()),
+    one.join(`ids-${codes}-2`, fakeSocket()),
+    two.join(`ids-${codes}-3`, fakeSocket()),
+  ];
+  assert.equal(new Set([seats[0].id, seats[1].id]).size, 2, 'unique within a room');
+  assert.equal(seats[0].id, seats[2].id, 'and restarting the count in the next one is fine');
+
+  const woken = cycle(one);
+  woken.players = [];
+  const fresh = woken.join(`ids-${codes}-4`, fakeSocket());
+  assert.equal(new Set([seats[0].id, seats[1].id, fresh.id]).size, 3,
+    'a woken room keeps counting from where it left off rather than reissuing p1');
+});

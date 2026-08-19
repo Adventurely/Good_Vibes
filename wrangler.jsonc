@@ -1,0 +1,47 @@
+{
+  // Good Vibes on its own domain.
+  //
+  // This repo used to have no wrangler config on purpose, because the only
+  // deployed copy of the game lived inside Tool Haven and a stray `deploy` from
+  // here would either make a second worker or, with the wrong name, overwrite
+  // that one. The game has its own Worker and its own domain now, so the danger
+  // is gone — but the name below still matters for exactly that reason. It is
+  // `good-vibes`, and it is not `tool-haven`.
+  "name": "good-vibes",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-08-01",
+
+  // public/ verbatim, served by Cloudflare rather than by this Worker. No build
+  // step: what you push is what you play. Because the game sits at the root of
+  // its own domain, every relative path in the client resolves the way it does
+  // under `npm start` — the subdirectory the game used to live in was the only
+  // thing that ever made those two differ.
+  //
+  // Note there is no `run_worker_first`. Assets are matched first and the
+  // Worker only runs for paths that are not files, which is one invocation for
+  // the socket and none for the 400 KB of client. Turning that on would put a
+  // Worker call in front of every art file to gain nothing.
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+
+  // One object per room code. SQLite-backed because that is what the free plan
+  // supports; the game only uses the key-value storage API, one key.
+  "durable_objects": {
+    "bindings": [
+      { "name": "ROOM", "class_name": "GameRoom" }
+    ]
+  },
+
+  // Append only. Editing or reordering a tag that has already run does not
+  // re-run it — it changes what Cloudflare believes about objects that already
+  // exist, and those objects are somebody's game in progress.
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["GameRoom"] }
+  ],
+
+  "observability": {
+    "enabled": true
+  }
+}

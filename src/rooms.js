@@ -52,9 +52,7 @@ const SELF_DRAWN = new Set([
   'canker', 'cankerAll', 'heft', 'cover', 'graft',
 ]);
 
-let serial = 0;
-
-class Room {
+export class Room {
   constructor(code){
     this.code = code;
     /* Which run this is in this room, and the reason the seed is not simply
@@ -63,6 +61,11 @@ class Room {
        the same waves, which turns a second attempt into a memory test. */
     this.run = 0;
     this.seed = seedFromCode(code);
+    /* Per room, not per process. It used to be a module-level counter, which
+       is fine while every room lives in one Node process and wrong the moment
+       they do not: a Durable Object is one room, woken from storage, with no
+       memory of any other. Ids only ever have to be unique inside a room. */
+    this.serial = 0;
     this.reseed();
     this.players = [];
     this.reset();
@@ -70,12 +73,92 @@ class Room {
 
   /* The generator, rebuilt from whatever this.seed currently is.
    *
-   * A seam: the deployed room wraps this in a call counter so a hibernating
-   * Durable Object can replay its way back to the same stream. Everything that
-   * needs a fresh generator goes through here so there is one line to keep
-   * different rather than three.
+   * It counts its own draws, because the deployed room hibernates: a closure
+   * cannot be written to storage, but "the seed, and how many draws happened"
+   * can, and replaying that many draws on wake reproduces the stream exactly.
+   * Everything that needs a fresh generator goes through here, so the count
+   * cannot be got round.
    */
-  reseed(){ this.random = seededRandom(this.seed); }
+  reseed(){
+    this.rngCalls = 0;
+    const inner = seededRandom(this.seed);
+    this.random = () => { this.rngCalls += 1; return inner(); };
+  }
+
+  /* ---- hibernation ------------------------------------------------------
+   *
+   * A room on the deployed site is a Durable Object, and a Durable Object is
+   * evicted whenever it goes quiet. What survives is whatever was written to
+   * storage, so these two methods are the whole of the room's memory: what
+   * goes into `serialize` comes back, and what does not is gone the first time
+   * everybody steps away for ten minutes.
+   *
+   * Locally, `npm start` keeps rooms in a Map and never calls either of these.
+   * They are still tested here, because "it worked on the dev server" is
+   * exactly how state goes missing in the one place that matters.
+   */
+
+  /* Everything but the sockets and the generator closure. Player effect lists
+     and stats, and each enemy's landed-hit counter, ride along in the spreads
+     below — the ailment cadence has to survive a wake, or a Rust Hulk starts
+     counting again every time the room sleeps.
+
+     `run` and `seed` are stored together and are not the same fact: a party
+     that restarts moves the seed off the room code, so restoring a second run
+     from the code alone would put it back in the first run's ruin. */
+  serialize(){
+    return {
+      code: this.code, seed: this.seed, run: this.run,
+      serial: this.serial, rngCalls: this.rngCalls,
+      phase: this.phase, round: this.round, outcome: this.outcome,
+      waveTurn: this.waveTurn || 0,
+      site: this.site, terrain: this.terrain, nodes: this.nodes,
+      buildings: this.buildings, enemies: this.enemies,
+      stash: this.stash, salvage: this.salvage, pages: this.pages,
+      upgrades: this.upgrades, power: this.power,
+      // The scriptorium and the garden. Both are run-length state the party
+      // spends whole build phases on — a spellbook that came back empty after
+      // a deploy would be four rounds of somebody's evening — so they
+      // hibernate with everything else.
+      spellbook: this.spellbook, offers: this.offers, pots: this.pots,
+      players: this.players.map(({ socket, ...p }) => p),
+    };
+  }
+
+  static restore(data){
+    const room = new Room(data.code);
+    Object.assign(room, {
+      serial: data.serial || 0,
+      phase: data.phase, round: data.round, outcome: data.outcome,
+      // Which seat the wave opens on. State, not a render detail: a room that
+      // wakes with this reset starts hitting seat one again from the top.
+      waveTurn: data.waveTurn || 0,
+      site: data.site, terrain: data.terrain, nodes: data.nodes,
+      buildings: data.buildings, enemies: data.enemies,
+      stash: data.stash, salvage: data.salvage, pages: data.pages,
+      upgrades: data.upgrades, power: data.power,
+      // Defaulted rather than assumed: a room stored before the scriptorium
+      // existed has none of these, and waking it must not throw.
+      spellbook: data.spellbook || freshSpellbook(),
+      offers: data.offers ?? null,
+      pots: data.pots || Array(POT_COUNT).fill(null),
+      // The socket is the one thing that cannot be stored. Whoever wakes the
+      // room hands each seat a fresh one; until then a send is a no-op.
+      players: (data.players || []).map(p => ({ ...p, socket: null })),
+    });
+    // The seed first, then the generator, then the replay. A restart moved the
+    // seed off the room code, so rebuilding from the code would silently hand
+    // the party the ruin they already played.
+    room.run = data.run || 0;
+    if(data.seed !== undefined) room.seed = data.seed;
+    room.reseed();
+    // Fast-forward the generator to where it was. The count is a few hundred
+    // per run; the cost is microseconds, and the alternative is a fork in
+    // every replay after a reload.
+    const burn = data.rngCalls || 0;
+    for(let i = 0; i < burn; i++) room.random();
+    return room;
+  }
 
   reset(){
     this.phase = PHASES.lobby;
@@ -119,7 +202,7 @@ class Room {
     if(this.phase !== PHASES.lobby) return null;   // no joining a run in progress
 
     player = {
-      id: `p${++serial}`,
+      id: `p${++this.serial}`,
       token,
       socket,
       name: `Player ${this.players.length + 1}`,

@@ -2,15 +2,20 @@
 
 > ## ⚠️ Read this before pushing to `main`
 >
-> **Pushing to `main` publishes `public/` to Tool Haven and redeploys the live
-> site.** The game now has a server, and that server is **not** in `public/` —
-> so a deploy ships a client that talks a protocol the deployed site does not
-> answer. Worse, `public/content.js` is imported by Tool Haven's Worker, where a
-> missing export is a top-level throw that takes the **whole site down,
-> sign-in included**.
+> The game is moving to its own domain, **good-vibe-games.com**, served by the
+> Worker in this repo. Until that is proven and Tool Haven's copy is retired,
+> **two** deployments exist and a push to `main` reaches both:
 >
-> Nobody working in this repository can read the Worker's source. The steps
-> below are written so none of them require guessing what it contains.
+> - **This repo's Worker** imports `src/rooms.js` directly, so client and rules
+>   ship together and cannot disagree. Nothing below applies to it.
+> - **Tool Haven** still runs a *hand-written port* of `src/rooms.js`, and still
+>   imports `public/content.js` directly — where a missing export is a top-level
+>   throw that takes **that whole site down, sign-in included**. It also has no
+>   automatic sync, so its client only changes when somebody copies it across.
+>
+> The steps below exist for Tool Haven and end when it does. Nobody working in
+> this repository can read its Worker's source, so none of them require
+> guessing what it contains.
 
 ### What is true here, and what is documented from the other side
 
@@ -20,9 +25,11 @@
 | ✅ Verified in this repo | Every name `content.js` has ever exported is still exported (a test pins it) |
 | ✅ Verified in this repo | The workflow copies **only** `source/public/.` — `src/` never leaves |
 | ✅ Documented | What the Worker imports and what its room does with it — see [docs/tool-haven-server.md](docs/tool-haven-server.md) |
-| ✅ Done | The Worker runs a port of `src/rooms.js` and speaks this client's protocol |
+| ✅ Done | Tool Haven's Worker runs a port of `src/rooms.js` and speaks this client's protocol |
+| ✅ Verified in this repo | This repo's own Worker builds, binds and bundles — `npx wrangler deploy --dry-run` |
 | ❓ Cannot be checked here | Whether the `TOOL_HAVEN_TOKEN` secret exists (manual sync until it does) |
-| ⚠️ Half set up | GitHub Pages is on, but the repo's default branch is not `main`, which blocks it — see [The preview channel](#the-preview-channel) |
+| ❓ Cannot be checked here | Whether `good-vibe-games.com` is bound to the Worker yet — see [Hosting](#hosting) |
+| ⚠️ Half set up | GitHub Pages is on, but the `github-pages` environment only allows the default branch — see [The preview channel](#the-preview-channel) |
 
 ### Steps before a deploy
 
@@ -196,19 +203,60 @@ to read apart at a glance converge on the same dim brown.
 
 ## Hosting
 
-This repo is where the work happens; it is not what serves it. The site is
-[Tool Haven](https://github.com/Adventurely/Tool-Haven), a Cloudflare Worker
-that Workers Builds redeploys within a minute of any push to its `main`.
+The game has its own Worker and its own domain: **good-vibe-games.com**, built
+from this repo. `wrangler.jsonc`, `src/worker.js` and `src/room-do.js` are the
+whole of it.
 
-So publishing is a copy, not a deploy. `.github/workflows/publish-to-tool-haven.yml`
-runs on every push to `main` here: it runs the tests, copies `public/` into
-Tool Haven's `tools/good-vibes/`, and commits. Cloudflare does the rest. The
-page then lives at `/tools/good-vibes/` on the site, behind its Cloudflare
-Access sign-in.
+    good-vibe-games.com
+      ├── /                    public/, served by Cloudflare's asset store
+      └── /api/good-vibes/ws   src/worker.js  →  one Durable Object per code
 
-Nothing deploys from this repo directly, and there is no `wrangler.toml` here
-on purpose — deploying a worker from here would either create a stray second
-worker or, with the wrong name, overwrite Tool Haven itself.
+`public/` ships verbatim, no build step. The Worker is not invoked for files at
+all — assets are matched first, so the client costs zero Worker calls and the
+socket costs one. Because the game sits at the root of its own domain, every
+relative path resolves exactly as it does under `npm start`; the subdirectory
+the game used to live in was the only thing that made those two differ.
+
+**The rules exist once.** `src/room-do.js` imports `Room` from `src/rooms.js` —
+the same module the local server runs and the tests drive. This is the point of
+the move. Previously the deployed rules were a 1,200-line hand-written port
+that had to be edited in step with every change here, by hand, and any drift
+between them was a bug nobody could see from either side.
+
+What the Durable Object adds, and all it adds, is the two things a room needs to
+survive being evicted when it goes quiet: `serialize()` and `Room.restore()`,
+both in `rooms.js` and both pinned by tests. A room in a fight comes back in the
+same fight, and — because the generator's draw count is stored and replayed —
+holding the same cards it would have drawn had nobody left.
+
+There is no sign-in, by choice: the room code is the secret. That is how you
+hand a game to four friends in a message instead of in an onboarding flow, and
+the cost is that a short code is a guessable code. The answer to that is a
+longer code, not an account.
+
+**Deploys** are Workers Builds: connect this repo once in the Cloudflare
+dashboard and every push to `main` redeploys. Nothing here needs a token or a
+secret.
+
+**One-time setup.** In the Cloudflare dashboard: create the Worker from this
+repo (Workers & Pages → Create → connect `Adventurely/Good_Vibes`, branch
+`main`), then bind the domain under the Worker's Settings → Domains & Routes.
+Durable Objects need no plan upgrade — the SQLite-backed class this uses is on
+the free tier.
+
+### Tool Haven, until it is retired
+
+The game also still runs inside
+[Tool Haven](https://github.com/Adventurely/Tool-Haven) at `/tools/good-vibes/`,
+behind that site's Cloudflare Access sign-in. That copy is on its way out and
+should be removed once good-vibe-games.com has hosted a real multiplayer game.
+
+Until then it costs what it has always cost: `.github/workflows/publish-to-tool-haven.yml`
+is supposed to copy `public/` across on every push to `main`, but it needs a
+`TOOL_HAVEN_TOKEN` secret that does not exist, so the copy is manual. And its
+server is a *separate hand-written port* of `src/rooms.js` living at
+`src/game/good-vibes.js` in that repo — so a rules change is not done until it
+has been made twice. Retiring it is what collects the prize.
 
 **One-time setup.** The workflow needs push access to the other repo, which a
 `GITHUB_TOKEN` does not have. Create a fine-grained personal access token
@@ -303,10 +351,15 @@ public/pixel.js     bitmap font and canvas helpers, shared by both pages
 public/title.js     the title screen: a real generated site with the real party
                     walking it, drawn from the same modules the game uses
 public/index.html   the landing page the title screen is mounted in
-src/app.js          static files out of public/
-src/ws.js           a WebSocket server, standard library only
-src/rooms.js        the authoritative game state: rooms, seats, phases
-src/server.js       http + the socket route
+src/rooms.js        the authoritative game state: rooms, seats, phases — and
+                    the only copy of it, imported by both servers below
+src/worker.js       the deployed front door: assets, and the socket route
+src/room-do.js      one Durable Object per room code — sockets and hibernation,
+                    no rules
+wrangler.jsonc      what Cloudflare builds and what it binds
+src/server.js       the local server: http + the socket route
+src/app.js          static files out of public/, for local work only
+src/ws.js           a WebSocket server, standard library only, likewise local
 test/content.test.js validates every table above and the rules over them
 test/rooms.test.js  drives a real room: what a card resolves to, statuses,
                     kills, levelling, and that the client has an animation and

@@ -1,7 +1,7 @@
 {
   "name": "good-vibes",
   "version": "1.0.0",
-  "description": "A minimal Node.js HTTP server serving a hello world page.",
+  "description": "A five-player deck-building co-op: build a solarpunk garden by day, hold the line at night.",
   "type": "module",
   "main": "src/server.js",
   "engines": {
@@ -9,7 +9,9 @@
   },
   "scripts": {
     "start": "node src/server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "check": "npx wrangler deploy --dry-run",
+    "deploy": "npx wrangler deploy"
   },
   "license": "MIT"
 }
