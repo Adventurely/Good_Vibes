@@ -10,8 +10,8 @@
   "scripts": {
     "start": "node src/server.js",
     "test": "node --test",
-    "check": "npx wrangler deploy --dry-run",
-    "deploy": "npx wrangler deploy"
+    "check": "npx wrangler@4.86.0 deploy --dry-run",
+    "deploy": "npx wrangler@4.86.0 deploy"
   },
   "license": "MIT"
 }

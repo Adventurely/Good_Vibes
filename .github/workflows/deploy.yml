@@ -1,0 +1,91 @@
+# Deploy the Worker to Cloudflare on every push to `main`.
+#
+# This is the live site: good-vibe-games.com. `wrangler deploy` uploads
+# `src/worker.js`, both room classes (`GameRoom` and `SolariumRoom`) and the
+# whole of `public/` in one shot, so a client and the server it talks to always
+# move together — the split-brain where the page is newer than the socket
+# cannot happen from here.
+#
+# This replaces Cloudflare's own Workers Builds. Do not run both: two services
+# watching the same branch means two deploys per push, racing to be last.
+#
+# Requires two repository secrets (Settings -> Secrets and variables -> Actions):
+#
+#   CLOUDFLARE_API_TOKEN   an API token made from the "Edit Cloudflare Workers"
+#                          template, which carries the Workers Scripts: Edit
+#                          permission that uploading a script and its assets
+#                          needs. Durable Objects need nothing beyond it.
+#   CLOUDFLARE_ACCOUNT_ID  Workers & Pages -> Overview, right-hand column.
+#
+# Until those exist the deploy step fails with an authentication error and the
+# site keeps serving whatever was deployed last — a failed deploy is never a
+# broken site.
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Deploys are last-write-wins, so a newer push must not overtake an older one
+# still uploading. Queue rather than cancel: cancelling mid-upload would leave
+# the newer run to finish alone, which is fine, but cancelling the *newer* one
+# is not, and `cancel-in-progress` cannot tell the two apart.
+concurrency:
+  group: deploy-worker
+  cancel-in-progress: false
+
+jobs:
+  # Everything that can be checked without credentials, so a fork's pull
+  # request gets the same verdict as a push does.
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # A game whose own rules fail its tests should not reach the site — and
+      # these are the same rules the Worker runs, not a copy of them.
+      - name: Test
+        run: npm test
+
+      # Catches what tests cannot: a binding that is not declared, a migration
+      # tag that does not parse, an assets directory that is not there. It is
+      # the deploy, minus the upload, and it needs no token.
+      - name: Check the Worker builds
+        run: npx --yes wrangler@4.86.0 deploy --dry-run
+
+  deploy:
+    needs: check
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    # Records the deploy against a named environment so the repo's home page
+    # links to the live site. GitHub creates this one on first use with no
+    # branch policy — unlike `github-pages`, which ships with one and is why
+    # the preview workflow needs the default branch changed.
+    environment:
+      name: production
+      url: https://good-vibe-games.com
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Pinned, and pinned to the same version `npm run deploy` uses, because
+      # "latest" is a dependency nobody in this repo chose and a deploy is the
+      # worst place to meet a new one. Current wrangler also requires Node 22,
+      # which this repo does not — an unpinned `npx wrangler` simply refuses to
+      # run for anyone still on 20.
+      - name: Deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: '4.86.0'
