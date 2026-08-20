@@ -14,16 +14,22 @@
  *   node test/balance.mjs              every table size, 400 runs each
  *   node test/balance.mjs 1000         a tighter interval
  *
- * The dial it reports on is THREAT_PER_PLAYER in public/content.js. Round
- * losses tell you which entry to move: round three losing 60% of the runs that
- * reach it is that round's number, not the boss's.
+ * The dials it reports on are in public/good-vibes/content.js, and there are
+ * fewer of them than there used to be. A wave is the same wave at every table
+ * size now, so what moves the *height* of the curve is `WAVE_PATTERN` and the
+ * `hp`/`hits` in `ENEMIES`, and what moves the *tilt* between table sizes is
+ * `HP_PER_PLAYER` alone. Turn the height first; the tilt only means anything
+ * once the line is at the right level.
+ *
+ * The round losses tell you where to look: round three losing 60% of the runs
+ * that reach it is that round's wave, not the boss's.
  */
 
 import { roomFor } from '../src/rooms.js';
 import {
-  PHASES, BOSS_ROUND, CARDS, cardEffect, cardPlayable, playableClasses,
+  PHASES, BOSS_ROUND, CARDS, cardEffect, actionReady, playableClasses,
   RECIPES, BUILDINGS, UPGRADES, upgradeCost, canAfford, pathTo, hasEffect,
-  effectAmount, MODIFIERS, SPELL_SLOTS,
+  effectAmount, MODIFIERS, SPELL_SLOTS, classById, nodeYield,
 } from '../public/good-vibes/content.js';
 
 const RUNS = Number(process.argv[2]) || 400;
@@ -47,18 +53,20 @@ function playBuild(room){
   const seated = room.players.filter(p => p.classId);
 
   // Gather, round-robin, until nothing reachable is left. Round-robin rather
-  // than one player sweeping, because the Alchemist's doubled yield should
-  // land on the herbs and a real table lets her take them.
+  // than one player sweeping, because a node pays what the seat standing on it
+  // is worth there and a real table routes the right person to the right find.
   for(let pass = 0; pass < 40; pass++){
     let took = false;
     for(const player of seated){
-      // Herbs are the Alchemist's alone now — anyone else walking onto one
-      // leaves it in the ground, so the model does not waste passes trying.
-      const gathers = player.classId === 'alchemist';
-      const wants = room.nodes.filter(n => !n.taken && (gathers || n.kind !== 'herb'));
+      const cls = classById(player.classId);
+      // A seat the stat prices at nothing leaves the node standing, so the
+      // model does not waste passes walking to one it cannot take. Among what
+      // it can take, richest first and nearest to break the tie: that is the
+      // Alchemist onto herbs and the Engineer onto caches without either being
+      // named here, which is the point of pricing by stat rather than by owner.
+      const wants = room.nodes.filter(n => !n.taken && nodeYield(cls, n) > 0);
       const ordered = [...wants].sort((a, b) => {
-        const pref = (n) => (gathers ? (n.kind === 'herb' ? 0 : 1) : (n.kind === 'herb' ? 1 : 0));
-        if(pref(a) !== pref(b)) return pref(a) - pref(b);
+        if(nodeYield(cls, a) !== nodeYield(cls, b)) return nodeYield(cls, b) - nodeYield(cls, a);
         return (Math.abs(a.x - player.x) + Math.abs(a.y - player.y))
              - (Math.abs(b.x - player.x) + Math.abs(b.y - player.y));
       });
@@ -185,18 +193,23 @@ function freeTile(room){
  * players who are worse than the people who will eventually play this.
  */
 function pickCard(room, player){
-  // A crafted spell reads its numbers off the book and costs nothing to play;
-  // everything else answers to the card table and its costs.
-  const hand = player.hand
-    .map((id, index) => {
+  /* Everything this seat could do, filtered to what it can afford right now.
+   *
+   * It used to read a hand of three. There is no hand: a seat's options are a
+   * fixed list and what varies is which of them its pools can pay for, so the
+   * model chooses from everything and `actionReady` does the filtering — the
+   * same function the room and the client both call, so a play this model
+   * thinks is legal is one the room will accept.
+   *
+   * Two seats always have something: a basic swing and a basic guard cost
+   * nothing, so `hand` is never empty and the model never idles through a
+   * round it could have acted in. */
+  const hand = room.actionIds(player)
+    .map((id) => {
       const spell = room.spellFor(player, id);
-      return { id, index, card: CARDS[id], effect: spell ? spell.effect : cardEffect(id, room.upgrades), spell };
+      return { id, card: CARDS[id], effect: spell ? spell.effect : cardEffect(id, room.upgrades), spell };
     })
-    // `hp` is the Hauler's price: a card that would take the last point is not
-    // a legal play, and without this the model spends down through the floor.
-    .filter(c => c.card && (c.spell || cardPlayable(c.id, {
-      pages: room.pages, power: room.power, classId: player.classId, hp: player.hp,
-    })));
+    .filter(c => (c.card || c.spell) && actionReady(c.id, room.seatState(player), c.spell).ok);
   if(!hand.length) return null;
 
   const alive = room.enemies.filter(e => e.hp > 0);
@@ -309,7 +322,7 @@ function pickCard(room, player){
 
 const totalHp = list => list.reduce((sum, e) => sum + e.hp, 0);
 const aim = (choice, target) =>
-  ({ t: 'play', card: choice.id, index: choice.index, target });
+  ({ t: 'action', id: choice.id, target });
 
 /* ------------------------------------------------------------- a whole run --- */
 

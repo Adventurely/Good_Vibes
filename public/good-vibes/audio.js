@@ -338,6 +338,21 @@ export function createAudio(){
        recognise. Better a thud than silence. */
     ail(t){ voice(midi(53), t, 0.3, 'sawtooth', 0.05, midi(45)); },
 
+    /* ---- what the wave does to itself ----------------------------------
+       The two intents that land nothing. Both have to read as *worse coming*
+       rather than as something happening now, so both rise — the only two
+       sounds in the table that do, which is what sets them against the
+       descending ailments above. */
+    charge(t){
+      // Drawing breath. A note winding upward that stops without arriving.
+      voice(midi(38), t, 0.46, 'sawtooth', 0.07, midi(52));
+      hit(t + 0.3, 0.16, 0.05, 800, 'highpass');
+    },
+    bolster(t){
+      // Something swelling, and pleased about it.
+      [43, 50, 55].forEach((n, i) => voice(midi(n), t + i * 0.06, 0.34, 'square', 0.05, midi(n + 5)));
+    },
+
     /* ---- a thing dying -------------------------------------------------
      *
      * `slain` is one enemy coming apart: a wet crack, then the body going

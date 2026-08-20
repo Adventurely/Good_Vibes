@@ -19,8 +19,16 @@ import {
   CARDS, EFFECT_KINDS, PHASES, BOSS_ROUND, classById, cardEffect,
   AILMENTS, addAilment, hasEffect, effectName, waveFor, enemyStats, ENEMIES,
   runHighlights, STAT_KEYS, blankStats,
-  intentOf, waveTargets, effectAmount, strikePower, cardPlayable,
+  intentOf, effectAmount, strikePower, cardPlayable,
   playableClasses, PARTY_SIZE,
+  ENEMY_INTENTS, intentKindOf, enemyDamage, blightDamage, blightOf,
+  CHARGE_MULTIPLIER, BOLSTER_STEP, readyState, HAND_SIZE,
+  HP_PER_PLAYER, WAVE_CAP,
+  actionsFor, actionCost, actionReady, actionRemaining, freshStock, freshUses,
+  CHARGE_CAP, CHARGE_REGEN, CLASS_BASICS, CLASS_ACTIONS,
+  CACHE_YIELD, nodeYield,
+  PACK_ITEMS, PACK_W, PACK_H, packPlace, packedCards, packedStats,
+  normalisePack, gridCells,
 } from '../public/good-vibes/content.js';
 
 /* The client's own dispatch, imported rather than re-implemented. That is the
@@ -50,27 +58,81 @@ const fakeSocket = () => ({ open: true, sent: [], send(text){ this.sent.push(tex
 const eventsOn = socket => socket.sent.flatMap(text => JSON.parse(text).state.events || []);
 const fxIn = socket => eventsOn(socket).filter(e => e.t === 'fx');
 
-/* A room with one seated player, parked in a fight, holding exactly the card
-   the test wants to play. Setting the hand rather than dealing is deliberate:
-   a shuffle is not what any of these tests are about. */
-function fightWith(cardId, classId = 'wizard'){
+/* A room with one seated player, parked in a fight, able to take exactly the
+   action the test is about.
+ *
+ * The seat is chosen by the action rather than passed in, because an action
+ * belongs to a class now and the room refuses one the seat does not own — the
+ * old `classId` argument stays for the handful of tests that pick a seat for
+ * some other reason. Every pool is filled, so these tests are about what an
+ * action does and never about affording it. */
+/* Which seat owns an action. A brewed potion has no `classId` — it is the
+   Alchemist's because it is in her list — so ownership is the list rather than
+   the field, exactly as the room reads it. */
+/* Which seat can take this action. `actionsFor` answers for four of the five;
+   the Hauler owns nothing by class any more, so a card he can only reach by
+   packing it has to be found through CARDS instead. */
+const ownerOf = id => Object.keys(CLASS_BASICS).find(c => actionsFor(c).includes(id))
+  || ((CARDS[id] || {}).packed ? CARDS[id].classId : undefined);
+
+/* Put the item that grants this card into a seat's bag, at the first place it
+   will legally go. The Hauler's option list *is* his bag, so a test about one
+   of his cards has to pack it first — the same way a test about the Bolt Gun
+   has to have built a panel. Legal placement rather than a hand-written
+   `placed` entry, so a helper can never set up a bag the room would refuse. */
+function packInto(room, player, cardId){
+  const item = Object.values(PACK_ITEMS).find(i => i.card === cardId);
+  if(!item) return;
+  player.pack = normalisePack(player.pack);
+  if(player.pack.placed.some(p => p.id === item.id)) return;
+
+  for(let y = 0; y < PACK_H; y++){
+    for(let x = 0; x < PACK_W; x++){
+      for(let rot = 0; rot < 4; rot++){
+        const placed = packPlace(room.round, player.pack.placed, item.id, x, y, rot);
+        if(placed){ player.pack.placed = placed; return; }
+      }
+    }
+  }
+  // The bag was too full to take it. Empty it and try once more, because a
+  // test about one card should never fail on the arrangement of the others.
+  player.pack.placed = packPlace(room.round, [], item.id, 0, 0, 0)
+    || packPlace(room.round, [], item.id, 0, PACK_H - 1, 0) || [];
+}
+
+function fightWith(actionId, classId = 'wizard'){
+  const seatFor = ownerOf(actionId) || classId;
   const room = roomFor(`fx-${++codes}`);
   const socket = fakeSocket();
   const player = room.join(`token-${codes}`, socket);
-  room.handle(player, { t: 'class', classId });
+  room.handle(player, { t: 'class', classId: seatFor });
   room.handle(player, { t: 'start' });
   assert.equal(room.phase, PHASES.build, 'the run should open in the build phase');
 
   room.handle(player, { t: 'ready', ready: true });
   assert.equal(room.phase, PHASES.combat, 'one ready player is the whole party here');
 
-  player.hand = [cardId, 'hold', 'hold'];
-  // Pages and power are what a costed card needs; give it enough that these
-  // tests are about the effect and not about affording it.
-  room.pages = 5;
-  room.power = 5;
+  fill(room, player);
+  // His bag is his option list, so the card under test has to be in it.
+  if((CARDS[actionId] || {}).packed) packInto(room, player, actionId);
   socket.sent.length = 0;                 // everything before the turn under test
   return { room, player, socket };
+}
+
+/* The two free things every seat has. Universal Strike and Hold are gone from
+   the game — each class has its own now, and they are not the same two numbers
+   any more, which was the whole point of the change. */
+const swing = p => CLASS_BASICS[p.classId][0];
+const guard = p => CLASS_BASICS[p.classId][1];
+
+/* Every pool, full. A test about what Bulwark does should not fail because a
+   panel was never built. */
+function fill(room, player){
+  room.pages = 9;
+  room.power = 9;
+  player.charges = CHARGE_CAP;
+  player.stock = { tonic: 9, censer: 9, vapours: 9, sunsalve: 9, stillwater: 9, greenfire: 9 };
+  player.uses = { ringbark: 9, season: 9, scion: 9, cutting: 9 };
 }
 
 
@@ -80,23 +142,32 @@ function fightWith(cardId, classId = 'wizard'){
  * something else. Nothing is out of reach any more — a standoff has everything
  * on the field from the first turn — so "do not interfere" is now a swing of
  * zero rather than a distance. */
-const mute = room => { for(const enemy of room.enemies) enemy.hits = 0; };
+const mute = room => {
+  for(const enemy of room.enemies){ enemy.hits = 0; enemy.might = 0; enemy.charged = false; }
+};
 
-/* Every card that hits, from the fist to the bolt gun. */
-const strikeCards = Object.entries(CARDS)
-  .filter(([, card]) => card.effect.kind === 'strike')
-  .map(([id]) => id);
+/* Every action that hits, from the fist to the bolt gun. Taken off the class
+   lists rather than off CARDS, because owning it is what makes it takeable —
+   the universals in that table are not in anybody's list any more. */
+const strikeCards = [...new Set([
+  ...Object.keys(CLASS_BASICS).flatMap(c => actionsFor(c)),
+  // The Hauler's, which are in nobody's class list — they are in his bag, and
+  // leaving them out of this would leave the newest cards in the game as the
+  // only ones nothing checks can be seen or heard.
+  ...Object.values(PACK_ITEMS).map(i => i.card).filter(Boolean),
+  'cutting',
+])].filter(id => ((CARDS[id] || {}).effect || {}).kind === 'strike');
 
-test('every strike card resolves the way the Strike action did', () => {
-  assert.ok(strikeCards.includes('strike'), 'Strike itself must be one of them');
+test('every strike action resolves the way the basic swing does', () => {
+  assert.ok(strikeCards.length >= 5, 'every seat has at least a swing');
 
   for(const id of strikeCards){
     const card = CARDS[id];
-    const { room, player, socket } = fightWith(id, card.classId || 'wizard');
+    const { room, player, socket } = fightWith(id, card.classId || 'grafter');
 
     const target = room.enemies[0];
     const before = target.hp;
-    room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: id, target: target.id } });
+    room.handle(player, { t: 'intent', intent: { t: 'action', id: id, target: target.id } });
 
     const fx = fxIn(socket).find(e => e.kind === id);
     assert.ok(fx, `"${id}" resolved without an fx event, so it is silent and invisible`);
@@ -140,10 +211,10 @@ test('a strike fx arrives before the damage that follows it', () => {
   const { room, player, socket } = fightWith('strike', 'engineer');
   const target = room.enemies[0];
   target.hp = 1;                                   // one fist finishes it
-  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'strike', target: target.id } });
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: swing(player), target: target.id } });
 
   const order = eventsOn(socket).map(e => (e.t === 'fx' ? `fx:${e.kind}` : e.t));
-  const fxAt = order.indexOf('fx:strike');
+  const fxAt = order.indexOf(`fx:${swing(player)}`);
   const logAt = order.indexOf('log');
   assert.ok(fxAt >= 0 && logAt >= 0, 'the turn should both animate and narrate');
   assert.ok(fxAt < logAt, 'the fx must be emitted before the hit it depicts is reported');
@@ -152,7 +223,7 @@ test('a strike fx arrives before the damage that follows it', () => {
 test('being hit is its own effect, on the victim', () => {
   const { room, player, socket } = fightWith('hold', 'engineer');
   // Walk the wave into contact so somebody actually gets hit this turn.
-  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'hold' } });
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: guard(player) } });
 
   const hit = fxIn(socket).find(e => e.kind === 'hit');
   assert.ok(hit, 'an enemy reaching the party must show on screen');
@@ -192,21 +263,18 @@ test('a monster ailment lands on its cadence, and only on a hit that got through
   room.enemies = [{ id: 'e0', type: 'sporeling', name: 'Sporeling', art: 'sporeling',
                     hp: 20, maxHp: 20, hits: 2, landed: 0 }];
 
-  player.hand = ['strike', 'hold', 'hold'];
-  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'strike' } });
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: swing(player) } });
   assert.equal(hasEffect(player.effects, 'rot'), false,
     'a Sporeling rots on its second landed hit, not its first');
 
-  player.hand = ['strike', 'hold', 'hold'];
-  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'strike' } });
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: swing(player) } });
   assert.ok(hasEffect(player.effects, 'rot'), 'the second landed hit should rot');
 
   // Guard that swallows the blow whole leaves nothing behind. That is the
   // trade the ward is for, and it is easy to lose in a refactor.
   const before = player.effects.length;
-  player.hand = ['strike', 'hold', 'hold'];
   player.block = 99;
-  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'strike' } });
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: swing(player) } });
   assert.equal(player.effects.length, before,
     'a fully blocked hit must not land an ailment');
 });
@@ -221,15 +289,13 @@ test('blightrot keeps taking, then stops', () => {
 
   let hp = player.hp;
   for(let turn = 0; turn < rounds; turn++){
-    player.hand = ['hold', 'hold', 'hold'];
-    room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'hold' } });
+    room.handle(player, { t: 'intent', intent: { t: 'action', id: guard(player) } });
     assert.equal(player.hp, hp - damage, `rot should bite on turn ${turn + 1}`);
     hp = player.hp;
   }
   assert.equal(hasEffect(player.effects, 'rot'), false, `rot should be gone after ${rounds} turns`);
 
-  player.hand = ['hold', 'hold', 'hold'];
-  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'hold' } });
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: guard(player) } });
   assert.equal(player.hp, hp, 'an expired ailment must stop costing health');
 });
 
@@ -241,17 +307,15 @@ test('stun costs the turn and weakness costs the swing', () => {
 
   const stunned = target.hp;
   player.effects = addAilment([], 'stun');
-  player.hand = ['strike', 'hold', 'hold'];
-  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'strike', target: target.id } });
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: swing(player), target: target.id } });
   assert.equal(target.hp, stunned, 'a stunned player deals no damage');
   assert.equal(hasEffect(player.effects, 'stun'), false, 'a one-round stun lasts one round');
 
   const before = target.hp;
   player.effects = addAilment([], 'weak');
-  player.hand = ['strike', 'hold', 'hold'];
-  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'strike', target: target.id } });
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: swing(player), target: target.id } });
   const dealt = before - target.hp;
-  assert.equal(dealt, CARDS.strike.effect.amount - AILMENTS.weak.amount,
+  assert.equal(dealt, CARDS[swing(player)].effect.amount - AILMENTS.weak.amount,
     'a weakened strike should land lighter, and still land');
   assert.ok(dealt > 0, 'weakness must never zero a card out');
 });
@@ -288,12 +352,9 @@ test('the party cards land on the party, not on the player who spent them', () =
   room.pages = 5;
   room.power = 5;
 
-  seats[0].hand = ['vapours', 'hold', 'hold'];
-  seats[1].hand = ['bulwark', 'hold', 'hold'];
-  seats[2].hand = ['rune', 'hold', 'hold'];
-  room.handle(seats[0], { t: 'intent', intent: { t: 'play', index: 0, card: 'vapours' } });
-  room.handle(seats[1], { t: 'intent', intent: { t: 'play', index: 0, card: 'bulwark' } });
-  room.handle(seats[2], { t: 'intent', intent: { t: 'play', index: 0, card: 'rune', target: seats[1].id } });
+  room.handle(seats[0], { t: 'intent', intent: { t: 'action', id: 'vapours' } });
+  room.handle(seats[1], { t: 'intent', intent: { t: 'action', id: 'bulwark' } });
+  room.handle(seats[2], { t: 'intent', intent: { t: 'action', id: 'rune', target: seats[1].id } });
 
   for(const p of seats){
     assert.equal(p.hp, 10 + CARDS.vapours.effect.amount, `${p.classId} should have been mended`);
@@ -311,7 +372,7 @@ test('a cleanse takes the ailments off and leaves the boons on', () => {
     ...addAilment([], 'rot'),
     { kind: 'might', amount: 4, rounds: 3 },
   ];
-  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'censer', target: player.id } });
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: 'censer', target: player.id } });
   assert.equal(hasEffect(player.effects, 'rot'), false, 'the censer should clear the rot');
   assert.ok(hasEffect(player.effects, 'might'), 'and leave what the party put there');
 });
@@ -325,22 +386,20 @@ test('jumper cables pick an ally up, and are not a dead card alone', () => {
   });
   room.handle(seats[0], { t: 'start' });
   for(const p of seats) room.handle(p, { t: 'ready', ready: true });
+  room.power = 9;       // Jumper Cables draw on the pool like everything he owns
   mute(room);
 
   seats[1].down = true;
   seats[1].hp = 0;
-  seats[0].hand = ['jumper', 'hold', 'hold'];
-  room.handle(seats[0], { t: 'intent', intent: { t: 'play', index: 0, card: 'jumper', target: seats[1].id } });
+  room.handle(seats[0], { t: 'intent', intent: { t: 'action', id: 'jumper', target: seats[1].id } });
   assert.equal(seats[1].down, false, 'the downed ally should be back up');
   assert.ok(seats[1].hp > 0);
-  assert.ok(seats[1].hand.length, 'and holding cards to play with');
+  assert.ok(room.actionIds(seats[1]).length, "and with everything they can do still there");
 
   // Nobody down: it mends instead of doing nothing at all.
   const hurt = seats[1].hp = 4;
-  seats[0].hand = ['jumper', 'hold', 'hold'];
-  seats[1].hand = ['hold', 'hold', 'hold'];
-  room.handle(seats[0], { t: 'intent', intent: { t: 'play', index: 0, card: 'jumper' } });
-  room.handle(seats[1], { t: 'intent', intent: { t: 'play', index: 0, card: 'hold' } });
+  room.handle(seats[0], { t: 'intent', intent: { t: 'action', id: 'jumper' } });
+  room.handle(seats[1], { t: 'intent', intent: { t: 'action', id: guard(seats[1]) } });
   assert.ok(seats[1].hp > hurt, 'with nobody down it should still be worth playing');
 });
 
@@ -354,16 +413,14 @@ test('a kill is announced, and the last kill of a round says so', () => {
     { id: 'e1', type: 'sporeling', name: 'Sporeling', art: 'sporeling', hp: 1, maxHp: 6, hits: 0, landed: 0 },
   ];
 
-  player.hand = ['strike', 'hold', 'hold'];
-  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'strike', target: 'e0' } });
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: swing(player), target: 'e0' } });
   const first = fxIn(socket).find(e => e.kind === 'slain');
   assert.ok(first, 'a kill has to reach the client or it cannot be animated');
   assert.equal(first.target, 'e0');
   assert.equal(first.last, false, 'one of two is not the end of the round');
 
   socket.sent.length = 0;
-  player.hand = ['strike', 'hold', 'hold'];
-  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'strike', target: 'e1' } });
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: swing(player), target: 'e1' } });
   const last = fxIn(socket).find(e => e.kind === 'slain');
   assert.ok(last && last.last, 'the kill that empties the lane is the one the round holds open for');
 });
@@ -374,7 +431,7 @@ test('a nova kills the whole lane and only the last one ends the round', () => {
     ({ ...e, hp: 1, hits: 0, landed: 0 }));
   const count = room.enemies.length;
 
-  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'nova' } });
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: 'nova' } });
   const slain = eventsOn(socket).filter(e => e.t === 'fx' && e.kind === 'slain');
   assert.equal(slain.length, count, 'every enemy it killed should be seen dying');
   assert.equal(slain.filter(e => e.last).length, 1, 'exactly one of them ends the round');
@@ -383,25 +440,53 @@ test('a nova kills the whole lane and only the last one ends the round', () => {
 
 /* ---- levelling ---------------------------------------------------------- */
 
-test('a bigger table meets a bigger fight', () => {
-  // Not merely more of them: the budget promotes what it cannot fit more of,
-  // so the wave gets worse as well as longer.
-  let lastThreat = 0;
-  for(let size = 1; size <= 5; size++){
-    const threat = waveFor(1, size).reduce((sum, t) => sum + ENEMIES[t].threat, 0);
-    assert.ok(threat > lastThreat, `a table of ${size} should meet more than a table of ${size - 1}`);
-    lastThreat = threat;
-  }
+/* One dial, and it is health. The wave used to be levelled by spending a threat
+ * budget — a bigger table met a fuller lane of worse things — and that stopped
+ * working the moment an attack landed on the whole party, because an enemy's
+ * damage is multiplied by the head count before any dial touches it. These four
+ * pin the model that replaced it.
+ */
 
-  // And the boss, which is always exactly one thing, scales in place instead.
-  const solo = enemyStats('extractor', 1);
-  const full = enemyStats('extractor', 5);
-  assert.ok(full.hp > solo.hp * 2, 'the Extractor has to grow with the party');
-  assert.ok(full.hits > solo.hits, 'including what it swings for');
-  assert.deepEqual(enemyStats('sporeling', 5), enemyStats('sporeling', 1),
-    'everything else is levelled by the wave table, and must not be scaled twice');
+test('the wave is the same wave at every table size', () => {
+  for(let round = 1; round <= BOSS_ROUND; round++){
+    const solo = waveFor(round, 1);
+    for(let size = 2; size <= PARTY_SIZE; size++){
+      assert.deepEqual(waveFor(round, size), solo,
+        `round ${round} sends a different wave to a table of ${size}`);
+    }
+  }
 });
 
+test('the first fight is three things', () => {
+  assert.equal(waveFor(1, 1).length, 3);
+  assert.equal(waveFor(1, PARTY_SIZE).length, 3);
+});
+
+test('no wave is longer than the lane can draw', () => {
+  for(let round = 1; round <= BOSS_ROUND; round++){
+    assert.ok(waveFor(round).length <= WAVE_CAP,
+      `round ${round} sends more than the ${WAVE_CAP} the lane can show`);
+  }
+});
+
+test('health scales with the table and damage never does', () => {
+  for(const type of Object.keys(ENEMIES)){
+    const solo = enemyStats(type, 1);
+    const full = enemyStats(type, PARTY_SIZE);
+    assert.equal(solo.hp, ENEMIES[type].hp, `${type} at a table of one is what the table says`);
+    assert.ok(full.hp > solo.hp, `${type} has to grow with the party`);
+    // The one that matters: a swing lands on everybody, so the head count is
+    // already inside the damage. Scaling it as well multiplies it twice.
+    assert.equal(solo.hits, ENEMIES[type].hits, `${type} swings for what it is authored to swing for`);
+    assert.equal(full.hits, solo.hits, `${type} must not swing harder at a bigger table`);
+  }
+
+  // And health is linear in the head count, which is the whole argument for
+  // scaling it: a party puts out roughly its head count in damage, so a fight
+  // that scales the same way takes the same number of rounds at every size.
+  const one = enemyStats('sporeling', 1).hp;
+  assert.equal(enemyStats('sporeling', 5).hp, Math.round(one * (1 + HP_PER_PLAYER * 4)));
+});
 /* ---- how a run ends ------------------------------------------------------ */
 
 /* Losing used to be a state the client had no screen for: `over` fell through
@@ -415,7 +500,7 @@ test('a wipe ends the run rather than rolling into another round', () => {
   const { room, player, socket } = fightWith('hold', 'wizard');
   for(const enemy of room.enemies) enemy.hits = 99;
 
-  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'hold' } });
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: guard(player) } });
 
   assert.equal(room.phase, PHASES.over, 'the last player going down is the end of the run');
   assert.equal(room.outcome, 'lost');
@@ -433,12 +518,11 @@ test('the run keeps a record, and the record can name who did what', () => {
   mute(room);
   target.hp = 99;
 
-  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'strike', target: target.id } });
-  assert.equal(player.stats.damage, CARDS.strike.effect.amount, 'a swing should be counted');
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: swing(player), target: target.id } });
+  assert.equal(player.stats.damage, CARDS[swing(player)].effect.amount, 'a swing should be counted');
 
-  player.hand = ['hold', 'hold', 'hold'];
-  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'hold' } });
-  assert.equal(player.stats.guard, CARDS.hold.effect.amount, 'so should guard');
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: guard(player) } });
+  assert.equal(player.stats.guard, CARDS[guard(player)].effect.amount, 'so should guard');
 
   const rows = runHighlights(room.players);
   const damage = rows.find(r => r.key === 'damage');
@@ -454,7 +538,7 @@ test('overkill is not credited, or aiming a Fireball at a Sporeling wins the run
   mute(room);
   target.hp = 2;
 
-  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'fireball', target: target.id } });
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: 'fireball', target: target.id } });
   assert.equal(player.stats.damage, 2, 'only what actually landed counts');
   assert.equal(player.stats.kills, 1);
 });
@@ -462,7 +546,7 @@ test('overkill is not credited, or aiming a Fireball at a Sporeling wins the run
 test('another run keeps the crew and changes the ruin', () => {
   const { room, player } = fightWith('hold', 'wizard');
   for(const enemy of room.enemies) enemy.hits = 99;
-  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'hold' } });
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: guard(player) } });
   assert.equal(room.phase, PHASES.over);
 
   const wasSeed = room.seed;
@@ -534,7 +618,6 @@ function surgeWith(slots, hand){
   room.spellbook = { known: Object.keys(slots), satchel: [], slots };
   room.handle(player, { t: 'ready', ready: true });
   assert.equal(room.phase, PHASES.combat);
-  if(hand) player.hand = hand;
   return { room, player };
 }
 
@@ -594,10 +677,13 @@ test('sockets move through real intents and the deck list follows the book', () 
   room.handle(player, { t: 'intent', intent: { t: 'mod', mod: 'siphon', spell: 'fireball' } });
   assert.equal(room.spellbook.slots.fireball.length, 3, 'a fourth socket does not exist');
 
-  // (10+5)x2-3 = 27, and 1-1+1 = 1 charge... charges: 2-1+1 = 2.
+  // (10+5)x2-3 = 27, and the charges the composed spell asks for are what a
+  // cast costs out of her pool.
   const composed = composeSpell('fireball', room.spellbook.slots.fireball);
-  assert.equal(player.deck.filter(id => id === 'fireball').length, composed.charges,
-    'the deck list is the book\'s shadow, updated the moment the book is');
+  assert.ok(room.actionIds(player).includes('fireball'),
+    'what she can cast is read off the book, the moment the book changes');
+  assert.equal(actionCost('fireball', composed).amount, composed.charges,
+    'and the socketed spell prices itself');
 
   // Reordering: pull one out, put it back in front.
   room.handle(player, { t: 'intent', intent: { t: 'mod', mod: 'kindling', spell: null } });
@@ -612,27 +698,32 @@ test('a crafted Twin Core Fireball lands for 30 and costs the pool nothing', () 
   target.hp = 99; mute(room);
   const pages = room.pages;
 
-  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'fireball', target: target.id } });
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: 'fireball', target: target.id } });
   assert.equal(target.hp, 99 - 30, 'the worked example, through the whole engine');
   assert.equal(room.pages, pages, 'the book already paid — no page leaves the pool');
 });
 
-test('charges are per combat: spent when played, dealt again next surge', () => {
+test('charges are a pool: spent on the cast, and a little back every round', () => {
   const { room, player } = surgeWith({ fireball: [] });
-  const counts = () => [...player.deck, ...player.discard, ...player.hand]
-    .filter(id => id === 'fireball').length;
-  assert.equal(counts(), SPELLS.fireball.charges, 'the book dealt the charges');
+  assert.equal(player.charges, CHARGE_CAP, 'a fight opens with the pool full');
 
   mute(room);
-  player.hand = ['fireball', 'fireball', 'hold'];
-  player.deck = player.deck.filter(id => id !== 'fireball');
-  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'fireball' } });
-  assert.equal(counts(), 1, 'the played copy is spent; the unplayed one only discards');
+  const cost = SPELLS.fireball.charges;
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: 'fireball' } });
+  // Spent on the cast, then topped up by the round that follows. That gap is
+  // the Wizard's whole economy: her question is always this round or next.
+  assert.equal(player.charges, CHARGE_CAP - cost + CHARGE_REGEN, 'the cast costs, the round pays back');
+  assert.ok(CHARGE_REGEN < cost, 'or a big spell every round would be free');
 
-  // The next surge deals from the book again, not from what is left.
+  // Emptied, the option is still on the table and still says why it is greyed.
+  player.charges = 0;
+  assert.equal(actionReady('fireball', room.seatState(player), composeSpell('fireball', [])).ok, false);
+  assert.equal(actionReady('fireball', room.seatState(player), composeSpell('fireball', [])).why, 'charges');
+
+  // And the next surge opens full again, however the last one ended.
   room.phase = PHASES.build;
   room.handle(player, { t: 'ready', ready: true });
-  assert.equal(counts(), SPELLS.fireball.charges, 'a charge is a per-combat thing');
+  assert.equal(player.charges, CHARGE_CAP, 'a pool is a per-combat thing');
 });
 
 test('the bloodpact cannot take the last point, and the siphon gives some back', () => {
@@ -640,14 +731,14 @@ test('the bloodpact cannot take the last point, and the siphon gives some back',
   for(const enemy of bled.room.enemies) enemy.hp = 99;
   mute(bled.room);
   bled.player.hp = 2;
-  bled.room.handle(bled.player, { t: 'intent', intent: { t: 'play', index: 0, card: 'fireball' } });
+  bled.room.handle(bled.player, { t: 'intent', intent: { t: 'action', id: 'fireball' } });
   assert.equal(bled.player.hp, 1, 'the seal takes what it can and stops at the last point');
 
   const fed = surgeWith({ fireball: ['siphon'] }, ['fireball', 'hold', 'hold']);
   for(const enemy of fed.room.enemies) enemy.hp = 99;
   mute(fed.room);
   fed.player.hp = 5;
-  fed.room.handle(fed.player, { t: 'intent', intent: { t: 'play', index: 0, card: 'fireball' } });
+  fed.room.handle(fed.player, { t: 'intent', intent: { t: 'action', id: 'fireball' } });
   assert.equal(fed.player.hp, 5 + Math.ceil(SPELLS.fireball.amount / 2),
     'half of what it took out of them finds its way back');
 });
@@ -662,7 +753,7 @@ test('farsight snipes the back of the lane when she does not aim', () => {
     { id: 'near', type: 'sporeling', name: 'Sporeling', art: 'sporeling', hp: 50, maxHp: 50, hits: 0, landed: 0 },
     { id: 'far', type: 'creeper', name: 'Creeper', art: 'creeper', hp: 50, maxHp: 50, hits: 0, landed: 0 },
   ];
-  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'fireball' } });
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: 'fireball' } });
   assert.equal(room.enemies[0].hp, 50, 'the nearest is not the one it lands on');
   assert.ok(room.enemies[1].hp < 50, 'it lands all the way back');
 });
@@ -676,15 +767,23 @@ test('a gilded kill pays pages back to the library', () => {
     { id: 'e1', type: 'creeper', name: 'Creeper', art: 'creeper', hp: 50, maxHp: 50, hits: 0, landed: 0 },
   ];
   const pages = room.pages;
-  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'fireball', target: 'e0' } });
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: 'fireball', target: 'e0' } });
   assert.equal(room.pages, pages + 1, 'a kill worth writing down pays for the paper');
 });
 
-test('an opening word is in the opening hand', () => {
+test('an opening word opens the fight with more in the pool than it can hold', () => {
   const { room, player } = surgeWith({ fireball: ['opening'] });
-  assert.ok(player.hand.includes('fireball'),
-    'the first thing said when the surge arrives');
-  assert.equal(room.enemies.length > 0, true);
+  // It used to put the spell on top of the deck, so it was in the first hand.
+  // There is no deck; what it buys now is a charge over the cap — the same
+  // promise, that you get to say the big thing first, in the currency that
+  // still exists.
+  assert.ok(player.charges > CHARGE_CAP, 'the surge opens with a surplus');
+  assert.ok(room.enemies.length > 0);
+
+  // And it decays, because the round's top-up stops at the cap.
+  mute(room);
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: 'sign' } });
+  assert.ok(player.charges <= CHARGE_CAP, 'the surplus is a start, not a standing bonus');
 });
 
 /* ---- the garden ---------------------------------------------------------- */
@@ -719,10 +818,8 @@ test('the pots are the alchemist\'s, they grow between rounds, and they pay on h
   for(const p of seats) room.handle(p, { t: 'ready', ready: true });
   assert.equal(room.phase, PHASES.combat);
   for(const enemy of room.enemies) enemy.hp = 0;
-  seats[0].hand = ['hold', 'hold', 'hold'];
-  seats[1].hand = ['hold', 'hold', 'hold'];
-  room.handle(seats[0], { t: 'intent', intent: { t: 'play', index: 0, card: 'hold' } });
-  room.handle(seats[1], { t: 'intent', intent: { t: 'play', index: 0, card: 'hold' } });
+  room.handle(seats[0], { t: 'intent', intent: { t: 'action', id: guard(seats[0]) } });
+  room.handle(seats[1], { t: 'intent', intent: { t: 'action', id: guard(seats[1]) } });
   assert.equal(room.phase, PHASES.build, 'an empty lane ends the round');
   assert.equal(room.pots[0].age, 1, 'the garden grew while everyone was fighting');
 
@@ -765,14 +862,63 @@ test('anyone can bend down for a herb, and the Alchemist is worth two of them', 
   assert.ok(classById('alchemist').gather > classById('wizard').gather,
     'which is the whole of the difference');
 
-  // Pages are still anyone's to fetch.
+  // Pages are the Wizard's alphabet, and he is the only seat that reads one.
   const pages = room.nodes.find(n => n.kind === 'pages' && !n.taken);
   if(pages){
     const before = room.pages;
+    seats[1].x = pages.x; seats[1].y = pages.y;
+    room.pickUp(seats[1]);
+    assert.equal(pages.taken, false, 'the Alchemist leaves the pages standing');
+    assert.equal(room.pages, before, 'and the party is no richer for the walk');
+
     seats[0].x = pages.x; seats[0].y = pages.y;
     room.pickUp(seats[0]);
-    assert.equal(room.pages, before + 1, 'the party carries the library');
+    assert.equal(pages.taken, true, 'the Wizard reads it');
+    assert.equal(room.pages, before + CACHE_YIELD.pages);
   }
+});
+
+/* The other half of the same rule, and the one the yield gate was written for:
+ * a cache is a wreck read back into parts, and two of the five seats cannot
+ * read one. It stays where it lies for a seat that can, and the Engineer is
+ * three of a Hauler at it — a reason to send him, not a door the rest are
+ * locked out of, since three of the five can crack one.
+ */
+test('a cache is only worth what the seat cracking it can read out of it', () => {
+  const room = roomFor(`caches-${++codes}`);
+  const seats = ['wizard', 'engineer', 'hauler'].map((classId, i) => {
+    const player = room.join(`cache-token-${codes}-${i}`, fakeSocket());
+    room.handle(player, { t: 'class', classId });
+    return player;
+  });
+  room.handle(seats[0], { t: 'start' });
+
+  const caches = room.nodes.filter(n => n.kind === 'salvage');
+  assert.ok(caches.length >= 2, 'a site always leaves wreckage');
+
+  const total = (s) => Object.values(s).reduce((n, v) => n + v, 0);
+
+  // The Wizard reads books, not pipework.
+  const before = total(room.salvage);
+  seats[0].x = caches[0].x; seats[0].y = caches[0].y;
+  room.pickUp(seats[0]);
+  assert.equal(caches[0].taken, false, 'he leaves the cache for somebody who can');
+  assert.equal(total(room.salvage), before, 'and takes nothing out of it');
+
+  // The Engineer, standing on the very same one, empties it.
+  seats[1].x = caches[0].x; seats[1].y = caches[0].y;
+  room.pickUp(seats[1]);
+  assert.equal(caches[0].taken, true);
+  assert.equal(total(room.salvage) - before, classById('engineer').salvage);
+
+  // The Hauler can crack one too, for a third of what the Engineer gets.
+  const mid = total(room.salvage);
+  seats[2].x = caches[1].x; seats[2].y = caches[1].y;
+  room.pickUp(seats[2]);
+  assert.equal(caches[1].taken, true, 'a cache is not for the Engineer alone');
+  assert.equal(total(room.salvage) - mid, classById('hauler').salvage);
+  assert.ok(classById('engineer').salvage > classById('hauler').salvage,
+    'which is the whole of the difference');
 });
 
 /* ---- the soundtrack ------------------------------------------------------ */
@@ -813,80 +959,609 @@ test('every song is playable data rather than a silent typo', () => {
 /* ---- the standoff -------------------------------------------------------- */
 
 /* A surge used to be a chase: enemies carried a `dist` and only swung once it
- * reached zero. Everything below is a property of the standoff that replaced
- * it, and every one of them is a rule the old model made impossible to state.
+ * reached zero. Then it was a standoff where each swing found one seat on a
+ * rotation. It is a standoff where a swing finds *everybody* now, and what an
+ * enemy is about to do — rather than who it picked — is the whole of the
+ * telegraph. Everything below is a property of that.
  */
 
-test('everything on the field swings from the first turn', () => {
+/* Park an enemy on a chosen intent. `turn` is what the pattern cycles on, so
+   this is the same lever the room pulls, not a back door around it. */
+const parkOn = (enemy, kind) => {
+  const pattern = ENEMIES[enemy.type].pattern;
+  const at = pattern.indexOf(kind);
+  assert.ok(at >= 0, `${enemy.type} has no ${kind} in its pattern`);
+  enemy.turn = at;
+  return enemy;
+};
+
+/* One enemy of a chosen type, parked on a chosen intent, in place of whatever
+   the round rolled. Not every pattern holds every intent — only the Rust Hulk
+   winds up and only the Extractor bolsters — so a test about one of those has
+   to bring the thing that does it. */
+const loneEnemy = (room, type, kind, over = {}) => {
+  const def = ENEMIES[type];
+  const enemy = parkOn({
+    id: 'e0', type, name: def.name, art: def.art,
+    hp: 99, maxHp: 99, hits: def.hits,
+    turn: 0, cast: 0, might: 0, charged: false, ...over,
+  }, kind);
+  room.enemies = [enemy];
+  return enemy;
+};
+
+test('everything on the field acts from the first turn', () => {
   const { room, player } = fightWith('hold', 'engineer');
-  const before = player.hp;
-  player.hand = ['hold', 'hold', 'hold'];
-  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'hold' } });
-  // Guard eats some of it; what matters is that the wave acted at all on turn
-  // one, which under the approach model it could not have.
-  const incoming = room.enemies.reduce((sum, e) => sum + e.hits, 0);
-  assert.ok(incoming > 0, 'the wave has to be able to do something');
-  assert.ok(player.hp < before || player.block === 0,
-    'the wave swung on the opening turn');
+  const acting = room.enemies.filter(e => e.hp > 0).length;
+  assert.ok(acting > 0, 'the wave has to be able to do something');
+
+  const turnsBefore = room.enemies.map(e => e.turn || 0);
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: guard(player) } });
+  // Under the approach model nothing could act on turn one. Every living thing
+  // now takes its turn every round, whatever that turn happens to be.
+  for(const [i, enemy] of room.enemies.entries()){
+    if(enemy.hp <= 0) continue;
+    assert.equal(enemy.turn, turnsBefore[i] + 1, 'every living enemy took its turn');
+  }
 });
 
-test('the telegraph says what is coming and who it is coming for', () => {
+test('the telegraph names which of the four things is coming', () => {
   const { room, player, socket } = fightWith('hold', 'engineer');
   room.broadcast();
   const state = JSON.parse(socket.sent[socket.sent.length - 1]).state;
 
   for(const enemy of state.enemies){
     assert.ok(enemy.intent, 'a living enemy must publish an intent');
-    assert.equal(enemy.intent.damage, enemy.hits, 'the telegraph is the real number');
-    assert.equal(enemy.intent.at, player.id, 'and it names the seat it is aimed at');
+    assert.ok(ENEMY_INTENTS[enemy.intent.kind], `${enemy.intent.kind} is not an intent`);
+    assert.equal(enemy.intent.kind, intentKindOf(enemy.type, enemy.turn || 0));
+    // No seat on it any more: an attack lands on the whole party, so there is
+    // nobody in particular for the plate to name.
+    assert.equal(enemy.intent.at, undefined, 'the plate no longer names a seat');
   }
-  // The lookahead is a lookahead, not a second copy: it names the ailment the
-  // NEXT landed blow would leave, read off the same counter advanceWave uses.
-  const sporeling = room.enemies.find(e => e.type === 'sporeling');
-  if(sporeling){
-    sporeling.landed = 1;
-    assert.equal(intentOf(sporeling).ail, 'rot',
-      'the second landed blow rots, and the telegraph should say so before it lands');
+
+  // The plate is a lookahead, not a second copy of the rule. An attack says the
+  // number the swing will use, read off the same enemyDamage the swing reads.
+  const one = room.enemies[0];
+  parkOn(one, 'attack');
+  assert.equal(intentOf(one).damage, enemyDamage(one));
+  one.might = 3;
+  assert.equal(intentOf(one).damage, enemyDamage(one), 'a bolstered thing says so on the plate');
+});
+
+test('an attack lands on every seat at once', () => {
+  const room = roomFor(`aoe-${++codes}`);
+  const seats = ['alchemist', 'engineer', 'wizard'].map((classId, i) => {
+    const player = room.join(`aoe-token-${codes}-${i}`, fakeSocket());
+    room.handle(player, { t: 'class', classId });
+    return player;
+  });
+  room.handle(seats[0], { t: 'start' });
+  for(const p of seats) room.handle(p, { t: 'ready', ready: true });
+
+  // One enemy, on an attack, against three seats. Under the round-robin this
+  // was the fight where two of the three were never touched.
+  room.enemies = [room.enemies[0]];
+  const enemy = parkOn(room.enemies[0], 'attack');
+  enemy.hp = 99;
+  for(const p of seats){ p.hp = 30; p.maxHp = 30; p.block = 0; }
+
+  const damage = enemyDamage(enemy);
+  for(const p of seats) room.handle(p, { t: 'intent', intent: { t: 'wait' } });
+
+  for(const p of seats){
+    assert.equal(p.hp, 30 - damage, `${p.classId} should have taken the swing too`);
   }
 });
 
-test('the wave rotates which seat it opens on', () => {
-  // Two enemies and three seats: without a rotation seat three is never hit,
-  // every round, for the whole fight.
-  const seats = [
-    { id: 'p1', effects: [], block: 0 },
-    { id: 'p2', effects: [], block: 0 },
-    { id: 'p3', effects: [], block: 0 },
-  ];
-  const wave = [{ id: 'e0', hp: 5, hits: 2 }, { id: 'e1', hp: 5, hits: 2 }];
-  const hitBy = new Set();
-  for(let round = 0; round < 3; round++){
-    for(const who of waveTargets(wave, seats, round).values()) hitBy.add(who);
-  }
-  assert.equal(hitBy.size, 3, 'every seat should come up inside three rounds');
+test('guard comes off each seat share of the blow, not off a pool', () => {
+  const { room, player } = fightWith('hold', 'engineer');
+  room.enemies = [room.enemies[0]];
+  const enemy = parkOn(room.enemies[0], 'attack');
+  enemy.hp = 99;
+  enemy.hits = 5;
+  enemy.might = 0;
+  enemy.charged = false;
+
+  player.hp = 30; player.maxHp = 30;
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: guard(player) } });
+
+  // Hold wards 2 against a swing of 5: three gets through, and the guard is
+  // gone rather than carried.
+  assert.equal(player.hp, 30 - (5 - CARDS[guard(player)].effect.amount), 'guard subtracts from the blow');
+  assert.equal(player.block, 0, 'and does not carry into the next round');
 });
 
-test('cover puts the wave on the coverer for as much guard as it has', () => {
-  const wave = [{ id: 'e0', hp: 9, hits: 4 }, { id: 'e1', hp: 9, hits: 4 }, { id: 'e2', hp: 9, hits: 4 }];
-  const seats = [
-    { id: 'p1', effects: [{ kind: 'cover', amount: 6 }], block: 6 },
-    { id: 'p2', effects: [], block: 0 },
-  ];
-  // Six guard against fours: the first two blows land on the coverer and the
-  // third finds the guard gone. The number on the card is literally how much
-  // wave it buys, and no more.
-  const at = waveTargets(wave, seats, 1);
-  assert.equal(at.get('e0'), 'p1');
-  assert.equal(at.get('e1'), 'p1');
-  assert.equal(at.get('e2'), 'p2', 'once the guard is spent the wave moves on');
+test('a wind-up lands for double the round after, and says so first', () => {
+  const { room, player } = fightWith('hold', 'engineer');
+  const enemy = loneEnemy(room, 'hulk', 'charge', { hits: 4 });
 
-  // And with no guard behind it, cover buys nothing — the effect is not the
-  // thing that redirects, the block is.
-  const spent = waveTargets(wave, [{ ...seats[0], block: 0 }, seats[1]], 1);
-  assert.notEqual(spent.get('e0'), 'p1', 'a coverer with no guard left covers nothing');
+  const promised = intentOf(enemy);
+  assert.equal(promised.kind, 'charge');
+  assert.equal(promised.damage, 0, 'a wind-up lands nothing on the round it winds up');
+  assert.equal(promised.next, 4 * CHARGE_MULTIPLIER, 'and the plate says what is coming');
+
+  player.hp = 40; player.maxHp = 40;
+  room.handle(player, { t: 'intent', intent: { t: 'wait' } });
+  assert.equal(player.hp, 40, 'nothing lands on the wind-up itself');
+  assert.equal(enemy.charged, true, 'it is holding the swing');
+
+  // And the plate now promises the doubled number, which is what makes the
+  // wind-up a decision rather than a free round.
+  parkOn(enemy, 'attack');
+  assert.equal(intentOf(enemy).damage, 4 * CHARGE_MULTIPLIER);
+  room.handle(player, { t: 'intent', intent: { t: 'wait' } });
+  assert.equal(player.hp, 40 - 4 * CHARGE_MULTIPLIER, 'and then it lands for all of it');
+  assert.equal(enemy.charged, false, 'the wind-up is spent on the blow it was saved for');
+});
+
+test('a bolster is kept for the rest of the fight', () => {
+  const { room, player } = fightWith('hold', 'engineer');
+  const enemy = loneEnemy(room, 'extractor', 'bolster', { hits: 3 });
+
+  player.hp = 40; player.maxHp = 40;
+  room.handle(player, { t: 'intent', intent: { t: 'wait' } });
+
+  assert.equal(player.hp, 40, 'a bolster lands nothing');
+  assert.equal(enemy.might, BOLSTER_STEP, 'it takes the weight onto itself');
+  parkOn(enemy, 'attack');
+  assert.equal(intentOf(enemy).damage, 3 + BOLSTER_STEP, 'and swings for more from here on');
+});
+
+test('a dose that guard swallows whole leaves nothing behind', () => {
+  const { room, player } = fightWith('shore', 'engineer');
+  room.enemies = [room.enemies[0]];
+  const enemy = parkOn(room.enemies[0], 'blight');
+  enemy.hp = 99;
+  enemy.hits = 4;
+  enemy.might = 0;
+  enemy.charged = false;
+
+  const intent = intentOf(enemy);
+  assert.equal(intent.kind, 'blight');
+  assert.equal(intent.damage, blightDamage(enemy));
+  assert.ok(intent.ail, 'a dose has to say what it is a dose of');
+
+  // Shore Up wards 3 against a dose of 2: nothing gets through, so nothing is
+  // left behind. This is the whole reason to spend a card on guard against a
+  // Creeper rather than trade with it.
+  player.hp = 30; player.maxHp = 30;
+  assert.ok(CARDS.shore.effect.amount >= intent.damage, 'the ward has to cover the dose');
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: 'shore' } });
+
+  assert.equal(player.hp, 30, 'guard ate all of it');
+  assert.equal(hasEffect(player.effects, intent.ail), false, 'and the ailment with it');
+  assert.equal(enemy.cast || 0, 0, 'a refused dose does not advance the ring');
+});
+
+test('a dose that gets through leaves its ailment', () => {
+  const { room, player } = fightWith('hold', 'engineer');
+  room.enemies = [room.enemies[0]];
+  const enemy = parkOn(room.enemies[0], 'blight');
+  enemy.hp = 99;
+  enemy.hits = 8;
+  enemy.might = 0;
+  enemy.charged = false;
+  const ail = intentOf(enemy).ail;
+
+  player.hp = 30; player.maxHp = 30;
+  room.handle(player, { t: 'intent', intent: { t: 'wait' } });
+
+  assert.ok(player.hp < 30, 'a dose still costs health');
+  assert.ok(hasEffect(player.effects, ail), `and leaves ${ail} behind`);
+  assert.equal(enemy.cast, 1, 'a given dose advances the ring');
+});
+
+test('the boss walks its whole ring of ailments', () => {
+  // One ailment enemies always land the same one; the Extractor cycles, and
+  // `cast` is the only state that decides which.
+  const ring = ['weak', 'rot', 'stun'];
+  for(let i = 0; i < 7; i++){
+    assert.equal(blightOf('extractor', i), ring[i % ring.length]);
+  }
+  assert.equal(blightOf('sporeling', 4), 'rot', 'and a Sporeling only ever rots');
+});
+
+test('cover stands in front of the party while the guard holds', () => {
+  const room = roomFor(`cover-${++codes}`);
+  const seats = ['hauler', 'engineer', 'wizard'].map((classId, i) => {
+    const player = room.join(`cover-token-${codes}-${i}`, fakeSocket());
+    room.handle(player, { t: 'class', classId });
+    return player;
+  });
+  room.handle(seats[0], { t: 'start' });
+  for(const p of seats) room.handle(p, { t: 'ready', ready: true });
+  const [hauler, engineer, wizard] = seats;
+
+  room.enemies = [room.enemies[0]];
+  const enemy = parkOn(room.enemies[0], 'attack');
+  enemy.hp = 99;
+  enemy.hits = 4;
+  enemy.might = 0;
+  enemy.charged = false;
+
+  for(const p of seats){ p.hp = 40; p.maxHp = 40; p.block = 0; }
+
+  // Six of guard against a swing of four, three shares to cover. The Hauler
+  // takes their own share out of the guard and one ally's, and the last two
+  // points are not enough for the third — so the wave finds that seat.
+  room.handle(hauler, { t: 'intent', intent: { t: 'action', id: 'behind' } });
+  room.handle(engineer, { t: 'intent', intent: { t: 'wait' } });
+  room.handle(wizard, { t: 'intent', intent: { t: 'wait' } });
+
+  const covered = [engineer, wizard].filter(p => p.hp === 40).length;
+  assert.equal(covered, 1, 'the guard buys exactly one ally a free round');
+  assert.ok(hauler.hp < 40, 'and the Hauler pays for it once the guard is gone');
+});
+
+/* ---- coordination -------------------------------------------------------
+ *
+ * A phase turns when everybody who can act has acted, and until this section
+ * existed nothing checked what "everybody" meant when somebody closed a laptop.
+ * All four of these were reproducible bugs: a dropped seat froze the round it
+ * was in, a dropped host stranded the party on the end screen with nobody able
+ * to restart, and a commitment could not be taken back once it was made.
+ */
+
+/* A seated party, mid-fight, with a socket kept per seat so a drop is a real
+   drop rather than a flag being set behind the room's back. */
+const party = (label, classes) => {
+  const room = roomFor(`${label}-${++codes}`);
+  const sockets = [];
+  const seats = classes.map((classId, i) => {
+    const socket = fakeSocket();
+    sockets.push(socket);
+    const player = room.join(`${label}-token-${codes}-${i}`, socket);
+    room.handle(player, { t: 'class', classId });
+    return player;
+  });
+  room.handle(seats[0], { t: 'start' });
+  return { room, seats, sockets, tokenOf: i => `${label}-token-${codes}-${i}` };
+};
+
+test('a seat dropping mid-round does not freeze the round', () => {
+  const { room, seats } = party('drop', ['alchemist', 'engineer', 'wizard']);
+  for(const p of seats) room.handle(p, { t: 'ready', ready: true });
+  assert.equal(room.phase, PHASES.combat);
+
+  room.handle(seats[0], { t: 'intent', intent: { t: 'wait' } });
+  room.handle(seats[1], { t: 'intent', intent: { t: 'wait' } });
+  assert.ok(seats[0].intent, 'two are in and the round is still waiting on the third');
+
+  // The third closes the tab. The round is owed a resolution to the two people
+  // still sitting there, and used to sit unresolved until the absent player
+  // came back — which, if they had gone to bed, was never.
+  room.leave(seats[2]);
+  assert.equal(seats[0].intent, null, 'the round resolved without the seat that left');
+  assert.equal(seats[1].intent, null);
+});
+
+test('a seat dropping in the build phase does not hold the surge back', () => {
+  const { room, seats } = party('holdout', ['alchemist', 'engineer', 'wizard']);
+  room.handle(seats[0], { t: 'ready', ready: true });
+  room.handle(seats[1], { t: 'ready', ready: true });
+  assert.equal(room.phase, PHASES.build, 'still waiting on the third');
+
+  room.leave(seats[2]);
+  assert.equal(room.phase, PHASES.combat, 'the last holdout leaving is the phase turning');
+});
+
+test('a returning seat comes back to the character it was playing, mid-fight', () => {
+  const { room, seats, tokenOf } = party('rejoin', ['alchemist', 'engineer']);
+  for(const p of seats) room.handle(p, { t: 'ready', ready: true });
+  assert.equal(room.phase, PHASES.combat);
+
+  seats[0].hp = 17;
+  const was = seats[0].id;
+  room.leave(seats[0]);
+  assert.equal(seats[0].connected, false, 'the seat is away');
+  assert.ok(room.players.includes(seats[0]), 'but it is still their seat');
+
+  // A round went by without them. resolve() only deals to the people who were
+  // in it, so the returning seat would otherwise come back holding nothing.
+  const back = room.join(tokenOf(0), fakeSocket());
+  assert.equal(back, seats[0], 'the token gets the same character back');
+  assert.equal(back.id, was);
+  assert.equal(back.hp, 17, 'with the health it left with');
+  assert.equal(back.connected, true);
+  assert.equal(back.stock.tonic, 2, 'with the rack they walked away from');
+});
+
+test('a returning seat completes the round it came back to', () => {
+  const { room, seats, tokenOf } = party('late', ['alchemist', 'engineer']);
+  for(const p of seats) room.handle(p, { t: 'ready', ready: true });
+
+  room.leave(seats[1]);
+  room.handle(seats[0], { t: 'intent', intent: { t: 'wait' } });
+  // One seat away, one committed: the round already resolved without the absent
+  // one, so the party is waiting on nothing.
+  assert.equal(seats[0].intent, null);
+
+  const back = room.join(tokenOf(1), fakeSocket());
+  room.handle(seats[0], { t: 'intent', intent: { t: 'wait' } });
+  assert.ok(seats[0].intent, 'now there are two of them again, so one is not enough');
+  room.handle(back, { t: 'intent', intent: { t: 'wait' } });
+  assert.equal(seats[0].intent, null, 'and the second commitment turns the round');
+});
+
+test('the host is a role and it survives the host leaving', () => {
+  const { room, seats } = party('host', ['alchemist', 'engineer']);
+  assert.equal(seats[0].host, true);
+
+  room.leave(seats[0]);
+  assert.equal(seats[1].host, true, 'the room passes to whoever is still in it');
+  assert.equal(room.players.filter(p => p.host && p.connected).length, 1, 'exactly one host');
+
+  // And the point of it: `restart` is host-only, so a party whose host dropped
+  // mid-run used to reach the end screen with nobody able to press the button.
+  room.phase = PHASES.over;
+  room.outcome = 'lost';
+  room.handle(seats[1], { t: 'restart' });
+  assert.equal(room.phase, PHASES.lobby, 'the new host can start the next run');
+});
+
+test('a choice can be changed until the last seat is in', () => {
+  const { room, seats } = party('undo', ['engineer', 'wizard']);
+  for(const p of seats) room.handle(p, { t: 'ready', ready: true });
+
+  room.handle(seats[0], { t: 'intent', intent: { t: 'action', id: guard(seats[0]) } });
+  assert.equal(seats[0].intent.id, 'shore');
+
+  // Swapped for another action. The fastest reader at the table commits first and
+  // should not be the one seat that cannot react to what the others do.
+  room.handle(seats[0], { t: 'intent', intent: { t: 'action', id: 'wrench' } });
+  assert.equal(seats[0].intent.id, 'wrench', 'a commitment is a pencil');
+
+  // And taken back to undecided entirely.
+  room.handle(seats[0], { t: 'intent', intent: { t: 'take' } });
+  assert.equal(seats[0].intent, null, 'a choice can be withdrawn as well as swapped');
+
+  // The round still turns on the last commitment, so nobody can change anything
+  // after there is nothing left to change it against.
+  room.handle(seats[0], { t: 'intent', intent: { t: 'action', id: 'shore' } });
+  room.handle(seats[1], { t: 'intent', intent: { t: 'wait' } });
+  assert.equal(seats[0].intent, null, 'the last seat in resolves the round');
+});
+
+test('a seat that committed and then left still plays the card', () => {
+  const { room, seats } = party('ghost', ['engineer', 'wizard', 'alchemist']);
+  for(const p of seats) room.handle(p, { t: 'ready', ready: true });
+  mute(room);
+
+  room.handle(seats[0], { t: 'intent', intent: { t: 'action', id: 'shore' } });
+  room.leave(seats[0]);
+  room.handle(seats[1], { t: 'intent', intent: { t: 'wait' } });
+  room.handle(seats[2], { t: 'intent', intent: { t: 'wait' } });
+
+  // Leaving after committing is not the same as leaving before it. resolve()
+  // walks intents rather than connections, so the card they chose is the card
+  // that resolves, whether or not they are still there to watch it.
+  assert.equal(seats[0].stats.guard, CARDS.shore.effect.amount, 'the guard they chose went up');
+});
+
+/* ---- the beat ------------------------------------------------------------ */
+
+test('a round is numbered so the party resolves before the wave', () => {
+  const room = roomFor(`beat-${++codes}`);
+  const socket = fakeSocket();
+  const seats = ['engineer', 'wizard'].map((classId, i) => {
+    const player = room.join(`beat-token-${codes}-${i}`, i === 0 ? socket : fakeSocket());
+    room.handle(player, { t: 'class', classId });
+    return player;
+  });
+  room.handle(seats[0], { t: 'start' });
+  for(const p of seats) room.handle(p, { t: 'ready', ready: true });
+
+  loneEnemy(room, 'sporeling', 'attack');
+  for(const p of seats){ p.hp = 40; p.maxHp = 40; }
+  socket.sent.length = 0;                 // everything before the round under test
+
+  room.handle(seats[0], { t: 'intent', intent: { t: 'action', id: 'shore' } });
+  room.handle(seats[1], { t: 'intent', intent: { t: 'action', id: 'spark' } });
+
+  const fx = fxIn(socket);
+  assert.ok(fx.length, 'a resolved round has to emit something');
+  for(const e of fx) assert.equal(typeof e.step, 'number', 'every fx carries its beat');
+
+  // Two cards, then the quiet gap, then the wave: three distinct beats at
+  // least, and the wave's is after both cards. An fx names the card that
+  // caused it when a card did — Spark comes through as `spark` — and its verb
+  // otherwise, which is why the ward is `ward`.
+  const cards = fx.filter(e => e.kind === 'ward' || e.kind === 'spark');
+  const wave = fx.filter(e => e.kind === 'hit');
+  assert.ok(cards.length && wave.length, 'both halves of the round should be present');
+  assert.ok(Math.max(...cards.map(e => e.step)) < Math.min(...wave.map(e => e.step)),
+    'every card resolves before anything the wave does');
+  // And the two cards are not on the same beat as each other: the client plays
+  // one seat at a time.
+  assert.equal(new Set(cards.map(e => e.step)).size, 2, 'each seat gets its own beat');
 });
 
 /* ---- seats four and five ------------------------------------------------- */
+
+/* ---- the pack, driven through a real room ----------------------------- */
+
+/* A Hauler, seated, in the build phase, with the socket cleared. */
+function haulerInBuild(label){
+  const room = roomFor(`pack-${label}`);
+  const socket = fakeSocket();
+  const player = room.join(`token-${label}`, socket);
+  room.handle(player, { t: 'class', classId: 'hauler' });
+  room.handle(player, { t: 'start' });
+  assert.equal(room.phase, PHASES.build);
+  return { room, player, socket };
+}
+
+test('a run opens with his signature card in the bag and nothing else', () => {
+  const { room, player } = haulerInBuild('open');
+  // Every other seat has a floor it cannot draw beneath. His is one item.
+  assert.deepEqual(packedCards(player.pack.placed), ['behind']);
+  assert.deepEqual(room.actionIds(player).sort(), ['behind', 'shoulder', 'weight'].sort(),
+    'two basics and whatever is in the bag — that is the whole list');
+});
+
+test('three items arrive every build phase, unasked for', () => {
+  const { room, player } = haulerInBuild('draw');
+  assert.equal(player.pack.loose.length, 3, 'the wreckage turns out three');
+  for(const id of player.pack.loose) assert.ok(PACK_ITEMS[id], `rolled "${id}"`);
+
+  // And again next build phase, on top of whatever survived.
+  room.handle(player, { t: 'ready', ready: true });
+  assert.equal(room.phase, PHASES.combat);
+  for(const enemy of room.enemies) enemy.hp = 0;
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: 'shoulder', target: room.enemies[0].id } });
+  assert.equal(room.phase, PHASES.build, 'the wave is dead and the next build phase is open');
+  assert.equal(player.pack.loose.length, 3, 'three more, every round');
+});
+
+test('what he could not fit is left on the ground when the surge starts', () => {
+  const { room, player } = haulerInBuild('spill');
+  const kept = player.pack.loose[0];
+  const item = PACK_ITEMS[kept];
+
+  // Take one of the three, leave two.
+  let placed = null;
+  outer: for(let y = 0; y < PACK_H; y++){
+    for(let x = 0; x < PACK_W; x++){
+      for(let rot = 0; rot < 4; rot++){
+        if(packPlace(room.round, player.pack.placed, kept, x, y, rot)){
+          room.handle(player, { t: 'intent', intent: { t: 'pack', index: 0, x, y, rot } });
+          placed = { x, y, rot };
+          break outer;
+        }
+      }
+    }
+  }
+  assert.ok(placed, `${item.name} had to go in somewhere`);
+  assert.equal(player.pack.loose.length, 2, 'the other two are still loose');
+  assert.ok(player.pack.placed.some(p => p.id === kept), 'and the first one is in');
+
+  room.handle(player, { t: 'ready', ready: true });
+  assert.equal(room.phase, PHASES.combat);
+  assert.deepEqual(player.pack.loose, [], 'the bag closes and the rest is left behind');
+  assert.ok(player.pack.placed.some(p => p.id === kept), 'what fitted is still his');
+});
+
+test('the bag is the option list: pack a kit and the card appears, take it out and it goes', () => {
+  const { room, player } = haulerInBuild('options');
+  const before = room.actionIds(player);
+  assert.equal(before.includes('sledge'), false, 'he does not own a Sledge by class');
+
+  // Wherever it will go — the round-one bag is 13 cells with the top row cut
+  // away, and a five-cell pentomino has very few homes in it.
+  let put = null;
+  for(let y = 0; y < PACK_H && !put; y++){
+    for(let x = 0; x < PACK_W && !put; x++){
+      for(let rot = 0; rot < 4 && !put; rot++){
+        put = packPlace(room.round, player.pack.placed, 'sledge', x, y, rot);
+      }
+    }
+  }
+  assert.ok(put, 'the Sledge goes somewhere in the round-one bag');
+  player.pack.placed = put;
+  assert.ok(room.actionIds(player).includes('sledge'), 'and it is an option the moment it is in');
+
+  // Out again, and the option goes with it.
+  const index = player.pack.placed.findIndex(p => p.id === 'sledge');
+  room.handle(player, { t: 'intent', intent: { t: 'unpack', index } });
+  assert.equal(room.actionIds(player).includes('sledge'), false, 'out of the bag is out of the list');
+  assert.ok(player.pack.loose.includes('sledge'),
+    'and back among the loose — taking it out to try again must not be what loses it');
+});
+
+test('the room refuses a placement that does not fit, and nothing moves', () => {
+  const { room, player } = haulerInBuild('refuse');
+  const before = JSON.stringify(player.pack);
+
+  // On top of Get Behind Me, which is already at 1,1.
+  player.pack.loose = ['sledge'];
+  room.handle(player, { t: 'intent', intent: { t: 'pack', index: 0, x: 1, y: 1, rot: 0 } });
+  assert.equal(player.pack.placed.length, 1, 'nothing was placed');
+
+  // Off the edge of the bag entirely.
+  room.handle(player, { t: 'intent', intent: { t: 'pack', index: 0, x: 4, y: 0, rot: 0 } });
+  assert.equal(player.pack.placed.length, 1, 'and a piece may not hang off the side');
+
+  player.pack.loose = [];
+  assert.equal(JSON.stringify(player.pack), before.replace(/"loose":\[[^\]]*\]/, '"loose":[]'),
+    'a refusal is a no-op, never a half-applied bag');
+});
+
+test('ballast pays out as the fight opens and asks for no turn', () => {
+  const { room, player } = haulerInBuild('ballast');
+  player.pack.placed = [
+    { id: 'plate', x: 0, y: 2, rot: 0 },
+    { id: 'plate', x: 2, y: 2, rot: 0 },
+    { id: 'bracing', x: 0, y: 3, rot: 0 },
+    { id: 'tin', x: 4, y: 2, rot: 0 },
+  ];
+  player.pack.loose = [];
+  assert.deepEqual(packedStats(player.pack.placed), { heft: 4, ward: 3, regen: 2, bolt: 0 });
+
+  room.handle(player, { t: 'ready', ready: true });
+  assert.equal(room.phase, PHASES.combat);
+
+  // Heft is applied here rather than granted as a card, and it is the whole
+  // reason a bag is worth packing on a seat whose every other verb costs blood.
+  assert.equal(effectAmount(player.effects, 'heft'), 4, 'two Plates are worth two twos');
+  assert.equal(player.block, 3, 'and the guard is in the pool before the first blow');
+  assert.equal(effectAmount(player.effects, 'regen'), 2);
+  assert.equal(strikePower(CARDS.shoulder.effect.amount, player.effects),
+    CARDS.shoulder.effect.amount + 4, 'it is a term in every swing, paid for in room');
+
+  // None of it is an option — ballast never asks for a turn.
+  for(const id of ['plate', 'bracing', 'tin']){
+    assert.equal(room.actionIds(player).includes(id), false, `${id} must not be a card`);
+  }
+});
+
+test('a Bolt Case reaches the fight through the crossbow and nothing else', () => {
+  const { room, player } = haulerInBuild('boltcase');
+  mute(room);
+  player.pack.placed = [
+    { id: 'crossbow', x: 1, y: 1, rot: 0 },
+    { id: 'boltcase', x: 0, y: 2, rot: 0 },
+  ];
+  player.pack.loose = [];
+  room.handle(player, { t: 'ready', ready: true });
+
+  const target = room.enemies[0];
+  target.hp = 99;
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: 'crossbow', target: target.id } });
+  assert.equal(target.hp, 99 - (CARDS.crossbow.effect.amount + 2),
+    'the case is in the number the room resolves, not only on the button');
+});
+
+test('the bag grows every round, and the growth is the progression', () => {
+  const { room, player } = haulerInBuild('growth');
+  const seen = [];
+  for(let round = 1; round <= 4; round++){
+    seen.push(gridCells(room.round));
+    if(round === 4) break;
+    room.handle(player, { t: 'ready', ready: true });
+    for(const enemy of room.enemies) enemy.hp = 0;
+    room.handle(player, { t: 'intent', intent: { t: 'action', id: 'shoulder', target: room.enemies[0].id } });
+  }
+  assert.deepEqual(seen, [13, 16, 18, 20],
+    'the items churn, so the container is what has to compound');
+});
+
+test('a bag survives hibernation, and one stored before it existed wakes up', () => {
+  const { room, player } = haulerInBuild('hibernate');
+  player.pack.placed = packPlace(room.round, player.pack.placed, 'plate', 0, 2, 0);
+  const before = JSON.stringify(player.pack);
+
+  const woken = Room.restore(JSON.parse(JSON.stringify(room.serialize())));
+  const seat = woken.players.find(p => p.classId === 'hauler');
+  assert.equal(JSON.stringify(seat.pack), before, 'a whole build phase of packing must not evaporate');
+
+  // The room the Durable Object is holding right now has no pack on anybody.
+  const stored = JSON.parse(JSON.stringify(room.serialize()));
+  for(const p of stored.players) delete p.pack;
+  const old = Room.restore(stored);
+  const seatless = old.players.find(p => p.classId === 'hauler');
+  assert.equal(seatless.pack, null, 'and waking one from before this shipped must not throw');
+  assert.deepEqual(old.actionIds(seatless), ['shoulder', 'weight'], 'he is just two basics until the next build phase');
+});
 
 test('heft is bought once and kept for the fight', () => {
   const { room, player } = fightWith('setfeet', 'hauler');
@@ -895,15 +1570,14 @@ test('heft is bought once and kept for the fight', () => {
   target.hp = 99;
 
   const before = player.hp;
-  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'setfeet' } });
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: 'setfeet' } });
   assert.equal(player.hp, before - CARDS.setfeet.hpCost, 'it is paid for in health');
   assert.equal(effectAmount(player.effects, 'heft'), CARDS.setfeet.effect.amount);
 
   // Three turns later it is still there — the only effect in the game that
   // does not age.
   for(let turn = 0; turn < 3; turn++){
-    player.hand = ['shoulder', 'hold', 'hold'];
-    room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'shoulder', target: target.id } });
+    room.handle(player, { t: 'intent', intent: { t: 'action', id: 'shoulder', target: target.id } });
   }
   assert.equal(effectAmount(player.effects, 'heft'), CARDS.setfeet.effect.amount,
     'heft is bought for the fight, not rented for a round');
@@ -928,20 +1602,18 @@ test('canker keeps coming off after the card, and refreshes rather than stacks',
   target.hp = 99;
   const amount = CARDS.ringbark.effect.amount;
 
-  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'ringbark', target: target.id } });
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: 'ringbark', target: target.id } });
   assert.equal(target.canker, amount, 'the ring is cut this round');
   assert.equal(player.stats.damage, 0, 'and pays nothing on the round it was cut');
 
   // A second ring on the same target is still one ring — additive would pay
   // out triangularly and three of them would be forty-five damage.
-  player.hand = ['ringbark', 'hold', 'hold'];
-  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'ringbark', target: target.id } });
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: 'ringbark', target: target.id } });
   assert.ok(target.canker <= amount, 'canker refreshes rather than stacks');
 
   // It comes off on its own, smaller each round, whether or not she acts.
   const hp = target.hp;
-  player.hand = ['hold', 'hold', 'hold'];
-  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'hold' } });
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: guard(player) } });
   assert.ok(target.hp < hp, 'canker arrives without a card being played at it');
   assert.ok(player.stats.damage > 0, 'and is credited to whoever cut the ring');
 });
@@ -951,12 +1623,11 @@ test('a stun cannot take canker off the table', () => {
   mute(room);
   const target = room.enemies[0];
   target.hp = 99;
-  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'ringbark', target: target.id } });
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: 'ringbark', target: target.id } });
 
   const hp = target.hp;
   player.effects = addAilment([], 'stun');
-  player.hand = ['hook', 'hold', 'hold'];
-  room.handle(player, { t: 'intent', intent: { t: 'play', index: 0, card: 'hook', target: target.id } });
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: 'hook', target: target.id } });
   assert.ok(target.hp < hp, 'the ring keeps closing while she is finding her feet');
 });
 
@@ -971,12 +1642,10 @@ test('a graft is in the ally hand next round, and nowhere else', () => {
   for(const p of seats) room.handle(p, { t: 'ready', ready: true });
   mute(room);
 
-  seats[0].hand = ['scion', 'hold', 'hold'];
-  seats[1].hand = ['hold', 'hold', 'hold'];
-  room.handle(seats[0], { t: 'intent', intent: { t: 'play', index: 0, card: 'scion', target: seats[1].id } });
-  room.handle(seats[1], { t: 'intent', intent: { t: 'play', index: 0, card: 'hold' } });
+  room.handle(seats[0], { t: 'intent', intent: { t: 'action', id: 'scion', target: seats[1].id } });
+  room.handle(seats[1], { t: 'intent', intent: { t: 'action', id: guard(seats[1]) } });
 
-  assert.ok(seats[1].hand.includes('cutting'),
+  assert.ok((seats[1].uses || {}).cutting > 0,
     'a cutting posted this round is in that hand the next one');
   assert.equal(seats[0].hand.includes('cutting'), false, 'and not in the grafter\'s');
   // It is a strike, so whatever the arm is carrying counts.

@@ -303,6 +303,9 @@ npm test
 ```
 public/good-vibes/content.js  the game as data — classes, cards, resources, buildings,
                     enemies, rounds, and the pure functions over them
+public/good-vibes/pack.js  the Hauler's bag: the shapes, the items, and the pure
+                    geometry over them. Re-exported by content.js, and it
+                    imports nothing from it — that cycle would be a throw
 public/art.js       the palette, the tiles and their cuts, the props, and every
                     sprite, as text
 public/stage.js     the surge's backdrop, painted rather than tiled: sky,
@@ -311,7 +314,7 @@ public/fx.js        what a resolved effect looks and sounds like, card first
                     and effect kind second, so nothing lands silently
 public/audio.js     the three tracks — title, build, surge — and every sound,
                     synthesised, no files
-public/play.html    the game: lobby, build phase, the surge, the hand
+public/play.html    the game: lobby, build phase, the surge, the options
 public/pixel.js     bitmap font and canvas helpers, shared by both pages
 public/title.js     the title screen: a real generated site with the real party
                     walking it, drawn from the same modules the game uses
@@ -331,6 +334,7 @@ src/server.js       the local server: http + the socket route
 src/app.js          static files out of public/, for local work only
 src/ws.js           a WebSocket server, standard library only, likewise local
 test/content.test.js validates every table above and the rules over them
+test/pack.test.js   the pack: rotation, the cut corners, the draw, the budget
 test/rooms.test.js  drives a real room: what a card resolves to, statuses,
                     kills, levelling, and that the client has an animation and
                     a sound for all of it
@@ -346,7 +350,8 @@ declarative — a throw at its top level would take the Worker down — and
 why `test/content.test.js` checks the shape of every class before the deploy
 workflow will ship anything.
 
-Adding a class is a block in `CLASSES`, a deck in `STARTING_DECKS`, and a sprite
+Adding a class is a block in `CLASSES`, two basics and a list in `CLASS_BASICS`
+and `CLASS_ACTIONS`, and a sprite
 in `art.js`. Every field is documented above the array, and the test names the
 one you missed. The roster is **five of five** — Alchemist, Engineer, Wizard,
 Hauler, Grafter — so `OPEN_ROLES` is empty; it is kept as an export because the
@@ -426,7 +431,7 @@ being at the mercy of the roll.
 
 ### Brewing
 
-Brewing does not fill a rack — it puts cards in the Alchemist's deck. A recipe
+Brewing fills a rack. A recipe
 has `makes`, and one brew deals several copies, which is what makes the walk
 across the site worth the trouble: a Sunpetal you bent down for is three heals,
 not one.
@@ -442,14 +447,16 @@ wards 4, Acid Flask strikes 3 — because brewing should always feel like an
 upgrade over the card it dilutes. Between the three, every material on the map
 has a use, so no herb is ever pointless to bend down for.
 
-Brewed cards are **consumed**: playing one takes it out of the deck for good
-rather than sending it to the discard. That is what stops a good brew being a
-permanent upgrade, and it is why the Alchemist's deck changes shape every fight
-where the Engineer's only grows.
+Brewed doses are **consumed**: taking one takes it off the rack for good. That
+is what stops a good brew being a permanent upgrade, and it is why the
+Alchemist's rack changes shape every fight where the Engineer's power just comes
+back.
 
-They are shuffled in rather than kept on a tray. Three Sunsalves in a nine-card
-deck *dilute* it — you might draw healing when you needed a guard — and that
-cost is what makes gathering a decision instead of pure upside.
+They are hers for the whole run rather than the fight that follows the brew,
+which is the shape of her economy against the other four: the Engineer's panels
+refill every surge and the Wizard's charges refill every round, but a Sunsalve
+spent in round one is not there for the Array. She is the only seat whose
+question is *which fight*, and the rack is where that question lives.
 
 ### The garden
 
@@ -465,6 +472,97 @@ her economy that compounds. Every build phase asks the same quiet question of
 each pot: brew it this fight, or let it grow toward the boss — her copy of the
 Wizard's compound-or-spend tension, in soil. Drag a stash chip onto a pot, or
 tap the chip and tap the pot; tap a plant to harvest it.
+
+### The pack
+
+The Hauler's build phase, and the first economy in this game that is a **shape
+rather than a number**.
+
+Three items land at his feet every build phase, unasked for and unchosen. The
+bag is smaller than they are. What fits is his for the run; what is still loose
+when the surge starts is left where it lies.
+
+```
+   round 1            round 2            round 3            round 4
+   . . . . .          . X X X .          . X X X .          X X X X X
+   . X X X .          . X X X .          X X X X X          X X X X X
+   X X X X X          X X X X X          X X X X X          X X X X X
+   X X X X X          X X X X X          X X X X X          X X X X X
+      13                 16                 18                 20
+```
+
+**The bag growing is the progression, and it has to be.** The items churn, so
+the thing that compounds across a run cannot be the items — it has to be the
+container, which is also the only sentence his own bio asks for: *knows to
+within a kilo what they can take, and takes that much*. It is legible the way
+the wave tables are legible: a bag that visibly grows a row is something you
+see, where "+2 capacity" is something you read.
+
+It grows on a schedule rather than being bought, on the precedent the library
+already sets — `PAGES_PER_ROUND` pays the Wizard a page every build phase
+simply for being seated, because the draft is her whole game. The pack is his
+whole game, and health is the one pool in this project that never comes back,
+so charging him health for the thing the seat is *made of* would be a toll on
+existing. He can pay 3 health to pull the next expansion forward a round, and
+that is the only place blood touches the bench.
+
+**A kit is an option; ballast is a number.** Eleven and four:
+
+| | | |
+| --- | --- | --- |
+| **Kit** | 3–5 cells, awkward | puts a card in his list for as long as it is in the bag |
+| **Ballast** | 1–2 cells | flat, applied once as the fight opens, never asks for a turn |
+
+Ballast exists because a packing puzzle without small pieces is a puzzle with
+dead holes in it — every inventory-tetris game ever made carries ammunition and
+herbs for exactly that reason. A Ballast Plate opens the fight at `heft 2` for
+free, which is the whole thesis: the bag is the half of his ramp he does not
+bleed for, and packing well is what buys him the health to also afford covering.
+
+**`CLASS_ACTIONS.hauler` is empty, and that is the point.** Set Your Feet, Get
+Behind Me and Leg Up were his entire class list and are now pack items with
+their numbers unchanged. His floor is two basics; everything above it is
+something he found room for. The room appends the rest per player from
+`packedCards`, exactly as it appends the Wizard's book — what a seat can do is
+not always knowable from its class id. Get Behind Me starts in the bag, because
+every other seat has a floor it cannot draw beneath and a Hauler whose first
+three finds were all ballast would otherwise open a run with nothing at all.
+
+**No draft, and deliberately not.** An offer of three to keep one is the
+Wizard's bench, and a second one would be her build phase in another colour.
+The decision here is never *which* — it is *where*, and it is only a decision
+because the bag is smaller than what arrives. Round one fits its draw with room
+to spare; from round two the bag is full and every find is a swap rather than an
+addition. By the boss he is cutting about half of what he has been handed.
+
+A kit already in the bag is never rolled again, the way `rollOffers` refuses a
+spell already in the book — a duplicate unique ability is a dead draw. Ballast
+repeats freely, because two Ration Tins is four health a round and the whole job
+of a small piece is to be the thing that fills the hole.
+
+**One thing to watch, and it is the interaction to balance first.** Heft is
+additive on every strike and never wears off, the Winch Crossbow is `strike 6`
+free and unlimited, and Set Your Feet stacks. A bag holding a Crossbow, two
+Plates and Set Your Feet is throwing 10 a round by turn two, from a seat with 38
+health — where a Fireball is 10 for two charges. Free-unlimited strikes and
+stacking heft in the same bag is the thing that could make him the strongest
+seat by round three; the balance harness already shows him leading damage *and*
+guard at every table size. The fix is not to nerf heft, which is what makes him
+a battery — it is that the free kits should mostly not be strikes.
+
+**Where the code lives.** `public/good-vibes/pack.js`, re-exported by
+`content.js`. The property that matters was never "one file" — it is one
+*import surface*, and a re-exported name is on the module's namespace object
+identically to a local one, so the Worker's import, the browser's, and the
+published-contract test cannot tell the difference. The rule that keeps it safe:
+**`pack.js` imports nothing from `content.js`**, because a cycle between them
+would put a live binding in the temporal dead zone at module scope, which here
+is a throw at the top of the deployed Worker.
+
+Nothing in the item table needed a new effect kind. Every one is something
+`EFFECT_KINDS` already lists and the room already resolves, so `fx.js` falls
+back to the verb and none of them lands silently — and `test/rooms.test.js`
+plays every one of the new strikes through a real room to prove it.
 
 ### The scriptorium
 
@@ -482,13 +580,15 @@ Core is `(10+5)x2 = 30`; the same two sockets reversed are 25. Duplicates are
 a real find — a second Kindling can turn up, and two spells can carry the
 same ink — with rares kept genuinely rare by `MODIFIER_WEIGHTS` instead.
 
-**Charges are copies in the deck.** At every surge the Wizard's deck is
-written fresh from the book: her slim kit plus `charges` copies of each spell
-as composed right now. A played copy is spent for the fight; the book deals it
-again next surge. That is `composeSpell`, `rollOffers`, `takeOffer`,
-`moveModifier` and `wizardCombatDeck` in `content.js` — pure, shared, and the
-reason the bench, the deck list and the surge can never disagree about what a
-Fireball has become.
+**Charges are what a cast costs.** `charges` used to be how many copies of a
+spell went into the deck the surge dealt her; it is the price of casting it out
+of a pool that fills at the start of a fight and comes back `CHARGE_REGEN` at
+the top of every round. Nothing is dealt and nothing is rebuilt — what she can
+cast is read off the book every time it is asked for, so a spell drafted or
+re-socketed mid-run is castable on the very next round. That is `composeSpell`,
+`rollOffers`, `takeOffer` and `moveModifier` in `content.js` — pure, shared, and
+the reason the bench, the option list and the surge can never disagree about
+what a Fireball has become.
 
 Some inks do more than move numbers: a ward on cast, a heal for half the
 damage dealt, a page back on a kill, a copy stacked into the opening hand, a
@@ -521,47 +621,112 @@ The spawner uses the same flood. Terrain rolls islands — a pocket of grass
 behind a pond — and a Cellsap on one is a node the player can see, walk at, and
 never reach; `reachableFrom` keeps every node on ground a hero can get to.
 
-### The hand
+### The options
 
-Everyone holds a deck. A turn is **draw three, play one, discard the hand** —
-the two you did not play go down with the one you did.
+A turn is **pick one thing from a list you can always see**. No deck, no hand,
+no discard, no shuffle.
 
-Three is small on purpose. Five players commit simultaneously, so a hand has to
-be readable in about three seconds or four people sit watching a fifth think,
-and a planning problem you cannot coordinate is just a wait. Discarding the
-whole hand is what keeps a turn atomic: nobody holds a card for three rounds
-waiting for a setup the other four cannot see coming.
+There was a deck. Ten or eleven cards, three drawn a turn, one played, the rest
+discarded. It is gone, and the reason is one table:
 
-Every class opens with the same six cards wearing different names: three
-basic attacks and three basic wards, all at 3 (`CLASS_KITS` — the Alchemist's
-flasks and steady hands, the Engineer's wrenches and shoring, the Wizard's
-sparks and signs). The basics are the floor of a turn and nothing more;
-everything a class actually *is* comes out of its build phase, so the deck a
-fight sees is six basics plus whatever the round paid for. At three cards a
-turn a kit cycles fast, and a player learns what is in theirs by round two.
-(`STARTING_DECKS` and the `strike`/`hold` universals still exist for the
-deployed Worker, which deals the older decks.)
+```
+flask  wrench  spark  shoulder  hook      ->  strike 3
+steady shore   sign   weight    bramble   ->  ward 3
+```
 
-`deckFor(classId)` builds the opening deck once, and everything after that adds
-to it in place — the Alchemist brewing, the Engineer buying a barrel. A deck
-rebuilt at the surge would throw away the build phase that paid for it. The
-Wizard is the deliberate exception: hers is `wizardCombatDeck`, written fresh
-from the book at every surge, because for her the build phase *is* the deck
-and re-dealing it is what makes a spell's charges per-combat without a counter
-anywhere.
+Every class opened with six cards that were **two cards wearing five sets of
+names**, and `CLASS_KITS` said so in its own comment — *the basics are identical
+under the rename*. Six of ten for the Alchemist, the Wizard and the Hauler;
+**seven of ten for the Engineer**. Draw three and play one out of that and the
+majority of turns in this game were a 3-damage hit or a 3-point ward whoever you
+were sitting as, with the interesting cards buried underneath.
 
-Shuffling and dealing are pure functions taking the generator, like everything
-else that rolls here. A client that shuffled for itself would hold cards the
-room never dealt it, and a replayed room would deal a different hand than the
-one that was played. Each player needs their own stream, too, or one player's
-draw shifts everyone else's. `draw()` returns new piles rather than mutating,
-because two callers sharing an array is how a hand ends up in somebody else's
-deck.
+A deck earns that cost by becoming an engine, and it never could here: a run is
+four fights, a deck of ten cycles about once per fight, so it paid the whole
+price of randomness and never collected. Where variance comes from instead is
+the wave, the site and the draft — see
+**[Levelling a fight to the table](#levelling-a-fight-to-the-table)**.
 
-Cards are the *only* interface in a fight. There is no second list of things you
-can do — a card that costs power is dealt like any other and simply greys out
-when the pool is empty, which is a bad draw the player caused. A crafted spell
-never greys: the book already paid for it at the bench.
+#### Two free basics, and they are not the same two numbers
+
+`CLASS_BASICS` gives every seat one swing and one guard, free and unlimited.
+The numbers are the point:
+
+| | swing | guard | |
+| --- | --- | --- | --- |
+| Alchemist | 3 | 3 | middling at both, as she is at everything |
+| Engineer | 3 | 4 | hits like a tool, holds like a wall |
+| Wizard | **5** | **2** | the best free swing in the game and the worst free guard |
+| Hauler | 4 | 4 | the most health and the heaviest hands |
+| Grafter | 3 | 3 | plain, because her damage is supposed to arrive late |
+
+The Wizard's line is the roster's glass floor stated twice — she already had the
+lowest health, and now she says the same thing again in what she can do for
+nothing. A test pins that the swings and guards are *not* all equal, because
+flattening them is exactly the state this replaced.
+
+Universal Strike and Hold are superseded and in nobody's list. They stay in
+`CARDS` only because removing an export is a bet on what the deployed Worker
+imports, and that bet is declined here as everywhere else.
+
+#### Five economies, which were always there
+
+The shuffle was a translation layer over five limits that already existed in
+`content.js`. Taking it out did not invent them; it stopped hiding them.
+
+| | who | refills | reads |
+| --- | --- | --- | --- |
+| `stocked` | Alchemist | never — brewing is the only way back | a rack of bottles, carried the whole run |
+| `power` | Engineer | every fight, from the panels | one pool, everything draining it at a different rate |
+| `chargeCost` | Wizard | `CHARGE_REGEN` at the top of every round | this round or next |
+| `hpCost` | Hauler | never | he has always paid in health, and pays for the sharp half of the bag |
+| `packed` | Hauler | never depletes, because it never spends | **the sixth, and the odd one out** — see below |
+| `uses` | Grafter, for now | every fight | her old copy counts, one for one |
+
+**`packed` is the only limit that is not a count of uses.** The other five all
+answer "how many times"; the pack answers "how many things", and it is paid once
+in the build phase in floor space rather than at each play. A kit in the bag is
+an option every round of the fight for nothing — the cost was the three other
+things that then could not go in. It is the only economy in the game where the
+question is what you *have* rather than what you can afford to spend, which is
+what a backpack means and the reason it earns a row of its own.
+
+`RECIPES.makes` used to deal three Sunsalves into a shuffle; it puts three in
+the rack, which is what it always meant. `SPELLS.charges` used to be how many
+copies of a spell went into her deck; it is what a cast costs. Raising a panel
+used to push a Bolt Gun card into the Engineer's deck and hope he drew it; he
+always has the gun, and what a panel buys is the power to fire it. In every case
+the mechanic is unchanged and the indirection is gone.
+
+The Grafter is in the `uses` column because she has no economy of her own yet —
+`CLASS_EXTRAS` has always admitted that, and it is the field to empty when she
+grows one.
+
+#### What an option says on its face
+
+Unaffordable options are **greyed, never hidden**, and they say *why*: "not
+enough charge" and "the rack is empty" are different facts, and a player who can
+see which one applies can do something about one of them. `actionCost` names the
+pool and `actionReady` returns a reason rather than a boolean, so the room and
+the client answer that question out of the same function and cannot disagree.
+
+Costs are paid at **resolution**, not on the click — a commitment can still be
+taken back, and a charge spent on an action that was never taken would be gone
+for nothing. Affordability is checked twice for the same reason: two Engineers
+committing a Bolt Gun against one panel's worth of power is a legal pair of
+clicks, and the second to resolve has to find the pool empty rather than take it
+negative.
+
+Two things changed shape rather than porting cleanly:
+
+- **Graft** put a Cutting on top of an ally's deck, which guaranteed it in their
+  hand next round. There is no deck to sit on top of, so it arrives as a *use*
+  on their board — if anything sharper, because it is there the moment it is
+  bound and everyone can see it.
+- **An Opening Word** put its spell at the top of the deck. It now opens the
+  fight with a charge *over* the cap: the same promise — you get to say the big
+  thing first — in the currency that still exists. It decays on its own, because
+  the per-round top-up stops at `CHARGE_CAP`.
 
 ### The build phase
 
@@ -666,17 +831,21 @@ itself is unwalkable, the ring is the nearest thing the ordering can offer.
 **One panel per class.** Below the map you get the pool you spend and the verb
 you have, and nothing belonging to somebody else's economy: the Alchemist's
 stash, garden and recipes, the Engineer's salvage, buildings, power and
-workbench, the Wizard's library, draft, bench and satchel. Each is hidden
-whole, heading included, on the rule power was
+workbench, the Wizard's library, draft, bench and satchel, the Hauler's pack.
+Each is hidden whole, heading included, on the rule power was
 already hidden by — a readout you cannot act on is one you learn to skip past,
 and a live heading over the words "only the Alchemist can brew" spends a
-section of the screen on saying no. The client branches on the `craft`, `build`
-and `cast` flags in `CLASSES`, never on the class id, so a fourth class gets a
-panel by declaring what it can do.
+section of the screen on saying no. The client branches on the `craft`, `build`,
+`cast` and `haul` flags in `CLASSES`, never on the class id, so a class gets a
+panel by declaring what it can do — which is exactly how the Hauler got his:
+one flag on his entry in `CLASSES`, and the bench appeared.
 
 This is presentation only. `stash`, `salvage`, `pages` and `power` are
 room-level fields that `viewFor` sends to everyone regardless of class; what
-changed is which of them a given seat draws.
+changed is which of them a given seat draws. The pack is per seat rather than
+per room, and it is public for the same reason every other pool is: a packing
+puzzle is the best thing in this game to lean over somebody's shoulder at, and
+whether the Stretcher went in is whether anybody is getting back up.
 
 **The phase turns when everyone is ready.** `readyState` counts only connected
 players, so a party is not held in the build phase by someone whose train went
@@ -716,7 +885,7 @@ bought at the workbench:
 
 | Upgrade | Base cost | Does |
 | --- | --- | --- |
-| **Second Barrel** | 3 Screws + 2 Pipe | another Bolt Gun into the deck |
+| **Second Barrel** | 3 Screws + 2 Pipe | a bolt costs one less power, floored at one |
 | **Overcharged Coil** | 2 Plating + 1 Coil | every bolt hits for 3 more |
 
 Both repeat, and both get dearer each time by `step` — an Engineer who never
@@ -728,7 +897,7 @@ hits.
 The opening is a decision. `STARTING_SALVAGE` covers a Solar Panel *or* a
 Workbench and deliberately not both — power now against upgrades later — and
 two tests pin it: one that the panel is always affordable on round one, because
-a bolt gun with nothing to draw on is a dead card in an opening hand, and one
+a bolt gun with nothing to draw on is an option greyed out all fight, and one
 that buying either leaves the other out of reach.
 
 ### The surge
@@ -767,19 +936,95 @@ not an interesting question. **`dist` is gone.** An enemy is authored by its
 health and its damage, and it is *there*.
 
 What replaced the tension of watching something walk at you is the **telegraph**
-(`intentOf`): every living enemy publishes what it is about to do — the damage,
-the ailment its next landed blow would leave, and **which seat it is aimed at**.
-It is derived, never stored, off the same counters `advanceWave` reads, so there
-is no second copy of the rule to drift. You cannot see a monster coming any
-more; you can see what it is about to do, which is a decision rather than a
-countdown.
+(`intentOf`): every living enemy publishes what it is about to do, one round
+ahead. You cannot see a monster coming any more; you can see what it is about to
+do, which is a decision rather than a countdown.
 
-Who each blow lands on is one function, `waveTargets`, shared by the engine and
-the telegraph — the moment a card could *change* the answer, two copies of that
-rule would have been a bug waiting. It also rotates the opening seat each round:
-deterministic round-robin was invisible while the wave arrived a piece at a
-time, and glaring once all of it swings at once, because with two enemies and
-three seats the third was never hit.
+#### Four things an enemy can be about to do
+
+The telegraph used to say one thing — a number, an ailment, and which seat the
+blow was lined up on — because there was only one thing an enemy did. It hit
+somebody. Everything else about a monster was a stat, and a fight was the same
+unreadable exchange every round with different arithmetic in it.
+
+An enemy has a **`pattern`** now, and it is the largest single thing an enemy
+is. `hp` and `hits` say how much trouble it is; the pattern says what *kind*.
+`ENEMY_INTENTS` holds the four, and they are four because each asks the party a
+different question:
+
+| | what lands | what it asks |
+| --- | --- | --- |
+| `attack` | full damage, on **everybody** | can you absorb this |
+| `blight` | half damage on everybody, and the ailment is the point | can you refuse this |
+| `charge` | nothing, and `CHARGE_MULTIPLIER`&times; next round | can you answer it in one round |
+| `bolster` | nothing, and `BOLSTER_STEP` more damage for the rest of the fight | can you afford to ignore it |
+
+A Sporeling alternates attack and blight. A Rust Hulk winds up, lands the big
+one, then doses. The Extractor is the only thing that walks all four, and the
+only thing that bolsters — a boss the party lets run gets permanently worse,
+which is the pressure a single enemy cannot apply by arriving in numbers.
+
+The pattern cycles on `enemy.turn`, a counter the room keeps, so it is
+arithmetic rather than a roll: a replayed room runs the same fight, and the
+telegraph reads the next entry without a second copy of the rule. Everything the
+plate says comes out of `intentOf`, `enemyDamage` and `blightDamage` — and
+`advanceWave` resolves the round by calling those same three functions, so what
+the party was promised is exactly what arrives.
+
+**An attack lands on the whole party.** This is the change everything else falls
+out of. It was a round-robin before — every enemy swung, each swing found one
+seat, and `waveTargets` rotated the opening seat so a five-player fight did not
+gang up on seat one. Two things were wrong with it. A wave of two against a
+table of five was mostly a wave hitting nobody, so a bigger table was *safer*
+per head at the exact moment it should have been under more pressure. And the
+damage a party actually took came down to a rotation nobody could see or
+influence, which made "who is it aimed at" the most important fact on the board
+and the one the party had no card for. `waveTargets` is gone. What an enemy is
+about to do is the question now, not who it picked.
+
+**Guard comes off the top of each seat's own share.** Five players facing a
+swing of four is five separate subtractions, not one pool of four. That is what
+makes the party-wide defends worth their worse per-head numbers: Bulwark on five
+seats now blunts five shares of every swing in the round, which is a different
+card from the one that put guard on five people who mostly were not going to be
+hit.
+
+**A dose that guard swallows whole leaves nothing behind.** The best rule in the
+old model survives intact, and it is now the whole reason `blight` is its own
+intent rather than a rider on a lucky swing: a Creeper *tells you* it is about
+to weaken the party, and a round of guard is how you refuse. An ailment used to
+arrive on every nth landed hit, counted on a hidden `landed` counter — the
+interesting half of a monster was invisible until it fired. The boss's ring of
+three walks on `enemy.cast`, and a dose the party guarded off entirely does not
+advance it, so refusing one is genuinely refusing it rather than merely
+surviving it.
+
+**`cover` keeps its sentence.** The Hauler is still the only seat that decides
+who takes a blow: they stand in front of each ally's share in turn, a point of
+guard per point of damage, until the guard runs out and the wave goes back to
+finding everybody. Nothing was added to make that work — it is the same number
+on the same card, read against a swing that now has more shares in it.
+
+#### A round is a sequence, not a flash
+
+Everything a round resolves is **numbered**. Each seat's card takes a beat, in
+player-id order; then one beat for the quiet gap where rot and canker bite; then
+each enemy's intent takes a beat of its own. The room stamps the beat onto every
+fx event it emits (`event()` does it in one place rather than at forty call
+sites) and the client plays one beat at a time — `startVolley` takes the events
+sharing the lowest step and the frame loop comes back for the next.
+
+The room still resolves the whole round in one pass and sends one view. The beat
+is a stamp on what already happened, not a pause in the server, so nothing about
+determinism or the wire protocol changes.
+
+This was tolerable when a swing found one seat: four or five things happening to
+four or five different people reads as a turn even played together. It stopped
+being tolerable the moment an attack landed on everybody — five simultaneous hit
+sparks with five guards coming off at once is not something a person can read.
+The hold at the end of a round grew with it: `playbackMs` costs the whole
+sequence out in advance, because the wave now dies at the end of a run of beats
+rather than in the only one.
 
 A round opens with the phase card, then the two sides **walk onto the field**,
 and the cards go live once everybody is in place. Three beats: what this is, who
@@ -792,27 +1037,41 @@ boss cannot leak into an earlier round.
 
 #### Levelling a fight to the table
 
-`waveFor(round, partySize)` spends a **threat budget** rather than trimming a
-fixed list. Each enemy carries a `threat` — what one of it is worth against one
-player — and each round carries a `THREAT_PER_PLAYER` figure. Filling cycles the
-round's pattern while the budget covers the next thing and the lane has room
-(`WAVE_CAP`, six, is what the lane can show without sprites sharing rows); the
-remainder then **promotes** the weakest enemy present up the tier ladder. So a
-bigger table meets a fuller lane *and* worse things in it, rather than the
-five-player fight with three enemies deleted.
+**One dial, and it is health.**
 
-Two numbers refuse to be levelled that way and get their own treatment:
+| | scales with the table |
+| --- | --- |
+| how many enemies | no — fixed per round. Round one is three things, whoever turned up |
+| what they swing for | no — `ENEMIES` is what it swings for, at every size |
+| how much health they have | **yes**, and it is the only thing that does |
 
-- **The party is worth more than the players in it.** `PARTY_SYNERGY` makes the
-  budget superlinear. At a linear budget, settings that left a solo player
-  winning three runs in five had two players winning ninety-seven — a second
-  player brings a whole second class, somebody to spread the round-robin over,
-  and the ability to lose a member and keep fighting.
-- **The boss is always exactly one thing**, so it cannot scale by arriving in
-  different numbers. `BOSS_SCALING` grows the Extractor's health *and* what it
-  swings for. The damage matters more than it looks: a single enemy hits one
-  player a round, so at a table of three the same number is a third of the
-  pressure it is on a table of one.
+`waveFor(round, partySize)` returns the round's literal wave and ignores its
+second argument. `enemyStats(type, partySize)` is the only place the table size
+reaches a fight, and `HP_PER_PLAYER` is the only number it reads.
+
+It used to spend a **threat budget**: each enemy carried a `threat` — what one
+of it was worth against one player — each round carried a `THREAT_PER_PLAYER`
+figure, and a bigger table met a fuller lane *and* worse things in it. That was
+the right shape while a swing found one seat, because five enemies against five
+players was five blows a round however you arranged them.
+
+It stopped being the right shape the moment an attack landed on the whole party.
+An enemy's damage is now multiplied by the head count before any dial touches
+it, so adding enemies for a bigger table multiplies the pressure twice over —
+the fifth Sporeling is worth five times to a table of five what the first one is
+worth to a solo player. Measured, that was a table of four winning one run in
+twenty against a target of three in five. `threat`, `THREAT_PER_PLAYER`,
+`PARTY_SYNERGY` and `threatBudget` are all gone; `WAVE_CAP` stays, as the
+ceiling of six any future round has to be authored under.
+
+Health is the number that *should* scale, and the argument is short: a party
+puts out roughly its head count in damage, so a wave carrying its head count in
+health is the same fight taking the same number of rounds. Everything else a
+bigger table brings — more guard, more heals, somebody to lose and keep
+fighting — is what makes it a party rather than a longer solo run. The boss
+keeps its own share (`BOSS_SCALING.hp`) for the reason it has always had its own
+treatment: it is one thing, and it cannot scale by arriving in different
+numbers.
 
 **These are measured, not argued.** `node test/balance.mjs` drives the real
 `Room` over the real protocol through whole runs — a build phase that gathers,
@@ -825,24 +1084,47 @@ node test/balance.mjs 1000        a tighter interval
 node test/balance.mjs 400 1       one table size
 ```
 
-The target is 60%. At the numbers currently in `content.js` it lands **53% /
-65% / 61% / 54% / 62%** for one through five players — every table size inside
-seven points of it.
+The target is 60%. **The structure is right and the numbers are not.** At 200
+runs a size:
 
-That took one correction worth knowing about. The harness used to seat the
-first N classes in roster order, so every three-player number was the
-Alchemist, the Engineer and the Wizard, and every two-player number was the two
-of them without her — and she is the party's damage by design. The curve it
-drew was mostly a picture of who was sitting down rather than how many, and it
-did not move when the dials did. It rotates the roster by the run index now, so
-each size averages over every composition.
+```
+1 player 0%   2 players 0%   3 players 0%   4 players 0%   5 players 0%
+```
 
-The threat values are coarse (1, 2, 3.5), so a tenth of a point can flip a
-whole enemy into or out of a wave and move a win rate forty points — tune with
-the harness open, never by eye. The sharpest edge in the file is the
-Extractor's own `hits`: at a table of one it is the only thing swinging, and
-three to four took solo from 72% to 6%.
+Read that as two separate results. The first is the one this rewrite was for:
+**the curve is flat.** Table size has stopped mattering, which is exactly what
+fixed count + flat damage + linear health was supposed to buy — before it, the
+same harness read 56 / 36 / 16 / 5 / 9 and every dial had to be five dials.
+What is left is one global difficulty knob rather than five curves that fight
+each other.
 
+The second is that the knob is set far too hot. The arithmetic is legible now,
+which is the point of the model. Round one sends two Sporelings and a Creeper,
+all three of which open on `attack`, for **seven damage on every seat on turn
+one**. A solo Wizard has 22 health, a free swing worth 5 and a wave worth 22
+health to chew through: she needs four rounds and has three. Every table size
+dies in rounds one and two, and four in five of those losses are round one.
+
+Nothing here is broken. A traced solo round one takes exactly the seven the
+plates promise, a three-player wave carries exactly 3&times; the health, and the
+removal of the deck moved this number very little in either direction — the
+party's floor came up (every seat now always has its best basic rather than
+whatever it drew) and the ceiling came down slightly (no more lucky opening
+Fireball). What decides these runs is the opening wave, not the options.
+
+Three places to turn it, in the order worth trying:
+
+- **Round one's wave.** Three things all swinging on turn one is the hardest
+  opening the game has ever had. Two, or three with one of them opening on
+  something that is not `attack`, is the cheapest fix.
+- **Opening intents.** Every enemy starts at `turn: 0`, so a wave whose patterns
+  all begin with `attack` opens at maximum pressure with no variety — the
+  telegraph has nothing to say on the round it matters most. Staggering each
+  enemy's starting `turn` by its position would spread a wave's intents from the
+  first round and cost nothing.
+- **`HP_PER_PLAYER`.** This one changes how the *sizes* sit relative to each
+  other rather than the global difficulty, so reach for it only once the flat
+  line is at the right height.
 #### What the blight leaves behind
 
 Damage is a number and is over; an **ailment** is the same monster still costing
@@ -852,12 +1134,17 @@ different thing away: `rot` takes health every round and guard cannot stop it,
 They refresh rather than stack — two Sporelings should be twice as many things
 to kill, not four rot ticks a round on one person.
 
-An enemy's `ability` names which one it lands and `every` how many of its blows
-have to land first, counted on `enemies[].landed`. **A blow that guard swallowed
-whole never counts**, which is the reason to spend a card on a ward against a
-Creeper rather than trade with it: you are not buying health, you are buying the
-two rounds of Weakened that would have followed. The cadence is arithmetic on a
-counter rather than a roll, so a replayed room lands the same statuses.
+An ailment arrives on a **`blight` intent** and nowhere else. An enemy's
+`ability` names which one it leaves — or which ring of them, for the boss — and
+`blightOf` reads `enemies[].cast` to say which is next. It used to ride in on
+every nth landed hit, counted on a hidden `landed` counter, which meant the
+interesting half of a monster was invisible until it fired; a Creeper announces
+it now, a round in advance, and **a dose that guard swallowed whole leaves
+nothing behind and does not advance the ring**. That is the reason to spend a
+card on a ward against a Creeper rather than trade with it: you are not buying
+health, you are buying the two rounds of Weakened that would have followed. The
+cadence is arithmetic on a counter rather than a roll, so a replayed room lands
+the same statuses.
 
 Statuses age at one fixed point in the turn — `tickAilments()`, after the cards
 resolve and *before* the wave lands new ones — so a rot dealt this round does
@@ -871,12 +1158,22 @@ ageing: a buff aged the same evening it was given would be a zero-round buff.
 `pageCost` and `powerCost`, and `cardPlayable` refuses the play that would take
 the last point — a card must never be the thing that kills you. It buys two
 things: `heft`, the only buff in the game that does not expire before the fight
-does (it is a term inside `strikePower`, so it multiplies everything that seat
+does (it is a term inside `strikePower`, so it is added to everything that seat
 swings), and `cover`, the only card that changes *who* a blow lands on. Cover
 has no charge counter: the number on the card is literally how much wave it
 buys, a point of guard per point of damage, because the redirect ends when the
 guard runs out. Which means the Engineer warding the Hauler is the Hauler
 covering for longer, with nothing added to make it so.
+
+What he does with all that is **[the pack](#the-pack)** — the build-phase verb
+he spent four rounds of this project not having.
+
+A swing lands on the whole party now, so what cover buys is stated in shares
+rather than in blows: the Hauler steps in front of each ally's share in turn
+until the guard is spent, and the seats it did not reach take their own. Same
+card, same number, same sentence — read against a swing that has more shares in
+it. It is a straightforwardly better card at a full table than it was, and that
+is one of several reasons the balance numbers above need redoing.
 
 **The Grafter** deals `canker` — the only damage that is not a strike. It never
 routes through `strikePower`, so Might, Heft and Weakened are all irrelevant to
@@ -889,10 +1186,10 @@ Hulk would be forty-five damage. Her `scout` flag also deepens what a site puts
 out — salvage and pages, never herbs, because the herb count is the one number
 scarcity rests on.
 
-`Graft` is the only effect that changes what somebody else will be holding: it
-puts a Cutting on the top of an ally's deck, which means it is in their hand
-next round, guaranteed. A Cutting is a strike, so it lands for four plus
-whatever that arm is carrying.
+`Graft` is the only effect that changes what somebody else can do: it puts a
+Cutting on an ally's board as a use, there the moment it is bound and visible to
+everybody. A Cutting is a strike, so it lands for four plus whatever that arm is
+carrying.
 
 #### Aiming at your own side
 
@@ -1019,13 +1316,26 @@ follows it. Worth doing, worth doing deliberately:
 
 Honest status, so nobody discovers these at the table:
 
-- **A hand of nothing but costed cards is possible late.** An Engineer with
-  several Bolt Guns and no power can draw three unplayable cards; *Do nothing*
-  is the way out, and it is always available.
-- **The full table runs friendliest.** 78% measured against a 60% target,
-  because the Wizard is the only pure damage seat and only the three-player
-  table has one. Levelling by composition rather than by head-count is a
-  future dial; `PARTY_SYNERGY` and `BOSS_SCALING` are the current ones.
+- **The fight is far too hard at every table size.** 0% against a 60% target:
+  round one puts seven damage on every seat on turn one, and four in five losses
+  are round one. The *shape* is right — the curve is flat, so table size has
+  stopped mattering and there is one difficulty knob instead of five — but
+  nobody has turned it yet. Known and deliberate debt; see **[Levelling a fight
+  to the table](#levelling-a-fight-to-the-table)** for the measurements, the
+  traced arithmetic, and the three places to turn it.
+- **The Grafter has no economy.** Her four options are limited by a per-fight
+  `uses` count carried over one-for-one from her old deck, which is a
+  placeholder and reads as one. Every other seat's limit says something about
+  the class; hers says "three of these". `CLASS_EXTRAS` and the `uses` column
+  are what to empty when she grows one.
+- **The Hauler's pack needs a balance pass.** The system is built and the
+  numbers are first-draft. Free-unlimited strikes and stacking heft in the same
+  bag is the interaction to look at first — see **[The pack](#the-pack)**. His
+  identity is no longer a price without a verb, which is what this replaced.
+- **Nothing has replaced the deck as a source of in-fight variance, on purpose.**
+  A surge is now fully deterministic given its commitments. The plan is that
+  variance lives in the wave, the site and the draft instead — none of which has
+  been built yet. Until it is, a fight is the same fight every time you meet it.
 - **Modifier duplicates share a face.** Two of the same modifier cannot exist
   (the draft refuses), but a modifier moved between two spells that each could
   hold it is found satchel-first — a wart only a hand-edited book can reach.
@@ -1063,22 +1373,98 @@ spending the same stash with the same verbs. The seat is held by a **token**,
 not a connection: the client keeps one in `sessionStorage`, so a dropped socket
 comes back to the character it was playing rather than to a new one.
 
-### Private hands
+**The host is a role, not a person.** `rehost()` hands the room to the oldest
+still-connected seat whenever the current host is gone, in any phase. It used to
+do that in the lobby only, which meant a host who closed their laptop mid-run
+left a party that reached the end screen with nobody able to press *Another
+run* — `start` and `restart` are both host-only, and there was no host.
 
-This is the first per-player state in the game, and it is why views are built
-per socket rather than broadcast whole. You get your own `deck`, `discard` and
-`hand` as arrays; everybody else arrives as `deckCount`, `discardCount` and
-`handCount`. Their `intent` says *that* they committed, never *what* — a hand
-is secret right up to the moment the round resolves.
+### Coming and going
+
+Everything about a phase turning goes through one method, **`settle()`**, and
+four things call it: committing, readying, dropping and rejoining. That is not
+tidiness for its own sake — each of those four can change the answer to "is the
+room still waiting on anybody", and before they shared a rule, two of them
+simply did not ask.
+
+Both halves of the rule count **the people who are here to be counted**:
+
+- The build phase turns when every connected seat is ready.
+- A combat round resolves when every connected seat that is up has committed.
+
+Which means a disconnect can complete a phase, and has to. Two seats in and the
+third closes a tab used to leave the round unresolved until that person came
+back — which, if they had gone to bed, was never. The same freeze had a build
+phase version: two ready, the third drops, and the surge never comes.
+
+**Rejoining works mid-fight**, which is the point of holding a seat by token.
+There is nothing to restore but the seat. A returning player's pools are their
+own state and never went anywhere, which is one more thing the deck's removal
+made simpler rather than harder.
+
+Leaving *after* committing is a different thing from leaving before it, and the
+room treats it as one: `resolve()` walks intents rather than connections, so the
+card you chose is the card that resolves whether or not you are still there to
+watch it.
+
+### A commitment is a pencil
+
+A choice can be changed — swapped for another card, or taken back to undecided
+with `{t:'take'}` — right up until the last seat is in, which is the moment the
+round resolves and there is nothing left to change it against.
+
+It used to be final the instant it was made, which punished exactly the wrong
+person. The fastest reader at the table commits first, watches two allies commit
+around them, realises the plan is now wrong, and is the one seat that cannot
+adapt. In a co-op game where the whole round resolves at once, that is
+backwards. The last player to commit is the one who does not get to reconsider,
+and that is a fair price for being last.
+
+The client shows you the card you have chosen — lifted and lit rather than
+dimmed, because it is a choice that stands rather than one that has been taken
+away — and *Do nothing* becomes *Take it back* while you hold one.
+
+### Public pools
+
+This used to be **Private hands**, and it was the first per-player state in the
+game: you got your own `deck`, `discard` and `hand` as arrays, everybody else
+arrived as counts, and an ally's `intent` said *that* they had committed and
+never *what*.
+
+None of that exists. A hand was secret because a hand is a hand; a list of
+options is not, and in a co-op game there was never a reason for it to be. So
+`charges`, `stock` and `uses` go out for **every** seat, and anybody can see
+that the Wizard has one charge left, that the rack is down to its last Sunsalve,
+and that the Hauler can still afford to cover. The cards that need two people to
+agree about a round in advance — Ember Rune, Bulwark, Graft — finally have
+something to agree over.
+
+Views are still built per socket, because one thing is still yours alone: your
+own `intent` comes back in full and nobody else's does. That is the price of
+being able to change it — a player who cannot see which option they chose cannot
+meaningfully choose another one — and it keeps the last shred of simultaneity
+that makes a round a commitment rather than a negotiation.
+
+The client shows you the option you have chosen, lifted and lit rather than
+dimmed, because it is a choice that stands rather than one that has been taken
+away — and *Do nothing* becomes *Take it back* while you hold one.
 
 ### Determinism
 
-Every shuffle and every roll comes from a generator the room owns, and each
-player has their own stream keyed off their id, so one player drawing cannot
-shift anyone else's draw. Combat resolves in player-id order and never in the
-order the clicks arrived: the same commitments have to produce the same round
-however the network delivered them.
+Every roll comes from a generator the room owns. Combat resolves in player-id
+order and never in the order the clicks arrived: the same commitments have to
+produce the same round however the network delivered them.
 
+There is a good deal less to be deterministic about than there was. Shuffling
+and dealing were the largest users of the seeded stream and both are gone, so
+what is left rolling is the site, the spawns, the spell draft and the salvage
+after a fight — all of it in the build phase, none of it inside a round. A
+surge is now fully deterministic given its commitments, which is what lets the
+telegraph promise exactly what will land.
+
+The beat numbers a round is played back on are stamped on the way out and change
+none of this: the room resolves the whole round in one pass and sends one view,
+and the client is what spreads it over time.
 ## Playing locally
 
 `npm start` serves the pages **and the socket**. Open

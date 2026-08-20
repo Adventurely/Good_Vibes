@@ -157,54 +157,24 @@
       .who-name { display: block; color: var(--text); }
       .who-sub { display: block; font-size: 0.62rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
 
-      /* What is in the deck, counted rather than listed one card per line —
-         nine cards as nine rows is a spreadsheet, not a deck. */
-      .deck-list { display: flex; flex-wrap: wrap; gap: 0.35rem; align-content: flex-start; max-width: 34rem; }
-      .deck-entry {
+      /* What this seat will be able to do in the surge, as chips rather than
+         one row per line — ten options as ten rows is a spreadsheet. */
+      .action-list { display: flex; flex-wrap: wrap; gap: 0.35rem; align-content: flex-start; max-width: 34rem; }
+      .action-entry {
         display: flex; align-items: center; gap: 0.35rem;
         padding: 0.2rem 0.45rem; font-size: 0.72rem;
         background: var(--panel); border: 1px solid var(--line); border-radius: 4px;
       }
-      .deck-entry b { color: var(--sun); font-variant-numeric: tabular-nums; font-weight: 400; }
-      .deck-entry[data-brewed='true'] { border-color: var(--accent); }
+      .action-entry b { color: var(--sun); font-variant-numeric: tabular-nums; font-weight: 400; }
+      .action-entry[data-brewed='true'] { border-color: var(--accent); }
 
-      /* --- the table: deck, hand, discard ---------------------------------- */
+      /* --- the table -------------------------------------------------------
+         A face-down deck and a discard heap used to stand either side of the
+         hand, and all the style that drew them went with them. */
       .table {
         display: flex; align-items: center; justify-content: center;
-        gap: 1rem; flex-wrap: wrap;
+        gap: 1.5rem; flex-wrap: wrap;
       }
-
-      .pile { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; flex: none; }
-      .pile-face {
-        width: 3.2rem; height: 4.6rem; border-radius: 5px;
-        border: 2px solid var(--line); background: var(--panel);
-        /* A card back, drawn in gradients rather than as an image: the deck is
-           face down and needs to read as a stack, not as a blank rectangle. */
-        background-image:
-          repeating-linear-gradient(45deg, #3d2c1c 0 4px, transparent 4px 8px),
-          linear-gradient(#3a2b1d, #2b2014);
-        box-shadow: 3px 3px 0 -1px var(--panel), 3px 3px 0 0 var(--line),
-                    6px 6px 0 -1px var(--panel), 6px 6px 0 0 var(--line);
-      }
-      .pile-face.is-discard {
-        background-image: linear-gradient(#2e2417, #241a10);
-        opacity: 0.75;
-      }
-      /* An empty pile is a space where cards go, not a blank card. Dashed and
-         hollow, so it reads as "nothing here yet" rather than a missing image. */
-      .pile[data-empty='true'] .pile-face {
-        background-image: none; background: transparent;
-        border-style: dashed; box-shadow: none; opacity: 0.5;
-      }
-      .pile-label {
-        font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted);
-      }
-      .pile-count { color: var(--sun); font-weight: 400; font-variant-numeric: tabular-nums; }
-
-      /* Not flex-grow: the hand expanding would shove the two piles out to the
-         edges of a wide screen, and the deck wants to read as sitting beside
-         the cards it dealt. */
-      .table { gap: 1.5rem; }
       .hand { display: flex; gap: 0.6rem; justify-content: center; flex-wrap: wrap; flex: 0 1 auto; }
 
       .pcard {
@@ -219,6 +189,14 @@
         border-color: var(--accent); transform: translateY(-3px);
       }
       .pcard:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+      /* The card this seat has committed to, while the table is still deciding.
+         Lifted and lit rather than dimmed: it is the choice that stands, not a
+         card that has been taken away — and it can still be swapped for another
+         until the last seat is in. */
+      .pcard[data-chosen='true'] {
+        border-color: var(--sun); transform: translateY(-6px);
+        box-shadow: 0 0 0 1px var(--sun), 0 6px 14px rgba(0, 0, 0, 0.45);
+      }
       .pcard-name { font-size: 0.8rem; color: var(--text); }
       .pcard-amount {
         font-size: 1.5rem; color: var(--sun); font-variant-numeric: tabular-nums; line-height: 1;
@@ -362,7 +340,7 @@
 
       /* --- the scriptorium ------------------------------------------------- */
       /* An offer's border is its rarity — the draft reads at a glance the way
-         the deck list's brewed border does. */
+         the action list's brewed border does. */
       .card[data-rarity='uncommon'] { border-color: var(--accent); }
       .card[data-rarity='rare'] { border-color: var(--sun); }
       .rarity { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
@@ -392,6 +370,37 @@
       .mod-chip { cursor: grab; touch-action: none; }
       /* The chip riding the pointer mid-drag. */
       .drag-ghost { position: fixed; pointer-events: none; z-index: 90; opacity: 0.9; transform: translate(-50%, -120%); }
+
+      /* The pack. Fixed cell size rather than a fractional grid, because the
+         thing being read off it is *area* — a bag whose cells reflowed with
+         the window would be a bag whose pieces changed size, and the whole
+         puzzle is that they do not. The cut corners are cells with no border
+         and no background: not walls a piece stops at, simply not bag. */
+      .pack-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 2.75rem);
+        gap: 2px;
+        width: max-content;
+      }
+      .pack-cell {
+        width: 2.75rem; height: 2.75rem;
+        border: 1px solid var(--line, #3a4a55);
+        border-radius: 3px;
+        background: rgba(0, 0, 0, 0.25);
+        padding: 0; position: relative;
+        display: flex; align-items: center; justify-content: center;
+      }
+      .pack-cell[data-bag="no"] { border-color: transparent; background: none; pointer-events: none; }
+      .pack-cell[data-fits="yes"] { border-color: var(--accent); background: rgba(255, 255, 255, 0.12); }
+      .pack-cell[data-fits="no"] { border-color: #a82f24; }
+      .pack-cell[data-full="yes"] { background: rgba(255, 255, 255, 0.06); }
+      /* Picked up but not yet put down: it is still in the bag and still
+         blocking nothing, so it reads as lifted rather than as gone. */
+      .pack-cell[data-held="yes"] { outline: 2px solid var(--accent); opacity: 0.55; }
+      .pack-cell:disabled { cursor: default; }
+      /* One icon per cell, not one per item: a Sledge is five stamps, because
+         cells are the currency and the eye should be counting them. */
+      .pack-cell canvas { display: block; }
 
       .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
       .chip {
@@ -560,10 +569,6 @@
         <canvas id="map" width="384" height="240" tabindex="0"
                 aria-label="The site. Click anywhere to walk there, or step with the arrow keys; walking onto a herb picks it up."></canvas>
 
-        <!-- One player, three characters. Click a portrait to take control of
-             that one; the map click routes whoever is selected. -->
-        <div class="roster" id="roster"></div>
-
         <div class="ready-line">
           <button type="button" id="hold">Ready</button>
         </div>
@@ -603,6 +608,29 @@
           <div class="grid" id="upgrades"></div>
         </div>
 
+        <!-- The Hauler's bench. It is a grid rather than a list because the
+             whole decision is a shape: what a piece costs is the room it takes
+             from everything else, and no list can say that. -->
+        <div id="hauler-only" hidden>
+          <h2 style="margin-top:1.4rem">The pack</h2>
+          <p id="pack-hint" style="margin-bottom:0.6rem"></p>
+          <div id="pack-grid" class="pack-grid"
+               aria-label="The pack. Tap a find, then tap a cell to put it in; tap something already in to take it out."></div>
+          <!-- Shown only while something is in hand. Buttons rather than a
+               drag or a modifier key, because the bag has to work on a phone
+               and a canvas-less grid cannot rely on either. -->
+          <div class="actions" id="pack-controls" style="margin-top:0.6rem" hidden>
+            <button type="button" id="pack-turn">Turn it</button>
+            <button type="button" id="pack-out">Take it out</button>
+            <button type="button" id="pack-cancel">Leave it</button>
+          </div>
+          <p id="pack-carried" style="margin:0.6rem 0 0.4rem"></p>
+
+          <h2 style="margin-top:1.4rem">What you turned up</h2>
+          <p id="pack-loose-hint" style="margin-bottom:0.6rem"></p>
+          <div class="grid" id="pack-loose"></div>
+        </div>
+
         <div id="wizard-only" hidden>
           <h2 style="margin-top:1.4rem">The library</h2>
           <div class="chips" id="library"></div>
@@ -621,19 +649,25 @@
           <div class="chips" id="satchel"></div>
         </div>
 
-        <h2 style="margin-top:1.4rem">Your deck</h2>
+        <!-- What this seat will be able to do when the surge lands, with each
+             economy's number beside it. It was the deck as counts, back when
+             there was a deck; the point of the panel is unchanged — the walk
+             that paid for something has to visibly buy it. -->
+        <h2 style="margin-top:1.4rem">In the surge</h2>
+        <p id="actions-hint" style="margin-bottom:0.6rem"></p>
         <div class="table" style="margin-bottom:0.6rem">
-          <div class="pile" id="build-deck-pile">
-            <span class="pile-face" aria-hidden="true"></span>
-            <span class="pile-label">Deck</span>
-            <b class="pile-count" id="build-deck-count">0</b>
-          </div>
-          <div class="deck-list" id="deck-list"></div>
+          <div class="action-list" id="action-list"></div>
         </div>
 
         <div class="actions" style="margin-top:1.2rem">
           <button type="button" id="leave-run">Leave</button>
         </div>
+
+        <!-- The preview's roster, and it is last on purpose: picking which of
+             the five you are driving is the least frequent thing you do on this
+             screen and was sitting directly under the map, above everything you
+             came here to spend. In a real room it is not drawn at all. -->
+        <div class="roster" id="roster"></div>
       </section>
 
       <!-- combat -->
@@ -647,8 +681,6 @@
         <canvas id="combat-map" width="480" height="144"
                 aria-label="The surge. The wave advances from the right toward the party."></canvas>
 
-        <div class="roster" id="combat-roster"></div>
-
         <!-- Aim and play, adjacent. Picking a target and playing the card at it
              is one decision, and it used to be split across two places you
              could not see at the same time. -->
@@ -659,22 +691,12 @@
         <div class="enemy-row" id="allies"></div>
         <div class="enemy-row" id="enemies"></div>
 
+        <!-- Everything this seat can do, face up. There was a deck, a discard
+             and a hand of three here; what limits an option now is its own
+             pool, printed on it. -->
         <div class="table">
-          <div class="pile" id="deck-pile">
-            <span class="pile-face" aria-hidden="true"></span>
-            <span class="pile-label">Deck</span>
-            <b class="pile-count" id="deck-count">0</b>
-          </div>
-
           <div class="hand" id="hand"></div>
-
-          <div class="pile" id="discard-pile">
-            <span class="pile-face is-discard" aria-hidden="true"></span>
-            <span class="pile-label">Discard</span>
-            <b class="pile-count" id="discard-count">0</b>
-          </div>
         </div>
-
         <div class="actions" style="margin-top:0.9rem">
           <button type="button" id="combat-wait">Do nothing</button>
           <button type="button" id="leave-combat">Leave</button>
@@ -686,6 +708,13 @@
           <h2 style="margin-top:1.2rem">Log</h2>
           <div class="log" id="combat-log"></div>
         </details>
+
+        <!-- The preview's roster, last on both screens for the same reason:
+             choosing which of the five you are driving is the rarest thing you
+             do here, and it was sitting directly under the board, above the
+             options you actually came to read. In a real room it is not drawn
+             at all — you are you. -->
+        <div class="roster" id="combat-roster"></div>
       </section>
 
       <!-- How a run ends.
@@ -735,28 +764,35 @@
       import {
         PALETTE, HERO_ART, MATERIAL_ART, TERRAIN_ART, BUILDING_ART, SALVAGE_ART,
         PAGES_ART, ENEMY_ART, CARD_ART, MARK_ART, TILE,
-        TERRAIN_VARIANTS, PROP_ART, TREE_ART, FIRE_ART,
+        TERRAIN_VARIANTS, PROP_ART, TREE_ART, FIRE_ART, PACK_ART,
       } from './art.js';
       import {
         CLASSES, OPEN_ROLES, MATERIALS, RECIPES, missingFor, playableClasses,
         pathTo, walkableAt, brew, CAMP_X, CAMP_Y, CAMP_RADIUS, TENT_Y,
         MAP_W, MAP_H, TERRAIN, PHASES, isBuildPhase, readyState,
-        generateMap, generateCombatTerrain, respawnItems, seededRandom, seedFromCode, spawnTile, tileAt,
+        generateMap, generateCombatTerrain, respawnItems, seededRandom, seedFromCode, spawnTile, tileAt, isWater,
         ROUNDS_BEFORE_BOSS, BOSS_ROUND, roundInfo, phaseCard, PARTY_SIZE, classById,
-        SALVAGE, BUILDINGS, STARTING_SALVAGE, CACHE_YIELD, PAGES,
+        SALVAGE, BUILDINGS, STARTING_SALVAGE, PAGES,
+        nodeYield, NODE_REFUSAL,
         UPGRADES, upgradeCost, buyUpgrade, cardEffect, powerFrom, canBuildMore, buildingsOf,
         ENEMIES, waveFor, enemyStats, COMBAT_H,
-        AILMENTS, BLIGHTS, effectName, effectLabel, hasEffect, strikePower, ailmentOnHit, intentOf,
-        waveTargets,
+        AILMENTS, BLIGHTS, effectName, effectLabel, hasEffect, strikePower, intentOf,
+        ENEMY_INTENTS, intentKindOf, enemyDamage, blightDamage, blightOf, BOLSTER_STEP,
         STAT_KEYS, STAT_LABELS, STAT_SHORT, blankStats, runHighlights,
-        addAilment, tickEffects, effectAmount, clearAilments,
-        HAND_SIZE, CARDS, classKit, shuffle, draw, discardHand, cardById, cardPlayable,
+        addAilment, addEffect, tickEffects, effectAmount, clearAilments,
+        CARDS, cardById,
+        actionsFor, actionCost, actionReady, actionRemaining, freshStock, freshUses,
+        CHARGE_CAP, CHARGE_REGEN,
         missingForBuilding, canBuildAt,
         salvageAfterCombat, addSalvage, spendSalvage,
         SPELLS, MODIFIERS, SPELL_SLOTS, PAGES_PER_ROUND, freshSpellbook,
-        composeSpell, rollOffers, takeOffer, moveModifier, wizardCombatDeck,
+        composeSpell, rollOffers, takeOffer, moveModifier,
         draftableCount,
         POT_COUNT, potYield, potStage, plantPot, harvestPot, growPots,
+        PACK_ITEMS, PACK_W, PACK_H, gridFor, gridHas, gridCells, itemCells,
+        packAt, packUsed, packFits, packPlace, packMove, packRemove,
+        packedCards, packedStats, packedAmount, rotationsOf,
+        rollPackItems, freshPack, normalisePack,
       } from './content.js';
       import { createAudio } from './audio.js';
       import { fxStyles, styleFor, soundFor, verbOf } from './fx.js';
@@ -941,36 +977,11 @@
         }
       }
 
-      /* Prints left behind a walking hero, fading on a timer. Soft ground only:
-         nobody leaves a footprint on a slab. */
-      const prints = [];
-      function dropPrint(x, y){
-        const kind = tileAt(room.terrain, x, y);
-        if(kind !== 'grass' && kind !== 'camp') return;
-        prints.push({ x, y, at: now });
-        if(prints.length > 40) prints.shift();
-      }
-
-      /* The camp's own ground: worn earth ringing the tent, and whatever prints
-         are still fading. Drawn over the cached terrain rather than into it,
-         because the prints change and the cache does not. */
-      function campGround(ctx, top){
-        for(const print of prints){
-          const age = (now - print.at) / 4200;
-          if(age >= 1) continue;
-          ctx.fillStyle = age < 0.5 ? PALETTE.T : PALETTE.t;
-          const px = print.x * TILE + 6, py = top + print.y * TILE + 11;
-          ctx.fillRect(px, py, 2, 2);
-          ctx.fillRect(px + 4, py + 2, 2, 2);
-        }
-        while(prints.length && now - prints[0].at > 4200) prints.shift();
-      }
-
       /* Softer kinds feather over harder ones at every boundary, which is what
          breaks the tile grid: a coastline gets a lapping edge, grass creeps
          onto the slabs, hills trail dust. The scatter is hashed from the tile
          coordinates so it never shimmers between redraws. */
-      const FRINGE = {
+      const EDGE = {
         grass:  { over: 3, keys: ['g', 'G'] },
         tree:   { over: 3, keys: ['g', 'G'] },
         hill:   { over: 2, keys: ['t', 'T'] },
@@ -979,6 +990,10 @@
         water:  { over: 0, keys: ['b'] },
         crevice:{ over: 0, keys: ['x'] },
       };
+      /* A shore feathers like the water it is, so the grass still creeps onto
+         it and it still creeps onto nothing. Looked up rather than listed
+         eight more times. */
+      const fringeFor = kind => EDGE[isWater(kind) ? 'water' : kind];
 
       const hash2 = (x, y) => {
         let h = (x * 374761393 + y * 668265263) ^ 0x5bf03635;
@@ -1005,7 +1020,7 @@
         for(let y = 0; y < rows; y++){
           for(let x = 0; x < MAP_W; x++){
             const kind = tileAt(terrain, x, y) || fallback;
-            const mine = FRINGE[kind];
+            const mine = fringeFor(kind);
             if(!mine) continue;
             const edges = [[1, 0], [-1, 0], [0, 1], [0, -1]];
             for(const [dx, dy] of edges){
@@ -1013,7 +1028,7 @@
               if(ny2 < 0 || ny2 >= rows) continue;
               const other = tileAt(terrain, x + dx, ny2);
               if(!other || other === kind) continue;
-              if((FRINGE[other] || { over: 0 }).over >= mine.over) continue;
+              if((fringeFor(other) || { over: 0 }).over >= mine.over) continue;
               const seed = hash2(x * 4 + dx + 2, y * 4 + dy + 2);
               const bx = (x + dx) * TILE, by = top + ny2 * TILE;
               for(let i = 0; i < TILE; i++){
@@ -1029,12 +1044,17 @@
                 }
               }
             }
+            /* Open water still meeting land is the case a shore tile could not
+               be picked for: a channel one tile wide, pulled at equally from
+               both banks. It gets the old scatter of light along the edge,
+               which is all it ever had. Anywhere a shore was chosen the art
+               carries its own surf and this would only double it. */
             if(kind === 'water'){
               for(const [dx, dy] of edges){
                 const ny2 = y + dy;
                 if(ny2 < 0 || ny2 >= rows) continue;
                 const other = tileAt(terrain, x + dx, ny2);
-                if(!other || other === 'water') continue;
+                if(!other || isWater(other)) continue;
                 const seed = hash2(x * 7 + dx, y * 7 + dy);
                 ctx.fillStyle = PALETTE.c;
                 for(let i = 0; i < TILE; i += 2){
@@ -1125,7 +1145,6 @@
         // Face the way you are going. A cast that always looked one direction
         // walked backwards half the time and nobody could say why it read wrong.
         if(step.x !== player.x) facing.set(player.id, step.x > player.x ? 1 : -1);
-        dropPrint(player.x, player.y);
         player.x = step.x;
         player.y = step.y;
         schedule();                      // just the canvas: the panels have not changed
@@ -1208,7 +1227,6 @@
         // Ground first, everything else on top of it. Stamped from the cache:
         // the picture only changes when the terrain or the hour does.
         mctx.drawImage(groundFor(room.terrain, MAP_H, 'grass', room.round || 1), 0, HEADER);
-        campGround(mctx, HEADER);
 
         // Items sit low in their tile so the sprite reads as standing on the
         // ground rather than floating in the middle of it. Three kinds, one
@@ -1369,6 +1387,73 @@
           if(event.t !== 'fx') continue;
           fxQueue.push(event);
           any = true;
+        }
+        if(any && !volley) startVolley();
+        // Under reduced motion the loop parks itself after a frame, so a volley
+        // has to ask for the frames it needs rather than assume they arrive.
+        if(any) schedule();
+      }
+
+      /* The volley in flight, or null. One beat of the round, and the round is
+         a numbered sequence of them — see startVolley. */
+      let volley = null;
+
+      /* How long a death is watched for. The dissolve runs the whole span, and
+         the last one of a round runs longer still — that is the beat the round
+         holds open for, so a kill is a thing you saw rather than the frame
+         before a splash. */
+      const DEATH_MS = 900;
+      const FINISH_MS = 1900;
+      /* One beat of the round. Shorter than the single volley this replaced,
+         because there are now up to ten of them in a round rather than one. */
+      const BEAT_MS = 420;
+
+      /* How long a pile of fx will take to play, in beats, before any of it has
+         played. The same arithmetic startVolley does per beat, run ahead of
+         time — the hold at the end of a round has to outlast the whole sequence
+         rather than only its last beat, and the sequence is no longer one. */
+      function playbackMs(events){
+        const beats = new Map();
+        for(const e of events){
+          if(e.t !== 'fx') continue;
+          const step = e.step ?? 0;
+          beats.set(step, (beats.get(step) || []).concat(e));
+        }
+        let total = 0;
+        for(const list of beats.values()){
+          const slain = list.filter(e => e.kind === 'slain');
+          const held = !slain.length ? 0 : slain.some(e => e.last) ? FINISH_MS : DEATH_MS;
+          total += Math.max(BEAT_MS, held);
+        }
+        return total;
+      }
+
+      /* One beat, and then the loop comes back for the next one.
+       *
+       * The room numbers everything it resolves: each seat's card in turn, then
+       * the quiet gap where rot and canker bite, then each enemy's intent in
+       * turn. A volley is one of those numbers, so a round plays as a sequence
+       * — the Alchemist throws, then the Engineer braces, then the Sporeling
+       * doses the party — rather than as one undifferentiated flash.
+       *
+       * It used to take the whole queue at once, which was right when a swing
+       * found one seat and a round was four or five things happening to four or
+       * five different people. It stopped being right the moment an attack
+       * landed on everybody: five simultaneous hit sparks with five guards
+       * coming off at once is not something a player can read.
+       *
+       * The sounds and the recoil markers fire here rather than on arrival, or
+       * the whole round would still be audible in one go under a picture that
+       * had been carefully spread out.
+       */
+      function startVolley(){
+        if(!fxQueue.length || room?.phase !== PHASES.combat){ fxQueue.length = 0; volley = null; return; }
+
+        const step = fxQueue[0].step ?? 0;
+        const events = [];
+        while(fxQueue.length && (fxQueue[0].step ?? 0) === step) events.push(fxQueue.shift());
+
+        for(const event of events){
           // A kill has two sounds and they are not the same sound: one thing
           // coming apart, and the fight stopping. The room tells us which by
           // marking the event that emptied the lane.
@@ -1382,27 +1467,7 @@
           else if(event.kind === 'slain') dying.set(event.target, now);
           else if(event.target) struck.set(event.target, now);
         }
-        if(any && !volley) startVolley();
-        // Under reduced motion the loop parks itself after a frame, so a volley
-        // has to ask for the frames it needs rather than assume they arrive.
-        if(any) schedule();
-      }
 
-      /* The volley in flight, or null. Everything that arrived in one state
-         update plays together, because a turn resolves all at once and the
-         picture should agree. */
-      let volley = null;
-
-      /* How long a death is watched for. The dissolve runs the whole span, and
-         the last one of a round runs longer still — that is the beat the round
-         holds open for, so a kill is a thing you saw rather than the frame
-         before a splash. */
-      const DEATH_MS = 900;
-      const FINISH_MS = 1900;
-
-      function startVolley(){
-        if(!fxQueue.length || room?.phase !== PHASES.combat){ fxQueue.length = 0; volley = null; return; }
-        const events = fxQueue.splice(0, fxQueue.length);
         // A volley that killed something has to outlast the dissolve, or the
         // loop stops asking for frames halfway through a body coming apart.
         const slain = events.filter(e => e.kind === 'slain');
@@ -1410,10 +1475,9 @@
         volley = {
           events,
           started: now,
-          duration: stillness() ? 120 : Math.max(620, held),
+          duration: stillness() ? 120 : Math.max(BEAT_MS, held),
         };
       }
-
       /* The effects layer, painted over whatever the scene left. Split out of
          the old frame loop so the scene and the overlay are drawn by one clock
          rather than by two that each thought they owned the canvas. */
@@ -1980,10 +2044,31 @@
           drawText(cctx, String(enemy.canker), x + 8, y - 1, 'v', 1);
         }
 
+        /* The plate itself: a glyph for what it is about to do, and a number
+         * for how much of it.
+         *
+         * Four glyphs, because there are four intents, and they have to be
+         * tellable apart at four pixels across from the other side of the
+         * board. A blade for a swing, a flask for a dose, a chevron for a
+         * wind-up, a bar climbing for a bolster — two of them pointing up,
+         * which is the shared reading for "this is about to get worse".
+         *
+         * The seat stripe is gone. It used to say which player a blow was
+         * lined up on, and there is no such thing now: an attack lands on the
+         * whole party, so the only question left is what kind of thing is
+         * landing.
+         */
         const intent = enemy.intent;
         if(!intent) return;
 
-        const label = String(intent.damage);
+        const spec = ENEMY_INTENTS[intent.kind] || ENEMY_INTENTS.attack;
+        const label = intent.kind === 'bolster'
+          ? `+${intent.gain}`
+          : String(intent.kind === 'charge' ? intent.next : intent.damage);
+        const tint = intent.kind === 'blight' && intent.ail
+          ? ((AILMENTS[intent.ail] || {}).colour || spec.colour)
+          : spec.colour;
+
         const width = textWidth(label, 1) + 6 + (intent.ail ? 4 : 0);
         const px = Math.round(x + w / 2 - width / 2);
         const py = y - 16;
@@ -1991,32 +2076,41 @@
         cctx.fillStyle = '#241a10';
         cctx.fillRect(px - 1, py - 1, width + 2, 9);
 
-        // A blade, four pixels of it, which at this size is all a sword can be.
-        cctx.fillStyle = PALETTE.e;
-        cctx.fillRect(px, py + 1, 1, 4);
-        cctx.fillRect(px + 1, py, 1, 6);
-        cctx.fillRect(px + 2, py + 1, 1, 4);
-
-        drawText(cctx, label, px + 5, py, 'w', 1);
-
-        // Who it is going for, in that seat's own colour. This is the half of
-        // the telegraph the Hauler exists to change: a Rust Hulk lining up on
-        // the Wizard is a fact you can do something about, and could not see
-        // at all while the wave was still walking.
-        if(intent.at){
-          const who = (room.players || []).find(p => p.id === intent.at);
-          const wcls = who && classById(who.classId);
-          if(wcls){
-            cctx.fillStyle = wcls.colour;
-            cctx.fillRect(px + 1, py + 8, width - 2, 1);
-          }
+        cctx.fillStyle = PALETTE[tint] || PALETTE.e;
+        if(intent.kind === 'attack'){
+          // A blade, four pixels of it, which at this size is all a sword can be.
+          cctx.fillRect(px, py + 1, 1, 4);
+          cctx.fillRect(px + 1, py, 1, 6);
+          cctx.fillRect(px + 2, py + 1, 1, 4);
+        }else if(intent.kind === 'blight'){
+          // A flask: a narrow neck over a round body.
+          cctx.fillRect(px + 1, py, 1, 2);
+          cctx.fillRect(px, py + 2, 3, 4);
+          cctx.fillStyle = '#241a10';
+          cctx.fillRect(px, py + 2, 1, 1);
+          cctx.fillRect(px + 2, py + 2, 1, 1);
+        }else if(intent.kind === 'charge'){
+          // Two chevrons pointing up: something drawing back.
+          cctx.fillRect(px + 1, py, 1, 1);
+          cctx.fillRect(px, py + 1, 1, 1);
+          cctx.fillRect(px + 2, py + 1, 1, 1);
+          cctx.fillRect(px + 1, py + 3, 1, 1);
+          cctx.fillRect(px, py + 4, 1, 1);
+          cctx.fillRect(px + 2, py + 4, 1, 1);
+        }else{
+          // Bolster: a bar climbing, left to right.
+          cctx.fillRect(px, py + 4, 1, 2);
+          cctx.fillRect(px + 1, py + 2, 1, 4);
+          cctx.fillRect(px + 2, py, 1, 6);
         }
 
-        // And a pip in the ailment's own colour when the next blow through
-        // guard would leave something behind.
+        drawText(cctx, label, px + 5, py, intent.kind === 'attack' ? 'w' : tint, 1);
+
+        // And a pip in the ailment's own colour, so a dose says which one it
+        // is about to be rather than only that it is a dose.
         if(intent.ail){
-          const spec = AILMENTS[intent.ail];
-          cctx.fillStyle = PALETTE[(spec && spec.colour) || 'v'];
+          const ail = AILMENTS[intent.ail];
+          cctx.fillStyle = PALETTE[(ail && ail.colour) || 'v'];
           cctx.fillRect(px + width - 3, py + 1, 3, 3);
           cctx.fillRect(px + width - 2, py + 4, 1, 2);
         }
@@ -2084,6 +2178,10 @@
         lobby: els('lobby'), seats: els('seats'), classes: els('classes'),
         ready: els('ready'), start: els('start'), leave: els('leave'),
         run: els('run'), levelNote: els('level-note'),
+        haulerOnly: els('hauler-only'), packGrid: els('pack-grid'), packHint: els('pack-hint'),
+        packCarried: els('pack-carried'), packLoose: els('pack-loose'), packLooseHint: els('pack-loose-hint'),
+        packControls: els('pack-controls'), packTurn: els('pack-turn'),
+        packOut: els('pack-out'), packCancel: els('pack-cancel'),
         alchemistOnly: els('alchemist-only'), stash: els('stash'), recipes: els('recipes'),
         garden: els('garden'), gardenHint: els('garden-hint'),
         leaveRun: els('leave-run'),
@@ -2099,10 +2197,9 @@
         satchelHint: els('satchel-hint'), satchel: els('satchel'),
         combatName: els('combat-name'), combatMeta: els('combat-meta'),
         enemies: els('enemies'),
-        hand: els('hand'), deckPile: els('deck-pile'), discardPile: els('discard-pile'),
-        roster: els('roster'), combatRoster: els('combat-roster'), deckList: els('deck-list'),
-        buildDeckPile: els('build-deck-pile'), buildDeckCount: els('build-deck-count'),
-        deckCount: els('deck-count'), discardCount: els('discard-count'),
+        hand: els('hand'),
+        roster: els('roster'), combatRoster: els('combat-roster'), actionList: els('action-list'),
+        actionsHint: els('actions-hint'),
         combatWait: els('combat-wait'), combatLog: els('combat-log'),
         splash: els('splash'), splashTitle: els('splash-title'), splashSub: els('splash-sub'),
         over: els('over'), overCard: els('over-card'), overMark: els('over-mark'),
@@ -2212,12 +2309,17 @@
         // draws: renderCombat reads holdTimer to decide whether the cards are
         // live, and a card played into a round the room has finished is an
         // intent it will drop on the floor.
+        // Long enough for every beat of the round, not only the one the kill
+        // landed on: the wave dies at the end of a sequence that opens with
+        // however many cards the party played, and cutting to the splash
+        // halfway through it would lose the same moment this hold exists to
+        // protect.
         next.events = events.filter(e => e.t !== 'fx');
         holdTimer = setTimeout(() => {
           holdTimer = 0;
           room = next;
           render();
-        }, FINISH_MS);
+        }, playbackMs(events));
 
         // Part one, on the board we are already looking at: the wave, dead.
         // Only the fx events come through now — the log lines and the phase
@@ -2292,6 +2394,17 @@
         });
         // The garden grew while everyone was fighting.
         room.pots = growPots(room.pots);
+        // Three more things at the Hauler's feet, unasked for, as the room
+        // rolls them. The preview always seats one.
+        for(const player of room.players){
+          if(!classById(player.classId)?.haul) continue;
+          player.pack = normalisePack(player.pack);
+          player.pack.loose = rollPackItems(demoRandom, player.pack.placed, 3);
+          room.events.push({
+            t: 'log',
+            text: `${player.name} turns out the wreckage: ${player.pack.loose.map(id => PACK_ITEMS[id].name).join(', ')}.`,
+          });
+        }
         // The library's round wage, exactly as the room pays it — the preview
         // always seats a wizard.
         room.pages += PAGES_PER_ROUND;
@@ -2332,7 +2445,10 @@
             // and a building adds to everyone's, so rebuilding it at the surge
             // would throw away the round's whole point. The Wizard's is the
             // exception either way: hers is the book's shadow.
-            deck: cls.cast ? wizardCombatDeck(spellbook) : classKit(cls.id), discard: [], hand: [],
+            stock: freshStock(cls.id), uses: {}, charges: 0,
+            // His bag, with his signature card already in it. Null on everyone
+            // else, the way `stock` is empty on everyone but the Alchemist.
+            pack: cls.haul ? freshPack() : null,
           })),
         };
         demoEnterBuild();
@@ -2343,29 +2459,20 @@
         render();
       }
 
-      /* Deal a fresh hand, reshuffling the discard if the deck has run out.
-         The preview holds one player, but this takes the player it is given so
-         it reads the same as the room's version will. */
-      function demoDeal(player){
-        const dealt = draw(player.deck, player.discard, demoRandom, HAND_SIZE);
-        player.hand = dealt.hand;
-        player.deck = dealt.deck;
-        player.discard = dealt.discard;
-      }
-
-      /* One combat turn, whichever interface started it.
+      /* One seat's action, and nothing else.
        *
-       * Applying the effect, advancing the wave and checking the field are the
-       * same three steps whether the effect came off a card or out of a
-       * building, so both paths land here rather than growing two copies that
-       * drift.
+       * This used to be the whole turn — apply the card, tick the statuses, run
+       * the wave — because the preview committed and resolved on the same
+       * click. One seat clicking a card was five seats' round, so four of the
+       * five never chose anything and the wave swung once per card played
+       * rather than once per round. That was survivable while a swing found one
+       * seat; with an attack landing on everybody it means a party of five
+       * takes the whole wave five times a round.
+       *
+       * `fx` comes in from demoRound rather than being made here, because the
+       * emitter carries the beat and the beat belongs to the round.
        */
-      function demoTurn(you, effect, label, targetId, cardId, spell = null){
-        // The same fx events the room emits, in the same shape and at the same
-        // point in the turn. Without them the preview is the one screen where
-        // cards resolve in silence against a still board — and the preview is
-        // how you play this without a room at all.
-        const fx = event => room.events.push({ t: 'fx', ...event });
+      function demoCard(you, effect, label, targetId, cardId, spell, fx){
 
         // What this turn's swings landed and killed, for the sockets that pay
         // on either — the room reads the same numbers off its stat deltas.
@@ -2463,7 +2570,7 @@
           if(hit.length) room.events.push({ t: 'log', text: `${label} cuts a ring in ${hit.length > 1 ? 'the whole row' : `the ${hit[0].name}`}.` });
         }else if(effect.kind === 'graft'){
           const who = ally();
-          for(let i = 0; i < effect.amount; i++) who.deck.unshift('cutting');
+          who.uses = { ...who.uses, cutting: ((who.uses || {}).cutting || 0) + effect.amount };
           fx({ kind: 'graft', player: who.id });
           room.events.push({ t: 'log', text: `${label}: a cutting on top of ${who.name}'s deck.` });
         }else if(effect.kind === 'revive'){
@@ -2475,7 +2582,6 @@
             who.down = false;
             who.hp = Math.min(who.maxHp, effect.amount);
             who.effects = clearAilments(who.effects);
-            demoDeal(who);
             score(you, 'revived', 1);
           }else{
             who.hp = Math.min(who.maxHp, who.hp + effect.amount);
@@ -2515,9 +2621,122 @@
           }
         }
 
+      }
+
+      /* Is the table still waiting on anybody?
+       *
+       * The preview's `settle()`, and it exists for the reason the room's does:
+       * a round turns when everybody who can act has acted, and that has to be
+       * one rule rather than a thing each entry point decides for itself.
+       *
+       * The preview drives every seat from one pair of hands, so "everybody has
+       * chosen" means clicking through the roster and giving each of them a
+       * card — which is exactly what a real table does, one person per seat.
+       * Anyone on the floor is not owed a turn.
+       */
+      function demoSettle(){
+        const acting = room.players.filter(p => p.classId && !p.down);
+        if(!acting.length || !acting.every(p => p.intent)) return render();
+
+        render();                                 // the last mark, before it all goes
+        clearTimeout(demoBeat);
+        demoBeat = setTimeout(() => { demoRound(); render(); }, 420);
+      }
+
+      /* The round, once every seat is in.
+       *
+       * The same order the room resolves in, and for the same reasons: every
+       * card in seat order, then the quiet gap where the statuses bite, then
+       * the wave one enemy at a time. Each of those takes a beat, and the
+       * client plays the beats in order.
+       */
+      function demoRound(){
+        let beat = 0;
+        const fx = event => room.events.push({ t: 'fx', step: beat, ...event });
+
+        // Snapshotted before anything resolves: going down clears an intent,
+        // and a seat that is knocked over by an ally's Bloodpact must still get
+        // the card it chose.
+        const order = room.players
+          .filter(p => p.classId && p.intent)
+          .sort((a, b) => a.id.localeCompare(b.id))
+          .map(p => ({ player: p, intent: p.intent }));
+
+        for(const { player, intent } of order){
+          beat += 1;
+
+          if(intent.t !== 'action') continue;      // waiting is a turn spent on nothing
+
+          // Stunned costs the turn rather than shading it. Nothing is paid and
+          // nothing is spent — there is no hand to drop it out of any more, so
+          // a stun costs the round and nothing else.
+          if(hasEffect(player.effects, 'stun')){
+            fx({ kind: 'stun', player: player.id });
+            room.events.push({ t: 'log', text: `${player.name} is still finding their feet.` });
+            continue;
+          }
+
+          const cardId = intent.id;
+          const card = cardById(cardId);
+          const spell = spellForCard(player, cardId);
+          if(!card && !spell) continue;
+          // Checked again at resolution, not only at the click: two seats can
+          // both commit a Bolt Gun against one panel's worth of power, and the
+          // second to resolve has to find the pool empty rather than take it
+          // negative.
+          if(!actionReady(cardId, seatState(player), spell).ok) continue;
+
+          // Paid here rather than on the click, for the reason the room pays in
+          // resolve(): a commitment can be taken back, and a charge spent on an
+          // action that was never taken would be gone for nothing.
+          const cost = actionCost(cardId, spell, room.upgrades);
+          if(cost){
+            if(cost.pool === 'power') room.power = Math.max(0, (room.power || 0) - cost.amount);
+            else if(cost.pool === 'charges') player.charges = Math.max(0, (player.charges || 0) - cost.amount);
+            else if(cost.pool === 'hp'){
+              const paid = Math.min(cost.amount, player.hp - 1);
+              if(paid > 0){ score(player, 'taken', paid); player.hp -= paid; }
+            }else if(cost.pool === 'stock'){
+              player.stock = { ...player.stock, [cardId]: Math.max(0, (player.stock[cardId] || 0) - 1) };
+            }else if(cost.pool === 'uses'){
+              player.uses = { ...player.uses, [cardId]: Math.max(0, (player.uses[cardId] || 0) - 1) };
+            }
+          }
+          if(spell){
+            // The cast's own costs and covers, before it flies.
+            if(spell.flags.hpCost){
+              const paid = Math.min(spell.flags.hpCost, player.hp - 1);
+              if(paid > 0){
+                score(player, 'taken', paid);
+                player.hp -= paid;
+                room.events.push({ t: 'log', text: `${player.name} pays ${paid} health to the seal.` });
+              }
+            }
+            if(spell.flags.selfWard){
+              player.block = (player.block || 0) + spell.flags.selfWard;
+              score(player, 'guard', spell.flags.selfWard);
+            }
+          }
+
+          // Farsight reaches the back of the lane, which is the far end of the
+          // row as drawn — the last thing standing, exactly as the room reads it.
+          let target = intent.target;
+          if(spell && spell.flags.farthest && !target && spell.effect.kind === 'strike'){
+            const alive = room.enemies.filter(e => e.hp > 0);
+            const far = alive[alive.length - 1];
+            if(far) target = far.id;
+          }
+
+          demoCard(player, spell ? spell.effect : cardEffect(cardId, room.upgrades),
+            spell ? spell.name : card.name, target, cardId, spell, fx);
+        }
+
+        for(const { player } of order) player.intent = null;
+
         // Ailments bite and age before the wave lands new ones, in the room's
         // order — the preview is how this gets looked at, so it has to be the
         // order the room resolves in.
+        beat += 1;
         for(const p of room.players){
           const rot = effectAmount(p.effects, 'rot');
           if(rot && !p.down){
@@ -2532,42 +2751,78 @@
           p.effects = tickEffects(p.effects);
         }
 
-        // The wave swings. Guard is spent absorbing it and does not carry — a
-        // ward is for the blow you saw coming.
-        //
-        // The preview runs one seat at a time, so the blow lands on whoever is
-        // holding the controls rather than on the round-robin's pick; what it
-        // does share is the rule about cover, because that is the thing worth
-        // looking at.
-        room.waveTurn = (room.waveTurn || 0) + 1;
+        /* The wave's turn, one enemy at a time, each doing what its plate said.
+         *
+         * The preview drives the whole party from one seat, so unlike every
+         * other difference between this and the room, the wave's half is not
+         * simplified here at all: an attack lands on everybody, and the preview
+         * has everybody. This is the closest the two get.
+         */
         for(const enemy of room.enemies){
           if(enemy.hp <= 0) continue;
-          const blocked = Math.min(you.block || 0, enemy.hits);
-          you.block = (you.block || 0) - blocked;
-          const through = enemy.hits - blocked;
-          if(through > 0){
-            score(you, 'taken', Math.min(through, you.hp));
-            you.hp = Math.max(0, you.hp - through);
+          const intent = intentOf(enemy);
+          if(!intent) continue;
+
+          beat += 1;
+          enemy.turn = (enemy.turn || 0) + 1;
+
+          if(intent.kind === 'charge'){
+            enemy.charged = true;
+            fx({ kind: 'charge', target: enemy.id });
+            room.events.push({ t: 'log', text: `The ${enemy.name} winds up. ${intent.next} coming.` });
+            continue;
           }
-          fx({ kind: 'hit', player: you.id, from: enemy.id });
+          if(intent.kind === 'bolster'){
+            enemy.might = (enemy.might || 0) + intent.gain;
+            fx({ kind: 'bolster', target: enemy.id });
+            room.events.push({ t: 'log', text: `The ${enemy.name} swings for ${intent.gain} more from here on.` });
+            continue;
+          }
+
+          const standing = room.players.filter(p => p.classId && !p.down);
+          const coverer = standing.find(p => hasEffect(p.effects, 'cover'));
+          const dose = intent.kind === 'blight';
+          let through = 0;
+
           room.events.push({
             t: 'log',
-            text: blocked
-              ? `The ${enemy.name} hits for ${enemy.hits}; guard eats ${blocked}.`
-              : `The ${enemy.name} hits you for ${enemy.hits}.`,
+            text: dose
+              ? `The ${enemy.name} opens up: ${intent.damage} on everyone, and ${effectName(intent.ail)} in it.`
+              : `The ${enemy.name} swings at the whole party for ${intent.damage}.`,
           });
-          if(through > 0){
-            enemy.landed = (enemy.landed || 0) + 1;
-            const ail = ailmentOnHit(enemy.type, enemy.landed);
-            if(ail){
-              you.effects = addAilment(you.effects, ail, enemy.id);
-              fx({ kind: 'ail', ail, player: you.id, from: enemy.id });
-              room.events.push({ t: 'log', text: `${you.name} is ${effectName(ail)}.` });
+
+          for(const victim of standing){
+            const taker = (coverer && coverer !== victim && !coverer.down && (coverer.block || 0) > 0)
+              ? coverer
+              : victim;
+            if(taker.down) continue;
+
+            fx({ kind: 'hit', player: taker.id, from: enemy.id });
+            const blocked = Math.min(taker.block || 0, intent.damage);
+            taker.block = (taker.block || 0) - blocked;
+            const took = intent.damage - blocked;
+            if(took > 0){
+              through += 1;
+              score(taker, 'taken', Math.min(took, taker.hp));
+              taker.hp = Math.max(0, taker.hp - took);
             }
+            room.events.push({
+              t: 'log',
+              text: blocked ? `${taker.name} takes ${took}; guard eats ${blocked}.` : `${taker.name} takes ${took}.`,
+            });
+            if(dose && took > 0 && intent.ail && !taker.down){
+              taker.effects = addAilment(taker.effects, intent.ail, enemy.id);
+              fx({ kind: 'ail', ail: intent.ail, player: taker.id, from: enemy.id });
+              room.events.push({ t: 'log', text: `${taker.name} is ${effectName(intent.ail)}.` });
+            }
+            demoDownIf(taker);
           }
-          demoDownIf(you);
+
+          if(dose && through > 0) enemy.cast = (enemy.cast || 0) + 1;
+          enemy.charged = false;
         }
-        you.block = 0;
+
+        for(const p of room.players) p.block = 0;
         demoIntents();
 
         // The preview used to floor everyone at one health, which made it a
@@ -2580,11 +2835,20 @@
           return;
         }
 
-        if(!room.enemies.every(e => e.hp <= 0)) return;
+        if(!room.enemies.every(e => e.hp <= 0)){
+          // The Wizard's pool comes back a little at the top of every round,
+          // which is the whole of her economy. Nothing else refills mid-fight.
+          for(const pl of room.players){
+            if(pl.down || !pl.classId) continue;
+            const c = classById(pl.classId);
+            if(c && c.cast) pl.charges = Math.min(CHARGE_CAP, (pl.charges || 0) + CHARGE_REGEN);
+          }
+          return;
+        }
 
         // The round is over, but the last thing to die is still coming apart.
-        // Same hold the real client puts on a finished round, for the same
-        // reason: the preview is where this animation gets looked at.
+        // Same hold the real client puts on a finished round, and the same
+        // arithmetic behind it: long enough for every beat, not only the last.
         const finish = () => {
           const drawn = salvageAfterCombat(room.players, room.buildings, demoRandom);
           room.salvage = addSalvage(room.salvage, drawn);
@@ -2599,9 +2863,8 @@
         };
         if(stillness()) return finish();
         clearTimeout(holdTimer);
-        holdTimer = setTimeout(() => { holdTimer = 0; finish(); render(); }, FINISH_MS);
+        holdTimer = setTimeout(() => { holdTimer = 0; finish(); render(); }, playbackMs(room.events));
       }
-
       /* The preview's two bookkeeping helpers, matching the room's `score` and
          `downIf` so the numbers on the end screen mean the same thing whichever
          side produced them. */
@@ -2613,18 +2876,12 @@
 
       /* The telegraph, recomputed from the same helper the room uses. */
       const demoIntents = () => {
-        const at = waveTargets(
-          room.enemies || [],
-          (room.players || []).filter(p => p.classId && !p.down),
-          room.waveTurn || 0,
-        );
-        for(const enemy of room.enemies || []) enemy.intent = intentOf(enemy, at);
+        for(const enemy of room.enemies || []) enemy.intent = intentOf(enemy);
       };
 
       function demoDownIf(player){
         if(player.hp > 0 || player.down) return;
         player.down = true;
-        player.hand = [];
         player.intent = null;
         const cls = classById(player.classId);
         room.events.push({ t: 'log', text: cls ? `${player.name}: "${cls.downLine}"` : `${player.name} goes down.` });
@@ -2662,9 +2919,11 @@
             room.enemies = waveFor(room.round, seats).map((type, i) => {
               const def = ENEMIES[type];
               const stats = enemyStats(type, seats);
+              // The same four counters the room starts an enemy with, and for
+              // the same reason: the telegraph is derived from them.
               return { id: `e${i}`, type, name: def.name, art: def.art,
                        hp: stats.hp, maxHp: stats.hp, hits: stats.hits,
-                       landed: 0, intent: null };
+                       turn: 0, cast: 0, might: 0, charged: false, intent: null };
             });
             // The room publishes the telegraph in viewFor; the preview has no
             // viewFor, so it publishes its own from the same helper.
@@ -2674,97 +2933,62 @@
             // fight, not per run — for now: the cards that persist between
             // fights are the next slice.
             for(const player of room.players){
-              // Shuffle what the build phase left them — brewed cards, granted
-              // cards and all. Rebuilding the deck here would throw the round
-              // away, which is the bug this whole phase exists to avoid.
-              // Hand included: a fight can end with cards still held, and
-              // shuffling only deck and discard would delete them.
-              // The Wizard is the exception, as in the room: her deck is
-              // written fresh from the book, which is what charges are.
+              // What resets per fight and what does not is the whole of the
+              // class economies. The rack carries — she brewed it, it is hers
+              // until she drinks it. Everything else opens full.
               const cls = classById(player.classId);
-              const owned = cls && cls.cast
-                ? wizardCombatDeck(room.spellbook)
-                : [...player.deck, ...(player.discard || []), ...(player.hand || [])];
-              player.deck = shuffle(owned, demoRandom);
-              if(cls && cls.cast){
-                for(const spellId of room.spellbook.known){
-                  const composed = composeSpell(spellId, room.spellbook.slots[spellId]);
-                  if(!composed || !composed.flags.opening) continue;
-                  const at = player.deck.indexOf(spellId);
-                  if(at > 0){ player.deck.splice(at, 1); player.deck.unshift(spellId); }
-                }
-              }
-              player.discard = [];
-              player.hand = [];
+              player.uses = freshUses(player.classId);
+              player.charges = cls && cls.cast ? CHARGE_CAP : 0;
+              if(!player.stock) player.stock = freshStock(player.classId);
               player.block = 0;
               player.effects = [];        // a fight starts clean, as in the room
-              demoDeal(player);
+
+              // The bag closes: what is loose is left behind, and the ballast
+              // pays out. Same order and same numbers as enterCombat, because
+              // a preview that was generous here would teach the wrong game.
+              if(cls && cls.haul){
+                player.pack = normalisePack(player.pack);
+                if(player.pack.loose.length){
+                  room.events.push({
+                    t: 'log',
+                    text: `${player.name} leaves it: ${player.pack.loose.map(id => PACK_ITEMS[id].name).join(', ')}. It would not go in.`,
+                  });
+                }
+                player.pack.loose = [];
+                const carried = packedStats(player.pack.placed);
+                if(carried.heft > 0){
+                  player.effects = addEffect(player.effects, {
+                    kind: 'heft', amount: carried.heft, rounds: 0, lasting: true,
+                  });
+                }
+                if(carried.ward > 0) player.block += carried.ward;
+                if(carried.regen > 0){
+                  player.effects = addEffect(player.effects, {
+                    kind: 'regen', amount: carried.regen, rounds: 0, lasting: true, fresh: true,
+                  });
+                }
+              }
             }
 
             room.events.push({ t: 'phase', ...phaseCard(room.round, PHASES.combat) });
           }
-        }else if(msg.t === 'intent' && msg.intent.t === 'play' && room.phase === PHASES.combat){
-          const hand = you.hand || [];
-          const cardId = hand[msg.intent.index];
-          const card = cardById(cardId);
-          // The id has to match the slot as well as exist: a click that landed
-          // after the hand was redealt would otherwise play whatever moved
-          // into that position.
-          if(!card || cardId !== msg.intent.card) return render();
-          const spell = spellForCard(you, cardId);
-          if(!spell && !cardPlayable(cardId, {
-            pages: room.pages || 0, power: room.power || 0, classId: you.classId, hp: you.hp,
-          })) return render();
+        }else if(msg.t === 'intent' && msg.intent.t === 'action' && room.phase === PHASES.combat){
+          const id = msg.intent.id;
+          if(!optionIds(you).includes(id)) return render();
+          const spell = spellForCard(you, id);
+          if(!spell && !CARDS[id]) return render();
+          if(!actionReady(id, seatState(you), spell).ok) return render();
 
-          if(!spell){
-            if(card.pageCost) room.pages -= card.pageCost;
-            if(card.powerCost) room.power -= card.powerCost;
-          }else{
-            // The cast's own costs and covers, before it flies — the same
-            // order the room resolves them in.
-            if(spell.flags.hpCost){
-              const paid = Math.min(spell.flags.hpCost, you.hp - 1);
-              if(paid > 0){
-                score(you, 'taken', paid);
-                you.hp -= paid;
-                room.events.push({ t: 'log', text: `${you.name} pays ${paid} health to the seal.` });
-              }
-            }
-            if(spell.flags.selfWard){
-              you.block = (you.block || 0) + spell.flags.selfWard;
-              score(you, 'guard', spell.flags.selfWard);
-            }
-          }
-
-          // Commit, show the mark, then resolve on a beat. In a real room the
-          // wait is for the other four; here it is the only way to see the
-          // thing the mark is for.
-          you.intent = { t: 'play', card: cardId };
-          // Brewed cards are spent, not discarded: everything else in the hand
-          // goes face down, the consumed one leaves the deck for good. A
-          // played spell copy is spent too — the book deals it again next
-          // surge — but an unplayed copy only discards.
-          const rest = hand.filter((id, at) => !(spell && at === msg.intent.index));
-          you.discard = discardHand(you.discard, rest.filter(id => !(CARDS[id] || {}).consumed));
-          you.hand = [];
-          render();
-
-          // Farsight aims at the back of the lane unless she aimed herself.
-          let target = msg.intent.target;
-          if(spell && spell.flags.farthest && !target && spell.effect.kind === 'strike'){
-            const far = [...room.enemies].filter(e => e.hp > 0).sort((a, b) => b.dist - a.dist)[0];
-            if(far) target = far.id;
-          }
-
-          clearTimeout(demoBeat);
-          demoBeat = setTimeout(() => {
-            you.intent = null;
-            demoTurn(you, spell ? spell.effect : cardEffect(cardId, room.upgrades), card.name,
-              target, cardId, spell);
-            if(room.phase === PHASES.combat) demoDeal(you);
-            render();
-          }, 420);
-          return;
+          /* Commit, and nothing more.
+           *
+           * Nothing is paid and nothing resolves here. Both used to happen on
+           * the click, which is what made one seat's card the whole party's
+           * round — and it is also what made a commitment impossible to take
+           * back, because the page was already spent. The round happens in
+           * demoRound, once every seat has chosen.
+           */
+          you.intent = { t: 'action', id, target: msg.intent.target || null };
+          return demoSettle();
         }else if(msg.t === 'intent' && msg.intent.t === 'wait' && room.phase === PHASES.combat){
           /* "Do nothing" is still a turn, and the preview had no branch for it
              at all — the button was live and inert, so the wave never closed
@@ -2772,18 +2996,12 @@
              see what waiting costs. It costs the hand and the ground the wave
              covers, exactly as it does in a room. */
           you.intent = { t: 'wait' };
-          you.discard = discardHand(you.discard, (you.hand || []).filter(id => !(CARDS[id] || {}).consumed));
-          you.hand = [];
-          render();
-
-          clearTimeout(demoBeat);
-          demoBeat = setTimeout(() => {
-            you.intent = null;
-            demoTurn(you, { kind: 'wait', amount: 0 }, 'Waiting', null, null);
-            if(room.phase === PHASES.combat) demoDeal(you);
-            render();
-          }, 420);
-          return;
+          return demoSettle();
+        }else if(msg.t === 'intent' && msg.intent.t === 'take' && room.phase === PHASES.combat){
+          // Taking it back, which the preview can offer honestly now that it
+          // waits for the table rather than resolving on the click.
+          you.intent = null;
+          return render();
         }else if(msg.t === 'intent' && msg.intent.t === 'moveTo'){
           // The room's job in a real game: decide the route and where you ended
           // up. Here it walks the sprite and lets arrive() pick anything up.
@@ -2795,13 +3013,13 @@
           const made = brew(msg.intent.recipe, room.stash);
           if(made){
             room.stash = made.stash;
-            // Straight into the deck, not onto a rack. Shuffled in is the
-            // point: three Sunsalves dilute the deck they improve.
-            you.deck = [...you.deck, ...made.cards];
+            // Onto the rack, where they stay until she drinks them — across
+            // fights, unlike every other pool in the game.
+            you.stock = { ...you.stock, [made.card]: ((you.stock || {})[made.card] || 0) + made.cards.length };
             const recipe = RECIPES[msg.intent.recipe];
             room.events.push({
               t: 'log',
-              text: `Brewed ${recipe.makes} ${recipe.name}${recipe.makes > 1 ? 's' : ''} into the deck.`,
+              text: `Brewed ${recipe.makes} ${recipe.name}${recipe.makes > 1 ? 's' : ''} onto the rack.`,
             });
           }
         }else if(msg.t === 'intent' && msg.intent.t === 'upgrade'){
@@ -2813,10 +3031,10 @@
             room.upgrades = { ...room.upgrades, [id]: bought.level };
             const upgrade = UPGRADES[id];
             if(bought.adds === 'card'){
-              // Straight into the deck, like a brew: the point of the barrel is
+              // The barrel makes a bolt cheaper rather than more numerous:
               // another bolt to draw, and it should appear when it is paid for.
-              you.deck = [...you.deck, 'boltgun'];
-              room.events.push({ t: 'log', text: `${upgrade.name}: another Bolt Gun in the deck.` });
+              /* Nothing to grant: the Bolt Gun is an action he always has. */
+              room.events.push({ t: 'log', text: `${upgrade.name}: a bolt costs ${actionCost('boltgun', null, room.upgrades).amount} power now.` });
             }else{
               room.events.push({
                 t: 'log',
@@ -2859,6 +3077,30 @@
             room.stash = picked.stash;
             room.events.push({ t: 'log', text: `Harvested ${picked.yielded} ${MATERIALS[picked.herb].name} from the pot.` });
           }
+        }else if(msg.t === 'intent' && ['pack', 'shift', 'unpack'].includes(msg.intent.t)){
+          /* The pack, behind the same helpers the room uses, so what the
+             preview refuses is what a real room refuses. Every one of these
+             returns null rather than a half-applied bag, which is what lets
+             the failure branch simply do nothing. */
+          const cls = classById(you.classId);
+          if(cls?.haul){
+            you.pack = normalisePack(you.pack);
+            const { index, x, y, rot = 0 } = msg.intent;
+            if(msg.intent.t === 'pack'){
+              const id = you.pack.loose[index];
+              const placed = id && packPlace(room.round, you.pack.placed, id, x, y, rot);
+              if(placed){
+                you.pack = { placed, loose: you.pack.loose.filter((_, i) => i !== index) };
+                room.events.push({ t: 'log', text: `${PACK_ITEMS[id].name} works into the bag.` });
+              }
+            }else if(msg.intent.t === 'shift'){
+              const placed = packMove(room.round, you.pack.placed, index, x, y, rot);
+              if(placed) you.pack = { ...you.pack, placed };
+            }else{
+              const { placed, id } = packRemove(you.pack.placed, index);
+              if(id) you.pack = { placed, loose: [...you.pack.loose, id] };
+            }
+          }
         }else if(msg.t === 'intent' && msg.intent.t === 'page'){
           // The scriptorium, behind the same helpers the room uses, so the
           // preview's drafts cannot drift from a real room's.
@@ -2875,8 +3117,7 @@
           if(next){
             room.spellbook = next;
             room.offers = null;
-            you.deck = wizardCombatDeck(room.spellbook);
-            you.discard = []; you.hand = [];
+            /* Nothing to rebuild: actionIds reads the book every time. */
             room.events.push({ t: 'log', text: offer.type === 'spell'
               ? `Learned ${SPELLS[offer.id].name}.`
               : `Inscribed ${MODIFIERS[offer.id].name}.` });
@@ -2886,8 +3127,6 @@
           const next = cls?.cast && moveModifier(room.spellbook, msg.intent.mod, msg.intent.spell, msg.intent.pos);
           if(next){
             room.spellbook = next;
-            you.deck = wizardCombatDeck(room.spellbook);
-            you.discard = []; you.hand = [];
             if(msg.intent.spell){
               const composed = composeSpell(msg.intent.spell, next.slots[msg.intent.spell]);
               room.events.push({ t: 'log', text:
@@ -2899,20 +3138,27 @@
         }else if(msg.t === 'intent' && msg.intent.t === 'gather'){
           const node = room.nodes.find(n => n.id === msg.intent.node && !n.taken);
           if(node){
-            node.taken = true;
-            if(node.kind === 'salvage'){
-              room.salvage = addSalvage(room.salvage, { [node.salvage]: CACHE_YIELD.salvage });
-              room.events.push({ t: 'log', text: `Cracked a cache: ${CACHE_YIELD.salvage} ${SALVAGE[node.salvage].name}.` });
-            }else if(node.kind === 'pages'){
-              room.pages += CACHE_YIELD.pages;
-              room.events.push({ t: 'log', text: `Found ${CACHE_YIELD.pages} spell page.` });
+            /* The same rule the room runs, from the same function: what the
+               node is worth to this seat, and nothing at all when the stat
+               says this is not their kind of find. `nodeYield` is shared so
+               solo play cannot quietly pay better than a real table. */
+            const cls = CLASSES.find(c => c.id === you.classId);
+            const yielded = nodeYield(cls, node);
+            if(yielded <= 0){
+              room.events.push({ t: 'log',
+                text: `You ${NODE_REFUSAL[node.kind] || 'leave it where it lies.'}` });
             }else{
-              // Anyone can bend down; the Alchemist is simply worth two of
-              // anybody else doing it, because `gather` says so.
-              const cls = CLASSES.find(c => c.id === you.classId);
-              const yielded = (cls && cls.gather) || 1;
-              room.stash[node.material] = (room.stash[node.material] || 0) + yielded;
-              room.events.push({ t: 'log', text: `Gathered ${yielded} ${MATERIALS[node.material].name}.` });
+              node.taken = true;
+              if(node.kind === 'salvage'){
+                room.salvage = addSalvage(room.salvage, { [node.salvage]: yielded });
+                room.events.push({ t: 'log', text: `Cracked a cache: ${yielded} ${SALVAGE[node.salvage].name}.` });
+              }else if(node.kind === 'pages'){
+                room.pages += yielded;
+                room.events.push({ t: 'log', text: `Found ${yielded} spell page${yielded === 1 ? '' : 's'}.` });
+              }else{
+                room.stash[node.material] = (room.stash[node.material] || 0) + yielded;
+                room.events.push({ t: 'log', text: `Gathered ${yielded} ${MATERIALS[node.material].name}.` });
+              }
             }
           }
         }
@@ -3043,77 +3289,82 @@
       const AIMS_ENEMY = new Set(['strike', 'canker']);
       const AIMS_ALLY = new Set(['cleanse', 'revive', 'might', 'heft', 'graft']);
 
-      function aimsAt(cardId){
-        const card = CARDS[cardId];
-        if(!card) return 'none';
-        const kind = card.effect.kind;
+      function aimsAt(id, spell = null){
+        const source = spell || CARDS[id];
+        if(!source) return 'none';
+        const kind = spell ? spell.effect.kind : source.effect.kind;
         if(AIMS_ENEMY.has(kind)) return 'enemy';
-        if(AIMS_ALLY.has(kind) || card.targetsAlly) return 'ally';
+        if(AIMS_ALLY.has(kind) || source.targetsAlly) return 'ally';
         return 'none';
       }
 
-      /* The hand, the deck and the discard.
+      /* Everything this seat can do, face up.
        *
-       * Counts, not contents: the deck is face down and the discard is a heap,
-       * and showing either as a list would turn a card game into a spreadsheet.
-       * The room deals — everything here is drawn from what it sent.
+       * There was a hand of three here, with a deck and a discard either side
+       * of it drawn as counts — face down, because a deck is face down. None of
+       * that exists any more. A seat's options are a fixed list it can always
+       * read, and what stops it taking one is the pool printed on the option
+       * itself.
+       *
+       * Unaffordable options are greyed rather than hidden, and they say *why*.
+       * "No charges" and "the rack is empty" are different facts, and a player
+       * who can see which one applies can do something about one of them.
        */
       function renderHand(you, acting){
-        const deck = (you && you.deck) || [];
-        const discard = (you && you.discard) || [];
-        const hand = (you && you.hand) || [];
-
-        ui.deckCount.textContent = deck.length;
-        ui.discardCount.textContent = discard.length;
-        ui.deckPile.dataset.empty = String(!deck.length);
-        ui.discardPile.dataset.empty = String(!discard.length);
-
         ui.hand.replaceChildren();
-        if(!hand.length){
+        if(!you || !you.classId) return;
+        if(you.down){
           ui.hand.append(Object.assign(document.createElement('p'), {
             className: 'hand-empty',
-            textContent: you && you.down ? 'You are down. No hand this turn.' : 'No cards drawn.',
+            textContent: 'You are down. Somebody has to get you up.',
           }));
           return;
         }
 
-        const cls = you && classById(you.classId);
-        hand.forEach((cardId, index) => {
-          const card = cardById(cardId);
-          if(!card) return;
-          const points = aimsAt(cardId);
-          // A crafted spell is always castable — the book already paid — and
-          // its numbers are the bench's, not the card table's.
-          const spell = spellForCard(you, cardId);
-          const playable = !!spell || cardPlayable(cardId, {            pages: room.pages || 0,
-            power: room.power || 0,
-            classId: cls ? cls.id : null,
-            // The Hauler pays for damage in health, and a card must never be
-            // the thing that kills you — so the cost is a playability rule,
-            // exactly like a page or a charge.
-            hp: you ? you.hp : Infinity,
-          });
+        const cls = classById(you.classId);
+        const ids = optionIds(you);
+        // What this seat has committed to, or null. The room sends your own
+        // intent in full and everybody else's as the bare fact that they have
+        // one, so this is only ever about you.
+        const own = you.intent;
+        const chosen = own && own.t === 'action' ? own.id : null;
+        const seat = seatState(you);
+
+        for(const id of ids){
+          const spell = spellForCard(you, id);
+          const card = CARDS[id];
+          if(!card && !spell) continue;
+          const points = aimsAt(id, spell);
+          const ready = actionReady(id, seat, spell);
+          const cost = actionCost(id, spell, room.upgrades);
+          const left = actionRemaining(id, seat);
 
           const el = document.createElement('button');
           el.type = 'button';
           el.className = 'pcard';
-          el.dataset.kind = card.kind;
-          el.dataset.playable = String(playable);
-          el.disabled = !acting || !playable;
+          el.dataset.kind = (card || {}).kind || spell.kind || 'attack';
+          el.dataset.playable = String(ready.ok);
+          el.dataset.basic = String(!!(card && card.basic));
+          el.disabled = !acting || !ready.ok;
+          // The option this seat has chosen, marked while the table is still
+          // deciding. A commitment can be changed until the last seat is in,
+          // and a choice you cannot see is a choice you cannot reconsider.
+          if(chosen === id) el.dataset.chosen = 'true';
 
-          if(CARD_ART[card.kind]) el.append(pixels(CARD_ART[card.kind], 3));
+          const art = CARD_ART[(card || {}).kind || spell.kind];
+          if(art) el.append(pixels(art, 3));
 
           const name = document.createElement('b');
           name.className = 'pcard-name';
-          name.textContent = card.name;
+          name.textContent = spell ? spell.name : card.name;
 
-          const effect = spell ? spell.effect : cardEffect(cardId, room.upgrades);
+          const effect = spell ? spell.effect : cardEffect(id, room.upgrades);
 
           const amount = document.createElement('span');
           amount.className = 'pcard-amount';
           // The upgraded number, not the printed one: a coil-wound bolt gun
-          // that still says 9 on the card is a lie the player acts on — and a
-          // crafted Fireball shows what the bench made of it.
+          // that still says 9 is a lie the player acts on — and a crafted
+          // Fireball shows what the bench made of it.
           amount.textContent = effect.amount;
 
           const kind = document.createElement('span');
@@ -3121,35 +3372,29 @@
           kind.textContent = effectLabel(effect.kind)
             + (effect.rounds > 1 ? ` · ${effect.rounds} rounds` : '');
 
-          // Where the card came from, and what it costs. A Fireball with an
-          // empty library still gets dealt — it just says why it is greyed.
-          const source = document.createElement('span');
-          source.className = (!spell && (card.pageCost || card.powerCost || card.hpCost))
-            ? 'pcard-cost' : 'pcard-source';
-          if(spell){
-            source.textContent = 'from the book · once a fight';
-          }else if(card.hpCost){
-            source.textContent = playable
-              ? `${card.hpCost} health · ${you ? you.hp : 0} left`
-              : 'not enough health';
-          }else if(card.pageCost){
-            source.textContent = playable
-              ? `${card.pageCost} page · ${room.pages || 0} left`
-              : 'no pages left';
-          }else if(card.powerCost){
-            source.textContent = playable
-              ? `${card.powerCost} power · ${room.power || 0} left`
-              : 'no power left';
-          }else if(card.fromBuilding){
-            source.textContent = BUILDINGS[card.fromBuilding]
-              ? `from the ${BUILDINGS[card.fromBuilding].name}` : '';
-          }else{
-            source.textContent = card.universal ? 'always' : '';
+          // The price, and what is left to pay it with. This line is the whole
+          // of an economy on one option: the Alchemist reads a count, the
+          // Engineer reads a pool, the Wizard reads a pool that refills, the
+          // Hauler reads his own health.
+          const price = document.createElement('span');
+          price.className = cost ? 'pcard-cost' : 'pcard-source';
+          price.textContent = !cost ? 'always'
+            : cost.pool === 'power' ? `${cost.amount} power · ${room.power || 0} left`
+            : cost.pool === 'charges' ? `${cost.amount} charge${cost.amount === 1 ? '' : 's'} · ${you.charges || 0} left`
+            : cost.pool === 'hp' ? `${cost.amount} health · ${you.hp} left`
+            : cost.pool === 'stock' ? `${left} in the rack`
+            : `${left} left this fight`;
+          if(!ready.ok){
+            price.textContent = ready.why === 'power' ? 'not enough power'
+              : ready.why === 'charges' ? 'not enough charge'
+              : ready.why === 'hp' ? 'not enough health'
+              : ready.why === 'empty' ? 'the rack is empty'
+              : 'none left this fight';
           }
 
           const note = document.createElement('span');
           note.className = 'pcard-note';
-          // Say where it is going, in the same breath as what it is. A card
+          // Say where it is going, in the same breath as what it is. An option
           // that lands on somebody else and does not say so is the bug the ally
           // row exists to fix.
           const at = points === 'enemy' ? (room.enemies.find(x => x.id === aimAt) || {}).name
@@ -3160,25 +3405,53 @@
                 return wcls ? wcls.name.replace(/^The /, '') : who.name;
               })()
             : null;
-          note.textContent = at ? `${card.note}  —  aimed at the ${at}.` : card.note;
+          const text = spell ? spell.note : card.note;
+          note.textContent = at ? `${text}  —  aimed at the ${at}.` : text;
 
-          el.append(name, amount, kind, source, note);
-          // The index, not the id: a hand can hold two of the same card and
-          // the room has to know which one was played.
+          el.append(name, amount, kind, price, note);
           el.onclick = () => send({
             t: 'intent',
             intent: {
-              t: 'play', card: cardId, index,
-              // An ally card unaimed falls back to the caster, which is what
+              t: 'action', id,
+              // An ally option unaimed falls back to the taker, which is what
               // the room does anyway — but sending it explicitly means the
-              // room and the card face agree about who it landed on.
-              target: points === 'ally' ? (aimAlly || (you && you.id) || null)
+              // room and the option's face agree about who it landed on.
+              target: points === 'ally' ? (aimAlly || you.id || null)
                 : points === 'enemy' ? (aimAt || null)
                 : null,
             },
           });
           ui.hand.append(el);
-        });
+        }
+      }
+
+      /* The client's copy of the room's two lookups. Both read the same
+         `content.js` tables the room reads, which is the whole reason that file
+         is pure — the two ends cannot disagree about what an option costs. */
+      function optionIds(you){
+        const cls = classById(you.classId);
+        const ids = actionsFor(you.classId);
+        if(cls && cls.cast){
+          for(const id of (room.spellbook || {}).known || []) if(!ids.includes(id)) ids.push(id);
+        }
+        // The bag, appended for the reason the book is: what this seat can do
+        // is not knowable from its class id. CLASS_ACTIONS.hauler is empty, so
+        // for him this is the entire list above his two basics.
+        if(cls && cls.haul){
+          for(const id of packedCards((you.pack || {}).placed)) if(!ids.includes(id)) ids.push(id);
+        }
+        if(((you.uses || {}).cutting || 0) > 0) ids.push('cutting');
+        return ids;
+      }
+
+      function seatState(you){
+        return {
+          power: room.power || 0,
+          charges: you.charges || 0,
+          hp: you.hp,
+          stock: you.stock || {},
+          uses: you.uses || {},
+        };
       }
 
       function renderCombat(){
@@ -3315,9 +3588,15 @@
         }
 
 
-        // Potions are combat items too — the Alchemist throws them. Same
-        // intent as drinking in the build phase; the room does not care which
-        // phase a heal lands in.
+        /* One button, two jobs, because they are the same job at two moments:
+           before you have chosen, the way to spend a turn on nothing; after you
+           have, the way to un-choose. A round resolves on the last commitment,
+           so up until then anybody who has committed can still change their
+           mind — and a game that lets you do that has to have somewhere to
+           click. */
+        const chose = !!(you && you.intent);
+        ui.combatWait.textContent = chose ? 'Take it back' : 'Do nothing';
+        ui.combatWait.dataset.take = String(chose);
         ui.combatWait.disabled = !acting;
 
         ui.combatLog.replaceChildren();
@@ -3504,16 +3783,18 @@
           name.textContent = cls ? cls.name.replace(/^The /, '') : p.name;
           const sub = document.createElement('span');
           sub.className = 'who-sub';
-          // Your own cards arrive as arrays and everyone else's as counts,
-          // because a hand is secret until the round resolves. Read whichever
-          // the room sent rather than assuming one of them.
-          const owned = p.deck
-            ? p.deck.length + (p.discard || []).length + (p.hand || []).length
-            : (p.deckCount || 0) + (p.discardCount || 0) + (p.handCount || 0);
-          const held = p.hand ? p.hand.length : (p.handCount || 0);
+          // The pools are public now, so this line can say something true
+          // about anybody rather than only about you.
+          // The Hauler's list is his bag, so counting his class actions would
+          // read "2 options" all run however well he packed.
+          const opts = p.classId
+            ? actionsFor(p.classId).length + packedCards((p.pack || {}).placed).length
+            : 0;
+          const wiz = classById(p.classId);
+          const pool = wiz && wiz.cast ? ` · ${p.charges || 0} charge${(p.charges || 0) === 1 ? '' : 's'}` : '';
           sub.textContent = isBuildPhase(room.phase)
-            ? `${p.ready ? 'ready' : 'thinking'} · ${owned} cards`
-            : `${p.intent ? 'committed' : 'thinking'} · ${held} in hand`;
+            ? `${p.ready ? 'ready' : 'thinking'} · ${opts} options`
+            : `${p.intent ? 'committed' : 'thinking'}${pool}`;
           body.append(name, sub);
           el.append(body, healthBar(p));
 
@@ -3524,41 +3805,76 @@
         }
       }
 
-      /* The deck as counts, brewed cards marked. The Alchemist has to see three
-         Sunsalves appear the moment she brews them, or the walk that paid for
-         them did not visibly buy anything. */
-      function renderDeckList(you){
-        // Deck plus discard plus hand. Between fights the three piles are one
-        // deck, and showing only the undrawn part means a card brewed last
-        // round quietly disappears from the list that is meant to prove it.
-        const deck = you ? [...(you.deck || []), ...(you.discard || []), ...(you.hand || [])] : [];
-        ui.buildDeckCount.textContent = deck.length;
-        ui.buildDeckPile.dataset.empty = String(!deck.length);
+      /* What this seat will be able to do when the surge lands, listed in the
+         build phase so the walk that paid for something visibly buys it.
+         Renamed from the deck list along with everything else, and the job is
+         unchanged: three Sunsalves have to show up on the rack the moment she
+         brews them. */
+      function renderActionList(you){
+        ui.actionList.replaceChildren();
+        if(!you || !you.classId){
+          ui.actionsHint.textContent = '';
+          return;
+        }
 
-        const counts = new Map();
-        for(const id of deck) counts.set(id, (counts.get(id) || 0) + 1);
+        const ids = optionIds(you);
+        // The heading says "in the surge", so the counts have to be the ones the
+        // surge will hand out. Per-fight counters are empty between fights —
+        // showing the Grafter three Ringbarks as "x0" while she plans her round
+        // is the panel lying about the thing it exists to promise.
+        const seat = { ...seatState(you),
+          uses: isBuildPhase(room.phase) ? freshUses(you.classId) : (you.uses || {}) };
+        const free = ids.filter(id => !actionCost(id, spellForCard(you, id), room.upgrades)).length;
+        // Say what the list is before listing it. Which pool a seat spends is
+        // the one fact that makes its half of this screen make sense.
+        const cls = classById(you.classId);
+        ui.actionsHint.textContent = cls
+          ? `${ids.length} to choose from, ${free} of them free. ` + (
+              cls.craft ? 'The rack carries between fights: what you brew is yours until you drink it.'
+              : cls.build ? 'Power is made fresh by the panels each surge and does not carry over.'
+              : cls.cast ? 'Charges fill at the start of a fight and come back a little every round.'
+              // Branching on the flag rather than the id, as everything else on
+              // this screen does — a class gets its sentence by declaring what
+              // it can do, never by being named.
+              : cls.haul ? 'Everything here but your two basics is in the bag, and what costs health costs it out of your own — never the last point.'
+              : 'Everything but the two basics runs out for the fight and comes back for the next one.')
+          : '';
 
-        ui.deckList.replaceChildren();
-        for(const [id, n] of counts){
+        for(const id of ids){
           const card = cardById(id);
           if(!card) continue;
           // A crafted spell wears the brewed border and the bench's numbers:
-          // the deck list is where a socketed Twin Core has to show its work.
+          // this list is where a socketed Twin Core has to show its work.
           const spell = spellForCard(you, id);
+          const left = actionRemaining(id, seat);
+          const cost = actionCost(id, spell, room.upgrades);
+
           const el = document.createElement('span');
-          el.className = 'deck-entry';
+          el.className = 'action-entry';
           el.dataset.brewed = String(!!card.brewed || !!spell);
           if(CARD_ART[card.kind]) el.append(pixels(CARD_ART[card.kind], 1));
-          el.append(document.createTextNode(card.name));
+          el.append(document.createTextNode(spell ? spell.name : card.name));
+
+          // One number, and which number depends on the economy: a count for
+          // the things you have so many of, a price for the things you pay for.
           const count = document.createElement('b');
-          count.textContent = `x${n}`;
+          count.textContent = left !== null ? `x${left}`
+            : !cost ? 'free'
+            : cost.pool === 'power' ? `${cost.amount}p`
+            : cost.pool === 'charges' ? `${cost.amount}c`
+            : cost.pool === 'hp' ? `${cost.amount}hp` : '';
           el.append(count);
-          const effect = spell ? spell.effect : card.effect;
-          el.title = `${effectLabel(effect.kind)} ${effect.amount}. ${card.note}`;
-          ui.deckList.append(el);
+
+          // The bag reaches the number, as the workbench does: a Bolt Case in
+          // the pack is on the crossbow's face here and in the room's
+          // resolution, out of the same function.
+          const base = spell ? spell.effect : card.effect;
+          const effect = spell ? base
+            : { ...base, amount: packedAmount(id, base.amount, ((you.pack || {}).placed)) };
+          el.title = `${effectLabel(effect.kind)} ${effect.amount}. ${spell ? spell.note : card.note}`;
+          ui.actionList.append(el);
         }
       }
-
       /* Power and the workbench, and only for the Engineer.
        *
        * Nobody else can spend power or buy an upgrade, and a readout you cannot
@@ -3605,7 +3921,7 @@
           gives.className = 'card-sub';
           gives.style.color = 'var(--accent)';
           gives.textContent = upgrade.adds === 'card'
-            ? 'One more Bolt Gun in the deck'
+            ? 'A cheaper bolt: one less power a shot'
             : `Bolts hit for ${cardEffect('boltgun', { ...room.upgrades, [id]: level + 1 }).amount}`;
 
           const note = document.createElement('span');
@@ -3676,6 +3992,205 @@
           body.append(name, line, note);
           card.append(body);
           ui.garden.append(card);
+        });
+      }
+
+      /* ---- the pack ------------------------------------------------------- */
+
+      /* What the Hauler is holding, if anything: an index into his loose finds,
+         or an index into what is already in the bag, plus the rotation he has
+         turned it to. Local to the client and never sent — the room is told
+         where a thing went, never what is hovering. */
+      let heldPack = null;
+
+      /* Where a piece would go if it were dropped on this cell.
+         The origin is the piece's own top-left, so pointing at a cell means
+         "put the corner here" — which is what a ghost drawn from the cursor
+         reads as, and what packFits is written against. */
+      function packGhost(round, placed, cell){
+        if(!heldPack || !cell) return null;
+        const id = heldPack.from === 'loose'
+          ? (heldPack.id)
+          : (placed[heldPack.index] || {}).id;
+        if(!id) return null;
+        const ignore = heldPack.from === 'bag' ? heldPack.index : -1;
+        const cells = itemCells(id, heldPack.rot).map(([cx, cy]) => [cell.x + cx, cell.y + cy]);
+        return { id, cells, ok: packFits(round, placed, id, cell.x, cell.y, heldPack.rot, ignore) };
+      }
+
+      /* One tap to pick a find up, one to put it down — the same two-tap
+         grammar the garden uses for a cutting, because a canvas-less grid on a
+         phone cannot rely on a drag. Rotation is a third tap on the held item.
+         Everything is checked here for the ghost and again in the room for
+         real: the client draws the refusal, the room *is* the refusal. */
+      function renderPack(you, acting, canHaul){
+        ui.haulerOnly.hidden = !canHaul;
+        if(!canHaul){ heldPack = null; return; }
+
+        const pack = normalisePack(you && you.pack);
+        const round = room.round || 1;
+        const placed = pack.placed;
+        const cells = gridCells(round);
+        const used = packUsed(placed);
+
+        /* Anything picked up out of the bag stays in the bag until it is put
+           down somewhere legal, so a rearrangement that turns out not to work
+           costs nothing. A piece is only ever lost at the surge. */
+        const heldId = !heldPack ? null
+          : heldPack.from === 'loose' ? heldPack.id
+          : (placed[heldPack.index] || {}).id;
+        if(heldPack && !heldId) heldPack = null;   // it moved out from under us
+
+        ui.packHint.textContent = heldId
+          ? `Holding ${PACK_ITEMS[heldId].name} — tap a cell to set it down.`
+          : `${used} of ${cells} cells full. Tap something in the bag to move it.`;
+
+        ui.packControls.hidden = !heldId || !acting;
+        if(heldId){
+          ui.packTurn.hidden = rotationsOf(PACK_ITEMS[heldId].shape) < 2;
+          ui.packTurn.onclick = () => { heldPack = { ...heldPack, rot: (heldPack.rot + 1) % 4 }; render(); };
+          // Only a piece already in the bag can come out of it; a loose find is
+          // out already, and "leave it" is what refuses one of those.
+          ui.packOut.hidden = heldPack.from !== 'bag';
+          ui.packOut.onclick = () => {
+            send({ t: 'intent', intent: { t: 'unpack', index: heldPack.index } });
+            heldPack = null;
+            render();
+          };
+          ui.packCancel.onclick = () => { heldPack = null; render(); };
+        }
+
+        /* What the bag is currently worth, said plainly. It is the only place
+           the passive half of the pack is visible at all — ballast never asks
+           for a turn, so without this line a player would have no way to know
+           a Ballast Plate was doing anything. */
+        const carried = packedStats(placed);
+        const kits = packedCards(placed);
+        const bits = [
+          kits.length ? `${kits.length} option${kits.length === 1 ? '' : 's'} in the fight` : 'No options but your basics',
+          carried.heft ? `+${carried.heft} to every swing` : '',
+          carried.ward ? `${carried.ward} guard from the first blow` : '',
+          carried.regen ? `${carried.regen} mending a round` : '',
+          carried.bolt ? (kits.includes('crossbow')
+            ? `crossbow hits for ${packedAmount('crossbow', CARDS.crossbow.effect.amount, placed)}`
+            : 'bolts, and no crossbow to fire them') : '',
+        ].filter(Boolean);
+        ui.packCarried.textContent = bits.join(' · ');
+
+        /* The grid. Every cell is a button, including the corners that are not
+           bag — they are rendered and disabled rather than omitted, so the
+           five columns stay square and the bag's silhouette is the thing that
+           changes between rounds rather than the layout jumping. */
+        ui.packGrid.replaceChildren();
+        for(let y = 0; y < PACK_H; y++){
+          for(let x = 0; x < PACK_W; x++){
+            const cell = document.createElement('button');
+            cell.type = 'button';
+            cell.className = 'pack-cell';
+            const isBag = gridHas(round, x, y);
+            cell.dataset.bag = isBag ? 'yes' : 'no';
+            if(!isBag){ ui.packGrid.append(cell); continue; }
+
+            const index = packAt(placed, x, y);
+            const here = index >= 0 ? placed[index] : null;
+            if(here){
+              cell.dataset.full = 'yes';
+              if(PACK_ART[here.id]) cell.append(pixels(PACK_ART[here.id], 3));
+              cell.title = PACK_ITEMS[here.id].name;
+              if(heldPack && heldPack.from === 'bag' && heldPack.index === index) cell.dataset.held = 'yes';
+            }
+            cell.disabled = !acting;
+
+            // The ghost: what would happen if this were the drop. Drawn from
+            // the same packFits the room will answer with, so a cell that
+            // lights green is a cell the room accepts.
+            const ghost = packGhost(round, placed, { x, y });
+            if(ghost) cell.dataset.fits = ghost.ok ? 'yes' : 'no';
+
+            cell.onclick = () => {
+              if(heldPack){
+                // Putting it down. The room refuses an illegal drop, so a bad
+                // click costs nothing — but the ghost has already said so.
+                const intent = heldPack.from === 'loose'
+                  ? { t: 'pack', index: heldPack.index, x, y, rot: heldPack.rot }
+                  : { t: 'shift', index: heldPack.index, x, y, rot: heldPack.rot };
+                send({ t: 'intent', intent });
+                heldPack = null;
+                audio.sfx('build');
+              }else if(here){
+                // Picked up where it stands. It does not leave the bag until
+                // it is put somewhere else or taken out, so a rearrangement
+                // that turns out not to work has cost nothing.
+                heldPack = { from: 'bag', index, id: here.id, rot: here.rot || 0 };
+              }
+              render();
+            };
+            ui.packGrid.append(cell);
+          }
+        }
+
+        /* The three finds. They are cards rather than chips because each one
+           has to say what it would do and what it would cost in room, and a
+           chip has space for neither. */
+        ui.packLooseHint.textContent = pack.loose.length
+          ? 'What fits is yours. What is still loose when the surge starts is left where it lies.'
+          : 'Nothing loose. The bag is as packed as it is going to get.';
+
+        ui.packLoose.replaceChildren();
+        pack.loose.forEach((id, index) => {
+          const item = PACK_ITEMS[id];
+          if(!item) return;
+          const holding = heldPack && heldPack.from === 'loose' && heldPack.index === index;
+
+          const card = document.createElement('button');
+          card.type = 'button';
+          card.className = 'card';
+          card.disabled = !acting;
+          card.setAttribute('aria-pressed', String(!!holding));
+          if(PACK_ART[id]) card.append(pixels(PACK_ART[id], 3));
+
+          const body = document.createElement('span');
+          body.className = 'card-body';
+          const name = document.createElement('b');
+          name.className = 'card-name';
+          name.textContent = item.name;
+
+          const sub = document.createElement('span');
+          sub.className = 'card-sub';
+          sub.textContent = `${item.cells} cell${item.cells === 1 ? '' : 's'}`;
+
+          // What it buys, in the accent, above the flavour — the same order
+          // the buildings and the recipes put it in.
+          const gives = document.createElement('span');
+          gives.className = 'card-sub';
+          gives.style.color = 'var(--accent)';
+          if(item.kind === 'kit'){
+            const card_ = CARDS[item.card];
+            const cost = actionCost(item.card);
+            gives.textContent = [
+              `${effectLabel(card_.effect.kind)} ${card_.effect.amount}`,
+              cost && cost.pool === 'hp' ? `${cost.amount} health a use` : 'free, every round',
+            ].filter(Boolean).join(' · ');
+          }else{
+            gives.textContent = Object.entries(item.gives).map(([key, n]) => ({
+              heft: `+${n} to every swing, all fight`,
+              ward: `${n} guard before the first blow`,
+              regen: `${n} mending a round`,
+              bolt: `+${n} on the Winch Crossbow`,
+            })[key] || `+${n} ${key}`).join(' · ');
+          }
+
+          const note = document.createElement('span');
+          note.className = 'card-blurb';
+          note.textContent = holding ? 'Tap a cell in the bag to set it down.' : item.note;
+
+          body.append(name, sub, gives, note);
+          card.append(body);
+          card.onclick = () => {
+            heldPack = holding ? null : { from: 'loose', index, id, rot: 0 };
+            render();
+          };
+          ui.packLoose.append(card);
         });
       }
 
@@ -3983,7 +4498,7 @@
 
         schedule();
         renderRoster(ui.roster);
-        renderDeckList(you);
+        renderActionList(you);
 
         // The room decides when the phase turns; the count of who it is still
         // waiting for is in the canvas header, so this is only the commit.
@@ -4013,6 +4528,7 @@
           ui.stash.append(chip);
         }
         renderGarden(you, acting, !!cls?.craft);
+        renderPack(you, acting, !!cls?.haul);
 
         renderWizard(you, acting, !!cls?.cast);
 
@@ -4113,7 +4629,7 @@
             sub.textContent = Object.entries(recipe.costs)
               .map(([m, n]) => `${n} ${MATERIALS[m].name}`).join(' + ');
 
-            // What it puts in the deck is the reason to do it, so it goes
+            // What it does to the gun is the reason to do it, so it goes
             // above the flavour rather than under it.
             const made = cardById(recipe.card || id);
             const gives = document.createElement('span');
@@ -4272,7 +4788,10 @@
       ui.ready.addEventListener('click', () => { const you = me(); send({ t: 'ready', ready: !(you && you.ready) }); });
       ui.hold.addEventListener('click', () => { const you = me(); send({ t: 'ready', ready: !(you && you.ready) }); });
       ui.start.addEventListener('click', () => send({ t: 'start' }));
-      ui.combatWait.addEventListener('click', () => send({ t: 'intent', intent: { t: 'wait' } }));
+      ui.combatWait.addEventListener('click', () => send({
+        t: 'intent',
+        intent: { t: ui.combatWait.dataset.take === 'true' ? 'take' : 'wait' },
+      }));
       ui.leave.addEventListener('click', () => leave());
       ui.overAgain.addEventListener('click', () => send({ t: 'restart' }));
       ui.overLeave.addEventListener('click', () => leave());

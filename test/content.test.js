@@ -7,12 +7,14 @@ import {
 } from '../public/good-vibes/art.js';
 import {
   PARTY_SIZE, CLASSES, OPEN_ROLES, MATERIALS, RECIPES,
+  CLASS_BASICS, CLASS_ACTIONS, actionsFor, actionCost, actionReady, actionRemaining,
+  freshStock, freshUses, CHARGE_CAP, CHARGE_REGEN,
   ROUNDS, ROUNDS_BEFORE_BOSS, BOSS_ROUND, roundInfo, phaseCard,
   ENEMIES, waveFor, SPAWNS, CACHE_YIELD, PAGES, spawnItems,
   classById, playableClasses, missingFor, materialFor,
   MAP_W, MAP_H, TERRAIN, HERB_COUNT, PHASES, isBuildPhase, readyState,
   seededRandom, seedFromCode, generateTerrain, spawnHerbs, generateMap,
-  spawnTile, tileAt, inBounds, BASE_ROOM, largestBuildableArea,
+  spawnTile, tileAt, inBounds, BASE_ROOM, largestBuildableArea, isWater, shoreline,
   SALVAGE, salvageFor, BUILDINGS, STARTING_SALVAGE, COMBAT_ACTIONS,
   BASE_ACTIONS, EFFECT_KINDS, missingForBuilding, canAfford,
   affordableBuildings, canBuildAt, salvageAfterCombat, addSalvage, spendSalvage,
@@ -204,8 +206,12 @@ test('the wizard economy is wired end to end', () => {
     'squishy means the lowest hp in the roster');
   const fireball = CARDS.fireball;
   assert.equal(fireball.classId, 'wizard', 'fireball must belong to the wizard');
-  assert.ok(STARTING_DECKS.wizard.fireball > 0, 'the wizard should open holding fireballs');
-  assert.ok(fireball.pageCost >= 1, 'a free fireball makes pages pointless');
+  assert.ok(actionsFor('wizard').includes('fireball'), 'the wizard should always have one to hand');
+  // Two pools doing two different jobs, which is the shape of her whole class:
+  // pages are the run's currency and buy what she *can* cast at the bench;
+  // charges are the fight's and decide when she gets to cast it.
+  assert.ok(fireball.chargeCost >= 1, 'a free fireball makes charges pointless');
+  assert.ok(!fireball.pageCost, 'and a page is not what a cast costs any more');
   assert.equal(fireball.effect.kind, 'strike');
   assert.ok(SPAWNS.pages > 0, 'no pages ever spawn');
   assert.ok(CACHE_YIELD.pages > 0);
@@ -373,31 +379,52 @@ test('the deck the book deals is the kit plus the charges', () => {
     'an Echo Script is another copy in the deal');
 });
 
-test('every class opens with the same six basics wearing different names', () => {
+/* This test used to *enforce* the thing the action rewrite deleted: every class
+ * opened with six cards that were `strike 3` and `ward 3` under five sets of
+ * names, and the old assertion checked they all still said 3. That was 60-70%
+ * of every deck and most of every turn in the game.
+ *
+ * Inverted, it now pins the opposite: two free basics per seat, one swing and
+ * one guard, and the numbers on them are *not* all the same. If somebody ever
+ * flattens them again this is what says so.
+ */
+test('every class has its own two basics, and they are not the same two numbers', () => {
+  const swings = new Set();
+  const guards = new Set();
+
   for (const cls of playableClasses()) {
-    // The *basics*, not the whole kit: two seats also open with cards of their
-    // own, because they have no build phase to earn any in — see CLASS_EXTRAS.
-    // What this pins is that the six under everybody are the same six.
-    const kit = [];
-    for (const [id, n] of Object.entries(CLASS_KITS[cls.id] || {})) {
-      for (let i = 0; i < n; i++) kit.push(id);
-    }
-    assert.equal(kit.length, 6, `${cls.id}: three attacks and three wards, nothing else`);
-    const attacks = kit.filter((id) => CARDS[id].kind === 'attack');
-    const defends = kit.filter((id) => CARDS[id].kind === 'defend');
-    assert.equal(attacks.length, 3, `${cls.id}: three basic attacks`);
-    assert.equal(defends.length, 3, `${cls.id}: three basic wards`);
-    for (const id of kit) {
+    const basics = CLASS_BASICS[cls.id] || [];
+    assert.equal(basics.length, 2, `${cls.id}: one swing and one guard, nothing else`);
+
+    const [swing, ward] = basics.map((id) => CARDS[id]);
+    assert.equal(swing.kind, 'attack', `${cls.id}: the first basic is the swing`);
+    assert.equal(ward.kind, 'defend', `${cls.id}: the second is the guard`);
+
+    for (const id of basics) {
       assert.equal(CARDS[id].classId, cls.id, `${cls.id}: "${id}" wears the class's name`);
-      assert.equal(CARDS[id].effect.amount, 3,
-        `${cls.id}: "${id}" — the basics are identical under the rename, all at 3`);
+      assert.ok(CARDS[id].basic, `${cls.id}: "${id}" must be marked as a basic`);
+      assert.equal(actionCost(id), null, `${cls.id}: "${id}" is free or it is not a basic`);
     }
-    // The rename is real: no two classes share a basic card id.
+
+    swings.add(swing.effect.amount);
+    guards.add(ward.effect.amount);
+
+    // The rename is real: no two classes share a basic id.
     for (const other of playableClasses()) {
       if (other.id === cls.id) continue;
-      for (const id of kit) assert.ok(!Object.keys(CLASS_KITS[other.id] || {}).includes(id));
+      for (const id of basics) assert.ok(!(CLASS_BASICS[other.id] || []).includes(id));
     }
   }
+
+  assert.ok(swings.size > 1, 'every seat swinging for the same number is the bug this replaced');
+  assert.ok(guards.size > 1, 'and every seat guarding for the same number is the other half of it');
+
+  // The Wizard is the roster's glass floor, and it is stated in her basics as
+  // well as her health: the best swing in the game and the worst guard in it.
+  const wizardSwing = CARDS[CLASS_BASICS.wizard[0]].effect.amount;
+  const wizardGuard = CARDS[CLASS_BASICS.wizard[1]].effect.amount;
+  assert.equal(wizardSwing, Math.max(...swings), 'the Wizard hits hardest for free');
+  assert.equal(wizardGuard, Math.min(...guards), 'and hides worst');
 });
 
 test('an invested Fireball out-hits an invested Bolt Gun', () => {
@@ -693,6 +720,116 @@ test('the tent and the fire are solid, the clearing is not', () => {
     assert.ok(walkableAt(terrain, [], CAMP_X + dx, CAMP_Y + dy),
       `the clearing at (${dx},${dy}) from the fire is not walkable`);
   }
+});
+
+/* The shore is eight pictures of one thing, so what these check is that the
+ * picture never disagrees with the ground it is drawn on: a shore is water in
+ * every rule, and it points at land that is actually there.
+ */
+test('every shore is as impassable as the water it is made of', () => {
+  for (const dir of ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']) {
+    const kind = 'shore' + dir;
+    for (const rule of ['walk', 'build', 'grows']) {
+      assert.equal(TERRAIN[kind][rule], TERRAIN.water[rule], `${kind} does not ${rule} like water`);
+    }
+    assert.ok(isWater(kind), `isWater does not recognise ${kind}`);
+  }
+  assert.ok(isWater('water'), 'isWater does not recognise water');
+  assert.equal(isWater('grass'), false, 'isWater thinks grass is wet');
+  assert.equal(isWater(null), false, 'isWater chokes on an off-map tile');
+});
+
+test('a shore points the way the land actually is', () => {
+  // Not that the named tile is land — it need not be. Land at both upper
+  // corners and water in the notch between them is a north shore, and
+  // correctly: the bank runs along the top of the tile either side of a gap
+  // one tile wide. What has to hold is weaker and more useful — a shore has a
+  // bank at all, and the way it points is the way the bank is.
+  const OFFSET = { N: [0, -1], NE: [1, -1], E: [1, 0], SE: [1, 1],
+                   S: [0, 1], SW: [-1, 1], W: [-1, 0], NW: [-1, -1] };
+
+  for (let seed = 1; seed <= 120; seed++) {
+    const terrain = generateTerrain(seededRandom(seed));
+    for (let y = 0; y < MAP_H; y++) {
+      for (let x = 0; x < MAP_W; x++) {
+        const kind = tileAt(terrain, x, y);
+        if (kind === 'water' || !isWater(kind)) continue;
+        const where = `seed ${seed} at (${x},${y})`;
+
+        let sx = 0, sy = 0, banks = 0;
+        for (const [dx, dy] of Object.values(OFFSET)) {
+          const other = tileAt(terrain, x + dx, y + dy);
+          if (!other || isWater(other)) continue;
+          banks += 1;
+          sx += dx;
+          sy += dy;
+        }
+        assert.ok(banks > 0, `${where} is a ${kind} in the middle of open water`);
+
+        const [nx, ny] = OFFSET[kind.slice(5)];
+        assert.ok(nx * sx + ny * sy > 0, `${where} is a ${kind} pointing away from its bank`);
+      }
+    }
+  }
+});
+
+test('open water is only left where the banks cancel out', () => {
+  // A tile of water pulled at from opposite sides has no direction to shallow
+  // in, and that is the only excuse for leaving one looking deep against a
+  // bank. Anything else is a coastline the generator forgot to draw.
+  const AROUND = [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1]];
+
+  for (let seed = 1; seed <= 120; seed++) {
+    const terrain = generateTerrain(seededRandom(seed));
+    for (let y = 0; y < MAP_H; y++) {
+      for (let x = 0; x < MAP_W; x++) {
+        if (tileAt(terrain, x, y) !== 'water') continue;
+        let sx = 0, sy = 0;
+        for (const [dx, dy] of AROUND) {
+          const other = tileAt(terrain, x + dx, y + dy);
+          if (!other || isWater(other)) continue;
+          const pull = dx && dy ? 1 : 2;
+          sx += dx * pull;
+          sy += dy * pull;
+        }
+        assert.ok(!sx && !sy, `seed ${seed} left open water at (${x},${y}) with a bank on one side`);
+      }
+    }
+  }
+});
+
+test('the shore reads the eight directions, and a dead heat as none', () => {
+  // Straight from the table rather than from a rolled map, because the cases
+  // that matter — a corner, a channel — are the ones a hundred seeds might
+  // never happen to produce.
+  const lay = (marks) => {
+    const cells = new Array(MAP_W * MAP_H).fill('water');
+    for (const [x, y, kind] of marks) cells[y * MAP_W + x] = kind;
+    return cells;
+  };
+  const kindAt = (marks, x, y) => shoreline(lay(marks))[y * MAP_W + x];
+
+  for (const [dx, dy, dir] of [[0, -1, 'N'], [1, -1, 'NE'], [1, 0, 'E'], [1, 1, 'SE'],
+                               [0, 1, 'S'], [-1, 1, 'SW'], [-1, 0, 'W'], [-1, -1, 'NW']]) {
+    assert.equal(kindAt([[5 + dx, 5 + dy, 'grass']], 5, 5), 'shore' + dir,
+      `land at (${dx},${dy}) did not read as ${dir}`);
+  }
+
+  // A coast running east that turns north: land along the top and the right,
+  // which is the common way a corner tile happens and has to read as one.
+  assert.equal(kindAt([[5, 4, 'grass'], [6, 4, 'grass'], [6, 5, 'grass']], 5, 5), 'shoreNE',
+    'a coast turning north did not read as a corner');
+
+  // An orthogonal bank outvotes a diagonal one: you could touch it.
+  assert.equal(kindAt([[5, 4, 'grass'], [6, 4, 'grass']], 5, 5), 'shoreN',
+    'a bank past a corner outvoted the one against the tile');
+
+  // A channel one tile wide has a bank both ways and no way to shallow.
+  assert.equal(kindAt([[4, 5, 'grass'], [6, 5, 'grass']], 5, 5), 'water',
+    'a channel picked a side');
+
+  // Off the map is not land: a pond at the edge has no bank there to draw.
+  assert.equal(kindAt([], 0, 0), 'water', 'the edge of the map read as a shore');
 });
 
 test('the camp clears its own ground, whatever the ruin rolled', () => {
@@ -1078,14 +1215,28 @@ test('everybody can swing something, and Strike is the floor of what they swing'
   }
 });
 
-test('a card that costs pages is dealt but not playable without them', () => {
-  // The interesting kind of bad draw: one the player caused by spending.
-  assert.equal(cardPlayable('fireball', { pages: 0, classId: 'wizard' }), false);
-  assert.equal(cardPlayable('fireball', { pages: 1, classId: 'wizard' }), true);
-  assert.equal(cardPlayable('spark', { pages: 0, classId: 'wizard' }), true);
-  assert.equal(cardPlayable('not-a-card', { pages: 9 }), false);
-  // Nothing stops a free card, whoever is holding it.
-  assert.equal(cardPlayable('hold', {}), true);
+test('an action says which pool it spends, and greys itself when the pool is dry', () => {
+  // Every economy, checked through the one function the room and the client
+  // both call. A price nobody can read off the face of an option is a price
+  // the player cannot plan against.
+  assert.equal(actionCost('spark'), null, 'a basic is free');
+  assert.deepEqual(actionCost('fireball'), { pool: 'charges', amount: CARDS.fireball.chargeCost });
+  assert.deepEqual(actionCost('boltgun'), { pool: 'power', amount: CARDS.boltgun.powerCost });
+  assert.deepEqual(actionCost('legup'), { pool: 'hp', amount: CARDS.legup.hpCost });
+  assert.deepEqual(actionCost('tonic'), { pool: 'stock', amount: 1 });
+  assert.deepEqual(actionCost('ringbark'), { pool: 'uses', amount: 1 });
+
+  assert.equal(actionReady('spark', {}).ok, true, 'a basic is always takeable');
+  assert.equal(actionReady('fireball', { charges: 0 }).why, 'charges');
+  assert.equal(actionReady('fireball', { charges: 9 }).ok, true);
+  assert.equal(actionReady('boltgun', { power: 0 }).why, 'power');
+  assert.equal(actionReady('tonic', { stock: { tonic: 0 } }).why, 'empty');
+  assert.equal(actionReady('ringbark', { uses: { ringbark: 0 } }).why, 'spent');
+
+  // An action must never be the thing that kills you: the last point is never
+  // spendable, whatever the price says.
+  assert.equal(actionReady('legup', { hp: CARDS.legup.hpCost }).why, 'hp');
+  assert.equal(actionReady('legup', { hp: CARDS.legup.hpCost + 1 }).ok, true);
 });
 
 test('the combat lane is shorter than the site, and still a lane', () => {
@@ -1306,22 +1457,33 @@ test('power is what the panels make, and nothing else makes it', () => {
   assert.equal(powerFrom([{ id: 'not-a-building' }]), 0);
 });
 
-test('the bolt gun costs power, is not consumed, and only the engineer holds it', () => {
+test('the bolt gun is the engineer\'s, and the panels are what load it', () => {
   const bolt = CARDS.boltgun;
   assert.equal(bolt.classId, 'engineer');
-  assert.equal(bolt.powerCost, 1);
-  assert.ok(!bolt.consumed, 'the gun is a gun, not a potion — it must cycle back');
+  assert.ok(bolt.powerCost >= 1, 'a free bolt gun makes the panel pointless');
+  assert.ok(!bolt.consumed, 'the gun is a gun, not a potion');
   assert.ok(bolt.effect.amount > CARDS.wrench.effect.amount, 'the bolt gun should out-hit the basic');
-  assert.ok(STARTING_DECKS.engineer.boltgun >= 1, 'the engineer must open holding one');
 
-  assert.equal(cardPlayable('boltgun', { power: 0, classId: 'engineer' }), false, 'fired with no power');
-  assert.equal(cardPlayable('boltgun', { power: 1, classId: 'engineer' }), true);
-  assert.equal(cardPlayable('boltgun', { power: 9, classId: 'wizard' }), false, 'the wizard picked up the gun');
+  // He always has it — raising a panel used to push a card into his deck and
+  // hope he drew it. What a panel buys now is the power to fire the thing he
+  // was already holding, which is the build phase reaching the fight directly.
+  assert.ok(actionsFor('engineer').includes('boltgun'), 'the engineer always has the gun');
+  assert.equal(actionsFor('wizard').includes('boltgun'), false, 'and nobody else ever does');
+
+  assert.equal(actionReady('boltgun', { power: 0 }).ok, false, 'fired with no power');
+  assert.equal(actionReady('boltgun', { power: bolt.powerCost }).ok, true);
+
+  // Everything he owns drains the same pool at a different rate, which is the
+  // whole of his economy.
+  const rates = new Set(actionsFor('engineer')
+    .map((id) => (actionCost(id) || {}).amount)
+    .filter((n) => n !== undefined));
+  assert.ok(rates.size > 1, 'a pool everything costs the same out of is not a budget');
 });
 
 test('upgrades cost more each time and do what they say', () => {
   for (const [id, upgrade] of Object.entries(UPGRADES)) {
-    assert.ok(['card', 'damage'].includes(upgrade.adds), `upgrade "${id}" adds "${upgrade.adds}"`);
+    assert.ok(['shots', 'damage'].includes(upgrade.adds), `upgrade "${id}" adds "${upgrade.adds}"`);
     for (const resource of Object.keys(upgrade.costs)) {
       assert.ok(SALVAGE[resource], `upgrade "${id}" costs "${resource}", which is not salvage`);
     }
@@ -1336,7 +1498,13 @@ test('upgrades cost more each time and do what they say', () => {
 test('buying an upgrade spends the salvage, or does nothing at all', () => {
   const salvage = { screw: 9, pipe: 9, plating: 9, coil: 9 };
   const bought = buyUpgrade('barrel', 0, salvage);
-  assert.equal(bought.adds, 'card');
+  assert.equal(bought.adds, 'shots');
+  // The barrel used to put another Bolt Gun in the deck. There is no deck, so
+  // what another barrel buys is a cheaper shot out of the same charge.
+  assert.equal(actionCost('boltgun', null, { barrel: 0 }).amount, CARDS.boltgun.powerCost);
+  assert.equal(actionCost('boltgun', null, { barrel: 1 }).amount, CARDS.boltgun.powerCost - 1);
+  assert.equal(actionCost('boltgun', null, { barrel: 9 }).amount, 1,
+    'a bolt is never free, or the panel it draws on is pointless');
   assert.equal(bought.level, 1);
   assert.equal(bought.salvage.screw, 9 - UPGRADES.barrel.costs.screw);
   assert.deepEqual(salvage, { screw: 9, pipe: 9, plating: 9, coil: 9 }, 'it wrote to the pool it was given');
@@ -1467,7 +1635,7 @@ const PUBLISHED = [
   'PARTY_SIZE', 'MATERIALS', 'RECIPES', 'SALVAGE', 'PAGES', 'CLASSES', 'OPEN_ROLES',
   'BUILDINGS', 'UPGRADES', 'CARDS', 'COMBAT_ACTIONS', 'ENEMIES', 'ROUNDS', 'LEVELS',
   'TERRAIN', 'PHASES', 'EFFECT_KINDS', 'BASE_ACTIONS', 'UNIVERSAL_CARDS',
-  'STARTING_SALVAGE', 'STARTING_DECKS', 'SPAWNS', 'CACHE_YIELD',
+  'STARTING_SALVAGE', 'STARTING_DECKS', 'SPAWNS', 'CACHE_YIELD', 'NODE_REFUSAL',
   // numbers
   'MAP_W', 'MAP_H', 'COMBAT_H', 'BASE_ROOM', 'HERB_COUNT', 'HAND_SIZE',
   'ROUNDS_BEFORE_BOSS', 'BOSS_ROUND',
@@ -1478,7 +1646,7 @@ const PUBLISHED = [
   'powerFrom', 'upgradeCost', 'buyUpgrade', 'brew', 'combatOptions',
   'deckFor', 'buildDeck', 'shuffle', 'draw', 'discardHand',
   'roundInfo', 'phaseCard', 'waveFor', 'readyState', 'isBuildPhase',
-  'salvageAfterCombat', 'addSalvage', 'spendSalvage',
+  'salvageAfterCombat', 'addSalvage', 'spendSalvage', 'nodeYield',
   // the map
   'generateTerrain', 'generateMap', 'generateCombatTerrain', 'spawnItems',
   'spawnHerbs', 'respawnItems', 'spawnTile', 'tileAt', 'tileIndex', 'inBounds',
@@ -1495,6 +1663,33 @@ const PUBLISHED = [
   'POT_COUNT', 'potYield', 'potStage', 'plantPot', 'harvestPot', 'growPots',
   // the kits
   'CLASS_KITS', 'classKit', 'WIZARD_BASE_KIT',
+  // the wave's intents. `waveTargets` and `ailmentOnHit` were the two names
+  // this section replaced, and neither ever reached this list — they were
+  // combat internals written long after it, imported by `rooms.js` and the
+  // client and nowhere else. Everything below is on it from the first day, so
+  // the next person removing one has to decline the same bet.
+  'ENEMY_INTENTS', 'ENEMY_INTENT_KINDS', 'CHARGE_MULTIPLIER', 'BOLSTER_STEP',
+  'BLIGHT_SHARE', 'BOSS_SCALING', 'HP_PER_PLAYER', 'WAVE_CAP',
+  'enemyStats', 'enemyAbility',
+  'intentOf', 'intentKindOf', 'enemyDamage', 'blightDamage', 'blightOf',
+  // the action surface that replaced the deck. Everything the deck machinery
+  // above exported is still exported and now shims — a Worker that imports
+  // `draw` or `HAND_SIZE` still gets one, it just has nothing left to draw.
+  'CLASS_BASICS', 'CLASS_ACTIONS', 'CHARGE_CAP', 'CHARGE_REGEN',
+  'actionsFor', 'actionCost', 'actionReady', 'actionRemaining',
+  'freshStock', 'freshUses', 'isBasic',
+  // The Hauler's pack. Declared in pack.js and re-exported by content.js —
+  // which is exactly why they belong on this list rather than only in
+  // test/pack.test.js. What the Worker imports is this module's namespace, and
+  // a re-export quietly dropped from it is the same throw at the top of the
+  // deployed Worker as a local export deleted.
+  'PACK_W', 'PACK_H', 'PACK_GRIDS', 'PACK_SHAPES', 'PACK_ITEMS', 'PACK_KINDS',
+  'gridFor', 'gridHas', 'gridCells',
+  'packItem', 'packCard', 'packAt', 'packFilled', 'packUsed',
+  'packFits', 'packPlace', 'packMove', 'packRemove', 'packSpill',
+  'packedCards', 'packedStats', 'packedAmount',
+  'rotateCells', 'shapeCells', 'itemCells', 'rotationsOf',
+  'rollPackItems', 'freshPack', 'normalisePack',
 ];
 
 test('every name this module has ever published is still exported', async () => {
