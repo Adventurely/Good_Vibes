@@ -26,7 +26,7 @@ import {
   HP_PER_PLAYER, WAVE_CAP,
   actionsFor, actionCost, actionReady, actionRemaining, freshStock, freshUses,
   CHARGE_CAP, CHARGE_REGEN, CLASS_BASICS, CLASS_ACTIONS,
-  CACHE_YIELD, nodeYield,
+  CACHE_YIELD, nodeYield, DRAW, ABILITIES, PAGES_PER_ROUND, canBuildAt,
   PACK_ITEMS, PACK_W, PACK_H, packPlace, packedCards, packedStats,
   normalisePack, gridCells,
 } from '../public/good-vibes/content.js';
@@ -177,7 +177,7 @@ test('every strike action resolves the way the basic swing does', () => {
     // table — Fireball is a crafted spell in her hands and a legacy card in
     // the deployed room's.
     const spell = room.spellFor(player, id);
-    const amount = spell ? spell.amount : cardEffect(id, room.upgrades).amount;
+    const amount = spell ? spell.amount : cardEffect(id, room.works).amount;
     assert.equal(target.hp, Math.max(0, before - amount),
       `"${id}" announced one thing and did another`);
 
@@ -353,7 +353,7 @@ test('the party cards land on the party, not on the player who spent them', () =
   room.power = 5;
 
   room.handle(seats[0], { t: 'intent', intent: { t: 'action', id: 'vapours' } });
-  room.handle(seats[1], { t: 'intent', intent: { t: 'action', id: 'bulwark' } });
+  room.handle(seats[1], { t: 'intent', intent: { t: 'action', id: 'shore' } });
   room.handle(seats[2], { t: 'intent', intent: { t: 'action', id: 'rune', target: seats[1].id } });
 
   for(const p of seats){
@@ -377,30 +377,371 @@ test('a cleanse takes the ailments off and leaves the boons on', () => {
   assert.ok(hasEffect(player.effects, 'might'), 'and leave what the party put there');
 });
 
-test('jumper cables pick an ally up, and are not a dead card alone', () => {
-  const room = roomFor(`revive-${++codes}`);
-  const seats = ['engineer', 'alchemist'].map((classId, i) => {
-    const player = room.join(`revive-token-${codes}-${i}`, fakeSocket());
+/* ---- the works: what the Engineer left running -------------------------- */
+
+/* A room in a fight with a given base standing behind it.
+ *
+ * The buildings are written straight in rather than placed, because where they
+ * may stand is `placeRefusal`'s question and it has its own tests in
+ * content.test.js — these are about what a standing base *pays*. Laid out in a
+ * row from x=0, which matters only for panels: two of them touching is four
+ * power and is exactly the thing worth being deliberate about.
+ */
+function works(buildings = [], abilities = [], second = null){
+  const room = roomFor(`works-${++codes}`);
+  const socket = fakeSocket();
+  const player = room.join(`works-token-${codes}`, socket);
+  room.handle(player, { t: 'class', classId: 'engineer' });
+
+  // Seated before the run starts, because `join` is a lobby door — a seat
+  // cannot be taken half way through a fight.
+  let ally = null;
+  if(second){
+    ally = room.join(`works-ally-${codes}`, fakeSocket());
+    room.handle(ally, { t: 'class', classId: second });
+  }
+
+  room.handle(player, { t: 'start' });
+  room.buildings = buildings.map((id, i) => ({ id, x: i, y: 0 }));
+  room.abilities = abilities;
+  for(const p of [player, ally].filter(Boolean)) room.handle(p, { t: 'ready', ready: true });
+  assert.equal(room.phase, PHASES.combat);
+  room.power = 9;
+  socket.sent.length = 0;
+  return { room, player, ally, socket };
+}
+
+test('the lines pay out at the top of a round, and cost nobody a turn', () => {
+  /* The whole of the seat in one assertion: the player spends their turn on a
+   * plain guard, and the wave still takes damage — because the heliostat has
+   * been standing since the build phase and does not wait to be asked. Nothing
+   * else in this game contributes on a turn somebody else is using. */
+  const { room, player } = works(['heliostat']);
+  mute(room);
+  const enemy = room.enemies[0];
+  const before = enemy.hp;
+
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: guard(player) } });
+
+  assert.equal(before - enemy.hp, room.works.burn,
+    'the mirrors fired while he was doing something else');
+});
+
+test('a line pays more for every tier standing on it', () => {
+  const one = works(['heliostat']);
+  mute(one.room);
+  const first = one.room.enemies[0].hp;
+  one.room.handle(one.player, { t: 'intent', intent: { t: 'action', id: guard(one.player) } });
+  const bare = first - one.room.enemies[0].hp;
+
+  const three = works(['heliostat', 'mirrorfield', 'furnace']);
+  mute(three.room);
+  const start = three.room.enemies[0].hp;
+  three.room.handle(three.player, { t: 'intent', intent: { t: 'action', id: guard(three.player) } });
+  const grown = start - three.room.enemies[0].hp;
+
+  assert.equal(bare, 1);
+  assert.equal(grown, 3, 'three mirrors, three times the afternoon');
+  assert.ok(grown > bare);
+});
+
+test('the windbreak guards the party before the wave lands', () => {
+  // Ward is paid at the head of the round and block is cleared at the foot of
+  // it, so the only place the guard is visible is in what the wave failed to
+  // take. Which is the right place to test it.
+  const bare = works([]);
+  bare.room.enemies.forEach(e => { e.hits = 1; e.might = 0; e.charged = false; });
+  const bareHp = bare.player.hp;
+  bare.room.handle(bare.player, { t: 'intent', intent: { t: 'action', id: swing(bare.player) } });
+  const tookBare = bareHp - bare.player.hp;
+  assert.ok(tookBare > 0, 'the wave has to actually swing for this to mean anything');
+
+  const walled = works(['trellis', 'livingwall', 'hedgerow']);
+  walled.room.enemies.forEach(e => { e.hits = 1; e.might = 0; e.charged = false; });
+  const walledHp = walled.player.hp;
+  walled.room.handle(walled.player, { t: 'intent', intent: { t: 'action', id: swing(walled.player) } });
+
+  assert.ok(walledHp - walled.player.hp < tookBare,
+    'three tiers of windbreak should eat some of the blow');
+});
+
+test('the carillon is in the swing on the round it sounds', () => {
+  const bare = works([]);
+  mute(bare.room);
+  const bareStart = bare.room.enemies[0].hp;
+  bare.room.handle(bare.player, { t: 'intent', intent: { t: 'action', id: swing(bare.player) } });
+  const plain = bareStart - bare.room.enemies[0].hp;
+
+  const rung = works(['carillon', 'tubes']);
+  mute(rung.room);
+  const rungStart = rung.room.enemies[0].hp;
+  rung.room.handle(rung.player, { t: 'intent', intent: { t: 'action', id: swing(rung.player) } });
+
+  assert.equal(rungStart - rung.room.enemies[0].hp, plain + rung.room.works.might,
+    'might is paid before anybody acts, so it is in this round’s swing');
+});
+
+test('the base keeps working while the Engineer is face down', () => {
+  /* A machine does not care that its operator is unconscious, and a base that
+   * stopped the moment its builder went down would be a pet rather than
+   * infrastructure. It is also the only way this seat contributes on a round
+   * it cannot act in — which no other class can do at all. */
+  const { room, player, ally } = works(['heliostat'], [], 'alchemist');
+  mute(room);
+  assert.ok(ally, 'this one needs somebody left standing to end the round');
+
+  player.down = true;
+  player.hp = 0;
+  const before = room.enemies[0].hp;
+  room.handle(ally, { t: 'intent', intent: { t: 'action', id: guard(ally) } });
+
+  assert.equal(before - room.enemies[0].hp, room.works.burn,
+    'the mirrors kept tracking the sun without him');
+});
+
+test('an ability is worth what its line pays, and needs that line standing', () => {
+  const bare = works(['trellis'], ['closeranks']);
+  assert.ok(bare.room.actionIds(bare.player).includes('closeranks'),
+    'bought, with its trellis up, so he can take it');
+  assert.equal(cardEffect('closeranks', bare.room.works).amount, DRAW,
+    'one tier is one crew’s share');
+
+  const grown = works(['trellis', 'livingwall', 'hedgerow'], ['closeranks']);
+  assert.equal(cardEffect('closeranks', grown.room.works).amount, 3 * DRAW,
+    'and three tiers is three of them, off the same chip');
+
+  // Bought, but with nothing to draw through: not an option at all.
+  const empty = works([], ['closeranks']);
+  assert.equal(empty.room.actionIds(empty.player).includes('closeranks'), false,
+    'an ability whose whole number is a line is not an ability without one');
+
+  // The Bolt Gun is the exception, and the reason he is playable on round one.
+  const gun = works([], ['boltgun']);
+  assert.ok(gun.room.actionIds(gun.player).includes('boltgun'),
+    'the one thing he can fire off a bare panel');
+});
+
+test('close ranks puts the whole windbreak on one head', () => {
+  /* The payout puts works.ward on everybody; the ability puts DRAW times it on
+   * one of them, on top. Block is cleared at the foot of the round it was
+   * spent in, so what is visible afterwards is what the wave failed to take —
+   * and the seat it was aimed at should be the one that kept its health. */
+  const { room, player, ally } = works(['trellis', 'livingwall'], ['closeranks'], 'hauler');
+  assert.equal(room.works.ward, 2, 'two tiers standing');
+  for(const enemy of room.enemies){ enemy.hits = 1; enemy.might = 0; enemy.charged = false; }
+  ally.hp = 40;
+  const before = ally.hp;
+
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: 'closeranks', target: ally.id } });
+  room.handle(ally, { t: 'intent', intent: { t: 'action', id: swing(ally) } });
+
+  assert.equal(before - ally.hp, 0,
+    'ten of guard on one head should swallow a round of a wave this size');
+});
+
+test('hold the charge pays nothing now and twice next', () => {
+  const { room, player } = works(['heliostat', 'mirrorfield'], ['holdcharge']);
+  mute(room);
+  const enemy = room.enemies[0];
+  enemy.hp = 999;                       // it has to survive being shot at twice
+
+  const start = enemy.hp;
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: 'holdcharge' } });
+  const afterHold = enemy.hp;
+  assert.equal(start - afterHold, room.works.burn,
+    'the round it is played still pays — what it banks is the next one');
+  assert.equal(room.banked, true);
+
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: guard(player) } });
+  assert.equal(afterHold - enemy.hp, room.works.burn * 2, 'and the next one pays double');
+  assert.equal(room.banked, false, 'the bank is spent, not standing');
+});
+
+test('the cistern pays once, when the fight is over', () => {
+  const { room, player } = works(['cistern', 'reedbed']);
+  mute(room);
+  player.hp = 5;
+
+  // Mid-fight it does nothing at all: the mend line does not tick.
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: guard(player) } });
+  assert.equal(player.hp, 5, 'no healing while the fight is on');
+
+  // Now end it.
+  for(const enemy of room.enemies) enemy.hp = 1;
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: swing(player) } });
+  for(const enemy of room.enemies) enemy.hp = 0;
+  room.handle(player, { t: 'intent', intent: { t: 'action', id: swing(player) } });
+
+  assert.ok(player.hp > 5, 'and a round of it when the wave is down');
+});
+
+test('the community buildings reach four build phases that are not his', () => {
+  const room = roomFor(`grants-${++codes}`);
+  const seats = ['engineer', 'wizard', 'alchemist', 'hauler'].map((classId, i) => {
+    const player = room.join(`grants-token-${codes}-${i}`, fakeSocket());
     room.handle(player, { t: 'class', classId });
     return player;
   });
   room.handle(seats[0], { t: 'start' });
+
+  const bareBag = gridCells(room.packRound);
+  const barePages = room.pages;
+
+  room.buildings = [
+    { id: 'press', x: 0, y: 0 }, { id: 'glasshouse', x: 1, y: 0 },
+    { id: 'barrow', x: 2, y: 0 },
+  ];
+
+  // The Barrow moves the Hauler along the bag's schedule early.
+  assert.equal(room.packRound, room.round + 1);
+  assert.ok(gridCells(room.packRound) > bareBag, 'the bag should have grown a row');
+
+  // The Glasshouse is worth a unit on every pot pulled.
+  room.stash = { ...room.stash, sunpetal: 3 };
+  room.handle(seats[2], { t: 'intent', intent: { t: 'plant', pot: 0, herb: 'sunpetal' } });
+  const held = room.stash.sunpetal;
+  room.handle(seats[2], { t: 'intent', intent: { t: 'harvest', pot: 0 } });
+  assert.equal(room.stash.sunpetal - held, potYield(0) + 1, 'the glazing is worth a unit');
+
+  // And the Pulp Press is a page at every build phase, on top of the library's.
   for(const p of seats) room.handle(p, { t: 'ready', ready: true });
-  room.power = 9;       // Jumper Cables draw on the pool like everything he owns
-  mute(room);
+  assert.equal(room.phase, PHASES.combat);
+  const beforePages = room.pages;
+  for(const enemy of room.enemies) enemy.hp = 0;
+  for(const p of seats) room.handle(p, { t: 'intent', intent: { t: 'action', id: guard(p) } });
+  assert.equal(room.phase, PHASES.build, 'the wave is down');
+  assert.equal(room.pages - beforePages, PAGES_PER_ROUND + 1, 'the press ran off one more');
+  assert.ok(barePages >= 0);
+});
 
-  seats[1].down = true;
-  seats[1].hp = 0;
-  room.handle(seats[0], { t: 'intent', intent: { t: 'action', id: 'jumper', target: seats[1].id } });
-  assert.equal(seats[1].down, false, 'the downed ally should be back up');
-  assert.ok(seats[1].hp > 0);
-  assert.ok(room.actionIds(seats[1]).length, "and with everything they can do still there");
+test('a building is refused where its rule says it may not stand', () => {
+  const room = roomFor(`refuse-${++codes}`);
+  const player = room.join(`refuse-token-${codes}`, fakeSocket());
+  room.handle(player, { t: 'class', classId: 'engineer' });
+  room.handle(player, { t: 'start' });
+  room.salvage = { screw: 99, coil: 99, chip: 99 };
 
-  // Nobody down: it mends instead of doing nothing at all.
-  const hurt = seats[1].hp = 4;
-  room.handle(seats[0], { t: 'intent', intent: { t: 'action', id: 'jumper' } });
-  room.handle(seats[1], { t: 'intent', intent: { t: 'action', id: guard(seats[1]) } });
-  assert.ok(seats[1].hp > hurt, 'with nobody down it should still be worth playing');
+  // A Living Wall with no Trellis anywhere is refused, and the room does not
+  // take the salvage for it.
+  const before = room.salvage.screw;
+  room.handle(player, { t: 'intent', intent: {
+    t: 'place', building: 'livingwall', x: player.x + 1, y: player.y } });
+  assert.equal(room.buildings.length, 0, 'a wall with no trellis is not a wall');
+  assert.equal(room.salvage.screw, before, 'and it was not paid for');
+});
+
+test('a building can be shifted, and the array is worth more for it', () => {
+  const room = roomFor(`shift-${++codes}`);
+  const player = room.join(`shift-token-${codes}`, fakeSocket());
+  room.handle(player, { t: 'class', classId: 'engineer' });
+  room.handle(player, { t: 'start' });
+  room.salvage = { screw: 99, coil: 99, chip: 99 };
+
+  // Two panels, deliberately apart. Somewhere clear, found the way a player
+  // would find it rather than assumed.
+  const clear = [];
+  for(let y = 0; y < 17 && clear.length < 3; y++){
+    for(let x = 0; x < 30 && clear.length < 3; x++){
+      if(canBuildAt(room.terrain, room.buildings, room.nodes, x, y)
+         && canBuildAt(room.terrain, room.buildings, room.nodes, x + 1, y)) clear.push({ x, y });
+    }
+  }
+  assert.ok(clear.length, 'a site should have somewhere to put a panel');
+  const spot = clear[0];
+  const far = clear[clear.length - 1];
+
+  room.handle(player, { t: 'intent', intent: { t: 'place', building: 'panel', x: spot.x, y: spot.y } });
+  room.handle(player, { t: 'intent', intent: { t: 'place', building: 'panel', x: far.x + 1, y: far.y } });
+  assert.equal(room.buildings.length, 2);
+
+  // Apart they are two ones; walked onto the same rail they are two twos, and
+  // it cost nothing. That is the whole reason the verb exists.
+  const apart = room.works.array;
+  room.handle(player, { t: 'intent', intent: {
+    t: 'shift', index: 1, x: spot.x + 1, y: spot.y } });
+  assert.equal(room.buildings[1].x, spot.x + 1, 'the panel should have moved');
+  assert.equal(room.works.array, apart + 2, 'and the pair is worth twice what they were');
+  assert.equal(room.salvage.screw, 99 - 6, 'moving is free — two panels is all that was paid');
+});
+
+test('a shift is refused where a placement would be, and never half-lands', () => {
+  const room = roomFor(`shift-no-${++codes}`);
+  const player = room.join(`shift-no-token-${codes}`, fakeSocket());
+  room.handle(player, { t: 'class', classId: 'engineer' });
+  room.handle(player, { t: 'start' });
+  room.buildings = [{ id: 'trellis', x: 5, y: 5 }, { id: 'livingwall', x: 6, y: 5 }];
+
+  // Onto a tile nothing can stand on.
+  const water = room.terrain.findIndex(t => t === 'water');
+  if(water >= 0){
+    room.handle(player, { t: 'intent', intent: {
+      t: 'shift', index: 0, x: water % 30, y: Math.floor(water / 30) } });
+    assert.equal(room.buildings[0].x, 5, 'a trellis cannot be walked into the meltwater');
+  }
+
+  // And a move that would strand the wall hanging off it.
+  room.handle(player, { t: 'intent', intent: { t: 'shift', index: 0, x: 20, y: 12 } });
+  assert.equal(room.buildings[0].x, 5, 'the trellis should not have walked off');
+  assert.equal(room.buildings[1].x, 6, 'and the wall should still be beside it');
+
+  // Nothing at that index is a no-op rather than a throw.
+  room.handle(player, { t: 'intent', intent: { t: 'shift', index: 9, x: 5, y: 6 } });
+  assert.equal(room.buildings.length, 2);
+});
+
+test('only the seat that builds can shift what it built', () => {
+  const room = roomFor(`shift-who-${++codes}`);
+  const seats = ['engineer', 'wizard'].map((classId, i) => {
+    const player = room.join(`shift-who-token-${codes}-${i}`, fakeSocket());
+    room.handle(player, { t: 'class', classId });
+    return player;
+  });
+  room.handle(seats[0], { t: 'start' });
+  room.buildings = [{ id: 'panel', x: 4, y: 4 }];
+
+  room.handle(seats[1], { t: 'intent', intent: { t: 'shift', index: 0, x: 5, y: 4 } });
+  assert.equal(room.buildings[0].x, 4, 'the Wizard does not move the Engineer’s panels');
+
+  room.handle(seats[0], { t: 'intent', intent: { t: 'shift', index: 0, x: 5, y: 4 } });
+  assert.equal(room.buildings[0].x, 5, 'and the Engineer does');
+});
+
+test('learning an ability spends chips, and only once', () => {
+  const room = roomFor(`learn-${++codes}`);
+  const player = room.join(`learn-token-${codes}`, fakeSocket());
+  room.handle(player, { t: 'class', classId: 'engineer' });
+  room.handle(player, { t: 'start' });
+  room.salvage = { screw: 0, coil: 0, chip: 9 };
+
+  room.handle(player, { t: 'intent', intent: { t: 'learn', ability: 'boltgun' } });
+  assert.deepEqual(room.abilities, ['boltgun']);
+  assert.equal(room.salvage.chip, 9 - ABILITIES.boltgun.chips);
+
+  // Twice is once.
+  room.handle(player, { t: 'intent', intent: { t: 'learn', ability: 'boltgun' } });
+  assert.deepEqual(room.abilities, ['boltgun'], 'learned twice');
+  assert.equal(room.salvage.chip, 9 - ABILITIES.boltgun.chips, 'and paid for twice');
+
+  // And one whose line is not standing is refused outright.
+  room.handle(player, { t: 'intent', intent: { t: 'learn', ability: 'sunlance' } });
+  assert.deepEqual(room.abilities, ['boltgun'], 'no heliostat, no sunlance');
+});
+
+test('the abilities survive a room going to sleep mid-run', () => {
+  // A room hibernates and comes back. What the chips bought is the party's
+  // whole progression on this seat, so losing it to a wake would be losing the
+  // run.
+  const room = roomFor(`wake-${++codes}`);
+  const player = room.join(`wake-token-${codes}`, fakeSocket());
+  room.handle(player, { t: 'class', classId: 'engineer' });
+  room.handle(player, { t: 'start' });
+  room.salvage = { screw: 99, coil: 99, chip: 99 };
+  room.handle(player, { t: 'intent', intent: { t: 'learn', ability: 'boltgun' } });
+  room.banked = true;
+
+  const woken = Room.restore(JSON.parse(JSON.stringify(room.serialize())));
+  assert.deepEqual(woken.abilities, ['boltgun'], 'it forgot what it had learned');
+  assert.equal(woken.banked, true, 'and what the grid was holding');
 });
 
 /* ---- the death the client holds the round open for ---------------------- */

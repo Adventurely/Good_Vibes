@@ -28,6 +28,9 @@ import {
   WIZARD_BASE_KIT, CLASS_KITS, classKit, freshSpellbook, composeSpell,
   rollOffers, takeOffer, moveModifier, wizardCombatDeck, ownedModifiers, draftableCount,
   POT_COUNT, potYield, potStage, plantPot, harvestPot, growPots,
+  worksFrom, grantsFrom, placeRefusal, canPlace, NEIGHBOURS,
+  moveRefusal, canMove, strandedIn,
+  DRAW, ABILITIES, ABILITY_IDS, abilityRefusal,
 } from '../public/good-vibes/content.js';
 
 /* content.js is imported by the authoritative room object as well as the browser, not
@@ -427,12 +430,16 @@ test('every class has its own two basics, and they are not the same two numbers'
   assert.equal(wizardGuard, Math.min(...guards), 'and hides worst');
 });
 
-test('an invested Fireball out-hits an invested Bolt Gun', () => {
+test('an invested Fireball out-hits an invested Sunlance', () => {
   // The Wizard is the heavy hitter the party built around; the Engineer's
-  // ceiling is real but hers is higher. Two sockets against two coil levels.
+  // ceiling is real but hers is higher. Two sockets against the whole
+  // heliostat line — three tiers, every one of them built.
   const hers = composeSpell('fireball', ['kindling', 'twin']).amount;
-  const his = cardEffect('boltgun', { coilwind: 2 }).amount;
-  assert.ok(hers > his, `Fireball at ${hers} must clear the bolt gun at ${his}`);
+  const his = cardEffect('sunlance', worksFrom([
+    { id: 'heliostat', x: 0, y: 0 }, { id: 'mirrorfield', x: 1, y: 0 },
+    { id: 'furnace', x: 2, y: 0 },
+  ])).amount;
+  assert.ok(hers > his, `Fireball at ${hers} must clear the sunlance at ${his}`);
 });
 
 test('the library pays a round wage and the bench has three sockets', () => {
@@ -977,7 +984,16 @@ test('every combat action does something the engine implements', () => {
     assert.equal(typeof action.name, 'string', `action "${id}" needs a name`);
     assert.ok(EFFECT_KINDS.includes(action.effect.kind),
       `action "${id}" has effect kind "${action.effect.kind}", which the engine does not implement`);
-    assert.ok(action.effect.amount > 0, `action "${id}" must do a positive amount`);
+    // `draws` cards carry a zero and are priced off the standing works — see
+    // `cardEffect`. What has to be positive is what they turn into, so they
+    // are checked against a line rather than against their own face. `hold`
+    // has no amount at all: it lands on the room, not on a body.
+    if (action.draws) {
+      assert.ok(cardEffect(id, { [action.draws]: 1 }).amount > 0,
+        `action "${id}" draws "${action.draws}" and still comes out at nothing`);
+    } else if (action.effect.kind !== 'hold') {
+      assert.ok(action.effect.amount > 0, `action "${id}" must do a positive amount`);
+    }
   }
   for (const id of BASE_ACTIONS) {
     assert.ok(COMBAT_ACTIONS[id], `base action "${id}" does not exist`);
@@ -987,8 +1003,9 @@ test('every combat action does something the engine implements', () => {
 
 
 test('missingForBuilding reports the shortfall, not just that there is one', () => {
-  assert.deepEqual(missingForBuilding('workbench', { screw: 4, pipe: 3 }), {});
-  assert.deepEqual(missingForBuilding('workbench', { screw: 1 }), { screw: 3, pipe: 3 });
+  assert.deepEqual(missingForBuilding('trellis', { screw: 5 }), {});
+  assert.deepEqual(missingForBuilding('trellis', { screw: 2 }), { screw: 3 });
+  assert.deepEqual(missingForBuilding('press', {}), { coil: BUILDINGS.press.costs.coil });
   assert.equal(missingForBuilding('not-a-building', {}), null);
 });
 
@@ -998,7 +1015,7 @@ test('canBuildAt refuses water, rubble, occupied tiles and standing herbs', () =
   const terrain = new Array(MAP_W * MAP_H).fill('grass');
   terrain[0] = 'water';
   terrain[1] = 'rubble';
-  const buildings = [{ id: 'workbench', x: 2, y: 0 }];
+  const buildings = [{ id: 'trellis', x: 2, y: 0 }];
   const nodes = [
     { id: 'n0', x: 3, y: 0, material: 'sunpetal', taken: false },
     { id: 'n1', x: 4, y: 0, material: 'sunpetal', taken: true },
@@ -1013,18 +1030,23 @@ test('canBuildAt refuses water, rubble, occupied tiles and standing herbs', () =
   assert.equal(canBuildAt(terrain, buildings, nodes, -1, 0), false, 'built off the map');
 });
 
-test('salvage after combat pays the crew and the buildings', () => {
+test('salvage after combat is what the crew picked up, and nothing else', () => {
+  /* Buildings used to pay an income and no longer do. Every one of them now
+   * buys a standing payout instead — a line the party is paid every round, or
+   * somebody else's build phase made bigger — so a building that also handed
+   * back the salvage it cost would be paying twice for one tile.
+   *
+   * Which leaves the crew's share as the whole of the after-combat draw, and
+   * `cls.salvage` as the only thing that decides it. */
   const players = [
     { classId: 'engineer', down: false },
     { classId: 'alchemist', down: false },
   ];
-  const drawn = salvageAfterCombat(players, [{ id: 'workbench', x: 1, y: 1 }], seededRandom(3));
+  const drawn = salvageAfterCombat(players, [{ id: 'trellis', x: 1, y: 1 }], seededRandom(3));
 
   const total = Object.values(drawn).reduce((a, b) => a + b, 0);
-  const bench = BUILDINGS.workbench.income;
-  const fromBench = Object.values(bench).reduce((a, b) => a + b, 0);
-  assert.equal(total, classById('engineer').salvage + fromBench,
-    'the draw should be the engineer’s share plus what the bench turned out');
+  assert.equal(total, classById('engineer').salvage,
+    'the draw should be the engineer’s share and the alchemist’s nothing');
   for (const id of Object.keys(drawn)) assert.ok(SALVAGE[id], `drew "${id}", which is not salvage`);
 });
 
@@ -1055,7 +1077,14 @@ test('every card is a real effect with an icon to draw it', () => {
     assert.ok(CARD_ART[card.kind], `${where}: kind "${card.kind}" has no icon`);
     assert.ok(EFFECT_KINDS.includes(card.effect.kind),
       `${where}: effect kind "${card.effect.kind}" is not one the engine implements`);
-    assert.ok(card.effect.amount > 0, `${where}: must do a positive amount`);
+    if (card.draws) {
+      assert.ok(worksFrom([]).hasOwnProperty(card.draws),
+        `${where}: draws "${card.draws}", which is not a line the works pay`);
+      assert.ok(cardEffect(id, { [card.draws]: 1 }).amount > 0,
+        `${where}: draws a line and still comes out at nothing`);
+    } else if (card.effect.kind !== 'hold') {
+      assert.ok(card.effect.amount > 0, `${where}: must do a positive amount`);
+    }
     // A card belongs to a class, to a building, or to everybody — exactly one.
     // `granted` is the fifth owner flag: a card that is never dealt by a class
     // and never starts in a deck, only put into one by another card.
@@ -1210,8 +1239,12 @@ test('everybody can swing something, and Strike is the floor of what they swing'
   // asserts the floor and leaves the tie visible.
   for (const [id, card] of Object.entries(CARDS)) {
     if (card.effect.kind !== 'strike') continue;
-    assert.ok(card.effect.amount >= CARDS.strike.effect.amount,
-      `"${id}" hits for ${card.effect.amount}, less than a fist`);
+    // A drawn strike has no number of its own — the Sunlance is worth DRAW
+    // times what the heliostat pays, so the floor is checked against the
+    // smallest line that can exist rather than against a zero on the card.
+    const amount = card.draws ? cardEffect(id, { [card.draws]: 1 }).amount : card.effect.amount;
+    assert.ok(amount >= CARDS.strike.effect.amount,
+      `"${id}" hits for ${amount}, less than a fist`);
   }
 });
 
@@ -1390,7 +1423,7 @@ test('a site grows enough for some brewing and never all of it', () => {
 /* ------------------------------------------------------------ the engineer */
 
 /* Two buildings and one gun. Power is what a panel makes, a fight spends and
- * the end of it throws away; the workbench turns salvage into a better gun
+ * the end of it throws away; the lines turn salvage into a standing payout
  * rather than more ground.
  */
 
@@ -1398,6 +1431,7 @@ test('every building is buildable and gives something for the tile', () => {
   for (const [id, building] of Object.entries(BUILDINGS)) {
     const where = `building "${id}"`;
     assert.equal(typeof building.name, 'string', `${where}: needs a name`);
+    assert.equal(typeof building.note, 'string', `${where}: needs a note`);
     assert.ok(BUILDING_ART[building.art], `${where}: art "${building.art}" does not exist`);
     assert.ok(Object.keys(building.costs).length, `${where}: must cost something`);
 
@@ -1405,125 +1439,361 @@ test('every building is buildable and gives something for the tile', () => {
       assert.ok(SALVAGE[resource], `${where}: costs "${resource}", which is not salvage`);
       assert.ok(Number.isInteger(n) && n > 0, `${where}: cost of ${resource} must be positive`);
     }
-    for (const [resource, n] of Object.entries(building.income)) {
-      assert.ok(SALVAGE[resource], `${where}: pays "${resource}", which is not salvage`);
-    }
 
-    // A building that makes no power, pays nothing and unlocks nothing is a
-    // tile you spent for the view.
+    // A building that pays no line, carries no power and grants nobody
+    // anything is a tile you spent for the view.
     const gives = (building.power || 0) > 0
-      || Object.keys(building.income).length > 0
-      || id === 'workbench';
+      || (building.pays || 0) > 0
+      || (building.carry || 0) > 0
+      || building.perPanels
+      || Object.keys(building.grants || {}).length > 0;
     assert.ok(gives, `${where}: gives nothing back`);
-  }
-});
 
-test('the engineer can always make power on the first build phase', () => {
-  // A bolt gun with no panel behind it is a dead card in an opening hand.
-  assert.ok(canAfford(BUILDINGS.panel.costs, STARTING_SALVAGE),
-    'a Solar Panel must be affordable from the starting salvage');
-});
-
-test('the opening is a choice: panel or workbench, never both', () => {
-  const ids = Object.keys(BUILDINGS);
-  for (const id of ids) {
-    assert.ok(canAfford(BUILDINGS[id].costs, STARTING_SALVAGE), `"${id}" is unaffordable at the start`);
-    const after = spendSalvage(STARTING_SALVAGE, BUILDINGS[id].costs);
-    for (const other of ids) {
-      if (other === id) continue;
-      assert.ok(!canAfford(BUILDINGS[other].costs, after),
-        `building "${id}" first still leaves enough for "${other}" — the opening is not a choice`);
+    if (building.line) {
+      assert.ok(worksFrom([]).hasOwnProperty(building.line),
+        `${where}: feeds "${building.line}", which is not a line the works pay`);
     }
   }
 });
 
-test('only the workbench is capped, and panels are not', () => {
-  assert.equal(BUILDINGS.workbench.max, 1);
-  assert.equal(BUILDINGS.panel.max, undefined, 'every panel is another shot, so they must not be capped');
-
-  const one = [{ id: 'workbench', x: 1, y: 1 }];
-  assert.equal(canBuildMore('workbench', []), true);
-  assert.equal(canBuildMore('workbench', one), false, 'a second workbench should be refused');
-  assert.equal(canBuildMore('panel', [{ id: 'panel', x: 0, y: 0 }, { id: 'panel', x: 2, y: 0 }]), true);
-  assert.equal(canBuildMore('not-a-building', []), false);
-  assert.equal(buildingsOf(one, 'workbench'), 1);
+test('every placement rule names something that exists', () => {
+  // A rule pointing at a building or a terrain kind that is not there would
+  // refuse forever, and the refusal string would read as a crash.
+  for (const [id, building] of Object.entries(BUILDINGS)) {
+    const rule = building.place;
+    if (!rule) continue;
+    const where = `building "${id}"`;
+    if (rule.beside) assert.ok(BUILDINGS[rule.beside], `${where}: must touch "${rule.beside}", which is not a building`);
+    if (rule.near) assert.ok(TERRAIN[rule.near], `${where}: must touch "${rule.near}", which is not terrain`);
+    for (const t of rule.on || []) assert.ok(TERRAIN[t], `${where}: must stand on "${t}", which is not terrain`);
+    if (rule.onOrNear) assert.ok(TERRAIN[rule.onOrNear], `${where}: names "${rule.onOrNear}", which is not terrain`);
+    for (const t of rule.clearOf || []) assert.ok(TERRAIN[t], `${where}: must avoid "${t}", which is not terrain`);
+    for (const bid of Object.keys(rule.needs || {})) {
+      assert.ok(BUILDINGS[bid], `${where}: needs "${bid}", which is not a building`);
+    }
+    // Every tier above the first hangs off the one below it, so a line is a
+    // run of touching tiles rather than three things scattered across a ruin.
+    if (rule.beside) assert.ok(BUILDINGS[rule.beside].line === building.line || !building.line,
+      `${where}: touches a building on a different line`);
+  }
 });
 
-test('power is what the panels make, and nothing else makes it', () => {
+test('placement says why, and the reason is a sentence a player can act on', () => {
+  const terrain = new Array(MAP_W * MAP_H).fill('floor');
+  const at = (x, y) => x + y * MAP_W;
+  terrain[at(10, 3)] = 'water';
+  terrain[at(20, 3)] = 'grass';
+  terrain[at(20, 4)] = 'grass';
+  const ctx = (x, y, buildings = []) => ({ terrain, buildings, nodes: [], x, y });
+
+  // No rule at all: a panel stands anywhere the ground allows.
+  assert.equal(placeRefusal('panel', ctx(5, 5)), null);
+  assert.ok(placeRefusal('panel', ctx(10, 3)), 'a panel cannot stand in the meltwater');
+
+  // Terrain the tile has to be touching.
+  assert.equal(placeRefusal('cistern', ctx(11, 3)), null, 'beside the water is where a cistern goes');
+  assert.ok(placeRefusal('cistern', ctx(5, 5)), 'and nowhere else');
+
+  // Terrain the tile has to be, or be against.
+  assert.equal(placeRefusal('trellis', ctx(20, 4)), null);
+  assert.equal(placeRefusal('trellis', ctx(20, 5)), null, 'against the overgrowth counts');
+  assert.ok(placeRefusal('trellis', ctx(5, 5)), 'and bare floor does not');
+
+  // A tier hangs off the tier below it.
+  const trellis = [{ id: 'trellis', x: 20, y: 4 }];
+  assert.equal(placeRefusal('livingwall', ctx(21, 4, trellis)), null);
+  assert.ok(placeRefusal('livingwall', ctx(25, 4, trellis)), 'a wall away from its trellis is not a wall');
+  assert.ok(placeRefusal('livingwall', ctx(21, 5, [])), 'and with no trellis at all it is nothing');
+
+  // A count, rather than a neighbour.
+  const panels = [{ id: 'panel', x: 1, y: 1 }, { id: 'panel', x: 2, y: 1 }];
+  assert.ok(placeRefusal('flywheel', ctx(1, 2, panels)), 'two panels is not three');
+  const three = [...panels, { id: 'panel', x: 3, y: 1 }];
+  assert.equal(placeRefusal('flywheel', ctx(1, 2, three)), null);
+
+  // The camp, and the sky.
+  assert.equal(placeRefusal('carillon', ctx(CAMP_X + 1, CAMP_Y + 1)), null);
+  assert.ok(placeRefusal('carillon', ctx(1, 1)), 'a bell belongs where people are');
+  const shaded = new Array(MAP_W * MAP_H).fill('floor');
+  shaded[at(6, 5)] = 'tree';
+  assert.ok(placeRefusal('heliostat', { terrain: shaded, buildings: [], nodes: [], x: 5, y: 5 }),
+    'a mirror under a sapling is a mirror looking at a sapling');
+
+  assert.ok(placeRefusal('not-a-building', ctx(5, 5)));
+  assert.equal(canPlace('panel', ctx(5, 5)), true);
+  assert.equal(canPlace('panel', ctx(10, 3)), false);
+});
+
+test('a building can be walked to a better tile, for nothing', () => {
+  /* Free and build-phase only, on the precedent the scriptorium sets: a spell
+   * is re-socketed at the desk, and rearranging what you have already paid for
+   * should not cost twice. The single most valuable thing this verb does is
+   * walk a panel into the run beside another one — same salvage, twice the
+   * power — which is why it exists at all. */
+  const terrain = new Array(MAP_W * MAP_H).fill('floor');
+  const ctx = (buildings, x, y) => ({ terrain, buildings, nodes: [], x, y });
+
+  const apart = [{ id: 'panel', x: 1, y: 1 }, { id: 'panel', x: 8, y: 8 }];
+  assert.equal(powerFrom(apart), 2, 'two panels that cannot see each other');
+  assert.equal(moveRefusal(1, ctx(apart, 2, 1)), null);
+
+  const together = apart.map((b, i) => (i === 1 ? { ...b, x: 2, y: 1 } : b));
+  assert.equal(powerFrom(together), 4, 'and the same two on one rail');
+
+  // Onto itself is a put-back, not a refusal.
+  assert.equal(moveRefusal(0, ctx(apart, 1, 1)), null);
+  // Onto its neighbour is not.
+  assert.ok(moveRefusal(0, ctx(apart, 8, 8)), 'two buildings on one tile');
+  assert.ok(moveRefusal(9, ctx(apart, 3, 3)), 'nothing at that index');
+  assert.equal(canMove(1, ctx(apart, 2, 1)), true);
+});
+
+test('a move is refused where a placement would be', () => {
+  const terrain = new Array(MAP_W * MAP_H).fill('floor');
+  const at = (x, y) => x + y * MAP_W;
+  terrain[at(4, 4)] = 'water';
+  terrain[at(9, 9)] = 'grass';
+  const ctx = (buildings, x, y) => ({ terrain, buildings, nodes: [], x, y });
+
+  // The cistern still has to touch water wherever it goes.
+  const cistern = [{ id: 'cistern', x: 5, y: 4 }];
+  assert.equal(moveRefusal(0, ctx(cistern, 4, 5)), null, 'still against the water');
+  assert.ok(moveRefusal(0, ctx(cistern, 20, 2)), 'and a cistern in a field is a tank');
+
+  // The cap does not count the thing in your hands: a Trellis moving is not a
+  // second Trellis.
+  const trellis = [{ id: 'trellis', x: 9, y: 10 }];
+  assert.equal(moveRefusal(0, ctx(trellis, 10, 9)), null,
+    'a trellis moving beside the overgrowth is the same trellis');
+});
+
+test('a move may not strand the tier hanging off it', () => {
+  /* Without this every adjacency rule in the game is decoration: place the
+   * Trellis, hang the Living Wall off it, then walk the Trellis to the far
+   * side of the site and keep both. The tiers have to stay a run of touching
+   * tiles, or they were never a shape. */
+  const terrain = new Array(MAP_W * MAP_H).fill('grass');
+  const ctx = (buildings, x, y) => ({ terrain, buildings, nodes: [], x, y });
+  const line = [{ id: 'trellis', x: 5, y: 5 }, { id: 'livingwall', x: 6, y: 5 }];
+
+  const why = moveRefusal(0, ctx(line, 20, 5));
+  assert.ok(why, 'the trellis walked away from its own wall');
+  assert.match(why, /Living Wall/, 'and it should say what it left behind');
+
+  // A step that keeps them touching is fine.
+  assert.equal(moveRefusal(0, ctx(line, 6, 4)), null, 'still touching, still a hedge');
+
+  // And the wall itself may move anywhere the trellis still reaches.
+  assert.equal(moveRefusal(1, ctx(line, 5, 6)), null);
+  assert.ok(moveRefusal(1, ctx(line, 20, 20)), 'a wall away from its trellis is not a wall');
+
+  // The count rules are honoured the same way: a flywheel needs three panels
+  // standing, and moving one of them does not change that.
+  const rig = [
+    { id: 'panel', x: 1, y: 1 }, { id: 'panel', x: 2, y: 1 }, { id: 'panel', x: 3, y: 1 },
+    { id: 'flywheel', x: 1, y: 2 },
+  ];
+  assert.equal(moveRefusal(2, ctx(rig, 4, 1)), null, 'three panels are still three panels');
+});
+
+test('strandedIn finds every rule broken underneath a building', () => {
+  const terrain = new Array(MAP_W * MAP_H).fill('grass');
+  const sound = [{ id: 'trellis', x: 5, y: 5 }, { id: 'livingwall', x: 6, y: 5 }];
+  assert.deepEqual(strandedIn({ terrain, buildings: sound, nodes: [] }), []);
+
+  const broken = [{ id: 'trellis', x: 5, y: 5 }, { id: 'livingwall', x: 20, y: 5 }];
+  const found = strandedIn({ terrain, buildings: broken, nodes: [] });
+  assert.equal(found.length, 1);
+  assert.equal(found[0].id, 'livingwall');
+
+  assert.deepEqual(strandedIn({ terrain, buildings: [], nodes: [] }), []);
+  assert.deepEqual(strandedIn({ terrain, buildings: null, nodes: [] }), []);
+});
+
+test('a panel is worth more with a neighbour, and the array is the sum', () => {
+  // The one line that is not a plain count, and the reason the map is a
+  // puzzle: an array wants a contiguous run and a ruin is full of holes.
   assert.equal(powerFrom([]), 0);
-  assert.equal(powerFrom([{ id: 'panel' }]), 1);
-  assert.equal(powerFrom([{ id: 'panel' }, { id: 'panel' }, { id: 'panel' }]), 3);
-  assert.equal(powerFrom([{ id: 'workbench' }]), 0, 'the workbench is not a generator');
-  assert.equal(powerFrom([{ id: 'not-a-building' }]), 0);
+  assert.equal(powerFrom([{ id: 'panel', x: 1, y: 1 }]), 1, 'a lone panel is worth one');
+  assert.equal(powerFrom([{ id: 'panel', x: 1, y: 1 }, { id: 'panel', x: 5, y: 5 }]), 2,
+    'two panels that cannot see each other are two ones');
+  assert.equal(powerFrom([{ id: 'panel', x: 1, y: 1 }, { id: 'panel', x: 2, y: 1 }]), 4,
+    'and two on the same rail are two twos');
+  assert.equal(powerFrom([{ id: 'panel', x: 1, y: 1 }, { id: 'panel', x: 2, y: 2 }]), 2,
+    'a diagonal is not touching');
+
+  // The Inverter reads the count, not the shape.
+  const five = [0, 1, 2, 3, 4].map((i) => ({ id: 'panel', x: i, y: 0 }));
+  assert.equal(powerFrom(five), 10);
+  assert.equal(powerFrom([...five, { id: 'inverter', x: 0, y: 1 }]), 11, 'one more for every three panels');
+
+  assert.equal(powerFrom([{ id: 'trellis', x: 1, y: 1 }]), 0, 'a hedge is not a generator');
+  assert.equal(powerFrom([{ id: 'not-a-building', x: 1, y: 1 }]), 0);
 });
 
-test('the bolt gun is the engineer\'s, and the panels are what load it', () => {
-  const bolt = CARDS.boltgun;
-  assert.equal(bolt.classId, 'engineer');
-  assert.ok(bolt.powerCost >= 1, 'a free bolt gun makes the panel pointless');
-  assert.ok(!bolt.consumed, 'the gun is a gun, not a potion');
-  assert.ok(bolt.effect.amount > CARDS.wrench.effect.amount, 'the bolt gun should out-hit the basic');
+test('every line pays what its tiers add up to, and nothing bleeds across', () => {
+  const works = worksFrom([
+    { id: 'trellis', x: 1, y: 1 }, { id: 'livingwall', x: 2, y: 1 },
+    { id: 'carillon', x: 5, y: 5 },
+    { id: 'cistern', x: 8, y: 8 }, { id: 'reedbed', x: 9, y: 8 },
+  ]);
+  assert.equal(works.ward, 2, 'two tiers of windbreak');
+  assert.equal(works.might, 1);
+  assert.equal(works.burn, 0, 'a line nobody built pays nothing');
+  assert.equal(works.mend, BUILDINGS.cistern.pays + BUILDINGS.reedbed.pays);
+  assert.equal(works.carry, 0);
 
-  // He always has it — raising a panel used to push a card into his deck and
-  // hope he drew it. What a panel buys now is the power to fire the thing he
-  // was already holding, which is the build phase reaching the fight directly.
-  assert.ok(actionsFor('engineer').includes('boltgun'), 'the engineer always has the gun');
-  assert.equal(actionsFor('wizard').includes('boltgun'), false, 'and nobody else ever does');
-
-  assert.equal(actionReady('boltgun', { power: 0 }).ok, false, 'fired with no power');
-  assert.equal(actionReady('boltgun', { power: bolt.powerCost }).ok, true);
-
-  // Everything he owns drains the same pool at a different rate, which is the
-  // whole of his economy.
-  const rates = new Set(actionsFor('engineer')
-    .map((id) => (actionCost(id) || {}).amount)
-    .filter((n) => n !== undefined));
-  assert.ok(rates.size > 1, 'a pool everything costs the same out of is not a budget');
+  // The Flywheel is the only thing that keeps power across a fight.
+  assert.equal(worksFrom([{ id: 'flywheel', x: 1, y: 1 }]).carry, BUILDINGS.flywheel.carry);
+  assert.deepEqual(worksFrom([]), { array: 0, ward: 0, might: 0, burn: 0, mend: 0, carry: 0 });
+  assert.deepEqual(worksFrom(null), { array: 0, ward: 0, might: 0, burn: 0, mend: 0, carry: 0 });
 });
 
-test('upgrades cost more each time and do what they say', () => {
-  for (const [id, upgrade] of Object.entries(UPGRADES)) {
-    assert.ok(['shots', 'damage'].includes(upgrade.adds), `upgrade "${id}" adds "${upgrade.adds}"`);
-    for (const resource of Object.keys(upgrade.costs)) {
-      assert.ok(SALVAGE[resource], `upgrade "${id}" costs "${resource}", which is not salvage`);
-    }
-    const first = upgradeCost(id, 0);
-    const third = upgradeCost(id, 2);
-    const sum = (c) => Object.values(c).reduce((a, b) => a + b, 0);
-    assert.ok(sum(third) > sum(first), `upgrade "${id}" never gets dearer, so buying it is free money`);
-  }
-  assert.equal(upgradeCost('not-an-upgrade', 0), null);
+test('the cistern is the one line no ability can draw', () => {
+  // Healing every round was simply the best thing a line could do. It pays
+  // once, when the fight ends, and nothing can concentrate it — which is what
+  // stops the mend line from turning into a spike.
+  const drawn = Object.values(CARDS).map((c) => c.draws).filter(Boolean);
+  assert.ok(drawn.includes('ward') && drawn.includes('might') && drawn.includes('burn'),
+    'the three per-round lines should each have something that draws them');
+  assert.equal(drawn.includes('mend'), false, 'nothing may draw the cistern');
+  assert.equal(drawn.includes('array'), false, 'and nothing may draw the power itself');
 });
 
-test('buying an upgrade spends the salvage, or does nothing at all', () => {
-  const salvage = { screw: 9, pipe: 9, plating: 9, coil: 9 };
-  const bought = buyUpgrade('barrel', 0, salvage);
-  assert.equal(bought.adds, 'shots');
-  // The barrel used to put another Bolt Gun in the deck. There is no deck, so
-  // what another barrel buys is a cheaper shot out of the same charge.
-  assert.equal(actionCost('boltgun', null, { barrel: 0 }).amount, CARDS.boltgun.powerCost);
-  assert.equal(actionCost('boltgun', null, { barrel: 1 }).amount, CARDS.boltgun.powerCost - 1);
-  assert.equal(actionCost('boltgun', null, { barrel: 9 }).amount, 1,
-    'a bolt is never free, or the panel it draws on is pointless');
-  assert.equal(bought.level, 1);
-  assert.equal(bought.salvage.screw, 9 - UPGRADES.barrel.costs.screw);
-  assert.deepEqual(salvage, { screw: 9, pipe: 9, plating: 9, coil: 9 }, 'it wrote to the pool it was given');
+test('what a drawn ability is worth is written on the map, not on the card', () => {
+  const bare = { ward: 1 };
+  const grown = { ward: 3 };
+  assert.equal(cardEffect('closeranks', bare).amount, DRAW,
+    'one tier of windbreak is one crew’s share');
+  assert.equal(cardEffect('closeranks', grown).amount, 3 * DRAW,
+    'and three tiers is three of them, off the same chip');
+  assert.equal(cardEffect('closeranks', {}).amount, 0, 'with no line there is nothing to draw');
 
-  assert.equal(buyUpgrade('barrel', 0, { screw: 1 }), null);
-  assert.equal(buyUpgrade('coilwind', 9, salvage), null, 'level nine should be far out of reach');
-  assert.equal(buyUpgrade('not-an-upgrade', 0, salvage), null);
-});
-
-test('the coil upgrade makes every bolt hit harder', () => {
-  const base = cardEffect('boltgun').amount;
-  assert.equal(cardEffect('boltgun', {}).amount, base);
-  assert.ok(cardEffect('boltgun', { coilwind: 1 }).amount > base);
-  assert.equal(cardEffect('boltgun', { coilwind: 2 }).amount, base + 2 * CARDS.boltgun.upgradeStep);
+  // DRAW is the party size and that is the fiction: the whole crew's share of
+  // one round, pulled through a single line. Flat, so it is worth exactly the
+  // same alone as it is at a table of five.
+  assert.equal(DRAW, PARTY_SIZE);
 
   // Untouched cards are untouched, and the table itself is never rewritten.
-  assert.equal(cardEffect('wrench', { coilwind: 5 }).amount, CARDS.wrench.effect.amount);
-  assert.equal(CARDS.boltgun.effect.amount, base, 'cardEffect mutated the card table');
+  assert.equal(cardEffect('wrench', { ward: 5 }).amount, CARDS.wrench.effect.amount);
+  assert.equal(CARDS.closeranks.effect.amount, 0, 'cardEffect mutated the card table');
   assert.equal(cardEffect('not-a-card'), null);
+});
+
+test('the engineer starts with two basics and buys the rest', () => {
+  // CLASS_ACTIONS.engineer is empty, exactly as the Hauler's is. What he can
+  // do in a fight is what the chips bought and the buildings allow.
+  assert.deepEqual(actionsFor('engineer'), ['wrench', 'shore']);
+  assert.equal(CARDS.jumper, undefined, 'the Stretcher revives for more, for a point of health');
+  assert.equal(CARDS.bulwark, undefined, 'and the Rigging Tarp is the same guard, free');
+
+  for (const [id, ability] of Object.entries(ABILITIES)) {
+    const where = `ability "${id}"`;
+    assert.ok(CARDS[id], `${where}: has no card behind it`);
+    assert.equal(CARDS[id].classId, 'engineer', `${where}: is not the engineer's`);
+    assert.ok(CARDS[id].ability, `${where}: the card is not flagged as one`);
+    assert.ok(Number.isInteger(ability.chips) && ability.chips > 0, `${where}: must cost chips`);
+    assert.equal(typeof ability.note, 'string', `${where}: needs a note`);
+    if (ability.needs) assert.ok(BUILDINGS[ability.needs], `${where}: needs "${ability.needs}", which is not a building`);
+  }
+  assert.deepEqual(ABILITY_IDS, Object.keys(ABILITIES));
+});
+
+test('an ability needs the chips and the line it draws through', () => {
+  const rich = { chip: 9 };
+  const trellis = [{ id: 'trellis', x: 1, y: 1 }];
+
+  // The Bolt Gun is the exception, and the reason the seat is playable on the
+  // first build phase: a flat number off a bare panel, with nothing standing.
+  assert.equal(abilityRefusal('boltgun', { salvage: rich, bought: [], buildings: [] }), null);
+  assert.ok(canAfford({ chip: ABILITIES.boltgun.chips }, STARTING_SALVAGE),
+    'the opening salvage must cover the one ability that needs no building');
+
+  // Every other one is worth what its line pays, so it is not an ability until
+  // there is a line.
+  assert.ok(abilityRefusal('closeranks', { salvage: rich, bought: [], buildings: [] }),
+    'learned with no windbreak to draw through');
+  assert.equal(abilityRefusal('closeranks', { salvage: rich, bought: [], buildings: trellis }), null);
+
+  assert.ok(abilityRefusal('closeranks', { salvage: { chip: 0 }, bought: [], buildings: trellis }),
+    'learned without paying');
+  assert.ok(abilityRefusal('closeranks', { salvage: rich, bought: ['closeranks'], buildings: trellis }),
+    'learned twice');
+  assert.ok(abilityRefusal('not-an-ability', { salvage: rich, bought: [], buildings: [] }));
+});
+
+test('the opening is a fork: power now, or a line to draw through later', () => {
+  // Screws buy both halves of his combat — panels are the power to fire an
+  // ability, lines are what the ability is worth — and there is never enough
+  // for both. That is the decision, and it must exist on the first build
+  // phase rather than arriving in round three.
+  assert.ok(canAfford(BUILDINGS.panel.costs, STARTING_SALVAGE),
+    'a Solar Panel must be affordable from the starting salvage');
+
+  const firsts = ['trellis', 'carillon', 'heliostat', 'cistern'];
+  for (const id of firsts) {
+    assert.ok(canAfford(BUILDINGS[id].costs, STARTING_SALVAGE), `"${id}" is out of reach at the start`);
+    const after = spendSalvage(STARTING_SALVAGE, BUILDINGS[id].costs);
+    assert.ok(!canAfford(BUILDINGS.panel.costs, after),
+      `a "${id}" first still leaves a panel — the opening is not a fork`);
+  }
+
+  // Two panels, or one line's first tier. Never both.
+  const twoPanels = spendSalvage(spendSalvage(STARTING_SALVAGE, BUILDINGS.panel.costs), BUILDINGS.panel.costs);
+  assert.equal(twoPanels.screw, 0, 'the array eats the whole opening');
+
+  // And coil covers nothing at all, so the first community machine is always a
+  // round away and always a decision.
+  for (const id of ['press', 'glasshouse', 'barrow', 'windrow']) {
+    assert.ok(!canAfford(BUILDINGS[id].costs, STARTING_SALVAGE), `"${id}" should not be free on round one`);
+  }
+});
+
+test('only the panel may be built twice', () => {
+  assert.equal(BUILDINGS.panel.max, undefined, 'every panel is more power, so they must not be capped');
+  for (const [id, building] of Object.entries(BUILDINGS)) {
+    if (id === 'panel') continue;
+    assert.equal(building.max, 1, `"${id}" is uncapped, and a second one is a tile sink`);
+  }
+
+  const one = [{ id: 'trellis', x: 1, y: 1 }];
+  assert.equal(canBuildMore('trellis', []), true);
+  assert.equal(canBuildMore('trellis', one), false, 'a second trellis should be refused');
+  assert.equal(canBuildMore('panel', [{ id: 'panel', x: 0, y: 0 }, { id: 'panel', x: 2, y: 0 }]), true);
+  assert.equal(canBuildMore('not-a-building', []), false);
+  assert.equal(buildingsOf(one, 'trellis'), 1);
+});
+
+test('the community buildings reach economies that are not his', () => {
+  // The one role nobody else can occupy. Rune, Graft and Leg Up hand an ally
+  // something for one round inside a fight; these four make somebody else's
+  // build phase permanently bigger.
+  const all = [
+    { id: 'press', x: 1, y: 1 }, { id: 'glasshouse', x: 2, y: 1 },
+    { id: 'barrow', x: 3, y: 1 }, { id: 'windrow', x: 4, y: 1 },
+  ];
+  assert.equal(grantsFrom(all, 'pages'), 1, 'the Wizard drafts more');
+  assert.equal(grantsFrom(all, 'pot'), 1, 'the Alchemist harvests more');
+  assert.equal(grantsFrom(all, 'pack'), 1, 'the Hauler carries more');
+  assert.equal(grantsFrom(all, 'uses'), 1, 'the Grafter cuts more');
+  assert.equal(grantsFrom(all, 'nothing'), 0);
+  assert.equal(grantsFrom([], 'pages'), 0);
+  assert.equal(grantsFrom(null, 'pages'), 0);
+
+  // Every live class but the Engineer is served by exactly one of them.
+  const served = new Set(all.map((b) => Object.keys(BUILDINGS[b.id].grants)[0]));
+  assert.equal(served.size, all.length, 'two of them feed the same economy');
+});
+
+test('the upgrade path is gone, and its names still answer', () => {
+  /* Removing an export from this module is a throw at the top of a Worker
+   * nobody working here can read the source of, which takes the whole site
+   * down. So the Workbench's three names stay exported and answer emptily.
+   * See the published contract at the foot of this file. */
+  assert.deepEqual(UPGRADES, {});
+  assert.equal(upgradeCost('barrel', 0), null);
+  assert.equal(buyUpgrade('barrel', 0, { screw: 99 }), null);
+  assert.equal(BUILDINGS.workbench, undefined, 'the bench itself is gone');
 });
 
 test('a deck keeps its size across a fight, hand included', () => {
@@ -1567,7 +1837,7 @@ test('a respawned site keeps its ground and reseeds only what grows', () => {
 
 test('nothing sprouts underneath a standing building', () => {
   // The site persists, so round two spawns onto ground round one built on. A
-  // herb under the workbench is one the party can see and never pick up.
+  // herb under a building is one the party can see and never pick up.
   const terrain = new Array(MAP_W * MAP_H).fill('grass');
   const buildings = [];
   for (let x = 0; x < MAP_W; x++) for (let y = 0; y < 6; y++) buildings.push({ id: 'panel', x, y });
@@ -1647,6 +1917,10 @@ const PUBLISHED = [
   'deckFor', 'buildDeck', 'shuffle', 'draw', 'discardHand',
   'roundInfo', 'phaseCard', 'waveFor', 'readyState', 'isBuildPhase',
   'salvageAfterCombat', 'addSalvage', 'spendSalvage', 'nodeYield',
+  // the works: five payout lines, the placement rules, and what chips buy
+  'NEIGHBOURS', 'placeRefusal', 'canPlace', 'worksFrom', 'grantsFrom',
+  'moveRefusal', 'canMove', 'strandedIn',
+  'DRAW', 'ABILITIES', 'ABILITY_IDS', 'abilityRefusal',
   // the map
   'generateTerrain', 'generateMap', 'generateCombatTerrain', 'spawnItems',
   'spawnHerbs', 'respawnItems', 'spawnTile', 'tileAt', 'tileIndex', 'inBounds',

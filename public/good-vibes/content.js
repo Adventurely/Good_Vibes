@@ -175,29 +175,40 @@ export const RECIPES = {
 export const SALVAGE = {
   screw: {
     name: 'Screws',
-    rarity: 12,
+    rarity: 11,
     colour: 'M',
     note: 'Every ruin is mostly fasteners. Somebody built all this once.',
   },
-  pipe: {
-    name: 'Pipe',
-    rarity: 9,
-    colour: 'x',
-    note: 'Cut to length with whatever was to hand. Still holds pressure.',
-  },
-  plating: {
-    name: 'Plating',
-    rarity: 6,
-    colour: 'm',
-    note: 'Panel steel, sheared square. Heavy, and worth the carry.',
-  },
   coil: {
     name: 'Coil',
-    rarity: 3,
+    rarity: 7,
     colour: 'c',
     note: 'Copper wound tight around a core that still hums when you hold it.',
   },
+  chip: {
+    name: 'Chips',
+    rarity: 4,
+    colour: 'x',
+    note: 'Green boards prised out of dead machines, and somebody’s whole trade still printed on them.',
+  },
 };
+
+/* Three piles, and the split is the whole of the Engineer's design.
+ *
+ * Screws are the works: panels, and the four lines that pay the party out
+ * every round. Coil is the community: the four machines that make somebody
+ * *else's* build phase bigger. Chips are know-how, and buy abilities.
+ *
+ * They are separate piles on purpose. The Engineer never chooses between his
+ * own gun and the party's press, because they do not come out of the same
+ * pocket — helping the table is not a sacrifice, it is the other half of the
+ * board. The one decision that is a real fork lives inside screws: see
+ * `worksFrom`.
+ *
+ * Pipe and Plating were folded into Screws when the piles went from four to
+ * three. Four resources across two spends was bookkeeping; three across three
+ * is a shape.
+ */
 
 /* Weighted pick from the salvage table, same contract as materialFor: the
    caller supplies the roll, because the randomness has to be the room's. */
@@ -334,6 +345,11 @@ export const EFFECT_KINDS = [
   /* into an ally's deck. The only effect that changes what somebody else will
      be holding next round. */
   'graft',
+  /* on the works, and on nobody. The Engineer's lines pay out at the top of
+     every round whether or not he acts; this tells them not to, and to pay
+     double when they next do. The only effect in the list that lands on the
+     room rather than on a body. */
+  'hold',
 ];
 
 /* ============================================================== ailments === */
@@ -565,45 +581,240 @@ export const BASE_ACTIONS = ['strike', 'hold'];
 
 /* What the Engineer puts on the map, and the reason the build phase matters.
  *
- * A building is not a stat. It is a tile you chose to spend, and a combat
- * option the whole party gets to use afterwards — so the build phase is where
- * the party decides what its combat is going to look like. That is the whole
- * two-phase design in one field: `grants`.
+ * A building is not a stat. It is a tile you chose to spend, and what it buys
+ * is a **standing payout to the whole party** — every round, automatically,
+ * costing nobody a turn. That is the seat's whole identity and the one thing
+ * no other class can copy: the Hauler's bag can pack a card that does what a
+ * Bulwark did, but it cannot pack a thing that keeps working while he is doing
+ * something else. The Engineer's contribution already happened.
  *
- *   tier    1 is affordable from STARTING_SALVAGE, 2 needs income first
+ * Five lines. Four pay the party, one pays him:
+ *
+ *   array      power, to the Engineer, per fight
+ *   ward       guard on every seat, at the top of every round
+ *   might      a harder swing for every seat, at the top of every round
+ *   burn       damage on the nearest enemy, at the top of every round
+ *   mend       health for every seat, once, when the fight ends
+ *
+ * `mend` is the odd one and deliberately so: healing every round was simply
+ * the best line in the game, so it fires once and pays more. It is between-
+ * fight economy rather than combat sustain, and no ability draws it — which
+ * is what stops it spiking.
+ *
+ * Fields:
+ *
  *   costs   salvage spent to raise it, checked against the shared pool
- *   grants  combat action ids this building adds for everyone
- *   income  salvage drawn after each combat while it stands
+ *   line    which payout it feeds, and `pays` is how much
+ *   power   panels only; the array is adjacency-scored, see `worksFrom`
+ *   carry   unspent power survives the fight, this many points of it
+ *   grants  what somebody else's build phase gets while it stands
+ *   place   where it may stand — see `placeRefusal`
+ *   max     how many may stand at once
  *   art     key into BUILDING_ART — client-only, like every art key here
  */
 export const BUILDINGS = {
+
+  /* ---- the array: power, and only the Engineer spends it -------------- */
+
   panel: {
     name: 'Solar Panel',
-    costs: { screw: 3, plating: 2 },
+    costs: { screw: 3 },
+    line: 'array',
     power: 1,
-    income: {},
-    note: 'Cracked, half-blind, and still tracking the sun. One panel, one shot.',
+    note: 'Cracked, half-blind, and still tracking the sun. Two of them share a rail and both do better.',
     art: 'panel',
   },
-  workbench: {
-    name: 'Workbench',
-    costs: { screw: 4, pipe: 3 },
-    power: 0,
+  flywheel: {
+    name: 'Flywheel',
+    costs: { screw: 6 },
+    carry: 2,
+    place: { beside: 'panel', needs: { panel: 3 } },
     max: 1,
-    // Coil is the rarest salvage and the Overcharged Coil needs one per
-    // level; on a short run the roll could simply never produce it. A
-    // standing bench guarantees the coil economy exists, so the upgrade it
-    // exists to sell is always reachable.
-    income: { screw: 2, pipe: 1, coil: 1 },
-    note: 'A vice, a flat surface, and somewhere to put the gun down and open it up.',
-    art: 'workbench',
+    note: 'A tonne of salvaged rotor, spun up all afternoon. It is still turning when the sun is not.',
+    art: 'flywheel',
+  },
+  inverter: {
+    name: 'Inverter',
+    costs: { screw: 7 },
+    line: 'array',
+    perPanels: 3,
+    place: { beside: 'panel', needs: { panel: 5 } },
+    max: 1,
+    note: 'Takes what the whole rail makes and hands it back as something a gun can drink.',
+    art: 'inverter',
+  },
+
+  /* ---- the windbreak: guard on everybody, every round ----------------- */
+
+  trellis: {
+    name: 'Trellis',
+    costs: { screw: 5 },
+    line: 'ward', pays: 1,
+    place: { onOrNear: 'grass' },
+    max: 1,
+    note: 'Woven green over a frame of scrap. It does not stop much. It stops it everywhere at once.',
+    art: 'trellis',
+  },
+  livingwall: {
+    name: 'Living Wall',
+    costs: { screw: 6 },
+    line: 'ward', pays: 1,
+    place: { beside: 'trellis' },
+    max: 1,
+    note: 'The trellis, grown in. Roots in the rubble and a metre of leaf between you and the wind.',
+    art: 'livingwall',
+  },
+  hedgerow: {
+    name: 'Hedgerow',
+    costs: { screw: 7 },
+    line: 'ward', pays: 1,
+    place: { beside: 'livingwall' },
+    max: 1,
+    note: 'Laid the old way, half-cut and bent over. A hedge is a wall that mends itself.',
+    art: 'hedgerow',
+  },
+
+  /* ---- the carillon: a harder swing for everybody, every round -------- */
+
+  carillon: {
+    name: 'Carillon',
+    costs: { screw: 5 },
+    line: 'might', pays: 1,
+    place: { camp: 2 },
+    max: 1,
+    note: 'Cut pipe hung in a frame and struck on the hour. Everybody works better to a beat.',
+    art: 'carillon',
+  },
+  tubes: {
+    name: 'Speaking Tubes',
+    costs: { screw: 6 },
+    line: 'might', pays: 1,
+    place: { beside: 'carillon' },
+    max: 1,
+    note: 'Brass throats run out to the far end of the site. Nobody has to shout twice.',
+    art: 'tubes',
+  },
+  belfry: {
+    name: 'Belfry',
+    costs: { screw: 7 },
+    line: 'might', pays: 1,
+    place: { beside: 'tubes' },
+    max: 1,
+    note: 'The bells got a tower. You can hear it from the treeline, and you move when you do.',
+    art: 'belfry',
+  },
+
+  /* ---- the heliostat: it shoots on its own ---------------------------- */
+
+  heliostat: {
+    name: 'Heliostat',
+    costs: { screw: 5 },
+    line: 'burn', pays: 1,
+    place: { clearOf: ['tree', 'tent'] },
+    max: 1,
+    note: 'One mirror on a tracker, folded down the lane. It does not need telling twice.',
+    art: 'heliostat',
+  },
+  mirrorfield: {
+    name: 'Mirror Field',
+    costs: { screw: 6 },
+    line: 'burn', pays: 1,
+    place: { beside: 'heliostat', clearOf: ['tree', 'tent'] },
+    max: 1,
+    note: 'Nine more, all aimed at the same square metre of afternoon.',
+    art: 'mirrorfield',
+  },
+  furnace: {
+    name: 'Solar Furnace',
+    costs: { screw: 7 },
+    line: 'burn', pays: 1,
+    place: { beside: 'mirrorfield', clearOf: ['tree', 'tent'] },
+    max: 1,
+    note: 'The point where all of it meets. Do not look at it, and do not stand in it.',
+    art: 'furnace',
+  },
+
+  /* ---- the cistern: everybody mends when the fight is over ------------ */
+
+  cistern: {
+    name: 'Rain Cistern',
+    costs: { screw: 5 },
+    line: 'mend', pays: 2,
+    place: { near: 'water' },
+    max: 1,
+    note: 'Roof runoff, caught and kept. Half of getting better is having drunk something clean.',
+    art: 'cistern',
+  },
+  reedbed: {
+    name: 'Reed Bed',
+    costs: { screw: 6 },
+    line: 'mend', pays: 2,
+    place: { beside: 'cistern' },
+    max: 1,
+    note: 'Gravel, reeds and patience. What comes out the far end is better than what went in.',
+    art: 'reedbed',
+  },
+  mycelial: {
+    name: 'Mycelial Filter',
+    costs: { screw: 7 },
+    line: 'mend', pays: 2,
+    place: { beside: 'reedbed' },
+    max: 1,
+    note: 'White threads through a barrel of woodchip. They eat what the reeds would not touch.',
+    art: 'mycelial',
+  },
+
+  /* ---- the community: somebody else's build phase, made bigger --------
+   *
+   * The only role in this game nobody else can occupy. Rune, Graft and Leg Up
+   * hand something to an ally, but they are one round, one target, inside a
+   * fight. These four are the only things in the project that reach another
+   * seat's *economy*, and they are why the coil pile exists at all.
+   */
+
+  press: {
+    name: 'Pulp Press',
+    costs: { coil: 5 },
+    grants: { pages: 1 },
+    place: { near: 'water' },
+    max: 1,
+    note: 'Rag, water and a screw press. The library stops being a thing you only find.',
+    art: 'press',
+  },
+  glasshouse: {
+    name: 'Glasshouse',
+    costs: { coil: 5 },
+    grants: { pot: 1 },
+    place: { on: ['grass'] },
+    max: 1,
+    note: 'Salvaged glazing over the pots. Everything under it comes up heavier.',
+    art: 'glasshouse',
+  },
+  barrow: {
+    name: 'The Barrow',
+    costs: { coil: 5 },
+    grants: { pack: 1 },
+    place: { camp: 2 },
+    max: 1,
+    note: 'Two wheels and a deep tray. What he could not carry, he can now wheel.',
+    art: 'barrow',
+  },
+  windrow: {
+    name: 'Windrow',
+    costs: { coil: 5 },
+    grants: { uses: 1 },
+    place: { near: 'tree' },
+    max: 1,
+    note: 'Cuttings laid in a long heap to rot down. She takes more out of it than she put in.',
+    art: 'windrow',
   },
 };
 
-/* How many can stand at once. Only the Workbench is capped: a second one would
-   not give the Engineer anything a first one does not, and a row of them would
-   be a tile sink with no decision in it. Panels are the opposite — every one is
-   another shot, so building more is the whole point. */
+/* How many can stand at once. Everything but the panel is capped at one: a
+   second Trellis would pay the same line twice for no decision, and the tiers
+   above it are what a line is *for*. Panels are the opposite — every one is
+   more power and another neighbour for the next, so building more is the whole
+   point. */
 export const buildingsOf = (buildings, id) =>
   (buildings || []).filter(b => b.id === id).length;
 
@@ -613,62 +824,262 @@ export function canBuildMore(id, buildings){
   return building.max === undefined || buildingsOf(buildings, id) < building.max;
 }
 
-/* ============================================================== upgrades === */
+/* ---- where a thing may stand ----------------------------------------- */
 
-/* What the Workbench is for: salvage spent on the bolt gun rather than on more
- * ground. Both are repeatable, and both get dearer each time — an Engineer who
- * never stops upgrading should be feeling the cost, not compounding for free.
+/* Orthogonal neighbours only. A diagonal is not touching — you cannot run a
+   conduit through a corner, and a hedge laid corner to corner is two hedges. */
+export const NEIGHBOURS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
+/* Why this building may not stand on this tile, or null when it may.
  *
- *   costs  base price; every level already bought adds `step` again
- *   adds   'shots' makes a bolt cost less power, 'damage' makes it hit harder
+ * A reason rather than a boolean, on the rule `actionReady` already follows: a
+ * greyed button whose price you can read is information, and one that refuses
+ * silently is a bug report. The client draws the string.
+ *
+ * Terrain and occupancy are `canBuildAt`'s job — called here so there is one
+ * question to ask, and the per-building rule sits on top of it.
  */
-export const UPGRADES = {
-  barrel: {
-    name: 'Second Barrel',
-    adds: 'shots',
-    costs: { screw: 3, pipe: 2 },
-    step: { screw: 2, pipe: 1 },
-    note: 'Another barrel, another bolt out of the same charge. It is not elegant.',
-  },
-  coilwind: {
-    name: 'Overcharged Coil',
-    adds: 'damage',
-    costs: { plating: 2, coil: 1 },
-    step: { plating: 1, coil: 1 },
-    note: 'Wind the coil tighter. Every bolt hits harder and the gun gets warm.',
-  },
-};
+export function placeRefusal(id, { terrain, buildings, nodes, x, y }){
+  const building = BUILDINGS[id];
+  if(!building) return 'No such thing.';
+  if(!canBuildMore(id, buildings)) return `One ${building.name} is all a site needs.`;
+  if(!canBuildAt(terrain, buildings, nodes, x, y)) return 'Nothing can stand here.';
 
-/* What the next level of an upgrade costs, given how many are already bought. */
-export function upgradeCost(id, level = 0){
-  const upgrade = UPGRADES[id];
-  if(!upgrade) return null;
-  const costs = {};
-  for(const [resource, base] of Object.entries(upgrade.costs)){
-    costs[resource] = base + level * ((upgrade.step || {})[resource] || 0);
+  const rule = building.place;
+  if(!rule) return null;
+
+  const around = NEIGHBOURS.map(([dx, dy]) => ({ x: x + dx, y: y + dy }));
+  const terrainAt = (t) => around.some(c => tileAt(terrain, c.x, c.y) === t);
+  const buildingAt = (bid) =>
+    (buildings || []).some(b => b.id === bid && around.some(c => c.x === b.x && c.y === b.y));
+
+  if(rule.needs){
+    for(const [bid, n] of Object.entries(rule.needs)){
+      if(buildingsOf(buildings, bid) < n){
+        return `Needs ${n} ${BUILDINGS[bid].name}${n === 1 ? '' : 's'} standing.`;
+      }
+    }
   }
-  return costs;
+  if(rule.beside && !buildingAt(rule.beside)){
+    return `Has to touch the ${BUILDINGS[rule.beside].name}.`;
+  }
+  if(rule.near && !terrainAt(rule.near)){
+    return `Has to touch ${TERRAIN[rule.near].name.toLowerCase()}.`;
+  }
+  if(rule.on && !rule.on.includes(tileAt(terrain, x, y))){
+    return `Only on ${rule.on.map(t => TERRAIN[t].name.toLowerCase()).join(' or ')}.`;
+  }
+  if(rule.onOrNear && tileAt(terrain, x, y) !== rule.onOrNear && !terrainAt(rule.onOrNear)){
+    return `Has to be on or against ${TERRAIN[rule.onOrNear].name.toLowerCase()}.`;
+  }
+  if(rule.clearOf){
+    const shade = rule.clearOf.find(t => terrainAt(t));
+    if(shade) return `${TERRAIN[shade].name} in the way. It needs the sky.`;
+  }
+  if(rule.camp !== undefined && !inCamp(x, y, rule.camp)){
+    return 'Belongs at the camp.';
+  }
+  return null;
 }
 
-/* Power is the Engineer's other pool, and the only one that is not carried:
- * it is whatever the panels make, refilled at the start of every fight and
- * gone at the end of it. Hoarding is not a strategy — you either spent the
- * sunlight this round or you did not.
+export const canPlace = (id, ctx) => placeRefusal(id, ctx) === null;
+
+/* Which standing buildings have had their rule broken underneath them.
+ *
+ * Only the two predicates that name *other buildings* — `beside` and `needs` —
+ * can be broken by somebody else moving. Every other one is about the tile a
+ * building is already on, and that does not change when a neighbour walks. The
+ * check is written through `placeRefusal` anyway rather than reimplementing
+ * those two, because one rule in one place is the whole reason that function
+ * exists: a predicate added there is a predicate this honours for free.
+ *
+ * Each building is asked about its own tile against a board it has been taken
+ * out of, which is exactly the question `placeRefusal` already answers.
  */
-export const powerFrom = buildings =>
-  (buildings || []).reduce((sum, b) => sum + ((BUILDINGS[b.id] || {}).power || 0), 0);
+export function strandedIn({ terrain, buildings, nodes }){
+  const placed = buildings || [];
+  return placed.filter(b => placeRefusal(b.id, {
+    terrain, buildings: placed.filter(other => other !== b), nodes, x: b.x, y: b.y,
+  }) !== null);
+}
+
+/* Why the building at `index` may not move to this tile, or null when it may.
+ *
+ * Moving is free and build-phase only, on the precedent the scriptorium
+ * already sets: a spell is re-socketed at the desk and not mid-surge, and
+ * rearranging what you have already paid for should never cost twice. What a
+ * player is doing when they shuffle the array into a longer run is thinking,
+ * and charging for thinking is how you get a base nobody dares improve.
+ *
+ * Two questions, and the second is the one that matters. The destination is
+ * `placeRefusal` against a board the building has been lifted off — which also
+ * settles the cap for free, since a Trellis is not a second Trellis when the
+ * first one is the thing in your hand.
+ *
+ * Then: **a move may not strand anything.** Without that, every adjacency rule
+ * in the game is decoration — you would place the Trellis, hang the Living
+ * Wall off it, and walk the Trellis to the far side of the site. The tiers
+ * have to stay a run of touching tiles, or they were never a shape.
+ */
+export function moveRefusal(index, { terrain, buildings, nodes, x, y }){
+  const placed = buildings || [];
+  const held = placed[index];
+  if(!held) return 'Nothing there to move.';
+  if(held.x === x && held.y === y) return null;      // put back where it was
+
+  const without = placed.filter((_, i) => i !== index);
+  const why = placeRefusal(held.id, { terrain, buildings: without, nodes, x, y });
+  if(why) return why;
+
+  const stranded = strandedIn({
+    terrain, nodes, buildings: [...without, { ...held, x, y }],
+  });
+  if(stranded.length){
+    const names = [...new Set(stranded.map(b => BUILDINGS[b.id].name))];
+    return `That would strand the ${names.join(' and the ')}.`;
+  }
+  return null;
+}
+
+export const canMove = (index, ctx) => moveRefusal(index, ctx) === null;
+
+/* ---- what the works pay ---------------------------------------------- */
+
+/* Every payout the standing buildings make, in one object.
+ *
+ * One function, because the round's payout, an ability's damage and the
+ * client's readout all have to agree about what the base is worth, and three
+ * places that each add it up is three places that can drift.
+ *
+ * The array is the only line that is not a plain sum. A panel makes 1 alone
+ * and 2 with another panel orthogonally beside it, so the array wants a
+ * contiguous run and the map fights back — rubble, water, trees and crevices
+ * are unbuildable, herb nodes hold their tile until somebody takes them, and
+ * the camp is stamped through the middle. Finding six clear tiles in a row on
+ * a rolled ruin is the Engineer's real spatial problem, and it competes for
+ * ground with every line building that has to touch the tier below it.
+ */
+export function worksFrom(buildings){
+  const placed = buildings || [];
+  const works = { array: 0, ward: 0, might: 0, burn: 0, mend: 0, carry: 0 };
+
+  const panels = placed.filter(b => b.id === 'panel');
+  for(const panel of panels){
+    const paired = panels.some(other => other !== panel
+      && NEIGHBOURS.some(([dx, dy]) => panel.x + dx === other.x && panel.y + dy === other.y));
+    works.array += paired ? 2 : 1;
+  }
+
+  for(const b of placed){
+    const building = BUILDINGS[b.id];
+    if(!building) continue;
+    if(building.line && building.pays) works[building.line] += building.pays;
+    if(building.perPanels) works.array += Math.floor(panels.length / building.perPanels);
+    if(building.carry) works.carry += building.carry;
+  }
+  return works;
+}
+
+/* The array alone, kept under its old name because everything that only wants
+   to know "how much power a fight" already asks for it by this one. */
+export const powerFrom = buildings => worksFrom(buildings).array;
+
+/* What one of somebody else's economies gets out of the standing buildings.
+   `grants` is a plain count, so a second thing granting `pages` would simply
+   add — the callers read a number, never a building id. */
+export function grantsFrom(buildings, key){
+  return (buildings || []).reduce(
+    (n, b) => n + (((BUILDINGS[b.id] || {}).grants || {})[key] || 0), 0);
+}
+
+/* ============================================================== upgrades === */
+
+/* Gone, and kept as a shim.
+ *
+ * The Workbench and the two upgrades it sold were a second progression system
+ * beside the buildings, and it was the one that decided the fight — so every
+ * placement the Engineer made was decoration and every purchase was the game.
+ * Folding both into buildings is what makes a tile worth choosing.
+ *
+ * The names stay exported and answer emptily, because this module is imported
+ * at the top of a Worker nobody here can read the source of, and an import of
+ * a name that is not exported takes the whole site down, sign-in included. See
+ * the published contract at the foot of `test/content.test.js`.
+ */
+export const UPGRADES = {};
+export function upgradeCost(){ return null; }
+export function buyUpgrade(){ return null; }
 
 /* What the party starts a run with.
  *
- * It must cover a Solar Panel on the first build phase — an Engineer who
- * cannot make power on round one has a bolt gun and no way to fire it, which
- * is a dead card in an opening hand.
- *
- * It also covers a Workbench, and deliberately not both: power now or upgrades
- * later is the Engineer's opening decision, and a test pins it so a balance
- * pass cannot quietly make the first move free.
+ * Two panels' worth of screws, or one line's first tier with a panel left over
+ * — the opening fork in miniature. Coil covers nothing on its own, so the
+ * first community machine is always a round away and always a decision. Two
+ * chips is exactly a Bolt Gun, which is the one ability needing no building
+ * behind it and therefore the only one a round-one Engineer can fire.
  */
-export const STARTING_SALVAGE = { screw: 5, pipe: 3, plating: 2, coil: 0 };
+export const STARTING_SALVAGE = { screw: 6, coil: 3, chip: 2 };
+
+/* ============================================================= abilities === */
+
+/* What chips buy, and the only combat the Engineer has beyond his two basics.
+ *
+ * Four of the five draw a line: their number is not on the card, it is on the
+ * map. `DRAW` times what that line pays every round, onto one target. Close
+ * Ranks off a bare Trellis is 5 guard; with the windbreak grown in it is 15,
+ * from the same chip. The first card in this game whose text you read by
+ * looking at the board.
+ *
+ * DRAW is PARTY_SIZE, and that is the fiction: the whole crew's share of one
+ * round, pulled through a single line. It is a flat multiplier rather than an
+ * actual redistribution because a redistribution is worth five times as much
+ * at a full table and nothing at all alone, and this seat has to be playable
+ * by one person.
+ *
+ *   chips  what it costs to learn
+ *   needs  the building that has to stand for it to be takeable at all
+ */
+export const DRAW = PARTY_SIZE;
+
+export const ABILITIES = {
+  boltgun: {
+    name: 'Bolt Gun', chips: 2, needs: null,
+    note: 'The one thing he can fire off a bare panel. No mirrors, no line, no excuse.',
+  },
+  closeranks: {
+    name: 'Close Ranks', chips: 2, needs: 'trellis',
+    note: 'A round of the windbreak, all of it, put on one person.',
+  },
+  allhands: {
+    name: 'All Hands', chips: 2, needs: 'carillon',
+    note: 'Every bell and every tube, and the whole crew behind one swing.',
+  },
+  sunlance: {
+    name: 'Sunlance', chips: 3, needs: 'heliostat',
+    note: 'The array’s whole afternoon through one mirror, at one thing.',
+  },
+  holdcharge: {
+    name: 'Hold the Charge', chips: 3, needs: null,
+    note: 'Let the grid bank a round. What it did not pay out, it pays twice.',
+  },
+};
+
+/* Every ability id a party could buy, in menu order. */
+export const ABILITY_IDS = Object.keys(ABILITIES);
+
+/* Can this be learned, and if not, why not. Same contract as `placeRefusal`. */
+export function abilityRefusal(id, { salvage, bought, buildings }){
+  const ability = ABILITIES[id];
+  if(!ability) return 'No such thing.';
+  if((bought || []).includes(id)) return 'Already learned.';
+  if(((salvage || {}).chip || 0) < ability.chips){
+    return `Needs ${ability.chips} ${SALVAGE.chip.name}.`;
+  }
+  if(ability.needs && !(buildings || []).some(b => b.id === ability.needs)){
+    return `Needs a ${BUILDINGS[ability.needs].name} standing.`;
+  }
+  return null;
+}
 
 /* ============================================================== classes === */
 
@@ -936,7 +1347,20 @@ export const CARDS = {
     note: 'Poured on the fire. Everyone standing near it breathes easier.',
   },
 
-  /* --- the Engineer: hits like a tool, holds like a wall --- */
+  /* --- the Engineer: two basics, and everything else is bought ---------
+   *
+   * `CLASS_ACTIONS.engineer` is empty, exactly as the Hauler's is. What he can
+   * do in a fight is what the chips bought and the buildings allow, and the
+   * room appends it per run from `abilities` — the same door the Wizard's book
+   * and the Hauler's bag already come through.
+   *
+   * Bulwark and Jumper Cables used to live here and are gone. The Hauler's bag
+   * now packs a Rigging Tarp (wardAll 3, free) and a Stretcher (revive 8, one
+   * health), which are both of them, better, on a seat that did not have to
+   * build a panel first. A class whose whole option list is a worse copy of
+   * somebody else's kit does not need rebalancing, it needs a different job —
+   * so his is the payout that runs while everybody else is taking their turn.
+   */
   wrench: {
     name: 'Wrench', kind: 'attack', classId: 'engineer', basic: true,
     effect: { kind: 'strike', amount: 3 },
@@ -947,22 +1371,53 @@ export const CARDS = {
     effect: { kind: 'ward', amount: 4, rounds: 1 },
     note: 'Plating, a strut, and eleven seconds. It will hold.',
   },
-  /* Guard on everyone, worse per head than Shore Up on one. That trade is the
-     whole point of a party card: it is the wrong card at a table of one and
-     the best card in the deck at a table of five. */
-  bulwark: {
-    name: 'Bulwark', kind: 'defend', classId: 'engineer', powerCost: 3,
-    effect: { kind: 'wardAll', amount: 3 },
-    note: 'Plate dragged into a line and braced. Get behind it, all of you.',
+
+  /* --- what the chips bought -------------------------------------------
+   *
+   * `ability: true` is the flag the client reads to draw these apart from the
+   * rest of the menu, and `draws` is what makes four of them worth looking at
+   * the map to price. See ABILITIES for what each one costs to learn and what
+   * has to be standing before it can be taken at all.
+   */
+
+  /* The exception, and the reason it exists: every other ability is worth
+     exactly what its line pays, so an Engineer who has built nothing has
+     nothing to fire. This one is a flat number off a bare panel, which is what
+     makes the seat playable in the first build phase and playable alone. */
+  boltgun: {
+    name: 'Bolt Gun', kind: 'attack', classId: 'engineer', ability: true, powerCost: 1,
+    effect: { kind: 'strike', amount: 9 },
+    note: 'A captive bolt driver on a battery. Loud, ugly, and it goes through.',
   },
-  /* The only card that undoes a death. Deliberately not dead in solo — with
-     nobody down it is a jolt to whoever is worst off — because a card that
-     does nothing at a table of one would be a card the Engineer resents
-     drawing rather than one they are pleased to be holding. */
-  jumper: {
-    name: 'Jumper Cables', kind: 'heal', classId: 'engineer', powerCost: 3, targetsAlly: true,
-    effect: { kind: 'revive', amount: 6 },
-    note: 'Across the chest, and mind your hands. Somebody has to get them up.',
+  sunlance: {
+    name: 'Sunlance', kind: 'attack', classId: 'engineer', ability: true, powerCost: 2,
+    draws: 'burn',
+    effect: { kind: 'strike', amount: 0 },
+    note: 'Every mirror on the field turned to the same point, and the point put on one thing.',
+  },
+  closeranks: {
+    name: 'Close Ranks', kind: 'defend', classId: 'engineer', ability: true, powerCost: 1,
+    draws: 'ward', targetsAlly: true,
+    effect: { kind: 'ward', amount: 0, rounds: 1 },
+    note: 'The whole windbreak, for one round, standing in front of one person.',
+  },
+  /* Might is a term inside strikePower and it lands on the target's *next*
+     turn, exactly as the Wizard's Ember Rune does. That is the coordination:
+     the table can see a commitment before the round resolves, so a Wizard who
+     watches this land on her picks the Nova. */
+  allhands: {
+    name: 'All Hands', kind: 'buff', classId: 'engineer', ability: true, powerCost: 1,
+    draws: 'might', targetsAlly: true,
+    effect: { kind: 'might', amount: 0, rounds: 1 },
+    note: 'Every bell on the site rung at once, and the whole crew behind one swing.',
+  },
+  /* The only ability that draws nothing and targets nobody. It is also the one
+     that works identically at a table of one, because it concentrates a payout
+     across rounds rather than across people. */
+  holdcharge: {
+    name: 'Hold the Charge', kind: 'buff', classId: 'engineer', ability: true, powerCost: 1,
+    effect: { kind: 'hold' },
+    note: 'Let it bank. Nothing this round, and twice as much on the next one.',
   },
 
   /* --- the Wizard: a floor of a basic and the worst basic guard, which is
@@ -1048,25 +1503,6 @@ export const CARDS = {
     name: 'Greenfire', kind: 'attack', brewed: true, stocked: 0, consumed: true,
     effect: { kind: 'strike', amount: 8 },
     note: 'A whole array’s worth of stored afternoon, lit and thrown.',
-  },
-
-  /* --- the Engineer's --------------------------------------------------
-   *
-   * The bolt gun is the only card in the game that costs power, and power is
-   * the only pool that is not carried: panels make it, a fight spends it, and
-   * whatever is left evaporates. So a bolt gun in hand with no panel behind it
-   * is a card you built wrong three minutes ago.
-   *
-   * It is not consumed — the gun is a gun, not a potion. What changes is how
-   * many of them are in the deck and how hard they hit, both bought at the
-   * workbench, which is why `upgradedBy` points at an upgrade rather than the
-   * effect being a fixed number.
-   */
-  boltgun: {
-    name: 'Bolt Gun', kind: 'attack', classId: 'engineer', powerCost: 2,
-    upgradedBy: 'coilwind', upgradeStep: 3, cheapenedBy: 'barrel',
-    effect: { kind: 'strike', amount: 9 },
-    note: 'A captive bolt driver on a battery. Loud, ugly, and it goes through.',
   },
 
   /* --- the Hauler: the only seat that buys with health ------------------
@@ -1343,7 +1779,7 @@ export const CLASS_BASICS = {
  */
 export const CLASS_ACTIONS = {
   alchemist: ['tonic', 'censer', 'vapours', 'sunsalve', 'stillwater', 'greenfire'],
-  engineer: ['boltgun', 'bulwark', 'jumper'],
+  engineer: [],
   wizard: ['fireball', 'nova', 'rune'],
   hauler: [],
   grafter: ['ringbark', 'season', 'scion'],
@@ -1387,18 +1823,16 @@ export function freshUses(classId){
 /* Which pool an action spends, or null for a basic. One field, because an
    action that answered to two of these would be a price nobody could read off
    the face of it. */
-export function actionCost(id, spell = null, upgrades = {}){
+export function actionCost(id, spell = null, works = {}){
   const card = CARDS[id];
   if(spell) return { pool: 'charges', amount: spell.charges || 0 };
   if(!card) return null;
-  if(card.powerCost){
-    // `cheapenedBy` is the workbench reaching the fight through the price
-    // rather than through the effect — the Second Barrel is more shots out of
-    // one charge, which is what another barrel is. Floored at one, or enough
-    // levels would make the gun free and the panel pointless.
-    const off = card.cheapenedBy ? (upgrades[card.cheapenedBy] || 0) : 0;
-    return { pool: 'power', amount: Math.max(1, card.powerCost - off) };
-  }
+  // Power prices are flat now. They used to be shaded by a workbench upgrade,
+  // and the fork that replaced it is a better one: screws go to panels for the
+  // power to fire an ability, or to a line for what the ability is worth. A
+  // cheaper shot on top of both would have been a third answer to a question
+  // that reads better with two.
+  if(card.powerCost) return { pool: 'power', amount: card.powerCost };
   if(card.chargeCost) return { pool: 'charges', amount: card.chargeCost };
   if(card.hpCost) return { pool: 'hp', amount: card.hpCost };
   if(card.stocked !== undefined) return { pool: 'stock', amount: 1 };
@@ -1415,7 +1849,7 @@ export function actionCost(id, spell = null, upgrades = {}){
 export function actionReady(id, seat = {}, spell = null){
   const card = CARDS[id];
   if(!card && !spell) return { ok: false, why: 'unknown' };
-  const cost = actionCost(id, spell, seat.upgrades);
+  const cost = actionCost(id, spell, seat.works);
   if(!cost) return { ok: true };
 
   if(cost.pool === 'power'){
@@ -1442,7 +1876,7 @@ export function actionReady(id, seat = {}, spell = null){
    client prints on the button. `null` where there is no count to show — a
    basic, or a cost that is paid out of something already on screen. */
 export function actionRemaining(id, seat = {}){
-  const cost = actionCost(id, null, seat.upgrades);
+  const cost = actionCost(id, null, seat.works);
   if(!cost) return null;
   if(cost.pool === 'stock') return (seat.stock || {})[id] || 0;
   if(cost.pool === 'uses') return (seat.uses || {})[id] || 0;
@@ -1461,7 +1895,7 @@ export const isBasic = id => !!(CARDS[id] || {}).basic;
  * not a moment — it is a rotation. */
 export const STARTING_DECKS = {
   alchemist: { flask: 3, steady: 3, tonic: 2, censer: 1, vapours: 1 },
-  engineer: { wrench: 3, shore: 4, boltgun: 1, bulwark: 1, jumper: 1 },
+  engineer: { wrench: 3, shore: 4 },
   wizard: { spark: 4, sign: 2, fireball: 2, rune: 1, nova: 1 },
   hauler: { shoulder: 3, weight: 3, setfeet: 2, behind: 1, legup: 1 },
   grafter: { hook: 3, ringbark: 3, bramble: 2, season: 1, scion: 1 },
@@ -1501,7 +1935,7 @@ export const COMBAT_ACTIONS = CARDS;
  */
 
 /* Was: the actions a party had, given what it had built. Buildings grant power
-   and upgrades now rather than cards, so there is nothing to add — but the
+   and buildings now rather than cards, so there is nothing to add — but the
    shape is still an array of ids that exist in CARDS. */
 export function combatOptions(){
   return [...BASE_ACTIONS].filter(id => CARDS[id]);
@@ -1538,31 +1972,25 @@ export function deckFor(classId){
   return [...buildDeck(classId), ...UNIVERSAL_CARDS];
 }
 
-/* What a card does right now, upgrades applied.
+/* What a card does right now, with the works that stand behind it applied.
  *
- * CARDS stays declarative and the bolt gun's damage lives here instead, because
- * the alternative is rewriting the card table when somebody buys a coil — and
- * then the client and the room disagree about how hard a bolt hits.
+ * Four of the Engineer's abilities have no number of their own. `draws` names
+ * a line, and the amount is DRAW times what that line pays every round — so
+ * the card is worth what the base is worth and the table can read its damage
+ * off the map. CARDS stays declarative and the arithmetic lives here, because
+ * the alternative is rewriting the card table every time somebody raises a
+ * hedge, and then the button and the resolution disagree about what a Close
+ * Ranks is.
+ *
+ * `works` is a `worksFrom` object. Everything that is not an ability ignores
+ * it entirely and returns its own flat effect, which is every other card in
+ * the game.
  */
-export function cardEffect(cardId, upgrades = {}){
+export function cardEffect(cardId, works = {}){
   const card = CARDS[cardId];
   if(!card) return null;
-  const levels = card.upgradedBy ? (upgrades[card.upgradedBy] || 0) : 0;
-  if(!levels) return card.effect;
-  return { ...card.effect, amount: card.effect.amount + levels * (card.upgradeStep || 0) };
-}
-
-/* Buy the next level of an upgrade. Returns the spent pool and what it did, or
-   null when the salvage is short — the caller cannot half-apply it. */
-export function buyUpgrade(id, level, salvage){
-  const upgrade = UPGRADES[id];
-  if(!upgrade) return null;
-  const costs = upgradeCost(id, level);
-  if(!canAfford(costs, salvage)) return null;
-
-  const spent = { ...salvage };
-  for(const [resource, n] of Object.entries(costs)) spent[resource] -= n;
-  return { salvage: spent, adds: upgrade.adds, level: level + 1 };
+  if(!card.draws) return card.effect;
+  return { ...card.effect, amount: DRAW * (works[card.draws] || 0) };
 }
 
 /* Can a hero stand on this tile? Terrain has to allow it and nothing can be
@@ -1907,7 +2335,7 @@ export const freshSpellbook = () => ({
 });
 
 /* What a spell does with these sockets, resolved. This is to spellcraft what
- * cardEffect is to upgrades: CARDS and SPELLS stay declarative and the live
+ * cardEffect is to the works: CARDS and SPELLS stay declarative and the live
  * numbers happen here, on both sides of the wire, so the bench and the surge
  * can never disagree about what a Fireball has become.
  *
@@ -2457,12 +2885,17 @@ export function canBuildAt(terrain, buildings, nodes, x, y){
 }
 
 
-/* Salvage drawn once a fight is over: what the crew picks up, plus what the
- * standing buildings produced while it happened.
+/* Salvage drawn once a fight is over: what the crew picked up, and that is all.
  *
- * The crew's share is rolled and the buildings' is fixed, which is the shape
- * the economy wants — building is how you stop being at the mercy of the roll.
- * The caller supplies the generator, as everywhere else in this file.
+ * Buildings used to pay an income on top. They no longer do, because every one
+ * of them now buys a standing payout instead — a line the party is paid every
+ * round, or somebody else's build phase made permanently bigger — and a
+ * building that also handed back the salvage it cost would be paying twice for
+ * one tile.
+ *
+ * `income` is still read, so a building that wants one can simply declare it.
+ * Nothing does today. The caller supplies the generator, as everywhere else in
+ * this file.
  */
 export function salvageAfterCombat(players, buildings, random){
   const drawn = {};
@@ -2477,7 +2910,7 @@ export function salvageAfterCombat(players, buildings, random){
   for(const placed of buildings || []){
     const building = BUILDINGS[placed.id];
     if(!building) continue;
-    for(const [id, n] of Object.entries(building.income)) add(id, n);
+    for(const [id, n] of Object.entries(building.income || {})) add(id, n);
   }
 
   return drawn;

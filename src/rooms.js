@@ -22,7 +22,8 @@ import {
   PHASES, PARTY_SIZE, ROUNDS_BEFORE_BOSS, BOSS_ROUND, roundInfo, phaseCard,
   CLASSES, classById, playableClasses,
   MATERIALS, SALVAGE, STARTING_SALVAGE, nodeYield, NODE_REFUSAL,
-  BUILDINGS, UPGRADES, upgradeCost, buyUpgrade, canBuildMore, powerFrom,
+  BUILDINGS, canBuildMore, powerFrom, worksFrom, grantsFrom,
+  placeRefusal, moveRefusal, ABILITIES, abilityRefusal,
   CARDS, cardById, cardEffect,
   RECIPES, brew, missingForBuilding, canBuildAt,
   actionsFor, actionCost, actionReady, freshStock, freshUses,
@@ -41,6 +42,13 @@ import {
 } from '../public/good-vibes/content.js';
 
 const rooms = new Map();
+
+/* What each payout line is called in a log line. The ids are what the
+   buildings feed; these are what a player reads. */
+const LINE_NAMES = {
+  array: 'array', ward: 'windbreak', might: 'carillon',
+  burn: 'heliostat', mend: 'cistern',
+};
 
 /* Effect kinds that post their own fx events, one per thing they landed on.
    Everything else gets one generic event from resolve(). */
@@ -115,7 +123,7 @@ export class Room {
       site: this.site, terrain: this.terrain, nodes: this.nodes,
       buildings: this.buildings, enemies: this.enemies,
       stash: this.stash, salvage: this.salvage, pages: this.pages,
-      upgrades: this.upgrades, power: this.power,
+      abilities: this.abilities, power: this.power, banked: this.banked,
       // The scriptorium and the garden. Both are run-length state the party
       // spends whole build phases on — a spellbook that came back empty after
       // a deploy would be four rounds of somebody's evening — so they
@@ -133,7 +141,8 @@ export class Room {
       site: data.site, terrain: data.terrain, nodes: data.nodes,
       buildings: data.buildings, enemies: data.enemies,
       stash: data.stash, salvage: data.salvage, pages: data.pages,
-      upgrades: data.upgrades, power: data.power,
+      abilities: data.abilities || [], banked: !!data.banked,
+      power: data.power,
       // Defaulted rather than assumed: a room stored before the scriptorium
       // existed has none of these, and waking it must not throw.
       spellbook: data.spellbook || freshSpellbook(),
@@ -174,8 +183,15 @@ export class Room {
     this.stash = {};
     this.salvage = { ...STARTING_SALVAGE };
     this.pages = 2;
-    this.upgrades = {};
+    /* What the chips bought. The Engineer's whole option list beyond two
+       basics, and shared rather than per-player for the same reason the
+       spellbook and the salvage pool are: one seat spends it, but it is the
+       party's run. */
+    this.abilities = [];
     this.power = 0;
+    /* Set by Hold the Charge and spent by the next payout. On the room
+       rather than on the player, because the lines are the room's. */
+    this.banked = false;
     this.outcome = null;
     // The Wizard's book: what she knows, what she owns, and how it is
     // arranged. Room state like the buildings are, because the party can
@@ -297,6 +313,20 @@ export class Room {
 
   get empty(){ return !this.players.some(p => p.connected); }
 
+  /* Everything the standing buildings pay, in one object. Derived rather
+     than stored: a building goes up mid-build-phase and the number the
+     Engineer is reading changes on the same broadcast. */
+  get works(){ return worksFrom(this.buildings); }
+
+  /* Which of the bag's four layouts the Hauler is packing into.
+
+     The pack grows on a schedule — 13 cells, then 16, 18, 20 — and The
+     Barrow simply moves him along it early. `gridFor` already clamps at
+     both ends, so a barrow in the last round is a no-op rather than a
+     lookup off the end of the table, and every pack helper takes this in
+     place of the round for free. */
+  get packRound(){ return this.round + grantsFrom(this.buildings, 'pack'); }
+
   /* ---- what each client is allowed to see ---------------------------- */
 
   viewFor(player){
@@ -320,7 +350,11 @@ export class Room {
       stash: this.stash,
       salvage: this.salvage,
       pages: this.pages,
-      upgrades: this.upgrades,
+      abilities: this.abilities,
+      // What the standing works pay, sent rather than recomputed: the
+      // client prices four of the abilities off it and must not be able to
+      // disagree with the room about what a Close Ranks is worth.
+      works: this.works,
       power: this.power,
       outcome: this.outcome,
       // The book and the open draft are public: a draft the table can lean
@@ -474,8 +508,13 @@ export class Room {
     // than only foraging, because the draft is the Wizard's whole build phase
     // and a round with no page is a round spent watching.
     if(this.players.some(p => (classById(p.classId) || {}).cast)){
-      this.pages += PAGES_PER_ROUND;
-      this.log(`The library gives up ${PAGES_PER_ROUND} page${PAGES_PER_ROUND === 1 ? '' : 's'}.`);
+      // Plus whatever the Pulp Press ran off. The Engineer reaching into the
+      // Wizard's economy is the one thing no other seat can do for anybody:
+      // Rune and Graft hand an ally something for one round inside a fight,
+      // and this makes her build phase permanently bigger.
+      const pages = PAGES_PER_ROUND + grantsFrom(this.buildings, 'pages');
+      this.pages += pages;
+      this.log(`The library gives up ${pages} page${pages === 1 ? '' : 's'}.`);
     }
 
     /* Three things arrive at the Hauler's feet, unasked for and unchosen.
@@ -514,7 +553,16 @@ export class Room {
   enterCombat(){
     this.phase = PHASES.combat;
     this.terrain = generateCombatTerrain(this.random);
-    this.power = powerFrom(this.buildings);
+    /* Power was always the one pool that is not carried: panels make it, a
+       fight spends it, and whatever is left evaporates. The Flywheel is the
+       single exception and buys exactly `carry` points of it across, which is
+       why the sum is done here rather than inside `worksFrom` — what a fight
+       opens with is the room's arithmetic, not the buildings'. */
+    const works = this.works;
+    const kept = Math.min(works.carry, this.power || 0);
+    this.power = works.array + kept;
+    if(kept > 0) this.log(`The Flywheel gives back ${kept} it was still holding.`);
+    this.banked = false;
     const partySize = Math.max(1, this.players.filter(p => p.classId && p.connected).length);
     this.enemies = waveFor(this.round, partySize).map((type, i) => {
       const def = ENEMIES[type];
@@ -545,6 +593,14 @@ export class Room {
       // is made fresh by the panels, the Wizard's charges fill, and the
       // per-fight use counters go back to what the table says.
       p.uses = freshUses(p.classId);
+      /* And another of each, for as long as the Windrow stands. Written
+         against the counter rather than against the Grafter, because `uses` is
+         a rule about cards and she is only the seat that currently has any —
+         a heap of cuttings does not know whose they are. */
+      const spare = grantsFrom(this.buildings, 'uses');
+      if(spare > 0){
+        for(const id of Object.keys(p.uses)) p.uses[id] += spare;
+      }
       /* An Opening Word used to put its spell on top of the deck, so it was in
          the first hand dealt. There is no deck and no hand, so what it buys is
          a charge over the cap: the fight opens with more in the pool than a
@@ -590,7 +646,7 @@ export class Room {
         // stored against a different schedule can wake holding a layout this
         // one has no room for, and a piece hanging off the edge is a thing
         // you would find out about in a fight.
-        const spilled = packSpill(this.round, p.pack.placed);
+        const spilled = packSpill(this.packRound, p.pack.placed);
         for(const over of spilled){
           this.log(`${PACK_ITEMS[over.id].name} no longer fits the bag and falls out.`);
         }
@@ -706,7 +762,8 @@ export class Room {
       else if(intent.t === 'gather') this.gather(player, intent);
       else if(intent.t === 'brew') this.brew(player, cls, intent);
       else if(intent.t === 'place') this.place(player, cls, intent);
-      else if(intent.t === 'upgrade') this.upgrade(player, cls, intent);
+      else if(intent.t === 'learn') this.learn(player, cls, intent);
+      else if(intent.t === 'shift') this.shift(player, cls, intent);
       else if(intent.t === 'page') this.openPage(player, cls);
       else if(intent.t === 'pick') this.pickOffer(player, cls, intent);
       else if(intent.t === 'pack') this.packPut(player, cls, intent);
@@ -810,41 +867,92 @@ export class Room {
     const building = BUILDINGS[id];
     if(!building) return;
     if(Object.keys(missingForBuilding(id, this.salvage)).length) return;
-    if(!canBuildMore(id, this.buildings)) return;
-    if(!canBuildAt(this.terrain, this.buildings, this.nodes, x, y)) return;
+    /* One question, asked in one place. `placeRefusal` folds the terrain, the
+       occupancy, the cap and the building's own rule into a single answer, so
+       the ghost the client draws and the check the room makes cannot come
+       apart — and the string it returns is the one the client prints. */
+    if(placeRefusal(id, {
+      terrain: this.terrain, buildings: this.buildings, nodes: this.nodes, x, y,
+    })) return;
 
     this.salvage = spendSalvage(this.salvage, building.costs);
     this.buildings = [...this.buildings, { id, x, y }];
-    this.log(building.power
-      ? `${player.name} raised the ${building.name}. ${powerFrom(this.buildings)} power a fight now.`
-      : `${player.name} raised the ${building.name}.`);
+
+    /* Say what it changed, not that it happened. A payout line is invisible
+       until it fires, so the log is the only place a player learns that the
+       Living Wall they just raised took the windbreak from one to two — and a
+       panel says the whole array's number, because pairing means the tile you
+       chose changed what its neighbour was already worth. */
+    const works = this.works;
+    const paid = building.line === 'array' || building.carry
+      ? `${works.array} power a fight now.`
+      : building.line
+        ? `The ${LINE_NAMES[building.line]} pays ${works[building.line]} now.`
+        : '';
+    this.log(`${player.name} raised the ${building.name}. ${paid}`.trim());
   }
 
-  upgrade(player, cls, { upgrade: id }){
+  /* Pick a standing building up and put it down somewhere else.
+   *
+   * Free, and build-phase only, on the precedent `moveMod` already sets: a
+   * spell is re-socketed at the desk rather than mid-surge, and rearranging
+   * something already paid for should not cost twice. An array is a shape, and
+   * a shape you cannot adjust is one nobody dares start.
+   *
+   * `moveRefusal` refuses anything illegal — including a move that would
+   * strand a tier hanging off this one — so this is a move or a no-op, never a
+   * half-move. Same shape as every other build-phase verb in this file.
+   */
+  shift(player, cls, { index, x, y }){
     if(!cls || !cls.build) return;
-    if(!this.buildings.some(b => b.id === 'workbench')) return;
-    const level = this.upgrades[id] || 0;
-    const bought = buyUpgrade(id, level, this.salvage);
-    if(!bought) return;
+    const held = this.buildings[index];
+    if(!held) return;
+    if(moveRefusal(index, {
+      terrain: this.terrain, buildings: this.buildings, nodes: this.nodes, x, y,
+    })) return;
+    if(held.x === x && held.y === y) return;         // put back where it was
 
-    this.salvage = bought.salvage;
-    this.upgrades = { ...this.upgrades, [id]: bought.level };
-    if(bought.adds === 'shots'){
-      /* It used to push another Bolt Gun into his deck and hope he drew it.
-         The gun is an action he always has, so what a second barrel buys is a
-         cheaper shot — more bolts out of the same afternoon of sun. */
-      const cost = actionCost('boltgun', null, this.upgrades).amount;
-      this.log(`${UPGRADES[id].name}: a bolt costs ${cost} power now.`);
-    }else{
-      this.log(`${UPGRADES[id].name}: bolts now hit for ${cardEffect('boltgun', this.upgrades).amount}.`);
-    }
+    this.buildings = this.buildings.map((b, i) => (i === index ? { ...b, x, y } : b));
+
+    /* Say what it changed, for the reason placing one does: a payout is
+       invisible until it fires, and walking a panel into the run beside
+       another is the single most valuable thing this verb can do. */
+    const building = BUILDINGS[held.id];
+    const works = this.works;
+    const paid = building.line === 'array' || building.carry
+      ? `${works.array} power a fight now.`
+      : building.line
+        ? `The ${LINE_NAMES[building.line]} pays ${works[building.line]} now.`
+        : '';
+    this.log(`${player.name} shifted the ${building.name}. ${paid}`.trim());
+  }
+
+  /* ---- what chips buy ------------------------------------------------- */
+
+  /* Learn an ability. It is bought outright rather than placed — no tile, no
+     cursor — which is why the client draws it in the same menu as the
+     buildings but marked apart.
+
+     Four of the five need a line's first tier standing before they can be
+     learned at all: an ability whose whole number is what a line pays is not
+     an ability until there is a line. The Bolt Gun is the exception and the
+     reason the seat is playable in the first build phase. */
+  learn(player, cls, { ability: id }){
+    if(!cls || !cls.build) return;
+    if(abilityRefusal(id, {
+      salvage: this.salvage, bought: this.abilities, buildings: this.buildings,
+    })) return;
+
+    this.salvage = spendSalvage(this.salvage, { chip: ABILITIES[id].chips });
+    this.abilities = [...this.abilities, id];
+    this.log(`${player.name} works out the ${ABILITIES[id].name}.`);
   }
 
   /* ---- the garden: the Alchemist's slow half -------------------------- */
 
-  /* Both gated on `craft`, like brewing: the pots are hers the way the
-     workbench is the Engineer's. The helpers refuse anything illegal, so
-     these are a move or a no-op, never a half-move. */
+  /* Both gated on `craft`, like brewing: the pots are hers the way the array
+     is the Engineer's. The helpers refuse anything illegal, so these are a
+     move or a no-op, never a half-move. */
   plant(player, cls, { pot, herb }){
     if(!cls || !cls.craft) return;
     const planted = plantPot(this.pots, pot, herb, this.stash);
@@ -859,8 +967,21 @@ export class Room {
     const picked = harvestPot(this.pots, pot, this.stash);
     if(!picked) return;
     this.pots = picked.pots;
-    this.stash = picked.stash;
-    this.log(`${player.name} harvests ${picked.yielded} ${MATERIALS[picked.herb].name} from the pot.`);
+
+    /* And whatever the Glasshouse added on top.
+     *
+     * Added here rather than inside `harvestPot`, because what a pot is worth
+     * for its age is a rule about the garden and belongs with the garden; what
+     * a pane of salvaged glazing is worth is a rule about the Engineer's works
+     * and has no business in `content.js`'s pot table. The stash gets both,
+     * and the log says the number the player actually received.
+     */
+    const under = grantsFrom(this.buildings, 'pot');
+    const yielded = picked.yielded + under;
+    this.stash = under > 0
+      ? { ...picked.stash, [picked.herb]: (picked.stash[picked.herb] || 0) + under }
+      : picked.stash;
+    this.log(`${player.name} harvests ${yielded} ${MATERIALS[picked.herb].name} from the pot.`);
   }
 
   /* ---- the scriptorium: the Wizard's build phase ---------------------- */
@@ -910,7 +1031,7 @@ export class Room {
     const id = pack.loose[index];
     if(!id) return;
 
-    const placed = packPlace(this.round, pack.placed, id, x, y, rot);
+    const placed = packPlace(this.packRound, pack.placed, id, x, y, rot);
     if(!placed) return;                       // it does not go there; nothing moved
 
     player.pack = { placed, loose: pack.loose.filter((_, i) => i !== index) };
@@ -997,6 +1118,22 @@ export class Room {
     if(cls && cls.haul){
       for(const id of packedCards((player.pack || {}).placed)) if(!ids.includes(id)) ids.push(id);
     }
+    /* The Engineer's, and the third thing to come through this same door.
+       CLASS_ACTIONS.engineer is empty, so — exactly as with the Hauler's bag —
+       this is the whole of what he can do beyond two basics.
+
+       The building is checked here rather than only at the moment of learning,
+       because `needs` is about a thing that *stands*: an ability is takeable
+       while its line is up. Nothing knocks a building down today, but when
+       something does, the ability should leave with it rather than outliving
+       the machine it draws through. */
+    if(cls && cls.build){
+      for(const id of this.abilities){
+        const needs = (ABILITIES[id] || {}).needs;
+        if(needs && !this.buildings.some(b => b.id === needs)) continue;
+        if(!ids.includes(id)) ids.push(id);
+      }
+    }
     // A Cutting is the one thing nobody owns: it arrives because somebody else
     // spent a turn binding it on, and it leaves when it is swung.
     if(((player.uses || {}).cutting || 0) > 0) ids.push('cutting');
@@ -1021,9 +1158,10 @@ export class Room {
       hp: player.hp,
       stock: player.stock || {},
       uses: player.uses || {},
-      // The workbench prices the bolt gun, so what the party built has to be
-      // in the same object the cost is read against.
-      upgrades: this.upgrades || {},
+      // Four abilities are priced off the lines rather than off the card, so
+      // what the party built has to be in the same object the effect is read
+      // against — see `cardEffect`.
+      works: this.works,
     };
   }
 
@@ -1031,7 +1169,7 @@ export class Room {
      click — a commitment can still be taken back, and a charge spent on an
      action that was never taken would be a charge gone for nothing. */
   pay(player, id, spell){
-    const cost = actionCost(id, spell, this.upgrades);
+    const cost = actionCost(id, spell, this.works);
     if(!cost) return;
     if(cost.pool === 'power'){
       this.power = Math.max(0, (this.power || 0) - cost.amount);
@@ -1097,7 +1235,73 @@ export class Room {
    * same commitments have to produce the same round however the network
    * delivered them, or two clients replaying it disagree.
    */
+  /* What the works hand out at the top of a round.
+   *
+   * This is the Engineer's whole identity in one method: it costs nobody a
+   * turn, it happens before anybody acts, and it happens whether or not he is
+   * conscious — a machine does not care that its operator is face down in the
+   * rubble, and a base that stops working the moment the person who built it
+   * goes down is not infrastructure, it is a pet.
+   *
+   * Ward lands before the wave does, and might lands before the party swings,
+   * so both are worth something on the round they arrive. Burn goes to the
+   * nearest thing still standing, which on a standoff field is the first of
+   * the wave as drawn — the same default a plain strike takes.
+   *
+   * `mend` is not here. It pays once, when the fight is over — see winRound.
+   */
+  payOut(){
+    const works = this.works;
+    if(!works.ward && !works.might && !works.burn) return;
+
+    // Hold the Charge skipped a round to make this one worth twice as much.
+    const times = this.banked ? 2 : 1;
+    if(this.banked){
+      this.banked = false;
+      this.log('The grid lets go of what it was holding.');
+    }
+
+    this.nextBeat();
+
+    if(works.ward){
+      const amount = works.ward * times;
+      for(const who of this.standing){
+        who.block = (who.block || 0) + amount;
+        this.event({ t: 'fx', kind: 'ward', player: who.id });
+      }
+      this.log(`The windbreak puts ${amount} of guard on everyone.`);
+    }
+
+    if(works.might){
+      const amount = works.might * times;
+      for(const who of this.standing){
+        who.effects = addEffect(who.effects, {
+          kind: 'might', amount: effectAmount(who.effects, 'might') + amount,
+          rounds: 1, fresh: true,
+        });
+        this.event({ t: 'fx', kind: 'might', player: who.id });
+      }
+      this.log(`The carillon sounds. Everyone swings for ${amount} more.`);
+    }
+
+    if(works.burn){
+      const alive = this.enemies.filter(e => e.hp > 0);
+      const target = alive[0];
+      if(target){
+        // Through hitEnemy, so overkill, the kill beat and the client's
+        // held-open death all behave exactly as they do for a swung blow.
+        // `null` for the player: nobody swung it, and nobody is credited.
+        this.hitEnemy(null, target, works.burn * times, 'The heliostat', null);
+      }
+    }
+  }
+
   resolve(){
+    // Before anybody acts, and before the wave does. The base has been working
+    // since the last build phase and does not wait to be asked.
+    this.payOut();
+    if(this.enemies.every(e => e.hp <= 0)) return this.winRound();
+
     const order = [...this.players]
       .filter(p => p.intent && p.classId)
       .sort((a, b) => a.id.localeCompare(b.id));
@@ -1153,12 +1357,12 @@ export class Room {
         }
       }
 
-      /* The bag reaches the fight through the number, the way the workbench
-         does: cardEffect prices the bolt gun off the upgrades and packedAmount
-         prices the crossbow off the Bolt Cases beside it. Both are pure and
-         shared, so the button and the resolution cannot disagree about how
-         hard the thing hits. */
-      const base = spell ? spell.effect : cardEffect(id, this.upgrades);
+      /* Two ways a number arrives from outside the card, and both are pure
+         and shared so the button and the resolution cannot disagree about how
+         hard the thing hits: cardEffect prices a drawn ability off the lines
+         the Engineer built, and packedAmount prices the crossbow off the Bolt
+         Cases packed beside it. */
+      const base = spell ? spell.effect : cardEffect(id, this.works);
       const effect = spell ? base : {
         ...base, amount: packedAmount(id, base.amount, ((player.pack || {}).placed)),
       };
@@ -1267,24 +1471,40 @@ export class Room {
   /* One strike, resolved against one enemy. Split out of apply() because a
      Cinder Nova is this same thing several times and the two must not drift on
      what a kill announces. */
+  /* `player` is null when nothing swung it.
+   *
+   * The heliostat fires at the top of every round off the standing mirrors,
+   * and there is no hand on it — that is the whole point of the line. So the
+   * scoreboard gets nothing (score() already refuses a seat it cannot find),
+   * the fx is posted without a source for the client to draw the bolt from,
+   * and the log says the machine's name instead of a person's. Everything
+   * else about a hit is identical, which is why this is one method and not
+   * two: overkill, kills and the held-open death beat are rules about the
+   * blow, not about who threw it.
+   */
   hitEnemy(player, target, amount, label, cardId){
     // `amount` rides along so the client can size the show to the swing — a
     // thirty-point Fireball should not draw the same orb a three-point Strike does.
-    this.event({ t: 'fx', kind: cardId || 'strike', player: player.id, target: target.id, amount });
+    this.event({
+      t: 'fx', kind: cardId || 'strike',
+      player: player ? player.id : null, target: target.id, amount,
+    });
     // Landed, not swung: overkill on a thing with two health left is two points
     // of damage, or the end screen rewards aiming a Fireball at a Sporeling.
     const landed = Math.min(amount, target.hp);
-    this.score(player, 'damage', landed);
+    if(player) this.score(player, 'damage', landed);
     target.hp = Math.max(0, target.hp - amount);
-    this.log(`${player.name}'s ${label} hits the ${target.name} for ${amount}.`);
+    this.log(player
+      ? `${player.name}'s ${label} hits the ${target.name} for ${amount}.`
+      : `${label} hits the ${target.name} for ${amount}.`);
     if(target.hp > 0) return landed;
-    this.score(player, 'kills', 1);
+    if(player) this.score(player, 'kills', 1);
     this.log(`The ${target.name} comes apart.`);
     // The client holds the round open on this event so a kill is watched
     // rather than skipped past, and `last` is what tells it whether it is
     // watching the end of a fight or the middle of one.
     this.event({
-      t: 'fx', kind: 'slain', player: player.id, target: target.id,
+      t: 'fx', kind: 'slain', player: player ? player.id : null, target: target.id,
       enemy: target.type, last: this.enemies.every(e => e.hp <= 0),
     });
     return landed;
@@ -1376,6 +1596,14 @@ export class Room {
       });
       this.event({ t: 'fx', kind: 'might', player: who.id });
       this.log(`${player.name}'s ${label}: ${who.name} swings for ${effect.amount} more next round.`);
+
+    }else if(effect.kind === 'hold'){
+      // The only effect that lands on the room. Nothing is paid out this
+      // round; the next payout is doubled. Concentration across *rounds*
+      // rather than across people, which is why it is the ability that is
+      // worth exactly the same alone as it is at a full table.
+      this.banked = true;
+      this.log(`${player.name}'s ${label}: the grid banks the round.`);
 
     }else if(effect.kind === 'heft'){
       // Summed and re-added rather than pushed: addEffect replaces by kind, so
@@ -1652,6 +1880,22 @@ export class Room {
     if(dose && through > 0) enemy.cast = (enemy.cast || 0) + 1;
   }
   winRound(){
+    /* The cistern, and the reason it is the one line that does not tick.
+       Healing every round was simply the best thing a line could do, so it
+       pays once and pays more — economy between fights rather than sustain
+       inside one, and nothing can draw it through an ability to make a spike
+       out of it. */
+    const mend = this.works.mend;
+    if(mend > 0){
+      let total = 0;
+      for(const who of this.party){
+        const before = who.hp;
+        who.hp = Math.min(who.maxHp, who.hp + mend);
+        total += who.hp - before;
+      }
+      if(total > 0) this.log(`The cistern goes round. ${total} mended across the party.`);
+    }
+
     const drawn = salvageAfterCombat(this.players.filter(p => p.classId), this.buildings, this.random);
     this.salvage = addSalvage(this.salvage, drawn);
     const summary = Object.entries(drawn).map(([id, n]) => `${n} ${SALVAGE[id].name}`).join(', ');

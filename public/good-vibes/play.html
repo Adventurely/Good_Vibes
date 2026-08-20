@@ -600,12 +600,16 @@
           <p id="build-hint" style="margin-bottom:0.6rem"></p>
           <div class="grid" id="buildings"></div>
 
-          <h2 style="margin-top:1.4rem">Power</h2>
+          <h2 style="margin-top:1.4rem">The works</h2>
           <p id="power-line" style="margin-bottom:0.6rem"></p>
+          <div class="chips" id="lines"></div>
 
-          <h2 style="margin-top:1.4rem">The workbench</h2>
+          <!-- Abilities sit in the same menu as the buildings and are marked
+               apart: they take no tile, so there is nothing to pick up and
+               nowhere to put it. Bought on the click. -->
+          <h2 style="margin-top:1.4rem">Abilities</h2>
           <p id="bench-hint" style="margin-bottom:0.6rem"></p>
-          <div class="grid" id="upgrades"></div>
+          <div class="grid" id="abilities"></div>
         </div>
 
         <!-- The Hauler's bench. It is a grid rather than a list because the
@@ -774,7 +778,8 @@
         ROUNDS_BEFORE_BOSS, BOSS_ROUND, roundInfo, phaseCard, PARTY_SIZE, classById,
         SALVAGE, BUILDINGS, STARTING_SALVAGE, PAGES,
         nodeYield, NODE_REFUSAL,
-        UPGRADES, upgradeCost, buyUpgrade, cardEffect, powerFrom, canBuildMore, buildingsOf,
+        cardEffect, powerFrom, worksFrom, canBuildMore, buildingsOf,
+        placeRefusal, moveRefusal, ABILITIES, ABILITY_IDS, abilityRefusal, DRAW,
         ENEMIES, waveFor, enemyStats, COMBAT_H,
         AILMENTS, BLIGHTS, effectName, effectLabel, hasEffect, strikePower, intentOf,
         ENEMY_INTENTS, intentKindOf, enemyDamage, blightDamage, blightOf, BOLSTER_STEP,
@@ -1187,8 +1192,32 @@
          about the room, and sending it would make every other client redraw. */
       let holding = null;
 
-      const canPlaceHere = (x, y) =>
-        !!holding && canBuildAt(room.terrain, room.buildings, room.nodes, x, y);
+      /* Which standing building is in the player's hands, by index, or null.
+       *
+       * Two things the cursor can be carrying and they are deliberately not
+       * the same variable: `holding` is a building id being bought, `shifting`
+       * is one already paid for being walked somewhere better. They refuse for
+       * different reasons — a purchase can be short of salvage, a move can
+       * strand a tier hanging off it — and one variable would have had to
+       * carry a flag to tell them apart. */
+      let shifting = null;
+
+      /* Why what the cursor is carrying may not go here, or null when it may.
+       *
+       * The same functions the room refuses with, so the cursor can never
+       * promise a tile the click will bounce off. They fold the terrain and the
+       * occupancy in, which is why `canBuildAt` is no longer asked separately —
+       * a Living Wall on perfectly good ground with no Trellis beside it is
+       * still a red tile, and now it can say so. */
+      const refusalHere = (x, y) => {
+        const ctx = { terrain: room.terrain, buildings: room.buildings, nodes: room.nodes, x, y };
+        if(shifting !== null) return moveRefusal(shifting, ctx);
+        return holding ? placeRefusal(holding, ctx) : 'Nothing held';
+      };
+      const carrying = () => (shifting !== null
+        ? (room.buildings[shifting] || {}).id
+        : holding) || null;
+      const canPlaceHere = (x, y) => !!carrying() && refusalHere(x, y) === null;
 
       function drawMap(){
         mctx.fillStyle = '#241a10';
@@ -1320,14 +1349,15 @@
           // changes what the cursor is asking, so it changes what it says.
           const gatherable = !!nodeAt(hover.x, hover.y);
           let colour = '#fffaf0', alpha = 0.35;
-          if(holding) [colour, alpha] = canPlaceHere(hover.x, hover.y)
+          const held = carrying();
+          if(held) [colour, alpha] = canPlaceHere(hover.x, hover.y)
             ? ['#6cc24a', 0.95] : ['#ef5a45', 0.8];
           else if(gatherable) [colour, alpha] = ['#ffd23f', 0.9];
 
           // A held building previews on the tile, so "will it fit" is answered
           // by looking rather than by placing it and finding out.
-          if(holding && canPlaceHere(hover.x, hover.y)){
-            const art = BUILDING_ART[BUILDINGS[holding].art];
+          if(held && canPlaceHere(hover.x, hover.y)){
+            const art = BUILDING_ART[BUILDINGS[held].art];
             if(art){
               mctx.globalAlpha = 0.55;
               blit(mctx, art, hover.x * TILE, HEADER + hover.y * TILE);
@@ -1649,6 +1679,29 @@
 
       function schedule(){
         if(!frameHandle) frameHandle = requestAnimationFrame(frame);
+      }
+
+      /* Holding something, hovering somewhere it will not go: say why.
+       *
+       * Its own function because it follows the cursor, and the cursor only
+       * ever schedules a canvas frame — `render()` runs on state changes, which
+       * a mouse moving across a map is not. The red tile is the fast answer;
+       * this is the one a player can act on. "Has to touch the Trellis" is a
+       * plan, and a red square is a guess.
+       */
+      function updateBuildHint(){
+        if(!ui.buildHint || !room || !isBuildPhase(room.phase)) return;
+        const held = carrying();
+        if(!held){
+          ui.buildHint.textContent =
+            'Pick a structure, then click where it goes. Click one already standing to move it.';
+          return;
+        }
+        const under = hover ? refusalHere(hover.x, hover.y) : null;
+        const verb = shifting !== null ? 'Moving' : 'Placing';
+        ui.buildHint.textContent = under
+          ? `${BUILDINGS[held].name}: ${under}`
+          : `${verb} the ${BUILDINGS[held].name} — click a clear tile, or click it again to leave it.`;
       }
 
       // A tab that comes back should not show the frame it left on.
@@ -2190,7 +2243,7 @@
         allies: els('allies'),
         salvage: els('salvage'), buildings: els('buildings'), buildHint: els('build-hint'),
         engineerOnly: els('engineer-only'), powerLine: els('power-line'),
-        benchHint: els('bench-hint'), upgrades: els('upgrades'),
+        benchHint: els('bench-hint'), abilities: els('abilities'), lines: els('lines'),
         wizardOnly: els('wizard-only'), library: els('library'),
         studyHint: els('study-hint'), openPage: els('open-page'), offers: els('offers'),
         benchLine: els('bench-line'), spells: els('spells'),
@@ -2432,7 +2485,7 @@
           bossRound: BOSS_ROUND, maxPlayers: PARTY_SIZE,
           site, terrain: site, nodes: [], buildings: [], enemies: [],
           stash: {}, pages: 2, events: [],
-          salvage: { ...STARTING_SALVAGE }, upgrades: {}, power: 0,
+          salvage: { ...STARTING_SALVAGE }, abilities: [], banked: false, power: 0,
           spellbook, offers: null,
           pots: Array(POT_COUNT).fill(null),
           players: playableClasses().map((cls, i) => ({
@@ -2689,7 +2742,7 @@
           // Paid here rather than on the click, for the reason the room pays in
           // resolve(): a commitment can be taken back, and a charge spent on an
           // action that was never taken would be gone for nothing.
-          const cost = actionCost(cardId, spell, room.upgrades);
+          const cost = actionCost(cardId, spell, worksOf(room));
           if(cost){
             if(cost.pool === 'power') room.power = Math.max(0, (room.power || 0) - cost.amount);
             else if(cost.pool === 'charges') player.charges = Math.max(0, (player.charges || 0) - cost.amount);
@@ -2727,7 +2780,7 @@
             if(far) target = far.id;
           }
 
-          demoCard(player, spell ? spell.effect : cardEffect(cardId, room.upgrades),
+          demoCard(player, spell ? spell.effect : cardEffect(cardId, worksOf(room)),
             spell ? spell.name : card.name, target, cardId, spell, fx);
         }
 
@@ -3022,43 +3075,59 @@
               text: `Brewed ${recipe.makes} ${recipe.name}${recipe.makes > 1 ? 's' : ''} onto the rack.`,
             });
           }
-        }else if(msg.t === 'intent' && msg.intent.t === 'upgrade'){
-          const id = msg.intent.upgrade;
-          const level = (room.upgrades || {})[id] || 0;
-          const bought = buyUpgrade(id, level, room.salvage);
-          if(bought){
-            room.salvage = bought.salvage;
-            room.upgrades = { ...room.upgrades, [id]: bought.level };
-            const upgrade = UPGRADES[id];
-            if(bought.adds === 'card'){
-              // The barrel makes a bolt cheaper rather than more numerous:
-              // another bolt to draw, and it should appear when it is paid for.
-              /* Nothing to grant: the Bolt Gun is an action he always has. */
-              room.events.push({ t: 'log', text: `${upgrade.name}: a bolt costs ${actionCost('boltgun', null, room.upgrades).amount} power now.` });
-            }else{
-              room.events.push({
-                t: 'log',
-                text: `${upgrade.name}: bolts now hit for ${cardEffect('boltgun', room.upgrades).amount}.`,
-              });
-            }
+        }else if(msg.t === 'intent' && msg.intent.t === 'learn'){
+          /* The same refusal the room makes, from the same function, so solo
+             play cannot learn something a real table could not. */
+          const id = msg.intent.ability;
+          const why = abilityRefusal(id, {
+            salvage: room.salvage, bought: room.abilities, buildings: room.buildings,
+          });
+          if(!why){
+            room.salvage = spendSalvage(room.salvage, { chip: ABILITIES[id].chips });
+            room.abilities = [...(room.abilities || []), id];
+            room.events.push({ t: 'log', text: `Worked out the ${ABILITIES[id].name}.` });
+          }
+        }else if(msg.t === 'intent' && msg.intent.t === 'shift'){
+          /* The same refusal the room makes, from the same function — including
+             the one that matters, which is that a move may not strand a tier
+             hanging off the thing being moved. */
+          const { index, x, y } = msg.intent;
+          const held = room.buildings[index];
+          const why = held && moveRefusal(index, {
+            terrain: room.terrain, buildings: room.buildings, nodes: room.nodes, x, y,
+          });
+          if(held && !why && !(held.x === x && held.y === y)){
+            room.buildings = room.buildings.map((b, i) => (i === index ? { ...b, x, y } : b));
+            const building = BUILDINGS[held.id];
+            const works = worksFrom(room.buildings);
+            const paid = building.line === 'array' || building.carry
+              ? `${works.array} power a fight now.`
+              : building.line ? `The line pays ${works[building.line]} now.` : '';
+            room.events.push({ t: 'log', text: `Shifted the ${building.name}. ${paid}`.trim() });
           }
         }else if(msg.t === 'intent' && msg.intent.t === 'place'){
           const { building: id, x, y } = msg.intent;
           const building = BUILDINGS[id];
           const affordable = building && Object.keys(missingForBuilding(id, room.salvage)).length === 0;
-          if(building && affordable && canBuildMore(id, room.buildings)
-             && canBuildAt(room.terrain, room.buildings, room.nodes, x, y)){
+          /* `placeRefusal` folds the terrain, the occupancy, the cap and the
+             building's own rule into one answer — the same one the ghost on
+             the map was drawn from, so what the cursor promised is what the
+             click does. */
+          const why = building && placeRefusal(id, {
+            terrain: room.terrain, buildings: room.buildings, nodes: room.nodes, x, y,
+          });
+          if(building && affordable && !why){
             room.salvage = spendSalvage(room.salvage, building.costs);
             room.buildings.push({ id, x, y });
-            // Buildings no longer deal cards — a panel makes power and a bench
-            // opens the gun up. Say which, so the tile reads as having bought
-            // something rather than just standing there.
-            room.events.push({
-              t: 'log',
-              text: building.power
-                ? `Raised the ${building.name}. ${powerFrom(room.buildings)} power a fight now.`
-                : `Raised the ${building.name}.`,
-            });
+
+            // Say what it changed, not that it happened: a payout line is
+            // invisible until it fires, so this is where a player learns that
+            // the wall they just raised took the windbreak from one to two.
+            const works = worksFrom(room.buildings);
+            const paid = building.line === 'array' || building.carry
+              ? `${works.array} power a fight now.`
+              : building.line ? `The line pays ${works[building.line]} now.` : '';
+            room.events.push({ t: 'log', text: `Raised the ${building.name}. ${paid}`.trim() });
             holding = null;
           }
         }else if(msg.t === 'intent' && msg.intent.t === 'plant'){
@@ -3336,7 +3405,7 @@
           if(!card && !spell) continue;
           const points = aimsAt(id, spell);
           const ready = actionReady(id, seat, spell);
-          const cost = actionCost(id, spell, room.upgrades);
+          const cost = actionCost(id, spell, worksOf(room));
           const left = actionRemaining(id, seat);
 
           const el = document.createElement('button');
@@ -3358,7 +3427,7 @@
           name.className = 'pcard-name';
           name.textContent = spell ? spell.name : card.name;
 
-          const effect = spell ? spell.effect : cardEffect(id, room.upgrades);
+          const effect = spell ? spell.effect : cardEffect(id, worksOf(room));
 
           const amount = document.createElement('span');
           amount.className = 'pcard-amount';
@@ -3824,7 +3893,7 @@
         // is the panel lying about the thing it exists to promise.
         const seat = { ...seatState(you),
           uses: isBuildPhase(room.phase) ? freshUses(you.classId) : (you.uses || {}) };
-        const free = ids.filter(id => !actionCost(id, spellForCard(you, id), room.upgrades)).length;
+        const free = ids.filter(id => !actionCost(id, spellForCard(you, id), worksOf(room))).length;
         // Say what the list is before listing it. Which pool a seat spends is
         // the one fact that makes its half of this screen make sense.
         const cls = classById(you.classId);
@@ -3847,7 +3916,7 @@
           // this list is where a socketed Twin Core has to show its work.
           const spell = spellForCard(you, id);
           const left = actionRemaining(id, seat);
-          const cost = actionCost(id, spell, room.upgrades);
+          const cost = actionCost(id, spell, worksOf(room));
 
           const el = document.createElement('span');
           el.className = 'action-entry';
@@ -3865,7 +3934,7 @@
             : cost.pool === 'hp' ? `${cost.amount}hp` : '';
           el.append(count);
 
-          // The bag reaches the number, as the workbench does: a Bolt Case in
+          // The bag reaches the number, as the Engineer's lines do: a Bolt Case in
           // the pack is on the crossbow's face here and in the room's
           // resolution, out of the same function.
           const base = spell ? spell.effect : card.effect;
@@ -3875,67 +3944,132 @@
           ui.actionList.append(el);
         }
       }
-      /* Power and the workbench, and only for the Engineer.
+      /* What the standing works pay.
        *
-       * Nobody else can spend power or buy an upgrade, and a readout you cannot
-       * act on is one you learn to skip past — so the whole panel is hidden
-       * rather than greyed for the other two.
+       * Sent by the room rather than recomputed, so the number on the button
+       * and the number the round pays out cannot come apart. `worksFrom` is
+       * the fallback for solo play, where there is no room to send it. */
+      const worksOf = r => (r && r.works) || worksFrom((r || {}).buildings);
+
+      /* One line per payout, and only the ones that pay. A line at zero is a
+         row of nothing, and this panel already has plenty to read. */
+      const LINE_TEXT = {
+        ward: n => `Windbreak: ${n} guard on everyone, every round`,
+        might: n => `Carillon: everyone swings for ${n} more, every round`,
+        burn: n => `Heliostat: ${n} into the nearest thing, every round`,
+        mend: n => `Cistern: ${n} back to everyone when the fight ends`,
+        carry: n => `Flywheel: ${n} power carried across a fight`,
+      };
+
+      /* The works, and only for the Engineer.
+       *
+       * Nobody else can spend power or learn an ability, and a readout you
+       * cannot act on is one you learn to skip past — so the whole panel is
+       * hidden rather than greyed for the other four.
        */
       function renderEngineer(you, acting, canBuild){
         ui.engineerOnly.hidden = !canBuild;
         if(!canBuild) return;
 
+        const works = worksOf(room);
         const panels = buildingsOf(room.buildings, 'panel');
-        const power = powerFrom(room.buildings);
         ui.powerLine.textContent = panels
-          ? `${panels} panel${panels === 1 ? '' : 's'} — ${power} power a fight, ` +
-            `enough for ${power} bolt${power === 1 ? '' : 's'}. It does not carry over.`
-          : 'No panels. The bolt gun has nothing to draw on — build one.';
+          ? `${panels} panel${panels === 1 ? '' : 's'} — ${works.array} power a fight. ` +
+            'Two panels side by side are worth twice two apart.'
+          : 'No panels. Every ability draws on power — build one.';
 
-        const bench = buildingsOf(room.buildings, 'workbench') > 0;
-        ui.benchHint.textContent = bench
-          ? 'Salvage into a better gun rather than more ground.'
-          : 'Build the Workbench to open the gun up.';
+        /* The lines, as chips rather than as cards: they are a readout of what
+           is already standing, not a thing to click. This is the only place in
+           the game a player can see what their base is worth without waiting
+           for a round to pay it out. */
+        ui.lines.replaceChildren();
+        for(const [line, text] of Object.entries(LINE_TEXT)){
+          if(!works[line]) continue;
+          const chip = document.createElement('span');
+          chip.className = 'chip';
+          chip.textContent = text(works[line]);
+          ui.lines.append(chip);
+        }
+        if(!ui.lines.childElementCount){
+          const chip = document.createElement('span');
+          chip.className = 'chip';
+          chip.textContent = 'Nothing running yet. A line pays the whole party, every round, for free.';
+          ui.lines.append(chip);
+        }
 
-        ui.upgrades.replaceChildren();
-        for(const [id, upgrade] of Object.entries(UPGRADES)){
-          const level = (room.upgrades || {})[id] || 0;
-          const costs = upgradeCost(id, level);
-          const short = shortfallOf(costs, room.salvage || {});
-          const card = document.createElement('button');
-          card.type = 'button';
-          card.className = 'card';
-          card.disabled = !acting || !bench || short.length > 0;
+        const chips = (room.salvage || {}).chip || 0;
+        ui.benchHint.textContent = chips
+          ? `${chips} ${SALVAGE.chip.name} in hand. What a drawn ability is worth is what its line pays.`
+          : 'No chips. They are the rarest thing a cache turns out.';
+
+        ui.abilities.replaceChildren();
+        for(const id of ABILITY_IDS){
+          const ability = ABILITIES[id];
+          const card = CARDS[id];
+          const bought = (room.abilities || []).includes(id);
+          const why = abilityRefusal(id, {
+            salvage: room.salvage, bought: room.abilities, buildings: room.buildings,
+          });
+
+          const button = document.createElement('button');
+          button.type = 'button';
+          /* Marked apart from the buildings above it: an ability takes no tile,
+             so there is no cursor to pick it up onto and no ghost to place. The
+             dashed edge is the whole of the difference and it is enough. */
+          button.className = 'card';
+          button.style.borderStyle = 'dashed';
+          button.disabled = !acting || bought || !!why;
 
           const body = document.createElement('span');
           body.className = 'card-body';
           const name = document.createElement('b');
           name.className = 'card-name';
-          name.textContent = level ? `${upgrade.name} ${level + 1}` : upgrade.name;
+          name.textContent = ability.name;
 
           const sub = document.createElement('span');
           sub.className = 'card-sub';
-          sub.textContent = Object.entries(costs).map(([r, n]) => `${n} ${SALVAGE[r].name}`).join(' + ');
+          sub.textContent = `${ability.chips} ${SALVAGE.chip.name}`
+            + (card.powerCost ? ` · ${card.powerCost} power to use` : '');
 
+          /* What it is worth right now, off the map. A drawn ability with its
+             line built says a number; without one it says what it would take,
+             which is the whole reason the line is worth building. */
           const gives = document.createElement('span');
           gives.className = 'card-sub';
           gives.style.color = 'var(--accent)';
-          gives.textContent = upgrade.adds === 'card'
-            ? 'A cheaper bolt: one less power a shot'
-            : `Bolts hit for ${cardEffect('boltgun', { ...room.upgrades, [id]: level + 1 }).amount}`;
+          gives.textContent = card.draws
+            ? (works[card.draws]
+              ? `${cardEffect(id, works).amount} — ${DRAW} × what the line pays`
+              : `${DRAW} × whatever the line pays. Nothing yet.`)
+            : card.effect.amount ? `${card.effect.amount} damage` : 'Banks a round of every line';
 
           const note = document.createElement('span');
           note.className = 'card-blurb';
-          note.textContent = !bench ? 'Needs a Workbench.'
-            : short.length ? `Short of ${short.join(' and ')}.`
-            : upgrade.note;
+          note.textContent = bought ? 'Learned. It is in the fight.' : (why || ability.note);
 
           body.append(name, sub, gives, note);
-          card.append(body);
-          card.onclick = () => send({ t: 'intent', intent: { t: 'upgrade', upgrade: id } });
-          ui.upgrades.append(card);
+          button.append(body);
+          button.onclick = () => send({ t: 'intent', intent: { t: 'learn', ability: id } });
+          ui.abilities.append(button);
         }
       }
+
+      /* What a line would pay with this tier standing on it, and what a
+         community machine hands to somebody else's build phase. Both written
+         once, because the building card and the ability card have to describe
+         the same thing the same way. */
+      const LINE_GIVES = {
+        ward: n => `Windbreak pays ${n} guard to everyone, every round`,
+        might: n => `Carillon pays ${n} to everyone's swing, every round`,
+        burn: n => `Heliostat puts ${n} into the wave, every round`,
+        mend: n => `Cistern gives everyone ${n} back when the fight ends`,
+      };
+      const GRANT_GIVES = {
+        pages: 'The Wizard drafts a page more, every build phase',
+        pot: 'Every pot the Alchemist pulls is worth one more',
+        pack: 'The Hauler\u2019s bag grows a round early',
+        uses: 'One more use of everything the Grafter counts',
+      };
 
       const shortfallOf = (costs, pool) => Object.entries(costs)
         .filter(([r, n]) => (pool[r] || 0) < n)
@@ -4557,10 +4691,13 @@
           // Nobody else can place one, so a structure cannot stay picked up
           // across a change of character in the preview.
           holding = null;
+          shifting = null;
         }else{
-          ui.buildHint.textContent = holding
-            ? `Placing the ${BUILDINGS[holding].name} — click a clear tile, or pick it again to put it down.`
-            : 'Pick a structure, then click where it goes.';
+          // A building that went away underneath the cursor — a wake, a
+          // restart, somebody else's room — must not leave an index pointing
+          // at nothing.
+          if(shifting !== null && !room.buildings[shifting]) shifting = null;
+          updateBuildHint();
 
           for(const [id, building] of Object.entries(BUILDINGS)){
             const short = missingForBuilding(id, room.salvage || {});
@@ -4583,16 +4720,22 @@
             sub.textContent = Object.entries(building.costs)
               .map(([r, n]) => `${n} ${SALVAGE[r].name}`).join(' + ');
 
-            // What it gives is the reason to build it, so it goes above the
-            // flavour rather than under it.
+            /* What it gives is the reason to build it, so it goes above the
+               flavour rather than under it. A line building says what the line
+               will pay *once this one is standing*, not what it pays now — the
+               question a player is asking of a card they have not bought is
+               what it would buy them. */
             const gives = document.createElement('span');
             gives.className = 'card-sub';
             gives.style.color = 'var(--accent)';
-            const income = Object.entries(building.income).map(([r, n]) => `+${n} ${SALVAGE[r].name}`);
+            const works = worksOf(room);
             gives.textContent = [
-              building.power ? `+${building.power} power a fight` : '',
-              id === 'workbench' ? 'Upgrades the bolt gun' : '',
-              income.length ? `Each fight: ${income.join(', ')}` : '',
+              building.power ? 'A panel: 1 power, or 2 beside another' : '',
+              building.perPanels ? `+1 power per ${building.perPanels} panels` : '',
+              building.carry ? `${building.carry} power carried across a fight` : '',
+              building.line && building.pays ? LINE_GIVES[building.line](
+                (works[building.line] || 0) + building.pays) : '',
+              GRANT_GIVES[Object.keys(building.grants || {})[0]] || '',
             ].filter(Boolean).join(' · ');
 
             const note = document.createElement('span');
@@ -4603,7 +4746,7 @@
 
             body.append(name, sub, gives, note);
             card.append(body);
-            card.onclick = () => { holding = holding === id ? null : id; render(); };
+            card.onclick = () => { shifting = null; holding = holding === id ? null : id; render(); };
             ui.buildings.append(card);
           }
         }
@@ -4806,6 +4949,18 @@
         const tile = tileFromEvent(event);
         if(!tile) return;
 
+        if(shifting !== null){
+          // Clicking it where it already stands is putting it back down.
+          const held = room.buildings[shifting];
+          if(held && held.x === tile.x && held.y === tile.y){ shifting = null; render(); return; }
+          if(canPlaceHere(tile.x, tile.y)){
+            audio.sfx('build');
+            send({ t: 'intent', intent: { t: 'shift', index: shifting, x: tile.x, y: tile.y } });
+            shifting = null;
+          }
+          return;
+        }
+
         if(holding){
           if(canPlaceHere(tile.x, tile.y)){
             audio.sfx('build');
@@ -4813,6 +4968,25 @@
             holding = null;
           }
           return;
+        }
+
+        /* A click on something already standing picks it up to move.
+         *
+         * This gesture was free: a building's tile is not walkable, so `pathTo`
+         * has always refused it and the click did nothing at all. Now it is the
+         * one thing a player wants to do with a structure they can see — walk
+         * a panel into the run beside another one and the array is worth twice
+         * as much for no salvage at all. */
+        const cls = classById((me() || {}).classId);
+        if(cls && cls.build){
+          const index = (room.buildings || []).findIndex(b => b.x === tile.x && b.y === tile.y);
+          if(index >= 0){
+            shifting = index;
+            holding = null;
+            notify('');
+            render();
+            return;
+          }
         }
 
         // Otherwise the click is a destination. Route from where the sprite has
@@ -4834,12 +5008,14 @@
         const same = tile && hover ? tile.x === hover.x && tile.y === hover.y : tile === hover;
         if(same) return;                       // only redraw when the tile changes
         hover = tile;
+        updateBuildHint();
         schedule();
       });
 
       map.addEventListener('mouseleave', () => {
         if(!hover) return;
         hover = null;
+        updateBuildHint();
         if(room && isBuildPhase(room.phase)) schedule();
       });
 

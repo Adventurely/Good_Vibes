@@ -28,8 +28,9 @@
 import { roomFor } from '../src/rooms.js';
 import {
   PHASES, BOSS_ROUND, CARDS, cardEffect, actionReady, playableClasses,
-  RECIPES, BUILDINGS, UPGRADES, upgradeCost, canAfford, pathTo, hasEffect,
+  RECIPES, BUILDINGS, canAfford, pathTo, hasEffect,
   effectAmount, MODIFIERS, SPELL_SLOTS, classById, nodeYield,
+  ABILITIES, placeRefusal, worksFrom, missingForBuilding,
 } from '../public/good-vibes/content.js';
 
 const RUNS = Number(process.argv[2]) || 400;
@@ -79,27 +80,53 @@ function playBuild(room){
     if(!took) break;
   }
 
-  // Build: a panel first so the bolt gun works at all, then the workbench, then
-  // more panels. Upgrades take whatever is left.
+  /* The works, played the way the fork asks to be played.
+   *
+   * Screws buy both halves of his combat and there is never enough for both:
+   * panels are the power to fire an ability, a line is what the ability is
+   * worth. So the model builds a small array first — nothing can be fired
+   * without one — then drives a single line as deep as it will go, because
+   * DRAW rewards depth over breadth and three tiers of one beats one tier of
+   * three. Chips go on the ability that draws whatever is standing.
+   *
+   * The Bolt Gun comes first of all. It is the only ability that needs no
+   * building, so it is the only thing a round-one Engineer can actually fire.
+   */
   const engineer = seated.find(p => p.classId === 'engineer');
   if(engineer){
     const cls = { build: true };
-    for(let i = 0; i < 6; i++){
-      const wanted = !room.buildings.some(b => b.id === 'panel') ? 'panel'
-        : !room.buildings.some(b => b.id === 'workbench') ? 'workbench' : 'panel';
-      if(!canAfford(BUILDINGS[wanted].costs, room.salvage)) break;
-      const spot = freeTile(room);
-      if(!spot) break;
+    const standing = id => room.buildings.some(b => b.id === id);
+
+    const learn = id => {
+      if(room.abilities.includes(id)) return;
+      room.learn(engineer, cls, { ability: id });
+    };
+    const raise = id => {
+      if(Object.keys(missingForBuilding(id, room.salvage)).length) return false;
+      const spot = spotFor(room, id);
+      if(!spot) return false;
       const before = room.buildings.length;
-      room.place(engineer, cls, { building: wanted, x: spot.x, y: spot.y });
-      if(room.buildings.length === before) break;      // refused; stop asking
+      room.place(engineer, cls, { building: id, x: spot.x, y: spot.y });
+      return room.buildings.length > before;
+    };
+
+    learn('boltgun');
+
+    // Enough array to fire something, then the line, then back to the array
+    // with whatever is left. Six passes, because a good round can afford more
+    // than one thing and a bad one should stop asking.
+    const line = ['heliostat', 'mirrorfield', 'furnace'];
+    for(let i = 0; i < 8; i++){
+      const panels = room.buildings.filter(b => b.id === 'panel').length;
+      const next = panels < 2 ? 'panel'
+        : line.find(id => !standing(id)) || 'panel';
+      if(!raise(next)) break;
     }
-    for(let i = 0; i < 6; i++){
-      const id = Object.keys(UPGRADES).find(u =>
-        canAfford(upgradeCost(u, room.upgrades[u] || 0), room.salvage));
-      if(!id) break;
-      room.upgrade(engineer, cls, { upgrade: id });
-    }
+
+    // What the standing lines can draw, cheapest first, and the community
+    // machines with whatever coil turned up.
+    for(const id of ['sunlance', 'closeranks', 'allhands', 'holdcharge']) learn(id);
+    for(const id of ['press', 'glasshouse', 'barrow', 'windrow']) raise(id);
   }
 
   // The scriptorium: pages are crafting currency now, so spend every one.
@@ -169,6 +196,36 @@ function playBuild(room){
 
 const cost = costs => Object.values(costs).reduce((a, b) => a + b, 0);
 
+/* The first tile this building may legally stand on, or null.
+ *
+ * `freeTile` was enough when the only rule was "somewhere clear". It is not
+ * any more: a Living Wall has to touch its Trellis, a Cistern has to touch
+ * water, and a Carillon belongs at the camp. So the model scans for a tile the
+ * shared rule accepts rather than picking the first clear one and being
+ * refused — which would have looked like an Engineer who never built anything.
+ *
+ * Panels prefer a tile beside another panel, because that is the difference
+ * between an array worth N and one worth 2N, and a model that scattered them
+ * would under-rate the whole line.
+ */
+function spotFor(room, id){
+  const ok = (x, y) => placeRefusal(id, {
+    terrain: room.terrain, buildings: room.buildings, nodes: room.nodes, x, y,
+  }) === null;
+
+  if(id === 'panel'){
+    for(const panel of room.buildings.filter(b => b.id === 'panel')){
+      for(const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]){
+        if(ok(panel.x + dx, panel.y + dy)) return { x: panel.x + dx, y: panel.y + dy };
+      }
+    }
+  }
+  for(let y = 0; y < 17; y++){
+    for(let x = 0; x < 30; x++) if(ok(x, y)) return { x, y };
+  }
+  return null;
+}
+
 function freeTile(room){
   for(let y = 0; y < 17; y++){
     for(let x = 0; x < 30; x++){
@@ -207,7 +264,7 @@ function pickCard(room, player){
   const hand = room.actionIds(player)
     .map((id) => {
       const spell = room.spellFor(player, id);
-      return { id, card: CARDS[id], effect: spell ? spell.effect : cardEffect(id, room.upgrades), spell };
+      return { id, card: CARDS[id], effect: spell ? spell.effect : cardEffect(id, room.works), spell };
     })
     .filter(c => (c.card || c.spell) && actionReady(c.id, room.seatState(player), c.spell).ok);
   if(!hand.length) return null;

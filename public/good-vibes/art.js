@@ -448,46 +448,415 @@ export const ENEMY_ART = {
  * row of three would read as a wall. Leaving the corners open is what keeps a
  * base looking like separate things somebody put there.
  *
+ * The panel is the exception, and on purpose. Three benches in a row are three
+ * things somebody put there; three solar panels in a row are an array, and an
+ * array is supposed to read as one thing. So it fills its square, and the map
+ * sprite in PROP_ART is cut to overlap the one behind it — see the note there.
+ *
  * The key matches the `art` field in content.js BUILDINGS.
  */
 export const BUILDING_ART = {
-  /* Angled to the sun, cracked, and still working. The cells read as a grid at
-     one tile because that is the one thing a panel unmistakably is. */
+  /* The card face and the placement ghost: the same elevated square the map
+     draws, with the legs shortened to fit inside one tile. Cracked, half-blind
+     and still tracking the sun — the cells read as a grid because that is the
+     one thing a panel unmistakably is, and the pale rail along the top and the
+     shadowed lip along the bottom are what say it is a slab held up off the
+     ground rather than a square painted on it. */
   panel: [
+    '################',
+    '#mmmmmmmmmmmmmm#',
+    '#UUbUMUbUUMUUbc#',
+    '#UbUUMUUbUMUbcU#',
+    '#MMMMMMMMMMMMMM#',
+    '#BBUBMBUBBMBBUB#',
+    '#BUBBMBBUBMBUBB#',
+    '#MMMMMMMMMMMMMM#',
+    '#BdBBMBBdBMBdBB#',
+    '#BBdBMdBBBMBBdB#',
+    '#jjjjjjjjjjjjjj#',
+    '#JJJJJJJJJJJJJJ#',
+    '################',
+    '...xJ......xJ...',
+    '...xJ......xJ...',
+    '..#xJ#....#xJ#..',
+  ],
+  /* ---- the array ------------------------------------------------------ */
+
+  /* A tonne of salvaged rotor on a bearing. Rust ring, steel hub, and the
+     spokes left as gaps so the eye reads it as turning rather than as a
+     wheel-shaped plate. */
+  flywheel: [
     '................',
-    '................',
-    '..############..',
-    '..#bBbBcBbBbB#..',
-    '..#BbBbBbBcBb#..',
-    '..#bBcBbBbBbB#..',
-    '..#BbBbBcBbBb#..',
-    '..############..',
-    '.....#xxxx#.....',
-    '......#xx#......',
-    '......#xx#......',
-    '......#xx#......',
     '.....######.....',
+    '...##rrrrrr##...',
+    '..#rrRRRRRRrr#..',
+    '.#rRR#MMMM#RRr#.',
+    '.#rR#MjjjjM#Rr#.',
+    '#rrRMjxxxxjMRrr#',
+    '#rrRMjxMMxjMRrr#',
+    '#rrRMjxMMxjMRrr#',
+    '#rrRMjxxxxjMRrr#',
+    '.#rR#MjjjjM#Rr#.',
+    '.#rRR#MMMM#RRr#.',
+    '..#rrRRRRRRrr#..',
+    '...##rrrrrr##...',
+    '....#JJJJJJ#....',
+    '....##xJJx##....',
+  ],
+  /* A grey box with a bolt down the middle of it. Vents above and below so it
+     reads as something that gets hot, which is the only thing an inverter
+     visibly does. */
+  inverter: [
     '................',
+    '..############..',
+    '..#mmmmmmmmmm#..',
+    '..#mMMMMMMMMm#..',
+    '..#mMjjjjjjMm#..',
+    '..#mM#yyyy#Mm#..',
+    '..#mM#yYY#jMm#..',
+    '..#mM##YY##Mm#..',
+    '..#mMj#YY#jMm#..',
+    '..#mMjj#Y#jMm#..',
+    '..#mMjjjjjjMm#..',
+    '..#mM#x##x#Mm#..',
+    '..#mmmmmmmmmm#..',
+    '..############..',
+    '....#x#..#x#....',
+    '....###..###....',
+  ],
+
+  /* ---- the windbreak: three tiers, and each one greener than the last --- */
+
+  /* Scrap battens in a lattice with the first year's growth on it. Mostly
+     frame, a little leaf — the tier above is the same shape filled in. */
+  trellis: [
+    '................',
+    '.#T#........#T#.',
+    '.#T#..gggg..#T#.',
+    '.#T#.ghhhhg.#T#.',
+    '#TTTTTTTTTTTTTT#',
+    '.#T#g#T##T#g#T#.',
+    '.#T#hh#TT#hh#T#.',
+    '.#T#.h#TT#h.#T#.',
+    '#TTTTTTTTTTTTTT#',
+    '.#T#g#T##T#g#T#.',
+    '.#T#hg#TT#gh#T#.',
+    '.#T#.gGGGGg.#T#.',
+    '#TTTTTTTTTTTTTT#',
+    '.#T#..gGGg..#T#.',
+    '.#T#........#T#.',
+    '.###........###.',
+  ],
+  /* The trellis, grown in. The battens are still under there and show through
+     in three places, which is what keeps it the same object at the next tier
+     rather than a different one. */
+  livingwall: [
+    '................',
+    '.##############.',
+    '.#hgHgGhHgGhgh#.',
+    '.#gGvGhgGvhGgG#.',
+    '.#TgHvGgvGhgHT#.',
+    '.#hGgvhGgHvGgh#.',
+    '.#gvGhTgGhvGHg#.',
+    '.#HgGvgGhgvhgv#.',
+    '.#gGhvGTgvGhGg#.',
+    '.#vhGgvhGgvGhH#.',
+    '.#gGvGhgTvhGgG#.',
+    '.#hgHgGhHgGhgh#.',
+    '.#GvgGhvgGhvGg#.',
+    '.##############.',
+    '..#TT#....#TT#..',
+    '..####....####..',
+  ],
+  /* Laid the old way: half-cut, bent over and pegged. Wider than it is tall,
+     and the woody stems run through it diagonally because that is the one
+     thing that says laid rather than planted. */
+  hedgerow: [
+    '................',
+    '................',
+    '...gg....gg.....',
+    '..ghhg..ghhg....',
+    '.ghHGHghhHGHgh..',
+    'ghHGvGHhGvGHhHg.',
+    '#hGvGHgvGHvGhg#.',
+    '#TGvhGTvhGvTGh#.',
+    '#hTGvhgTGvhGTg#.',
+    '#GhTvGhgTvGhTG#.',
+    '#TGhvGTghvGThG#.',
+    '.#TGhvgTGhvGT#..',
+    '..#TTGhgGhTT#...',
+    '...#TT#..#TT#...',
+    '....##....##....',
+    '................',
+  ],
+
+  /* ---- the carillon: cut pipe, then brass, then a tower ---------------- */
+
+  /* Lengths of pipe hung in a frame, longest to shortest. Struck on the hour,
+     and everybody works better to a beat. */
+  carillon: [
+    '................',
+    '.##############.',
+    '.#IIIIIIIIIIII#.',
+    '.#T##T##T##T#T#.',
+    '.#T#o#o#o#o##T#.',
+    '.#T#o#o#o#o##T#.',
+    '.#TOoOoOoOoO#T#.',
+    '.#TOoOoOoOoO#T#.',
+    '.#TOoOoOoOoO#T#.',
+    '.#TOoOoOoOoO#T#.',
+    '.#TOoOoOoOoO#T#.',
+    '.#T#O#O#O#O##T#.',
+    '.#T##O##O####T#.',
+    '.#TTTTTTTTTTTT#.',
+    '..#T#......#T#..',
+    '..###......###..',
+  ],
+  /* Brass throats run out to the far end of the site. Two horns, turned up,
+     so nobody has to shout twice. */
+  tubes: [
+    '................',
+    '...####..####...',
+    '..#oooo##oooo#..',
+    '.#oOOOo##oOOOo#.',
+    '.#oO##O##O##Oo#.',
+    '.#oO#.####.#Oo#.',
+    '..#O#.#Oo#.#O#..',
+    '...#O##Oo##O#...',
+    '....#O#Oo#O#....',
+    '.....#OOOOO#....',
+    '.....#OjjjO#....',
+    '......#jjj#.....',
+    '......#xjx#.....',
+    '......#xxx#.....',
+    '.....##xxx##....',
+    '.....#######....',
+  ],
+  /* The bells got a tower. You can hear it from the treeline, and you move
+     when you do. */
+  belfry: [
+    '.......##.......',
+    '......#yy#......',
+    '.....#TyyT#.....',
+    '....#TTttTT#....',
+    '...#TTTttTTT#...',
+    '..##TTTTTTTT##..',
+    '..#T#o####o#T#..',
+    '..#T#OoooO#T#...',
+    '..#T#OoooO#T#...',
+    '..#T##OOO##T#...',
+    '..#T#######T#...',
+    '..#TT#...#TT#...',
+    '..#T#.....#T#...',
+    '..#T#.....#T#...',
+    '.##T##...##T##..',
+    '.#####...#####..',
+  ],
+
+  /* ---- the heliostat: one mirror, then nine, then the point they meet --- */
+
+  /* A single mirror on a tracker, holding a slab of sky. The gradient is the
+     reflection — a flat grey panel would read as a sign. */
+  heliostat: [
+    '................',
+    '..############..',
+    '.#cccuuuubbbbb#.',
+    '.#cuuubbbbUUUb#.',
+    '.#uuubbbbUUUBB#.',
+    '.#ubbbbUUUBBBB#.',
+    '.#bbbUUUBBBddd#.',
+    '.#bUUUBBBddddd#.',
+    '.##############.',
+    '.....#xJx#......',
+    '.....#xJx#......',
+    '.....#xJx#......',
+    '.....#xJx#......',
+    '....##xJx##.....',
+    '...#JJJJJJJ#....',
+    '...#########....',
+  ],
+  /* Nine more of them, all aimed at the same square metre of afternoon. */
+  mirrorfield: [
+    '................',
+    '.####.####.####.',
+    '.#cu#.#cu#.#cu#.',
+    '.#ub#.#ub#.#ub#.',
+    '.#bU#.#bU#.#bU#.',
+    '.####.####.####.',
+    '..#x#..#x#..#x#.',
+    '..###..###..###.',
+    '.####.####.####.',
+    '.#cu#.#cu#.#cu#.',
+    '.#ub#.#ub#.#ub#.',
+    '.#bU#.#bU#.#bU#.',
+    '.####.####.####.',
+    '..#x#..#x#..#x#.',
+    '..###..###..###.',
+    '................',
+  ],
+  /* The point where all of it meets. Do not look at it, and do not stand in
+     it — so the centre is the only pure white anywhere in the tables. */
+  furnace: [
+    '................',
+    '..#JJ#....#JJ#..',
+    '.#JMMJ#..#JMMJ#.',
+    '.#MmmM#..#MmmM#.',
+    '..#JJ#yyyy#JJ#..',
+    '....#yYYYYy#....',
+    '...#yYwwwwYy#...',
+    '..#yYwwwwwwYy#..',
+    '..#yYwwwwwwYy#..',
+    '...#yYwwwwYy#...',
+    '....#yYYYYy#....',
+    '..#JJ#yyyy#JJ#..',
+    '.#MmmM#..#MmmM#.',
+    '.#JMMJ#..#JMMJ#.',
+    '..#JJ#....#JJ#..',
+    '................',
+  ],
+
+  /* ---- the cistern: caught, then filtered, then filtered again --------- */
+
+  /* Roof runoff, caught and kept. The water darkens down the tank because a
+     flat blue box reads as a box. */
+  cistern: [
+    '................',
+    '...##########...',
+    '...#MMMMMMMM#...',
+    '...#MccccccM#...',
+    '...#MuuuuuuM#...',
+    '...#MbbbbbbM#...',
+    '...#MbbbbbbM#...',
+    '...#MUUUUUUM#...',
+    '...#MUUUUUUM#...',
+    '...#MBBBBBBM#...',
+    '...#MBBBBBBM#...',
+    '...#MddddddM#...',
+    '...#MMMMMMMM#...',
+    '...##########...',
+    '....#x#..#x#....',
+    '....###..###....',
+  ],
+  /* Gravel, reeds and patience. What comes out the far end is better than
+     what went in. */
+  reedbed: [
+    '................',
+    '...g..g...g..g..',
+    '...h..h...h..h..',
+    '..gh.gh..gh.gh..',
+    '..#h##h###h##h#.',
+    '.##############.',
+    '.#uuuuuuuuuuuu#.',
+    '.#bbbbbbbbbbbb#.',
+    '.#aAaAaAaAaAaA#.',
+    '.#AaAaAaAaAaAa#.',
+    '.#IiIiIiIiIiIi#.',
+    '.#iIiIiIiIiIiI#.',
+    '.#TITITITITITI#.',
+    '.##############.',
+    '..#T#......#T#..',
+    '..###......###..',
+  ],
+  /* White threads through a barrel of woodchip. They eat what the reeds would
+     not touch. */
+  mycelial: [
+    '................',
+    '...##########...',
+    '..#TIIIIIIIIT#..',
+    '..#IwWwiWwtwI#..',
+    '..#IWwtwIwWwI#..',
+    '..#TwWiwWtwWT#..',
+    '..#IwtwWiwWwI#..',
+    '..#IWwWtwIwWI#..',
+    '..#TwIwWwtwWT#..',
+    '..#IwWtwWiwwI#..',
+    '..#IwtwIwWtWI#..',
+    '..#TIIIIIIIIT#..',
+    '..#TTTTTTTTTT#..',
+    '...##########...',
+    '....#T#..#T#....',
+    '....###..###....',
+  ],
+
+  /* ---- the community: four machines for somebody else's build phase ---- */
+
+  /* Rag, water and a screw press. The library stops being a thing you only
+     find. */
+  press: [
+    '................',
+    '..############..',
+    '..#JJJJJJJJJJ#..',
+    '..#J#MMMMMM#J#..',
+    '..#J#MjjjjM#J#..',
+    '..#J##MMMM##J#..',
+    '..#J###MM###J#..',
+    '..#J####M###J#..',
+    '..#JwwwwwwwwJ#..',
+    '..#JwWwWwWwWJ#..',
+    '..#JwwwwwwwwJ#..',
+    '..#JJJJJJJJJJ#..',
+    '..############..',
+    '...#T#....#T#...',
+    '...#T#....#T#...',
+    '...###....###...',
+  ],
+  /* Salvaged glazing over the pots. Everything under it comes up heavier. */
+  glasshouse: [
+    '.......##.......',
+    '.....##cc##.....',
+    '...##cccccc##...',
+    '.##cccccccccc##.',
+    '#ccccc####ccccc#',
+    '#cuc#cccccc#cuc#',
+    '#####mmmmmm#####',
+    '.##############.',
+    '.#mcmcmcmcmcmc#.',
+    '.#cmgcmhcmgcmc#.',
+    '.#mchmcgcmhcmc#.',
+    '.#cmgcmhcmgcmc#.',
+    '.#mHcgmhcgmHcm#.',
+    '.##############.',
+    '..#TT#....#TT#..',
+    '..####....####..',
+  ],
+  /* Two wheels and a deep tray. What he could not carry, he can now wheel. */
+  barrow: [
+    '................',
+    '................',
+    '.###########....',
+    '.#IIIIIIIII#....',
+    '.#TIIIIIIIT#....',
+    '.#TTTTTTTTT#MM..',
+    '.###########MM..',
+    '...#M#..#M#.....',
+    '..##M##.#M#.....',
+    '..#JJJ#.#M#.....',
+    '..#JxJ#.###.....',
+    '..#JJJ#.........',
+    '..##J##.........',
+    '...###..........',
     '................',
     '................',
   ],
-  workbench: [
+  /* Cuttings laid in a long heap to rot down. Green at the top where it is
+     still this week's, and gone to leaf mould underneath. */
+  windrow: [
     '................',
     '................',
-    '.....#M#........',
-    '....########....',
-    '...#mmmmmmmm#...',
-    '...#MMMMMMMM#...',
-    '...#tttttttt#...',
-    '...#TtTtTtTt#...',
-    '...##T####T##...',
-    '....#T#..#T#....',
-    '....#T#..#T#....',
-    '....#T#..#T#....',
-    '....#N#..#N#....',
-    '....###..###....',
     '................',
-    '................',
+    '.....gg..gg.....',
+    '...gghhgghhgg...',
+    '..ghHGhHGhHGhg..',
+    '.ghHGvGhHvGHhHg.',
+    'ghHvGTIhTGvHhGhg',
+    '#hGvTIiItIvGhTg#',
+    '#TvGIitIiItIGvT#',
+    '#IiTtIiItIitTiI#',
+    '#tIiItiIitIiItT#',
+    '.#TIitIiItiIT#..',
+    '..#TTIitIITT#...',
+    '...##TTTTT##....',
+    '.....#####......',
   ],
 };
 
@@ -2229,65 +2598,59 @@ export const PROP_ART = {
     '..#tGGggglgGGGGg#RrOooOoooooorRO#vFGvvvvvFGGNG#.',
     '.##iWwWWWWiWwWwwwiWWWWWWiWWWWWWWWSSSttItttttt#t#',
   ],
+  /* The array, and the one prop built to be stood next to itself.
+   *
+   * A panel is an elevated square: a slab of cells on posts, with a pale rail
+   * along its far edge and a shadowed lip along its near one, which is the
+   * whole of what says "held up off the ground" at this size. It is one tile
+   * wide and fills that tile, so two side by side make a continuous deck with
+   * a frame line between them rather than two objects with grass showing
+   * through the gap.
+   *
+   * Up the screen it is cut to swallow the one behind it. Props are bottom
+   * anchored on the floor of their tile, so a sprite this many rows tall hangs
+   * that many rows minus sixteen over the tile above:
+   *
+   *     24 rows tall, 16 of deck and 8 of legs
+   *     bottom anchored at (y+1)*TILE, so it covers y*TILE-8 .. y*TILE+15
+   *     the panel one row back covers y*TILE-24 .. y*TILE-1
+   *       its legs, being its last 8 rows, are y*TILE-8 .. y*TILE-1
+   *       this one's deck, being its first 8 rows, is the same 8 rows
+   *
+   * The legs are exactly as tall as the overhang, so the deck in front lands
+   * on the legs behind pixel for pixel — and the depth sort already paints the
+   * nearer row second, because that is what makes walking behind a tree work.
+   * A field of panels is decks and frame lines all the way back, with legs
+   * only under the front row, which is what a solar farm looks like.
+   *
+   * That is why the deck's first eight rows carry no transparent pixel. Open a
+   * gap anywhere in them and a leg shows through it from a tile away.
+   */
   panel: [
-    '................................',
-    '................................',
-    '................................',
-    '................................',
-    '................................',
-    '................................',
-    '..############################..',
-    '..#BBbBBbBBbBBbMMbBBbBBbBBbBB#..',
-    '..#BbBcbBBbBBbBMMBBbBBbBBbBBb#..',
-    '..#bBBbcBbBBbBBMMBbBBbBBbBBbB#..',
-    '..#BBbBBcBBbBBbMMbBBbBBbBBbBB#..',
-    '..#BbBBbBcbBBbBMMBBbBBbBBbBBb#..',
-    '..#MMMMMMMcMMMMMMMMMMMMMMMMMM#..',
-    '..#BBbBBbBBcBBbMMbBBbBBbBBbBB#..',
-    '..#BbBBbBBbBBbBMMBBbBBbBBbBBb#..',
-    '..#bBBbBBbBBbBBMMBbBBbBBbBBbB#..',
-    '..#BBbBBbBBbBBbMMbBBbBBbBBbBB#..',
-    '..#BbBBbBBbBBbBMMBBbBBbBBbBBb#..',
-    '..#bBBbBBbBBbBBMMBbBBbBBbBBbB#..',
-    '..############################..',
-    '.........M............M.........',
-    '.........M............M.........',
-    '.........M............M.........',
-    '.........M............M.........',
-    '.........M............M.........',
-    '.........M............M.........',
-    '.........M............M.........',
-    '.........M............M.........',
-    '.........M............M.........',
-    '.........M............M.........',
-    '.......xxxxxxxxxxxxxxxxxx.......',
-    '................................',
-  ],
-  workbench: [
-    '................................',
-    '................................',
-    '................................',
-    '................................',
-    '................................',
-    '................................',
-    '................................',
-    '........oo...........xxxx.......',
-    '.......rrrr.........MMMMMM......',
-    '..############################..',
-    '..nnnnnnnnnnnnnnnnnnnnnnnnnnnn..',
-    '..NNNNNNNNNNNNNNNNNNNNNNNNNNNN..',
-    '..############################..',
-    '...#N......................N#...',
-    '...#N......................N#...',
-    '...#N......................N#...',
-    '...#N......................N#...',
-    '...#N.MMMMMMM..............N#...',
-    '...#N......................N#...',
-    '...#N......................N#...',
-    '...#N......................N#...',
-    '...#N......................N#...',
-    '...#N......................N#...',
-    '..############################..',
+    '################',
+    '#mmmmmmmmmmmmmm#',
+    '#UUbUMUbUUMUUbc#',
+    '#UbUUMUUbUMUbcU#',
+    '#UUUbMbUUUMUcUb#',
+    '#MMMMMMMMMMMMMM#',
+    '#BBUBMBUBBMBBUB#',
+    '#BUBBMBBUBMBUBB#',
+    '#BBBUMUBBBMBBBU#',
+    '#MMMMMMMMMMMMMM#',
+    '#BdBBMBBdBMBdBB#',
+    '#BBdBMdBBBMBBdB#',
+    '#dBBBMBdBBMdBBB#',
+    '#jjjjjjjjjjjjjj#',
+    '#JJJJJJJJJJJJJJ#',
+    '################',
+    '...xJ......xJ...',
+    '...xJ......xJ...',
+    '...xJ......xJ...',
+    '...xJJJJJJJxJ...',
+    '...xJ......xJ...',
+    '...xJ......xJ...',
+    '..#xJ#....#xJ#..',
+    '..####....####..',
   ],
 };
 
@@ -2720,6 +3083,19 @@ export const SALVAGE_ART = {
     '#cRRRRc#',
     '.#cccc#.',
     '..####..'
+  ],
+  /* Chips: a board prised out of something that used to think. Green, with a
+     black package sat on it and two rows of legs — read as a circuit board at
+     eight pixels because the legs are what say it, not the traces. */
+  chip: [
+    '.llllll.',
+    'l#l##l#l',
+    'l######l',
+    'l#xxxx#l',
+    'l#xxxx#l',
+    'l######l',
+    'l#l##l#l',
+    '.llllll.'
   ],
 };
 

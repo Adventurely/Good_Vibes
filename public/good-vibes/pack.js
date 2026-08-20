@@ -372,7 +372,7 @@ export function packedStats(placed){
 /* What one packed card hits for, once the ballast has had its say. Kept beside
    the stats rather than in the room, so the client's button and the room's
    resolution read the same number — the same reason cardEffect exists for the
-   bolt gun and the workbench. */
+   bolt gun and the panels behind it. */
 export function packedAmount(cardId, baseAmount, placed){
   if(cardId !== 'crossbow') return baseAmount;
   return baseAmount + packedStats(placed).bolt;

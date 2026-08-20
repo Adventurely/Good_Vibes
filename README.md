@@ -105,7 +105,7 @@ needs more than nine pixels across:
 | Hero sprites | 32 &times; 40, one skeleton under the whole cast |
 | Terrain tiles | 16 &times; 16, noise rather than motifs so they tile |
 | Terrain cuts | 1–3 per kind, picked per tile from a coordinate hash |
-| Props — tent, trees, panel, workbench | bigger than a tile, bottom-anchored |
+| Props — tent, trees, panel | bigger than a tile, bottom-anchored |
 | Buildings (card art) | 16 &times; 16, transparent at the corners |
 | Icons — materials, salvage, cards, marks | 8 &times; 8 |
 
@@ -390,18 +390,23 @@ the last one is in. Five players never watch each other think, and resolution
 order is fixed by player id so the same commitments always produce the same
 round however the network delivered them.
 
-### Three classes, three economies
+### Five classes, five economies
 
 Every class spends a different pool, earned a different way, on a different
 thing. A test holds the line, because two classes that both gather and both
 spend would be one class with two sprites.
 
-| | Alchemist | Engineer | Wizard |
-| --- | --- | --- | --- |
-| Flag | `craft` | `build` | `cast` |
-| Pool | `stash` (herbs) | `salvage` | `pages` |
-| Spends on | potions + the garden | buildings | spellcraft |
-| Health | 30 | 32 | **22** |
+| | Alchemist | Engineer | Wizard | Hauler | Grafter |
+| --- | --- | --- | --- | --- | --- |
+| Flag | `craft` | `build` | `cast` | `haul` | `scout` |
+| Pool | `stash` (herbs) | `salvage` (3 kinds) | `pages` | **room** | `uses` |
+| Spends on | potions + the garden | the works | spellcraft | the pack | canker |
+| Health | 30 | 32 | **22** | 38 | 26 |
+
+The Hauler is the only one that does not spend a pool at all: three items
+arrive at his feet every build phase whether he wants them or not, the bag is
+smaller than they are, and what does not fit is left on the ground. He spends
+*room*. See **[The pack](#the-pack)**.
 
 The Wizard is the roster's glass floor and a test enforces it: strictly the
 lowest hp of any class, with a floor of a basic attack and the worst basic
@@ -425,9 +430,11 @@ the eleven that one of each costs. Six nodes drawn purely by weight regularly
 grew a site with no Dewglass and no Rustbloom on it — a round where nothing
 could be brewed at all, which is the worst thing scarcity can do.
 
-Salvage also arrives *after* a fight: `salvageAfterCombat` pays each Engineer a
-rolled share and each standing building a fixed one. Building is how you stop
-being at the mercy of the roll.
+Salvage also arrives *after* a fight: `salvageAfterCombat` pays each seat with
+a `salvage` stat a rolled share, and nothing else. Buildings used to pay an
+income on top and no longer do — every one of them now buys a standing payout
+instead, and a building that also handed back the salvage it cost would be
+paying twice for one tile.
 
 ### Brewing
 
@@ -601,16 +608,22 @@ Point, click, walk. A click on the map names a destination; `pathTo` finds the
 route with a breadth-first flood over walkable ground, and the sprite is stepped
 along it a tile at a time so distance is something the player watches rather
 than reads. Walking onto a node picks it up — having to click it again would be
-a second click for a decision already made, and **anyone can pick up anything**:
-herbs, caches and pages are all for whoever gets there.
+a second click for a decision already made.
 
-Herbs used to be the Alchemist's alone — everybody else walked over one and it
-stayed where it grew. That made four of the five seats walk past the thing the
-build phase is mostly made of, and it made a party without her unable to brew at
-all, which is not scarcity but a locked door. She is still far and away the best
-at it: `gather` is 2 on her and 1 on everybody else, so the same node is worth
-twice as much when she is the one who stoops. It is a reason to send her rather
-than a rule about who is allowed.
+**What a node pays is a stat, not a permission.** `nodeYield` prices every kind
+off the stat its class was already built around: herbs off `gather`, caches off
+`salvage`, pages off `cast`. So the same tile is worth a different amount
+depending on who stoops — the Alchemist is worth two of anybody at a herb, the
+Engineer three of a Hauler at a cache — and a seat the stat prices at nothing
+gets nothing, leaves the node standing, and says so in the log.
+
+That is deliberately not the locked door this replaced. Herbs were once the
+Alchemist's alone, which made four of the five seats walk past the thing the
+build phase is mostly made of and left a party without her unable to brew at
+all. Nothing is now gated to a seat the party can do without: every live class
+gathers, three of the five crack caches, and a page is refused only to the four
+seats that could never spend one — `openPage` has always refused them anyway.
+What it stops is the Wizard walking off with a crate of pipe he cannot read.
 
 Routing is pure and shared for the usual reason: the room has to be able to
 check that a click was reachable rather than trust a client that says it walked
@@ -694,9 +707,9 @@ what a backpack means and the reason it earns a row of its own.
 `RECIPES.makes` used to deal three Sunsalves into a shuffle; it puts three in
 the rack, which is what it always meant. `SPELLS.charges` used to be how many
 copies of a spell went into her deck; it is what a cast costs. Raising a panel
-used to push a Bolt Gun card into the Engineer's deck and hope he drew it; he
-always has the gun, and what a panel buys is the power to fire it. In every case
-the mechanic is unchanged and the indirection is gone.
+used to push a Bolt Gun card into the Engineer's deck and hope he drew it; a
+panel buys the power to fire what the chips already bought. In every case the
+mechanic is unchanged and the indirection is gone.
 
 The Grafter is in the `uses` column because she has no economy of her own yet —
 `CLASS_EXTRAS` has always admitted that, and it is the field to empty when she
@@ -712,10 +725,9 @@ the client answer that question out of the same function and cannot disagree.
 
 Costs are paid at **resolution**, not on the click — a commitment can still be
 taken back, and a charge spent on an action that was never taken would be gone
-for nothing. Affordability is checked twice for the same reason: two Engineers
-committing a Bolt Gun against one panel's worth of power is a legal pair of
-clicks, and the second to resolve has to find the pool empty rather than take it
-negative.
+for nothing. Affordability is checked twice for the same reason: two seats
+committing against one panel's worth of power is a legal pair of clicks, and
+the second to resolve has to find the pool empty rather than take it negative.
 
 Two things changed shape rather than porting cleanly:
 
@@ -741,7 +753,7 @@ underneath a structure, and a pocket this round's building walled off stops
 being somewhere the crop can land — the spawner floods with the buildings in
 place, so what it plants is what a hero can still walk to. Spawn tiles are
 building-aware for the same reason: nobody should open a round standing inside
-the workbench they put up last one.
+the array they put up last one.
 
 The site is a 30 &times; 17 grid of 16px tiles — a grid because every question
 the build phase asks is about neighbours, and a grid answers those with
@@ -830,8 +842,8 @@ itself is unwalkable, the ring is the nearest thing the ordering can offer.
 
 **One panel per class.** Below the map you get the pool you spend and the verb
 you have, and nothing belonging to somebody else's economy: the Alchemist's
-stash, garden and recipes, the Engineer's salvage, buildings, power and
-workbench, the Wizard's library, draft, bench and satchel, the Hauler's pack.
+stash, garden and recipes, the Engineer's salvage, buildings, lines and
+abilities, the Wizard's library, draft, bench and satchel, the Hauler's pack.
 Each is hidden whole, heading included, on the rule power was
 already hidden by — a readout you cannot act on is one you learn to skip past,
 and a live heading over the words "only the Alchemist can brew" spends a
@@ -857,48 +869,168 @@ committed and three dots over each one still deciding — the same mark answers
 Map generation is seeded — `seededRandom(seedFromCode(code))` — so a room code
 is a ruin, the same one on the server, in the client, and in the tests.
 
-### Buildings, power and the bolt gun
+### The works
 
-Two buildings, and they are the Engineer's whole mechanic.
+The Engineer does not have a deck, a bench or a bag. He has a **base that keeps
+working while everybody else is taking their turn**, and that is the whole seat.
 
-| | Costs | Gives |
+Nothing else in this game contributes on a round it is not acting in. The
+Wizard has to cast, the Hauler has to swing, the Alchemist has to pour. A
+machine does not care whether the person who built it is busy, or asleep, or
+face down in the rubble — so the payout runs regardless, and a downed Engineer
+is still the reason the party is winning.
+
+This replaced a seat that had no job. His three class cards were Bolt Gun,
+Bulwark and Jumper Cables; by the time the Hauler's bag landed, all three were
+in it and better — a Rigging Tarp is the same `wardAll 3` for free, a Stretcher
+revives for 8 instead of 6 at a cost of one health, and a Sledge hits for 11.
+He was paying a currency he had to build infrastructure for, to do things
+another seat did better for nothing. So he stopped having cards.
+
+#### Three piles, and only one of them is a fork
+
+| | Buys | Rarity |
 | --- | --- | --- |
-| **Solar Panel** | 3 Screws + 2 Plating | +1 power a fight. Build as many as you like |
-| **Workbench** | 4 Screws + 3 Pipe | Upgrades the bolt gun. Max one |
+| **Screws** | The works: panels and the four payout lines | Common |
+| **Coil** | The community machines | Uncommon |
+| **Chips** | Abilities | Rare |
 
-> **The panel is drawn two tiles across but occupies one.** That is deliberate
-> and temporary: a real footprint is a `content.js` signature change and
-> therefore a `src/rooms.js` re-port. See **[Multi-tile buildings](#multi-tile-buildings-not-built-yet)**.
+Pipe and Plating folded into Screws when the piles went from four to three:
+four resources across two spends was bookkeeping, three across three is a
+shape.
 
-**Power is the only pool nobody carries.** Panels make it, a fight spends it,
-and whatever is left at the end evaporates — `powerFrom` recomputes it at every
-surge. Hoarding is not a strategy; you either spent the sunlight this round or
-you did not. It is also the only pool that is *hidden from the rest of the
-party*, because nobody else can spend it and a number you cannot use is one you
-learn to skip past.
+The split exists so that **helping the party is never a sacrifice**. Coil buys
+nothing the Engineer can point at a monster, and screws buy nothing anybody
+else can touch, so the two never compete — a player is never choosing between
+their own win rate and the table's.
 
-The **Bolt Gun** — 1 power for a strike of 9 — arrives with the first Second
-Barrel: the Engineer builds her gun the way the Wizard writes her spells. It
-is not consumed — the gun is a gun, not a potion — so it cycles back through
-the discard like any basic. How many there are and how hard they hit are both
-bought at the workbench:
+The fork is *inside* screws, and it is self-referential:
 
-| Upgrade | Base cost | Does |
-| --- | --- | --- |
-| **Second Barrel** | 3 Screws + 2 Pipe | a bolt costs one less power, floored at one |
-| **Overcharged Coil** | 2 Plating + 1 Coil | every bolt hits for 3 more |
+- **Panels are the power to fire an ability.**
+- **Lines are what the ability is worth.**
 
-Both repeat, and both get dearer each time by `step` — an Engineer who never
-stops upgrading should feel the cost rather than compound for free.
-`cardEffect(id, upgrades)` is what applies the damage, so `CARDS` stays
-declarative and the client and the room cannot disagree about how hard a bolt
-hits.
+All array and no line: plenty of power, and Close Ranks guards for nothing. All
+line and no array: a fat number you cannot afford to pull. `STARTING_SALVAGE`
+is 6 screws, which is exactly two panels *or* one line's first tier, and a test
+pins that a first buy always leaves the other out of reach.
 
-The opening is a decision. `STARTING_SALVAGE` covers a Solar Panel *or* a
-Workbench and deliberately not both — power now against upgrades later — and
-two tests pin it: one that the panel is always affordable on round one, because
-a bolt gun with nothing to draw on is an option greyed out all fight, and one
-that buying either leaves the other out of reach.
+#### The five lines
+
+Four pay the party, at the top of every round, automatically. One pays him.
+
+| Line | Pays | When | Drawn by |
+| --- | --- | --- | --- |
+| **The array** | power, to the Engineer | per fight | — |
+| **The windbreak** | guard on every seat | top of every round | Close Ranks |
+| **The carillon** | a harder swing for every seat | top of every round | All Hands |
+| **The heliostat** | damage on the nearest enemy | top of every round | Sunlance |
+| **The cistern** | health for every seat | **once, when the fight ends** | nothing |
+
+**A panel makes 1, or 2 with another panel orthogonally beside it.** That is
+the one line that is not a plain sum, and it is what makes the map a puzzle:
+the array wants a contiguous run and a rolled ruin is full of holes. Rubble,
+water, trees and crevices are unbuildable, herb nodes hold their tile until
+somebody takes them, and the camp is stamped through the middle. Finding six
+clear tiles in a row is a real problem, and every line building competes for
+the same ground because each tier has to touch the one below it.
+
+**The cistern is the odd one and deliberately so.** Healing every round was
+simply the best thing a line could do, so it fires once and pays more — economy
+between fights rather than sustain inside one. Nothing draws it, which is what
+stops the mend line turning into a spike, and a test pins that no card ever
+names it.
+
+#### What chips buy
+
+| Ability | Chips | Does | Power | Needs |
+| --- | --- | --- | --- | --- |
+| **Bolt Gun** | 2 | strike 9 | 1 | — |
+| **Close Ranks** | 2 | guard one seat for `DRAW ×` the windbreak | 1 | Trellis |
+| **All Hands** | 2 | one seat swings `DRAW ×` the carillon harder | 1 | Carillon |
+| **Sunlance** | 3 | strike one enemy for `DRAW ×` the heliostat | 2 | Heliostat |
+| **Hold the Charge** | 3 | every line pays nothing now and **double** next | 1 | — |
+
+Four of the five have no number of their own. `DRAW` times what the line pays,
+onto one target — so **the card's text is written on the map**. Close Ranks off
+a bare Trellis is 5 guard; with the windbreak grown in it is 15, from the same
+chip. Nothing else in this game is priced by looking at the board.
+
+`DRAW` is `PARTY_SIZE`, and that is the fiction: the whole crew's share of one
+round, pulled through a single line. It is a **flat multiplier rather than an
+actual redistribution**, because a redistribution is worth five times as much
+at a full table and nothing at all alone, and this seat has to be playable by
+one person. Hold the Charge is the same idea on the other axis — it
+concentrates across *rounds* instead of across people.
+
+The Bolt Gun is the exception that makes the seat playable at all: a flat
+number off a bare panel, needing nothing standing. `STARTING_SALVAGE` carries
+exactly two chips, and a test pins that it covers it.
+
+**All Hands is the sharpest thing here, and on purpose.** `might` is a term
+inside `strikePower` and it lands on the target's *next* turn, exactly as the
+Wizard's Ember Rune does. Players can see each other's commitments before a
+round resolves, so a Wizard who watches All Hands land on her picks Cinder
+Nova — and `strikeAll` carries the might to every enemy in the lane. That is a
+coordination play with a real ceiling on it, and it is the number most likely
+to want tuning first.
+
+#### The community: four machines for somebody else's build phase
+
+| Building | Cost | Gives | Stands |
+| --- | --- | --- | --- |
+| **Pulp Press** | 5 coil | The Wizard drafts a page more each build phase | beside `water` |
+| **Glasshouse** | 5 coil | Every pot the Alchemist pulls is worth one more | on `grass` |
+| **The Barrow** | 5 coil | The Hauler's bag grows a round early | at the camp |
+| **Windrow** | 5 coil | One more use of everything the Grafter counts | beside a `tree` |
+
+This is the role nobody else can occupy. Ember Rune, Graft and Leg Up hand an
+ally something for one round inside a fight; these are the only things in the
+project that reach another seat's *economy*. The Barrow is the neatest of them:
+`gridFor` already clamps at both ends, so it is `gridFor(round + barrows)` and
+nothing else — and what the Hauler sees is a row of his bag arriving early
+rather than a number he has to read.
+
+#### Where a thing may stand
+
+`placeRefusal` folds the terrain, the occupancy, the cap and the building's own
+rule into **one answer, and returns a reason rather than a boolean** — the same
+contract `actionReady` follows. The client draws that string, the room refuses
+with the same function, and the placement ghost is computed from it, so the
+cursor can never promise a tile the click will bounce off. Six predicates cover
+all nineteen buildings: `beside`, `near`, `on`, `onOrNear`, `clearOf`, `camp`,
+plus a `needs` count.
+
+Only the panel may be built twice. A second Trellis would pay the same line
+again for no decision — the tiers above it are what a line is *for*.
+
+**A standing building can be walked to a better tile, for nothing.** Clicking
+one picks it up; clicking a tile puts it down. That gesture was free — a
+building's tile is not walkable, so `pathTo` always refused it and the click
+did nothing at all. Moving is free and build-phase only on the precedent
+`moveMod` already sets: a spell is re-socketed at the desk rather than
+mid-surge, and rearranging something already paid for should not cost twice. An
+array is a shape, and a shape you cannot adjust is one nobody dares start.
+
+`moveRefusal` asks two questions. The destination is `placeRefusal` against a
+board the building has been lifted off — which settles the cap for free, since
+a Trellis is not a second Trellis when the first one is the thing in your
+hands. Then: **a move may not strand anything.** Without that, every adjacency
+rule here is decoration — you would place the Trellis, hang the Living Wall off
+it, and walk the Trellis to the far side of the site. `strandedIn` asks each
+remaining building about its own tile against a board it has been taken out of,
+which is the question `placeRefusal` already answers, so a predicate added
+there is one this honours for free.
+
+#### What this replaced
+
+`UPGRADES`, `upgradeCost` and `buyUpgrade` are gone, along with the Workbench
+that sold them. They were a second progression system beside the buildings, and
+they were the one that decided the fight — which made every placement
+decoration and every purchase the game. The three names stay exported and
+answer emptily, because this module is imported at the top of a Worker nobody
+working here can read the source of, and an import of a name that is not
+exported takes the whole site down. See the published contract at the foot of
+`test/content.test.js`.
 
 ### The surge
 
@@ -984,10 +1116,11 @@ about to do is the question now, not who it picked.
 
 **Guard comes off the top of each seat's own share.** Five players facing a
 swing of four is five separate subtractions, not one pool of four. That is what
-makes the party-wide defends worth their worse per-head numbers: Bulwark on five
-seats now blunts five shares of every swing in the round, which is a different
-card from the one that put guard on five people who mostly were not going to be
-hit.
+makes the party-wide defends worth their worse per-head numbers: a Rigging Tarp
+over five seats blunts five shares of every swing in the round, which is a
+different card from the one that put guard on five people who mostly were not
+going to be hit. It is also why the Engineer's windbreak is worth building —
+one point a round, paid to everybody, is five subtractions off five swings.
 
 **A dose that guard swallows whole leaves nothing behind.** The best rule in the
 old model survives intact, and it is now the whole reason `blight` is its own
@@ -1202,20 +1335,25 @@ that must not be aimable at all.
 
 #### The party cards
 
-Every class opens with cards that are only worth holding because there is
-another seat at the table: the Alchemist's Blight Censer and Restorative
-Vapours, the Engineer's Bulwark and Jumper Cables, the Wizard's Ember Rune and
-Cinder Nova, the Hauler's Get Behind Me and Leg Up, the Grafter's Graft. Bulwark is the shape of all of them — guard on everyone, worse per
-head than Shore Up on one, so it is the wrong card at a table of one and the
-best card in the deck at a table of five.
+Every class has something only worth holding because there is another seat at
+the table: the Alchemist's Blight Censer and Restorative Vapours, the Wizard's
+Ember Rune and Cinder Nova, the Hauler's Get Behind Me, Leg Up and Rigging
+Tarp, the Grafter's Graft, and the Engineer's Close Ranks and All Hands. The
+Tarp is the shape of most of them — guard on everyone, worse per head than
+Shore Up on one, so it is the wrong card at a table of one and the best card in
+the bag at a table of five.
 
 Ember Rune is the clearest of them: it does no damage, it lands on somebody
 else's *next* turn, and it is worth a page only if that person then swings. Two
 people have to agree about a round in advance. One copy each rather than two, on
 purpose — a card you hold every other turn is a rotation, not a moment.
 
-Only one of them could have been dead weight solo, and it is not: with nobody
-down, Jumper Cables jolts whoever is worst off instead of doing nothing.
+**None of them is dead weight alone, and the Engineer's are the reason the rule
+had to be written down.** Close Ranks and All Hands are `DRAW ×` what a line
+pays rather than a share of it redistributed, so they are worth exactly the
+same to one player as to five; Hold the Charge concentrates across rounds
+instead of across people for the same reason. A seat whose whole kit only works
+at a full table is a seat nobody can learn.
 
 #### Ending
 
@@ -1436,8 +1574,9 @@ options is not, and in a co-op game there was never a reason for it to be. So
 `charges`, `stock` and `uses` go out for **every** seat, and anybody can see
 that the Wizard has one charge left, that the rack is down to its last Sunsalve,
 and that the Hauler can still afford to cover. The cards that need two people to
-agree about a round in advance — Ember Rune, Bulwark, Graft — finally have
-something to agree over.
+agree about a round in advance — Ember Rune, All Hands, Graft — finally have
+something to agree over. All Hands is the sharpest of them for exactly this
+reason: a Wizard who watches it land on her can still pick the Nova.
 
 Views are still built per socket, because one thing is still yours alone: your
 own `intent` comes back in full and nobody else's does. That is the price of
