@@ -296,10 +296,10 @@ def petal_textures(n):
     # bounded, so the spacing stays even the whole way down the petal.
     fan = np.arctan2(su, np.maximum(bt, 0.05))
     v = np.abs(np.sin(fan * 3.4))
-    veins = smoothstep(0.52, 0.0, v) * smoothstep(0.08, 0.40, bt)
+    veins = smoothstep(0.60, 0.0, v) * smoothstep(0.08, 0.40, bt)
 
-    deep = np.array([0.058, 0.012, 0.148])      # the body of the petal
-    pale = np.array([0.150, 0.070, 0.280])      # the margin, where it is thinnest
+    deep = np.array([0.043, 0.008, 0.132])      # the body of the petal
+    pale = np.array([0.125, 0.052, 0.268])      # the margin, where it is thinnest
     # Small and warm rather than big and cream. A Saintpaulia is saturated
     # almost the whole way to its centre; a wide pale base on five overlapping
     # petals adds up to a cream ring the flower does not have.
@@ -318,7 +318,7 @@ def petal_textures(n):
     col = col * (1 - tw) + throat[None, None, :] * tw
     # veins are a deeper crease in the colour, never a drawn line — but at 0.38
     # they did not register at all, and what did not register was a flat wash
-    col = col * (1.0 - 0.52 * veins[..., None])
+    col = col * (1.0 - 0.66 * veins[..., None])
 
     alb = np.ones((n, n, 4)); alb[..., :3] = np.clip(col, 0, 1)
 
@@ -327,7 +327,7 @@ def petal_textures(n):
     ht = np.ones((n, n, 4)); ht[..., :3] = np.clip(h, 0, 1)[..., None]
 
     # matte and faintly velvety; the creases catch a little more than the rest
-    r = np.clip(0.52 - 0.14 * veins + 0.10 * (fine - 0.5), 0.2, 0.9)
+    r = np.clip(0.74 - 0.10 * veins + 0.08 * (fine - 0.5), 0.40, 0.95)
     rg = np.ones((n, n, 4)); rg[..., :3] = r[..., None]
 
     TEX_ARRAYS.update(petal_albedo=alb[..., :3].copy(),
@@ -430,10 +430,24 @@ def petal_material():
     tex_h = n.new('ShaderNodeTexImage'); tex_h.image = P_HGT; tex_h.location = (-820, 0)
     tex_r = n.new('ShaderNodeTexImage'); tex_r.image = P_ROU; tex_r.location = (-820, -300)
 
+    # A Saintpaulia petal is finely papillate — thousands of little domed
+    # cells — and that is what makes it read as velvet rather than as vinyl.
+    # Far too small to put in a map, so it goes in as noise, chained under the
+    # vein bump exactly the way the leaf chains its hairs.
+    nap = n.new('ShaderNodeTexNoise'); nap.location = (-1100, -420)
+    nap.inputs['Scale'].default_value = 420.0
+    nap.inputs['Detail'].default_value = 7.0
+    nap.inputs['Roughness'].default_value = 0.72
+    velvet = n.new('ShaderNodeBump'); velvet.location = (-800, -420)
+    velvet.inputs['Strength'].default_value = 0.20
+    velvet.inputs['Distance'].default_value = 0.0004
+    nt.links.new(nap.outputs['Fac'], velvet.inputs['Height'])
+
     bump = n.new('ShaderNodeBump'); bump.location = (-460, -60)
     bump.inputs['Strength'].default_value = 0.35
     bump.inputs['Distance'].default_value = 0.0012
     nt.links.new(tex_h.outputs['Color'], bump.inputs['Height'])
+    nt.links.new(velvet.outputs['Normal'], bump.inputs['Normal'])
 
     # Six identical purples is the same tell that eleven identical greens was.
     # `leafvar` is already a per-part constant on the mesh, so the blooms can
@@ -441,8 +455,8 @@ def petal_material():
     attr = n.new('ShaderNodeAttribute'); attr.location = (-1100, 620)
     attr.attribute_name = 'leafvar'
     tint = n.new('ShaderNodeMixRGB'); tint.location = (-820, 620)
-    tint.inputs[1].default_value = (0.82, 0.86, 1.14, 1)     # a bluer bloom
-    tint.inputs[2].default_value = (1.18, 0.92, 0.96, 1)     # a redder one
+    tint.inputs[1].default_value = (0.91, 0.94, 1.08, 1)     # a bluer bloom
+    tint.inputs[2].default_value = (1.09, 0.97, 0.98, 1)     # a redder one
     nt.links.new(attr.outputs['Fac'], tint.inputs[0])
     mul = n.new('ShaderNodeMixRGB'); mul.location = (-240, 380)
     mul.blend_type = 'MULTIPLY'
@@ -464,11 +478,11 @@ def petal_material():
     set_if(b, 'Subsurface Weight', 0.18)
     set_if(b, 'Subsurface Radius', (0.060, 0.022, 0.090))
     set_if(b, 'Subsurface Scale', 0.0025)
-    set_if(b, 'Sheen Weight', 0.18)
+    set_if(b, 'Sheen Weight', 0.34)
     set_if(b, 'Sheen Roughness', 0.30)
     set_if(b, 'Sheen Tint', (0.72, 0.62, 0.86, 1))
     # and no broad white gloss, which is the other half of looking moulded
-    set_if(b, 'Specular IOR Level', 0.22)
+    set_if(b, 'Specular IOR Level', 0.13)
     return m
 
 
@@ -897,7 +911,10 @@ def add_bloom(j):
 
     # --- the corolla, as a frame that faces up and leans a little outward,
     # which is how a violet actually presents its face
-    lean = math.radians(16)
+    # A violet presents its face outward and up, not straight up. At 16 deg
+    # every bloom was seen edge-on from any normal camera height and read as
+    # a flat purple plate; the face is the whole flower, so it has to tip.
+    lean = math.radians(36) + rnd.uniform(-0.14, 0.14)
     cl, sl = math.cos(lean), math.sin(lean)
     ra = Vector((math.sin(ang), math.cos(ang), 0.0))     # outward, in plan
     ta = Vector((ra.y, -ra.x, 0.0))                      # across it
@@ -905,15 +922,28 @@ def add_bloom(j):
     face_up = (up * cl + ra * sl).normalized()
     face_ra = (ra * cl - up * sl).normalized()
 
-    # five petals, wide enough at 72 degrees apart that they overlap rather
-    # than leaving the gaps that made this read as a daisy
-    for p in range(5):
-        pa = (p / 5) * math.tau + rnd.uniform(-0.08, 0.08) + 0.4
-        sz = (0.0128 if p < 2 else 0.0170) * op          # two upper, three lower
-        hw = 0.72 * sz
+    # A Saintpaulia corolla is zygomorphic, not radial: two small dorsal lobes
+    # up top and three larger ones fanned below, on a very short corolla tube.
+    # Spacing all five at 72 degrees — which is what this did — builds a
+    # periwinkle. The bilateral arrangement is the single strongest cue that
+    # this is a violet and not a generic five-petalled flower.
+    #
+    # `pa` is measured around the flower's face from `face_ra`, which points up
+    # and outward, so pa = 0 is the top of the face.
+    LOBES = [
+        (math.radians(-38), 0.0122),   # dorsal pair, small and held back
+        (math.radians(38),  0.0122),
+        (math.radians(132), 0.0178),   # ventral trio, large and fanned
+        (math.radians(180), 0.0186),   # the lowest lobe is the biggest of all
+        (math.radians(228), 0.0178),
+    ]
+    for p, (pa0, sz0) in enumerate(LOBES):
+        pa = pa0 + rnd.uniform(-0.05, 0.05)
+        sz = sz0 * op
+        hw = (0.62 if p < 2 else 0.78) * sz
         d_out = (face_ra * math.cos(pa) + ta * math.sin(pa)).normalized()
         d_side = d_out.cross(face_up).normalized()
-        PU, PV = 9, 11
+        PU, PV = 11, 13
         cols = []
         pstart = len(bm.verts)
         for a in range(PU):
@@ -921,13 +951,25 @@ def add_bloom(j):
             for b_ in range(PV):
                 su = (a / (PU - 1) - 0.5) * 2
                 bt = b_ / (PV - 1)
+                # A real petal margin is not a clean arc — it waves slightly,
+                # and that irregularity along the silhouette does more for
+                # realism at this size than anything happening in the middle.
                 w = math.sin(math.pi * bt ** 0.55) ** 0.5
+                w *= 1.0 + 0.055 * math.sin(su * 7.0 + p * 2.1) * bt
                 # A violet presents a flat face. Curling the sides up as hard as
                 # this did turned five overlapping petals into a crumpled shell
                 # — the shape was doing more to make it look moulded than the
                 # material ever was.
+                # A petal is not a smooth sheet. Broad, low undulation across
+                # the blade is what stops a big curved surface reading as
+                # vacuum-formed — before this the only relief anywhere on the
+                # corolla was the creases where one lobe crossed another, and
+                # no amount of roughness in the material could stand in for it.
+                rip = (math.sin(su * 5.3 + p * 1.7) * math.sin(bt * 4.1 + p * 0.9)
+                       + 0.45 * math.sin(su * 9.7 - bt * 6.3 + p * 2.6))
                 pt = (top + d_out * (bt * sz) + d_side * (su * w * hw)
-                      + face_up * sz * (-0.09 * bt * bt + 0.035 * (su ** 2) * bt))
+                      + face_up * sz * (-0.09 * bt * bt + 0.035 * (su ** 2) * bt
+                                        + 0.034 * rip * bt))
                 v = bm.verts.new(pt)
                 v[varl] = bv
                 col.append(v)
@@ -969,11 +1011,62 @@ def add_bloom(j):
                 except ValueError:
                     pass
 
+    def filament(pts, rr, slot):
+        """A thin tube through `pts` — the style, and the corolla tube."""
+        RING = 6
+        prev = None
+        for i, c in enumerate(pts):
+            if i == 0:
+                tan = (pts[1] - pts[0]).normalized()
+            elif i == len(pts) - 1:
+                tan = (pts[-1] - pts[-2]).normalized()
+            else:
+                tan = (pts[i + 1] - pts[i - 1]).normalized()
+            axis = Vector((0, 0, 1))
+            if abs(tan.dot(axis)) > 0.95:
+                axis = Vector((1, 0, 0))
+            u = tan.cross(axis).normalized()
+            w2 = tan.cross(u).normalized()
+            ring = []
+            for k in range(RING):
+                th = k / RING * math.tau
+                ring.append(bm.verts.new(c + (u * math.cos(th) + w2 * math.sin(th)) * rr))
+                bind(len(bm.verts) - 1, 1.0, names)
+            bm.verts.ensure_lookup_table()
+            if prev:
+                for k in range(RING):
+                    f = bm.faces.new((prev[k], prev[(k + 1) % RING],
+                                      ring[(k + 1) % RING], ring[k]))
+                    f.material_index = slot
+            prev = ring
+
+    # The corolla tube. Very short on a violet — but with no tube at all, five
+    # petals converge on one point and the centre of the flower reads as a seam.
+    filament([top - face_up * 0.0034 + face_ra * -0.0006,
+              top - face_up * 0.0012,
+              top + face_up * 0.0008], 0.0021, SLOT_PETAL)
+
     # two fat yellow anthers, which is the detail that says Saintpaulia rather
     # than "small purple flower"
     for e in (-1, 1):
-        blob(top + face_up * 0.0022 + ta * (e * 0.0024) + face_ra * 0.0008,
+        blob(top + face_up * 0.0026 + ta * (e * 0.0021) + face_ra * 0.0010,
              0.0021, 0.85, SLOT_EYE)
+
+    # Every Saintpaulia is enantiostylous: the style is deflected hard to the
+    # left or right of the floral axis instead of standing up the middle, and
+    # which way is a coin toss per flower. It is a hair of geometry and the
+    # most specific thing about the bloom — a straight central style, or none
+    # at all, reads as almost any other small purple flower.
+    hand = 1 if rnd.random() < 0.5 else -1
+    style = [top
+             + face_up * (0.0012 + 0.0030 * (i / 5))
+             + ta * (hand * 0.0042 * (i / 5) ** 2)
+             + face_ra * (0.0008 * (i / 5))
+             for i in range(6)]
+    # 0.22 mm and 5 mm long. The first attempt at this was twice as thick and
+    # twice as long, and a style that reads as a stick is worse than no style.
+    filament(style, 0.00022, SLOT_STEM)
+    blob(style[-1], 0.00040, 1.0, SLOT_STEM)      # the stigma
 
 
 for i in range(int(P['leaves'])):

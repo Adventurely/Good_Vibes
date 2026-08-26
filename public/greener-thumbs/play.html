@@ -90,6 +90,7 @@
   <h2>African Violet</h2>
   <p><i>Saintpaulia ionantha</i></p>
   <p class="hint">Drag to look around &middot; scroll to zoom right in</p>
+  <p class="hint" style="color:#9db09a">Light: <b id="timenow">—</b></p>
 </div>
 
 <div id="panel" hidden>
@@ -111,15 +112,12 @@
   </fieldset>
 
   <fieldset>
-    <legend>Air</legend>
-    <div class="row">
-      <label for="wind">Wind</label>
-      <input id="wind" type="range" min="0" max="1.6" step="0.01" value="1">
-      <output for="wind">1.00</output>
-    </div>
-    <div class="btns">
-      <button id="gust">Gust</button>
-      <button id="play" aria-pressed="true">Pause</button>
+    <legend>Light</legend>
+    <div class="btns" id="times">
+      <button data-t="morning">Morning</button>
+      <button data-t="midday">Midday</button>
+      <button data-t="evening">Evening</button>
+      <button data-t="night">Night</button>
     </div>
   </fieldset>
 
@@ -185,9 +183,12 @@ $('#stage').appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 // Daylight outside the glass. A dark room behind glass walls just reads as a
 // dark room; the whole point of a greenhouse is that the light comes through it.
-scene.background = new THREE.Color(0x9fb4b0);
+// No flat background colour: the sky dome below is what you see through the
+// glass, and a colour behind it only shows up as a band when they disagree.
 
-const camera = new THREE.PerspectiveCamera(38, innerWidth/innerHeight, 0.01, 60);
+// Far plane out past the sky dome (140) and the hills behind it. At 60 the
+// dome was clipped away and the whole outside world simply was not drawn.
+const camera = new THREE.PerspectiveCamera(38, innerWidth/innerHeight, 0.01, 400);
 camera.position.set(0.24, 1.12, 0.34);
 
 /* Fit the plant to the viewport using BOTH field of view angles.
@@ -199,7 +200,7 @@ camera.position.set(0.24, 1.12, 0.34);
    19 cm plant. `pad` is a multiple of the distance that would just fit the
    plant, so ESTABLISH lands far enough out to hold the pedestal and the
    benches, and CLOSE puts the blade veining across the viewport. */
-const ESTABLISH = 9.0, CLOSE = 1.45;
+const ESTABLISH = 15.0, CLOSE = 1.45;
 
 function frameToFit(obj, pad = 1.6){
   const box = new THREE.Box3().setFromObject(obj);
@@ -240,38 +241,49 @@ scene.environmentIntensity = 0.55;
    own plinth the next time the greenhouse changes. */
 const PEDESTAL_TOP = 0.95;
 
-// ---- the greenhouse ---------------------------------------------------------
-/* Built rather than loaded. It is a few hundred triangles of boxes and planes,
-   which is far less to ship than any model of it would be, and it means the
-   room can be resized in one place when the game needs more bench space. */
-const GH = { W: 7.2, D: 5.0, EAVE: 2.35, RIDGE: 3.25 };
+/* Dimensions from a real dwarf-wall Victorian glasshouse rather than invented:
+   a brick base about knee height, glass above it to the eaves, a pitched roof
+   with a ridge, and the glazing divided into panes by bars rather than left as
+   one sheet. The pane grid is most of what makes glass read as a greenhouse —
+   a clean unbroken wall of it reads as an office. */
+const GH = {
+  W: 7.2, D: 5.0,
+  WALL: 0.62,          // the dwarf brick wall
+  EAVE: 2.45,
+  RIDGE: 3.35,
+  BAR: 0.045,          // glazing bar section
+  PANE_W: 0.72,        // roughly a standard horticultural pane
+};
 
-const matFrame = new THREE.MeshStandardMaterial({ color:0x27332a, roughness:0.55, metalness:0.25 });
-const matFloor = new THREE.MeshStandardMaterial({ color:0x37332c, roughness:0.94 });
-const matBench = new THREE.MeshStandardMaterial({ color:0x4a3b2a, roughness:0.85 });
+// ---- materials --------------------------------------------------------------
+const matFrame = new THREE.MeshStandardMaterial({ color:0x223026, roughness:0.52, metalness:0.30 });
+const matBrick = new THREE.MeshStandardMaterial({ color:0x6b4436, roughness:0.94 });
+const matFloor = new THREE.MeshStandardMaterial({ color:0x38332c, roughness:0.96 });
+const matBench = new THREE.MeshStandardMaterial({ color:0x5a4732, roughness:0.88 });
 const matStone = new THREE.MeshStandardMaterial({ color:0x6a6a63, roughness:0.80 });
+const matTerra = new THREE.MeshStandardMaterial({ color:0x8a4a2c, roughness:0.90 });
+const matGrass = new THREE.MeshStandardMaterial({ color:0x2f4a22, roughness:1.0 });
+const matHedge = new THREE.MeshStandardMaterial({ color:0x243d1c, roughness:1.0 });
+const matBark  = new THREE.MeshStandardMaterial({ color:0x3a2c22, roughness:0.92 });
+const matLeaf  = new THREE.MeshStandardMaterial({ color:0x2b4a1f, roughness:0.95 });
 
-/* Glass as a cheap translucent surface, not as refraction.
-   `transmission` would be physically better and costs a full extra render pass
-   per pane; at this opacity, against a bright environment, nobody can tell.
-   `depthWrite:false` because eight overlapping transparent panes sort badly
-   otherwise and flicker as the camera turns. */
+/* Glass as a cheap translucent surface, not as refraction. `transmission`
+   would be physically better and costs an extra render pass per pane; at this
+   opacity nobody can tell. `depthWrite:false` because a few dozen overlapping
+   transparent panes sort badly otherwise and flicker as the camera turns. */
 const matGlass = new THREE.MeshStandardMaterial({
-  color: 0xcfe6de, roughness: 0.16, metalness: 0.0,
-  transparent: true, opacity: 0.15, side: THREE.DoubleSide, depthWrite: false,
+  color: 0xd6e9e2, roughness: 0.14, metalness: 0.0,
+  transparent: true, opacity: 0.13, side: THREE.DoubleSide, depthWrite: false,
 });
 
 const house = new THREE.Group();
+scene.add(house);
 
-const floor = new THREE.Mesh(new THREE.PlaneGeometry(GH.W, GH.D).rotateX(-Math.PI/2), matFloor);
-floor.receiveShadow = true;
-house.add(floor);
-
-function bar(w, h, d, x, y, z){
-  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), matFrame);
+function box(w, h, d, x, y, z, mat, group = house){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
   m.position.set(x, y, z);
-  m.castShadow = true;
-  house.add(m);
+  m.castShadow = true; m.receiveShadow = true;
+  group.add(m);
   return m;
 }
 function pane(w, h, x, y, z, ry = 0, rx = 0){
@@ -282,95 +294,302 @@ function pane(w, h, x, y, z, ry = 0, rx = 0){
   return m;
 }
 
-// walls
-pane(GH.W, GH.EAVE, 0,  GH.EAVE/2, -GH.D/2);
-pane(GH.W, GH.EAVE, 0,  GH.EAVE/2,  GH.D/2);
-pane(GH.D, GH.EAVE, -GH.W/2, GH.EAVE/2, 0, Math.PI/2);
-pane(GH.D, GH.EAVE,  GH.W/2, GH.EAVE/2, 0, Math.PI/2);
+// ---- floor, and the dwarf wall it sits in -----------------------------------
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(GH.W, GH.D).rotateX(-Math.PI/2), matFloor);
+floor.receiveShadow = true;
+house.add(floor);
 
-// the pitched roof, as two leaves hinged on the ridge
+const B = GH.BAR;
+for (const sz of [-1, 1]) box(GH.W + B*2, GH.WALL, 0.14, 0, GH.WALL/2, sz*GH.D/2, matBrick);
+for (const sx of [-1, 1]) box(0.14, GH.WALL, GH.D, sx*GH.W/2, GH.WALL/2, 0, matBrick);
+// a stone coping course, which is what the frame actually bolts down to
+for (const sz of [-1, 1]) box(GH.W + 0.20, 0.05, 0.20, 0, GH.WALL + 0.02, sz*GH.D/2, matStone);
+for (const sx of [-1, 1]) box(0.20, 0.05, GH.D + 0.20, sx*GH.W/2, GH.WALL + 0.02, 0, matStone);
+
+// ---- glazing ----------------------------------------------------------------
+const GLASS_H = GH.EAVE - GH.WALL;
+for (const sz of [-1, 1]) pane(GH.W, GLASS_H, 0, GH.WALL + GLASS_H/2, sz*GH.D/2);
+for (const sx of [-1, 1]) pane(GH.D, GLASS_H, sx*GH.W/2, GH.WALL + GLASS_H/2, 0, Math.PI/2);
+
 const slopeH = Math.hypot(GH.D/2, GH.RIDGE - GH.EAVE);
-const pitch = Math.atan2(GH.RIDGE - GH.EAVE, GH.D/2);
+const pitch  = Math.atan2(GH.RIDGE - GH.EAVE, GH.D/2);
 for (const sgn of [-1, 1]){
   const leaf = new THREE.Mesh(new THREE.PlaneGeometry(GH.W, slopeH), matGlass);
   leaf.position.set(0, (GH.EAVE + GH.RIDGE)/2, sgn * GH.D/4);
-  leaf.rotation.x = sgn * (Math.PI/2 - pitch) * -1 + (sgn > 0 ? 0 : 0);
   leaf.rotation.x = sgn > 0 ? -(Math.PI/2 - pitch) : (Math.PI/2 - pitch);
   house.add(leaf);
 }
 
-// corner posts, eave beams and a ridge
-const T = 0.055;
+/* Glazing bars. Verticals every pane width and one horizontal transom, which
+   is what divides a wall of glass into a greenhouse. The rafters carry the
+   same rhythm up the roof so the eye reads one structure rather than two. */
+const nBays = Math.max(2, Math.round(GH.W / GH.PANE_W));
+for (let i = 0; i <= nBays; i++){
+  const x = -GH.W/2 + i * (GH.W / nBays);
+  for (const sz of [-1, 1]){
+    box(B, GLASS_H, B, x, GH.WALL + GLASS_H/2, sz*GH.D/2, matFrame);
+    const raf = box(B, B, slopeH, x, (GH.EAVE + GH.RIDGE)/2, sz*GH.D/4, matFrame);
+    raf.rotation.x = sz > 0 ? -(Math.PI/2 - pitch) : (Math.PI/2 - pitch);
+  }
+}
+const nBaysD = Math.max(2, Math.round(GH.D / GH.PANE_W));
+for (let i = 0; i <= nBaysD; i++){
+  const z = -GH.D/2 + i * (GH.D / nBaysD);
+  for (const sx of [-1, 1]) box(B, GLASS_H, B, sx*GH.W/2, GH.WALL + GLASS_H/2, z, matFrame);
+}
+// transoms, corner posts, eave beams, ridge
+for (const sz of [-1, 1]) box(GH.W, B, B, 0, GH.WALL + GLASS_H*0.55, sz*GH.D/2, matFrame);
+for (const sx of [-1, 1]) box(B, B, GH.D, sx*GH.W/2, GH.WALL + GLASS_H*0.55, 0, matFrame);
 for (const sx of [-1, 1]) for (const sz of [-1, 1])
-  bar(T, GH.EAVE, T, sx*GH.W/2, GH.EAVE/2, sz*GH.D/2);
-for (const sz of [-1, 1]) bar(GH.W, T, T, 0, GH.EAVE, sz*GH.D/2);
-for (const sx of [-1, 1]) bar(T, T, GH.D, sx*GH.W/2, GH.EAVE, 0);
-bar(GH.W, T, T, 0, GH.RIDGE, 0);
+  box(B*1.5, GLASS_H, B*1.5, sx*GH.W/2, GH.WALL + GLASS_H/2, sz*GH.D/2, matFrame);
+for (const sz of [-1, 1]) box(GH.W + B, B*1.6, B*1.6, 0, GH.EAVE, sz*GH.D/2, matFrame);
+for (const sx of [-1, 1]) box(B*1.6, B*1.6, GH.D, sx*GH.W/2, GH.EAVE, 0, matFrame);
+box(GH.W + B, B*1.8, B*1.8, 0, GH.RIDGE, 0, matFrame);
 
-// mullions, and the rafters that carry the roof back to the ridge
-for (let i = -2; i <= 2; i++){
-  const x = i * (GH.W / 5);
-  for (const sz of [-1, 1]) bar(T*0.7, GH.EAVE, T*0.7, x, GH.EAVE/2, sz*GH.D/2);
-  const raf = new THREE.Mesh(new THREE.BoxGeometry(T*0.7, T*0.7, slopeH), matFrame);
-  raf.position.set(x, (GH.EAVE + GH.RIDGE)/2, -GH.D/4);
-  raf.rotation.x = (Math.PI/2 - pitch);
-  house.add(raf);
-  const raf2 = raf.clone();
-  raf2.position.z = GH.D/4;
-  raf2.rotation.x = -(Math.PI/2 - pitch);
-  house.add(raf2);
+/* Ridge vents, propped open. A closed greenhouse in daylight is a greenhouse
+   nobody works in; a pair of lights cracked along the ridge is the detail that
+   says somebody was here this morning. */
+for (const sgn of [-1, 1]){
+  const v = new THREE.Mesh(new THREE.PlaneGeometry(GH.W * 0.30, 0.62), matGlass);
+  v.position.set(sgn * GH.W * 0.22, GH.RIDGE - 0.10, sgn * 0.30);
+  v.rotation.x = sgn > 0 ? -(Math.PI/2 - pitch) + 0.34 : (Math.PI/2 - pitch) - 0.34;
+  house.add(v);
+  box(0.03, 0.24, 0.03, sgn * GH.W * 0.22, GH.RIDGE - 0.22, sgn * 0.42, matFrame);
 }
+// ridge cresting — the row of little finials along the top
+for (let i = -6; i <= 6; i++)
+  box(0.028, 0.10, 0.028, i * (GH.W / 13), GH.RIDGE + 0.06, 0, matFrame);
 
-// potting benches down both long walls, so the room reads as a working house
+// ---- staging, and pots on it ------------------------------------------------
+/* Slatted staging, not a solid shelf: greenhouse benches are slatted so water
+   drains and air moves, and the gaps let the light through onto the floor,
+   which is worth the extra dozen boxes. */
 for (const sz of [-1, 1]){
-  const top = new THREE.Mesh(new THREE.BoxGeometry(GH.W - 0.6, 0.05, 0.62), matBench);
-  top.position.set(0, 0.78, sz * (GH.D/2 - 0.45));
-  top.castShadow = true; top.receiveShadow = true;
-  house.add(top);
-  for (let i = -2; i <= 2; i++)
-    bar(0.06, 0.78, 0.06, i * ((GH.W - 0.9) / 4), 0.39, sz * (GH.D/2 - 0.45));
+  const zc = sz * (GH.D/2 - 0.48);
+  for (let s = 0; s < 5; s++)
+    box(GH.W - 0.55, 0.035, 0.085, 0, 0.80, zc - 0.24 + s * 0.12, matBench);
+  for (let i = -2; i <= 2; i++){
+    box(0.05, 0.80, 0.05, i * ((GH.W - 0.9) / 4), 0.40, zc - 0.22, matFrame);
+    box(0.05, 0.80, 0.05, i * ((GH.W - 0.9) / 4), 0.40, zc + 0.22, matFrame);
+  }
+  for (let i = 0; i < 7; i++){
+    const r = 0.055 + (i % 3) * 0.012;
+    const pot = new THREE.Mesh(new THREE.CylinderGeometry(r, r*0.74, r*1.55, 14), matTerra);
+    pot.position.set(-GH.W/2 + 0.7 + i * ((GH.W - 1.4)/6), 0.82 + r*0.78, zc + (i%2?0.08:-0.06));
+    pot.castShadow = true; pot.receiveShadow = true;
+    house.add(pot);
+  }
 }
 
-// the pedestal the specimen stands on
-const plinth = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.06, 0.42), matStone);
-plinth.position.y = 0.03;
-const column = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.155, PEDESTAL_TOP - 0.10, 24), matStone);
+// ---- the pedestal the specimen stands on ------------------------------------
+box(0.42, 0.06, 0.42, 0, 0.03, 0, matStone);
+const column = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.13, 0.155, PEDESTAL_TOP - 0.10, 24), matStone);
 column.position.y = 0.06 + (PEDESTAL_TOP - 0.10)/2;
-const cap = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.04, 0.34), matStone);
-cap.position.y = PEDESTAL_TOP - 0.02;
-for (const m of [plinth, column, cap]){ m.castShadow = true; m.receiveShadow = true; house.add(m); }
+column.castShadow = true; column.receiveShadow = true;
+house.add(column);
+box(0.34, 0.04, 0.34, 0, PEDESTAL_TOP - 0.02, 0, matStone);
 
-scene.add(house);
+// ---- outside ----------------------------------------------------------------
+/* There is a world through the glass. Without it the panes show a flat void and
+   the whole room reads as a model on a table — the single biggest thing that
+   made this look like a viewer rather than a place. All of it is far enough out
+   to be seen through glass and never approached, so it is cones and spheres. */
+const out = new THREE.Group();
+scene.add(out);
 
-// ---- light ------------------------------------------------------------------
-/* One sun through the roof, and its shadow camera tight around the pedestal.
-   The greenhouse is seven metres across and the plant is nineteen centimetres,
-   so a shadow map that covers the room has nothing left over for the leaves —
-   this covers a metre and a half about the specimen and lets the rest of the
-   room get by on ambient. */
-const key = new THREE.DirectionalLight(0xfff2e0, 2.2);
-key.position.set(-2.2, 4.2, 1.9);
-key.target.position.set(0, PEDESTAL_TOP, 0);
-key.castShadow = true;
-key.shadow.mapSize.set(2048, 2048);
-key.shadow.camera.near = 0.5;
-key.shadow.camera.far = 9.0;
-const sc = 1.5;
-Object.assign(key.shadow.camera, { left:-sc, right:sc, top:sc, bottom:-sc });
-key.shadow.bias = -0.0006;
-key.shadow.normalBias = 0.004;
-key.shadow.camera.updateProjectionMatrix();
-scene.add(key);
-scene.add(key.target);
+const lawn = new THREE.Mesh(new THREE.CircleGeometry(90, 48).rotateX(-Math.PI/2), matGrass);
+lawn.position.y = -0.02;
+lawn.receiveShadow = true;
+out.add(lawn);
 
-const sky = new THREE.HemisphereLight(0xdfe8ff, 0x2a2a22, 0.55);
-scene.add(sky);
+// a gravel path out of the door end
+const path = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 14).rotateX(-Math.PI/2), matStone);
+path.position.set(0, -0.01, -GH.D/2 - 7.2);
+out.add(path);
+
+// hedge along two sides, kept back so it never touches the glass
+for (const [w, d, x, z] of [[26, 0.9, 0, -13], [26, 0.9, 0, 13], [0.9, 26, -13, 0], [0.9, 26, 13, 0]]){
+  const h = new THREE.Mesh(new THREE.BoxGeometry(w, 1.9, d), matHedge);
+  h.position.set(x, 0.95, z);
+  h.castShadow = true; h.receiveShadow = true;
+  out.add(h);
+}
+
+// trees, as a trunk and two rough crowns
+function tree(x, z, s){
+  const g = new THREE.Group();
+  const t = new THREE.Mesh(new THREE.CylinderGeometry(0.16*s, 0.24*s, 2.6*s, 8), matBark);
+  t.position.y = 1.3*s; g.add(t);
+  for (const [dy, r] of [[3.1, 1.7], [4.3, 1.15]]){
+    const c = new THREE.Mesh(new THREE.IcosahedronGeometry(r*s, 1), matLeaf);
+    c.position.set(0.2*s, dy*s, -0.1*s);
+    c.castShadow = true;
+    g.add(c);
+  }
+  g.position.set(x, 0, z);
+  out.add(g);
+}
+tree(-16, -12, 1.5); tree(-19, 6, 1.9); tree(15, -14, 1.25);
+tree(20, 9, 2.1); tree(-9, 19, 1.6); tree(11, 18, 1.35);
+
+// distant hills, low and wide, purely to give the horizon something to do
+for (const [x, z, r, h] of [[-45, -60, 34, 7], [30, -70, 44, 9], [70, 20, 38, 6]]){
+  const hill = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 12), matHedge);
+  hill.position.set(x, h - r, z);
+  out.add(hill);
+}
+
+/* The sky is a vertex-coloured sphere, not a shader.
+   A raw ShaderMaterial writing gl_FragColor sidesteps tone mapping and the
+   output colour transform, so it comes out looking nothing like the rest of
+   the frame unless the right include chunks are pasted in by hand. Vertex
+   colours go through the ordinary pipeline and cannot get that wrong, and at
+   ~600 vertices repainting them on every time change costs nothing. */
+const skyGeo = new THREE.SphereGeometry(140, 32, 18);
+skyGeo.setAttribute('color', new THREE.BufferAttribute(
+  new Float32Array(skyGeo.attributes.position.count * 3), 3));
+const skyDome = new THREE.Mesh(skyGeo,
+  new THREE.MeshBasicMaterial({ side: THREE.BackSide, vertexColors: true, fog: false }));
+scene.add(skyDome);
+
+function paintSky(topCol, botCol){
+  const pos = skyGeo.attributes.position, col = skyGeo.attributes.color;
+  const c = new THREE.Color();
+  for (let i = 0; i < pos.count; i++){
+    const h = THREE.MathUtils.clamp((pos.getY(i) / 140 + 0.22) / 1.22, 0, 1);
+    c.copy(botCol).lerp(topCol, Math.pow(h, 0.7));
+    col.setXYZ(i, c.r, c.g, c.b);
+  }
+  col.needsUpdate = true;
+}
+
+// ---- light, and the time of day ---------------------------------------------
+const sun = new THREE.DirectionalLight(0xffffff, 1);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 0.5;
+sun.shadow.camera.far = 22;
+/* The shadow camera is tight around the pedestal on purpose. The house is
+   seven metres across and the specimen is nineteen centimetres; a map that
+   covers the room has nothing left over for a leaf. This covers two metres
+   about the plant and the rest of the room gets by on ambient. */
+const SC = 2.0;
+Object.assign(sun.shadow.camera, { left:-SC, right:SC, top:SC, bottom:-SC });
+sun.shadow.bias = -0.0006;
+sun.shadow.normalBias = 0.004;
+sun.target.position.set(0, PEDESTAL_TOP, 0);
+scene.add(sun, sun.target);
+
+const hemi = new THREE.HemisphereLight(0xffffff, 0x444033, 0.5);
+scene.add(hemi);
+
+// Two hanging bulbs, off in daylight. They are what makes the night setting a
+// place somebody works in rather than a dark room.
+const lamps = [];
+for (const sx of [-1, 1]){
+  const g = new THREE.Group();
+  g.position.set(sx * 1.9, GH.EAVE - 0.32, 0);
+  const flex = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.55, 6), matFrame);
+  flex.position.y = 0.30; g.add(flex);
+  const shade = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.13, 16, 1, true),
+    new THREE.MeshStandardMaterial({ color:0x2b3630, roughness:0.6, side:THREE.DoubleSide }));
+  g.add(shade);
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8),
+    new THREE.MeshStandardMaterial({ color:0xffdca8, emissive:0xffbf70, emissiveIntensity:2.2 }));
+  bulb.position.y = -0.05; g.add(bulb);
+  const pt = new THREE.PointLight(0xffc98a, 0, 6.5, 2);
+  pt.position.y = -0.05; g.add(pt);
+  house.add(g);
+  lamps.push({ pt, bulb: bulb.material });
+}
+
+/* Four settings, read off real daylight rather than picked to look nice.
+   What changes between them is the sun's height and colour temperature, how
+   much of the light is sky rather than sun, and how far you can see: at dawn
+   the air is full of water and the horizon is close, at midday it is not. */
+const TIMES = {
+  morning: {
+    label: 'Morning',
+    az: 82, elev: 14, sunColor: 0xffd2a1, sunI: 4.6,
+    skyTop: 0x7ea6cf, skyBot: 0xf0cfae,
+    hemiSky: 0xbdd4ee, hemiGround: 0x4a4634, hemiI: 1.25,
+    fog: 0xd8d0c4, fogD: 0.0060, env: 0.95, exposure: 1.30, lamps: 0,
+  },
+  midday: {
+    label: 'Midday',
+    az: 150, elev: 62, sunColor: 0xfff4e2, sunI: 6.2,
+    skyTop: 0x3f77c4, skyBot: 0xbcd6ea,
+    hemiSky: 0xcfe2f7, hemiGround: 0x54503c, hemiI: 1.50,
+    fog: 0xc9d6e0, fogD: 0.0035, env: 1.25, exposure: 1.30, lamps: 0,
+  },
+  evening: {
+    label: 'Evening',
+    az: 262, elev: 7, sunColor: 0xff9346, sunI: 5.2,
+    skyTop: 0x40518f, skyBot: 0xf0a065,
+    hemiSky: 0x9a90c0, hemiGround: 0x3a2f24, hemiI: 0.90,
+    fog: 0xd0a380, fogD: 0.0080, env: 0.72, exposure: 1.28, lamps: 0.45,
+  },
+  night: {
+    label: 'Night',
+    // Not "midday turned down". Moonlight is dim, cool and directional, the
+    // sky keeps a little blue rather than going black, and the lamps take over.
+    az: 300, elev: 38, sunColor: 0x9fb6ff, sunI: 0.32,
+    skyTop: 0x080d1c, skyBot: 0x16203a,
+    hemiSky: 0x2a3550, hemiGround: 0x121012, hemiI: 0.14,
+    fog: 0x0d1220, fogD: 0.010, env: 0.08, exposure: 0.95, lamps: 1.0,
+  },
+};
+
+scene.fog = new THREE.FogExp2(0xffffff, 0.006);
+
+let timeKey = 'midday';
+function applyTime(key){
+  const t = TIMES[key] || TIMES.midday;
+  timeKey = key;
+
+  const el = THREE.MathUtils.degToRad(t.elev), az = THREE.MathUtils.degToRad(t.az);
+  sun.position.set(Math.sin(az) * 14 * Math.cos(el),
+                   PEDESTAL_TOP + 14 * Math.sin(el),
+                   Math.cos(az) * 14 * Math.cos(el));
+  sun.color.setHex(t.sunColor);
+  sun.intensity = t.sunI;
+
+  hemi.color.setHex(t.hemiSky);
+  hemi.groundColor.setHex(t.hemiGround);
+  hemi.intensity = t.hemiI;
+
+  paintSky(new THREE.Color(t.skyTop), new THREE.Color(t.skyBot));
+  scene.fog.color.setHex(t.fog);
+  scene.fog.density = t.fogD;
+  scene.environmentIntensity = t.env;
+  renderer.toneMappingExposure = t.exposure;
+
+  for (const l of lamps){
+    l.pt.intensity = t.lamps * 5.5;
+    l.bulb.emissiveIntensity = t.lamps > 0 ? 2.2 : 0.0;
+  }
+  const badge = document.getElementById('timenow');
+  if (badge) badge.textContent = t.label;
+}
+
+/* A game run takes the time from the player's own clock, which is the point:
+   the plants are cared for daily and a season is a real week, so the light in
+   the house should be the light outside the window. Dev mode overrides it. */
+function timeFromClock(){
+  const h = new Date().getHours();
+  if (h < 5 || h >= 21) return 'night';
+  if (h < 11) return 'morning';
+  if (h < 17) return 'midday';
+  return 'evening';
+}
+
 
 // ---- model -----------------------------------------------------------------
 const SHARE = [0.10, 0.20, 0.32, 0.38];   // must match violet.py
 const LEAF_BONE = /^L(\d+)_(\d+)$/;
 const leafBones = [];                      // {bone, share, k}
-let mixer = null, action = null, skinned = null, leafMat = null, helper = null;
+let skinned = null, leafMat = null, helper = null;
 let baseColor = new THREE.Color(1,1,1);
 
 /* The geometry is Draco-compressed, so the decoder has to be attached before
@@ -397,8 +616,15 @@ loader.load('./violet.glb', gltf => {
       if (m) {
         const i = +m[1], s = +m[2];
         // outer leaves give up first — same expression as violet.py
+        /* `base` is the bone's rest rotation, kept because droop is now
+           applied as an absolute pose rather than as an offset. The wind clip
+           used to rewrite every bone each frame and droop was layered on top
+           of that; with the clip gone there is nothing to reset them, and
+           subtracting an offset every frame would wind the leaves round and
+           round until the plant tied itself in a knot. */
         leafBones.push({ bone:o, share:SHARE[s] ?? SHARE.at(-1),
-                         k: 1.0 + 0.25 * Math.sin(i * 2.4) });
+                         k: 1.0 + 0.25 * Math.sin(i * 2.4),
+                         base: o.rotation.clone() });
       }
     }
   });
@@ -435,12 +661,6 @@ loader.load('./violet.glb', gltf => {
   });
   if (leafMat) baseColor = leafMat.color.clone();
 
-  if (gltf.animations.length) {
-    mixer = new THREE.AnimationMixer(root);
-    action = mixer.clipAction(gltf.animations[0]);
-    action.play();
-  }
-
   helper = new THREE.SkeletonHelper(root);
   helper.visible = false;
   scene.add(helper);
@@ -465,13 +685,13 @@ loader.load('./violet.glb', gltf => {
 }, undefined, err => { $('#load').textContent = 'failed to load violet.glb'; fail(err); });
 
 // ---- controls ---------------------------------------------------------------
-const ui = { droop:0, chlor:0, wind:1, playing:true, spin:false };
+const ui = { droop:0, chlor:0, spin:false };
 function bindRange(id, key){
   const el = $('#'+id), out = el.nextElementSibling;
   const sync = () => { ui[key] = +el.value; out.value = (+el.value).toFixed(2); };
   el.addEventListener('input', sync); sync();
 }
-bindRange('droop','droop'); bindRange('chlor','chlor'); bindRange('wind','wind');
+bindRange('droop','droop'); bindRange('chlor','chlor');
 
 function toggle(id, key, onLabel, offLabel){
   const el = $('#'+id);
@@ -482,7 +702,6 @@ function toggle(id, key, onLabel, offLabel){
   });
   return el;
 }
-toggle('play','playing','Pause','Play');
 toggle('spin','spin');
 $('#wire').addEventListener('click', e => {
   const on = e.target.getAttribute('aria-pressed') !== 'true';
@@ -498,14 +717,20 @@ $('#bones').addEventListener('click', e => {
   e.target.setAttribute('aria-pressed', String(on));
   if (helper) helper.visible = on;
 });
+/* Dev mode opens at midday and lets you step through the settings; a game run
+   takes the light from the player's own clock and leaves it alone. The premise
+   is that a season is a real week and the plants are tended daily, so the house
+   should be lit the way it is lit outside the window right now. */
+const timeBtns = document.querySelectorAll('#times button');
+function markTime(){
+  timeBtns.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.t === timeKey)));
+}
+timeBtns.forEach(b => b.addEventListener('click', () => { applyTime(b.dataset.t); markTime(); }));
+applyTime(DEV ? 'midday' : timeFromClock());
+markTime();
+
 $('#reset').addEventListener('click', () => { if (modelRoot) frameToFit(modelRoot, ESTABLISH); });
 $('#close').addEventListener('click', () => { if (modelRoot) frameToFit(modelRoot, CLOSE); });
-
-// A gust is a struck spring: energy in, then damped oscillation out. Cheap, and
-// it is the shape real secondary motion has — the leaves overshoot and settle
-// rather than snapping back.
-let gustV = 0, gustX = 0;
-$('#gust').addEventListener('click', () => { gustV += 7.0; });
 
 // ---- loop -------------------------------------------------------------------
 let last = performance.now();
@@ -517,26 +742,18 @@ renderer.setAnimationLoop(() => {
   const dt = Math.min((now - last) / 1000, 0.05);
   last = now;
 
-  // damped spring for the gust
-  gustV += (-38.0 * gustX - 5.2 * gustV) * dt;
-  gustX += gustV * dt;
-
-  if (mixer && ui.playing) mixer.update(dt);
-  if (action) action.setEffectiveWeight(Math.max(0, ui.wind + gustX * 0.35));
-
-  // Droop is applied *after* the mixer writes the wind pose, exactly as
-  // violet.py adds the wind offset on top of a droop base. Same bones, same
-  // shares — the browser is not approximating the Blender rig, it is running it.
+  /* Droop is written as an absolute pose, from each bone's rest rotation.
+     It used to be an offset — `rotation.x -= ...` every frame — which only
+     worked because the wind clip rewrote the whole pose first and wiped it.
+     With the clip gone that subtraction accumulates, and the leaves wind
+     through themselves in a couple of seconds. Same bones and same shares as
+     violet.py; the browser runs the Blender rig rather than approximating it. */
   if (leafBones.length){
     const total = THREE.MathUtils.degToRad(78) * ui.droop;
-    const extra = gustX * 0.05;
-    for (const {bone, share, k} of leafBones){
-      bone.rotation.x -= total * share * k;
-      bone.rotation.z += extra * share * k;
+    for (const {bone, share, k, base} of leafBones){
+      bone.rotation.x = base.x - total * share * k;
+      bone.rotation.z = base.z;
     }
-    // a thirsty plant has already given up; it moves less
-    if (action) action.setEffectiveWeight(
-      Math.max(0, (ui.wind + gustX * 0.35) * (1 - 0.55 * ui.droop)));
   }
 
   if (leafMat) leafMat.color.copy(baseColor).lerp(YELLOW, ui.chlor * 0.85);

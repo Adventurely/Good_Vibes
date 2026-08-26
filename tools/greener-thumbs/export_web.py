@@ -35,7 +35,7 @@ OUT_DIR = os.path.join(REPO, 'public', 'greener-thumbs')
 
 VIOLET_P = {
     'fuzz': 0,            # no glTF representation; sheen stands in for it
-    'wind': 0.6,
+    'wind': 0.0,          # no wind clip is exported; see export_animations below
     'droop': 0.0,
     'engine': 'CYCLES',
 }
@@ -158,7 +158,12 @@ for ob in bpy.context.view_layer.objects:
 bpy.context.view_layer.objects.active = plant
 
 opts = dict(filepath=glb, export_format='GLB', use_selection=True,
-            export_apply=False, export_animations=True, export_skins=True,
+            # The wind clip is not shipped. Driving the leaf bones and the
+            # droop offset from the same rotations made the two fight: a gust
+            # would wind the outer leaves past their own blades and they would
+            # curl through themselves. The skin still exports — droop needs
+            # those bones — but nothing animates them.
+            export_apply=False, export_animations=False, export_skins=True,
             export_yup=True, export_materials='EXPORT',
 
             # --- geometry
