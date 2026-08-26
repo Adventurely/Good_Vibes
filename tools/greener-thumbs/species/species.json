@@ -1,0 +1,1034 @@
+[
+  {
+    "care": {
+      "light": "Bright INDIRECT light only. Target 8,000-16,000 lux (750-1,500 fc) at leaf height for 12-14 h/day; DLI 4-6 mol/m2/day. East or north window, or behind a sheer curtain in a south/west window. Under artificial light: LED/fluorescent 25-40 cm above the rosette, 12-14 h on a timer; rotate the pot 90 degrees every 2-3 days or the rosette grows lopsided toward the source. Sustained direct midday sun above ~25,000 lux bleaches within days. Below ~5,000 lux the plant survives but stops flowering entirely and etiolates. Photoperiod is NOT a bloom trigger - this is a day-neutral species; total daily light integral gates flowering.",
+      "humidity": "50-70% RH ideal, 40% tolerable, below 35% causes bud blast. Raise humidity with a pebble tray or grouped plants, NEVER by misting: the leaf trichomes hold droplets as standing beads for hours, which invites Botrytis and, if the water is cool, ring spot. Humidity above ~80% with still air causes powdery mildew and crown rot, so ventilation matters as much as the number.",
+      "notes": "Grower knowledge a naive implementation gets wrong:\n\n1. TAXONOMY. Since 2012 the accepted name is Streptocarpus ionanthus (H.Wendl.) Christenh.; Saintpaulia ionantha is a synonym kept in horticulture. Wild populations in the Eastern Arc Mountains (Nguru, East/West Usambara, Tanzania; Taita Hills, Kenya) are IUCN-threatened by forest clearance. The wild species is a lithophyte on shaded, seepage-wet gneiss and forest floor under closed canopy - permanently humid, permanently dim, never dry, never in direct sun. Every care rule below is that habitat restated.\n\n2. ALMOST NOTHING SOLD IS THE SPECIES. Retail 'African violets' are complex hybrids (largely S. ionanthus x S. confusus x others) with bigger, often doubled or ruffled corollas, quilted or variegated leaves. If the game labels the specimen S. ionantha, model the species: ~2-2.5 cm single violet-blue flowers, thinner and flatter leaves, looser rosette. Giving a labelled species plant a 5 cm ruffled pink double is a botanical bug.\n\n3. WATER TEMPERATURE IS A SEPARATE VARIABLE FROM WATER AMOUNT. Room-temperature water (18-24 C, within ~2-3 C of the leaf) is mandatory. Water more than ~8 C below leaf temperature landing on a blade causes permanent chlorotic ring spot in 24-72 h. This is a cell-chilling injury, not a sunburn-through-droplet-lens effect. Model water temperature as its own player-visible property.\n\n4. WATER FROM BELOW OR AT THE SOIL SURFACE, NEVER OVER THE CROWN. Water standing in the crown at night rots it. Saucer/wick watering: fill, let the mix draw for 20-30 min, then POUR OFF the remainder. Standing water for hours is the single fastest route to root rot.\n\n5. LEAVES ARE BRITTLE, NOT FLOPPY. Fleshy petioles snap cleanly rather than bend. Handling, brushing past, or a knocked pot removes leaves permanently, leaving a stub scar on the crown. This should be a real physical consequence in-game.\n\n6. POT-RIM SALT BURN. Constant dilute feeding leaves a white crystalline crust on the rim; petioles resting on that crust develop a brown corky constriction at exactly the contact line and the leaf beyond it dies while the rest of the plant looks perfect. Real growers wax the rim, use foil collars, or leach the pot monthly with 4x its volume of plain tepid water.\n\n7. UNDERPOTTING IS CORRECT. Roots are fine, fibrous and shallow, occupying the top 5-8 cm. Pot diameter should be about ONE THIRD of the leaf span (a 25 cm rosette wants an 8-9 cm shallow/azalea pot). Repotting into a bigger pot causes rot and stops bloom - counter-intuitive and a great trap mechanic.\n\n8. THE NECK. As lower leaves are shed the compressed stem elongates into a bare, scarred 'neck'. Growers fix this by repotting deeper (burying the neck up to the lowest leaves) roughly every 6-12 months; the buried neck roots. Neck length is a running record of the plant's history and should be persistent state.\n\n9. SINGLE CROWN. Suckers (axillary side rosettes) must be pinched out; a multi-crowned plant loses its symmetry and its bloom.\n\n10. GROOMING DRIVES BLOOM. Deadheading spent cymes and removing the oldest tier of leaves both increase flowering. An ungroomed plant is not just untidy, it flowers measurably less.\n\n11. NO DORMANCY, NO SEASON. Given stable conditions it blooms 8-10 months a year in overlapping flushes. Reduced winter bloom in cultivation is a light and temperature artefact, not an endogenous rhythm. Do not build a dormant phase.\n\n12. BUZZ POLLINATION. The two fused yellow anthers open by apical pores; in the wild only vibrating bees release the pollen. Nothing indoors does, so capsules essentially never form on a houseplant - correct behaviour is flowers that simply abscise. Thrips damage looks like an anther emptied of pollen with brown streaks smeared across the lower petals.\n\n13. CYCLAMEN MITE is the signature pest and is nearly invisible; you diagnose it by geometry (a stunted, hairy, grey knot at the crown) rather than by seeing the animal.",
+      "soil": "Light, sterile, high-porosity soilless mix - roughly equal parts peat or coir, coarse perlite, and vermiculite (1:1:1). Bulk density must be low; standard bagged potting soil is too dense and holds too much water. pH 6.0-6.5 slightly acidic (above 7.0 locks out iron and the youngest leaves go pale between the veins). Low salinity: feed a balanced soluble fertiliser (e.g. 20-20-20) at one-quarter label strength with every watering rather than full strength monthly, and leach the pot with plain tepid water monthly. Shallow, wide 'azalea' pot; pot diameter about one third of the leaf span (8-10 cm pot for a 25-30 cm rosette); repot every 6-12 months into fresh mix at the SAME pot size, setting the plant deeper to bury the accumulated neck.",
+      "temperature": "18-24 C day, 16-21 C night; a 3-5 C night drop is fine and slightly improves flower substance. Below 16 C growth slows and bloom stops; below 13 C is chilling injury; below 7 C causes water-soaked tissue collapse within hours. Above 27 C buds abort and colours wash out; above 30 C flowering stops entirely and the crown tightens. Steady is better than optimal - the plant tolerates a constant 17 C far better than a 24 C day with a 10 C draft off a winter windowpane. Keep foliage from touching cold glass.",
+      "water": "Keep the mix evenly moist and never sodden or bone dry - in habitat the roots sit in constantly seeping, well-aerated rock crevices. Water when the top 1 cm reads dry to the touch and the pot has lost noticeable weight; typically every 4-7 days in a 9 cm pot at 21 C and 50% RH. Water TEPID (18-24 C, within 2-3 C of leaf temperature) from below into the saucer or via a wick, let it draw 20-30 minutes, then TIP OFF any water still standing. Never let the pot sit in water for hours. Never pour into the crown, and keep droplets off the foliage. Use rainwater, distilled, or tap water left to stand; never artificially softened water (sodium accumulates and burns the roots)."
+    },
+    "decline": [
+      {
+        "appearance": "Turgor loss propagates outside-in. The OLDEST outer tier goes first: the fleshy petiole sags along its length into a shallow catenary so the blade tips drop 3-6 cm and drape over the pot rim, blade held roughly flat but now tilted 30-50 degrees below horizontal; blade margins roll gently DOWNWARD and inward maybe 10-15 degrees. The velvet sheen goes matte and the colour shifts from mid-green toward grey-olive as the collapsed trichome layer scatters less light. The crown and the inner tier stay upright and level - this outside-in gradient is the diagnostic silhouette. Soil surface renders pale, shrunken, and pulled 2-4 mm away from the pot wall. Buds shrivel from the tip and drop, leaving bare green pedicel stubs on the peduncle; open flowers go papery at the lobe margins and abscise.",
+        "cause": "Underwatering / soil dried out completely",
+        "onsetDays": "First visible sag 2-4 days after the mix goes fully dry; full outer-tier drape by day 4-6; irreversible marginal crisping from day 7-10; death 2-4 weeks (this species survives a dry-out far longer than it looks like it will)",
+        "reversible": "Yes, and dramatically - full turgor returns within 2-12 h of a tepid bottom-water, which makes it excellent player feedback. But any leaf that reached the crisp stage keeps a permanent 1-3 mm brown papery band along the margin, tip inward, that never re-greens. Repeated cycles shorten outer-leaf life: those leaves yellow and abscise weeks early, leaving stub scars and a longer bare neck. Blasted buds never reopen; that cyme is lost."
+      },
+      {
+        "appearance": "Geometrically almost identical drooping to drought - AND THAT IS THE POINT, the player must read the context, not the leaves. Differentiators: the soil surface renders dark, glossy-wet, often with a green algal film or moss and fungus gnats hovering; the pot is heavy. Then the specific signs appear: petioles turn translucent and water-soaked at the base where they meet the crown, darkening to brown then black over a 5-15 mm band; the whole leaf beyond that band goes limp all at once rather than sagging gradually, and hangs straight down against the pot. The crown centre greys and turns mushy, the youngest leaves flatten and collapse inward like a folding umbrella, and the rosette's 3-tier plate structure disintegrates into a flat splayed star. Terminal stage: the plant lifts free of the mix with a black stub and no white roots; healthy roots are fine, white, and thread-like, rotted ones are brown, slimy, and slough off leaving bare thread cores.",
+        "cause": "Overwatering / waterlogged mix / crown rot (Pythium, Phytophthora); accelerated by cold soil, a too-large pot, dense soil, or water poured into the crown",
+        "onsetDays": "5-14 days of sodden mix at 21 C; 3-7 days if the mix is also below 16 C. Crown blackening once started progresses to total collapse in 4-8 days",
+        "reversible": "Only in the earliest window. If discoloration is confined to one or two outer petiole bases, the plant can be unpotted, rotted roots cut away, and rerooted in fresh barely-damp mix - it survives roughly half the time and permanently loses its lower tier. Once the CROWN itself greys or softens, it is unrecoverable; the only salvage is taking an undamaged outer leaf as a cutting, which takes 8-12 weeks to make a new plantlet. Model this as the species' primary death mode."
+      },
+      {
+        "appearance": "Sharply defined pale marks that exactly record where droplets sat. Each is a pale yellow to cream to tan ring, arc, crescent, or splash 3-15 mm across, often a bright outline with near-normal green enclosed - a droplet's rim. Edges are hard, not feathered. No swelling, no sunkenness, no bending: the leaf geometry is completely unchanged, only albedo. Marks cluster on the upper, most exposed leaves and along the line a watering can travelled. Under specular light the affected patch is slightly duller than surrounding velvet because the trichomes over dead cells collapse.",
+        "cause": "Cold water on the foliage - chilling injury to palisade cells when water more than ~8 C below leaf temperature sits on the blade. Also produced by a cold draft on wet leaves",
+        "onsetDays": "24-72 h; classically visible on day 2. Does not spread after that",
+        "reversible": "NO. The chlorophyll in those cells is destroyed and the tissue never re-greens. The mark persists for the remaining life of that leaf (months to over a year) and the only remedy is removing the leaf, which costs the plant a tier and lengthens the neck. This is the game's signature 'careless click, permanent scar' mechanic - it should be cheap to cause and impossible to undo."
+      },
+      {
+        "appearance": "Two-part response. (a) Bleaching: the leaves nearest the light source lose saturation from deep green to yellow-green to a washed bone-tan, brightest in the interveinal panels while the veins stay a green tracery for a while; the change is a directional gradient across the rosette, strongest on the sun side. (b) Shading posture: petioles SHORTEN and bend downward so the whole rosette cups over the pot rim like a closing hand, blades curling under at the margins by 20-40 degrees and the rosette diameter visibly contracting 15-25%. Acute scorch adds dry, silvery-tan, papery patches with a sharp boundary against green, sunken slightly and no longer velvet. Underside anthocyanin deepens toward red-purple. Flowers fade fast - purple corollas go washed grey-lilac and last 3-4 days instead of 2-3 weeks.",
+        "cause": "Direct sun / excessive light intensity (above ~25,000 lux, especially unfiltered midday sun through glass)",
+        "onsetDays": "Acute papery scorch in 1-2 days of harsh midday exposure; progressive bleaching and cupping over 3-10 days; rosette contraction obvious by day 7-14",
+        "reversible": "Partly. Move it to correct light and posture relaxes over 1-2 weeks and colour in mildly bleached tissue recovers over 3-6 weeks. Severely bleached leaves stay pale for life, and the papery scorched patches are dead tissue - permanent. Full cosmetic recovery requires growing out 2-3 new tiers, which is 2-4 months in real time."
+      },
+      {
+        "appearance": "Etiolation - the rosette turns from a flat plate into a funnel. Petioles elongate 1.5-2.5x (a 4 cm petiole becomes 7-10 cm) and lift from horizontal to 30-60 degrees above horizontal, all leaves reaching upward and inward so the silhouette becomes a shuttlecock or badly-made bouquet. Blades enlarge, thin, and darken to a deeper green with a slightly higher gloss and lower trichome density. Internodes at the crown stretch from ~0.4 cm to ~1 cm so tiers separate visibly and the bare scarred neck lengthens. Flowering stops completely: no new peduncles emerge from the axils, and the existing cyme finishes and drops, leaving the plant entirely green. Leaf colour on the light side stays normal while the dark side pales - a lopsided rosette if the pot is never rotated.",
+        "cause": "Insufficient light (below ~5,000 lux, or short daily exposure)",
+        "onsetDays": "Petiole elongation measurable at 10-14 days, unmistakable by 3-4 weeks; bloom cessation is the first sign and shows within 2-3 weeks as the current flush ends with nothing behind it",
+        "reversible": "Behaviour yes, geometry no. Restore light and NEW leaves emerge with correct short petioles and flat carriage, and bloom resumes in 4-8 weeks - but the already-stretched leaves keep their length and angle forever, so a recovering plant reads as a flat young rosette sitting inside a splayed ring of long-petioled old leaves. Growers strip the stretched tier and rebury the neck. The neck length gained is permanent unless the plant is repotted deeper."
+      },
+      {
+        "appearance": "Attacks the flowers first and almost exclusively - bud blast. Buds stop enlarging, shrivel from the apex, turn parchment-tan, and drop off the pedicel, leaving a peduncle carrying nothing but 2-4 mm bare green stubs. Open flowers brown at the lobe margins in a 1 mm papery rim, lose substance so the petals go limp and slightly translucent, and last 3-5 days instead of 2-3 weeks. On foliage, the outermost leaves develop a thin (1-2 mm) tan crisp band on the margin and the leaf TIP curls under, while the blade body stays green and turgid - the tell is that the leaf is dry only at its outline. Soil dries faster so drought symptoms often stack on top.",
+        "cause": "Low humidity / dry air (below ~35% RH), typically winter heating or a forced-air vent",
+        "onsetDays": "Bud blast at 5-10 days of dry air; leaf margin crisping 2-3 weeks",
+        "reversible": "Yes for future flowering - raise humidity and the next flush of buds develops normally within 2-3 weeks. Blasted buds are gone; that cyme does not regenerate. Browned leaf margins are dead tissue and stay."
+      },
+      {
+        "appearance": "Directional and fast. Leaves on the side facing the cold source - typically the ones touching cold window glass - go first: the blade darkens, loses its velvet matte and takes on a glassy, water-soaked translucency, then goes uniformly limp, drooping as a whole leaf without the graceful catenary of drought. Over the following 2-4 days that tissue dries and pales to grey-tan, often as an irregular blotch bounded by a vein rather than following the margin. Petals turn translucent and collapse into slumped rags within hours. The crown stops producing: no new leaf unfurls and no peduncle appears for weeks afterwards, so the plant renders frozen in time. At 13-16 C without frost, symptoms are subtler - just a dulled, slightly greyed rosette with a hard stop to all growth and bloom.",
+        "cause": "Cold air / chilling injury - draft, cold windowpane, an unheated room, an outdoor trip",
+        "onsetDays": "Below 7 C: hours to 2 days. 7-13 C: 2-5 days. 13-16 C: no acute injury, but growth and bloom halt within about a week",
+        "reversible": "Damaged tissue never recovers - collapsed leaves must be removed. The plant itself usually survives a brief chill and resumes growth once returned to 18-24 C, but there is a 4-8 week bloom blackout while the crown restarts, which is far longer than the player will expect. A hard freeze through the crown is fatal within 24 h."
+      },
+      {
+        "appearance": "A hard geometric line, which makes it unmistakable. A white-to-tan crystalline crust builds on the outer pot rim and as a pale salt bloom on the soil surface. Every petiole that rests across that rim develops a brown, dry, corky, constricted band 3-8 mm wide EXACTLY at the contact line; the leaf distal to the band loses turgor and hangs straight down while its own blade is still green and undamaged, and the rest of the plant looks entirely healthy. Independently, over-feeding burns leaf margins tan from the tip back, stunts and tightens the centre growth into small hard brittle leaves, and either suppresses flowers or produces undersized, short-lived ones. Root damage from salt eventually mimics drought droop in wet soil.",
+        "cause": "Fertiliser salt accumulation / over-feeding / softened water; the rim-contact injury needs only normal feeding plus an unwaxed clay rim",
+        "onsetDays": "Rim burn 4-10 weeks of accumulation, then the affected petiole collapses over 2-4 days. Generalised salt burn and centre stunting 6-12 weeks",
+        "reversible": "The plant is easily saved - leach with 4x pot volume of tepid water, scrape the rim, wax it or fit a foil collar. Individual burned petioles are severed functionally and those leaves are lost permanently. Centre stunting grows out over 4-8 weeks; margin burn is permanent on those leaves."
+      },
+      {
+        "appearance": "The rosette becomes normal at the edge and monstrous in the middle. The crown centre stops expanding and forms a tight grey-green knot of small, hard, brittle leaves, cupped sharply UPWARD, with visibly denser and coarser hair so the knot reads greyish and fuzzy against the normal green outer tiers. New leaves emerge already stunted, twisted, and distorted, often with the two halves of the blade unequal. Buds fail to open or open lopsided and streaked. The outer two tiers stay fully normal for weeks, so the silhouette is a healthy flat plate with a clenched grey fist at its centre - the pest itself is microscopic and never visible. (Thrips is a related but distinct look: yellow pollen scattered across the lower petals, emptied anthers, and pale silvery stippling on the petals.)",
+        "cause": "Cyclamen mite (Phytonemus pallidus) infestation, usually introduced on a new plant",
+        "onsetDays": "2-4 weeks from infestation to visible crown distortion; spreads to neighbouring plants within days",
+        "reversible": "Poorly. Miticide treatment or a 20-minute 43 C water bath can save a valued plant but the distorted growth never straightens and 6-10 weeks of clean new growth are needed to look normal. Standard grower practice is to discard the plant and quarantine everything within 30 cm. Model this as contagious between specimens in the player's collection."
+      },
+      {
+        "appearance": "Discrete circular colonies of flat, dry, white-grey powder 3-10 mm across appear on the UPPER leaf surface, on peduncles, and on petals, then coalesce into a continuous dusty film. Beneath a colony the leaf tissue yellows and later goes brown and thin. Flowers get a dulling grey-white bloom over the corolla, distort, and abort. The powder sits on top of the velvet, muting its sheen without changing the leaf's shape at first; heavily affected leaves later curl and dry.",
+        "cause": "Powdery mildew - high humidity combined with stagnant air, crowding, and cool nights",
+        "onsetDays": "Colonies visible 5-10 days after infection; coalescence and flower loss by 2-3 weeks",
+        "reversible": "Yes - improve airflow, reduce crowding, remove affected flowers and leaves, treat. New growth is clean within 1-2 weeks. Leaves that yellowed under a colony stay marked."
+      },
+      {
+        "appearance": "Not disease, but it wrecks the silhouette and the bloom. A small secondary rosette 1-3 cm across appears wedged in a leaf axil, forcing the surrounding petioles out of the flat plane and tilting the main rosette so the plant is visibly asymmetric from above. As it grows, both crowns compete: flower count falls by roughly half and peduncles emerge shorter and fewer. A three- or four-crowned plant looks bushy and full while flowering barely at all - a trap for the player, who reads 'more leaves' as 'healthier'.",
+        "cause": "Suckering - untended axillary crowns, favoured by high light, generous feeding, and lack of grooming",
+        "onsetDays": "Sucker visible at 2-3 weeks, symmetry loss obvious at 5-8 weeks, bloom decline at 6-10 weeks",
+        "reversible": "Yes, fully, if the sucker is pinched out early with a pencil tip or a knife blade; it leaves a small 2-4 mm scar on the crown and the rosette re-flattens over a few weeks. Left for months, removal means cutting away established tissue and the rosette stays permanently one-sided."
+      }
+    ],
+    "key": "african-violet",
+    "lifecycle": {
+      "stages": [
+        "REST / VEGETATIVE (game day 0-1): no peduncles. The crown unfurls one new leaf pair; leaves emerge tiny, pale, near-vertical and tightly furled at the centre, and rotate down to horizontal as they expand. Rosette diameter creeps up ~1-2%. This is the plant's baseline state and the state the player sees after any deadheading.",
+        "BUD INITIATION (day 1-2): pea-sized green bud clusters appear in leaf axils of tier 2, sitting BELOW the leaf canopy, half-hidden. Peduncle 1-2 cm. Two to four axils usually initiate together, staggered by a few hours. This stage is the reward signal for a week of correct care and should be legible at a glance.",
+        "PEDUNCLE ELONGATION & COLOUR BREAK (day 2-3): peduncles extend to 5-10 cm, threading up between petioles, and the cyme rises to or just above canopy level. Buds swell to 6-10 mm and the corolla colour shows through the calyx as a violet slit before opening. Most fragile stage: bud blast from dry air, heat, or drought happens here.",
+        "ANTHESIS / PEAK BLOOM (day 3-5): flowers open sequentially, one or two a day, so a cyme carries open flowers, spent flowers, and unopened buds simultaneously - never model a cyme as all-open-at-once. Peak is 4-8 open corollas per plant across 2-4 cymes, held 1-3 cm above the leaves, anthers bright yellow. This is the visual payoff state.",
+        "SENESCENCE (day 5-6): the oldest corollas lose substance, go translucent and slightly greyer, the lobes fold back and inward, then the whole corolla abscises cleanly at the top of the calyx, leaving a green calyx cup and a bare pedicel. Indoors, no pollination occurs, so no capsule forms - the calyx simply dries and drops. Petals litter the leaf surface and, left there, invite Botrytis.",
+        "GROOMING / TURNOVER (day 6-7): the spent peduncle yellows and is removed (or dries and falls). The oldest outer leaf tier yellows from the margin inward and abscises, adding 0.2-0.5 mm to the neck and a scar to the crown. Fresh axils on the newest tier initiate the next flush, and the cycle restarts. A plant groomed at this point flowers more heavily next flush than one left alone - grooming should be a mechanically real action, not cosmetic."
+      ],
+      "weekMapping": "HONEST ANSWER FIRST: this species has no seasons. Streptocarpus ionanthus is an equatorial montane understorey perennial with no dormancy, no photoperiod trigger, and no annual cycle. Well grown, it flowers 8-10 months a year in overlapping flushes. There is no winter form to model. Reduced winter bloom in cultivation is entirely a light-and-temperature artefact, not an endogenous rhythm. So a 'season' here must map onto the BLOOM FLUSH, which is the only real cycle the plant has.\n\nTHE MAPPING: one real bloom flush runs about 5-7 weeks - axillary bud initiation to peduncle emergence ~10-14 days, emergence to first open flower ~14-21 days, each individual corolla lasts 2-3 weeks, a full cyme finishes over 4-6 weeks. Compressing that into 7 days is roughly a 6x speedup. Use 6x for everything flower-related and the rhythm reads true.\n\nWHAT THE COMPRESSION DISTORTS, stated plainly:\n\n(1) FOLIAGE AND FLOWERS RUN ON DIFFERENT CLOCKS AND CANNOT SHARE ONE. A new leaf pair appears at the crown every 7-10 real days; a leaf takes 4-6 weeks to reach full size; a rosette takes 6-12 months to mature from a plantlet and 8-12 months from a leaf cutting to first bloom. At 6x, a week of game time buys about six weeks of foliage growth - roughly one new leaf tier and maybe 8% more rosette diameter. That is nearly invisible. Options, in order of honesty: (a) accept it - the rosette barely changes in a week and the flowers carry the visual narrative, which is exactly what a real violet does; (b) run foliage on a separate, faster clock and be explicit in the design doc that the two are decoupled; (c) do NOT scale foliage growth to match bloom, because a violet that visibly grows a whole new rosette in a week is a different, fictional plant.\n\n(2) DAMAGE MUST NOT BE COMPRESSED. Decline in this species is already fast in real time - wilt in 2-4 days, ring spot in 48 hours, crown rot to death in 1-3 weeks. Recovery is slow: damaged leaves never repair, and cosmetic recovery requires growing out 2-3 new tiers, which is 2-4 real months. If you run damage at 6x too, the plant dies in about a day and a half of play and the punishment stops teaching anything. RECOMMENDATION: run bloom at 6x and damage at approximately 1x - one real day of neglect equals one game day of neglect. The player then gets a plant that flowers on a satisfying weekly rhythm but punishes on the true biological schedule. The asymmetry between fast harm and slow healing is the truest thing about this species and should be preserved rather than smoothed.\n\n(3) INDIVIDUAL FLOWER LIFESPAN LOSES ITS MEANING. A real corolla lasts 2-3 weeks, which at 6x is about 2.5 game days - fine. But the fact that a well-grown violet can be continuously in bloom for months, with flushes overlapping so the plant is never bare, disappears if each week is treated as a discrete season with a bare start. Let flushes OVERLAP: a healthy plant should enter game day 0 already carrying a late-stage cyme from the previous week. A plant that goes completely flowerless between weeks is being read by the player as failure, and for this species it genuinely is.\n\n(4) THE NECK IS THE ONLY HONEST LONG-TERM CLOCK. Leaf turnover, neck elongation, and accumulated permanent scars (ring spots, burn margins, snapped-leaf stubs) accrue over months and are what actually distinguishes a well-kept two-year-old plant from a neglected one. Keep these on real-time-ish accumulation and they become the game's true record of care, doing the work that a growth curve cannot do in a week."
+    },
+    "modelling": {
+      "hardParts": "1. THE VELVET IS THE WHOLE IDENTITY, AND IT IS NOT A TEXTURE. Every blade and petiole is covered in 0.3-1.5 mm translucent white multicellular trichomes at 20-60 per mm2, standing 20-60 degrees off the surface. Rendered as a plain diffuse green leaf the plant instantly reads as plastic - this is the single most common failure. You need three layers: a velvet/sheen BSDF term that brightens sharply at grazing angles (the pale halo around every leaf edge is retro-reflection off hair, not a rim light), a normal-map or shell-texture fuzz for mid-distance, and ACTUAL hair curves on the silhouette and on the upper surface within ~30 cm of camera. Hair colour is near-white and translucent, so it desaturates the green wherever the surface turns away from the viewer - the leaf appears lighter at its edges than at its centre, the opposite of a smooth leaf.\n\n2. THE HAIRS CHANGE HOW WATER BEHAVES, AND WATER IS A GAME MECHANIC. Trichomes make the surface superhydrophobic: droplets sit as near-spherical beads 2-5 mm across, resting on the hair tips with an air gap beneath, and they persist for hours. If you render water on this leaf as a wetting film or a flattened meniscus, it is wrong, and it is wrong in exactly the moment the player is watering - the highest-attention moment in the game. The bead should also refract the green beneath and cast a bright caustic. This matters doubly because standing droplets are the mechanism behind ring spot and Botrytis.\n\n3. WILT MUST BEND THE PETIOLE, NOT THE BLADE. The petiole is a fleshy hydrostat about 4-6 mm thick; when turgor drops it sags progressively along its length into a shallow catenary, while the blade itself stays comparatively flat and simply rotates with the petiole tip, adding only a modest downward roll at its own margins. Applying a single bend deformer to the whole leaf produces limp cooked spinach - a completely different plant. Rig it as a 4-6 joint petiole chain with stiffness falling off toward the tip, driven by a per-leaf turgor scalar, plus a small independent margin-curl blendshape on the blade.\n\n4. WILT PROPAGATES OUTSIDE-IN AND THE ORDER IS DIAGNOSTIC. Outer/oldest tier droops first, crown stays upright; that gradient is how a real grower reads drought at a glance and how your player should. Drive it with a per-leaf age index, not a uniform global droop. Crucially, root rot produces almost the SAME geometry with WET soil - the discrimination has to come from the substrate, the pot weight, the petiole-base discoloration, and gnats, not from leaf pose. Build the soil surface as a real signalling surface (dry/pale/shrunk-from-the-wall vs dark/glossy/algal) because it carries half the diagnostic load.\n\n5. ROSETTE PACKING AND SELF-INTERSECTION. Twenty to forty leaves on a 1.5-2.5 cm crown will interpenetrate under any naive spiral placement. The correct structure is layered: outer tiers sit LOWER and their blades pass UNDER the inner tiers, overlapping like roof shingles, with the whole assembly forming a nearly flat plate. Solve with per-tier vertical offset plus a light collision relax pass; leaves resting on the pot rim should actually contact and deform against it (and that contact line is where salt burn appears, so it must be geometrically real).\n\n6. THE CROWN JUNCTION IS FIDDLY AND ALWAYS LOOKS WRONG FIRST. Twenty-plus thick petioles converging into a 1-2 cm succulent stem, plus a bare scarred neck below with elliptical leaf scars at ~137.5-degree intervals. Most of it is hidden in a healthy plant but it is fully exposed in every interesting state: an etiolated plant, an old plant, a rotting plant, a plant with a sucker. Model it properly rather than hiding it behind foliage.\n\n7. PEDUNCLES COME FROM LEAF AXILS, NOT THE CENTRE. Flower stalks must originate at the base of a specific petiole in tier 2 and thread UP between the surrounding petioles, emerging offset from centre. Spawning the cymes from the crown apex gives a bouquet-in-a-plant-pot look that is instantly, if inarticulably, wrong to anyone who has owned one. Route them with a simple path-of-least-resistance solve against the leaf collision proxies.\n\n8. A CYME IS NEVER ALL-OPEN. Each cyme must simultaneously carry open flowers, spent/abscising ones, and closed buds at multiple sizes, with the sequence advancing over days. Uniformly-open flower clusters are the second-most obvious tell of a synthetic plant.\n\n9. THE ANTHERS ARE A SPECIFIC SHAPE, NOT A BLOB. Two fertile stamens, filaments short and curved, anthers 2.5-4 mm, bright saturated yellow (~#F2C230), held face-to-face as a forward-pointing beak at the throat, with apical pores (poricidal - this is a buzz-pollinated flower). Three staminodes are vestigial and hidden. The style curves up and aside, so the stigma is offset from the anther beak, not in line with it. That yellow beak is the read-at-a-glance identity of the flower.\n\n10. PETAL TRANSLUCENCY. Corolla lobes are 0.2-0.4 mm thick with strong forward scattering - backlit violet lobes glow and show the vein tracery. Without subsurface/thin-film transmission the flowers read as painted card. Deep purple cultivars also have a faint velvety micro-papillate surface that kills specular highlights; the corolla should NOT be glossy.\n\n11. DAMAGE MUST BE PER-LEAF, PERSISTENT, AND ADDRESSED IN UV SPACE - NEVER A GLOBAL COLOUR LERP. A ring spot on leaf 7 belongs to leaf 7 forever, at those coordinates, until that leaf is removed. Give every leaf its own damage mask (R = chlorotic ring spot, G = necrotic/burn, B = bleach, A = rot progress) that is written into at the moment of injury, at the location of injury, and never cleared. A global 'health tint' that slides the whole plant yellow destroys the entire diagnostic premise of the game - the whole point of this species is that damage is local, shaped, and legible.\n\n12. LEAVES SNAP, THEY DO NOT BEND. Physical contact should break a petiole cleanly and permanently, leaving a stub and a crown scar. This is real and it should hurt.\n\n13. SCALE DISCIPLINE. This is a small plant - a mature standard is 25-30 cm across and 10 cm tall, in a 9 cm pot. Rendered without a size cue it photographs identically to something the size of a cabbage. Keep a familiar object in frame, or the trichome and crenation detail will silently mislead the player about scale.",
+      "parameters": [
+        {
+          "drives": "Overall silhouette size. Miniature 8-15 cm, semi-miniature 15-20 cm, standard 20-30 cm, large standard 30-40 cm (show plants to 45). Scales leaf_blade_length, petiole_length, and pot_diameter together - these must not be independent or the plant reads as the wrong size class.",
+          "name": "rosette_diameter_cm",
+          "range": "8-45, default 26"
+        },
+        {
+          "drives": "Foliage density. Standard mature plant carries 3 tiers of 8-14 leaves. Below ~12 the plant looks sparse/recently damaged; above ~40 it looks crowded and suckering. Leaves are removed from the outermost tier and added at the crown.",
+          "name": "leaf_count",
+          "range": "10-45, default 26"
+        },
+        {
+          "drives": "Spiral placement around the crown. Use 137.5 degrees with +/-8 degrees jitter. Perfect regularity looks CG; too much jitter destroys the show-plant symmetry the species is prized for. Combine with tier_index to get the overlapping shingled plate rather than a flat fan.",
+          "name": "phyllotaxy_divergence_deg",
+          "range": "132-143, default 137.5"
+        },
+        {
+          "drives": "Leaf age gradient: 0 = newest at crown, 1 = oldest outer. Drives droop order under drought, yellowing/abscission order, blade size, vertical tier offset, and which leaves accumulate historical damage. Most decline behaviour keys off this one number.",
+          "name": "tier_index",
+          "range": "0.0-1.0 per leaf"
+        },
+        {
+          "drives": "The etiolation tell and the drought lever arm. Healthy standard 3-6 cm. Multiply by 1.5-2.5 for low light; multiply by 0.7-0.85 for excess light. Long petioles also mean a bigger droop excursion when turgor falls.",
+          "name": "petiole_length_cm",
+          "range": "1.5-12, default 4.5"
+        },
+        {
+          "drives": "Leaf carriage. Healthy: 0 to +15 (near-horizontal plate). Low light: +30 to +60 (funnel/shuttlecock). Drought: -30 to -50 on the outer tiers only. Excess light: -20 to -35 across all tiers with shortened petioles (the cupped-over-the-rim look). This single angle carries most of the plant's readable body language.",
+          "name": "petiole_elevation_deg",
+          "range": "-50 to +60, default +8"
+        },
+        {
+          "drives": "Per-leaf hydration, 1 = full turgor. Drives petiole catenary sag, blade margin down-roll, specular/sheen falloff (turgid leaves are noticeably brighter), and a subtle albedo shift toward grey-olive. Should fall outside-in (weighted by tier_index) under drought and fall uniformly-but-fast under cold shock. Recovers within 2-12 h of watering - the fastest positive feedback the plant offers.",
+          "name": "turgor",
+          "range": "0.0-1.0 per leaf, default 1.0"
+        },
+        {
+          "drives": "Blade footprint. Species 2.5-5.5 cm; standard cultivar 5-8 cm; miniature 1.5-3 cm. Width/length ratio 0.80-1.00 (ovate to nearly orbicular). Blade thickness 0.8-1.5 mm - thick enough to catch a visible edge highlight and to snap rather than bend.",
+          "name": "leaf_blade_length_cm",
+          "range": "1.5-8, default 5.5"
+        },
+        {
+          "drives": "Cordate leaf base. 0 = rounded/truncate, 0.15 = deep heart-shaped notch with overlapping basal lobes. Attachment point of the petiole sits in that notch. Wild species tends shallower; many cultivars deeper.",
+          "name": "cordate_notch_depth",
+          "range": "0.0-0.15 of blade length, default 0.08"
+        },
+        {
+          "drives": "Margin profile. 10-30 scallops per margin at 0.5-3 mm amplitude, plus an optional wave/ruffle in some cultivars. Also defines exactly where marginal necrosis (drought crisp, salt burn, low-humidity crisp) renders as a band that follows the scallop line rather than a straight offset.",
+          "name": "margin_crenation_count / amplitude_mm",
+          "range": "8-32 count, 0.3-3.0 mm amplitude"
+        },
+        {
+          "drives": "Quilting. Pinnate venation, veins SUNKEN on the upper surface by 0-2 mm and raised beneath, creating the puffed interveinal cushions of quilted cultivars. Also controls where interveinal chlorosis (high pH, iron lockout) and interveinal bleaching (excess light) render - the veins stay green while the panels pale.",
+          "name": "vein_quilt_depth_mm",
+          "range": "0.0-2.0, default 0.6"
+        },
+        {
+          "drives": "Transverse blade curvature. Negative = margins curl DOWN (excess light, drought). Positive = margins cup UP (cyclamen mite, cold, some cultivars natively). Independent of petiole angle - the combination of the two is what distinguishes the decline modes visually.",
+          "name": "blade_cup_deg",
+          "range": "-40 to +40, default 0"
+        },
+        {
+          "drives": "The velvet. Hairs 0.3-1.5 mm, near-white and translucent, standing 20-60 degrees off the surface, present on blade upper AND lower surfaces, petioles, peduncles, pedicels, and sepals (not on petals). Drives sheen strength, grazing-angle brightness, droplet beading behaviour, and how much the leaf edge pales in silhouette. Falls slightly in low light and collapses locally over dead tissue.",
+          "name": "trichome_density_per_mm2 / length_mm",
+          "range": "15-70 per mm2; 0.3-1.5 mm length"
+        },
+        {
+          "drives": "Base leaf albedo, roughly #2E4A22 (deep, low light) through #4A6B2E (healthy) to #7FA857 (high light) to #C4C88A (bleached). Falls under nitrogen shortage and light excess; rises to very dark green under low light. Should never be applied as a global tint - modulate per-leaf.",
+          "name": "chlorophyll_density",
+          "range": "0.0-1.0, default 0.75"
+        },
+        {
+          "drives": "Underside colour. 0 = pale grey-green, 1 = strong red-purple. Cultivar-dependent and visible whenever leaves droop, cup, or are seen from below. Deepens under high light and cold stress - a subtle but real stress readout.",
+          "name": "underside_anthocyanin",
+          "range": "0.0-1.0, default 0.3"
+        },
+        {
+          "drives": "The bare, scarred compressed stem below the lowest leaves. 0 on a young plant; grows 0.2-0.5 mm each time a leaf abscises. Elongates faster under low light. Persistent history: it is the honest long-term record of how the plant has been treated, and it only resets when the player repots deeper.",
+          "name": "neck_length_cm",
+          "range": "0-6, default 0.5"
+        },
+        {
+          "drives": "Bloom load. Healthy plant 2-6 concurrent cymes; 0 in low light, heat above 27 C, or post-cold-shock. Peduncles emerge from tier-2 leaf axils, 4-12 cm long, 1.5-3 mm thick, hairy, holding the cyme 1-3 cm above the leaf canopy.",
+          "name": "peduncle_count / length_cm",
+          "range": "0-12 count; 4-12 cm"
+        },
+        {
+          "drives": "Flowers per cyme, 2-8 typical. Each must carry an independent bloom_phase in [0,1] so open, spent, and budded flowers coexist on one stalk. Pedicels 1-3 cm.",
+          "name": "flowers_per_cyme",
+          "range": "2-8, default 4"
+        },
+        {
+          "drives": "Flower size. Species 2.0-2.5 cm; modern standard cultivars 3-5 cm; miniatures 1.5-2 cm. If the specimen is labelled as the species, cap at 2.5 cm and keep the corolla single.",
+          "name": "corolla_diameter_cm",
+          "range": "1.5-5.0, default 2.3 (species) / 3.5 (cultivar)"
+        },
+        {
+          "drives": "Zygomorphy - the flower is bilabiate, not radial. Five lobes: the upper 2 are smaller (0.8-1.5 cm) and swept back, the lower 3 larger (1.2-2.5 cm) and forward-facing. Ratio 0.55-0.75. Modelling it radially symmetric is a botanical error and instantly reads as a generic CG flower.",
+          "name": "upper_lobe_ratio",
+          "range": "0.55-0.75, default 0.65"
+        },
+        {
+          "drives": "Corolla colour. Wild species is violet-blue to blue-purple (~#6B4FA8 to #4B3C8F) with a paler throat. Cultivar space adds white, pink, magenta, coral, red-purple, near-black-purple; edge patterns (Geneva white picotee), fantasy speckling, and two-tone. Colour desaturates under heat above 27 C and under excess light.",
+          "name": "corolla_hue / saturation",
+          "range": "violet-blue baseline for the species"
+        },
+        {
+          "drives": "Petal count and form: 0 = single 5-lobed flat corolla (the species), 0.5 = semidouble, 1.0 = double with 10-20 lobes hiding the anthers. Doubles are cultivar-only. Separate ruffle parameter 0-1 for wavy lobe margins.",
+          "name": "doubling / ruffle",
+          "range": "0.0-1.0 each, default 0.0 for the species"
+        },
+        {
+          "drives": "The identity detail. Two fused-appearing yellow anthers 2.5-4 mm, saturated ~#F2C230, held face-to-face as a forward beak at the corolla throat, opening by apical pores. Prominence falls to 0 in doubles. Also the anchor for thrips damage (emptied anthers plus yellow pollen smeared across the lower lobes).",
+          "name": "anther_prominence",
+          "range": "0.0-1.0, default 1.0"
+        },
+        {
+          "drives": "Per-flower stage: 0 = pinhead bud, 0.25 = swelling with colour break through the calyx, 0.5 = opening, 0.7 = full anthesis, 0.9 = lobes folding back and going translucent, 1.0 = abscission at the calyx. Advances asynchronously within a cyme.",
+          "name": "bloom_phase",
+          "range": "0.0-1.0 per flower"
+        },
+        {
+          "drives": "Substrate appearance and the wilt-diagnosis discriminator. 0 = pale, shrunken, cracked, pulled 2-4 mm from the pot wall; 1 = dark, glossy, possibly algal film and fungus gnats. Combined with turgor it distinguishes drought droop from rot droop, which are otherwise near-identical in silhouette.",
+          "name": "soil_moisture",
+          "range": "0.0-1.0, default 0.55"
+        },
+        {
+          "drives": "White-tan crystalline crust on the outer pot rim and soil surface. Above ~0.6, any petiole in contact with the rim starts accumulating a corky brown constriction band at exactly the contact line. Reduced by leaching, reset by repotting.",
+          "name": "salt_crust",
+          "range": "0.0-1.0, default 0.0"
+        },
+        {
+          "drives": "Per-leaf persistent damage in UV space, written at the moment and location of injury and NEVER cleared. R = chlorotic ring spot (cold water), G = necrosis/burn (crisp margin, salt band, scorch patch), B = bleach (excess light), A = rot progress from petiole base outward. Must be per-leaf; a global health tint invalidates the entire diagnostic design.",
+          "name": "damage_mask_RGBA",
+          "range": "per-leaf texture, 512x512 sufficient"
+        },
+        {
+          "drives": "Crown pathology. 0 = normal. Toward 1 = cyclamen mite: centre leaves shrink to 30-50% size, cup upward, harden, grey out, and trichome density rises sharply, while the outer tiers remain untouched. The knotted-grey-centre-on-a-normal-plate silhouette is the whole diagnosis.",
+          "name": "crown_distortion",
+          "range": "0.0-1.0, default 0.0"
+        },
+        {
+          "drives": "Axillary side rosettes, 1-4 cm across, wedged between petioles. Each one tilts the main rosette off-plane and cuts peduncle_count by roughly 40% per sucker. Removable by the player, leaving a 2-4 mm crown scar.",
+          "name": "sucker_count",
+          "range": "0-4, default 0"
+        },
+        {
+          "drives": "Pot geometry and, through it, root health. Shallow azalea proportions (height about 0.75 x diameter). Correct diameter is about one third of rosette_diameter_cm - so a 26 cm plant wants a 9 cm pot. Oversizing raises rot probability substantially, which should be a real simulated consequence of the player's repotting choice.",
+          "name": "pot_diameter_cm",
+          "range": "6-14, default 9"
+        }
+      ]
+    },
+    "morphology": {
+      "flower": "Zygomorphic (bilaterally symmetric - NOT radial; modelling it radially is the single most common flower error). Borne in axillary cymes: a slender, hairy peduncle 4-12 cm long and 1.5-3 mm thick emerges from a LEAF AXIL - typically in the second tier, not from the crown centre - and threads upward between the petioles, carrying 2-8 flowers on pedicels 1-3 cm long. The cyme holds the flowers 1-3 cm above or nestled just at the leaf canopy. Calyx of 5 free, narrow, lanceolate, hairy green sepals 4-7 mm long. Corolla sympetalous with a short tube 4-8 mm opening into 5 spreading lobes in a 2+3 arrangement: the 2 upper lobes are smaller (8-15 mm) and swept slightly back, the 3 lower lobes larger (12-25 mm) and forward-facing - the flower has a distinct top and bottom. Species colour is violet-blue to blue-purple (roughly #6B4FA8 to #4B3C8F) with a paler, sometimes white throat; the epithet ionantha means 'violet-flowered'. Petals are thin (0.2-0.4 mm), matte and micro-papillate rather than glossy, and strongly translucent - they glow when backlit and show a fine vein tracery. Androecium: 2 fertile stamens with short curved filaments and conspicuous bright yellow anthers 2.5-4 mm, held face-to-face as a forward-pointing beak at the throat, dehiscing by APICAL PORES (poricidal - buzz-pollinated by vibrating bees in habitat); 3 staminodes vestigial and hidden. That paired yellow beak is the flower's read-at-a-glance identity. Gynoecium: superior ovary, a single hairy style 8-15 mm curving upward and to one side so the small stigma sits offset from the anther beak. Fruit (essentially never formed indoors, since nothing buzz-pollinates a houseplant): a straight oblong capsule 5-15 mm long containing hundreds of dust-like seeds 0.3-0.5 mm - note the capsule is NOT spirally twisted, unlike the subgenus Streptocarpus proper. Day-neutral: flowers continuously in overlapping flushes given adequate light, 8-10 months a year. Individual corolla lasts 2-3 weeks; a cyme opens sequentially over 4-6 weeks, so open flowers, spent flowers, and unopened buds always coexist on one stalk.",
+      "habit": "Acaulescent (effectively stemless) evergreen perennial herb forming a flat, near-horizontal rosette. Leaves radiate in a tight spiral (divergence approx. 137.5 deg) from an extremely compressed, thick, succulent stem 1.0-2.5 cm in diameter, and because the internodes are only 0.3-0.8 cm the rosette reads as 3-5 shingled tiers rather than a spiral - outer/older tiers sit lower and their blades pass UNDER the inner tiers, so the plant is a layered plate, not a fan. Mature standard rosette 20-30 cm across (large standards to 40-45 cm; semi-miniatures 15-20 cm; miniatures 8-15 cm) and only 8-15 cm tall soil to canopy. As lower leaves abscise the compressed stem elongates into a bare, scarred 'neck' 0-6 cm long bearing elliptical leaf scars at the phyllotactic interval; growers periodically repot deeper to bury it. Roots are fine, fibrous, white and shallow, confined largely to the top 5-8 cm - hence shallow pots. Axillary buds can break as suckers, producing secondary crowns that break the rosette's symmetry. In habitat (shaded, seepage-wet gneiss faces and forest floor in the Eastern Arc Mountains of Tanzania and the Taita Hills of Kenya) it grows as a lithophyte or terrestrial in permanently humid, deeply shaded cloud forest - the flat plate is a light-harvesting posture for deep shade, and every deviation from flat is a stress signal.",
+      "leaf": "Simple, entire, ovate to broadly ovate or nearly orbicular, with a cordate (heart-shaped, notched) base and a rounded to obtuse apex. Blade 2.5-5.5 cm long in the wild species, 5-8 cm in standard cultivars, 1.5-3 cm in miniatures; width 0.80-1.00 of the length. Blade is thick and succulent for its size (0.8-1.5 mm) and BRITTLE - it snaps rather than bends. Margin entire to crenate or shallowly scalloped, typically 10-30 scallops per margin at 0.5-3 mm amplitude; some cultivars are wavy or serrate. Venation pinnate, with the primary and secondary veins SUNKEN on the upper surface (up to 2 mm) and raised beneath, giving the quilted, puffed-interveinal-cushion look of many cultivars; the wild species is flatter. Both surfaces, plus the petiole, peduncle, pedicel and calyx, are densely covered in short white multicellular trichomes 0.3-1.5 mm long at roughly 15-70 per mm2, standing 20-60 degrees off the surface - this is the velvet, and it dominates the plant's appearance: it retro-reflects at grazing angles so leaf edges look PALER than leaf centres, it kills specular gloss, and it makes the surface superhydrophobic so water sits as near-spherical beads on the hair tips for hours. Upper surface mid to deep green (approx. #4A6B2E healthy); underside pale grey-green to strongly red-purple with anthocyanin, cultivar-dependent and deepening under high light or cold. Petiole fleshy, brittle, hairy, semi-terete with a shallow groove on top, 2-10 cm long and 3-7 mm thick, functioning as a hydrostat - it is the petiole, not the blade, that sags when turgor is lost. Cultivar foliage types worth encoding: 'boy' foliage is plain green; 'girl' foliage carries a distinct cream-to-white blotch at the blade base around the petiole junction; variegated forms carry white or pink marginal or mosaic variegation that intensifies in cool conditions.",
+      "measurements": [
+        {
+          "cm": "20-30 typical standard; 30-45 large standard/show; 15-20 semi-miniature; 8-15 miniature",
+          "part": "Rosette diameter (leaf span)"
+        },
+        {
+          "cm": "8-15 (soil surface to top of foliage)",
+          "part": "Rosette height"
+        },
+        {
+          "cm": "1.0-2.5 diameter",
+          "part": "Crown / compressed stem"
+        },
+        {
+          "cm": "0 (young, correctly repotted) to 6 (old, neglected, or etiolated)",
+          "part": "Bare neck length"
+        },
+        {
+          "cm": "0.3-0.8",
+          "part": "Internode spacing at crown"
+        },
+        {
+          "cm": "2.5-5.5 long x 2.0-4.5 wide (wild species)",
+          "part": "Leaf blade"
+        },
+        {
+          "cm": "5.0-8.0 long x 4.0-6.5 wide",
+          "part": "Leaf blade (standard cultivar)"
+        },
+        {
+          "cm": "1.5-3.0 long x 1.2-2.5 wide",
+          "part": "Leaf blade (miniature)"
+        },
+        {
+          "cm": "0.08-0.15",
+          "part": "Leaf blade thickness"
+        },
+        {
+          "cm": "0.2-0.8 deep",
+          "part": "Cordate basal notch"
+        },
+        {
+          "cm": "0.05-0.30 amplitude, 10-30 per margin",
+          "part": "Margin crenation"
+        },
+        {
+          "cm": "0-0.2 (vein depression on upper surface)",
+          "part": "Vein quilting relief"
+        },
+        {
+          "cm": "3.0-6.0 healthy; 1.5-2.5 under excess light; 7-12 etiolated",
+          "part": "Petiole length"
+        },
+        {
+          "cm": "0.30-0.70 diameter",
+          "part": "Petiole thickness"
+        },
+        {
+          "cm": "0.03-0.15 long",
+          "part": "Trichome (leaf hair)"
+        },
+        {
+          "cm": "4-12 long x 0.15-0.30 thick",
+          "part": "Peduncle"
+        },
+        {
+          "cm": "1.0-3.0",
+          "part": "Pedicel"
+        },
+        {
+          "cm": "0.4-0.7 long x 0.10-0.20 wide",
+          "part": "Sepal (5)"
+        },
+        {
+          "cm": "0.4-0.8 long",
+          "part": "Corolla tube"
+        },
+        {
+          "cm": "2.0-2.5 (wild species); 3.0-5.0 (cultivars); 1.5-2.0 (miniatures)",
+          "part": "Corolla diameter"
+        },
+        {
+          "cm": "0.8-1.5 long",
+          "part": "Upper corolla lobes (2)"
+        },
+        {
+          "cm": "1.2-2.5 long",
+          "part": "Lower corolla lobes (3)"
+        },
+        {
+          "cm": "0.02-0.04 thick",
+          "part": "Petal thickness"
+        },
+        {
+          "cm": "0.25-0.40 long, paired",
+          "part": "Anther"
+        },
+        {
+          "cm": "0.8-1.5 long",
+          "part": "Style"
+        },
+        {
+          "cm": "0.5-1.5 long x 0.3-0.5 diameter",
+          "part": "Capsule (rare indoors)"
+        },
+        {
+          "cm": "0.03-0.05",
+          "part": "Seed"
+        },
+        {
+          "cm": "8-10 diameter for a 25-30 cm rosette (rule: pot diameter = 1/3 leaf span); height about 0.75 x diameter",
+          "part": "Pot (shallow azalea type)"
+        },
+        {
+          "cm": "Fibrous mass confined to top 5-8",
+          "part": "Root zone depth"
+        }
+      ]
+    }
+  },
+  {
+    "key": "daylily",
+    "morphology": {
+      "habit": "Herbaceous clump-forming perennial in Asphodelaceae (subfamily Hemerocallidoideae) \u2014 NOT a lily, no bulb, no true stem above ground. The structural unit is the FAN: a single short-stemmed shoot whose leaves are strictly distichous (two-ranked, alternating 180 degrees), so every fan is a flattened plane like a hand of cards, not a radial rosette. Leaves emerge from a compressed crown at soil level (a 2-5 cm whitish zone between green leaf bases and roots) and arch outward within that plane. Below the crown: a short thick rhizome plus fleshy spindle-shaped storage roots, white to tan, that fatten in autumn \u2014 the drought-survival organ and the reason the plant is nearly unkillable. A clump increases by producing offset fans at the crown edge, each offset rotated roughly 20-60 degrees from its parent, so a mature clump is an interlocking pinwheel of flat planes, not a sphere of leaves. Flowering is on a SCAPE: a leafless, solid, roughly terete stalk rising from the centre of a mature fan, usually taller than the foliage, branched near the top, carrying many buds at staggered maturities. Foliage habit is a cultivar trait with three registered classes \u2014 dormant (dies completely to the crown after frost, requires winter chill), semi-evergreen (partial dieback), evergreen (retains foliage, damaged below about -7 C).",
+      "leaf": "Linear, sessile, sheathing at the base, entire (smooth) margin, glabrous, parallel-veined with no visible reticulation, tapering to a long acuminate point. Cross-section is a shallow-to-deep V \u2014 a pronounced keel along the abaxial midrib, deepest near the base (interior angle roughly 100-130 degrees) and flattening toward the tip (150-175 degrees). The keel is the single most diagnostic silhouette feature and is also the turgor gauge: it closes tighter as the leaf dries. Curvature is a cantilever, not a circular arc \u2014 the basal 30-55 percent is nearly straight and stiff, then curvature increases monotonically toward the tip, which may hang past vertical on long cultivars. Most leaves carry a slight axial twist (0-90 degrees base to tip), so the blade face rotates as it arches. Colour medium to yellow-green (hex family #4E7A33 to #7FA65A), semi-glossy adaxially, duller and paler abaxially where the keel catches light as a bright line. New spring growth emerges as tightly rolled bright yellow-green spears that unfurl over several days. Older outer leaves of a fan are longer, more strongly arched and darker; the innermost are shorter, erect and paler.",
+      "flower": "Six tepals in two whorls of three, fused at the base into a perianth tube (floral tube) 1.5-5 cm long \u2014 this tube is where the nectar sits and it must be modelled; a six-petal fan with no tube reads as a lily and is wrong. OUTER whorl = 3 sepals, narrower, usually smoother-edged, at 0/120/240 degrees. INNER whorl = 3 petals, distinctly wider (petal width roughly 1.3-2.2x sepal width) and carrying most of the ruffling, at 60/180/300 degrees. Making all six tepals identical is the classic modelling bug. Form ranges from flat-faced through trumpet/funnelform to strongly recurved, to spider forms with narrow strap tepals. Colour covers everything except true blue and pure white: yellows, golds, oranges, melon, pink, red, purple, near-black, cream. Wild species are yellow or tawny orange only (H. fulva tawny orange; H. lilioasphodelus lemon and fragrant); all pinks, reds and purples are hybrid. Standard patterning, concentric outward from centre: a THROAT (green, yellow or gold, 12-35 percent of flower radius, transition slightly diffuse rather than a hard ring), often an EYE or band zone above it in a contrasting darker colour, then the base tepal colour, and frequently a picotee or gold-wire EDGE band 1-6 mm wide. Most cultivars show a paler MIDRIB stripe running the length of each tepal. Six stamens with filaments curving upward in a shallow arc and versatile (centrally hinged, freely swinging) anthers bearing yellow-gold to brown pollen; one style exceeding the anthers by 0.5-2 cm, ending in a small capitate stigma. Tepals are thin and translucent \u2014 they glow when backlit. Many cultivars show 'diamond dusting': raised epidermal cells that scatter light as a crystalline sparkle in direct sun. Flowers sit on short pedicels off the scape branches, generally at or above foliage height. CRITICAL: each individual flower lasts about one day. Diurnal cultivars break colour in the bud the evening before, split at the bud tip before dawn, are fully open by mid-morning, begin curling at the tepal edges in afternoon heat, and are collapsed by dusk. Nocturnal cultivars (H. citrina lineage, many fragrant yellows) open late afternoon and stay open until midday the following day. 'Extended' is a registered class meaning open 16+ hours. A spent flower does NOT abscise cleanly: it collapses into a wet, translucent, spirally twisted wad that shrinks to 20-40 percent of its open length, hangs on the pedicel darkening from saturated to brown, and dries to a papery twist over 2-4 days. If not deadheaded, a fertile cultivar may instead set a green three-ridged capsule at that pedicel tip. Fruit is a loculicidal 3-valved capsule with angular glossy black seeds.",
+      "measurements": [
+        {
+          "part": "Fan height, leaf tips at rest (standard cultivar)",
+          "cm": "30-75 cm (dwarf types 20-35)"
+        },
+        {
+          "part": "Leaf length",
+          "cm": "20-90 cm; dwarf 20-35, standard 45-70, large 70-90+. Outer leaves 1.2-1.5x the inner leaves of the same fan"
+        },
+        {
+          "part": "Leaf width at widest point (25-35% up from base)",
+          "cm": "1.0-3.5 cm"
+        },
+        {
+          "part": "Leaf thickness (blade)",
+          "cm": "0.08-0.15 cm"
+        },
+        {
+          "part": "Crown diameter, single fan",
+          "cm": "2-5 cm"
+        },
+        {
+          "part": "Clump diameter, year 3 / year 5 undivided",
+          "cm": "45-90 cm / 60-120 cm"
+        },
+        {
+          "part": "Recommended planting spacing between clumps",
+          "cm": "45-75 cm"
+        },
+        {
+          "part": "Crown planting depth below soil surface",
+          "cm": "2.0-2.5 cm (deeper invites rot, shallower invites frost heave)"
+        },
+        {
+          "part": "Fleshy storage root, length and diameter",
+          "cm": "8-30 cm long, 0.8-2.0 cm thick"
+        },
+        {
+          "part": "Root zone spread, lateral and depth",
+          "cm": "30-60 cm lateral, 20-45 cm deep"
+        },
+        {
+          "part": "Scape height",
+          "cm": "28-120 cm (dwarf rebloomers such as 'Stella de Oro' 28-35; standards 60-90)"
+        },
+        {
+          "part": "Scape diameter at base",
+          "cm": "0.5-1.5 cm (tetraploids at the thick end)"
+        },
+        {
+          "part": "Scape branch length",
+          "cm": "5-20 cm, upper branches shorter than lower"
+        },
+        {
+          "part": "Pedicel (bud/flower stalk off the branch)",
+          "cm": "1.5-5.0 cm"
+        },
+        {
+          "part": "Bud at full size, immediately before opening",
+          "cm": "6-10 cm long, 1.5-2.5 cm wide, gently upcurved"
+        },
+        {
+          "part": "Flower diameter, face-on",
+          "cm": "5-20 cm; miniature 5-8, standard 10-14, large 15-20"
+        },
+        {
+          "part": "Perianth tube (fused base of the tepals)",
+          "cm": "1.5-5.0 cm"
+        },
+        {
+          "part": "Petal (inner whorl) length and width",
+          "cm": "5-12 cm long, 2.0-5.0 cm wide"
+        },
+        {
+          "part": "Sepal (outer whorl) length and width",
+          "cm": "5-11 cm long, 1.5-3.0 cm wide"
+        },
+        {
+          "part": "Tepal thickness",
+          "cm": "0.03-0.08 cm (diploids thin, tetraploids thick)"
+        },
+        {
+          "part": "Stamen filament length",
+          "cm": "5-9 cm"
+        },
+        {
+          "part": "Anther length",
+          "cm": "0.6-1.2 cm"
+        },
+        {
+          "part": "Style length",
+          "cm": "6-10 cm, exceeding the anthers by 0.5-2.0 cm"
+        },
+        {
+          "part": "Spent bloom (collapsed twisted wad)",
+          "cm": "2-5 cm long, hanging on the pedicel"
+        },
+        {
+          "part": "Seed capsule",
+          "cm": "2-4 cm long, 1.5-2.5 cm wide, three-ridged"
+        },
+        {
+          "part": "Seed",
+          "cm": "0.4-0.7 cm, angular, glossy black"
+        },
+        {
+          "part": "Rust pustule (Puccinia hemerocallidis)",
+          "cm": "0.05-0.15 cm diameter"
+        },
+        {
+          "part": "Leaf streak spot (Aureobasidium microstictum)",
+          "cm": "0.2-0.8 cm, lens-shaped, aligned on the midrib"
+        },
+        {
+          "part": "Southern blight sclerotia at soil line",
+          "cm": "0.1-0.2 cm, tan, mustard-seed-like"
+        },
+        {
+          "part": "Emergence growth rate, spring spears",
+          "cm": "2-4 cm per day"
+        },
+        {
+          "part": "Scape elongation rate",
+          "cm": "2-5 cm per day"
+        }
+      ]
+    },
+    "care": {
+      "light": "Full sun, 6+ hours direct, is optimum for bud count and scape strength. Tolerates 4 hours or bright dappled shade with a large drop in flowering. Cultivar-dependent inversion that a naive model gets backwards: dark cultivars (deep red, purple, near-black) absorb enough radiant heat that their tepals scald in intense afternoon sun, so they want morning sun plus afternoon shade for bloom QUALITY even though that reduces bloom COUNT. Pale yellows, creams and pinks bleach and lose edge saturation in the same conditions. Light therefore needs two separate outputs in the sim: vigour/bud count (monotonic with light) and bloom appearance (cultivar-dependent optimum).",
+      "water": "About 2.5 cm (1 inch) per week, delivered deep and infrequent rather than shallow and daily; established clumps survive long droughts on their fleshy storage roots. The requirement is NOT flat across the year \u2014 the critical window is scape elongation and bud development, when drought causes bud blast (buds abort and drop) even though the foliage still looks fine. Outside that window the plant tolerates neglect almost indefinitely. Overwatering is only dangerous in combination with poor drainage and warmth; standing water at the crown in warm weather is the one reliable killer. Water at the base, not overhead \u2014 wet foliage drives leaf streak.",
+      "temperature": "Growth optimum roughly 18-29 C. Hardy USDA zones 3-9 (dormant cultivars survive soil at -40 C under mulch; evergreen cultivars are damaged below about -7 C and are unreliable below zone 6). Above about 35 C, flower life shortens and dark cultivars melt. Dormant cultivars REQUIRE a winter chill period; grown frost-free they weaken over a few years. Evergreen cultivars in cold zones flush new growth during winter warm spells and lose it to the next freeze. Freeze-thaw cycles heave shallow crowns out of the soil; mulch prevents it.",
+      "humidity": "Ambient outdoor humidity; the plant itself is not humidity-sensitive. Humidity matters only through disease \u2014 warm plus humid plus still air drives daylily rust, leaf streak and bacterial soft rot. Air circulation across the clump is the mitigating variable, not humidity level per se.",
+      "soil": "Highly adaptable, including clay. Prefers well-drained loam with organic matter, pH 6.0-6.5 (tolerates about 5.5-7.5). Drainage matters far more than fertility. Fertiliser should be light and balanced \u2014 excess nitrogen produces lush dark floppy foliage and few scapes.",
+      "notes": "Gotchas a real grower knows and a naive implementation will get wrong. (1) EVERY FLOWER DIES EVERY DAY AND THAT IS HEALTH. Hemerocallis means 'beauty for a day'. If the health system reads wilted blooms as neglect, the plant is permanently, wrongly sick. Daily bloom senescence must be a scheduled lifecycle event, not a damage state. (2) Spent blooms do not fall off. They hang as wet twisted wads. A plant carrying five days of spent blooms looks terrible and is perfectly healthy \u2014 deadheading is a cosmetic and energy chore, not a rescue. (3) Skipping deadheading on a fertile cultivar produces seed capsules that visibly divert energy: fewer or no rebloom scapes later in the season. (4) Underwatering punishes BUDS, not leaves. Drought during scape development blasts buds while foliage still looks acceptable. Modelling drought as leaf-wilt-first is backwards for this species. (5) The plant can lose 100 percent of its foliage and live; the crown and storage roots regenerate a new fan in 10-20 days. To actually kill a daylily you need warm waterlogged soil and crown rot \u2014 make that the only death path or the 'forgiving' design premise is a lie. (6) Foliage habit class (dormant / semi-evergreen / evergreen) changes the entire annual silhouette and the cold response; pick one per specimen and state it in the codex. (7) Nocturnal cultivars invert the daily loop entirely \u2014 bloom opens late afternoon, still open next morning. If the game's core loop is a morning check-in, a nocturnal specimen is a genuinely different game. (8) Rebloom is cultivar-specific. Most classic cultivars bloom once for 3-5 weeks and are done for the year; only rebloomers ('Stella de Oro', 'Happy Returns') go again. Do not make rebloom universal. (9) 'Spring sickness': emerging spring foliage in many cultivars comes up ragged, twisted, brown-streaked and holed for no reason the player caused, and the plant grows out of it. Realistic, and it must not be scored against the player. (10) Proliferations: small rooted plantlets sometimes form at nodes on the scape and can be snapped off and grown on \u2014 a free propagation mechanic that is entirely botanically real. (11) Division every 3-5 years. An undivided clump crowds, the centre thins, fans narrow, flowers shrink. (12) Deer eat daylily buds and scapes preferentially; this is the standard outdoor threat, not aphids. (13) Toxicity is asymmetric and worth getting right: daylilies cause acute fatal kidney failure in CATS, while the buds and flowers are a traditional human food (dried buds sold as golden needles). Do not label it simply 'toxic' or simply 'edible'. (14) It is not a lily and has no bulb. Anything in the art or copy showing a bulb is a bug. (15) A flower opens once and cannot re-open; if a player 'saves' a wilting afternoon flower with water, nothing should happen to that flower. Tomorrow's bud is the reward."
+    },
+    "decline": [
+      {
+        "cause": "Underwatering during scape elongation and bud development (the moisture-critical window)",
+        "appearance": "Bud blast. Individual buds on the scape stop swelling, lose their green gloss, go pale yellow-tan and slightly translucent at the base, soften, then shrivel and drop from the pedicel \u2014 leaving a bare stub 0.5-1.5 cm long standing on the scape branch. Blast runs from the youngest, uppermost buds downward, so a scape ends up with open flowers below and a comb of bare stubs above. Foliage at this stage still looks broadly acceptable, which is the point: the damage is in the flower stalk, not the leaves.",
+        "onsetDays": "3-7 real days of dry soil; the stubs remain visible for the rest of that scape's life, roughly 2-3 weeks",
+        "reversible": "The plant recovers fully once watered, but the blasted buds are gone permanently \u2014 those flowers never happen. Leaves a visible permanent scar on that scape for the season."
+      },
+      {
+        "cause": "Sustained drought over weeks, outside the bud window",
+        "appearance": "Turgor loss progressing outer-to-inner. Outer (oldest, longest) leaves go first: the keel angle closes from roughly 130 degrees toward 100, so the V deepens and the blade narrows in silhouette; the arch-onset point migrates toward the base so the whole leaf sags, and the tip drops from about 30 degrees below horizontal to 90-110, hanging near the soil. Colour desaturates from yellow-green toward grey-green with a matte loss of specular. Necrosis then advances from the tip backward as a straw-tan papery zone with a 0.5-4 cm yellow transition band between dead and living tissue. The crown and innermost leaves stay upright and green far longer than the outer ones. Under extreme drought the plant deliberately goes dormant: all foliage browns and collapses into a flattened mat over the crown.",
+        "onsetDays": "10-21 real days for visible sag; 21-40 for full collapse",
+        "reversible": "Almost always fully reversible \u2014 this is the species' signature. Green spears push from the crown 10-20 days after water returns and a new fan is established in 3-5 weeks. Already-necrotic leaf tips never re-green; those leaves stay marked until shed or cut. No permanent mark on the crown."
+      },
+      {
+        "cause": "Overwatering with poor drainage in warm weather \u2014 bacterial crown/soft rot (Pectobacterium/Erwinia), or southern blight (Sclerotium rolfsii)",
+        "appearance": "THE KILL PATH, and its signature is the exact inverse of drought. The INNERMOST leaves yellow first \u2014 the centre of the fan goes pale, then water-soaked tan, while the outer leaves are still green. The base of the fan at the crown turns soft, wet-looking, translucent tan-brown; the fan loses rigidity as a unit and leans, then topples sideways as a single flat plane rather than leaf by leaf. Pull-test: the whole fan lifts free of the crown with almost no resistance, base mushy and foul-smelling. With southern blight, add white cottony mycelium at the soil line and tan sclerotia the size and colour of mustard seeds. Roots go from firm white-tan to brown and hollow.",
+        "onsetDays": "5-14 real days in warm wet soil; an individual fan collapses within 2-3 days of its centre yellowing",
+        "reversible": "NOT reversible for the affected fan. Adjacent fans can be saved by cutting out the rotted fan and improving drainage. If the rot reaches the whole crown the plant dies \u2014 this should be the game's only true death state for this species."
+      },
+      {
+        "cause": "Insufficient light (deep or prolonged shade)",
+        "appearance": "Etiolation with no discolouration \u2014 the trap is that the plant looks lush. Leaves grow LONGER (up to 1.3x) and NARROWER, the keel opens flatter, the blade goes limp and floppy rather than arching cleanly, and the whole fan leans toward the brightest direction so the fan plane tilts off vertical. Colour stays green or even deepens. The real signal is reproductive: scape count per clump drops sharply, surviving scapes grow taller and thinner and bow or flop under bud weight, branch count falls (3-4 branches down to 0-1), buds per scape collapse (25 down to 5-8), and the flowers that do open are smaller in diameter and paler in base colour.",
+        "onsetDays": "14-30 real days for the leaf change; a full season for the flowering collapse to be unmistakable",
+        "reversible": "Fully reversible. Restored light produces normal new fans in 3-6 weeks and normal flowering the following season. Stretched leaves stay stretched until shed \u2014 no permanent damage."
+      },
+      {
+        "cause": "Intense direct sun plus heat above about 32 C on a dark-pigmented cultivar \u2014 'melting'",
+        "appearance": "A bloom-quality failure with zero foliage involvement. On dark red, purple or near-black tepals, translucent water-soaked blotches appear on the sun-facing surfaces by late morning, spreading into wet-looking glossy patches with a darker saturated rim. Tepal edges curl inward and downward, ruffles lose definition and go limp, and the affected areas collapse into a wet, blotchy, tacky-looking surface hours before normal dusk senescence. On pale yellow, cream and pink cultivars the equivalent damage is bleaching: the base colour washes toward off-white, the picotee edge and eye zone lose contrast, and the flower reads flat and chalky.",
+        "onsetDays": "Same day \u2014 visible within 3-6 hours of peak sun, on that individual flower only",
+        "reversible": "Not reversible for the affected flower, but it was going to die by dusk anyway. Zero lasting harm to the plant; tomorrow's flower opens clean if conditions change. This is the case where 'more sun' is the wrong player action despite improving plant vigour."
+      },
+      {
+        "cause": "Daylily rust (Puccinia hemerocallidis), driven by warm humid still air",
+        "appearance": "Raised pustules 0.5-1.5 mm, bright orange to yellow-orange, concentrated on the LEAF UNDERSIDE and arranged in broken lines following the parallel veins, densest along the keel. Each pustule sits in a pale yellow halo; on the upper surface the same spots show as faint yellow flecks. The spores are powdery and smear orange when wiped \u2014 a strong visual tell and a good interaction cue. Heavy infection turns whole leaves yellow, then dries them from the tip back, and pustules go darker and crustier late in the season.",
+        "onsetDays": "7-14 real days from infection to visible pustules; leaf yellowing 7-14 days after that",
+        "reversible": "Reversible at plant level: cutting foliage to about 10 cm removes the infection and regrowth comes back clean in 3-5 weeks. Infected leaves themselves never clear. Recurs from spores if humidity and crowding persist."
+      },
+      {
+        "cause": "Leaf streak (Aureobasidium microstictum), from overhead watering and persistently wet foliage",
+        "appearance": "A yellow stripe running ALONG THE MIDRIB, starting mid-leaf and extending toward the tip, studded with reddish-brown lens-shaped spots 2-8 mm arranged in a line on that midrib. The leaf then dies from the tip backward, the dead zone bounded by the same yellow stripe. Distinguish from drought necrosis by geometry: drought browns the whole tip evenly and symmetrically across both halves of the blade; leaf streak is a centreline defect with discrete spots on it, often asymmetric between the two halves.",
+        "onsetDays": "10-20 real days after a wet-foliage period",
+        "reversible": "Reversible by removing affected leaves and switching to base watering; new leaves emerge clean. Affected leaves are permanently marked."
+      },
+      {
+        "cause": "Hard freeze on an evergreen or semi-evergreen cultivar, or a late frost on new spring growth",
+        "appearance": "Leaves go dark and water-soaked, then translucent, then limp within hours. Turgor is lost completely and simultaneously across the whole leaf \u2014 unlike drought, which progresses tip-to-base \u2014 so the fan drops flat rather than arching down. Within a day or two the collapsed tissue turns tan and slimy, then dries to grey-brown papery ribbons. In dormant cultivars this same event is the NORMAL autumn transition and must not be scored as damage.",
+        "onsetDays": "Hours to 2 real days",
+        "reversible": "Foliage is a total loss; the crown survives within the cultivar's hardiness range and regrows in spring. If the crown itself freezes (an evergreen cultivar well below its zone) the plant dies."
+      },
+      {
+        "cause": "Deer or rabbit browsing",
+        "appearance": "Scapes sheared off at 15-40 cm leaving a blunt, ragged, fibrous-torn end \u2014 deer tear rather than cut, so the stub is frayed, not clean \u2014 with buds stripped from any remaining branches. Leaves cropped to a fairly uniform 10-25 cm across the whole clump with torn, whitened tips. The silhouette becomes a flat-topped tuft with cut stubs standing above it.",
+        "onsetDays": "Overnight \u2014 a single event, not a progression",
+        "reversible": "Foliage regrows in 3-5 weeks. The season's flowers on browsed scapes are permanently lost. No harm to the crown."
+      },
+      {
+        "cause": "Overcrowding \u2014 clump not divided for 5+ years",
+        "appearance": "Fan count climbs but each fan shrinks: leaves narrow by 30-50 percent and shorten, fans crowd shoulder to shoulder into a dense flat-topped hedge, and the centre of the clump thins or goes bare so the mass reads as a ring rather than a mound. Scapes are shorter and thinner, branch count drops, and flower diameter falls 20-40 percent below the cultivar's registered size. The whole clump looks busy and unwell without any single leaf looking damaged.",
+        "onsetDays": "Season-scale \u2014 2-4 real years, showing as declining flower size year over year",
+        "reversible": "Fully reversible by lifting and dividing; divisions return to full size in one to two seasons. Nothing is permanently lost."
+      },
+      {
+        "cause": "Excess nitrogen fertiliser",
+        "appearance": "Foliage becomes noticeably darker green, wider, longer and softer, arching more loosely and flopping outward so the fan plane loses definition; leaves take on a slightly glossy, almost swollen look. Meanwhile scape count drops toward zero and any scapes that do form are soft and lean. A big, dark, healthy-looking, flowerless plant \u2014 which is exactly the trap.",
+        "onsetDays": "14-30 real days for the foliage change; the flowering deficit shows over the following bloom cycle",
+        "reversible": "Reversible \u2014 stop feeding and normal flowering resumes the next cycle. Soft foliage is meanwhile more attractive to aphids and more rot-prone."
+      },
+      {
+        "cause": "Daylily gall midge (Contarinia quinquenotata), or thrips feeding inside the buds",
+        "appearance": "Gall midge: individual buds swell abnormally FAT and SHORT \u2014 roughly half normal length at nearly double normal width, lumpy and distorted rather than smoothly spindle-shaped \u2014 then fail to open, yellow, and rot in place on the scape while neighbouring buds develop normally. Thrips: the bud develops normally but the flower opens with silvered or brown streaks running lengthwise along the tepals and asymmetric distortion, one or two tepals failing to expand fully so the flower opens visibly lopsided.",
+        "onsetDays": "Gall midge distortion visible 7-14 days before that bud's scheduled opening; thrips damage visible only on the day the flower opens",
+        "reversible": "The affected buds and flowers are lost permanently. The plant is otherwise unharmed and later buds can be clean. Removing and destroying deformed buds reduces the next generation."
+      }
+    ],
+    "lifecycle": {
+      "stages": [
+        "WINTER DORMANCY (dormant cultivars, roughly Dec-Feb): no foliage at all. Visible geometry is a bare crown at soil level with last year's leaf bases as a small tan collar, plus mulch. Semi-evergreen cultivars keep a short ragged 10-20 cm tuft; evergreens keep near-full foliage with frost-marked tips.",
+        "EMERGENCE (early spring, 2-4 weeks): tightly rolled bright yellow-green spears push vertically from the crown at 2-4 cm per day. Colour markedly lighter and more yellow than mature foliage. Many cultivars show 'spring sickness' here \u2014 ragged, holed, brown-streaked, twisted new leaves the plant simply grows past. Not player-caused, must not be scored as damage.",
+        "FOLIAGE BUILD (mid-late spring, 3-6 weeks): leaves unfurl, lengthen and begin arching; the distichous fan plane becomes clearly readable. Colour deepens to full green. Offset fans appear at the clump edge. Storage roots, depleted by winter, refill.",
+        "SCAPE EMERGENCE (late spring, 10-20 days): a smooth round leafless stalk pushes from the centre of each mature fan and elongates 2-5 cm per day, overtaking the foliage. It branches near the top and buds appear as tiny green spindles at the branch tips. THIS IS THE MOISTURE-CRITICAL WINDOW \u2014 drought here blasts buds.",
+        "BUD DEVELOPMENT (10-25 days, overlapping bloom): buds elongate from 1 cm to a full 6-10 cm and curve gently upward. A single scape carries buds at every maturity simultaneously \u2014 fat colour-broken buds low down and pinhead green buds at the tips. The evening before opening a bud shows 'colour break': the cultivar colour appears at the bud tip.",
+        "BLOOM (3-5 weeks per cultivar): the scape opens flowers sequentially from the base branch upward. Each individual flower lasts about one day. A mature multi-branched scape opens 1-3 flowers per day; a mature clump with 6-12 scapes carries 4-15 open flowers on a good day. Spent flowers accumulate as twisted wads unless deadheaded.",
+        "POST-BLOOM / SEED SET (2-4 weeks): scapes yellow from the top down, dry to tan and go brittle; a ripe scape snaps cleanly out of the fan at the base. Undeadheaded fertile cultivars carry swollen green three-ridged capsules that later split to release glossy black seed. Rebloom cultivars only: a second, usually shorter, scape flush.",
+        "SUMMER PLATEAU (4-8 weeks): pure foliage. Leaves at maximum length and arch; older outer leaves begin browning at the tips regardless of care, which is normal ageing and not neglect. Fan multiplication continues underground.",
+        "AUTUMN SENESCENCE (3-5 weeks): foliage yellows from the tips inward, green to yellow to tan. Storage roots fatten and firm. After the first hard frost, dormant-cultivar leaves collapse flat as a mat over the crown within a day or two."
+      ],
+      "weekMapping": "HONEST ANSWER FIRST: this species does not compress cleanly, and the reason is the same reason you chose it. The daylily has exactly one true real-time element \u2014 a flower lasts one day, and 'one day' means one actual solar day. Everything else is annual. If a 7-day season equals a year, one game day equals about 52 real days, which would make each flower live about 30 game minutes. You cannot have both. RECOMMENDATION: run a DUAL CLOCK and say so in the design docs rather than pretending it is one timescale. Anchor the bloom at 1:1 \u2014 one flower opens at the player's morning and dies by their evening, so one game day is one flower's life, because that mapping is free and it is the species' entire identity. Compress everything else against it and accept that the compression ratio is not uniform. WHAT THIS DISTORTS, EXPLICITLY: (1) BLOOM DURATION. A real cultivar blooms 3-5 weeks and opens 15-40 flowers per scape. Seven days of bloom shows you maybe 7 flowers if you model one scape. The honest fix is to model a CLUMP, not a single fan: 6-12 fans, 6-12 scapes, 4-15 open flowers simultaneously per day, which is exactly what a real established clump does. That fills the week without lying about any single flower. Do NOT solve it by making flowers last two days. (2) BUD ECONOMY. If a scape must be exhausted by day 7 you will be tempted to model scapes with 6 buds. Real scapes carry 8-40. Keep the real count and let scapes carry unopened buds into the next season, or let the season simply end mid-bloom \u2014 a scape still holding buds at season's end is more truthful than one that conveniently runs dry. (3) DORMANCY. A dormant cultivar spends about four months of twelve as a bare crown; honest compression gives that roughly two of seven days with no plant on screen. That is bad gameplay and you will be tempted to delete it. Two defensible options: pick a SEMI-EVERGREEN cultivar as the game specimen so the plant is never fully bare and dormancy compresses to a short ragged tuft \u2014 a real registered cultivar class, not a cheat; or keep a dormant cultivar and treat winter as a between-season interstitial rather than in-season days. State which you chose in the codex entry. (4) RECOVERY ASYMMETRY \u2014 the most important distortion. Damage here is fast and recovery is slow: crown rot kills a fan in 5-14 real days, but regrowing that fan takes 3-5 real weeks. Under uniform compression both collapse to 'instant', which makes the forgiving plant feel fragile and makes rescue feel weightless. Decouple them deliberately: let damage accrue on compressed time, but make crown-driven regrowth take a large fraction of a season, so losing a fan costs most of a week. That preserves the true emotional shape of the species, which is 'very hard to kill, slow to forgive'. (5) EMERGENCE SPEED. New spears genuinely grow 2-4 cm per day, fast enough to read day over day at 1:1. Compressing that further makes the plant look animated rather than alive. Consider running vegetative growth near real time as well and compressing only the long summer plateau and autumn senescence. (6) SEASON-SCALE FAILURES DO NOT FIT AT ALL. Overcrowding takes 3-5 years to show and division is a 3-5 year decision. These cannot be honestly squeezed into a 7-day loop. Either surface them as multi-season meta-progression across many in-game seasons, or leave them out \u2014 do not shrink a four-year process into four days. (7) DISEASE LATENCY. Rust takes 7-14 days from infection to visible pustules. Compressed, cause and symptom land on the same day and the player learns nothing about the delay. If you compress it, keep at least one game day of latency so the lesson 'today's humid crowding is next week's orange leaves' survives."
+    },
+    "modelling": {
+      "parameters": [
+        {
+          "name": "fanCount",
+          "range": "1-30 (1 in year one, 6-12 at year three, 20-30 pre-division at year five)",
+          "drives": "Clump width and silhouette density; scape count derives from mature fans, so this is the master vigour parameter."
+        },
+        {
+          "name": "fanPlaneAzimuth",
+          "range": "Per-fan yaw; each offset fan rotated 20-60 degrees from its parent, not uniform random",
+          "drives": "Whether the clump reads as interlocking flat fans (correct) or a radial blob (wrong). This one parameter is the difference between 'daylily' and 'ornamental grass'."
+        },
+        {
+          "name": "leavesPerFan",
+          "range": "6-20, strictly distichous, alternating exactly 180 degrees, with a small 2-6 degree progressive splay so the fan opens slightly outward",
+          "drives": "Fan thickness and the layered edge-on silhouette."
+        },
+        {
+          "name": "leafLength",
+          "range": "20-90 cm; outer leaves 1.2-1.5x the inner leaves of the same fan",
+          "drives": "Overall scale. The inner-to-outer length ratio is what makes a fan look grown rather than assembled."
+        },
+        {
+          "name": "leafWidth",
+          "range": "1.0-3.5 cm maximum, occurring 25-35 percent up from the base, tapering to an acuminate point",
+          "drives": "Blade proportion. A leaf widest at its base looks like an iris, not a daylily."
+        },
+        {
+          "name": "keelAngle",
+          "range": "100-175 degrees interior V; deepest at the base, opening toward the tip; closes a further 20-40 degrees at low turgor",
+          "drives": "Cross-section, the bright abaxial highlight line, and the primary visual read of hydration."
+        },
+        {
+          "name": "archOnset",
+          "range": "0.30-0.55 of leaf length (the straight, rigid fraction before curvature begins); migrates toward 0.15 at low turgor",
+          "drives": "Cantilever character. A circular-arc leaf looks rubbery; straight-then-increasingly-curved is the correct profile."
+        },
+        {
+          "name": "tipDeclination",
+          "range": "20-110 degrees below horizontal at the tip",
+          "drives": "Droop. Combined with archOnset it is the whole posture of the plant."
+        },
+        {
+          "name": "leafAxialTwist",
+          "range": "0-90 degrees of rotation from base to tip",
+          "drives": "Breaks the flat-ribbon look and catches light unevenly along the blade, which is most of what makes foliage read as real."
+        },
+        {
+          "name": "turgor",
+          "range": "0.0-1.0",
+          "drives": "Simultaneously: keelAngle (closes), archOnset (drops toward the base), tipDeclination (increases), colour saturation (toward grey-green), specular intensity (drops). Must drive all five together or wilting looks like an animation rather than dehydration."
+        },
+        {
+          "name": "necrosisFraction + transitionBandWidth",
+          "range": "0.0-1.0 advancing from the tip; band 0.5-4 cm",
+          "drives": "Tip dieback. The yellow transition band between dead and living tissue is what sells it; a hard green-to-brown boundary reads as a texture error."
+        },
+        {
+          "name": "declineDirection",
+          "range": "Enum: outer-fan tip-to-base (drought) vs inner-fan base-to-tip (rot) vs whole-leaf simultaneous (freeze)",
+          "drives": "Which mask the yellowing uses. Three genuinely different geometries \u2014 collapsing them into one generic 'yellowing' parameter destroys the diagnostic skill the game teaches."
+        },
+        {
+          "name": "scapeCount / scapeHeight / branchCount",
+          "range": "0-3 scapes per mature fan; height 28-120 cm; branches 0-5, ascending, upper shorter than lower",
+          "drives": "Bloom architecture and how far the flowers stand above the foliage."
+        },
+        {
+          "name": "budsPerScape + budStageDistribution",
+          "range": "8-40 buds; every scape must simultaneously hold buds at stages 0-5, weighted so lower branches are more mature",
+          "drives": "The single most important flowering realism cue. A scape with uniformly identical buds is instantly, obviously wrong."
+        },
+        {
+          "name": "budStage (per bud, independent)",
+          "range": "0 pinhead green / 1 elongating spindle / 2 full size with colour break at the tip / 3 open flower / 4 collapsed spent wad / 5 dry twist or green capsule",
+          "drives": "The daily loop. Stage 2 to 3 is the overnight transition the player wakes up to; stage 3 to 4 is the one they must learn not to fear."
+        },
+        {
+          "name": "flowerDiameter",
+          "range": "5-20 cm; miniature 5-8, standard 10-14, large 15-20",
+          "drives": "Cultivar identity. Must stay consistent with scapeHeight and ploidy."
+        },
+        {
+          "name": "sepalWidthRatio",
+          "range": "0.45-0.75 of petal width",
+          "drives": "The outer-versus-inner whorl distinction. Setting this to 1.0 (all six tepals identical) is the most common and most conspicuous modelling error for this genus."
+        },
+        {
+          "name": "tepalRecurve + ruffleAmplitude/Frequency",
+          "range": "Recurve 0-90 degrees; ruffles 0-12 lobes per margin at 0-1.5 cm amplitude, applied mainly to petals",
+          "drives": "Form class, from flat-faced through trumpet to recurved to spider. Ruffles need real edge-length excess, not a normal map."
+        },
+        {
+          "name": "throatRadius / eyeZoneWidth / edgeBandWidth",
+          "range": "Throat 0.12-0.35 of flower radius; eye 0-0.35; edge band 0.1-0.6 cm",
+          "drives": "The concentric colour pattern. Transitions should be narrow 2-5 mm gradients, never hard rings."
+        },
+        {
+          "name": "perianthTubeLength",
+          "range": "1.5-5.0 cm",
+          "drives": "The fused base where all six tepals join and where the flower attaches to the pedicel. Omitting it turns the flower into a lily."
+        },
+        {
+          "name": "tepalThickness + translucency",
+          "range": "0.03-0.08 cm (diploids thinner, tetraploids thicker and stiffer)",
+          "drives": "Subsurface scattering and the backlit glow. An opaque tepal shader destroys the flower."
+        },
+        {
+          "name": "diamondDusting",
+          "range": "0.0-1.0 micro-facet density on the adaxial epidermis",
+          "drives": "The crystalline sparkle in direct sun. Cultivar-specific: absent on many, striking on some."
+        },
+        {
+          "name": "ploidy",
+          "range": "Diploid or tetraploid \u2014 a preset that co-varies several parameters at once",
+          "drives": "Tetraploids: larger flowers, thicker and more ruffled tepals, stiffer thicker scapes, wider leaves. Diploids: narrower, more graceful, more recurve. Exposing this as one switch stops artists building botanically impossible combinations."
+        },
+        {
+          "name": "spentWadTwist + shrinkFactor",
+          "range": "180-540 degrees of axial twist; shrink to 0.20-0.40 of open length",
+          "drives": "The daily death of every flower. A required deformation, not a colour change."
+        },
+        {
+          "name": "foliageHabitClass",
+          "range": "dormant / semi-evergreen / evergreen",
+          "drives": "Winter silhouette (bare crown / short ragged tuft / near-full foliage) and the cold-damage threshold. Must be a per-specimen property, chosen once and stated."
+        },
+        {
+          "name": "bloomChronotype",
+          "range": "diurnal / extended / nocturnal",
+          "drives": "When the flower opens and closes relative to the player's session. Nocturnal cultivars open late afternoon and are still open next morning \u2014 a different core loop, so lock this per specimen."
+        }
+      ],
+      "hardParts": "1. THE SPENT BLOOM. Every flower dies every day, so the collapsed-wad state is on screen constantly and it is the hardest asset in the plant. It is not a wilted version of the open flower \u2014 it is a wet, translucent, spirally twisted tube shrunk to about a fifth of its length, hanging limp off the pedicel and darkening over 2-4 days into a dry papery corkscrew. You cannot reach it by scaling or drooping the open mesh; it needs a dedicated twist-plus-shrink deformer with the tepal tips converging and the perianth tube pinching. Budget real time for this. If it looks like a shrunken flower rather than a wet rag, the plant reads as sick every single day of the game.\n\n2. THE FAN PLANE. Daylily leaves are strictly two-ranked in a single plane. Every instinct in a procedural foliage generator is to distribute leaves radially, and that instinct produces something unmistakably not-a-daylily that is very hard for a non-botanist reviewer to name as wrong. Enforce the 180-degree alternation, allow only a few degrees of splay, and get all your variety from the rotation of WHOLE FANS relative to each other \u2014 never from breaking the phyllotaxy inside a fan.\n\n3. LEAF CURVATURE. It is a cantilever under self-weight, not an arc: rigid and near-straight for the basal third to half, then curvature increasing monotonically to a tip that may hang past vertical. Curvature must be a function of both length and turgor, and the inflection point must MOVE toward the base as turgor drops. A fixed-shape leaf that merely rotates downward when dry looks like a hinge, not a wilt.\n\n4. RUFFLES. The ruffled margin of a modern cultivar exists because the petal edge has more arc length than the boundary it attaches to. It must be true geometry \u2014 sine or noise displacement along the edge normal with real added length \u2014 because it silhouettes against the sky and reads on the outline, where a normal map contributes nothing.\n\n5. TEPAL SHADING. Tepals are 0.3-0.8 mm of translucent tissue. Backlit they glow and the venation shows through; front-lit with diamond dusting they sparkle; dark red and purple cultivars have a velvety nap that eats specular highlights and goes almost black at grazing angles. Three distinct optical behaviours in one surface. A standard opaque diffuse-plus-specular shader fails all three, and the dark cultivars in particular will look like moulded plastic.\n\n6. SIMULTANEOUS BUD STATES ON ONE SCAPE. Real scapes carry pinhead buds, elongating buds, colour-broken buds, an open flower, yesterday's wad and last week's dry twist all at once. The scape therefore cannot be a single asset with a bloom toggle \u2014 every pedicel needs independent state and independent geometry, and the state distribution must be spatially biased (mature low, immature high). This is a data-structure decision, so make it before any art is built.\n\n7. THE THROAT GRADIENT. The throat-to-tepal transition is a narrow diffuse band, a few millimetres wide, that follows each tepal's own curvature down into the perianth tube. Painted as a flat ring on a UV it looks stamped on. It also has to survive the tepal deforming through opening and collapse, so make it procedural in the shader rather than baked into a texture.\n\n8. HONEST DECLINE DIRECTIONALITY. Drought damage travels outer-leaf-first, tip-to-base. Rot travels inner-leaf-first, base-to-tip. Freeze hits the whole leaf at once. If all three are implemented as one generic yellowing parameter, the player can never learn to tell them apart \u2014 and telling them apart is the entire skill this species exists to teach. Build them as separate, oppositely-directed masks from the start; retrofitting this later means rebuilding the damage shader."
+    }
+  },
+  {
+    "care": {
+      "light": "Full sun to light shade. Target 6+ hours of direct sun while foliage is green \u2014 critically INCLUDING the 6 weeks AFTER the flower dies, which is when the bulb is actually being built. Indoors: an unobstructed south/southwest window (roughly 20,000-50,000 lux peak, DLI 12-20 mol/m2/day). Below about DLI 6 the leaves etiolate and lodge and the bulb undercharges. Two exceptions a naive implementation gets backwards: (a) during the cold requirement the bulb needs NO light at all \u2014 it is rooting in the dark and light is irrelevant until the shoot clears ~5 cm; (b) an OPEN flower lasts noticeably longer in shade/cool, so the optimal light for flower display and the optimal light for bulb recharge point in opposite directions. Reward the player for moving it into the light once the petals drop.",
+      "water": "Four distinct regimes, and the boundaries matter more than the amounts. (1) Rooting, autumn: moisten thoroughly once at planting, then keep just-damp \u2014 the medium should never dry out completely while white roots are extending, but standing water at this stage is the single most common bulb-killer. (2) Cold period: barely any \u2014 cold + wet + no transpiring leaf = rot. Check every 10-14 days, water only if the top 5 cm is dry. (3) Active growth through flowering: water thoroughly when the top 2-3 cm is dry, let it drain completely, never leave a saucer full. A 20 cm pot of three bulbs in leaf drinks roughly 200-400 ml every 2-4 days at 15 C. (4) Post-flowering recharge: this is when water matters MOST and every naive player stops \u2014 the bulb is bulking and drought here costs next year's flower. Then taper hard as the leaves yellow, and keep the bulb DRY through summer dormancy. A Mediterranean-climate geophyte: wet winter, bone-dry summer.",
+      "temperature": "The defining requirement is a cumulative cold period: 12-16 weeks at 2-9 C, optimum 4-7 C, measured at the bulb, not the air. This is an accumulator \u2014 partial chill gives a partial result (see notes), not a binary fail. Below 0 C at the bulb does not count as chilling and freezing a potted bulb solid can kill it, so an unheated garage/fridge (4-5 C) beats a freezer. Growth and flowering are best at 10-16 C; the flower holds 14-21 days at 10 C, 7-10 days at 16 C, and 3-5 days above 21 C. Sustained above 21 C with wet medium is the trigger condition for Fusarium basal rot (the pathogen's optimum is ~25 C). Ground-hardy roughly -25 C (USDA 3-8); a pot has no soil buffer, so treat pot-hardy as about -8 C. Summer dormant storage: 17-20 C dry is ideal \u2014 that warmth is what initiates NEXT year's flower inside the bulb. Above ~25 C in storage degrades the preformed bud.",
+      "humidity": "Effectively humidity-indifferent, which is unusual and worth encoding as such: 40-60% ambient is fine, 30% is fine. Never mist \u2014 the glaucous wax on the leaves sheds water anyway, and free water sitting in the leaf axils at the bulb neck plus warmth is exactly the Fusarium/Botrytis entry route. High humidity is only a problem in combination with warmth. There is no humidity-driven decline mode for this species; if your engine has a humidity axis, this plant should be the one that ignores it.",
+      "soil": "Sharply free-draining, gritty, low-organic. A workable mix: 50% loam or soil-based compost, 30% coarse grit or perlite (2-5 mm), 20% leaf mould or coir. pH 6.0-7.0. Heavy wet clay is fatal over a season. Planting depth is 2-3x the bulb's own height \u2014 for a 6 cm bulb that is 12-18 cm of medium ABOVE the nose, so the container must be at least 25 cm deep; too-shallow planting is a leading cause of blindness and of bulbs splitting into non-flowering offsets. Nose upward; the basal plate (the flat, scarred disc) goes down. Feed low-nitrogen, high-potassium (e.g. 5-10-20) at shoot emergence and again immediately after flowering; high nitrogen produces lush floppy leaves, fewer flowers, and markedly more basal rot. Bone meal alone is nutritionally insufficient (phosphorus only).",
+      "notes": "The single most important fact for a delayed-consequence design: NEXT SPRING'S FLOWER IS ALREADY BUILT INSIDE THE BULB BY LATE SUMMER. Floral initiation happens in the dormant bulb at 17-20 C in July-August. A bulb bought in autumn will bloom in spring almost regardless of what the player does \u2014 year one is not a skill test. What the player's care buys is the flower TWO cycles out. Model the bulb as carrying a preformed-bud object plus a stored-reserve scalar across seasons, and consider surfacing that (a cutaway, a 'the bulb feels heavy/light' hint) so the mechanic is discoverable rather than merely cruel.\n\nOther things a real grower knows:\n- Do not cut, fold, knot, braid, or rubber-band the foliage after flowering. Leave it 6 weeks minimum; ideally until it yellows and pulls away from the neck with a gentle tug. Tying the leaves into the classic tidy knot cuts light interception and is a reliable way to get a blind bulb next year.\n- Deadhead, but only the seedpod. Snap off the swollen green ovary just behind the flower; LEAVE the hollow scape standing \u2014 it is green and photosynthetic. Letting a capsule ripen diverts a real fraction of the bulb's reserve into seed, and seed-grown daffodils take 5-7 years to flower.\n- Daffodil roots are white, fleshy, and essentially unbranched, they grow ONCE per year in autumn, and they do not regenerate if broken. Handle and reposition bulbs before rooting, never after. A bulb whose roots were snapped in January is crippled for the whole season no matter how well it is watered.\n- Contractile roots pull the bulb deeper each year. A bulb planted too shallow will visibly haul itself down over two or three seasons \u2014 a nice long-horizon detail if you track bulb depth.\n- Ethylene destroys the preformed flower bud during dry storage. Bulbs stored near ripening fruit, or beside a Fusarium-infected bulb (infected bulbs emit ethylene), abort or blast their bud with NO external sign. An invisible, unappealable, fully delayed failure \u2014 the most honest possible version of this species' game role.\n- Insufficient chill does not simply mean 'no flower'. Partial chill produces a short scape: the flower opens down among the leaves or barely clears them, sometimes still inside the leaf fan. That graded failure is far more readable than a binary.\n- Blindness (leaves, no flower) has six distinct real causes \u2014 too shallow, overcrowding from offsets, foliage removed early, too much shade, excess nitrogen, and drought during the post-flower recharge \u2014 plus insufficient chill. If your sim can attribute the cause, that is a whole diagnostic minigame.\n- Lift and divide congested clumps every 3-5 years. A bulb splits into offsets; a dense clump of small noses makes lots of leaves and no flowers.\n- Every part is toxic: lycorine, galantamine, and calcium oxalate raphides. Bulbs are periodically mistaken for onions with serious results, and the sap causes 'daffodil itch' in florists. The upside is that deer, squirrels, voles and rabbits leave them completely alone \u2014 unlike tulips. Worth a line of flavour text.\n- Cut daffodil sap is toxic to other cut flowers. Condition daffodils alone in water for 12-24 hours, then arrange WITHOUT recutting the stems.\n- Bulbs that were commercially forced (supermarket pots) are usually exhausted and rarely rebloom in a pot; the honest advice is to plant them out and wait two years.\n- Reject any bulb that is soft at the basal plate, light for its size, or shows chocolate-brown staining at the base. Fusarium spreads bulb-to-bulb in storage."
+    },
+    "decline": [
+      {
+        "cause": "Insufficient cold period (vernalization deficit) \u2014 bulb kept above ~9 C, or chilled for fewer than ~12 weeks",
+        "appearance": "Graded, not binary, and this is the whole point of the species. FULL FAILURE (0-4 weeks chill): 3-5 leaves emerge normally and reach near-full length; no scape appears at all. The pot reads as a healthy clump of grassy blue-green straps and nothing else \u2014 no bud, no stem, nothing visibly wrong. PARTIAL FAILURE (6-11 weeks chill): a scape emerges but stops at 8-15 cm instead of 35-45 cm, so the flower opens DOWN INSIDE the leaf fan, tepals pressed and creased against the surrounding leaves, sometimes never fully reflexing because the leaves physically block them. Corona often shorter than normal (2-3 cm rather than 4). SEVERE PARTIAL (4-6 weeks): a short scape with a bud that swells, the tan spathe splits partway, and the bud dries in place \u2014 tepal tips visible as a papery pale-yellow cone protruding 1 cm from the split spathe, then browning from the tips back over 3-4 days. Scape height should be a near-linear function of accumulated chill hours between the thresholds.",
+        "onsetDays": "Fully invisible until emergence, then visible over the 10-20 real days of leaf and scape extension \u2014 i.e. the mistake was made 3-4 months before any symptom exists. In a 28-day game year: committed during the winter week, revealed on days 2-5 of the spring week.",
+        "reversible": "Not for this cycle \u2014 once temperature-driven stem elongation has failed, no amount of care recovers it. No permanent mark on the bulb, though: a blind-from-cold bulb that is otherwise well fed and given proper chill the following winter flowers normally. Chilling can also be topped up BEFORE emergence \u2014 a bulb pulled at 8 weeks and returned to cold before the shoot exceeds 5 cm resumes accumulating."
+      },
+      {
+        "cause": "Foliage cut, mown, tied, braided, or folded down before natural senescence",
+        "appearance": "NOTHING happens this season \u2014 that is the trap. The player gets a tidier pot and no feedback whatsoever. The penalty renders one full cycle later: leaf count drops from 4-6 to 2-3 per nose; leaf width drops from 1.5-2.0 cm to 0.6-1.0 cm, so the fan reads visibly thinner and more grass-like; leaf length drops from 40 cm to 15-25 cm; and either no scape forms, or a scape of 15-25 cm carries an undersized flower \u2014 perianth 5-6 cm across instead of 9-10 cm, corona 2-2.5 cm instead of 4-5, with tepals narrower and slightly translucent, showing gaps between them instead of overlapping. If your model exposes the bulb: circumference down 20-35%, tunic loose and wrinkled rather than taut, neck soft. Cutting at 2 weeks post-flower is roughly twice as damaging as cutting at 4 weeks \u2014 make it a continuous function of the green-leaf-days integral, not a flag.",
+        "onsetDays": "Zero visible symptoms for the remainder of the cycle. Full expression at the next emergence \u2014 ~250-300 real days, or one full game year (28 days) later.",
+        "reversible": "Recoverable, slowly. Left completely alone, a depleted bulb rebuilds over 2-3 cycles and returns to full flower. No permanent scar. But the lost season cannot be bought back within itself, and repeating the mistake compounds \u2014 three consecutive cycles of early cutting typically ends in a bulb too small to ever flower again without lifting and growing on."
+      },
+      {
+        "cause": "Ethylene exposure during dry summer dormancy \u2014 bulb stored in a drawer with ripening fruit, or next to a Fusarium-infected bulb",
+        "appearance": "The most invisible failure this species has, and the most thematically perfect. The bulb looks and feels completely normal \u2014 firm, taut tunic, no discolouration, correct weight. Inside, the preformed flower bud is necrotic. Next cycle the bulb roots normally, chills normally, produces a FULL, healthy, correctly-sized set of 4-6 broad leaves, and either sends up no scape at all or sends up a scape bearing a hard, dry, brown, thumbnail-sized lump inside a spathe that never splits \u2014 'bud blast'. Render that lump as a shrunken, mummified bud, matte dark brown, roughly 1 cm, held on a scape of otherwise normal 30-40 cm height. Healthy leaves plus a dead bud on a full-height stem is the diagnostic silhouette, and it distinguishes ethylene damage from cold-deficit blindness (which gives a SHORT or absent scape).",
+        "onsetDays": "Damage is done in hours to days during storage. Zero symptoms for 4-8 months. Revealed at flowering time of the following cycle.",
+        "reversible": "Irreversible for that cycle \u2014 the bud is dead tissue and cannot regrow. The bulb itself is undamaged and will initiate a fresh bud in the following summer, so it recovers fully in one cycle if the player identifies the cause. Which they cannot, without a hint."
+      },
+      {
+        "cause": "Underwatering during active growth (emergence through flowering)",
+        "appearance": "Runs tip-downward, and starts on the OUTER, longest leaves. Stage 1 (mild): the distal 3-6 cm of the two or three longest outer leaves lose turgor and the leaf's shallow V-keel flattens out there; the tip folds over at a single discrete point rather than curving smoothly, and hangs over the pot rim. The crown and the inner young leaves stay upright \u2014 this contrast is the readable signature. Stage 2: the fold point migrates basipetally; the folded portion goes from glaucous blue-green to a dull grey-green (the wax bloom looks duller because the surface has flattened), then straw-yellow, then dry tan-buff from the tip back, with an irregular, slightly darker brown line at the moving boundary. Stage 3: the scape softens just below the ovary so the flower nods well past its normal 60-90 degrees, hanging almost vertically; tepals lose their flat plane, curl backward along the midline and become slightly translucent at the edges; the corona rim loses its crisp frill and folds inward. Stage 4: leaves collapse radially, splayed flat over the rim like a star, still attached and still partly green at the base.",
+        "onsetDays": "3-6 days without water at 15-18 C in a 20 cm pot; 2-3 days above 21 C. Stage 1 to Stage 3 in a further 2-4 days.",
+        "reversible": "Turgor recovers within 2-6 hours of a thorough watering if no tissue has browned \u2014 the fold points lift and re-cantilever, and the flower re-orients. Any leaf tissue that has gone straw-tan is dead and never regreens; it stays as a browned tip for the rest of the season, so repeated mild drought accumulates a visible history of browned tips. A wilted-then-recovered flower keeps a permanent crease across the tepals."
+      },
+      {
+        "cause": "Drought during the post-flowering recharge (the 6 weeks after the petals drop)",
+        "appearance": "Immediate symptom is mild and easy to dismiss: the leaves go limp and the fan splays outward over the rim, tips browning, and they yellow and die back 2-3 weeks EARLY \u2014 a premature, uniform, slightly grey-tinged yellowing rather than the rich buttery-gold of true senescence, with the leaves collapsing while still partly green at the base instead of drying upright and separating cleanly. The real symptom is the next cycle: a smaller flower on a shorter scape (25-30 cm instead of 40), and in a mature clump a proportion of noses go blind entirely \u2014 so you get a clump where two fans flower and three do not, an uneven, patchy result that reads very differently from total failure.",
+        "onsetDays": "Foliage symptom in 4-8 days. Early die-back within 2 weeks. Real consequence one full cycle later.",
+        "reversible": "The current cycle's leaves, once collapsed, do not stand back up. The bulb recovers over 1-2 cycles if watering resumes properly. Partial credit should be genuine: the recharge is an integral, so watering well for four of the six weeks gives you most of next year's flower."
+      },
+      {
+        "cause": "Overwatering / waterlogging, especially combined with warmth \u2014 Fusarium basal rot",
+        "appearance": "Runs base-upward, the exact opposite of drought, and that directionality is the diagnostic the player must learn. Stage 1: the outermost leaf yellows FROM THE SHEATH UP \u2014 a yellow zone appears at the soil line and advances toward the tip, while the tip itself may still be green. Stage 2: affected leaves go soft and slightly water-soaked-translucent near the base, then flop from the base outward \u2014 the whole leaf tips over as a unit, pivoting at soil level, rather than folding at a point partway along. The fan opens out and lies over the rim in 1-2 days. Stage 3: an open flower goes limp and hangs; leaves pull free from the neck with almost no resistance, coming away wet and stringy. Bulb interior (if the model exposes it, and it should on death): the basal plate turns chocolate-brown and spongy, the rot advances upward between the fleshy scales as a wedge of brown, and a fine white-to-pale-pink mycelium appears between the scales. The bulb ends soft, dark, and foul-smelling, with the tunic sloughing. Roots turn brown, translucent and mushy.",
+        "onsetDays": "7-21 days at 18-25 C with saturated medium; can be 4-5 days above 25 C; very slow below 13 C. Latent infections from storage can sit dormant for months and then erupt when the medium warms.",
+        "reversible": "Not reversible. Once the basal plate is brown, the bulb is dead \u2014 the meristem and the root-generating tissue are the tissue being destroyed. The correct action is discard, and discard the neighbours too, since the pathogen is soil-persistent and the infected bulb's ethylene damages adjacent bulbs' flower buds. This should be one of the few genuinely terminal outcomes in the game."
+      },
+      {
+        "cause": "Too warm while in flower (above ~21 C)",
+        "appearance": "Everything runs fast and bleaches. The bud opens in 12-18 hours instead of 36-48. Within 48-72 hours the tepals go from saturated yellow to pale cream at the margins first, the fade advancing inward toward the midrib, and they thin visibly \u2014 the tepals become slightly translucent so backlighting shows the parallel veins. The corona rim browns: a fine tan-brown crisping starts on the frilled outer edge and works down, 1-3 mm at a time, and the rim's crispness collapses into a soft, papery, inward-curling flute. Anthers dehisce early and the pollen goes from bright orange-yellow to dull ochre. Whole flower is over in 3-5 days instead of 14-21. Separately, the scape may etiolate \u2014 thinner (0.5 cm instead of 0.9), longer (45-55 cm), and it lodges, bending at 15-25 cm from the base and putting the flower head on the substrate.",
+        "onsetDays": "Visible within 24-48 hours; complete within 3-5 days.",
+        "reversible": "The acceleration stops if it is cooled, but nothing recolours \u2014 bleached tepals and browned corona rim are permanent for that flower. No harm at all to the bulb, provided the foliage is then treated correctly. Purely a cosmetic/duration penalty, which makes it a good low-stakes teaching failure early in the game."
+      },
+      {
+        "cause": "Insufficient light during growth and recharge",
+        "appearance": "Etiolation and lodging. Leaves overshoot in length (45-60 cm vs 35-45) while losing width and thickness, so the width-to-length ratio visibly changes; they go from glaucous blue-green to a soft, pale yellow-green, and \u2014 key shader detail \u2014 they LOSE THE WAX BLOOM, becoming slightly glossier and more saturated rather than matte and dusty. They cannot support themselves: the fan bends near the BASE (within the lower third) and splays flat, radiating over the rim in a floppy star, with the leaf blades twisting so alternate faces show. Scape likewise elongates, thins, and leans hard toward the light source, with the flower head pulled off-axis. Delayed component: the bulb undercharges, so the next cycle brings fewer, narrower leaves and a blind or undersized flower.",
+        "onsetDays": "Etiolation visible over 7-14 days of low light. Lodging by 14-21 days. Next-cycle blindness one game year later.",
+        "reversible": "Already-etiolated leaves never shorten, re-thicken, or regain the wax bloom \u2014 they stay floppy and pale for the rest of the season, so the pot carries the record. Moving it to good light immediately halts further elongation and the new growth is normal. Bulb recovers over 1-2 cycles."
+      },
+      {
+        "cause": "Watering through summer dormancy (the classic 'I should keep looking after it' mistake)",
+        "appearance": "Absolutely nothing visible above ground, because there is nothing above ground \u2014 the pot is bare soil. The bulb below softens, the tunic stains dark and goes slimy rather than papery, and secondary rot organisms move in. The failure renders as a total no-show at the next emergence: the pot simply stays empty while every other plant in the collection comes up. If the player digs, the bulb is a brown, soft, hollow shell that collapses under thumb pressure.",
+        "onsetDays": "3-6 weeks of a consistently damp dormant pot at summer temperatures. No symptom until the following emergence window \u2014 4-6 months.",
+        "reversible": "Irreversible once the bulb has softened. Fully avoidable and fully recoverable up to the point of softening: a dormant bulb that has been damp but is still firm is fine if it is dried out. Give the player a way to check (lifting the bulb should be a legal action, with a firm/soft readout)."
+      },
+      {
+        "cause": "Bud blast from root loss or too-rapid warming after chill (bulb moved from 5 C straight to 22 C, or roots broken during repotting)",
+        "appearance": "The scape emerges and elongates to 60-75% of normal height, then stalls. The papery tan spathe swells and splits normally, exposing a bud that is the right shape but undersized and pale green-yellow rather than deepening to yellow. Over 3-5 days the bud stops enlarging, its tip yellows then browns, it loses turgor and creases longitudinally, and it dries into a stiff, papery, tan-brown husk still half-sheathed by the spathe \u2014 the two dry structures, spathe and dead bud, become nearly the same colour and read as a single brown claw at the stem tip. The leaves around it stay entirely healthy and green, which is what makes it look so wrong.",
+        "onsetDays": "3-7 days after the bud becomes visible; the causal insult was 2-6 weeks earlier.",
+        "reversible": "Irreversible for that flower. The bulb is unharmed \u2014 it will flower next cycle if the foliage is now allowed to run its course. Prevention is the mechanic: warm bulbs up in stages (a week at 10-13 C between the fridge and the windowsill), and do not disturb a rooted bulb."
+      },
+      {
+        "cause": "Overcrowding \u2014 a clump left undivided for 5+ cycles",
+        "appearance": "A slow, multi-cycle drift that should be almost imperceptible per cycle. Leaf count per pot goes UP while flower count goes DOWN: cycle 3 might show 3 fans and 3 flowers, cycle 6 shows 9 fans and 1 flower, cycle 8 shows 12 crowded fans and none. Individual leaves get progressively narrower (1.8 cm to 0.8 cm) and the fans emerge at visibly different angles and heights because the offset bulbs sit at different depths and tilts. The clump reads as a dense, congested tuft of grass. Surface soil heaves and cracks as the bulb mass expands, and small noses may push partly out of the medium, showing pale bulb shoulders above the soil line.",
+        "onsetDays": "Detectable from cycle 4-5; unmistakable by cycle 7-8. This is the game's longest-horizon failure.",
+        "reversible": "Fully reversible and satisfying to fix. Lift after the foliage dies back, separate the offsets by hand (they snap apart cleanly at the basal plate), replant the largest at correct depth and spacing. Full-size flowers return in 1 cycle from large offsets, 2-3 cycles from small ones. No permanent damage."
+      },
+      {
+        "cause": "Narcissus bulb fly (Merodon equestris) \u2014 a single larva hollowing the bulb during dormancy",
+        "appearance": "Nothing during the dormant period except, if inspected, a small dark hole at the edge of the basal plate packed with brown frass. Next emergence produces the classic 'grassiness': instead of 4-6 broad straps, the bulb pushes up 10-20 very narrow leaves, 0.2-0.5 cm wide and only 10-20 cm long, in a limp, spreading tuft \u2014 a distorted mass of weak growth arising because the destroyed central bud has released a swarm of tiny lateral buds. Never any flower. Leaves are paler than normal and often twisted. Squeezing the bulb yields to thumb pressure and the neck is soft while the outer tunic still looks intact.",
+        "onsetDays": "Egg laid in early summer; larva feeds through the dormant period. Symptoms appear at the next emergence, 6-9 months later.",
+        "reversible": "Irreversible \u2014 the growing point is gone. Discard the bulb (and kill the larva). Preventable: firm the soil around the neck as the foliage dies back so the female cannot reach the bulb neck to lay."
+      },
+      {
+        "cause": "Hard freeze on an open flower or an advanced bud (below about -4 C)",
+        "appearance": "Foliage is far tougher than players expect and should mostly shrug it off \u2014 expect only the distal 1-3 cm of leaf tips to go water-soaked and glassy dark green, then bleach to a pale grey-white and shrivel into a thin twisted thread, leaving a permanent white-tipped leaf. The flower is the casualty: tepals go translucent and glassy while frozen, then on thawing collapse into limp, water-soaked, slightly grey-brown tissue that dries to a thin brown film within 24-48 hours, still hanging from the stem. The corona browns and folds. A scape caught mid-elongation kinks at a single point and stays permanently bent even after recovery.",
+        "onsetDays": "Damage during the freeze; full visual expression 12-48 hours after thaw.",
+        "reversible": "Flower is lost permanently. Bleached leaf tips and the kinked scape are permanent for the season but purely cosmetic. The bulb is untouched \u2014 daffodils are ground-hardy to about -25 C \u2014 so this is a display loss, not a life-threatening one. Buds still low in the fan are protected and may open later."
+      }
+    ],
+    "key": "daffodil",
+    "lifecycle": {
+      "stages": [
+        "1. SUMMER DORMANCY / FLORAL INITIATION (real: 8-12 weeks, Jul-Sep). No above-ground parts; the pot is bare. Bulb firm, tunic dry and papery mid-brown, roots dead and shrivelled. Invisibly, at 17-20 C, the flower for the cycle AFTER NEXT is being differentiated inside the bulb. State that changes: preformed_bud initialised (or destroyed by ethylene/heat).",
+        "2. ROOT EMERGENCE (real: 4-6 weeks, Oct-Nov, triggered by substrate falling below ~15 C). Still nothing above ground. White, unbranched, fleshy roots 1-2 mm thick push from the basal plate and reach 10-25 cm. This happens ONCE and is not repeated \u2014 broken roots are not replaced. State: root_mass 0 -> 1.",
+        "3. COLD REQUIREMENT / VERNALIZATION (real: 12-16 weeks at 2-9 C, Nov-Feb). Above ground, at most a 1-3 cm blunt pale-green nose breaking the surface late in the period. This is a pure accumulator with no visual output \u2014 the hardest stage to make legible and the most important to the design. State: chill_units accumulate; scape_potential is set by the total.",
+        "4. EMERGENCE (real: 10-18 days). A single tight spear of rolled leaves plus the enclosed scape pushes up inside a membranous cataphyll, blunt-tipped, pale whitish-green at first and darkening to blue-green as it clears the soil. 0 -> 10 cm.",
+        "5. LEAF EXPANSION (real: 14-21 days). Leaves separate and unroll, extend to 30-45 cm, develop the shallow V-keel and the glaucous wax bloom, and arch outward 15-40 degrees from vertical. The lowest 3-6 cm stays pale whitish-green where it was sheathed.",
+        "6. SCAPE ELONGATION AND BUD RISE (real: 10-14 days, overlapping stage 5). The two-edged hollow scape overtakes the leaves. The bud rides upright at the tip inside a green-then-tan spathe, then \u2014 the moment that reads most distinctively as 'daffodil' \u2014 the neck at the inferior ovary swings the bud over from vertical to 60-90 degrees while the spathe splits down one side and dries to papery tan.",
+        "7. ANTHESIS (real: 24-48 hours to open, flower holds 7-21 days). Tepals peel back from the corona and flatten into a 6-pointed star; the corona extends and the rim flares and frills. Colour saturates to full yellow. Anthers dehisce over the first 2-3 days.",
+        "8. FLORAL SENESCENCE (real: 5-10 days). Tepals fade from saturated yellow to cream, thin and go slightly translucent; the corona rim browns and crisps inward 1-3 mm at a time; tepals shrivel, curl, and hang as a limp brown skirt. The inferior ovary either swells into a green 3-chambered capsule (if pollinated and not deadheaded) or shrivels.",
+        "9. FOLIAGE RECHARGE (real: 6-8 weeks, and non-negotiable). Leaves stay green, upright-to-arching, at full size. Nothing visibly changes for six weeks \u2014 the bulb roughly doubles in mass below ground and next-next cycle's reserves are laid down. The stage where the game's whole risk lives and nothing happens on screen.",
+        "10. NATURAL DIE-BACK (real: 4-6 weeks). Yellowing begins at the leaf tips and along the margins and moves inward and basipetally with a ragged, irregular boundary; a warm buttery gold, then tan, then buff. Leaves simultaneously lose thickness, so they flatten, twist along their length, and sag progressively lower until they lie on the substrate. Finally they dry to straw and separate cleanly from the bulb neck with a light tug. Then back to stage 1."
+      ],
+      "weekMapping": "RECOMMENDED MAPPING: one game YEAR = four seasons = 28 real days, and this species uses all four. It is the wrong plant to squeeze into a single week, and squeezing it destroys the exact mechanic it exists to teach.\n\nAUTUMN WEEK (days 1-7) \u2014 rooting. Bare pot the whole week. Player actions that matter: planting depth, one thorough watering, then restraint. Real 4-6 weeks compressed 5x.\nWINTER WEEK (days 8-14) \u2014 the cold requirement. Bare pot, or a 1-3 cm nose by day 13. chill_units accumulate at roughly 1 real day = 2 real weeks of chilling, so the full 12-16 week requirement is met by about day 6 of 7 at 4-7 C. The player must simply LET THE WEEK ELAPSE at the right temperature. Nothing to do, nothing to see, and everything is decided.\nSPRING WEEK (days 15-21) \u2014 the payoff. Day 15-16 emergence, 16-18 leaf expansion and scape rise, day 18 the gooseneck and spathe split, day 19 anthesis, days 19-21 the flower holds. Real 8-10 weeks compressed ~9x.\nSUMMER WEEK (days 22-28) \u2014 the trap. Days 22-25 are the recharge: full green leaves, zero visible change, and the player must water, light, and NOT tidy. Days 25-27 die-back, tip-down yellowing. Day 28 dormancy begins and the pot goes bare again.\n\nWHAT THE COMPRESSION HONESTLY DISTORTS, and what to do about each:\n\n1. THE DORMANT:VISIBLE RATIO. In reality this plant is invisible or static for about 34 of 52 weeks. A linear 28-day compression still leaves roughly 14 of 28 days with an empty or unchanging pot. Do not fix this by shortening dormancy \u2014 the emptiness IS the species. Fix it by making dormancy an inspectable state (lift the bulb, feel firmness, see the tunic) so there is something to do that is not growth.\n\n2. VERNALIZATION IS NOT A GROWTH STAGE. It is a counter, and it has no visual output at any speed. You can accelerate the RATE (2 real weeks of chill per real day) but you must not let the player skip the elapsed time, or the delayed consequence evaporates and the plant becomes an ordinary watering puzzle. Keep it a genuine accumulator with partial credit \u2014 partial chill gives a short scape, not a coin flip \u2014 because a graded outcome is the only way the player can reverse-engineer the rule.\n\n3. THE SIX-WEEK RECHARGE COLLAPSES TO ~4 DAYS. This is the most damaging distortion, because six weeks of visible boredom is precisely what teaches a real gardener patience, and four days does not feel like a sacrifice. Compensate by making the recharge window the ONLY period when the pot demands frequent action (water, light position, deadheading) \u2014 substitute engagement for duration rather than shortening the penalty.\n\n4. SENESCENCE COLLAPSES FROM 4-6 WEEKS TO ~2 DAYS. At that speed a naive implementation renders it as a global colour lerp, which reads as a health bar rather than a plant. Stage it explicitly even in 48 hours: tips and margins first with a ragged boundary, then blade-flattening and twisting, then sag, then straw and clean detachment. Four discrete visual events beat one smooth ramp.\n\n5. FLOWER LONGEVITY IS NON-LINEAR IN TEMPERATURE. 14-21 days at 10 C but 3-5 days above 21 C \u2014 a factor of four, not a linear penalty. Under compression a per-day linear decrement will badly under-punish a warm room. Use a Q10-style rate multiplier on the senescence clock (roughly 2-2.5x per 10 C) rather than a flat modifier.\n\n6. THE PREFORMED BUD BREAKS THE ONE-YEAR FRAME ENTIRELY. Floral initiation in summer sets the flower for the spring AFTER next, so the true consequence horizon is 18 months, or about 42 real days \u2014 one and a half game years. Do not compress this away. Carry two persistent state variables on the bulb across the whole save \u2014 preformed_bud (exists / aborted) and bulb_reserve (0-1) \u2014 and never reset either at a season boundary. That is the entire reason this species is in the roster.\n\n7. IF YOU ARE FORCED INTO A SINGLE 7-DAY SEASON: compress to day 1 planting/rooting, days 2-3 chill (accumulator visible as frost on the pot rim), day 4 emergence, day 5 flowering, days 6-7 recharge and die-back. It works, but you lose the felt duration of both risky windows, and you must then double the mechanical severity of early foliage removal to compensate for the lost boredom. Say so in the design doc rather than pretending the plant is intact."
+    },
+    "modelling": {
+      "parameters": [
+        {
+          "drives": "Master size gate. Below ~10 cm circumference no flower forms at all (leaves only); 12-14 gives one flower; 16+ gives 2-3 noses and 2-3 flowers. Should be a persistent float that accumulates from photosynthesis and is spent on flowering, NOT a per-cycle constant.",
+          "name": "bulb_circumference_cm",
+          "range": "8.0 - 20.0 (grower grades: 10/12, 12/14, 14/16, 16/+)"
+        },
+        {
+          "drives": "Number of independent leaf fans and scapes, each with its own origin point, tilt (up to 20 degrees off vertical) and depth offset. Increments roughly every 2-3 cycles as offsets mature, and is the driver of the overcrowding decline mode. Never let fans share an origin or an up-vector.",
+          "name": "nose_count",
+          "range": "1 - 12 (integer; 1-3 for a young bulb, 8+ for a congested clump)"
+        },
+        {
+          "drives": "Density of the fan. Falls to 2-3 on a depleted bulb, spikes to 10-20 very narrow blades under bulb-fly damage ('grassiness').",
+          "name": "leaves_per_nose",
+          "range": "2 - 6 (integer; 4-5 typical on a flowering-size nose)"
+        },
+        {
+          "drives": "Overall silhouette height. Outer leaves longest, inner shortest \u2014 apply a per-leaf multiplier of 0.7-1.0 by rank. Overshoots to 60 cm under etiolation, collapses to 15-25 cm on a depleted bulb.",
+          "name": "leaf_length_cm",
+          "range": "12.0 - 60.0 (35-45 healthy cultivar; 12-35 wild N. pseudonarcissus)"
+        },
+        {
+          "drives": "Strap vs grass read. The width-to-length ratio is the single clearest visual proxy for bulb health \u2014 narrow long leaves say 'depleted' or 'etiolated' before any colour changes.",
+          "name": "leaf_width_cm",
+          "range": "0.2 - 2.2 (1.2-2.0 healthy)"
+        },
+        {
+          "drives": "Cross-section. The blade is not flat: it is a shallow V/keel, deepest near the base, flattening toward the blunt tip. Turgor loss collapses the keel toward 0 \u2014 model the flattening BEFORE the bend, because that is the real early-wilt cue.",
+          "name": "leaf_keel_depth_ratio",
+          "range": "0.0 - 0.35 (as a fraction of blade width; ~0.2 turgid)"
+        },
+        {
+          "drives": "The whole bend behaviour, and the most important shader-independent health signal. At 1.0 the leaf is a smooth cantilever curve, tip 15-40 degrees off vertical, keel intact. As it falls, the keel flattens, then below ~0.6 the leaf develops a DISCRETE crease at a point (drought, tip-down) or pivots as a rigid unit at soil level (rot, base-out). Never render wilt as a uniform bend along the whole length \u2014 that is the classic wrong look.",
+          "name": "turgor",
+          "range": "0.0 - 1.0"
+        },
+        {
+          "drives": "Natural asymmetry. Real daffodil leaves twist slowly along their length; without this the fan reads as extruded plastic. Increases during senescence as the blade thins.",
+          "name": "leaf_twist_deg_per_10cm",
+          "range": "0 - 25"
+        },
+        {
+          "drives": "Shader only, but critical. Controls a thin view-dependent waxy scattering layer that reads pale blue-grey at grazing angles and kills specular. At 0 the leaf is a plain saturated green and instantly reads as a generic game plant. Drops with etiolation and with handling \u2014 smeared streaks where a hand or a rain-splash removed the bloom is a detail that sells realism cheaply.",
+          "name": "glaucous_bloom",
+          "range": "0.0 - 1.0"
+        },
+        {
+          "drives": "Everything about the flower's presentation, and the primary readout of chill deficit. Below ~20 cm the flower opens down inside the leaf fan and is partly occluded \u2014 model that occlusion honestly, including creased tepals pressed against leaves.",
+          "name": "scape_height_cm",
+          "range": "0.0 - 55.0 (35-45 healthy; 8-20 = partial chill; 0 = blind)"
+        },
+        {
+          "drives": "The scape is NOT round. It is compressed with two distinct longitudinal edges/ridges, hollow, and ~0.9 cm across the wide axis at the base tapering to ~0.5 cm. The flattening also sets the preferred bending plane \u2014 it lodges across the narrow axis.",
+          "name": "scape_flatten_ratio",
+          "range": "1.3 - 2.2 (major:minor axis)"
+        },
+        {
+          "drives": "The signature pose. After the spathe splits, the axis rotates from vertical to near-horizontal at a SHARP node located at the inferior ovary \u2014 not as a smooth arc distributed along the stem. Increases past 100 degrees under drought so the flower hangs face-down. Getting this wrong is the number-one tell of a model built from a photograph of the flower alone.",
+          "name": "gooseneck_angle_deg",
+          "range": "0 - 110 (60-90 at full anthesis)"
+        },
+        {
+          "drives": "Division-1 trumpet identity: the corona must be AT LEAST as long as the tepals. Model it as a tube whose radius profile flares in the last 20% of its length, with the rim then everted. Ratio to tepal_length must stay >= 1.0 for a trumpet daffodil; drop it to 0.3-0.6 and you have accidentally modelled a different daffodil division.",
+          "name": "corona_length_cm",
+          "range": "1.5 - 5.5 (3.5-5.0 for a large trumpet)"
+        },
+        {
+          "drives": "The frilled, crenate rim. Six shallow lobes with a superimposed higher-frequency ripple; amplitude 0-4 mm. Amplitude should INCREASE slightly over the first 3 days of anthesis as the rim everts, then collapse inward as the flower fades. This is the single hardest part of the flower to get right.",
+          "name": "corona_rim_flare + rim_frill_amplitude",
+          "range": "flare 1.0 - 1.9 (rim radius / tube radius); frill 0.0 - 0.4 cm"
+        },
+        {
+          "drives": "Perianth presentation. At full anthesis the six tepals sit roughly perpendicular to the corona axis and OVERLAP by 20-40% at their bases, forming a continuous star, each with a small sharp apiculate point at the tip. Reflex increases with age and with heat; a fully aged flower has tepals swept back 30-45 degrees and no longer overlapping, showing gaps.",
+          "name": "tepal_reflex_deg + tepal_overlap",
+          "range": "reflex -10 to 50; overlap 0.0 - 0.45"
+        },
+        {
+          "drives": "Bud -> open animation, driven over 24-48 real hours (much faster when hot). Sequences: spathe splits -> tepal tips separate -> gooseneck rotates -> tepals peel back and flatten -> corona extends and rim everts -> anthers dehisce. These must be staged, not simultaneous.",
+          "name": "anthesis_t",
+          "range": "0.0 - 1.0"
+        },
+        {
+          "drives": "Chill accumulator. Maps to scape_height_cm via a sigmoid with a floor around 400 units (below which scape = 0) and saturation around 1400. The whole species mechanic lives in this one number and it must be visible to the player only indirectly.",
+          "name": "chill_units (hours below 9 C, above 0 C)",
+          "range": "0 - 2000"
+        },
+        {
+          "drives": "Persistent cross-cycle reserve. Integrates green-leaf-area x light x water over the recharge window; is spent on next cycle's leaf count, leaf width, scape height and flower size. This is the state variable that makes the plant a delayed-consequence plant. Do not reset it between seasons.",
+          "name": "bulb_reserve",
+          "range": "0.0 - 1.0"
+        },
+        {
+          "drives": "Two separate scalars: front_position is where the yellow boundary currently is (tip-to-base for natural senescence and drought; base-to-tip for rot), and roughness is how irregular that boundary is. Roughness must be high (0.4+) with margin-first bias \u2014 a clean horizontal colour ramp reads as a UI health bar, not a plant.",
+          "name": "senescence_front_position + boundary_roughness",
+          "range": "0.0 - 1.0 each"
+        },
+        {
+          "drives": "The dry papery bract behind the flower. Cheap to model, universally forgotten, and its presence is one of the fastest ways to make the model read as a real daffodil. Goes from green and closed, to split down one side, to translucent tan-buff and clinging behind the ovary.",
+          "name": "spathe_split_t + spathe_dryness",
+          "range": "0.0 - 1.0 each"
+        },
+        {
+          "drives": "Below-ground view. Roots are white, fleshy, ~1.5 mm, and \u2014 this is the constraint \u2014 UNBRANCHED. They grow once in autumn and never regenerate. Any branching root system or mid-season regrowth is botanically wrong for this genus.",
+          "name": "root_count + root_length_cm",
+          "range": "count 20 - 70; length 5 - 25 cm"
+        }
+      ],
+      "hardParts": "1. THE CORONA. It is not a cone and not a lofted cylinder. It is a tube arising from the fused base of the tepals \u2014 not from a separate receptacle disc \u2014 that flares only in its final fifth, then everts into a rim that is crenate with about six shallow lobes carrying a finer irregular ripple on top. The material read you are chasing is crepe paper, not moulded plastic: subtle longitudinal ribbing on the outside, visible venation, and a thin enough wall to translucate at the rim when backlit. Build the rim as a swept profile with two superimposed sine bands (6-lobe low frequency plus a 20-30 cycle high-frequency ripple at 10-20% amplitude) rather than a displacement texture, or it will read as noise.\n\n2. THE ATTACHMENT TOPOLOGY. In Narcissus the six tepals fuse basally into a floral tube, and the corona arises FROM that tube. So the order along the axis is: hollow scape -> sharp bend -> green inferior ovary (1-1.5 cm, ovoid, three faint ridges) -> slender floral tube (1.5-2.5 cm, green grading to yellow) -> the point where six tepals radiate outward AND the corona projects forward, from the same ring. Naive builds put the corona on a flat receptacle with the tepals on a separate ring behind it; it looks subtly and unfixably wrong.\n\n3. THE GOOSENECK. The flower hangs outward and slightly downward at 60-90 degrees, and the bend is a short sharp node at the ovary, not a smooth curve in the stem. Almost every reference photograph is taken face-on, which hides this completely, so models built from photographs come out facing straight up like a tulip. Get this one thing right and the silhouette is unmistakable from 30 metres.\n\n4. WILT KINEMATICS. A turgid daffodil leaf is a keeled cantilever: the V-section provides the second moment of area, so it curves smoothly and holds its arc. Losing turgor destroys the keel first, and only then does the flattened section buckle at a single discrete point and hang as two near-straight segments. So the correct simulation order is keel_depth -> crease_point -> hang, and the crease must migrate basipetally over subsequent days. A uniform bend-along-the-whole-length interpolation \u2014 the default in almost every engine \u2014 is the most common single error in plant simulation and it will be the first thing a gardener notices.\n\n5. DIRECTIONALITY OF YELLOWING. Drought and natural senescence run TIP-DOWN and margin-inward. Basal rot runs BASE-UP. If both use the same colour ramp with a flipped sign you have lost the single most useful diagnostic signal in the game. And true senescence is not a hue lerp: chlorophyll degrades and unmasks carotenoids that were already present, so the path goes green -> yellow-green -> warm buttery gold -> tan -> buff, passing through a saturated gold, whereas drought-kill goes green -> greyish straw -> buff without the gold. Two different gradients, and the leaf also thins and flattens and twists as it goes, so the geometry must animate alongside the colour.\n\n6. THE GLAUCOUS SURFACE. The leaf is not a green diffuse surface. It carries an epicuticular wax that scatters short wavelengths, so it reads matte, dusty, and distinctly blue-grey at grazing incidence with almost no specular highlight. A standard green PBR leaf material makes it look like a generic houseplant. Model it as a thin scattering layer over the green base with view-dependent strength, make it fade with etiolation, and \u2014 for a detail almost nobody implements \u2014 let it rub off where the plant is handled, leaving darker green streaks that persist.\n\n7. THE BOTTOM 5 CM. The base of each leaf, where it was sheathed inside the cataphyll, is pale whitish-green shading up to full blue-green over about 3-6 cm. It is a small thing that instantly makes the fan look like it grew out of a bulb rather than being planted into the ground as a mesh.\n\n8. THE CLUMP. Offsets sit at different depths, different tilts, and different phases. Randomise per-fan origin (within a 3-5 cm radius), up-vector (up to 20 degrees), emergence timing (up to 5 days), and scale (0.6-1.0). A clump of identical fans from one point is the giveaway of a procedural system.\n\n9. THE INTERIOR. The corona is open and the player will look into it. It needs: six stamens inserted in the tube AT TWO DIFFERENT HEIGHTS (three lower, three upper \u2014 this is diagnostic for the genus, not decorative), linear yellow-orange anthers ~1 cm, and a filiform style with a small trifid stigma reaching roughly to the corona mouth. An empty trumpet is very obviously empty.\n\n10. MAKING AN INVISIBLE MECHANIC LEGIBLE. The genuinely hard design problem, not a modelling one: this species' two defining requirements \u2014 accumulated chill, and six weeks of pointless-looking green leaves \u2014 produce no visual signal at the time they matter, and their failure appears three to nine months later. Consider a soil cutaway view, a bulb-weight readout on lifting, and a chill accumulator surfaced as frost on the pot rim. Otherwise the player learns nothing from failing and just feels cheated."
+    },
+    "morphology": {
+      "habit": "Acaulescent bulbous geophyte (Amaryllidaceae). There is no true stem above ground and no branching: everything emerges directly from the neck of an underground tunicate bulb. Each mature 'nose' (growth point) produces one basal fan of 4-6 linear leaves plus, if the bulb is large enough and has been sufficiently chilled, one leafless flowering scape. The fan is distichous at its base \u2014 the leaves emerge in two ranks and then splay radially \u2014 so a single nose reads as a flattened, slightly twisted fan rather than a rosette. Leaves emerge erect and progressively arch outward 15-40 degrees from vertical as they extend. The scape overtops the foliage by 5-15 cm in a healthy plant. Over successive years the bulb splits into offsets at the axils of the fleshy scales, producing a congested multi-nosed clump; each offset has its own fan, its own tilt (up to about 20 degrees off vertical) and its own depth, so a mature clump is emphatically NOT a radially symmetric arrangement about one point. Below ground: an ovoid to pyriform tunicate bulb with a papery mid-brown outer tunic, a flat basal plate at the bottom bearing white unbranched fleshy roots, and concentric fleshy scales enclosing the preformed shoot. Model as N. pseudonarcissus and its large trumpet cultivars (RHS Division 1, colour code 2Y-Y \u2014 self-yellow perianth and corona), e.g. 'Dutch Master' or 'King Alfred'; wild N. pseudonarcissus is roughly 60% of these dimensions.",
+      "leaf": "Linear to narrowly strap-shaped (loraceous), basal, sessile \u2014 no petiole. Emerges from the bulb neck sheathed in a membranous cataphyll, so the lowest 3-6 cm is pale whitish-green grading upward into full colour. Apex BLUNT/rounded (obtuse), never pointed \u2014 a tapered tip is the wrong genus. Margins entire and smooth. Venation parallel, many fine unbranched veins with no midrib prominence, faintly visible as longitudinal striations and much more visible when backlit. Cross-section is a shallow V or keel, deepest near the base (keel depth about 20% of blade width) and flattening toward the tip; blade thickness 0.5-1.0 mm. The blade twists slowly along its length, roughly 10-25 degrees per 10 cm, with the direction varying leaf to leaf. Colour glaucous blue-green \u2014 a dusty, matte, slightly grey-blue green (roughly RGB 122,150,120 base with a pale blue-grey wax layer over it, reading near 150,170,155 at grazing angles); noticeably bluer than most garden foliage. The surface carries a thick epicuticular wax bloom that kills specular reflection and rubs off where handled, leaving darker, glossier green streaks. Water beads and rolls off. Outer leaves are the longest and arch the most; inner leaves are shorter, narrower and more erect.",
+      "flower": "Solitary per scape (Division 1, trumpet). Held at 60-90 degrees from the vertical \u2014 facing outward and slightly downward, NOT upward \u2014 with the bend occurring as a sharp node at the inferior ovary rather than as a curve in the stem. Structure from the stem outward: (1) a papery, membranous, tan-buff SPATHE, a single dry bract 3-5 cm long that sheathed the bud and splits down one side, persisting as a translucent hood behind the flower; (2) the green INFERIOR OVARY, ovoid, 1.0-1.5 cm, faintly three-ridged; (3) a slender FLORAL TUBE 1.5-2.5 cm, green at the base grading to yellow; (4) six PERIANTH SEGMENTS (3 outer sepals and 3 inner petals, near-identical, so read as 6 tepals) \u2014 ovate to broadly lanceolate, 3.0-4.5 cm long by 1.5-2.5 cm wide, each with a small sharp apiculate point at the tip, overlapping 20-40% at their bases to form a continuous six-pointed star roughly perpendicular to the flower axis, giving a face diameter of 7-10 cm; (5) the CORONA or trumpet, a fused tube arising from the fused base of the tepals (not from a separate receptacle), 3.5-5.0 cm long \u2014 as long as or longer than the tepals, which is the defining character of the division \u2014 with a mouth 2.5-4.0 cm across, expanded and everted at the rim into a frilled, crenate margin of about six shallow lobes carrying a finer irregular ripple, and faint longitudinal ribbing on the outer wall. Inside the corona: six STAMENS inserted in the tube at TWO DISTINCT HEIGHTS (three lower, three upper \u2014 diagnostic for the genus), with linear yellow-orange basifixed anthers about 1.0 cm; and a filiform style with a small trifid stigma reaching roughly to the corona mouth. Colour uniform yellow: tepals about RHS Yellow Group 9A-12A (roughly RGB 252,205,42), corona a half-step deeper and warmer (roughly RGB 252,183,20), often with a faintly deeper orange-yellow flush on the everted rim. Scent sweet, light, strongest at midday. If pollinated and not deadheaded the ovary swells into a green then tan three-chambered loculicidal capsule about 2 cm, splitting to shed angular black seeds.",
+      "measurements": [
+        {
+          "cm": "4.0-6.5 diameter, 5.0-8.0 tall including the tapered neck (commercial grades quoted as circumference: 12/14, 14/16, 16/+ cm; 16 cm circumference \u2248 5.1 cm diameter)",
+          "part": "Bulb (flowering size, trumpet cultivar)"
+        },
+        {
+          "cm": "2.5-4.0 diameter, 0.3-0.5 thick",
+          "part": "Basal plate"
+        },
+        {
+          "cm": "10-25 long, 0.10-0.20 thick, unbranched, 20-70 per bulb",
+          "part": "Root"
+        },
+        {
+          "cm": "0.02-0.05 thick, covering the whole bulb",
+          "part": "Tunic (papery outer scale)"
+        },
+        {
+          "cm": "35-45 long (cultivar), 12-35 long (wild species); 1.2-2.0 wide; 0.05-0.10 thick",
+          "part": "Leaf, outer"
+        },
+        {
+          "cm": "20-30 long, 0.8-1.4 wide",
+          "part": "Leaf, inner"
+        },
+        {
+          "cm": "3-6 (pale whitish-green sheathed zone at the base)",
+          "part": "Leaf base colour transition"
+        },
+        {
+          "cm": "35-45 tall (healthy); 0.7-0.9 x 0.4-0.6 in cross-section at the base, tapering to 0.5 x 0.3",
+          "part": "Scape (flowering stem)"
+        },
+        {
+          "cm": "3.0-5.0 long, 1.5-2.5 wide when flat",
+          "part": "Spathe"
+        },
+        {
+          "cm": "1.0-1.5 long, 0.6-0.9 wide",
+          "part": "Ovary (inferior)"
+        },
+        {
+          "cm": "1.5-2.5 long, 0.3-0.5 wide",
+          "part": "Floral tube"
+        },
+        {
+          "cm": "3.0-4.5 long, 1.5-2.5 wide",
+          "part": "Tepal"
+        },
+        {
+          "cm": "7.0-10.0",
+          "part": "Perianth face diameter"
+        },
+        {
+          "cm": "3.5-5.0 long; mouth 2.5-4.0 across; tube 1.6-2.2 across",
+          "part": "Corona (trumpet)"
+        },
+        {
+          "cm": "0.8-1.2 long, 0.15-0.25 wide",
+          "part": "Anther"
+        },
+        {
+          "cm": "3.0-4.5 long; stigma lobes 0.15-0.25",
+          "part": "Style"
+        },
+        {
+          "cm": "10-18 of medium above the nose (2-3x bulb height); container 25+ deep",
+          "part": "Planting depth"
+        },
+        {
+          "cm": "12-15 between bulbs",
+          "part": "Spacing in a clump"
+        },
+        {
+          "cm": "45-55 tall overall, 30-40 wide",
+          "part": "Whole plant in flower (cultivar)"
+        }
+      ]
+    }
+  }
+]

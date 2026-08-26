@@ -11,6 +11,8 @@ site yet.
 ## What is here
 
     violet.py    a parametric African Violet, built and rendered headless
+    species/     what each plant IS, how it declines, and the shared
+                 state model all three are simulated by
     v-h.png      it, healthy
     w-bad.png    it, neglected — see "what is broken"
 
@@ -49,11 +51,26 @@ shows through the gaps. Two attempts at it:
 2. Rotating less, and curving the blade down along its length, and moving the
    attachment point out to the rim — better, still a dome.
 
-The likely fix is that a leaf should bend along a **bone chain** rather than
-being rotated as a rigid body: three segments, each rotating a little more than
-the last, so the blade curves instead of tilting. The armature code to do that
-is already proven (see the rig test in the session history) — it just is not
-wired into `violet.py` yet.
+`species/african-violet.md` explains why, and it is not the reason either
+attempt assumed. A wilting violet does not droop uniformly:
+
+> The OLDEST outer tier goes first ... the blade tips drop 3-6 cm and drape over
+> the pot rim ... **The crown and the inner tier stay upright and level — this
+> outside-in gradient is the diagnostic silhouette.**
+
+`violet.py` droops every leaf by the same amount, so eleven blades rotate
+together and close over the pot like a fist. There is no gradient, so there is
+no silhouette to read. The fix is two things, not one:
+
+1. **Droop by tier.** Leaf age is already implicit in the rosette index — the
+   outer tier should take nearly all of the droop and the crown almost none.
+2. **Bend, don't rotate.** A blade should curve along a three-segment bone
+   chain, each segment rotating a little more than the last, so the leaf goes
+   limp instead of tilting rigidly. The armature code for this is proven and
+   just is not wired in yet.
+
+Which is the argument for writing the specification before the model, rather
+than after.
 
 **It is not photorealistic**, and the gap is textures. Photoreal foliage is
 largely scanned albedo, normal and translucency maps. The geometry here is
