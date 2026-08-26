@@ -152,8 +152,14 @@ pb.inputs['Metallic'].default_value = 0.0
 # `material.sheen = 1` whenever the extension is present — the weight has to
 # live in the colour instead. The viewer sets the final values; these are only
 # what Blender previews with.
-for k, v in (('Sheen Weight', 0.30), ('Sheen Roughness', 0.32),
-             ('Specular IOR Level', 0.13)):
+# What the exporter writes is Sheen *Tint*, as `sheenColorFactor` — the weight
+# is dropped on the floor. Left at Blender's default white it exports as
+# [1,1,1], which is a full-strength white gloss over the whole petal: the
+# glare. A dark violet tint means the file itself is sane even before the
+# viewer clamps the strength.
+for k, v in (('Sheen Weight', 0.30), ('Sheen Roughness', 0.42),
+             ('Sheen Tint', (0.22, 0.16, 0.34, 1.0)),
+             ('Specular IOR Level', 0.05)):
     if k in pb.inputs:
         pb.inputs[k].default_value = v
 
@@ -239,8 +245,13 @@ _fa.location = (-500, 0)
 _ft.links.new(_fa.outputs['Alpha'], _fb.inputs['Alpha'])
 # Hairs are near-colourless and translucent — they read as a pale rim where the
 # light comes through them, which is most of what velvet looks like up close.
-_fb.inputs['Base Color'].default_value = (0.42, 0.47, 0.34, 1.0)
-_fb.inputs['Roughness'].default_value = 0.62
+# and closer to the blade underneath, so the shell reads as a pale rim at
+# the silhouette rather than as confetti scattered over the whole leaf
+_fb.inputs['Base Color'].default_value = (0.30, 0.34, 0.24, 1.0)
+# Hairs are not glossy. At 0.62, ten thousand little quads under a bright
+# sky each returned a specular pinpoint, and the leaf margins came out
+# crawling with white speckle rather than looking like velvet.
+_fb.inputs['Roughness'].default_value = 0.95
 _fb.inputs['Metallic'].default_value = 0.0
 # What we want is glTF alphaMode MASK — an alpha-blended shell of ten thousand
 # little quads is ten thousand sorting decisions a depth buffer cannot make,

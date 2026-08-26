@@ -1161,6 +1161,9 @@ loader.load('./violet.glb', gltf => {
           m.transparent = false;
           m.alphaTest = 0.35;
           m.depthWrite = true;
+          // barely any environment: a hair catching a sky reflection is a
+          // white dot, and there are ten thousand of them
+          m.envMapIntensity = 0.25;
         }
         /* Sheen has to be set here, not in Blender.
            KHR_materials_sheen carries a colour and a roughness but no weight,
@@ -1170,10 +1173,15 @@ loader.load('./violet.glb', gltf => {
            glare. A real petal is velvet: the sheen is weak, wide, and tinted
            toward the flower's own colour rather than white. */
         if (/petal/i.test(m.name || '')) {
-          m.sheen = 0.30;
-          m.sheenRoughness = 0.62;
-          if (m.sheenColor) m.sheenColor.setRGB(0.30, 0.22, 0.42);
-          m.specularIntensity = 0.08;
+          /* Measured rather than guessed: with sheen, specular and environment
+             all zeroed the corolla goes deep and velvety, which is what the
+             photographs show, so the glare was specular and not albedo. These
+             are the values that keep it lit without the satin coming back. */
+          m.sheen = 0.12;
+          m.sheenRoughness = 0.75;
+          if (m.sheenColor) m.sheenColor.setRGB(0.22, 0.16, 0.34);
+          m.specularIntensity = 0.03;
+          m.envMapIntensity = 0.45;
         }
         if (/stem/i.test(m.name || '')) {
           m.sheen = 0.22;
