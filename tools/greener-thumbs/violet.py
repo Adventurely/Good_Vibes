@@ -257,7 +257,7 @@ def leaf_textures(n):
     # the texture a macro photograph of a violet is full of and the thing that
     # most obviously separates a petal from painted plastic.
     sparkle = (fbm((n, n), 90, octaves=2) > 0.62).astype(np.float64)
-    col = col + sparkle[..., None] * 0.055
+    col = col + sparkle[..., None] * 0.032
 
     alb = np.ones((n, n, 4)); alb[..., :3] = np.clip(col, 0, 1)
 
@@ -304,15 +304,15 @@ def petal_textures(n):
     v = np.abs(np.sin(fan * 3.4))
     veins = smoothstep(0.60, 0.0, v) * smoothstep(0.08, 0.40, bt)
 
-    deep = np.array([0.043, 0.008, 0.132])      # the body of the petal
-    pale = np.array([0.125, 0.052, 0.268])      # the margin, where it is thinnest
+    deep = np.array([0.052, 0.005, 0.205])      # the body of the petal
+    pale = np.array([0.108, 0.030, 0.300])      # the margin, where it is thinnest
     # Small and warm rather than big and cream. A Saintpaulia is saturated
     # almost the whole way to its centre; a wide pale base on five overlapping
     # petals adds up to a cream ring the flower does not have.
     # Not a cream dot. In every close-up the pale zone is a broad white flare
     # out of the centre, covering a third of each lobe before the colour takes
     # over — on a magenta cultivar it is nearly white.
-    throat = np.array([0.330, 0.300, 0.235])
+    throat = np.array([0.420, 0.400, 0.360])
 
     col = deep[None, None, :] + (pale - deep)[None, None, :] * (mottle ** 1.3)[..., None]
     # a petal thins toward its edge, so the edge is paler — and that ring of
@@ -323,7 +323,7 @@ def petal_textures(n):
     col = col + (pale - deep)[None, None, :] * (0.12 * smoothstep(0.92, 1.0, bt))[..., None]
     # a violet carries a deeper wash around the throat before the pale eye
     col = col * (1.0 - 0.30 * smoothstep(0.40, 0.12, bt))[..., None]
-    tw = (smoothstep(0.24, 0.02, bt) ** 1.5)[..., None]
+    tw = (smoothstep(0.135, 0.015, bt) ** 1.7)[..., None]
     col = col * (1 - tw) + throat[None, None, :] * tw
     # veins are a deeper crease in the colour, never a drawn line — but at 0.38
     # they did not register at all, and what did not register was a flat wash
@@ -484,9 +484,9 @@ def petal_material():
     # scale the scattering ran right out to the silhouette and left a white
     # rim hugging every petal, which read as a moulded edge rather than a
     # glow — the thinner the geometry, the less of this it takes.
-    set_if(b, 'Subsurface Weight', 0.18)
+    set_if(b, 'Subsurface Weight', 0.28)
     set_if(b, 'Subsurface Radius', (0.060, 0.022, 0.090))
-    set_if(b, 'Subsurface Scale', 0.0025)
+    set_if(b, 'Subsurface Scale', 0.0022)
     set_if(b, 'Sheen Weight', 0.34)
     set_if(b, 'Sheen Roughness', 0.30)
     set_if(b, 'Sheen Tint', (0.72, 0.62, 0.86, 1))

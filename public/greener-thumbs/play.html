@@ -151,8 +151,10 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+// HDRLoader, not RGBELoader — the latter was deprecated at r180 and the
+// file that still carries the name is a shim that warns and forwards here.
+import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 /* Dev mode arrives in the URL, put there by the switch on the title screen.
    It is the only thing between the inspector and a plain run, so it is read
@@ -229,10 +231,11 @@ controls.dampingFactor = 0.07;
 controls.update();
 let modelRoot = null;
 
-// Image-based light, generated in-process — no HDRI file to ship, and the site
-// forbids external requests anyway.
-const pmrem = new THREE.PMREMGenerator(renderer);
-scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+/* The environment is a captured sky now — see the HDRI block further down.
+   This used to be a PMREM of `RoomEnvironment`, a synthetic studio box. It
+   gave every surface something to reflect, but it was the same indoor grey
+   whatever the hour, so evening and midday differed only by their sun.
+   `environmentIntensity` is set per time setting along with the rest. */
 scene.environmentIntensity = 0.55;
 
 /* The pedestal top is the one number the rest of the scene hangs off: the
@@ -256,13 +259,39 @@ const GH = {
 };
 
 // ---- textures ---------------------------------------------------------------
-/* Painted into canvases at load rather than shipped as files.
-   Every one of these is a few hundred bytes of code against a few hundred
-   kilobytes of PNG, they need no extra requests on a site that makes none, and
-   they can be re-tuned without leaving the file. Flat colours were what made
-   the room read as a blockout: mortar courses and wood grain do more for
-   "this is a real place" than any amount of extra geometry. */
-function canvasTex(size, draw, repeat = [1, 1], srgb = true){
+/* Scanned PBR sets, not painted ones.
+   The previous pass drew brick and wood into canvases at load. That was cheap
+   and it was the ceiling: hand-drawn albedo has no normal map and no roughness
+   map behind it, so every surface answered the light identically and the whole
+   room read as coloured cardboard however good the pattern was. These are CC0
+   scans from ambientCG — Bricks023, Tiles101, Wood062, Concrete034, Grass004 —
+   downsampled to 512/1024 and re-encoded as WebP, 1.5 MB for the set.
+
+   `repeat` is in metres of surface per tile, because BoxGeometry gives every
+   face a 0..1 UV regardless of how big that face is. A material shared across
+   a 7 m wall and a 0.6 m coping stone will smear on one of them, so anything
+   that needs a different density gets its own texture instances — cloning a
+   Texture shares the image and costs only the transform. */
+THREE.Cache.enabled = true;
+const texLoader = new THREE.TextureLoader().setPath('./tex/');
+
+function map1(file, rx, ry, srgb){
+  const t = texLoader.load(file + '.webp');
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(rx, ry);
+  t.anisotropy = 8;
+  if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+function pbr(base, rx, ry, extra){
+  return new THREE.MeshStandardMaterial(Object.assign({
+    map:          map1(base + '_col', rx, ry, true),
+    normalMap:    map1(base + '_nrm', rx, ry, false),
+    roughnessMap: map1(base + '_rgh', rx, ry, false),
+  }, extra || {}));
+}
+
+function canvasTex(size, draw, repeat, srgb){
   const c = document.createElement('canvas');
   c.width = c.height = size;
   draw(c.getContext('2d'), size, size);
@@ -270,132 +299,110 @@ function canvasTex(size, draw, repeat = [1, 1], srgb = true){
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.repeat.set(repeat[0], repeat[1]);
   t.anisotropy = 8;
-  if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+  if (srgb !== false) t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
 const rnd = (a, b) => a + Math.random() * (b - a);
 
-function speckle(g, w, h, n, alpha){
-  for (let i = 0; i < n; i++){
-    g.fillStyle = `rgba(0,0,0,${Math.random() * alpha})`;
-    g.fillRect(Math.random() * w, Math.random() * h, 2, 2);
-  }
-}
-
-// Stretcher bond, because that is what a dwarf wall is laid in: every other
-// course offset by half a brick. A grid of squares reads as tile, not brick.
-const texBrick = canvasTex(512, (g, w, h) => {
-  g.fillStyle = '#6d6459'; g.fillRect(0, 0, w, h);
-  const rows = 9, bh = h / rows, bw = w / 4;
-  for (let r = 0; r < rows; r++){
-    const off = (r % 2) ? bw / 2 : 0;
-    for (let i = -1; i < 5; i++){
-      const v = rnd(0.72, 1.12);
-      g.fillStyle = `rgb(${Math.round(150*v)|0},${Math.round(84*v)|0},${Math.round(62*v)|0})`;
-      g.fillRect(i * bw + off + 3, r * bh + 3, bw - 6, bh - 6);
-    }
-  }
-  speckle(g, w, h, 9000, 0.12);
-}, [5, 1]);
-
-const texWood = canvasTex(512, (g, w, h) => {
-  g.fillStyle = '#7d5c39'; g.fillRect(0, 0, w, h);
-  for (let i = 0; i < 190; i++){
-    const y = Math.random() * h;
-    g.strokeStyle = `rgba(${rnd(38,80)|0},${rnd(24,52)|0},${rnd(10,30)|0},${rnd(0.08,0.34)})`;
-    g.lineWidth = rnd(0.4, 2.4);
-    g.beginPath(); g.moveTo(0, y);
-    for (let x = 0; x <= w; x += 14) g.lineTo(x, y + Math.sin(x * 0.021 + i) * 3.6);
-    g.stroke();
-  }
-  speckle(g, w, h, 3000, 0.10);
-}, [3, 1]);
-
-// Old greenhouse concrete: stained, patched, and never once clean.
-const texFloor = canvasTex(512, (g, w, h) => {
-  g.fillStyle = '#585046'; g.fillRect(0, 0, w, h);
-  for (let i = 0; i < 260; i++){
-    const v = rnd(34, 92) | 0;
-    g.fillStyle = `rgba(${v},${v - 3},${v - 9},${rnd(0.05, 0.18)})`;
-    g.beginPath(); g.arc(Math.random()*w, Math.random()*h, rnd(8, 70), 0, 7); g.fill();
-  }
-  speckle(g, w, h, 16000, 0.20);
-}, [4, 3]);
-
-const texStone = canvasTex(512, (g, w, h) => {
-  g.fillStyle = '#8b877e'; g.fillRect(0, 0, w, h);
-  for (let i = 0; i < 340; i++){
-    const v = rnd(74, 132) | 0;                 // one value, three channels
-    g.fillStyle = `rgba(${v},${v - 2},${v - 7},${rnd(0.04, 0.14)})`;
-    g.beginPath(); g.arc(Math.random()*w, Math.random()*h, rnd(4, 22), 0, 7); g.fill();
-  }
-  speckle(g, w, h, 11000, 0.13);
-}, [2, 2]);
-
+// Terracotta is the one surface with no good CC0 scan to hand, and a flowerpot
+// is small enough that a painted one holds up next to the scanned brick.
 const texTerra = canvasTex(256, (g, w, h) => {
-  g.fillStyle = '#a95c34'; g.fillRect(0, 0, w, h);
-  for (let i = 0; i < 90; i++){
-    g.fillStyle = `rgba(${rnd(110,190)|0},${rnd(60,110)|0},${rnd(40,80)|0},${rnd(0.10,0.34)})`;
-    g.beginPath(); g.arc(Math.random()*w, Math.random()*h, rnd(4, 26), 0, 7); g.fill();
+  g.fillStyle = '#9d5330'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 120; i++){
+    const v = rnd(0.72, 1.22);
+    g.fillStyle = `rgba(${(168*v)|0},${(92*v)|0},${(58*v)|0},${rnd(0.10,0.30)})`;
+    g.beginPath(); g.arc(Math.random()*w, Math.random()*h, rnd(4, 30), 0, 7); g.fill();
   }
-  speckle(g, w, h, 2600, 0.16);
+  for (let i = 0; i < 4200; i++){
+    g.fillStyle = `rgba(0,0,0,${Math.random()*0.16})`;
+    g.fillRect(Math.random()*w, Math.random()*h, 2, 2);
+  }
 }, [1, 1]);
 
-// Mown stripes. An English lawn is cut in bands and the bands are half of why
-// it reads as maintained rather than as a green plane.
-const texGrass = canvasTex(512, (g, w, h) => {
-  for (let i = 0; i < 8; i++){
-    g.fillStyle = (i % 2) ? '#3c6128' : '#33531f';
-    g.fillRect(0, i * h / 8, w, h / 8);
+/* Greenhouse glass is never clean. Rain streaks, a haze of dust and the odd
+   splash of dried water are what stop a pane reading as a hole in the wall —
+   it goes in as a roughness map, so the dirt scatters the reflection rather
+   than tinting what you see through it. */
+const texGrime = canvasTex(512, (g, w, h) => {
+  g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, w, h);            // mostly smooth
+  for (let i = 0; i < 90; i++){                               // rain streaks
+    const x = Math.random()*w, wd = rnd(1.5, 7);
+    g.fillStyle = `rgba(210,210,210,${rnd(0.05, 0.30)})`;
+    g.fillRect(x, rnd(0, h*0.4), wd, rnd(h*0.25, h*0.8));
   }
-  for (let i = 0; i < 26000; i++){
-    g.fillStyle = `rgba(${rnd(30,90)|0},${rnd(70,150)|0},${rnd(20,60)|0},${rnd(0.05,0.35)})`;
-    g.fillRect(Math.random()*w, Math.random()*h, 1.6, 3);
+  for (let i = 0; i < 220; i++){                              // splashes
+    g.fillStyle = `rgba(200,200,200,${rnd(0.05, 0.35)})`;
+    g.beginPath(); g.arc(Math.random()*w, Math.random()*h, rnd(1.5, 9), 0, 7); g.fill();
   }
-}, [26, 26]);
+  for (let i = 0; i < 14000; i++){                            // dust
+    g.fillStyle = `rgba(180,180,180,${Math.random()*0.10})`;
+    g.fillRect(Math.random()*w, Math.random()*h, 2, 2);
+  }
+}, [3, 2], false);
+
+// One map for every flower head in the borders — they are tinted per drift by
+// `color`, so a single greyscale petal texture serves all of them.
+const texBloom = canvasTex(128, (g, w, h) => {
+  g.fillStyle = '#c8c8c8'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 26; i++){
+    g.strokeStyle = `rgba(${rnd(120,190)|0},${rnd(120,190)|0},${rnd(120,190)|0},0.55)`;
+    g.lineWidth = rnd(1, 3);
+    g.beginPath(); g.moveTo(w/2, h/2);
+    g.lineTo(w/2 + Math.cos(i)*w, h/2 + Math.sin(i)*h); g.stroke();
+  }
+  for (let i = 0; i < 2400; i++){
+    g.fillStyle = `rgba(255,255,255,${Math.random()*0.35})`;
+    g.fillRect(Math.random()*w, Math.random()*h, 2, 2);
+  }
+}, [1, 1]);
 
 const texHedge = canvasTex(256, (g, w, h) => {
   g.fillStyle = '#22391a'; g.fillRect(0, 0, w, h);
-  for (let i = 0; i < 14000; i++){
+  for (let i = 0; i < 16000; i++){
     g.fillStyle = `rgba(${rnd(20,70)|0},${rnd(50,130)|0},${rnd(14,54)|0},${rnd(0.15,0.75)})`;
     g.fillRect(Math.random()*w, Math.random()*h, rnd(2,5), rnd(2,5));
   }
 }, [10, 3]);
 
-const texGravel = canvasTex(256, (g, w, h) => {
-  g.fillStyle = '#8d8579'; g.fillRect(0, 0, w, h);
-  for (let i = 0; i < 5200; i++){
-    g.fillStyle = `rgba(${rnd(90,180)|0},${rnd(86,172)|0},${rnd(76,158)|0},${rnd(0.25,0.9)})`;
-    g.beginPath(); g.arc(Math.random()*w, Math.random()*h, rnd(1.2, 3.4), 0, 7); g.fill();
-  }
-}, [12, 12]);
-
 // ---- materials --------------------------------------------------------------
-const matFrame = new THREE.MeshStandardMaterial({ color:0x2b3a2e, roughness:0.48, metalness:0.35 });
-const matBrick = new THREE.MeshStandardMaterial({ map: texBrick, roughness:0.95 });
-const matFloor = new THREE.MeshStandardMaterial({ map: texFloor, roughness:0.96 });
-const matBench = new THREE.MeshStandardMaterial({ map: texWood, roughness:0.86 });
-const matStone = new THREE.MeshStandardMaterial({ map: texStone, roughness:0.82 });
-const matTerra = new THREE.MeshStandardMaterial({ map: texTerra, roughness:0.90 });
-const matGrass = new THREE.MeshStandardMaterial({ map: texGrass, roughness:1.0 });
+/* The frame is cream painted metal, which is what a Victorian glasshouse
+   actually is — bottle green was a guess and it made the whole interior read
+   as a shed. Cream is also why these buildings feel bright inside: every bar
+   bounces light instead of eating it. */
+// Painted metal: the wear and roughness are scanned, the colour is ours —
+// PaintedMetal001's own albedo is orange, and it is the scratches that matter.
+const matFrame = new THREE.MeshStandardMaterial({
+  color: 0xe9e4d4, roughness: 0.42, metalness: 0.10,
+  normalMap: map1('paint_nrm', 3, 3, false), roughnessMap: map1('paint_rgh', 3, 3, false) });
+const matBrickW = pbr('brick', 7.2, 0.62, { roughness: 1.0 });
+const matBrickD = pbr('brick', 5.0, 0.62, { roughness: 1.0 });
+const matBrickEdge = pbr('brick', 8.0, 0.1, { roughness: 1.0 });
+const matFloor = pbr('tile', 7.0, 5.0);
+const matBench = pbr('wood', 4.0, 0.5);
+const matShelf = pbr('wood', 3.0, 0.3);
+const matStone = pbr('stone', 1.2, 1.2);
+const matCoping = pbr('stone', 6.0, 0.3);
+const matGrass = pbr('grass', 70, 70);
+const matGravel = pbr('stone', 14, 14, { roughness: 1.0 });
+const matTerra = new THREE.MeshStandardMaterial({ map: texTerra, roughness:0.88 });
 const matHedge = new THREE.MeshStandardMaterial({ map: texHedge, roughness:1.0 });
-const matGravel= new THREE.MeshStandardMaterial({ map: texGravel, roughness:0.97 });
-const matBark  = new THREE.MeshStandardMaterial({ color:0x4a382b, roughness:0.94 });
+const matBark  = pbr('bark', 1, 2, { roughness:0.98 });
 const matLeaf  = new THREE.MeshStandardMaterial({ map: texHedge, color:0x9fbf88, roughness:0.95 });
-const matSteel = new THREE.MeshStandardMaterial({ color:0x9aa0a4, roughness:0.38, metalness:0.85 });
-const matGalv  = new THREE.MeshStandardMaterial({ color:0xb6bbbd, roughness:0.55, metalness:0.65 });
-const matHandle= new THREE.MeshStandardMaterial({ map: texWood, color:0xd8b98a, roughness:0.72 });
-const matSoil  = new THREE.MeshStandardMaterial({ color:0x2e241b, roughness:0.99 });
-const matTwine = new THREE.MeshStandardMaterial({ color:0xbfa678, roughness:0.92 });
-const matRubber= new THREE.MeshStandardMaterial({ color:0x1f4a2c, roughness:0.72 });
+const matSteel = pbr('steel', 1, 1, { color:0xa8aeb2, roughness:0.45, metalness:0.85 });
+const matGalv  = pbr('galv', 2, 2, { color:0x9298a0, roughness:0.62, metalness:0.55 });
+const matHandle= pbr('wood', 1, 4, { color:0xd8b98a, roughness:0.70 });
+const matSoil  = pbr('soil', 2, 2, { color:0x6b5a48, roughness:1.0 });
+const matTwine = pbr('cloth', 3, 3, { color:0xbfa678, roughness:0.94 });
+const matRubber= pbr('cloth', 6, 6, { color:0x24422e, roughness:0.78 });
 
 /* Glass as a cheap translucent surface, not as refraction. `transmission`
    would be physically better and costs an extra render pass per pane; at this
    opacity nobody can tell. `depthWrite:false` because a few dozen overlapping
    transparent panes sort badly otherwise and flicker as the camera turns. */
 const matGlass = new THREE.MeshStandardMaterial({
-  color: 0xd6e9e2, roughness: 0.14, metalness: 0.0,
-  transparent: true, opacity: 0.13, side: THREE.DoubleSide, depthWrite: false,
+  color: 0xdff0ea, roughness: 0.08, metalness: 0.0,
+  roughnessMap: texGrime,
+  transparent: true, opacity: 0.11, side: THREE.DoubleSide, depthWrite: false,
 });
 
 const house = new THREE.Group();
@@ -422,11 +429,11 @@ floor.receiveShadow = true;
 house.add(floor);
 
 const B = GH.BAR;
-for (const sz of [-1, 1]) box(GH.W + B*2, GH.WALL, 0.14, 0, GH.WALL/2, sz*GH.D/2, matBrick);
-for (const sx of [-1, 1]) box(0.14, GH.WALL, GH.D, sx*GH.W/2, GH.WALL/2, 0, matBrick);
+for (const sz of [-1, 1]) box(GH.W + B*2, GH.WALL, 0.14, 0, GH.WALL/2, sz*GH.D/2, matBrickW);
+for (const sx of [-1, 1]) box(0.14, GH.WALL, GH.D, sx*GH.W/2, GH.WALL/2, 0, matBrickD);
 // a stone coping course, which is what the frame actually bolts down to
-for (const sz of [-1, 1]) box(GH.W + 0.20, 0.05, 0.20, 0, GH.WALL + 0.02, sz*GH.D/2, matStone);
-for (const sx of [-1, 1]) box(0.20, 0.05, GH.D + 0.20, sx*GH.W/2, GH.WALL + 0.02, 0, matStone);
+for (const sz of [-1, 1]) box(GH.W + 0.20, 0.05, 0.20, 0, GH.WALL + 0.02, sz*GH.D/2, matCoping);
+for (const sx of [-1, 1]) box(0.20, 0.05, GH.D + 0.20, sx*GH.W/2, GH.WALL + 0.02, 0, matCoping);
 
 // ---- glazing ----------------------------------------------------------------
 const GLASS_H = GH.EAVE - GH.WALL;
@@ -532,7 +539,7 @@ for (const sz of [-1, 1]){
   const zc = sz * (GH.D/2 - 0.30);
   for (const [sy, depth] of [[1.52, 0.26], [1.92, 0.22]]){
     for (let s = 0; s < 3; s++)
-      box(GH.W - 1.1, 0.028, depth/3 - 0.012, 0, sy, zc - depth/2 + s*(depth/3), matBench);
+      box(GH.W - 1.1, 0.028, depth/3 - 0.012, 0, sy, zc - depth/2 + s*(depth/3), matShelf);
     for (let i = -2; i <= 2; i++){
       box(0.035, 0.05, depth, i * ((GH.W - 1.5) / 4), sy - 0.04, zc, matFrame);
       const br = box(0.03, 0.30, 0.03, i * ((GH.W - 1.5) / 4), sy - 0.17, zc + depth*0.32, matFrame);
@@ -561,21 +568,51 @@ for (let i = 0; i < 3; i++){
   box(0.36, 0.035, 0.22, x, 0.055, -GH.D/2 + 0.95, matSoil);
 }
 
-// a galvanised watering can — body, base, spout, and the two handles it has
+/* A galvanised watering can, built between endpoints rather than by guessing
+   rotations — which is how the last one ended up with its spout leaving the
+   body pointing the wrong way and its mouth above the rim. A can like that
+   cannot hold water: the spout is a communicating vessel with the body, so
+   the moment the mouth sits higher than the rim it either never fills or it
+   pours out of itself. The mouth here is at 0.185 and the rim is at 0.21. */
+function tube(a, b, rBase, rTip, mat, seg, g){
+  const dir = new THREE.Vector3().subVectors(b, a);
+  const len = dir.length();
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(rTip, rBase, len, seg), mat);
+  m.position.copy(a).addScaledVector(dir, 0.5);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+  m.castShadow = true; m.receiveShadow = true;
+  g.add(m);
+  return m;
+}
 {
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
   const g = new THREE.Group();
   g.position.set(GH.W/2 - 1.15, 0.83, GH.D/2 - 0.48);
-  cyl(0.105, 0.115, 0.21, 0, 0.105, 0, matGalv, 16, g);
-  cyl(0.118, 0.118, 0.012, 0, 0.006, 0, matGalv, 16, g);
-  const spout = cyl(0.020, 0.032, 0.34, -0.20, 0.15, 0, matGalv, 10, g);
-  spout.rotation.z = -0.62;
-  cyl(0.045, 0.045, 0.020, -0.335, 0.235, 0, matGalv, 12, g).rotation.z = -0.62;
-  const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.008, 6, 14, Math.PI), matGalv);
-  hoop.position.set(0, 0.215, 0); hoop.rotation.set(0, Math.PI/2, 0);
-  g.add(hoop);
-  const grip = new THREE.Mesh(new THREE.TorusGeometry(0.052, 0.007, 6, 12, Math.PI), matGalv);
-  grip.position.set(0.105, 0.145, 0); grip.rotation.set(Math.PI/2, 0, 0.6);
-  g.add(grip);
+  g.rotation.y = -0.5;
+
+  const RIM = 0.21;
+  cyl(0.108, 0.118, RIM, 0, RIM/2, 0, matGalv, 18, g);      // body
+  cyl(0.122, 0.122, 0.012, 0, 0.006, 0, matGalv, 18, g);    // foot
+  cyl(0.112, 0.112, 0.010, 0, RIM, 0, matGalv, 18, g);      // rolled rim
+
+  // Spout: out of the body low down, rising away from it. Tapered from wide at
+  // the body to narrow at the neck, which is the direction water needs.
+  tube(V(-0.070, 0.040, 0), V(-0.295, 0.165, 0), 0.032, 0.019, matGalv, 12, g);
+  // and the rose on the end, flaring back out
+  tube(V(-0.295, 0.165, 0), V(-0.331, 0.181, 0), 0.019, 0.030, matGalv, 16, g);
+
+  // Carrying handle over the top, and the back handle you tip it with — both
+  // on the far side from the spout, because that is what you brace against.
+  const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.085, 0.0075, 6, 18, Math.PI), matGalv);
+  hoop.position.set(0, RIM - 0.005, 0);
+  hoop.rotation.set(0, Math.PI/2, 0);
+  hoop.castShadow = true; g.add(hoop);
+
+  const grip = new THREE.Mesh(new THREE.TorusGeometry(0.058, 0.007, 6, 14, Math.PI * 1.05), matGalv);
+  grip.position.set(0.108, 0.130, 0);
+  grip.rotation.set(Math.PI/2, 0, -Math.PI/2);
+  grip.castShadow = true; g.add(grip);
+
   house.add(g);
 }
 
@@ -678,7 +715,7 @@ path.position.set(0, -0.005, -GH.D/2 - 11);
 path.receiveShadow = true;
 out.add(path);
 for (const sx of [-1, 1])
-  put(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.10, 22), matBrick), sx*0.86, 0.03, -GH.D/2 - 11);
+  put(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.10, 22), matBrickEdge), sx*0.86, 0.03, -GH.D/2 - 11);
 
 // A hedge on all four sides, taller than a person, with a gap where the path
 // leaves. Yew, kept tight — the whole point is that it reads as clipped.
@@ -716,7 +753,7 @@ function border(x0, z0, x1, z1, depth){
   let s = 0.4;
   while (s < len - 0.4){
     const drift = BLOOMS[(Math.random() * BLOOMS.length) | 0];
-    const clump = new THREE.MeshStandardMaterial({ color: drift, roughness: 0.86 });
+    const clump = new THREE.MeshStandardMaterial({ map: texBloom, color: drift, roughness: 0.86 });
     const run = rnd(0.9, 2.2);
     for (let d = 0; d < run && s < len - 0.4; d += 0.32, s += 0.32){
       const px = x0 + ux*s + (-uz) * rnd(-depth*0.3, depth*0.3);
@@ -786,28 +823,38 @@ tree(21, 10, 2.2); tree(-10, 20, 1.7); tree(12, 19, 1.4); tree(2, 22, 1.9);
   out.add(g);
 }
 
-/* The sky is a vertex-coloured sphere, not a shader.
-   A raw ShaderMaterial writing gl_FragColor sidesteps tone mapping and the
-   output colour transform, so it comes out looking nothing like the rest of
-   the frame unless the right include chunks are pasted in by hand. Vertex
-   colours go through the ordinary pipeline and cannot get that wrong, and at
-   ~600 vertices repainting them on every time change costs nothing. */
-const skyGeo = new THREE.SphereGeometry(140, 32, 18);
-skyGeo.setAttribute('color', new THREE.BufferAttribute(
-  new Float32Array(skyGeo.attributes.position.count * 3), 3));
-const skyDome = new THREE.Mesh(skyGeo,
-  new THREE.MeshBasicMaterial({ side: THREE.BackSide, vertexColors: true, fog: false }));
-scene.add(skyDome);
+/* Real captured skies, one per time of day.
+   The sky was a vertex-coloured sphere, which was honest about being a
+   gradient: it lit nothing. Everything metal and everything glass in here
+   answers its surroundings, and with no environment to answer they came out
+   flat — a cream glazing bar under a hemisphere light has no idea there is a
+   bright sky on one side of it and a dark hedge on the other.
 
-function paintSky(topCol, botCol){
-  const pos = skyGeo.attributes.position, col = skyGeo.attributes.color;
-  const c = new THREE.Color();
-  for (let i = 0; i < pos.count; i++){
-    const h = THREE.MathUtils.clamp((pos.getY(i) / 140 + 0.22) / 1.22, 0, 1);
-    c.copy(botCol).lerp(topCol, Math.pow(h, 0.7));
-    col.setXYZ(i, c.r, c.g, c.b);
-  }
-  col.needsUpdate = true;
+   These are Poly Haven CC0 HDRIs at 512x256, which is small for a background
+   and ample for image-based lighting: PMREM blurs it into mip levels anyway,
+   and the horizon is behind a 2.3 m hedge in every shot the player gets.
+   1.3 MB for four, and only the one in use is ever fetched.
+
+   Fetched lazily and cached, because loading four skies to show one is 1.3 MB
+   of somebody's connection spent on three of them they cannot see. */
+const HDRI = { morning: 'morning', midday: 'midday', evening: 'evening', night: 'night' };
+const envCache = new Map();
+const pmrem = new THREE.PMREMGenerator(renderer);
+pmrem.compileEquirectangularShader();
+const hdrLoader = new HDRLoader().setPath('./hdri/');
+
+function withEnv(key, done){
+  if (envCache.has(key)) return done(envCache.get(key));
+  hdrLoader.load(key + '.hdr', raw => {
+    raw.mapping = THREE.EquirectangularReflectionMapping;
+    const entry = { bg: raw, env: pmrem.fromEquirectangular(raw).texture };
+    envCache.set(key, entry);
+    done(entry);
+  }, undefined, err => {
+    // A missing sky must not take the room with it: the scene still has a sun
+    // and a hemisphere light, so it stays lit, just flatter.
+    console.warn('sky ' + key + ' failed to load', err);
+  });
 }
 
 // ---- light, and the time of day ---------------------------------------------
@@ -839,7 +886,7 @@ for (const sx of [-1, 1]){
   const flex = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.55, 6), matFrame);
   flex.position.y = 0.30; g.add(flex);
   const shade = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.13, 16, 1, true),
-    new THREE.MeshStandardMaterial({ color:0x2b3630, roughness:0.6, side:THREE.DoubleSide }));
+    pbr('galv', 1, 1, { color:0x53605a, roughness:0.55, metalness:0.5, side:THREE.DoubleSide }));
   g.add(shade);
   const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8),
     new THREE.MeshStandardMaterial({ color:0xffdca8, emissive:0xffbf70, emissiveIntensity:2.2 }));
@@ -905,7 +952,16 @@ function applyTime(key){
   hemi.groundColor.setHex(t.hemiGround);
   hemi.intensity = t.hemiI;
 
-  paintSky(new THREE.Color(t.skyTop), new THREE.Color(t.skyBot));
+  // Something to look at while the sky is in flight, and the colour the fog
+  // is about to be — so the load reads as the sky sharpening rather than as
+  // the world changing colour.
+  scene.background = new THREE.Color(t.skyBot);
+  withEnv(HDRI[key], e => {
+    if (timeKey !== key) return;        // the user moved on mid-download
+    scene.background = e.bg;
+    scene.environment = e.env;
+    scene.backgroundBlurriness = 0.25;  // it is 512 px and behind a hedge
+  });
   scene.fog.color.setHex(t.fog);
   scene.fog.density = t.fogD;
   scene.environmentIntensity = t.env;
@@ -967,6 +1023,25 @@ loader.load('./violet.glb', gltf => {
           m.transparent = false;
           m.alphaTest = 0.35;
           m.depthWrite = true;
+        }
+        /* Sheen has to be set here, not in Blender.
+           KHR_materials_sheen carries a colour and a roughness but no weight,
+           and GLTFLoader sets `sheen = 1` whenever the extension is present —
+           so a 0.30 authored in Blender arrives as full strength. On a petal
+           that is a broad white gloss across the whole face, which is the
+           glare. A real petal is velvet: the sheen is weak, wide, and tinted
+           toward the flower's own colour rather than white. */
+        if (/petal/i.test(m.name || '')) {
+          m.sheen = 0.30;
+          m.sheenRoughness = 0.62;
+          if (m.sheenColor) m.sheenColor.setRGB(0.30, 0.22, 0.42);
+          m.specularIntensity = 0.08;
+        }
+        if (/stem/i.test(m.name || '')) {
+          m.sheen = 0.22;
+          m.sheenRoughness = 0.55;
+          if (m.sheenColor) m.sheenColor.setRGB(0.26, 0.30, 0.20);
+          m.specularIntensity = 0.10;
         }
       });
     }

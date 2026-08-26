@@ -37,6 +37,45 @@ The GLB is Draco-compressed with WebP textures, which took it from 7.65 MB to
 the six texture maps were 82% of it. If it ever balloons again, look at the
 maps before the mesh.
 
+## Where the textures come from
+
+Everything in the greenhouse that is brick, tile, wood, stone or grass is a
+scanned PBR set from [ambientCG](https://ambientcg.com), which is CC0 — no
+attribution required, kept here because it is worth knowing what is ours:
+
+    brick_*   Bricks023      the dwarf wall
+    tile_*    Tiles101       the encaustic floor
+    wood_*    Wood062        benches, shelving, tool handles
+    stone_*   Concrete034    pedestal, coping, gravel
+    grass_*   Grass004       the lawn
+
+Downsampled to 512 (1024 for brick and tile) and re-encoded as WebP — 1.5 MB
+for the set, in `public/greener-thumbs/tex/`. Colour maps at quality 82,
+normal and roughness at 92, because a blocky normal map shows up as faceting
+across a whole surface and a blocky albedo does not.
+
+They replaced textures painted into canvases at load. That was cheap and it
+was the ceiling: a hand-drawn albedo has no normal or roughness map behind it,
+so every surface answers the light identically and the room reads as coloured
+cardboard however good the pattern is.
+
+**Egress works from a local machine.** The cloud session recorded that every
+asset host refused at the proxy; ambientCG and Poly Haven, API and CDN both,
+are reachable from here. That is the whole reason this pass was possible.
+
+## The colour-space trap, which cost a round
+
+`violet.py` authors every map as **linear float tagged Non-Color**, which is
+what Cycles wants. glTF has no such tag — a `baseColorTexture` is sRGB by
+definition. So any map that goes into the GLB still tagged Non-Color gets an
+sRGB decode applied to linear numbers, and comes out lighter and flatter than
+authored: correct in Blender, washed out in the browser.
+
+`as_image()` in `export_web.py` exists to re-encode on the way out, and the
+blade already went through it. The corolla did not, and that — not the colour
+values — is why the flowers were pale. Anything new that ships a base colour
+map has to go through `as_image(..., srgb=True)`.
+
 ## Running it
 
 Blender is used as a Python module, so there is nothing to install but a wheel:

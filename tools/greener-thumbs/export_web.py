@@ -116,6 +116,50 @@ for k, v in (('Sheen Weight', 0.35), ('Sheen Roughness', 0.45)):
     if k in b.inputs:
         b.inputs[k].default_value = v
 
+# ---- and the same treatment for the corolla ---------------------------------
+"""The petals were washing out in the browser and were correct in Blender, and
+the reason is the colour space rather than the colour.
+
+`violet.py` authors every map as linear float and tags it Non-Color, which is
+right for Cycles. The blade already gets re-encoded on the way out — that is
+what `as_image` is for — but the petal maps were going straight into the GLB
+still tagged Non-Color. glTF has no such tag: a baseColorTexture is sRGB by
+definition, so the browser took linear numbers and applied an sRGB decode to
+them a second time. Everything came out lighter and flatter than authored,
+which is exactly what "washed out" looks like.
+"""
+IMG_PALB = as_image("web_petal_albedo", TEX['petal_albedo'], srgb=True)
+IMG_PNRM = as_image("web_petal_normal", normal_from_height(TEX['petal_height'], 1.7), srgb=False)
+IMG_PRGH = as_image("web_petal_rough",
+                    np.repeat(TEX['petal_rough'][..., None], 3, axis=-1), srgb=False)
+
+pmat = bpy.data.materials.new("violet_petal_web")
+pmat.use_nodes = True
+pnt = pmat.node_tree
+pb = pnt.nodes["Principled BSDF"]
+pa = pnt.nodes.new('ShaderNodeTexImage'); pa.image = IMG_PALB; pa.location = (-700, 260)
+pr = pnt.nodes.new('ShaderNodeTexImage'); pr.image = IMG_PRGH; pr.location = (-700, 0)
+pn = pnt.nodes.new('ShaderNodeTexImage'); pn.image = IMG_PNRM; pn.location = (-700, -260)
+pn.image.colorspace_settings.name = 'Non-Color'
+pnm = pnt.nodes.new('ShaderNodeNormalMap'); pnm.location = (-420, -260)
+pnt.links.new(pa.outputs['Color'], pb.inputs['Base Color'])
+pnt.links.new(pr.outputs['Color'], pb.inputs['Roughness'])
+pnt.links.new(pn.outputs['Color'], pnm.inputs['Color'])
+pnt.links.new(pnm.outputs['Normal'], pb.inputs['Normal'])
+pb.inputs['Metallic'].default_value = 0.0
+# NOTE: 'Sheen Weight' does not survive to the browser as a strength.
+# KHR_materials_sheen carries a colour and a roughness, and three.js sets
+# `material.sheen = 1` whenever the extension is present — the weight has to
+# live in the colour instead. The viewer sets the final values; these are only
+# what Blender previews with.
+for k, v in (('Sheen Weight', 0.30), ('Sheen Roughness', 0.32),
+             ('Specular IOR Level', 0.13)):
+    if k in pb.inputs:
+        pb.inputs[k].default_value = v
+
+# slot 2 is the corolla — see SLOT_PETAL in violet.py
+plant.data.materials[2] = pmat
+
 # slot 0 is the blade — see SLOT_LEAF in violet.py
 plant.data.materials[0] = mat
 
@@ -126,6 +170,11 @@ plant.data.materials[0] = mat
 FLAT = {
     'terracotta': ((0.228, 0.080, 0.041, 1.0), 0.82),
     'soil':       ((0.021, 0.015, 0.011, 1.0), 0.97),
+    # The anthers belong on this list too, and were missed when they stopped
+    # being a `simple()` material and became a `noisy()` one to make them look
+    # powdery. That change was invisible in Cycles and turned the two yellow
+    # anthers white in the browser — which is most of the centre of the flower.
+    'violet_eye': ((0.520, 0.360, 0.045, 1.0), 0.80),
 }
 for m in bpy.data.materials:
     hit = next((v for k, v in FLAT.items() if m.name.startswith(k)), None)
@@ -160,7 +209,10 @@ thousands of little hairs standing off the surface — most of all on the
 silhouette, which is exactly where fuzz is visible and where a sheen term can
 never put anything. One shell, ~9k triangles, and it skins off the same
 armature so it droops with the leaf under it."""
-FUZZ_OFF = 0.0011          # 1.1 mm, a shade longer than violet.py's hairs
+FUZZ_OFF = 0.00072         # 0.72 mm. At 1.1 the shell stood far enough off
+                           # the blade that the alpha cut it into visible
+                           # shards rather than into hairs; hugging the
+                           # surface reads as velvet at every distance.
 FUZZ_TEX = 1024
 
 _r = np.random.default_rng(4)
@@ -285,6 +337,7 @@ result = {
     'verts': len(plant.data.vertices),
     'bones': len(rig.pose.bones),
     'materials': [m.name for m in plant.data.materials],
+    'petal_albedo_srgb': IMG_PALB.colorspace_settings.name,
     'fuzz_tris': len(shell.data.polygons),
     'frames': [scene.frame_start, scene.frame_end],
     'clipping_pairs': g['result']['leaf_pairs_intersecting'],
