@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Greener Thumbs — African Violet</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%231a1310'/%3E%3Ccircle cx='8' cy='9' r='3.4' fill='%236b4b9a'/%3E%3Ccircle cx='8' cy='9' r='1.1' fill='%23ffd23f'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#1a1310; --panel:#241b16; --line:#3a2b22;
+    --ink:#e8ded2; --dim:#a8998a; --gold:#ffd23f; --orange:#f59a2e; --leaf:#6f9c52;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font:14px/1.5 ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;
+    overflow:hidden;
+  }
+  #stage{position:fixed;inset:0}
+  canvas{display:block}
+
+  #panel{
+    position:fixed; top:14px; left:14px; width:268px; max-height:calc(100vh - 28px);
+    overflow-y:auto; background:color-mix(in srgb,var(--panel) 92%,transparent);
+    border:1px solid var(--line); border-radius:10px; padding:14px 14px 16px;
+    backdrop-filter:blur(8px);
+  }
+  #panel h1{
+    margin:0 0 2px; font-size:15px; letter-spacing:.2px; color:var(--gold);
+  }
+  #panel .sub{margin:0 0 12px; font-size:11.5px; color:var(--dim)}
+  fieldset{border:0;border-top:1px solid var(--line);margin:12px 0 0;padding:10px 0 0}
+  legend{font-size:10.5px;text-transform:uppercase;letter-spacing:.9px;color:var(--orange);padding:0 6px 0 0}
+  .row{display:flex;align-items:center;gap:8px;margin:8px 0}
+  .row label{flex:0 0 92px;font-size:12px;color:var(--dim)}
+  .row output{flex:0 0 42px;text-align:right;font-variant-numeric:tabular-nums;font-size:12px;color:var(--ink)}
+  input[type=range]{flex:1;accent-color:var(--leaf);min-width:0}
+  .btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  button{
+    flex:1 1 auto; background:#2f241d; color:var(--ink); border:1px solid var(--line);
+    border-radius:6px; padding:6px 9px; font-size:12px; cursor:pointer;
+  }
+  button:hover{border-color:var(--orange);color:#fff}
+  button[aria-pressed=true]{background:var(--leaf);border-color:var(--leaf);color:#10240a}
+  #stats{
+    margin-top:12px;padding-top:10px;border-top:1px solid var(--line);
+    font-size:11.5px;color:var(--dim);font-variant-numeric:tabular-nums;
+  }
+  #stats b{color:var(--ink);font-weight:600}
+  #err{
+    position:fixed;inset:auto 14px 14px 14px;max-width:620px;margin:0 auto;
+    background:#3a1a16;border:1px solid #7a3226;border-radius:8px;padding:10px 12px;
+    font-size:12.5px;color:#ffd9d2;display:none;white-space:pre-wrap;
+  }
+  #load{
+    position:fixed;inset:0;display:grid;place-content:center;text-align:center;
+    color:var(--dim);font-size:13px;pointer-events:none;
+  }
+  #back{ position:fixed; left:14px; top:14px; z-index:5; color:#9db09a;
+         font-size:.85rem; text-decoration:none; background:rgba(10,16,11,.62);
+         padding:.3rem .7rem; border-radius:999px; border:1px solid #2a3a2c;
+         backdrop-filter:blur(6px); }
+  #back:hover{ color:#eef3e6; }
+
+  #hud{ position:fixed; left:14px; bottom:14px; z-index:5;
+        background:rgba(10,16,11,.68); border:1px solid #2a3a2c;
+        border-radius:12px; padding:.7rem .95rem; backdrop-filter:blur(6px);
+        max-width:min(88vw, 22rem); }
+  #hud h2{ margin:0; font-size:1.05rem; }
+  #hud p{ margin:.15rem 0 0; color:#9db09a; font-size:.85rem; }
+  #hud .hint{ margin-top:.45rem; color:#6cc24a; font-size:.78rem; }
+
+  #devbadge{ font-size:.58rem; letter-spacing:.14em; text-transform:uppercase;
+             vertical-align:middle; padding:.12rem .42rem; border-radius:999px;
+             border:1px solid #3f8f38; color:#6cc24a; }
+
+  @media (max-width:640px){ #panel{width:auto;right:14px} }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div id="load">loading violet.glb …</div>
+
+<a id="back" href="./">&larr; title</a>
+
+<!-- A game run gets this in place of the inspector: what the specimen is, and
+     the only interaction that currently exists. -->
+<div id="hud" hidden>
+  <h2>African Violet</h2>
+  <p><i>Saintpaulia ionantha</i></p>
+  <p class="hint">Drag to look around &middot; scroll to zoom right in</p>
+</div>
+
+<div id="panel" hidden>
+  <h1>African Violet <span id="devbadge">dev</span></h1>
+  <p class="sub"><i>Saintpaulia ionantha</i> — parametric, rigged, 84 bones</p>
+
+  <fieldset>
+    <legend>Condition</legend>
+    <div class="row">
+      <label for="droop">Thirst</label>
+      <input id="droop" type="range" min="0" max="1" step="0.01" value="0">
+      <output for="droop">0.00</output>
+    </div>
+    <div class="row">
+      <label for="chlor">Chlorosis</label>
+      <input id="chlor" type="range" min="0" max="1" step="0.01" value="0">
+      <output for="chlor">0.00</output>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Air</legend>
+    <div class="row">
+      <label for="wind">Wind</label>
+      <input id="wind" type="range" min="0" max="1.6" step="0.01" value="1">
+      <output for="wind">1.00</output>
+    </div>
+    <div class="btns">
+      <button id="gust">Gust</button>
+      <button id="play" aria-pressed="true">Pause</button>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>View</legend>
+    <div class="btns">
+      <button id="spin" aria-pressed="false">Auto-spin</button>
+      <button id="wire" aria-pressed="false">Wireframe</button>
+      <button id="bones" aria-pressed="false">Skeleton</button>
+      <button id="close">Close up</button>
+      <button id="reset">Reset</button>
+    </div>
+  </fieldset>
+
+  <div id="stats">
+    <div><b id="s-tris">–</b> triangles &nbsp;·&nbsp; <b id="s-bones">–</b> bones</div>
+    <div><b id="s-fps">–</b> fps &nbsp;·&nbsp; <b id="s-calls">–</b> draw calls</div>
+  </div>
+</div>
+
+<div id="err"></div>
+
+<script type="importmap">
+{ "imports": {
+    "three": "./vendor/three.module.js",
+    "three/addons/": "./vendor/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+/* Dev mode arrives in the URL, put there by the switch on the title screen.
+   It is the only thing between the inspector and a plain run, so it is read
+   once here and neither path tests for it again. */
+const DEV = new URLSearchParams(location.search).get('dev') === '1';
+
+const $ = s => document.querySelector(s);
+const errBox = $('#err');
+function fail(e){
+  errBox.style.display = 'block';
+  errBox.textContent = String(e && e.stack || e);
+  console.error(e);
+}
+window.addEventListener('error', e => fail(e.error || e.message));
+
+// ---- scene -----------------------------------------------------------------
+const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:false });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+// AgX to match what Blender rendered through, so the two are comparable
+renderer.toneMapping = THREE.AgXToneMapping ?? THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFShadowMap;
+$('#stage').appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+// Daylight outside the glass. A dark room behind glass walls just reads as a
+// dark room; the whole point of a greenhouse is that the light comes through it.
+scene.background = new THREE.Color(0x9fb4b0);
+
+const camera = new THREE.PerspectiveCamera(38, innerWidth/innerHeight, 0.01, 60);
+camera.position.set(0.24, 1.12, 0.34);
+
+/* Fit the plant to the viewport using BOTH field of view angles.
+ *
+ * A fixed camera position frames correctly at one aspect ratio and crops at
+ * every other one — in a tall narrow pane the horizontal FOV is far smaller
+ * than the vertical, and a plant that is wider than it is tall disappears. */
+/* Two framings, because the scene has two scales in it: a 7 m room and a
+   19 cm plant. `pad` is a multiple of the distance that would just fit the
+   plant, so ESTABLISH lands far enough out to hold the pedestal and the
+   benches, and CLOSE puts the blade veining across the viewport. */
+const ESTABLISH = 9.0, CLOSE = 1.45;
+
+function frameToFit(obj, pad = 1.6){
+  const box = new THREE.Box3().setFromObject(obj);
+  if (box.isEmpty()) return;
+  const size = box.getSize(new THREE.Vector3());
+  const mid = box.getCenter(new THREE.Vector3());
+  const vFov = THREE.MathUtils.degToRad(camera.fov);
+  const hFov = 2 * Math.atan(Math.tan(vFov / 2) * camera.aspect);
+  const dist = Math.max((size.y / 2) / Math.tan(vFov / 2),
+                        (Math.max(size.x, size.z) / 2) / Math.tan(hFov / 2)) * pad;
+  const dir = new THREE.Vector3(0.55, 0.40, 0.74).normalize();
+  camera.position.copy(mid).addScaledVector(dir, dist);
+  controls.target.copy(mid);
+  /* Close enough to read the veining on one leaf, far enough back to see the
+     whole house. The specimen is 19 cm inside a 7 m room, so these two cannot
+     sensibly be derived from the same number. */
+  controls.minDistance = 0.045;
+  controls.maxDistance = 12;
+  controls.update();
+}
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1.03, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.07;
+controls.update();
+let modelRoot = null;
+
+// Image-based light, generated in-process — no HDRI file to ship, and the site
+// forbids external requests anyway.
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.55;
+
+/* The pedestal top is the one number the rest of the scene hangs off: the
+   plant sits on it, the camera aims at it, and the shadow camera is centred on
+   it. Naming it once is what stops the plant floating a centimetre above its
+   own plinth the next time the greenhouse changes. */
+const PEDESTAL_TOP = 0.95;
+
+// ---- the greenhouse ---------------------------------------------------------
+/* Built rather than loaded. It is a few hundred triangles of boxes and planes,
+   which is far less to ship than any model of it would be, and it means the
+   room can be resized in one place when the game needs more bench space. */
+const GH = { W: 7.2, D: 5.0, EAVE: 2.35, RIDGE: 3.25 };
+
+const matFrame = new THREE.MeshStandardMaterial({ color:0x27332a, roughness:0.55, metalness:0.25 });
+const matFloor = new THREE.MeshStandardMaterial({ color:0x37332c, roughness:0.94 });
+const matBench = new THREE.MeshStandardMaterial({ color:0x4a3b2a, roughness:0.85 });
+const matStone = new THREE.MeshStandardMaterial({ color:0x6a6a63, roughness:0.80 });
+
+/* Glass as a cheap translucent surface, not as refraction.
+   `transmission` would be physically better and costs a full extra render pass
+   per pane; at this opacity, against a bright environment, nobody can tell.
+   `depthWrite:false` because eight overlapping transparent panes sort badly
+   otherwise and flicker as the camera turns. */
+const matGlass = new THREE.MeshStandardMaterial({
+  color: 0xcfe6de, roughness: 0.16, metalness: 0.0,
+  transparent: true, opacity: 0.15, side: THREE.DoubleSide, depthWrite: false,
+});
+
+const house = new THREE.Group();
+
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(GH.W, GH.D).rotateX(-Math.PI/2), matFloor);
+floor.receiveShadow = true;
+house.add(floor);
+
+function bar(w, h, d, x, y, z){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), matFrame);
+  m.position.set(x, y, z);
+  m.castShadow = true;
+  house.add(m);
+  return m;
+}
+function pane(w, h, x, y, z, ry = 0, rx = 0){
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), matGlass);
+  m.position.set(x, y, z);
+  m.rotation.set(rx, ry, 0);
+  house.add(m);
+  return m;
+}
+
+// walls
+pane(GH.W, GH.EAVE, 0,  GH.EAVE/2, -GH.D/2);
+pane(GH.W, GH.EAVE, 0,  GH.EAVE/2,  GH.D/2);
+pane(GH.D, GH.EAVE, -GH.W/2, GH.EAVE/2, 0, Math.PI/2);
+pane(GH.D, GH.EAVE,  GH.W/2, GH.EAVE/2, 0, Math.PI/2);
+
+// the pitched roof, as two leaves hinged on the ridge
+const slopeH = Math.hypot(GH.D/2, GH.RIDGE - GH.EAVE);
+const pitch = Math.atan2(GH.RIDGE - GH.EAVE, GH.D/2);
+for (const sgn of [-1, 1]){
+  const leaf = new THREE.Mesh(new THREE.PlaneGeometry(GH.W, slopeH), matGlass);
+  leaf.position.set(0, (GH.EAVE + GH.RIDGE)/2, sgn * GH.D/4);
+  leaf.rotation.x = sgn * (Math.PI/2 - pitch) * -1 + (sgn > 0 ? 0 : 0);
+  leaf.rotation.x = sgn > 0 ? -(Math.PI/2 - pitch) : (Math.PI/2 - pitch);
+  house.add(leaf);
+}
+
+// corner posts, eave beams and a ridge
+const T = 0.055;
+for (const sx of [-1, 1]) for (const sz of [-1, 1])
+  bar(T, GH.EAVE, T, sx*GH.W/2, GH.EAVE/2, sz*GH.D/2);
+for (const sz of [-1, 1]) bar(GH.W, T, T, 0, GH.EAVE, sz*GH.D/2);
+for (const sx of [-1, 1]) bar(T, T, GH.D, sx*GH.W/2, GH.EAVE, 0);
+bar(GH.W, T, T, 0, GH.RIDGE, 0);
+
+// mullions, and the rafters that carry the roof back to the ridge
+for (let i = -2; i <= 2; i++){
+  const x = i * (GH.W / 5);
+  for (const sz of [-1, 1]) bar(T*0.7, GH.EAVE, T*0.7, x, GH.EAVE/2, sz*GH.D/2);
+  const raf = new THREE.Mesh(new THREE.BoxGeometry(T*0.7, T*0.7, slopeH), matFrame);
+  raf.position.set(x, (GH.EAVE + GH.RIDGE)/2, -GH.D/4);
+  raf.rotation.x = (Math.PI/2 - pitch);
+  house.add(raf);
+  const raf2 = raf.clone();
+  raf2.position.z = GH.D/4;
+  raf2.rotation.x = -(Math.PI/2 - pitch);
+  house.add(raf2);
+}
+
+// potting benches down both long walls, so the room reads as a working house
+for (const sz of [-1, 1]){
+  const top = new THREE.Mesh(new THREE.BoxGeometry(GH.W - 0.6, 0.05, 0.62), matBench);
+  top.position.set(0, 0.78, sz * (GH.D/2 - 0.45));
+  top.castShadow = true; top.receiveShadow = true;
+  house.add(top);
+  for (let i = -2; i <= 2; i++)
+    bar(0.06, 0.78, 0.06, i * ((GH.W - 0.9) / 4), 0.39, sz * (GH.D/2 - 0.45));
+}
+
+// the pedestal the specimen stands on
+const plinth = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.06, 0.42), matStone);
+plinth.position.y = 0.03;
+const column = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.155, PEDESTAL_TOP - 0.10, 24), matStone);
+column.position.y = 0.06 + (PEDESTAL_TOP - 0.10)/2;
+const cap = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.04, 0.34), matStone);
+cap.position.y = PEDESTAL_TOP - 0.02;
+for (const m of [plinth, column, cap]){ m.castShadow = true; m.receiveShadow = true; house.add(m); }
+
+scene.add(house);
+
+// ---- light ------------------------------------------------------------------
+/* One sun through the roof, and its shadow camera tight around the pedestal.
+   The greenhouse is seven metres across and the plant is nineteen centimetres,
+   so a shadow map that covers the room has nothing left over for the leaves —
+   this covers a metre and a half about the specimen and lets the rest of the
+   room get by on ambient. */
+const key = new THREE.DirectionalLight(0xfff2e0, 2.2);
+key.position.set(-2.2, 4.2, 1.9);
+key.target.position.set(0, PEDESTAL_TOP, 0);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+key.shadow.camera.near = 0.5;
+key.shadow.camera.far = 9.0;
+const sc = 1.5;
+Object.assign(key.shadow.camera, { left:-sc, right:sc, top:sc, bottom:-sc });
+key.shadow.bias = -0.0006;
+key.shadow.normalBias = 0.004;
+key.shadow.camera.updateProjectionMatrix();
+scene.add(key);
+scene.add(key.target);
+
+const sky = new THREE.HemisphereLight(0xdfe8ff, 0x2a2a22, 0.55);
+scene.add(sky);
+
+// ---- model -----------------------------------------------------------------
+const SHARE = [0.10, 0.20, 0.32, 0.38];   // must match violet.py
+const LEAF_BONE = /^L(\d+)_(\d+)$/;
+const leafBones = [];                      // {bone, share, k}
+let mixer = null, action = null, skinned = null, leafMat = null, helper = null;
+let baseColor = new THREE.Color(1,1,1);
+
+/* The geometry is Draco-compressed, so the decoder has to be attached before
+   anything will load. DRACOLoader defaults to fetching it from a CDN, and this
+   site makes no external requests at all — so it is served from `vendor/`
+   beside three.js itself, and the decoder runs in a worker off the main thread. */
+const draco = new DRACOLoader();
+draco.setDecoderPath('./vendor/jsm/libs/draco/gltf/');
+draco.setDecoderConfig({ type: 'wasm' });
+
+const loader = new GLTFLoader();
+loader.setDRACOLoader(draco);
+loader.load('./violet.glb', gltf => {
+  const root = gltf.scene;
+  root.traverse(o => {
+    if (o.isMesh || o.isSkinnedMesh) {
+      o.castShadow = true; o.receiveShadow = true;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      mats.forEach(m => { m.side = THREE.DoubleSide; });
+    }
+    if (o.isSkinnedMesh) skinned = o;
+    if (o.isBone) {
+      const m = LEAF_BONE.exec(o.name);
+      if (m) {
+        const i = +m[1], s = +m[2];
+        // outer leaves give up first — same expression as violet.py
+        leafBones.push({ bone:o, share:SHARE[s] ?? SHARE.at(-1),
+                         k: 1.0 + 0.25 * Math.sin(i * 2.4) });
+      }
+    }
+  });
+  // the specimen stands on the pedestal, not on the floor
+  root.position.y = PEDESTAL_TOP;
+  scene.add(root);
+
+  /* Rebuild the blade material as Physical so it can carry sheen.
+   *
+   * The mesh exports as four primitives, one per material slot, and GLTFLoader
+   * turns those into four separate meshes. Picking "the" skinned mesh out of a
+   * traverse therefore lands on whichever came last, and swapping its material
+   * builds one with no maps on it — which is why the leaves came out white.
+   * Match on the material instead, wherever it turns up. */
+  const swapped = new Map();
+  root.traverse(o => {
+    if (!o.isMesh && !o.isSkinnedMesh) return;
+    const arr = Array.isArray(o.material) ? o.material : [o.material];
+    const next = arr.map(m => {
+      if (!m || !/leaf/i.test(m.name)) return m;
+      if (swapped.has(m)) return swapped.get(m);
+      const pm = new THREE.MeshPhysicalMaterial({
+        map: m.map, normalMap: m.normalMap, roughnessMap: m.roughnessMap,
+        roughness: 1.0, metalness: 0.0, side: THREE.DoubleSide,
+        // the hairs are not in the GLB; sheen stands in for the light they scatter
+        sheen: 0.7, sheenRoughness: 0.5, sheenColor: new THREE.Color(0x8fa07a),
+        normalScale: m.normalScale ? m.normalScale.clone() : new THREE.Vector2(1, 1),
+      });
+      swapped.set(m, pm);
+      leafMat = pm;
+      return pm;
+    });
+    o.material = Array.isArray(o.material) ? next : next[0];
+  });
+  if (leafMat) baseColor = leafMat.color.clone();
+
+  if (gltf.animations.length) {
+    mixer = new THREE.AnimationMixer(root);
+    action = mixer.clipAction(gltf.animations[0]);
+    action.play();
+  }
+
+  helper = new THREE.SkeletonHelper(root);
+  helper.visible = false;
+  scene.add(helper);
+
+  let tris = 0;
+  root.traverse(o => {
+    if (o.geometry) {
+      const g = o.geometry;
+      tris += (g.index ? g.index.count : g.attributes.position.count) / 3;
+    }
+  });
+  $('#s-tris').textContent = Math.round(tris).toLocaleString();
+  $('#s-bones').textContent = leafBones.length ? new Set(leafBones.map(b=>b.bone.name)).size + 12 : '–';
+  modelRoot = root;
+  /* Open on the room, not on the plant. You are meant to arrive in a
+     greenhouse and see a specimen standing on a pedestal in the middle of it;
+     the close inspection is the thing you then choose to do. */
+  frameToFit(root, ESTABLISH);
+  $('#load').remove();
+  if (DEV) $('#panel').hidden = false;
+  else     $('#hud').hidden = false;
+}, undefined, err => { $('#load').textContent = 'failed to load violet.glb'; fail(err); });
+
+// ---- controls ---------------------------------------------------------------
+const ui = { droop:0, chlor:0, wind:1, playing:true, spin:false };
+function bindRange(id, key){
+  const el = $('#'+id), out = el.nextElementSibling;
+  const sync = () => { ui[key] = +el.value; out.value = (+el.value).toFixed(2); };
+  el.addEventListener('input', sync); sync();
+}
+bindRange('droop','droop'); bindRange('chlor','chlor'); bindRange('wind','wind');
+
+function toggle(id, key, onLabel, offLabel){
+  const el = $('#'+id);
+  el.addEventListener('click', () => {
+    ui[key] = !ui[key];
+    el.setAttribute('aria-pressed', String(ui[key]));
+    if (onLabel) el.textContent = ui[key] ? onLabel : offLabel;
+  });
+  return el;
+}
+toggle('play','playing','Pause','Play');
+toggle('spin','spin');
+$('#wire').addEventListener('click', e => {
+  const on = e.target.getAttribute('aria-pressed') !== 'true';
+  e.target.setAttribute('aria-pressed', String(on));
+  scene.traverse(o => {
+    if (o.isMesh || o.isSkinnedMesh) {
+      (Array.isArray(o.material)?o.material:[o.material]).forEach(m => m.wireframe = on);
+    }
+  });
+});
+$('#bones').addEventListener('click', e => {
+  const on = e.target.getAttribute('aria-pressed') !== 'true';
+  e.target.setAttribute('aria-pressed', String(on));
+  if (helper) helper.visible = on;
+});
+$('#reset').addEventListener('click', () => { if (modelRoot) frameToFit(modelRoot, ESTABLISH); });
+$('#close').addEventListener('click', () => { if (modelRoot) frameToFit(modelRoot, CLOSE); });
+
+// A gust is a struck spring: energy in, then damped oscillation out. Cheap, and
+// it is the shape real secondary motion has — the leaves overshoot and settle
+// rather than snapping back.
+let gustV = 0, gustX = 0;
+$('#gust').addEventListener('click', () => { gustV += 7.0; });
+
+// ---- loop -------------------------------------------------------------------
+let last = performance.now();
+let fpsT = 0, fpsN = 0;
+const YELLOW = new THREE.Color(0.62, 0.55, 0.16);
+
+renderer.setAnimationLoop(() => {
+  const now = performance.now();
+  const dt = Math.min((now - last) / 1000, 0.05);
+  last = now;
+
+  // damped spring for the gust
+  gustV += (-38.0 * gustX - 5.2 * gustV) * dt;
+  gustX += gustV * dt;
+
+  if (mixer && ui.playing) mixer.update(dt);
+  if (action) action.setEffectiveWeight(Math.max(0, ui.wind + gustX * 0.35));
+
+  // Droop is applied *after* the mixer writes the wind pose, exactly as
+  // violet.py adds the wind offset on top of a droop base. Same bones, same
+  // shares — the browser is not approximating the Blender rig, it is running it.
+  if (leafBones.length){
+    const total = THREE.MathUtils.degToRad(78) * ui.droop;
+    const extra = gustX * 0.05;
+    for (const {bone, share, k} of leafBones){
+      bone.rotation.x -= total * share * k;
+      bone.rotation.z += extra * share * k;
+    }
+    // a thirsty plant has already given up; it moves less
+    if (action) action.setEffectiveWeight(
+      Math.max(0, (ui.wind + gustX * 0.35) * (1 - 0.55 * ui.droop)));
+  }
+
+  if (leafMat) leafMat.color.copy(baseColor).lerp(YELLOW, ui.chlor * 0.85);
+
+  if (ui.spin){
+    const a = 0.25 * dt;
+    camera.position.applyAxisAngle(new THREE.Vector3(0,1,0), a);
+  }
+  controls.update();
+  renderer.render(scene, camera);
+
+  fpsN++; fpsT += dt;
+  if (fpsT >= 0.5){
+    $('#s-fps').textContent = Math.round(fpsN / fpsT);
+    $('#s-calls').textContent = renderer.info.render.calls;
+    fpsN = 0; fpsT = 0;
+  }
+});
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>

@@ -84,6 +84,15 @@
          image-rendering: pixelated; background: var(--edge);
          border-bottom: 2px solid var(--edge); }
 
+  /* One card is a photograph rather than a pixel drawing, and `pixelated` is
+     inherited from the rule above — on a rendered image it turns a soft
+     gradient into visible blocks, so it has to be turned back off explicitly. */
+  .shot.photo{ image-rendering: auto; object-fit: cover; }
+
+  /* A game that is not playable yet says so on its own card. Better here than
+     as a surprise on the other side of the click. */
+  .tags li.wip{ color: var(--muted); border-color: #4a4036; }
+
   .about{ padding: 1.1rem 1.25rem 1.35rem; }
   .about h2{ margin:0 0 .35rem; font-size: 1.4rem; letter-spacing:.01em; }
   .about p{ margin:0 0 .85rem; color: var(--muted); font-size: .95rem; }
@@ -111,8 +120,8 @@
 
 <header>
   <h1>Good Vibe Games</h1>
-  <p>Two co-op games about growing something back. Share a room code, take a
-     seat, play in the browser — no install and no account.</p>
+  <p>Games about growing something back. Share a room code, take a seat, play
+     in the browser — no install and no account.</p>
 </header>
 
 <main>
@@ -142,6 +151,21 @@
         <li>2&ndash;5 players</li>
         <li class="sun">Deck-builder</li>
         <li class="sky">Roguelite</li>
+      </ul>
+    </div>
+  </a>
+  <a class="game" href="/greener-thumbs/">
+    <img class="shot photo" src="/greener-thumbs/bonsai-thumb.webp" width="640" height="380"
+         loading="lazy" decoding="async"
+         alt="A bonsai on a stone pedestal in a raked gravel garden, lit by a low sun.">
+    <div class="about">
+      <h2>Greener Thumbs</h2>
+      <p>Collect specimens and keep them alive. Three species, a greenhouse, and
+         a season that runs a real week.</p>
+      <ul class="tags">
+        <li>Single player</li>
+        <li class="sun">Collection</li>
+        <li class="wip">In development</li>
       </ul>
     </div>
   </a>

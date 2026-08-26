@@ -5,16 +5,37 @@ keep them alive in a greenhouse. Photorealistic 3D, ecologically accurate, no
 crossbreeding. Three starting species: **African Violet**, **Daylily**,
 **Yellow Daffodil**.
 
-This directory is the asset pipeline, not the game. Nothing here ships to the
-site yet.
+This directory is the asset pipeline. Two of its outputs now ship: the browser
+scene reads `violet.glb`, and the title screen and the card on the home page are
+both `bonsai.webp`.
 
 ## What is here
 
-    violet.py    a parametric African Violet, built and rendered headless
-    species/     what each plant IS, how it declines, and the shared
-                 state model all three are simulated by
-    v-h.png      it, healthy
-    w-bad.png    it, neglected — see "what is broken"
+    violet.py      a parametric African Violet, built and rendered headless
+    export_web.py  the same plant as a GLB the browser can carry
+    bonsai.py      the title art: a bonsai on a pedestal in a zen garden
+    species/       what each plant IS, how it declines, and the shared
+                   state model all three are simulated by
+    v-h.png        the violet, healthy
+    w-bad.png      it, neglected — see "what is broken"
+
+## What it feeds
+
+    public/greener-thumbs/index.html   title screen, over bonsai.webp
+    public/greener-thumbs/play.html    the greenhouse, reading violet.glb
+    public/greener-thumbs/bonsai.webp        1920x1140 plate, ~88 KB
+    public/greener-thumbs/bonsai-thumb.webp  640x380 card,  ~18 KB
+    public/greener-thumbs/violet.glb         Draco + WebP,  ~428 KB
+
+`play.html` takes `?dev=1`. Without it you get the room and a name plate; with
+it you get the inspector — thirst, chlorosis, wind, wireframe, skeleton, and a
+close-up framing. The switch on the title screen is what sets it, and it
+remembers your choice.
+
+The GLB is Draco-compressed with WebP textures, which took it from 7.65 MB to
+428 KB. Draco alone would not have: the vertex data was 15% of that file and
+the six texture maps were 82% of it. If it ever balloons again, look at the
+maps before the mesh.
 
 ## Running it
 
@@ -42,7 +63,14 @@ finishes; the same three models driven by numbers is.
 
 ## What is broken
 
-**The wilt is wrong.** `droop` should make the outer leaves lose turgor and hang
+**Three things that were wrong are fixed** (Aug 2026): leaves no longer clip the
+pot — the pot was a sealed cone with a lid on it, and the crown sat underneath
+that lid; the petals had no UVs and no texture; and `make_image` reversed every
+texture's rows, which ran all of them backwards down their own surface. There is
+a `check_pot_clipping()` beside `check_clipping()` now, because the old check
+only ever compared leaves with each other and could not see the pot at all.
+
+**The wilt is still worth revisiting.** `droop` should make the outer leaves hang
 down beside the pot like wet cloth, from the tip back, with the crown staying
 upright. Instead eleven rigid blades close over the pot like a fist, and the pot
 shows through the gaps. Two attempts at it:

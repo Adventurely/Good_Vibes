@@ -11,6 +11,9 @@ const TYPES = {
   '.json': 'application/json; charset=utf-8',
   '.png': 'image/png',
   '.svg': 'image/svg+xml',
+  '.glb': 'model/gltf-binary',
+  '.wasm': 'application/wasm',
+  '.webp': 'image/webp',
 };
 
 /* Resolve a URL path to a file inside public/, or null.

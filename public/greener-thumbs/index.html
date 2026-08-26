@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Greener Thumbs</title>
+<meta name="description" content="Collect plant specimens and keep them alive. A greenhouse, three species, and a season that runs a real week.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230e1410'/%3E%3Cpath d='M8 14V6' stroke='%236cc24a' stroke-width='1.6'/%3E%3Cpath d='M8 7C8 4 6 2 3 2c0 3 2 5 5 5zM8 9c0-3 2-5 5-5 0 3-2 5-5 5z' fill='%236cc24a'/%3E%3C/svg%3E">
+<style>
+  /* The palette is the site's, shifted green: this is the same company as the
+     other two games, but it is a greenhouse rather than a solarpunk plaza. */
+  :root{
+    --ink:      #0e1410;
+    --paper:    #eef3e6;
+    --muted:    #9db09a;
+    --leaf:     #6cc24a;
+    --leaf-deep:#3f8f38;
+    --edge:     #2a3a2c;
+    --sun:      #ffd23f;
+  }
+  *{ box-sizing: border-box; }
+  html, body{ height: 100%; }
+  body{
+    margin: 0;
+    background: var(--ink);
+    color: var(--paper);
+    font: 16px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    overflow: hidden;
+  }
+
+  /* The plate is the same picture as the card on the home page, at full size.
+     `object-fit: cover` because it has to hold every aspect ratio from a phone
+     in portrait to an ultrawide, and the bonsai sits centre-right in frame with
+     room around it precisely so this crop cannot cut it. */
+  .plate{
+    position: fixed; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    object-position: 58% 45%;
+    z-index: 0;
+  }
+  /* Two washes, not one: a vertical gradient so the title has something to sit
+     on, and a flat scrim so the buttons keep their contrast over the bright
+     gravel at the bottom of the picture. */
+  .veil{
+    position: fixed; inset: 0; z-index: 1;
+    background:
+      linear-gradient(180deg, rgba(6,10,7,.82) 0%, rgba(6,10,7,.30) 38%,
+                              rgba(6,10,7,.55) 72%, rgba(6,10,7,.92) 100%),
+      radial-gradient(80% 60% at 30% 40%, rgba(6,10,7,0) 0%, rgba(6,10,7,.55) 100%);
+  }
+
+  main{
+    position: fixed; inset: 0; z-index: 2;
+    display: grid;
+    grid-template-rows: 1fr auto 1fr;
+    justify-items: center;
+    padding: clamp(1.2rem, 4vw, 3rem);
+    text-align: center;
+  }
+  .wrap{ grid-row: 2; max-width: 54rem; width: 100%; }
+
+  .eyebrow{
+    margin: 0 0 .5rem;
+    font-size: clamp(.7rem, 2vw, .82rem);
+    letter-spacing: .34em; text-transform: uppercase;
+    color: var(--leaf);
+  }
+  h1{
+    margin: 0;
+    /* Sized to keep 'Greener Thumbs' on one line down to about a
+       420px viewport; below that it wraps, which is fine, but at
+       desktop widths a wrap dropped the second word onto the tree. */
+    font-size: clamp(2.15rem, 8.2vw, 5.2rem);
+    line-height: .95;
+    letter-spacing: -.02em;
+    font-weight: 800;
+    background: linear-gradient(180deg, #eaf7e0 0%, var(--leaf) 118%);
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent;
+    text-shadow: 0 2px 30px rgba(0,0,0,.5);
+  }
+  .tag{
+    margin: .9rem auto 0; max-width: 34rem;
+    color: var(--muted);
+    font-size: clamp(.95rem, 2.6vw, 1.08rem);
+  }
+
+  .actions{
+    margin-top: clamp(1.6rem, 4vw, 2.4rem);
+    display: flex; flex-direction: column; align-items: center;
+    gap: 1.1rem;
+  }
+
+  .enter{
+    display: inline-block;
+    padding: .85rem 2.6rem;
+    border: 0; border-radius: 999px;
+    background: linear-gradient(180deg, var(--leaf) 0%, var(--leaf-deep) 100%);
+    color: #08120a;
+    font: inherit; font-weight: 800; font-size: 1.05rem;
+    letter-spacing: .04em; text-transform: uppercase; text-decoration: none;
+    cursor: pointer;
+    box-shadow: 0 10px 30px rgba(0,0,0,.45);
+    transition: transform .12s ease, filter .12s ease;
+  }
+  .enter:hover, .enter:focus-visible{ transform: translateY(-2px); filter: brightness(1.08); }
+  .enter:focus-visible{ outline: 3px solid var(--sun); outline-offset: 3px; }
+
+  /* The mode switch. A real control rather than a link, because which mode you
+     are entering has to be visible *before* you press the button — the two do
+     genuinely different things. */
+  .mode{
+    display: inline-flex; align-items: center; gap: .8rem;
+    padding: .5rem .75rem .5rem 1rem;
+    border: 1px solid var(--edge); border-radius: 999px;
+    background: rgba(10,16,11,.72);
+    backdrop-filter: blur(6px);
+  }
+  .mode > span{ font-size: .9rem; color: var(--muted); }
+  .switch{
+    position: relative; width: 3.1rem; height: 1.7rem;
+    border: 1px solid var(--edge); border-radius: 999px;
+    background: #1a241b; cursor: pointer; padding: 0;
+    transition: background .15s ease, border-color .15s ease;
+  }
+  .switch::after{
+    content: ''; position: absolute; top: 2px; left: 2px;
+    width: 1.3rem; height: 1.3rem; border-radius: 50%;
+    background: var(--muted);
+    transition: transform .15s ease, background .15s ease;
+  }
+  .switch[aria-checked="true"]{ background: #1d3a22; border-color: var(--leaf-deep); }
+  .switch[aria-checked="true"]::after{ transform: translateX(1.4rem); background: var(--leaf); }
+  .switch:focus-visible{ outline: 3px solid var(--sun); outline-offset: 3px; }
+
+  .modehint{
+    margin: 0; min-height: 1.4em;
+    font-size: .86rem; color: var(--muted);
+  }
+  .modehint b{ color: var(--paper); font-weight: 600; }
+
+  .back{
+    grid-row: 3; align-self: end;
+    color: var(--muted); font-size: .85rem; text-decoration: none;
+  }
+  .back:hover{ color: var(--paper); }
+
+  .wip{
+    display: inline-block; margin-top: .9rem;
+    padding: .18rem .6rem; border-radius: 999px;
+    border: 1px solid var(--leaf-deep); color: var(--leaf);
+    font-size: .72rem; letter-spacing: .12em; text-transform: uppercase;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .enter{ transition: none; }
+    .enter:hover, .enter:focus-visible{ transform: none; }
+  }
+</style>
+</head>
+<body>
+
+<img class="plate" src="./bonsai.webp" alt="A bonsai on a stone pedestal in a raked gravel garden, lit by a low sun.">
+<div class="veil"></div>
+
+<main>
+  <div class="wrap">
+    <p class="eyebrow">Good Vibe Games</p>
+    <h1>Greener Thumbs</h1>
+    <p class="tag">Collect specimens and keep them alive. Three species, a greenhouse,
+       and a season that runs a real week &mdash; neglect shows, and it kills.</p>
+
+    <div class="actions">
+      <div class="mode">
+        <span id="mode-label">Dev mode</span>
+        <button class="switch" id="dev" role="switch" aria-checked="false"
+                aria-labelledby="mode-label"></button>
+      </div>
+      <p class="modehint" id="hint"></p>
+      <a class="enter" id="enter" href="./play.html">Enter the greenhouse</a>
+      <span class="wip">Early build &mdash; the care simulation is not written yet</span>
+    </div>
+  </div>
+
+  <a class="back" href="/">&larr; all Good Vibe Games</a>
+</main>
+
+<script type="module">
+const sw    = document.getElementById('dev');
+const enter = document.getElementById('enter');
+const hint  = document.getElementById('hint');
+
+/* Dev mode is remembered, because the person who wants it wants it every time
+   and the person who does not will never touch the switch. localStorage can
+   throw outright in a private window, so every read and write is guarded and
+   the page has to render correctly having learned nothing. */
+const KEY = 'gt:dev';
+function remembered(){
+  try { return localStorage.getItem(KEY) === '1'; } catch { return false; }
+}
+function remember(on){
+  try { localStorage.setItem(KEY, on ? '1' : '0'); } catch { /* fine */ }
+}
+
+const HINTS = {
+  on:  '<b>Dev mode.</b> Free camera, inspector panel, and the plant parameters exposed live.',
+  off: '<b>Game run.</b> The greenhouse as a player sees it, with no debug tools.',
+};
+
+let dev = remembered();
+
+function apply(){
+  sw.setAttribute('aria-checked', String(dev));
+  hint.innerHTML = dev ? HINTS.on : HINTS.off;
+  // The mode travels in the URL, so a dev-mode session is a link you can send
+  // to someone and a bookmark that still means what it meant.
+  enter.setAttribute('href', dev ? './play.html?dev=1' : './play.html');
+}
+
+sw.addEventListener('click', () => {
+  dev = !dev;
+  remember(dev);
+  apply();
+});
+
+// Enter on the page, not just on the button — a title screen should take the
+// most obvious key there is.
+addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target === document.body) enter.click();
+});
+
+apply();
+</script>
+</body>
+</html>
