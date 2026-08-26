@@ -14,16 +14,23 @@
  *   node test/balance.mjs              every table size, 400 runs each
  *   node test/balance.mjs 1000         a tighter interval
  *
- * The dial it reports on is THREAT_PER_PLAYER in public/content.js. Round
- * losses tell you which entry to move: round three losing 60% of the runs that
- * reach it is that round's number, not the boss's.
+ * The dials it reports on are in public/good-vibes/content.js, and there are
+ * fewer of them than there used to be. A wave is the same wave at every table
+ * size now, so what moves the *height* of the curve is `WAVE_PATTERN` and the
+ * `hp`/`hits` in `ENEMIES`, and what moves the *tilt* between table sizes is
+ * `HP_PER_PLAYER` alone. Turn the height first; the tilt only means anything
+ * once the line is at the right level.
+ *
+ * The round losses tell you where to look: round three losing 60% of the runs
+ * that reach it is that round's wave, not the boss's.
  */
 
 import { roomFor } from '../src/rooms.js';
 import {
-  PHASES, BOSS_ROUND, CARDS, cardEffect, cardPlayable, playableClasses,
-  RECIPES, BUILDINGS, UPGRADES, upgradeCost, canAfford, pathTo, hasEffect,
-  effectAmount, MODIFIERS, SPELL_SLOTS,
+  PHASES, BOSS_ROUND, CARDS, cardEffect, actionReady, playableClasses,
+  RECIPES, BUILDINGS, canAfford, pathTo, hasEffect,
+  effectAmount, MODIFIERS, SPELL_SLOTS, classById, nodeYield,
+  ABILITIES, placeRefusal, worksFrom, missingForBuilding,
 } from '../public/good-vibes/content.js';
 
 const RUNS = Number(process.argv[2]) || 400;
@@ -47,18 +54,20 @@ function playBuild(room){
   const seated = room.players.filter(p => p.classId);
 
   // Gather, round-robin, until nothing reachable is left. Round-robin rather
-  // than one player sweeping, because the Alchemist's doubled yield should
-  // land on the herbs and a real table lets her take them.
+  // than one player sweeping, because a node pays what the seat standing on it
+  // is worth there and a real table routes the right person to the right find.
   for(let pass = 0; pass < 40; pass++){
     let took = false;
     for(const player of seated){
-      // Herbs are the Alchemist's alone now — anyone else walking onto one
-      // leaves it in the ground, so the model does not waste passes trying.
-      const gathers = player.classId === 'alchemist';
-      const wants = room.nodes.filter(n => !n.taken && (gathers || n.kind !== 'herb'));
+      const cls = classById(player.classId);
+      // A seat the stat prices at nothing leaves the node standing, so the
+      // model does not waste passes walking to one it cannot take. Among what
+      // it can take, richest first and nearest to break the tie: that is the
+      // Alchemist onto herbs and the Engineer onto caches without either being
+      // named here, which is the point of pricing by stat rather than by owner.
+      const wants = room.nodes.filter(n => !n.taken && nodeYield(cls, n) > 0);
       const ordered = [...wants].sort((a, b) => {
-        const pref = (n) => (gathers ? (n.kind === 'herb' ? 0 : 1) : (n.kind === 'herb' ? 1 : 0));
-        if(pref(a) !== pref(b)) return pref(a) - pref(b);
+        if(nodeYield(cls, a) !== nodeYield(cls, b)) return nodeYield(cls, b) - nodeYield(cls, a);
         return (Math.abs(a.x - player.x) + Math.abs(a.y - player.y))
              - (Math.abs(b.x - player.x) + Math.abs(b.y - player.y));
       });
@@ -71,27 +80,53 @@ function playBuild(room){
     if(!took) break;
   }
 
-  // Build: a panel first so the bolt gun works at all, then the workbench, then
-  // more panels. Upgrades take whatever is left.
+  /* The works, played the way the fork asks to be played.
+   *
+   * Screws buy both halves of his combat and there is never enough for both:
+   * panels are the power to fire an ability, a line is what the ability is
+   * worth. So the model builds a small array first — nothing can be fired
+   * without one — then drives a single line as deep as it will go, because
+   * DRAW rewards depth over breadth and three tiers of one beats one tier of
+   * three. Chips go on the ability that draws whatever is standing.
+   *
+   * The Bolt Gun comes first of all. It is the only ability that needs no
+   * building, so it is the only thing a round-one Engineer can actually fire.
+   */
   const engineer = seated.find(p => p.classId === 'engineer');
   if(engineer){
     const cls = { build: true };
-    for(let i = 0; i < 6; i++){
-      const wanted = !room.buildings.some(b => b.id === 'panel') ? 'panel'
-        : !room.buildings.some(b => b.id === 'workbench') ? 'workbench' : 'panel';
-      if(!canAfford(BUILDINGS[wanted].costs, room.salvage)) break;
-      const spot = freeTile(room);
-      if(!spot) break;
+    const standing = id => room.buildings.some(b => b.id === id);
+
+    const learn = id => {
+      if(room.abilities.includes(id)) return;
+      room.learn(engineer, cls, { ability: id });
+    };
+    const raise = id => {
+      if(Object.keys(missingForBuilding(id, room.salvage)).length) return false;
+      const spot = spotFor(room, id);
+      if(!spot) return false;
       const before = room.buildings.length;
-      room.place(engineer, cls, { building: wanted, x: spot.x, y: spot.y });
-      if(room.buildings.length === before) break;      // refused; stop asking
+      room.place(engineer, cls, { building: id, x: spot.x, y: spot.y });
+      return room.buildings.length > before;
+    };
+
+    learn('boltgun');
+
+    // Enough array to fire something, then the line, then back to the array
+    // with whatever is left. Six passes, because a good round can afford more
+    // than one thing and a bad one should stop asking.
+    const line = ['heliostat', 'mirrorfield', 'furnace'];
+    for(let i = 0; i < 8; i++){
+      const panels = room.buildings.filter(b => b.id === 'panel').length;
+      const next = panels < 2 ? 'panel'
+        : line.find(id => !standing(id)) || 'panel';
+      if(!raise(next)) break;
     }
-    for(let i = 0; i < 6; i++){
-      const id = Object.keys(UPGRADES).find(u =>
-        canAfford(upgradeCost(u, room.upgrades[u] || 0), room.salvage));
-      if(!id) break;
-      room.upgrade(engineer, cls, { upgrade: id });
-    }
+
+    // What the standing lines can draw, cheapest first, and the community
+    // machines with whatever coil turned up.
+    for(const id of ['sunlance', 'closeranks', 'allhands', 'holdcharge']) learn(id);
+    for(const id of ['press', 'glasshouse', 'barrow', 'windrow']) raise(id);
   }
 
   // The scriptorium: pages are crafting currency now, so spend every one.
@@ -161,6 +196,36 @@ function playBuild(room){
 
 const cost = costs => Object.values(costs).reduce((a, b) => a + b, 0);
 
+/* The first tile this building may legally stand on, or null.
+ *
+ * `freeTile` was enough when the only rule was "somewhere clear". It is not
+ * any more: a Living Wall has to touch its Trellis, a Cistern has to touch
+ * water, and a Carillon belongs at the camp. So the model scans for a tile the
+ * shared rule accepts rather than picking the first clear one and being
+ * refused — which would have looked like an Engineer who never built anything.
+ *
+ * Panels prefer a tile beside another panel, because that is the difference
+ * between an array worth N and one worth 2N, and a model that scattered them
+ * would under-rate the whole line.
+ */
+function spotFor(room, id){
+  const ok = (x, y) => placeRefusal(id, {
+    terrain: room.terrain, buildings: room.buildings, nodes: room.nodes, x, y,
+  }) === null;
+
+  if(id === 'panel'){
+    for(const panel of room.buildings.filter(b => b.id === 'panel')){
+      for(const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]){
+        if(ok(panel.x + dx, panel.y + dy)) return { x: panel.x + dx, y: panel.y + dy };
+      }
+    }
+  }
+  for(let y = 0; y < 17; y++){
+    for(let x = 0; x < 30; x++) if(ok(x, y)) return { x, y };
+  }
+  return null;
+}
+
 function freeTile(room){
   for(let y = 0; y < 17; y++){
     for(let x = 0; x < 30; x++){
@@ -185,18 +250,23 @@ function freeTile(room){
  * players who are worse than the people who will eventually play this.
  */
 function pickCard(room, player){
-  // A crafted spell reads its numbers off the book and costs nothing to play;
-  // everything else answers to the card table and its costs.
-  const hand = player.hand
-    .map((id, index) => {
+  /* Everything this seat could do, filtered to what it can afford right now.
+   *
+   * It used to read a hand of three. There is no hand: a seat's options are a
+   * fixed list and what varies is which of them its pools can pay for, so the
+   * model chooses from everything and `actionReady` does the filtering — the
+   * same function the room and the client both call, so a play this model
+   * thinks is legal is one the room will accept.
+   *
+   * Two seats always have something: a basic swing and a basic guard cost
+   * nothing, so `hand` is never empty and the model never idles through a
+   * round it could have acted in. */
+  const hand = room.actionIds(player)
+    .map((id) => {
       const spell = room.spellFor(player, id);
-      return { id, index, card: CARDS[id], effect: spell ? spell.effect : cardEffect(id, room.upgrades), spell };
+      return { id, card: CARDS[id], effect: spell ? spell.effect : cardEffect(id, room.works), spell };
     })
-    // `hp` is the Hauler's price: a card that would take the last point is not
-    // a legal play, and without this the model spends down through the floor.
-    .filter(c => c.card && (c.spell || cardPlayable(c.id, {
-      pages: room.pages, power: room.power, classId: player.classId, hp: player.hp,
-    })));
+    .filter(c => (c.card || c.spell) && actionReady(c.id, room.seatState(player), c.spell).ok);
   if(!hand.length) return null;
 
   const alive = room.enemies.filter(e => e.hp > 0);
@@ -309,7 +379,7 @@ function pickCard(room, player){
 
 const totalHp = list => list.reduce((sum, e) => sum + e.hp, 0);
 const aim = (choice, target) =>
-  ({ t: 'play', card: choice.id, index: choice.index, target });
+  ({ t: 'action', id: choice.id, target });
 
 /* ------------------------------------------------------------- a whole run --- */
 

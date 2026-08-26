@@ -326,6 +326,15 @@ export function createAudio(){
       hit(t, 0.12, 0.06, 1800, 'bandpass');
       [67, 74].forEach((n, i) => voice(midi(n), t + 0.06 + i * 0.08, 0.26, 'triangle', 0.06));
     },
+    /* The grid told to bank a round. A contactor drops out and the hum sits
+       there holding, which is the whole of what the card does: nothing now,
+       twice as much next. The one effect in the game that is a sound of
+       something *not* happening. */
+    hold(t){
+      hit(t, 0.06, 0.05, 400, 'lowpass');
+      voice(midi(43), t + 0.04, 0.42, 'square', 0.05);
+      voice(midi(50), t + 0.06, 0.4, 'triangle', 0.035);
+    },
 
     /* ---- what the blight leaves behind ---------------------------------
        Three ailments, three shapes, all of them descending: a status is
@@ -337,6 +346,21 @@ export function createAudio(){
     /* The generic one, for an ailment landing whose kind the client did not
        recognise. Better a thud than silence. */
     ail(t){ voice(midi(53), t, 0.3, 'sawtooth', 0.05, midi(45)); },
+
+    /* ---- what the wave does to itself ----------------------------------
+       The two intents that land nothing. Both have to read as *worse coming*
+       rather than as something happening now, so both rise — the only two
+       sounds in the table that do, which is what sets them against the
+       descending ailments above. */
+    charge(t){
+      // Drawing breath. A note winding upward that stops without arriving.
+      voice(midi(38), t, 0.46, 'sawtooth', 0.07, midi(52));
+      hit(t + 0.3, 0.16, 0.05, 800, 'highpass');
+    },
+    bolster(t){
+      // Something swelling, and pleased about it.
+      [43, 50, 55].forEach((n, i) => voice(midi(n), t + i * 0.06, 0.34, 'square', 0.05, midi(n + 5)));
+    },
 
     /* ---- a thing dying -------------------------------------------------
      *
