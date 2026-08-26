@@ -405,6 +405,39 @@ const matGlass = new THREE.MeshStandardMaterial({
   transparent: true, opacity: 0.11, side: THREE.DoubleSide, depthWrite: false,
 });
 
+/* Real refraction, on the four wall panes and nowhere else.
+   `transmission` is what glass actually does — it bends and tints what is
+   behind it rather than fading toward it — and the difference shows most at a
+   grazing angle, which is exactly how you see a greenhouse wall from inside.
+
+   The cost is one extra render of the scene per frame, not one per pane:
+   three.js draws the opaque world into a transmission buffer once and every
+   transmissive surface samples it. So four panes cost the same as forty, and
+   the reason the roof and the vents keep the cheap material is not their
+   number, it is that nothing behind them is close enough to refract — they
+   look at sky.
+
+   `transparent` stays false on purpose. Transmission does its own blending,
+   and flagging it transparent as well puts it back in the sorted pass this was
+   meant to get out of.
+
+   The grime map drives roughness here too, which is better than it was: on a
+   transmissive surface, roughness frosts what you see *through* the glass, so
+   the streaks and dust actually obscure the garden instead of just catching
+   the light. */
+const matGlassWall = new THREE.MeshPhysicalMaterial({
+  color: 0xf2fbf7,
+  roughness: 0.055,
+  roughnessMap: texGrime,
+  metalness: 0.0,
+  transmission: 1.0,
+  thickness: 0.004,        // 4 mm, which is what horticultural glass is
+  ior: 1.52,
+  specularIntensity: 1.0,
+  transparent: false,
+  side: THREE.DoubleSide,
+});
+
 const house = new THREE.Group();
 scene.add(house);
 
@@ -415,8 +448,8 @@ function box(w, h, d, x, y, z, mat, group = house){
   group.add(m);
   return m;
 }
-function pane(w, h, x, y, z, ry = 0, rx = 0){
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), matGlass);
+function pane(w, h, x, y, z, ry = 0, rx = 0, mat = matGlass){
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
   m.position.set(x, y, z);
   m.rotation.set(rx, ry, 0);
   house.add(m);
@@ -437,8 +470,10 @@ for (const sx of [-1, 1]) box(0.20, 0.05, GH.D + 0.20, sx*GH.W/2, GH.WALL + 0.02
 
 // ---- glazing ----------------------------------------------------------------
 const GLASS_H = GH.EAVE - GH.WALL;
-for (const sz of [-1, 1]) pane(GH.W, GLASS_H, 0, GH.WALL + GLASS_H/2, sz*GH.D/2);
-for (const sx of [-1, 1]) pane(GH.D, GLASS_H, sx*GH.W/2, GH.WALL + GLASS_H/2, 0, Math.PI/2);
+for (const sz of [-1, 1])
+  pane(GH.W, GLASS_H, 0, GH.WALL + GLASS_H/2, sz*GH.D/2, 0, 0, matGlassWall);
+for (const sx of [-1, 1])
+  pane(GH.D, GLASS_H, sx*GH.W/2, GH.WALL + GLASS_H/2, 0, Math.PI/2, 0, matGlassWall);
 
 const slopeH = Math.hypot(GH.D/2, GH.RIDGE - GH.EAVE);
 const pitch  = Math.atan2(GH.RIDGE - GH.EAVE, GH.D/2);
