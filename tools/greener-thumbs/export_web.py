@@ -21,7 +21,7 @@ normal map, because glTF has no bump node.
 **Hair is off.** Particle hair has no glTF representation. The browser gets the
 sheen term instead, which is what it was standing in for anyway.
 """
-import bpy, os, sys
+import bpy, bmesh, os, sys
 import numpy as np
 
 # `__file__` is not set when this is exec'd with a fresh globals dict, which is
@@ -148,11 +148,93 @@ for m in list(plant.modifiers):
         plant.modifiers.remove(m)
 
 
+# ---- the fuzz, as a shell ---------------------------------------------------
+"""Particle hair has no glTF representation, so this used to ship nothing and
+let the sheen term stand in for it. Sheen gives the soft response but not the
+thing you actually see: a violet leaf has a pale halo of separate hairs all
+round its edge, and every photograph of one is full of it.
+
+A shell does carry. The blade is duplicated, pushed a millimetre out along its
+own normals, and punched through with an alpha mask, so what survives reads as
+thousands of little hairs standing off the surface — most of all on the
+silhouette, which is exactly where fuzz is visible and where a sheen term can
+never put anything. One shell, ~9k triangles, and it skins off the same
+armature so it droops with the leaf under it."""
+FUZZ_OFF = 0.0011          # 1.1 mm, a shade longer than violet.py's hairs
+FUZZ_TEX = 1024
+
+_r = np.random.default_rng(4)
+_n = _r.random((FUZZ_TEX, FUZZ_TEX))
+# Two thresholds, so the mask is not a uniform dither: a sparse scatter of
+# stronger hairs over a fine haze of weaker ones.
+_alpha = np.where(_n > 0.855, 1.0, np.where(_n > 0.780, 0.70, 0.0))
+_img = bpy.data.images.new("violet_fuzz_alpha", FUZZ_TEX, FUZZ_TEX,
+                           alpha=True, float_buffer=True)
+_img.colorspace_settings.name = 'Non-Color'
+_rgba = np.ones((FUZZ_TEX, FUZZ_TEX, 4), dtype=np.float32)
+_rgba[..., 3] = _alpha
+_img.pixels.foreach_set(np.ascontiguousarray(_rgba).ravel())
+_img.file_format = 'PNG'
+_img.pack()
+
+fuzz_mat = bpy.data.materials.new("violet_fuzz")
+fuzz_mat.use_nodes = True
+_ft = fuzz_mat.node_tree
+_fb = _ft.nodes["Principled BSDF"]
+_fa = _ft.nodes.new('ShaderNodeTexImage')
+_fa.image = _img
+_fa.location = (-500, 0)
+_ft.links.new(_fa.outputs['Alpha'], _fb.inputs['Alpha'])
+# Hairs are near-colourless and translucent — they read as a pale rim where the
+# light comes through them, which is most of what velvet looks like up close.
+_fb.inputs['Base Color'].default_value = (0.42, 0.47, 0.34, 1.0)
+_fb.inputs['Roughness'].default_value = 0.62
+_fb.inputs['Metallic'].default_value = 0.0
+# What we want is glTF alphaMode MASK — an alpha-blended shell of ten thousand
+# little quads is ten thousand sorting decisions a depth buffer cannot make,
+# and a cutout has none to get wrong. Blender 5 removed the 'CLIP' blend mode
+# that the exporter used to turn into MASK, so there is no longer a way to say
+# it from here: this comes out as BLEND whatever we do, and the viewer converts
+# it back to a cutout on load. Left in with the try because it is harmless on
+# any build that still has it.
+for _bm_name in ('CLIP', 'BLEND'):
+    try:
+        fuzz_mat.blend_method = _bm_name
+        break
+    except Exception:
+        continue
+try:
+    fuzz_mat.alpha_threshold = 0.35
+except Exception:
+    pass
+
+shell = plant.copy()
+shell.data = plant.data.copy()
+shell.name = "violet_fuzz"
+bpy.context.collection.objects.link(shell)
+
+_bm = bmesh.new()
+_bm.from_mesh(shell.data)
+# keep the blade only — no fuzz on the stems, the petals or the anthers
+_drop = [f for f in _bm.faces if f.material_index != 0]
+bmesh.ops.delete(_bm, geom=_drop, context='FACES')
+_bm.verts.ensure_lookup_table()
+for v in _bm.verts:
+    v.co += v.normal * FUZZ_OFF
+_bm.to_mesh(shell.data)
+_bm.free()
+
+shell.data.materials.clear()
+shell.data.materials.append(fuzz_mat)
+for m in list(shell.modifiers):
+    if m.type in {'SOLIDIFY', 'SUBSURF', 'PARTICLE_SYSTEM'}:
+        shell.modifiers.remove(m)
+
 # ---- export ----------------------------------------------------------------
 os.makedirs(OUT_DIR, exist_ok=True)
 glb = os.path.join(OUT_DIR, 'violet.glb')
 
-keep = {plant.name, rig.name, 'pot', 'rim', 'soil'}
+keep = {plant.name, shell.name, rig.name, 'pot', 'rim', 'soil'}
 for ob in bpy.context.view_layer.objects:
     ob.select_set(ob.name in keep)
 bpy.context.view_layer.objects.active = plant
@@ -203,6 +285,7 @@ result = {
     'verts': len(plant.data.vertices),
     'bones': len(rig.pose.bones),
     'materials': [m.name for m in plant.data.materials],
+    'fuzz_tris': len(shell.data.polygons),
     'frames': [scene.frame_start, scene.frame_end],
     'clipping_pairs': g['result']['leaf_pairs_intersecting'],
     'unsupported_export_options': dropped,

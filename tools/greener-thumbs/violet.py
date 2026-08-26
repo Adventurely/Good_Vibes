@@ -253,6 +253,12 @@ def leaf_textures(n):
     # the margin darkens slightly, as it does on a real blade
     col = col * (1.0 - 0.25 * smoothstep(0.88, 1.0, np.abs(su)))[..., None]
 
+    # Papillae catch the light as a fine glitter of bright points, which is
+    # the texture a macro photograph of a violet is full of and the thing that
+    # most obviously separates a petal from painted plastic.
+    sparkle = (fbm((n, n), 90, octaves=2) > 0.62).astype(np.float64)
+    col = col + sparkle[..., None] * 0.055
+
     alb = np.ones((n, n, 4)); alb[..., :3] = np.clip(col, 0, 1)
 
     # veins are impressed; the tissue between them puffs up; fuzz on top
@@ -303,7 +309,10 @@ def petal_textures(n):
     # Small and warm rather than big and cream. A Saintpaulia is saturated
     # almost the whole way to its centre; a wide pale base on five overlapping
     # petals adds up to a cream ring the flower does not have.
-    throat = np.array([0.215, 0.150, 0.115])
+    # Not a cream dot. In every close-up the pale zone is a broad white flare
+    # out of the centre, covering a third of each lobe before the colour takes
+    # over — on a magenta cultivar it is nearly white.
+    throat = np.array([0.330, 0.300, 0.235])
 
     col = deep[None, None, :] + (pale - deep)[None, None, :] * (mottle ** 1.3)[..., None]
     # a petal thins toward its edge, so the edge is paler — and that ring of
@@ -314,7 +323,7 @@ def petal_textures(n):
     col = col + (pale - deep)[None, None, :] * (0.12 * smoothstep(0.92, 1.0, bt))[..., None]
     # a violet carries a deeper wash around the throat before the pale eye
     col = col * (1.0 - 0.30 * smoothstep(0.40, 0.12, bt))[..., None]
-    tw = smoothstep(0.11, 0.01, bt)[..., None]
+    tw = (smoothstep(0.24, 0.02, bt) ** 1.5)[..., None]
     col = col * (1 - tw) + throat[None, None, :] * tw
     # veins are a deeper crease in the colour, never a drawn line — but at 0.38
     # they did not register at all, and what did not register was a flat wash
@@ -955,7 +964,7 @@ def add_bloom(j):
                 # and that irregularity along the silhouette does more for
                 # realism at this size than anything happening in the middle.
                 w = math.sin(math.pi * bt ** 0.55) ** 0.5
-                w *= 1.0 + 0.055 * math.sin(su * 7.0 + p * 2.1) * bt
+                w *= 1.0 + 0.10 * math.sin(su * 7.0 + p * 2.1) * bt
                 # A violet presents a flat face. Curling the sides up as hard as
                 # this did turned five overlapping petals into a crumpled shell
                 # — the shape was doing more to make it look moulded than the
@@ -967,9 +976,16 @@ def add_bloom(j):
                 # no amount of roughness in the material could stand in for it.
                 rip = (math.sin(su * 5.3 + p * 1.7) * math.sin(bt * 4.1 + p * 0.9)
                        + 0.45 * math.sin(su * 9.7 - bt * 6.3 + p * 2.6))
+                # The margin ruffle, and it is the whole shape of the flower.
+                # Photographs of a real corolla show edges that wave in and out
+                # of plane by a good fraction of a millimetre — the petals are
+                # never the clean arcs this was drawing. Concentrated in |su|^3
+                # so the middle of the blade stays calm and only the rim moves,
+                # which is what makes it read as a frill rather than a crumple.
+                ruf = math.sin(su * 3.1 + bt * 8.5 + p * 1.9) * (abs(su) ** 3) * bt
                 pt = (top + d_out * (bt * sz) + d_side * (su * w * hw)
                       + face_up * sz * (-0.09 * bt * bt + 0.035 * (su ** 2) * bt
-                                        + 0.034 * rip * bt))
+                                        + 0.034 * rip * bt + 0.125 * ruf))
                 v = bm.verts.new(pt)
                 v[varl] = bv
                 col.append(v)

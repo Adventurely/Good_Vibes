@@ -255,17 +255,139 @@ const GH = {
   PANE_W: 0.72,        // roughly a standard horticultural pane
 };
 
+// ---- textures ---------------------------------------------------------------
+/* Painted into canvases at load rather than shipped as files.
+   Every one of these is a few hundred bytes of code against a few hundred
+   kilobytes of PNG, they need no extra requests on a site that makes none, and
+   they can be re-tuned without leaving the file. Flat colours were what made
+   the room read as a blockout: mortar courses and wood grain do more for
+   "this is a real place" than any amount of extra geometry. */
+function canvasTex(size, draw, repeat = [1, 1], srgb = true){
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  draw(c.getContext('2d'), size, size);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(repeat[0], repeat[1]);
+  t.anisotropy = 8;
+  if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+const rnd = (a, b) => a + Math.random() * (b - a);
+
+function speckle(g, w, h, n, alpha){
+  for (let i = 0; i < n; i++){
+    g.fillStyle = `rgba(0,0,0,${Math.random() * alpha})`;
+    g.fillRect(Math.random() * w, Math.random() * h, 2, 2);
+  }
+}
+
+// Stretcher bond, because that is what a dwarf wall is laid in: every other
+// course offset by half a brick. A grid of squares reads as tile, not brick.
+const texBrick = canvasTex(512, (g, w, h) => {
+  g.fillStyle = '#6d6459'; g.fillRect(0, 0, w, h);
+  const rows = 9, bh = h / rows, bw = w / 4;
+  for (let r = 0; r < rows; r++){
+    const off = (r % 2) ? bw / 2 : 0;
+    for (let i = -1; i < 5; i++){
+      const v = rnd(0.72, 1.12);
+      g.fillStyle = `rgb(${Math.round(150*v)|0},${Math.round(84*v)|0},${Math.round(62*v)|0})`;
+      g.fillRect(i * bw + off + 3, r * bh + 3, bw - 6, bh - 6);
+    }
+  }
+  speckle(g, w, h, 9000, 0.12);
+}, [5, 1]);
+
+const texWood = canvasTex(512, (g, w, h) => {
+  g.fillStyle = '#7d5c39'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 190; i++){
+    const y = Math.random() * h;
+    g.strokeStyle = `rgba(${rnd(38,80)|0},${rnd(24,52)|0},${rnd(10,30)|0},${rnd(0.08,0.34)})`;
+    g.lineWidth = rnd(0.4, 2.4);
+    g.beginPath(); g.moveTo(0, y);
+    for (let x = 0; x <= w; x += 14) g.lineTo(x, y + Math.sin(x * 0.021 + i) * 3.6);
+    g.stroke();
+  }
+  speckle(g, w, h, 3000, 0.10);
+}, [3, 1]);
+
+// Old greenhouse concrete: stained, patched, and never once clean.
+const texFloor = canvasTex(512, (g, w, h) => {
+  g.fillStyle = '#585046'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 260; i++){
+    const v = rnd(34, 92) | 0;
+    g.fillStyle = `rgba(${v},${v - 3},${v - 9},${rnd(0.05, 0.18)})`;
+    g.beginPath(); g.arc(Math.random()*w, Math.random()*h, rnd(8, 70), 0, 7); g.fill();
+  }
+  speckle(g, w, h, 16000, 0.20);
+}, [4, 3]);
+
+const texStone = canvasTex(512, (g, w, h) => {
+  g.fillStyle = '#8b877e'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 340; i++){
+    const v = rnd(74, 132) | 0;                 // one value, three channels
+    g.fillStyle = `rgba(${v},${v - 2},${v - 7},${rnd(0.04, 0.14)})`;
+    g.beginPath(); g.arc(Math.random()*w, Math.random()*h, rnd(4, 22), 0, 7); g.fill();
+  }
+  speckle(g, w, h, 11000, 0.13);
+}, [2, 2]);
+
+const texTerra = canvasTex(256, (g, w, h) => {
+  g.fillStyle = '#a95c34'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 90; i++){
+    g.fillStyle = `rgba(${rnd(110,190)|0},${rnd(60,110)|0},${rnd(40,80)|0},${rnd(0.10,0.34)})`;
+    g.beginPath(); g.arc(Math.random()*w, Math.random()*h, rnd(4, 26), 0, 7); g.fill();
+  }
+  speckle(g, w, h, 2600, 0.16);
+}, [1, 1]);
+
+// Mown stripes. An English lawn is cut in bands and the bands are half of why
+// it reads as maintained rather than as a green plane.
+const texGrass = canvasTex(512, (g, w, h) => {
+  for (let i = 0; i < 8; i++){
+    g.fillStyle = (i % 2) ? '#3c6128' : '#33531f';
+    g.fillRect(0, i * h / 8, w, h / 8);
+  }
+  for (let i = 0; i < 26000; i++){
+    g.fillStyle = `rgba(${rnd(30,90)|0},${rnd(70,150)|0},${rnd(20,60)|0},${rnd(0.05,0.35)})`;
+    g.fillRect(Math.random()*w, Math.random()*h, 1.6, 3);
+  }
+}, [26, 26]);
+
+const texHedge = canvasTex(256, (g, w, h) => {
+  g.fillStyle = '#22391a'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 14000; i++){
+    g.fillStyle = `rgba(${rnd(20,70)|0},${rnd(50,130)|0},${rnd(14,54)|0},${rnd(0.15,0.75)})`;
+    g.fillRect(Math.random()*w, Math.random()*h, rnd(2,5), rnd(2,5));
+  }
+}, [10, 3]);
+
+const texGravel = canvasTex(256, (g, w, h) => {
+  g.fillStyle = '#8d8579'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 5200; i++){
+    g.fillStyle = `rgba(${rnd(90,180)|0},${rnd(86,172)|0},${rnd(76,158)|0},${rnd(0.25,0.9)})`;
+    g.beginPath(); g.arc(Math.random()*w, Math.random()*h, rnd(1.2, 3.4), 0, 7); g.fill();
+  }
+}, [12, 12]);
+
 // ---- materials --------------------------------------------------------------
-const matFrame = new THREE.MeshStandardMaterial({ color:0x223026, roughness:0.52, metalness:0.30 });
-const matBrick = new THREE.MeshStandardMaterial({ color:0x6b4436, roughness:0.94 });
-const matFloor = new THREE.MeshStandardMaterial({ color:0x38332c, roughness:0.96 });
-const matBench = new THREE.MeshStandardMaterial({ color:0x5a4732, roughness:0.88 });
-const matStone = new THREE.MeshStandardMaterial({ color:0x6a6a63, roughness:0.80 });
-const matTerra = new THREE.MeshStandardMaterial({ color:0x8a4a2c, roughness:0.90 });
-const matGrass = new THREE.MeshStandardMaterial({ color:0x2f4a22, roughness:1.0 });
-const matHedge = new THREE.MeshStandardMaterial({ color:0x243d1c, roughness:1.0 });
-const matBark  = new THREE.MeshStandardMaterial({ color:0x3a2c22, roughness:0.92 });
-const matLeaf  = new THREE.MeshStandardMaterial({ color:0x2b4a1f, roughness:0.95 });
+const matFrame = new THREE.MeshStandardMaterial({ color:0x2b3a2e, roughness:0.48, metalness:0.35 });
+const matBrick = new THREE.MeshStandardMaterial({ map: texBrick, roughness:0.95 });
+const matFloor = new THREE.MeshStandardMaterial({ map: texFloor, roughness:0.96 });
+const matBench = new THREE.MeshStandardMaterial({ map: texWood, roughness:0.86 });
+const matStone = new THREE.MeshStandardMaterial({ map: texStone, roughness:0.82 });
+const matTerra = new THREE.MeshStandardMaterial({ map: texTerra, roughness:0.90 });
+const matGrass = new THREE.MeshStandardMaterial({ map: texGrass, roughness:1.0 });
+const matHedge = new THREE.MeshStandardMaterial({ map: texHedge, roughness:1.0 });
+const matGravel= new THREE.MeshStandardMaterial({ map: texGravel, roughness:0.97 });
+const matBark  = new THREE.MeshStandardMaterial({ color:0x4a382b, roughness:0.94 });
+const matLeaf  = new THREE.MeshStandardMaterial({ map: texHedge, color:0x9fbf88, roughness:0.95 });
+const matSteel = new THREE.MeshStandardMaterial({ color:0x9aa0a4, roughness:0.38, metalness:0.85 });
+const matGalv  = new THREE.MeshStandardMaterial({ color:0xb6bbbd, roughness:0.55, metalness:0.65 });
+const matHandle= new THREE.MeshStandardMaterial({ map: texWood, color:0xd8b98a, roughness:0.72 });
+const matSoil  = new THREE.MeshStandardMaterial({ color:0x2e241b, roughness:0.99 });
+const matTwine = new THREE.MeshStandardMaterial({ color:0xbfa678, roughness:0.92 });
+const matRubber= new THREE.MeshStandardMaterial({ color:0x1f4a2c, roughness:0.72 });
 
 /* Glass as a cheap translucent surface, not as refraction. `transmission`
    would be physically better and costs an extra render pass per pane; at this
@@ -390,54 +512,278 @@ column.castShadow = true; column.receiveShadow = true;
 house.add(column);
 box(0.34, 0.04, 0.34, 0, PEDESTAL_TOP - 0.02, 0, matStone);
 
-// ---- outside ----------------------------------------------------------------
-/* There is a world through the glass. Without it the panes show a flat void and
-   the whole room reads as a model on a table — the single biggest thing that
-   made this look like a viewer rather than a place. All of it is far enough out
-   to be seen through glass and never approached, so it is cones and spheres. */
+// ---- shelving, and the tools of the trade -----------------------------------
+/* A greenhouse with nothing in it but a plant is a showroom. What makes one
+   read as somewhere work happens is the clutter: a shelf of pots that do not
+   match, a can that has been put down rather than put away, a trowel left in a
+   tray of compost. All of it is boxes, cylinders and torus sections — none of
+   it is ever closer than a metre to the camera, so none of it needs to be
+   more than that. */
+function cyl(rt, rb, hh, x, y, z, mat, seg = 12, g = house){
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, hh, seg), mat);
+  m.position.set(x, y, z);
+  m.castShadow = true; m.receiveShadow = true;
+  g.add(m);
+  return m;
+}
+
+// A second tier of wooden shelving over each bench, on iron brackets.
+for (const sz of [-1, 1]){
+  const zc = sz * (GH.D/2 - 0.30);
+  for (const [sy, depth] of [[1.52, 0.26], [1.92, 0.22]]){
+    for (let s = 0; s < 3; s++)
+      box(GH.W - 1.1, 0.028, depth/3 - 0.012, 0, sy, zc - depth/2 + s*(depth/3), matBench);
+    for (let i = -2; i <= 2; i++){
+      box(0.035, 0.05, depth, i * ((GH.W - 1.5) / 4), sy - 0.04, zc, matFrame);
+      const br = box(0.03, 0.30, 0.03, i * ((GH.W - 1.5) / 4), sy - 0.17, zc + depth*0.32, matFrame);
+      br.rotation.x = sz * 0.5;
+    }
+  }
+  // odds and ends on the upper shelves
+  for (let i = 0; i < 9; i++){
+    const r = 0.032 + (i % 4) * 0.008;
+    cyl(r, r*0.76, r*1.6, -GH.W/2 + 0.85 + i*((GH.W-1.7)/8), 1.55 + r*0.8, zc, matTerra, 12);
+  }
+  for (let i = 0; i < 5; i++)
+    box(0.19, 0.055, 0.13, -GH.W/2 + 1.1 + i*0.62, 1.95, zc, matTerra);
+}
+
+// stacks of spare pots under the bench, nested the way they actually stack
+for (const [sx, sz, n] of [[-1, -1, 6], [1, 1, 4], [-1, 1, 5]]){
+  for (let i = 0; i < n; i++)
+    cyl(0.075, 0.056, 0.11, sx*(GH.W/2 - 0.55), 0.055 + i*0.032, sz*(GH.D/2 - 0.55), matTerra, 14);
+}
+
+// seed trays on the floor, with compost in them
+for (let i = 0; i < 3; i++){
+  const x = -GH.W/2 + 1.2 + i * 0.46;
+  box(0.40, 0.06, 0.26, x, 0.03, -GH.D/2 + 0.95, matTerra);
+  box(0.36, 0.035, 0.22, x, 0.055, -GH.D/2 + 0.95, matSoil);
+}
+
+// a galvanised watering can — body, base, spout, and the two handles it has
+{
+  const g = new THREE.Group();
+  g.position.set(GH.W/2 - 1.15, 0.83, GH.D/2 - 0.48);
+  cyl(0.105, 0.115, 0.21, 0, 0.105, 0, matGalv, 16, g);
+  cyl(0.118, 0.118, 0.012, 0, 0.006, 0, matGalv, 16, g);
+  const spout = cyl(0.020, 0.032, 0.34, -0.20, 0.15, 0, matGalv, 10, g);
+  spout.rotation.z = -0.62;
+  cyl(0.045, 0.045, 0.020, -0.335, 0.235, 0, matGalv, 12, g).rotation.z = -0.62;
+  const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.008, 6, 14, Math.PI), matGalv);
+  hoop.position.set(0, 0.215, 0); hoop.rotation.set(0, Math.PI/2, 0);
+  g.add(hoop);
+  const grip = new THREE.Mesh(new THREE.TorusGeometry(0.052, 0.007, 6, 12, Math.PI), matGalv);
+  grip.position.set(0.105, 0.145, 0); grip.rotation.set(Math.PI/2, 0, 0.6);
+  g.add(grip);
+  house.add(g);
+}
+
+// trowel and hand fork, dropped on the bench where they were last used
+function handTool(x, z, rot, forked){
+  const g = new THREE.Group();
+  g.position.set(x, 0.845, z);
+  g.rotation.y = rot;
+  cyl(0.014, 0.017, 0.115, 0.10, 0.014, 0, matHandle, 10, g).rotation.z = Math.PI/2;
+  cyl(0.008, 0.008, 0.05, 0.028, 0.012, 0, matSteel, 8, g).rotation.z = Math.PI/2;
+  if (forked){
+    for (const o of [-0.018, 0, 0.018])
+      box(0.085, 0.005, 0.006, -0.045, 0.010, o, matSteel, g);
+  } else {
+    const blade = box(0.10, 0.008, 0.052, -0.05, 0.011, 0, matSteel, g);
+    blade.rotation.z = 0.06;
+  }
+  house.add(g);
+}
+handTool(-1.05, -(GH.D/2 - 0.46), 0.35, false);
+handTool(-0.55, -(GH.D/2 - 0.52), -0.9, true);
+
+// secateurs, closed, next to them
+{
+  const g = new THREE.Group();
+  g.position.set(-1.55, 0.845, -(GH.D/2 - 0.44));
+  g.rotation.y = 1.1;
+  box(0.075, 0.010, 0.016, 0.035, 0.008, 0.006, matRubber, g);
+  box(0.075, 0.010, 0.016, 0.035, 0.008, -0.006, matRubber, g);
+  box(0.055, 0.006, 0.012, -0.030, 0.008, 0, matSteel, g);
+  house.add(g);
+}
+
+// a long-handled rake and a broom, leaning in the corner where they always are
+for (const [x, z, ang, headIsRake] of [[-GH.W/2 + 0.22, GH.D/2 - 0.30, 0.16, true],
+                                       [-GH.W/2 + 0.42, GH.D/2 - 0.26, 0.20, false]]){
+  const g = new THREE.Group();
+  g.position.set(x, 0, z);
+  g.rotation.z = ang; g.rotation.x = -0.12;
+  cyl(0.016, 0.018, 1.72, 0, 0.86, 0, matHandle, 8, g);
+  if (headIsRake){
+    box(0.30, 0.022, 0.022, 0, 0.03, 0, matSteel, g);
+    for (let i = -5; i <= 5; i++) box(0.008, 0.055, 0.008, i * 0.028, 0.005, 0, matSteel, g);
+  } else {
+    box(0.26, 0.05, 0.07, 0, 0.05, 0, matHandle, g);
+    box(0.25, 0.10, 0.055, 0, 0.0, 0, matTwine, g);
+  }
+  house.add(g);
+}
+
+// a coiled hose on the floor, and a ball of twine on the bench
+for (let i = 0; i < 4; i++){
+  const t = new THREE.Mesh(new THREE.TorusGeometry(0.20 - i*0.022, 0.016, 6, 22), matRubber);
+  t.position.set(GH.W/2 - 0.75, 0.018 + i*0.028, -GH.D/2 + 0.75);
+  t.rotation.x = Math.PI/2;
+  t.castShadow = true;
+  house.add(t);
+}
+{
+  const b = new THREE.Mesh(new THREE.SphereGeometry(0.042, 10, 8), matTwine);
+  b.position.set(1.35, 0.86, -(GH.D/2 - 0.50));
+  b.castShadow = true; house.add(b);
+}
+
+// a bag of compost slumped against the dwarf wall
+{
+  const bag = box(0.42, 0.26, 0.28, GH.W/2 - 0.62, 0.13, 0.30, matSoil);
+  bag.rotation.z = 0.08;
+}
+
+// ---- outside: an English garden ---------------------------------------------
+/* There is a world through the glass. Without it the panes show a flat void
+   and the whole room reads as a model on a table.
+
+   The hedge is what makes this affordable. A walled garden has a horizon you
+   can actually reach, so nothing has to exist beyond about fifteen metres —
+   no terrain, no draw distance, no LODs. Everything here is inside that box
+   and none of it is ever approached, so it is all spheres and cylinders. */
 const out = new THREE.Group();
 scene.add(out);
 
-const lawn = new THREE.Mesh(new THREE.CircleGeometry(90, 48).rotateX(-Math.PI/2), matGrass);
+const GARDEN = 15.0;          // half-width inside the hedge
+
+const lawn = new THREE.Mesh(new THREE.PlaneGeometry(200, 200).rotateX(-Math.PI/2), matGrass);
 lawn.position.y = -0.02;
 lawn.receiveShadow = true;
 out.add(lawn);
 
-// a gravel path out of the door end
-const path = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 14).rotateX(-Math.PI/2), matStone);
-path.position.set(0, -0.01, -GH.D/2 - 7.2);
-out.add(path);
+function put(mesh, x, y, z, g = out){
+  mesh.position.set(x, y, z);
+  mesh.castShadow = true; mesh.receiveShadow = true;
+  g.add(mesh);
+  return mesh;
+}
+const sphere = (r, mat, d = 1) => new THREE.Mesh(new THREE.IcosahedronGeometry(r, d), mat);
 
-// hedge along two sides, kept back so it never touches the glass
-for (const [w, d, x, z] of [[26, 0.9, 0, -13], [26, 0.9, 0, 13], [0.9, 26, -13, 0], [0.9, 26, 13, 0]]){
-  const h = new THREE.Mesh(new THREE.BoxGeometry(w, 1.9, d), matHedge);
-  h.position.set(x, 0.95, z);
-  h.castShadow = true; h.receiveShadow = true;
-  out.add(h);
+// The path: gravel, with a brick edging course down both sides.
+const path = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 22).rotateX(-Math.PI/2), matGravel);
+path.position.set(0, -0.005, -GH.D/2 - 11);
+path.receiveShadow = true;
+out.add(path);
+for (const sx of [-1, 1])
+  put(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.10, 22), matBrick), sx*0.86, 0.03, -GH.D/2 - 11);
+
+// A hedge on all four sides, taller than a person, with a gap where the path
+// leaves. Yew, kept tight — the whole point is that it reads as clipped.
+const HH = 2.3, HT = 1.0;
+function hedgeRun(w, d, x, z){
+  put(new THREE.Mesh(new THREE.BoxGeometry(w, HH, d), matHedge), x, HH/2, z);
+  // a lumpier crown so the top is not a machined edge
+  const n = Math.max(2, Math.round(Math.max(w, d) / 1.1));
+  for (let i = 0; i < n; i++){
+    const t = (i + 0.5)/n - 0.5;
+    put(sphere(rnd(0.42, 0.6), matHedge, 1),
+        x + (w > d ? t*w : 0), HH - 0.12, z + (d > w ? t*d : 0));
+  }
+}
+hedgeRun(GARDEN*2, HT, 0, GARDEN);
+hedgeRun(HT, GARDEN*2, -GARDEN, 0);
+hedgeRun(HT, GARDEN*2, GARDEN, 0);
+// the far side is split for the path
+hedgeRun(GARDEN - 0.8, HT, -(GARDEN/2 + 0.4), -GARDEN);
+hedgeRun(GARDEN - 0.8, HT, (GARDEN/2 + 0.4), -GARDEN);
+
+/* Herbaceous borders. A dug bed against the hedge, planted in drifts rather
+   than dotted about — a border reads as gardened because the same colour
+   repeats in a run, not because there are many colours. */
+const BLOOMS = [0xd8557f, 0xe8c34a, 0x8f6fc4, 0xe07a3a, 0xdfe3e6, 0xc23f52];
+function border(x0, z0, x1, z1, depth){
+  const len = Math.hypot(x1-x0, z1-z0);
+  const ux = (x1-x0)/len, uz = (z1-z0)/len;
+  const bed = new THREE.Mesh(new THREE.BoxGeometry(len, 0.09, depth), matSoil);
+  bed.position.set((x0+x1)/2, 0.045, (z0+z1)/2);
+  bed.rotation.y = -Math.atan2(uz, ux);
+  bed.receiveShadow = true;
+  out.add(bed);
+
+  let s = 0.4;
+  while (s < len - 0.4){
+    const drift = BLOOMS[(Math.random() * BLOOMS.length) | 0];
+    const clump = new THREE.MeshStandardMaterial({ color: drift, roughness: 0.86 });
+    const run = rnd(0.9, 2.2);
+    for (let d = 0; d < run && s < len - 0.4; d += 0.32, s += 0.32){
+      const px = x0 + ux*s + (-uz) * rnd(-depth*0.3, depth*0.3);
+      const pz = z0 + uz*s + ( ux) * rnd(-depth*0.3, depth*0.3);
+      const hgt = rnd(0.30, 0.85);
+      put(new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.03, hgt, 5), matHedge), px, hgt/2, pz);
+      const head = sphere(rnd(0.09, 0.17), clump, 0);
+      put(head, px, hgt + 0.05, pz);
+    }
+    s += rnd(0.1, 0.5);
+  }
+}
+const BD = 1.8;
+border(-GARDEN + 0.9, GARDEN - BD, GARDEN - 0.9, GARDEN - BD, BD);
+border(-GARDEN + BD, -GARDEN + 0.9, -GARDEN + BD, GARDEN - 0.9, BD);
+border( GARDEN - BD, -GARDEN + 0.9,  GARDEN - BD, GARDEN - 0.9, BD);
+
+// Topiary: box balls down the path, and a pair of cones flanking the door.
+for (let i = 0; i < 5; i++){
+  for (const sx of [-1, 1]){
+    const r = 0.34;
+    put(new THREE.Mesh(new THREE.CylinderGeometry(0.20, 0.24, 0.22, 10), matTerra),
+        sx * 1.35, 0.11, -GH.D/2 - 2.4 - i * 2.1);
+    put(sphere(r, matHedge, 1), sx * 1.35, 0.22 + r*0.86, -GH.D/2 - 2.4 - i * 2.1);
+  }
+}
+for (const sx of [-1, 1]){
+  const c = new THREE.Mesh(new THREE.ConeGeometry(0.34, 1.25, 12), matHedge);
+  put(c, sx * 1.15, 0.62, -GH.D/2 - 1.0);
 }
 
-// trees, as a trunk and two rough crowns
+// Trees behind the hedge, so the garden has a canopy over its wall.
 function tree(x, z, s){
   const g = new THREE.Group();
-  const t = new THREE.Mesh(new THREE.CylinderGeometry(0.16*s, 0.24*s, 2.6*s, 8), matBark);
-  t.position.y = 1.3*s; g.add(t);
-  for (const [dy, r] of [[3.1, 1.7], [4.3, 1.15]]){
-    const c = new THREE.Mesh(new THREE.IcosahedronGeometry(r*s, 1), matLeaf);
-    c.position.set(0.2*s, dy*s, -0.1*s);
-    c.castShadow = true;
-    g.add(c);
+  put(new THREE.Mesh(new THREE.CylinderGeometry(0.16*s, 0.26*s, 2.8*s, 8), matBark), 0, 1.4*s, 0, g);
+  for (const [dy, r] of [[3.2, 1.8], [4.4, 1.25], [3.6, 1.4]]){
+    const c = sphere(r*s, matLeaf, 1);
+    put(c, rnd(-0.5, 0.5)*s, dy*s, rnd(-0.5, 0.5)*s, g);
   }
   g.position.set(x, 0, z);
   out.add(g);
 }
-tree(-16, -12, 1.5); tree(-19, 6, 1.9); tree(15, -14, 1.25);
-tree(20, 9, 2.1); tree(-9, 19, 1.6); tree(11, 18, 1.35);
+tree(-18, -13, 1.6); tree(-20, 7, 2.0); tree(17, -15, 1.3);
+tree(21, 10, 2.2); tree(-10, 20, 1.7); tree(12, 19, 1.4); tree(2, 22, 1.9);
 
-// distant hills, low and wide, purely to give the horizon something to do
-for (const [x, z, r, h] of [[-45, -60, 34, 7], [30, -70, 44, 9], [70, 20, 38, 6]]){
-  const hill = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 12), matHedge);
-  hill.position.set(x, h - r, z);
-  out.add(hill);
+// A bench facing the greenhouse, a birdbath on the lawn, and a stack of
+// cloches — the things that say somebody sits here.
+{
+  const g = new THREE.Group();
+  g.position.set(4.6, 0, -1.2);
+  g.rotation.y = -0.9;
+  for (let i = 0; i < 4; i++) put(new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.05, 0.09), matBench), 0, 0.44, -0.13 + i*0.09, g);
+  for (let i = 0; i < 3; i++) put(new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.09, 0.045), matBench), 0, 0.58 + i*0.13, 0.16, g);
+  for (const sx of [-1, 1]){
+    put(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.44, 0.07), matBench), sx*0.76, 0.22, -0.12, g);
+    put(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.88, 0.07), matBench), sx*0.76, 0.44, 0.17, g);
+  }
+  out.add(g);
+}
+{
+  const g = new THREE.Group();
+  g.position.set(-5.2, 0, 2.6);
+  put(new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.16, 0.78, 12), matStone), 0, 0.39, 0, g);
+  put(new THREE.Mesh(new THREE.CylinderGeometry(0.40, 0.30, 0.11, 16), matStone), 0, 0.83, 0, g);
+  put(new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.02, 16),
+      new THREE.MeshStandardMaterial({ color:0x5b7a86, roughness:0.10, metalness:0.1 })), 0, 0.87, 0, g);
+  out.add(g);
 }
 
 /* The sky is a vertex-coloured sphere, not a shader.
@@ -608,7 +954,21 @@ loader.load('./violet.glb', gltf => {
     if (o.isMesh || o.isSkinnedMesh) {
       o.castShadow = true; o.receiveShadow = true;
       const mats = Array.isArray(o.material) ? o.material : [o.material];
-      mats.forEach(m => { m.side = THREE.DoubleSide; });
+      mats.forEach(m => {
+        m.side = THREE.DoubleSide;
+        /* The fuzz shell wants to be a cutout and arrives as a blend.
+           glTF's alphaMode MASK is what this needs, and Blender 5 dropped the
+           only blend mode its exporter turned into MASK — so the shell comes
+           over as alpha-blended, which is ten thousand little quads asking the
+           depth buffer to sort them and getting it wrong. `alphaTest` puts it
+           back: same pixels, no sorting, and it writes depth again so the
+           hairs occlude each other properly. */
+        if (/fuzz/i.test(m.name || '')) {
+          m.transparent = false;
+          m.alphaTest = 0.35;
+          m.depthWrite = true;
+        }
+      });
     }
     if (o.isSkinnedMesh) skinned = o;
     if (o.isBone) {
@@ -727,6 +1087,12 @@ function markTime(){
 }
 timeBtns.forEach(b => b.addEventListener('click', () => { applyTime(b.dataset.t); markTime(); }));
 applyTime(DEV ? 'midday' : timeFromClock());
+
+/* Dev mode hands the scene out on `window.gt`. Everything in this file is
+   module-scoped, which is right, but it also means there is no way to ask the
+   running scene a question from a console — and "is the fuzz shell actually in
+   there" is exactly the question you want to ask without editing the file. */
+if (DEV) window.gt = { THREE, scene, camera, renderer, controls, applyTime, house, out };
 markTime();
 
 $('#reset').addEventListener('click', () => { if (modelRoot) frameToFit(modelRoot, ESTABLISH); });
