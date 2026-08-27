@@ -476,7 +476,7 @@ def add_crown(c, rr, hh):
 
 # ---- tubes: scapes, branches, pedicels, filaments ---------------------------
 def tube(pts, radii, slot, RING=10, uv=(0.0, 1.0), names=None, svs=None,
-         cap=True):
+         cap=True, cap_start=None, cap_end=None):
     """A closed tube through `pts`, one radius per station.
 
     Closed at both ends unless told otherwise, because on the violet every open
@@ -507,20 +507,32 @@ def tube(pts, radii, slot, RING=10, uv=(0.0, 1.0), names=None, svs=None,
         if first is None:
             first = ring
         if prev is not None:
+            # `slot` may be a list, one entry per segment, so a single closed
+            # tube can change material along its length. Splitting it into two
+            # tubes instead leaves two coincident open rings at the join — an
+            # invisible hole, but the boundary-edge check finds it and it is
+            # right to.
+            si = slot[i - 1] if isinstance(slot, (list, tuple)) else slot
             for k in range(RING):
                 f = bm.faces.new((prev[k], prev[(k + 1) % RING],
                                   ring[(k + 1) % RING], ring[k]))
-                f.material_index = slot
+                f.material_index = si
                 for lp, _u, _v in zip(f.loops, (k, k + 1, k + 1, k),
                                       (i - 1, i - 1, i, i)):
                     lp[uvl].uv = (_u / RING, v0 + (v1 - v0) * _v / n)
         prev = ring
-    if cap:
-        for ring_, flip in ((first, True), (prev, False)):
-            fc = bm.faces.new(tuple(reversed(ring_)) if flip else tuple(ring_))
-            fc.material_index = slot
-            for lp in fc.loops:
-                lp[uvl].uv = (0.5, v0 if flip else v1)
+    # Per-end, because two tubes that abut must not each cap the join. A bud
+    # whose green half and colour-broken tip both closed put a disc between
+    # them, and on a tapering tube that disc reads as a cone stuck on the end.
+    for ring_, flip, want in ((first, True, cap if cap_start is None else cap_start),
+                              (prev, False, cap if cap_end is None else cap_end)):
+        if not want:
+            continue
+        fc = bm.faces.new(tuple(reversed(ring_)) if flip else tuple(ring_))
+        fc.material_index = (slot[0 if flip else -1]
+                             if isinstance(slot, (list, tuple)) else slot)
+        for lp in fc.loops:
+            lp[uvl].uv = (0.5, v0 if flip else v1)
     return first, prev
 
 
@@ -543,7 +555,10 @@ def bezier(a, c, b, s):
 
 
 # ---- the flower ------------------------------------------------------------
-TEP_NS, TEP_NW = 13, 9
+# 9 across was not enough for the margin frill: a five-lobed ruffle over nine
+# points aliases into a staircase along the silhouette, which is the one place
+# a tepal's outline is actually read.
+TEP_NS, TEP_NW = 15, 15
 
 
 def tepal(Wf, ang, half_w, L, th0, th1, ruffle_amp, lobes, chan, slot, spent):
@@ -581,8 +596,10 @@ def tepal(Wf, ang, half_w, L, th0, th1, ruffle_amp, lobes, chan, slot, spent):
         c, dv = pts[i], dirs[min(i, TEP_NS)]
         across = Vector((0.0, 1.0, 0.0))
         upv = dv.cross(across).normalized() * -1.0
-        # widest just past halfway, tapering to a blunt point
-        w = half_w * (((t + 0.10) ** 0.55) * ((1.02 - t) ** 0.55) / 0.4215)
+        # Widest just past halfway and drawn to a point. At (1.02 - t)**0.55
+        # the tip was still 11% of full width, which renders as a squared-off
+        # notch with the backface showing through it.
+        w = half_w * (((t + 0.10) ** 0.55) * ((1.005 - t) ** 0.80) / 0.4655)
         row = []
         for k in range(TEP_NW):
             su = (k / (TEP_NW - 1)) * 2.0 - 1.0
@@ -694,8 +711,8 @@ def add_bud(origin, axis, stage, scale=1.0):
     instantly, obviously wrong, and this is the strongest flowering realism cue
     the species has.
     """
-    L = lerp(0.008, 0.086, stage ** 1.3) * scale
-    rad = lerp(0.0022, 0.0105, stage ** 1.1) * scale
+    L = lerp(0.009, 0.082, stage ** 1.3) * scale
+    rad = lerp(0.0016, 0.0072, stage ** 1.1) * scale
     n = 9
     up = Vector(axis).normalized()
     tipd = (up * 0.72 + Vector((0.0, 0.0, 1.0)) * 0.28).normalized()
@@ -703,15 +720,19 @@ def add_bud(origin, axis, stage, scale=1.0):
     b = a + tipd * L
     c = a + up * (L * 0.62)
     pts = [bezier(a, c, b, i / n) for i in range(n + 1)]
-    radii = [rad * math.sin(math.pi * (0.12 + 0.80 * (i / n))) ** 0.55
+    # fattest a third of the way up and drawn to a long point, which is what
+    # "gently upcurved spindle" means; a symmetric bulge reads as a capsule
+    radii = [rad * (((i / n) + 0.06) ** 0.42) * ((1.04 - i / n) ** 0.85) / 0.475
              for i in range(n + 1)]
-    radii[0] = rad * 0.30
-    radii[-1] = rad * 0.10
+    radii[0] = rad * 0.26
+    radii[-1] = rad * 0.06
     # colour break: the cultivar colour shows at the bud tip the evening before
-    if stage > 0.82:
-        cut = int(n * 0.72)
-        tube(pts[:cut + 1], radii[:cut + 1], SLOT_SCAPE, RING=9)
-        tube(pts[cut:], radii[cut:], SLOT_TEPAL, RING=9)
+    if stage > 0.86:
+        # Colour break: the cultivar colour appears at the bud tip the evening
+        # before it opens, which is the transition the player wakes up to.
+        cut = int(n * 0.80)
+        slots = [SLOT_SCAPE if i < cut else SLOT_TEPAL for i in range(n)]
+        tube(pts, radii, slots, RING=9)
     else:
         tube(pts, radii, SLOT_SCAPE, RING=9)
 
@@ -913,7 +934,7 @@ def tepal_textures(n):
     slow = fbm((n, n), 6, octaves=4)
 
     # the width profile the geometry actually uses, so the two cannot disagree
-    w = (((V + 0.10) ** 0.55) * ((1.02 - V) ** 0.55) / 0.4215)
+    w = (((V + 0.10) ** 0.55) * ((1.005 - V) ** 0.80) / 0.4655)
     # half-width over length for a petal: pw = R*0.30, L = R*1.48
     rad = np.sqrt(V ** 2 + (su * w * 0.203) ** 2)
 
@@ -923,11 +944,13 @@ def tepal_textures(n):
     throat = np.array([0.520, 0.360, 0.020])     # gold-green, and it glows
 
     col = tawny[None, None, :] + (lighter - tawny)[None, None, :] * (slow ** 1.1)[..., None]
-    # the eye: a wide band just above the throat, diffuse at both edges
-    eb = smoothstep(0.16, 0.27, rad) * smoothstep(0.50, 0.34, rad)
-    col = col * (1 - 0.72 * eb)[..., None] + eye[None, None, :] * (0.72 * eb)[..., None]
+    # The eye: a wide darker band above the throat, diffuse at both edges. It
+    # has to start where the throat has finished — overlapping them let the gold
+    # win and fulva lost the red-orange zone that identifies it.
+    eb = smoothstep(0.17, 0.26, rad) * smoothstep(0.46, 0.32, rad)
+    col = col * (1 - 0.80 * eb)[..., None] + eye[None, None, :] * (0.80 * eb)[..., None]
     # the throat, which is the last thing before the tube
-    tw = (smoothstep(0.24, 0.055, rad) ** 1.3)[..., None]
+    tw = (smoothstep(0.155, 0.045, rad) ** 1.15)[..., None]
     col = col * (1 - tw) + throat[None, None, :] * tw
     # a paler midrib stripe the length of the tepal — most cultivars show one
     mid = np.exp(-((su / 0.10) ** 2)) * smoothstep(0.12, 0.34, V)
@@ -1033,8 +1056,11 @@ M_SCAPE = mapped("daylily_scape", S_ALB, S_HGT, S_ROU, bump=0.55, dist=0.0005,
 # Tepals are 0.3-0.8 mm thick and glow when backlit. An opaque tepal shader
 # destroys the flower, so the subsurface term here is doing real work rather
 # than being a garnish.
+# 0.62 with a bright radius scattered so much light back out that a saturated
+# tawny map rendered as pale peach — the flower has to glow when backlit without
+# going translucent in direct light.
 M_TEPAL = mapped("daylily_tepal", T_ALB, T_HGT, T_ROU, bump=0.45, dist=0.0007,
-                 sss=0.62, sss_r=(0.42, 0.14, 0.04), spec=0.34)
+                 sss=0.34, sss_r=(0.26, 0.075, 0.022), spec=0.34)
 # Versatile anthers bearing yellow-gold to brown pollen. On fulva they are the
 # dark note in the middle of an orange flower.
 M_EYE = simple("daylily_eye", (0.115, 0.052, 0.014), rough=0.80)

@@ -80,7 +80,7 @@
 </head>
 <body>
 <div id="stage"></div>
-<div id="load">loading violet.glb …</div>
+<div id="load">loading the specimen …</div>
 
 <a id="back" href="./">&larr; title</a>
 
@@ -162,6 +162,36 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
    once here and neither path tests for it again. */
 const DEV = new URLSearchParams(location.search).get('dev') === '1';
 
+/* Which specimen. One viewer, several species — the greenhouse, the light and
+   the wilt rig are shared, and what changes per plant is its file, its name,
+   the shape of its bone names and how far back you have to stand to see it.
+   `establish` is a multiple of the distance that would just fit the plant, so
+   it is not transferable: 15 frames a room around a 19 cm violet and would put
+   the camera outside the building for a metre-tall daylily. */
+const SPECIES = {
+  violet: {
+    glb: 'violet.glb', name: 'African Violet', latin: 'Saintpaulia ionantha',
+    leafBone: /^L(\d+)_(\d+)$/, establish: 15.0, close: 1.45,
+    // Matte and velvety: the hairs are real geometry, so the sheen here is
+    // only softening the terminator, and the surface itself barely specs.
+    leaf: { name: 'violet_leaf_web', sheen: 0.18, sheenRough: 0.80,
+            sheenColor: 0x3a4230, spec: 0.06, env: 0.55 },
+  },
+  daylily: {
+    glb: 'daylily.glb', name: 'Orange Daylily', latin: 'Hemerocallis fulva',
+    // bones are per fan here, so the name carries the fan as well as the rank
+    leafBone: /^F(\d+)L(\d+)_(\d+)$/, establish: 3.2, close: 1.35,
+    // The opposite surface. A daylily is glabrous — no trichomes anywhere —
+    // and semi-glossy on the upper face, so it takes no sheen at all and a
+    // real specular. Inheriting the violet's velvet here made the blades look
+    // dusty, which is a plausible-looking bug nobody would have gone looking
+    // for.
+    leaf: { name: 'daylily_leaf_web', sheen: 0.0, sheenRough: 0.6,
+            sheenColor: 0x000000, spec: 0.35, env: 0.85 },
+  },
+};
+const PLANT = SPECIES[new URLSearchParams(location.search).get('plant')] || SPECIES.violet;
+
 const $ = s => document.querySelector(s);
 const errBox = $('#err');
 function fail(e){
@@ -203,7 +233,7 @@ camera.position.set(0.24, 1.12, 0.34);
    19 cm plant. `pad` is a multiple of the distance that would just fit the
    plant, so ESTABLISH lands far enough out to hold the pedestal and the
    benches, and CLOSE puts the blade veining across the viewport. */
-const ESTABLISH = 15.0, CLOSE = 1.45;
+const ESTABLISH = PLANT.establish, CLOSE = PLANT.close;
 
 function frameToFit(obj, pad = 1.6){
   const box = new THREE.Box3().setFromObject(obj);
@@ -1062,7 +1092,7 @@ for (const L of LAMPS){
   const pt = new THREE.PointLight(0xffc98a, 0, 6.5, 2);
   pt.position.y = -0.05; g.add(pt);
   house.add(g);
-  lamps.push({ pt, bulb: bulb.material, cd: L.cd });
+  lamps.push({ pt, bulb: bulb.material, cd: L.cd, group: g, drop: L.drop });
 }
 
 /* Four settings, read off real daylight rather than picked to look nice.
@@ -1160,7 +1190,7 @@ function timeFromClock(){
 
 // ---- model -----------------------------------------------------------------
 const SHARE = [0.10, 0.20, 0.32, 0.38];   // must match violet.py
-const LEAF_BONE = /^L(\d+)_(\d+)$/;
+const LEAF_BONE = PLANT.leafBone;
 const leafBones = [];                      // {bone, share, k}
 let skinned = null, leafMat = null, helper = null;
 let baseColor = new THREE.Color(1,1,1);
@@ -1175,7 +1205,7 @@ draco.setDecoderConfig({ type: 'wasm' });
 
 const loader = new GLTFLoader();
 loader.setDRACOLoader(draco);
-loader.load('./violet.glb', gltf => {
+loader.load('./' + PLANT.glb, gltf => {
   const root = gltf.scene;
   root.traverse(o => {
     if (o.isMesh || o.isSkinnedMesh) {
@@ -1215,7 +1245,9 @@ loader.load('./violet.glb', gltf => {
            that is a broad white gloss across the whole face, which is the
            glare. A real petal is velvet: the sheen is weak, wide, and tinted
            toward the flower's own colour rather than white. */
-        if (/petal/i.test(m.name || '')) {
+        // `tepal` as well as `petal`: a daylily has six tepals in two whorls
+        // and no petals in the sense the violet has them.
+        if (/petal|tepal/i.test(m.name || '')) {
           /* Measured rather than guessed: with sheen, specular and environment
              all zeroed the corolla goes deep and velvety, which is what the
              photographs show, so the glare was specular and not albedo. These
@@ -1226,7 +1258,8 @@ loader.load('./violet.glb', gltf => {
           m.specularIntensity = 0.03;
           m.envMapIntensity = 0.45;
         }
-        if (/stem/i.test(m.name || '')) {
+        // and a daylily's flowering stalk is a scape, not a stem
+        if (/stem|scape/i.test(m.name || '')) {
           m.sheen = 0.22;
           m.sheenRoughness = 0.55;
           if (m.sheenColor) m.sheenColor.setRGB(0.26, 0.30, 0.20);
@@ -1282,7 +1315,7 @@ loader.load('./violet.glb', gltf => {
         // Named, so the overrides above and anything later can still find it.
         // Rebuilt anonymously, this material matched none of them and quietly
         // kept three.js's defaults for everything not listed here.
-        name: 'violet_leaf_web',
+        name: PLANT.leaf.name,
         map: m.map, normalMap: m.normalMap, roughnessMap: m.roughnessMap,
         roughness: 1.0, metalness: 0.0, side: THREE.DoubleSide,
         /* This was sheen 0.7 in a pale sage, on the stated grounds that the
@@ -1292,11 +1325,12 @@ loader.load('./violet.glb', gltf => {
            pale sheen at full strength over a leaf is precisely the glare that
            kept coming back. Weak, wide and dark: enough to soften the terminator,
            not enough to lie about the surface. */
-        sheen: 0.18, sheenRoughness: 0.80, sheenColor: new THREE.Color(0x3a4230),
+        sheen: PLANT.leaf.sheen, sheenRoughness: PLANT.leaf.sheenRough,
+        sheenColor: new THREE.Color(PLANT.leaf.sheenColor),
         // Left at their defaults (1.0) this leaf answered the greenhouse sky
         // like polished stone. A Saintpaulia blade is matte, and its highlight
         // is the hairs standing on it, not the surface underneath.
-        specularIntensity: 0.06, envMapIntensity: 0.55,
+        specularIntensity: PLANT.leaf.spec, envMapIntensity: PLANT.leaf.env,
         normalScale: m.normalScale ? m.normalScale.clone() : new THREE.Vector2(1, 1),
       });
       swapped.set(m, pm);
@@ -1324,11 +1358,34 @@ loader.load('./violet.glb', gltf => {
   /* Open on the room, not on the plant. You are meant to arrive in a
      greenhouse and see a specimen standing on a pedestal in the middle of it;
      the close inspection is the thing you then choose to do. */
+  /* Lift the low lamp over anything tall enough to grow into it. The violet
+     is 19 cm and clears it by a metre; a daylily's scapes top out near two
+     metres on the same pedestal, and without this the flowers come up through
+     the shade. Measured off the model rather than hard-coded per species, so
+     the next plant does not have to remember. */
+  {
+    const top = new THREE.Box3().setFromObject(root).max.y;
+    for (const l of lamps){
+      if (Math.abs(l.group.position.x) > 0.5) continue;   // the side lamps are clear
+      const want = top + 0.34;
+      if (l.group.position.y < want){
+        l.group.position.y = Math.min(want, GH.EAVE - 0.10);
+      }
+    }
+  }
+
+  document.title = 'Greener Thumbs — ' + PLANT.name;
+  $('#hud').querySelector('h2').textContent = PLANT.name;
+  $('#hud').querySelector('i').textContent = PLANT.latin;
+  $('#panel').querySelector('h1').childNodes[0].nodeValue = PLANT.name + ' ';
+  $('#panel').querySelector('.sub').innerHTML =
+    '<i>' + PLANT.latin + '</i> — parametric, rigged';
+
   frameToFit(root, ESTABLISH);
   $('#load').remove();
   if (DEV) $('#panel').hidden = false;
   else     $('#hud').hidden = false;
-}, undefined, err => { $('#load').textContent = 'failed to load violet.glb'; fail(err); });
+}, undefined, err => { $('#load').textContent = 'failed to load ' + PLANT.glb; fail(err); });
 
 // ---- controls ---------------------------------------------------------------
 const ui = { droop:0, chlor:0, spin:false };

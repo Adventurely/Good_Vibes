@@ -57,39 +57,16 @@ scene = bpy.context.scene
 
 
 # ---- textures the spec can carry ------------------------------------------
-def as_image(name, rgb, srgb):
-    """rgb is (N, N, 3) linear float with row 0 at v=0, as `violet.py` authors it.
-
-    Blender applies the colour transform on save, so writing linear values into
-    an image tagged sRGB produces a correctly encoded file, and tagging it
-    Non-Color writes the raw numbers — which is what a normal or roughness map
-    needs.
-
-    No row reversal, for the same reason `make_image` no longer does one: these
-    maps are authored in the direction the UVs run, and flipping them ran every
-    map backwards down its own surface.
-    """
-    n = rgb.shape[0]
-    img = bpy.data.images.new(name, n, n, alpha=False, float_buffer=True)
-    img.colorspace_settings.name = 'sRGB' if srgb else 'Non-Color'
-    rgba = np.ones((n, n, 4), dtype=np.float32)
-    rgba[..., :3] = np.clip(rgb, 0.0, 1.0)
-    img.pixels.foreach_set(np.ascontiguousarray(rgba).ravel())
-    img.file_format = 'PNG'
-    img.pack()
-    return img
-
-
-def normal_from_height(h, strength=2.6):
-    """Tangent-space normal map. glTF has no bump node, so the height field has
-    to be differentiated here instead of in the shader."""
-    gy, gx = np.gradient(h.astype(np.float64))
-    nx, ny = -gx * strength * h.shape[0] / 512.0, -gy * strength * h.shape[0] / 512.0
-    nz = np.ones_like(nx)
-    inv = 1.0 / np.sqrt(nx * nx + ny * ny + nz * nz)
-    return np.stack([nx * inv * 0.5 + 0.5,
-                     ny * inv * 0.5 + 0.5,
-                     nz * inv * 0.5 + 0.5], axis=-1)
+# The translation traps live in web_common.py now, not here. `as_image` and
+# `normal_from_height` were defined in this file and would have had to be
+# defined again in the daylily's exporter, which is exactly how a trap gets
+# found twice.
+for _p in (HERE,):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+import web_common as _W
+as_image = _W.as_image
+normal_from_height = _W.normal_from_height
 
 
 IMG_ALB = as_image("web_leaf_albedo", TEX['albedo'], srgb=True)

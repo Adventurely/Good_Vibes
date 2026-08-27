@@ -178,6 +178,12 @@
                 aria-labelledby="mode-label"></button>
       </div>
       <p class="modehint" id="hint"></p>
+      <div class="mode">
+        <span id="spec-label">Specimen</span>
+        <button class="switch" id="species" role="switch" aria-checked="false"
+                aria-labelledby="spec-label"></button>
+      </div>
+      <p class="modehint" id="spechint"></p>
       <a class="enter" id="enter" href="./play.html">Enter the greenhouse</a>
       <span class="wip">Early build &mdash; the care simulation is not written yet</span>
     </div>
@@ -196,6 +202,7 @@ const hint  = document.getElementById('hint');
    throw outright in a private window, so every read and write is guarded and
    the page has to render correctly having learned nothing. */
 const KEY = 'gt:dev';
+const SKEY = 'gt:species';
 function remembered(){
   try { return localStorage.getItem(KEY) === '1'; } catch { return false; }
 }
@@ -208,15 +215,44 @@ const HINTS = {
   off: '<b>Game run.</b> The greenhouse as a player sees it, with no debug tools.',
 };
 
+/* Which specimen is on the pedestal. Two of the three species exist so far,
+   and the switch is the only way to reach the second one — a plant nobody can
+   get to is a plant nobody will tell you is wrong. */
+const SPECIES = [
+  { id: 'violet',  name: 'African Violet',
+    hint: '<b>African Violet.</b> <i>Saintpaulia ionantha</i> — velvet leaves, and fussy.' },
+  { id: 'daylily', name: 'Orange Daylily',
+    hint: '<b>Orange Daylily.</b> <i>Hemerocallis fulva</i> — nearly unkillable, and every flower lasts one day.' },
+];
+const specSw = document.getElementById('species');
+const specHint = document.getElementById('spechint');
+const specLabel = document.getElementById('spec-label');
+
 let dev = remembered();
+let spec = 0;
+try { spec = SPECIES.findIndex(s => s.id === localStorage.getItem(SKEY)); } catch { spec = 0; }
+if (spec < 0) spec = 0;
 
 function apply(){
   sw.setAttribute('aria-checked', String(dev));
   hint.innerHTML = dev ? HINTS.on : HINTS.off;
   // The mode travels in the URL, so a dev-mode session is a link you can send
   // to someone and a bookmark that still means what it meant.
-  enter.setAttribute('href', dev ? './play.html?dev=1' : './play.html');
+  const q = [];
+  if (dev) q.push('dev=1');
+  if (SPECIES[spec].id !== 'violet') q.push('plant=' + SPECIES[spec].id);
+  enter.setAttribute('href', './play.html' + (q.length ? '?' + q.join('&') : ''));
+
+  specSw.setAttribute('aria-checked', String(spec === 1));
+  specLabel.textContent = SPECIES[spec].name;
+  specHint.innerHTML = SPECIES[spec].hint;
 }
+
+specSw.addEventListener('click', () => {
+  spec = (spec + 1) % SPECIES.length;
+  try { localStorage.setItem(SKEY, SPECIES[spec].id); } catch { /* fine */ }
+  apply();
+});
 
 sw.addEventListener('click', () => {
   dev = !dev;
