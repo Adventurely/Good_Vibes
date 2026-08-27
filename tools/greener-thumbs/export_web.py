@@ -7,19 +7,23 @@ all textures embedded.
 
 Three things are deliberate:
 
-**No modifiers are applied.** Subdivision at render level would ship a quarter
-of a million vertices to a web page, and applying modifiers to a skinned mesh
-risks the exporter baking the armature instead of exporting it as a skin. The
-base cage is 17k verts and reads fine with smooth normals; Solidify is dropped
-because `side: DoubleSide` in three.js does the same job for free.
+**Solidify is applied; Subdivision is not.** Subdivision at render level would
+ship a quarter of a million vertices to a web page. Solidify has to be applied,
+and used not to be, on the stated grounds that `side: DoubleSide` in three.js
+did the same job for free — it does not. Double-sided rendering lets you see
+the back of a surface; it does not give that surface an edge, and without one
+every leaf and petal came out of the browser as bent foil. It is applied here
+rather than left to `export_apply`, so the armature is never in the stack while
+it happens and the skin cannot get baked in by accident.
 
 **Textures are re-encoded, not reused.** `violet.py` authors its maps as linear
 float and marks them Non-Color, which is right for Cycles and wrong for glTF.
 Base colour has to be sRGB, and the height map has to become a tangent-space
 normal map, because glTF has no bump node.
 
-**Hair is off.** Particle hair has no glTF representation. The browser gets the
-sheen term instead, which is what it was standing in for anyway.
+**Hair is off, and shells stand in for it.** Particle hair has no glTF
+representation, so the blade is duplicated twice, pushed out along its normals
+and punched through with an alpha mask. See the fuzz section below.
 """
 import bpy, bmesh, os, sys
 import numpy as np
@@ -112,7 +116,13 @@ nt.links.new(tr.outputs['Color'], b.inputs['Roughness'])
 nt.links.new(tn.outputs['Color'], nm.inputs['Color'])
 nt.links.new(nm.outputs['Normal'], b.inputs['Normal'])
 b.inputs['Metallic'].default_value = 0.0
-for k, v in (('Sheen Weight', 0.35), ('Sheen Roughness', 0.45)):
+# Sheen Tint for the same reason it is set on the corolla below: the exporter
+# writes KHR_materials_sheen's *colour* and throws the weight away, and
+# Blender's default tint is white. This blade was shipping sheenColorFactor
+# [1, 1, 1] — a full-strength white gloss over every leaf, which under a
+# greenhouse sky is a sheet of glare rather than velvet.
+for k, v in (('Sheen Weight', 0.35), ('Sheen Roughness', 0.45),
+             ('Sheen Tint', (0.30, 0.34, 0.24, 1.0))):
     if k in b.inputs:
         b.inputs[k].default_value = v
 
@@ -129,7 +139,7 @@ them a second time. Everything came out lighter and flatter than authored,
 which is exactly what "washed out" looks like.
 """
 IMG_PALB = as_image("web_petal_albedo", TEX['petal_albedo'], srgb=True)
-IMG_PNRM = as_image("web_petal_normal", normal_from_height(TEX['petal_height'], 1.7), srgb=False)
+IMG_PNRM = as_image("web_petal_normal", normal_from_height(TEX['petal_height'], 0.9), srgb=False)
 IMG_PRGH = as_image("web_petal_rough",
                     np.repeat(TEX['petal_rough'][..., None], 3, axis=-1), srgb=False)
 
@@ -169,6 +179,34 @@ plant.data.materials[2] = pmat
 # slot 0 is the blade — see SLOT_LEAF in violet.py
 plant.data.materials[0] = mat
 
+# ---- and the anthers, which are the middle of every flower ------------------
+IMG_EALB = as_image("web_eye_albedo", TEX['eye_albedo'], srgb=True)
+IMG_ENRM = as_image("web_eye_normal", normal_from_height(TEX['eye_height'], 2.0), srgb=False)
+IMG_ERGH = as_image("web_eye_rough",
+                    np.repeat(TEX['eye_rough'][..., None], 3, axis=-1), srgb=False)
+
+emat = bpy.data.materials.new("violet_eye_web")
+emat.use_nodes = True
+ent = emat.node_tree
+eb = ent.nodes["Principled BSDF"]
+ea = ent.nodes.new('ShaderNodeTexImage'); ea.image = IMG_EALB; ea.location = (-700, 260)
+er = ent.nodes.new('ShaderNodeTexImage'); er.image = IMG_ERGH; er.location = (-700, 0)
+en = ent.nodes.new('ShaderNodeTexImage'); en.image = IMG_ENRM; en.location = (-700, -260)
+en.image.colorspace_settings.name = 'Non-Color'
+enm = ent.nodes.new('ShaderNodeNormalMap'); enm.location = (-420, -260)
+ent.links.new(ea.outputs['Color'], eb.inputs['Base Color'])
+ent.links.new(er.outputs['Color'], eb.inputs['Roughness'])
+ent.links.new(en.outputs['Color'], enm.inputs['Color'])
+ent.links.new(enm.outputs['Normal'], eb.inputs['Normal'])
+eb.inputs['Metallic'].default_value = 0.0
+# No sheen at all, and almost no specular. Pollen is dust: the one thing an
+# anther must never do is catch a highlight.
+if 'Specular IOR Level' in eb.inputs:
+    eb.inputs['Specular IOR Level'].default_value = 0.06
+
+# slot 3 is the anthers — see SLOT_EYE in violet.py
+plant.data.materials[3] = emat
+
 # The pot, rim and soil are procedural noise, and glTF has no procedural
 # textures — a node-driven Base Color exports as the socket's unlinked default,
 # which is white. Give them the mean of the colours they mix between, so the
@@ -176,11 +214,11 @@ plant.data.materials[0] = mat
 FLAT = {
     'terracotta': ((0.228, 0.080, 0.041, 1.0), 0.82),
     'soil':       ((0.021, 0.015, 0.011, 1.0), 0.97),
-    # The anthers belong on this list too, and were missed when they stopped
-    # being a `simple()` material and became a `noisy()` one to make them look
-    # powdery. That change was invisible in Cycles and turned the two yellow
-    # anthers white in the browser — which is most of the centre of the flower.
-    'violet_eye': ((0.520, 0.360, 0.045, 1.0), 0.80),
+    # The anthers used to be on this list, as a `noisy()` procedural flattened
+    # to its mean. A flat colour is the best a flat colour can do, and what it
+    # looked like was two cream beads: no grain, no slit, no relief. They are
+    # image-mapped now, like the blade and the corolla, and `blob()` in
+    # violet.py gives them the UVs to sample it with.
 }
 for m in bpy.data.materials:
     hit = next((v for k, v in FLAT.items() if m.name.startswith(k)), None)
@@ -196,11 +234,77 @@ for m in bpy.data.materials:
     bsdf.inputs['Base Color'].default_value = col
     bsdf.inputs['Roughness'].default_value = rough
 
-# Solidify is redundant once the viewer draws both sides, and Subdivision at
-# render level would ship ~280k verts to a browser.
+# ---- thickness -------------------------------------------------------------
+"""Solidify is not redundant, and dropping it was the reason the plant looked
+like it was cut out of paper.
+
+The old note here said `side: DoubleSide` in three.js did the same job for
+free. It does not. Double-sided rendering means you can *see* the back of a
+surface; it does not give that surface an edge. A blade or a petal with no
+thickness has a zero-width silhouette, so every leaf ends at a hard line and
+every petal reads as a bent sheet of foil — which is exactly what it looked
+like next to the Cycles render, where the same modifier was doing its job.
+
+Thickness is per material, because the plant is not made of one substance. A
+Saintpaulia leaf is fleshy, about a millimetre; a corolla lobe is a third of
+that; the stems, the style and the anthers are closed tubes and spheres that
+already have volume and need nothing added inside them.
+
+Subdivision stays off. It quadruples every face on the plant *and* on the fuzz
+shells that copy it, for smoothing that Draco's normal quantisation would eat
+half of anyway. Thickness was the complaint; thickness is what this buys."""
+SHELL_W = {0: 1.00,     # SLOT_LEAF  — the blade
+           2: 0.34,     # SLOT_PETAL — a corolla lobe is much thinner
+           1: 0.0,      # SLOT_STEM  — closed tubes, nothing to add
+           3: 0.0}      # SLOT_EYE   — closed spheres, likewise
+LEAF_THICK = 0.0011
+
+# The fuzz shells below have to be built on the surface as it is *now*: with
+# offset = -1 Solidify grows entirely inward, so this snapshot and the finished
+# top surface stay in the same place, and the shells keep their clearance.
+BASE_ME = plant.data.copy()
+
+_w = {}
+for poly in plant.data.polygons:
+    f = SHELL_W.get(poly.material_index, 0.0)
+    for vi in poly.vertices:
+        _w[vi] = max(_w.get(vi, 0.0), f)
+_vg = plant.vertex_groups.new(name="thickness")
+for vi, w in _w.items():
+    if w > 0.0:
+        _vg.add([vi], w, 'REPLACE')
+
 for m in list(plant.modifiers):
-    if m.type in {'SOLIDIFY', 'SUBSURF'}:
+    if m.type == 'SUBSURF':
         plant.modifiers.remove(m)
+_sol = next(m for m in plant.modifiers if m.type == 'SOLIDIFY')
+_sol.thickness = LEAF_THICK
+_sol.offset = -1.0                    # inward, so the lit surface does not move
+_sol.use_even_offset = True
+_sol.use_rim = True                   # the rim faces *are* the visible edge
+_sol.use_rim_only = False
+_sol.vertex_group = _vg.name
+_sol.thickness_vertex_group = 0.0     # weight 0 means no thickness, not minimum
+
+for ob in bpy.context.view_layer.objects:
+    ob.select_set(False)
+plant.select_set(True)
+bpy.context.view_layer.objects.active = plant
+bpy.ops.object.modifier_apply(modifier=_sol.name)
+
+# The zero-weight slots came through as a duplicate of themselves in the same
+# place — coincident, reversed, and z-fighting. Welding at a micron collapses
+# those back into the single surface they were, and takes the degenerate poles
+# of every `blob()` with them.
+_bm = bmesh.new()
+_bm.from_mesh(plant.data)
+_before = len(_bm.faces)
+bmesh.ops.remove_doubles(_bm, verts=_bm.verts[:], dist=1e-6)
+bmesh.ops.dissolve_degenerate(_bm, dist=1e-6, edges=_bm.edges[:])
+_welded = _before - len(_bm.faces)
+_bm.to_mesh(plant.data)
+_bm.free()
+plant.data.polygons.foreach_set('use_smooth', [True] * len(plant.data.polygons))
 
 
 # ---- the fuzz, as a shell ---------------------------------------------------
@@ -209,95 +313,134 @@ let the sheen term stand in for it. Sheen gives the soft response but not the
 thing you actually see: a violet leaf has a pale halo of separate hairs all
 round its edge, and every photograph of one is full of it.
 
-A shell does carry. The blade is duplicated, pushed a millimetre out along its
-own normals, and punched through with an alpha mask, so what survives reads as
-thousands of little hairs standing off the surface — most of all on the
-silhouette, which is exactly where fuzz is visible and where a sheen term can
-never put anything. One shell, ~9k triangles, and it skins off the same
-armature so it droops with the leaf under it."""
-FUZZ_OFF = 0.00072         # 0.72 mm. At 1.1 the shell stood far enough off
-                           # the blade that the alpha cut it into visible
-                           # shards rather than into hairs; hugging the
-                           # surface reads as velvet at every distance.
-FUZZ_TEX = 1024
+Shells do carry. The blade is duplicated, pushed out along its own normals, and
+punched through with an alpha mask, so what survives reads as thousands of
+little hairs standing off the surface — most of all on the silhouette, which is
+exactly where fuzz is visible and where a sheen term can never put anything.
+Each shell skins off the same armature, so they droop with the leaf under them.
+
+There are two of them now, and that is the difference between velvet and haze.
+A single layer can only ever be a texture lying on the surface: everything it
+draws is at one height, so nothing overlaps anything and the hairs have no
+length. Two layers at different heights, the far one sparser, give the overlap
+that reads as depth — and it is the far one, standing 1.6 mm off the blade,
+that puts separate lit hairs on the silhouette instead of a fringe."""
+# 512, not 1024. This is a pure binary noise mask, which is as close to
+# incompressible as an image gets — the pair of them at 1024 were 205 KB of a
+# 870 KB file, more than every other map on the plant put together. At 512 a
+# texel across a 40 mm blade is about 0.08 mm, which is the width of an actual
+# Saintpaulia hair, so the coarser map is also the more truthful one.
+FUZZ_TEX = 512
+
+# (offset, mask thresholds, base colour). The far shell keeps only hairs the
+# near one already drew at full strength, so a hair is one object standing off
+# the surface rather than two unrelated speckles at two heights.
+FUZZ_LAYERS = (
+    # 0.72 mm. At 1.1 on its own the shell stood far enough off the blade that
+    # the alpha cut it into visible shards rather than into hairs.
+    #
+    # The thresholds were (0.855, 0.780), which is 22% of the blade covered in
+    # pale flecks a millimetre above it — from any distance that is not velvet,
+    # it is mould. And the near layer is the one seen face-on, so it is the one
+    # that has to disappear into the leaf: it is only a shade lighter than the
+    # blade under it now, and it is the far layer's job to be visible.
+    #
+    # Brightness is the other half of it. A hair is translucent, but it is also
+    # 0.05 mm across, so what a pixel of leaf actually gets is a hair's colour
+    # averaged with the blade behind it. Painted at four times the blade's own
+    # albedo these read as frost on any leaf that was not in direct sun — most
+    # of them, in a greenhouse — so they are closer to the leaf now and it is
+    # the light that is allowed to make them pale, not the paint.
+    (0.00072, (0.906, 0.866), (0.105, 0.130, 0.082, 1.0)),
+    # and the tips, sparse enough to read as separate hairs against the sky
+    (0.00160, (0.968, 0.950), (0.225, 0.260, 0.185, 1.0)),
+)
 
 _r = np.random.default_rng(4)
 _n = _r.random((FUZZ_TEX, FUZZ_TEX))
-# Two thresholds, so the mask is not a uniform dither: a sparse scatter of
-# stronger hairs over a fine haze of weaker ones.
-_alpha = np.where(_n > 0.855, 1.0, np.where(_n > 0.780, 0.70, 0.0))
-_img = bpy.data.images.new("violet_fuzz_alpha", FUZZ_TEX, FUZZ_TEX,
-                           alpha=True, float_buffer=True)
-_img.colorspace_settings.name = 'Non-Color'
-_rgba = np.ones((FUZZ_TEX, FUZZ_TEX, 4), dtype=np.float32)
-_rgba[..., 3] = _alpha
-_img.pixels.foreach_set(np.ascontiguousarray(_rgba).ravel())
-_img.file_format = 'PNG'
-_img.pack()
 
-fuzz_mat = bpy.data.materials.new("violet_fuzz")
-fuzz_mat.use_nodes = True
-_ft = fuzz_mat.node_tree
-_fb = _ft.nodes["Principled BSDF"]
-_fa = _ft.nodes.new('ShaderNodeTexImage')
-_fa.image = _img
-_fa.location = (-500, 0)
-_ft.links.new(_fa.outputs['Alpha'], _fb.inputs['Alpha'])
-# Hairs are near-colourless and translucent — they read as a pale rim where the
-# light comes through them, which is most of what velvet looks like up close.
-# and closer to the blade underneath, so the shell reads as a pale rim at
-# the silhouette rather than as confetti scattered over the whole leaf
-_fb.inputs['Base Color'].default_value = (0.30, 0.34, 0.24, 1.0)
-# Hairs are not glossy. At 0.62, ten thousand little quads under a bright
-# sky each returned a specular pinpoint, and the leaf margins came out
-# crawling with white speckle rather than looking like velvet.
-_fb.inputs['Roughness'].default_value = 0.95
-_fb.inputs['Metallic'].default_value = 0.0
-# What we want is glTF alphaMode MASK — an alpha-blended shell of ten thousand
-# little quads is ten thousand sorting decisions a depth buffer cannot make,
-# and a cutout has none to get wrong. Blender 5 removed the 'CLIP' blend mode
-# that the exporter used to turn into MASK, so there is no longer a way to say
-# it from here: this comes out as BLEND whatever we do, and the viewer converts
-# it back to a cutout on load. Left in with the try because it is harmless on
-# any build that still has it.
-for _bm_name in ('CLIP', 'BLEND'):
+shells = []
+for _li, (_off, (_hi, _lo), _col) in enumerate(FUZZ_LAYERS):
+    # Two thresholds per layer, so the mask is not a uniform dither: a sparse
+    # scatter of stronger hairs over a fine haze of weaker ones.
+    _alpha = np.where(_n > _hi, 1.0, np.where(_n > _lo, 0.70, 0.0))
+    _img = bpy.data.images.new("violet_fuzz_alpha%d" % _li, FUZZ_TEX, FUZZ_TEX,
+                               alpha=True, float_buffer=True)
+    _img.colorspace_settings.name = 'Non-Color'
+    _rgba = np.ones((FUZZ_TEX, FUZZ_TEX, 4), dtype=np.float32)
+    _rgba[..., 3] = _alpha
+    _img.pixels.foreach_set(np.ascontiguousarray(_rgba).ravel())
+    _img.file_format = 'PNG'
+    _img.pack()
+
+    fuzz_mat = bpy.data.materials.new("violet_fuzz%d" % _li)
+    fuzz_mat.use_nodes = True
+    _ft = fuzz_mat.node_tree
+    _fb = _ft.nodes["Principled BSDF"]
+    _fa = _ft.nodes.new('ShaderNodeTexImage')
+    _fa.image = _img
+    _fa.location = (-500, 0)
+    _ft.links.new(_fa.outputs['Alpha'], _fb.inputs['Alpha'])
+    # Hairs are near-colourless and translucent — they read as a pale rim where
+    # the light comes through them, which is most of what velvet looks like.
+    _fb.inputs['Base Color'].default_value = _col
+    # Hairs are not glossy. At 0.62, ten thousand little quads under a bright
+    # sky each returned a specular pinpoint, and the leaf margins came out
+    # crawling with white speckle rather than looking like velvet.
+    _fb.inputs['Roughness'].default_value = 0.95
+    _fb.inputs['Metallic'].default_value = 0.0
+    if 'Specular IOR Level' in _fb.inputs:
+        _fb.inputs['Specular IOR Level'].default_value = 0.0
+    # What we want is glTF alphaMode MASK — an alpha-blended shell of ten
+    # thousand little quads is ten thousand sorting decisions a depth buffer
+    # cannot make, and a cutout has none to get wrong. Blender 5 removed the
+    # 'CLIP' blend mode the exporter used to turn into MASK, so there is no
+    # longer a way to say it from here: this comes out as BLEND whatever we do,
+    # and the viewer converts it back to a cutout on load.
+    for _bm_name in ('CLIP', 'BLEND'):
+        try:
+            fuzz_mat.blend_method = _bm_name
+            break
+        except Exception:
+            continue
     try:
-        fuzz_mat.blend_method = _bm_name
-        break
+        fuzz_mat.alpha_threshold = 0.35
     except Exception:
-        continue
-try:
-    fuzz_mat.alpha_threshold = 0.35
-except Exception:
-    pass
+        pass
 
-shell = plant.copy()
-shell.data = plant.data.copy()
-shell.name = "violet_fuzz"
-bpy.context.collection.objects.link(shell)
+    shell = plant.copy()
+    # BASE_ME is the plant as it stood before Solidify — which is still the
+    # surface the blade presents, because Solidify grows inward. Copying the
+    # finished mesh instead would wrap the shell round the new underside too,
+    # doubling it for hairs nobody can see.
+    shell.data = BASE_ME.copy()
+    shell.name = "violet_fuzz%d" % _li
+    bpy.context.collection.objects.link(shell)
 
-_bm = bmesh.new()
-_bm.from_mesh(shell.data)
-# keep the blade only — no fuzz on the stems, the petals or the anthers
-_drop = [f for f in _bm.faces if f.material_index != 0]
-bmesh.ops.delete(_bm, geom=_drop, context='FACES')
-_bm.verts.ensure_lookup_table()
-for v in _bm.verts:
-    v.co += v.normal * FUZZ_OFF
-_bm.to_mesh(shell.data)
-_bm.free()
+    _bm = bmesh.new()
+    _bm.from_mesh(shell.data)
+    # keep the blade only — no fuzz on the stems, the petals or the anthers
+    _drop = [f for f in _bm.faces if f.material_index != 0]
+    bmesh.ops.delete(_bm, geom=_drop, context='FACES')
+    _bm.verts.ensure_lookup_table()
+    for v in _bm.verts:
+        v.co += v.normal * _off
+    _bm.to_mesh(shell.data)
+    _bm.free()
 
-shell.data.materials.clear()
-shell.data.materials.append(fuzz_mat)
-for m in list(shell.modifiers):
-    if m.type in {'SOLIDIFY', 'SUBSURF', 'PARTICLE_SYSTEM'}:
-        shell.modifiers.remove(m)
+    shell.data.materials.clear()
+    shell.data.materials.append(fuzz_mat)
+    for m in list(shell.modifiers):
+        if m.type in {'SOLIDIFY', 'SUBSURF', 'PARTICLE_SYSTEM'}:
+            shell.modifiers.remove(m)
+    shells.append(shell)
+
 
 # ---- export ----------------------------------------------------------------
 os.makedirs(OUT_DIR, exist_ok=True)
 glb = os.path.join(OUT_DIR, 'violet.glb')
 
-keep = {plant.name, shell.name, rig.name, 'pot', 'rim', 'soil'}
+keep = {plant.name, rig.name, 'pot', 'rim', 'soil'} | {sh.name for sh in shells}
 for ob in bpy.context.view_layer.objects:
     ob.select_set(ob.name in keep)
 bpy.context.view_layer.objects.active = plant
@@ -349,7 +492,10 @@ result = {
     'bones': len(rig.pose.bones),
     'materials': [m.name for m in plant.data.materials],
     'petal_albedo_srgb': IMG_PALB.colorspace_settings.name,
-    'fuzz_tris': len(shell.data.polygons),
+    'fuzz_tris': [len(sh.data.polygons) for sh in shells],
+    'solidified_verts': len(plant.data.vertices),
+    'welded_faces': _welded,
+    'materials_slots': [m.name for m in plant.data.materials],
     'frames': [scene.frame_start, scene.frame_end],
     'clipping_pairs': g['result']['leaf_pairs_intersecting'],
     'unsupported_export_options': dropped,

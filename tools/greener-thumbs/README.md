@@ -76,6 +76,46 @@ blade already went through it. The corolla did not, and that — not the colour
 values — is why the flowers were pale. Anything new that ships a base colour
 map has to go through `as_image(..., srgb=True)`.
 
+## Two more traps of the same shape
+
+Both cost a round for the same reason the colour-space one did: the thing looked
+right where it was authored and wrong where it shipped, so the difference was
+never in front of you at the same time.
+
+**`side: DoubleSide` is not thickness.** Solidify used to be stripped before
+export, on the reasoning that a double-sided material shows the back of a
+surface so the modifier was redundant. It shows the back; it does not give the
+surface an edge. A zero-thickness blade has a zero-width silhouette, so every
+leaf ends at a hard line and every petal reads as bent foil — which is exactly
+what the browser was showing while Cycles, with the modifier still in the stack,
+showed a plant. It is applied by hand now rather than left to `export_apply`,
+so the armature is never in the stack while it happens.
+
+**Texture space is not flower space.** The corolla's pale throat was drawn where
+`bt < 0.135` — the first eighth of a lobe's *length*. But a lobe is a fan, and
+`sin(pi * bt**0.55)**0.5` is already at 88% of full width by `bt = 0.10`. So the
+throat was not a small disc at the middle of the flower, it was a wedge reaching
+most of the way to the rim, and five of them meeting made a pale star that sat
+across the face of every bloom through several rounds of blaming sheen,
+specular and the environment map in turn. Anything meant to read as "near the
+centre" has to be measured as a radius in the flower's own frame:
+
+```python
+fanw = np.sin(np.pi * np.maximum(bt, 0.0) ** 0.55) ** 0.5
+rad  = np.sqrt(bt ** 2 + (su * fanw * 0.72) ** 2)
+```
+
+The general lesson, twice over: when the browser and Cycles disagree, the bug is
+in the translation between them; when they agree and it still looks wrong, stop
+adjusting the lighting and go and measure the map.
+
+**Geometry with no UVs samples texel (0, 0).** `blob()` and `filament()` built
+the anthers, the style and the corolla tube without ever writing to the UV
+layer, so every loop sat at the origin of whatever map its material slot points
+at. On the anthers that meant a flat colour no texture could fix; on the corolla
+tube it meant the white of the throat, painted on the *outside* of the flower,
+which is the pair of pale hexagons that were visible under every bloom.
+
 ## Running it
 
 Blender is used as a Python module, so there is nothing to install but a wheel:

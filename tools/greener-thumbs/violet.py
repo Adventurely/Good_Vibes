@@ -304,8 +304,23 @@ def petal_textures(n):
     v = np.abs(np.sin(fan * 3.4))
     veins = smoothstep(0.60, 0.0, v) * smoothstep(0.08, 0.40, bt)
 
-    deep = np.array([0.052, 0.005, 0.205])      # the body of the petal
-    pale = np.array([0.108, 0.030, 0.300])      # the margin, where it is thinnest
+    # Distance from the middle of the *flower*, not along the petal.
+    #
+    # This is the one that mattered. A lobe is a fan, and `blade_width` opens
+    # it fast: at bt = 0.10 — a tenth of the way along — it is already 88% of
+    # its full width. So anything drawn "near the base" in bt is not a small
+    # patch at the centre of the flower, it is a wedge reaching most of the way
+    # to the rim, and five of those meeting is the pale star that has been
+    # sitting across the face of every bloom. `hw/sz` is 0.62 for the dorsal
+    # lobes and 0.78 for the ventral ones; 0.72 splits them.
+    fanw = np.sin(np.pi * np.maximum(bt, 0.0) ** 0.55) ** 0.5
+    rad = np.sqrt(bt ** 2 + (su * fanw * 0.72) ** 2)
+
+    # Enough red to be violet. At (0.052, 0.005, 0.205) there was almost none
+    # in it, and a purple with no red in it is periwinkle — which is what the
+    # corolla was reading as against the greens of the greenhouse.
+    deep = np.array([0.074, 0.009, 0.222])      # the body of the petal
+    pale = np.array([0.142, 0.044, 0.328])      # the margin, where it is thinnest
     # Small and warm rather than big and cream. A Saintpaulia is saturated
     # almost the whole way to its centre; a wide pale base on five overlapping
     # petals adds up to a cream ring the flower does not have.
@@ -322,17 +337,23 @@ def petal_textures(n):
     col = col + (pale - deep)[None, None, :] * (0.18 * smoothstep(0.82, 1.0, np.abs(su)))[..., None]
     col = col + (pale - deep)[None, None, :] * (0.12 * smoothstep(0.92, 1.0, bt))[..., None]
     # a violet carries a deeper wash around the throat before the pale eye
-    col = col * (1.0 - 0.30 * smoothstep(0.40, 0.12, bt))[..., None]
-    tw = (smoothstep(0.135, 0.015, bt) ** 1.7)[..., None]
+    col = col * (1.0 - 0.30 * smoothstep(0.40, 0.12, rad))[..., None]
+    tw = (smoothstep(0.150, 0.020, rad) ** 1.7)[..., None]
     col = col * (1 - tw) + throat[None, None, :] * tw
     # veins are a deeper crease in the colour, never a drawn line — but at 0.38
-    # they did not register at all, and what did not register was a flat wash
-    col = col * (1.0 - 0.66 * veins[..., None])
+    # they did not register at all, and what did not register was a flat wash.
+    # 0.66 overshot the other way: paired with the relief below it put a pale
+    # star across the face of every flower, and a Saintpaulia's venation is
+    # barely visible in a photograph taken from the front.
+    col = col * (1.0 - 0.34 * veins[..., None])
 
     alb = np.ones((n, n, 4)); alb[..., :3] = np.clip(col, 0, 1)
 
-    # ribbed along the veins, with the tissue between them lifting a little
-    h = 0.5 - 0.30 * veins + 0.16 * (mottle - 0.5) + 0.05 * (fine - 0.5)
+    # Ribbed along the veins, with the tissue between them lifting a little.
+    # At 0.30 the groove walls were steep enough to turn every vein into a lit
+    # ridge and a dark one, which is where the star came from: the albedo drew
+    # the veins dark and the normal map lit them right back up again.
+    h = 0.5 - 0.13 * veins + 0.16 * (mottle - 0.5) + 0.05 * (fine - 0.5)
     ht = np.ones((n, n, 4)); ht[..., :3] = np.clip(h, 0, 1)[..., None]
 
     # matte and faintly velvety; the creases catch a little more than the rest
@@ -346,10 +367,63 @@ def petal_textures(n):
             make_image("violet_petal_rough", rg))
 
 
+def anther_textures(n):
+    """The two yellow anthers, which are the middle of the flower.
+
+    These were the last thing on the plant still wearing a flat colour, and in
+    close-up that is exactly what they looked like: two smooth cream beads. A
+    Saintpaulia anther is a dry sac with a slit down one face and a surface
+    entirely covered in pollen. The grain is the point — and it has to be a map
+    rather than a noise node, because glTF has no procedural textures and a
+    node-driven Base Color exports as the socket's unlinked default.
+
+    UVs come from `blob()`: u runs once around the sac, v from tip to tip.
+    """
+    u = np.linspace(0.0, 1.0, n)
+    U, V = np.meshgrid(u, u, indexing='xy')
+
+    # pollen as discrete grains rather than a haze — thresholded fine noise over
+    # a slower mottle, so the sac is dusted unevenly the way a real one is
+    grain = smoothstep(0.42, 0.74, fbm((n, n), 34, octaves=3, rough=0.62))
+    mottle = fbm((n, n), 5, octaves=4)
+
+    # the dehiscence slit: one line down the face that splits open to shed
+    slit = (np.exp(-((U - 0.5) / 0.045) ** 2)
+            * smoothstep(0.06, 0.24, V) * smoothstep(0.96, 0.76, V))
+
+    deep = np.array([0.300, 0.170, 0.012])
+    bright = np.array([0.860, 0.720, 0.190])
+    col = deep[None, None, :] + (bright - deep)[None, None, :] * np.clip(
+        0.34 + 0.52 * grain + 0.22 * (mottle - 0.5), 0, 1)[..., None]
+    col = col * (1.0 - 0.62 * slit)[..., None]
+    # and it darkens where it meets the filament, instead of being one even
+    # yellow the whole way round — a bead is even, an anther is not
+    col = col * (1.0 - 0.30 * smoothstep(0.16, 0.0, V))[..., None]
+    col = col * (1.0 - 0.30 * smoothstep(0.84, 1.0, V))[..., None]
+
+    alb = np.ones((n, n, 4)); alb[..., :3] = np.clip(col, 0, 1)
+
+    h = np.clip(0.46 + 0.34 * grain + 0.10 * (mottle - 0.5) - 0.40 * slit, 0, 1)
+    ht = np.ones((n, n, 4)); ht[..., :3] = h[..., None]
+
+    # Pollen is dust. Nothing here is allowed to be shiny: two glossy beads in
+    # the middle of the flower is most of what made the bloom read as moulded.
+    r = np.clip(0.88 - 0.10 * grain + 0.06 * (mottle - 0.5), 0.72, 0.98)
+    rg = np.ones((n, n, 4)); rg[..., :3] = r[..., None]
+
+    TEX_ARRAYS.update(eye_albedo=alb[..., :3].copy(),
+                      eye_height=h.copy(), eye_rough=r.copy())
+    return (make_image("violet_eye_albedo", alb),
+            make_image("violet_eye_height", ht),
+            make_image("violet_eye_rough", rg))
+
+
 ALB, HGT, ROU = leaf_textures(int(P['tex']))
 # Half resolution: a petal is a fifth the size of a blade on screen and there
 # are five of them per bloom, so the memory is better spent on the leaves.
 P_ALB, P_HGT, P_ROU = petal_textures(max(128, int(P['tex']) // 2))
+# 2 mm across on a 55 mm plant. 256 is already more texels than it can show.
+A_ALB, A_HGT, A_ROU = anther_textures(256)
 
 
 # ---- materials -------------------------------------------------------------
@@ -495,8 +569,26 @@ def petal_material():
     return m
 
 
+def anther_material():
+    """Image-mapped, for the same reason the blade and the corolla are: a noise
+    node looks right in Cycles and exports as nothing at all."""
+    m, nt, b = principled("violet_eye")
+    ta = nt.nodes.new('ShaderNodeTexImage'); ta.image = A_ALB; ta.location = (-700, 240)
+    tr = nt.nodes.new('ShaderNodeTexImage'); tr.image = A_ROU; tr.location = (-700, 0)
+    th = nt.nodes.new('ShaderNodeTexImage'); th.image = A_HGT; th.location = (-700, -240)
+    bp = nt.nodes.new('ShaderNodeBump'); bp.location = (-420, -240)
+    bp.inputs['Strength'].default_value = 0.60
+    bp.inputs['Distance'].default_value = 0.00035
+    nt.links.new(ta.outputs['Color'], b.inputs['Base Color'])
+    nt.links.new(tr.outputs['Color'], b.inputs['Roughness'])
+    nt.links.new(th.outputs['Color'], bp.inputs['Height'])
+    nt.links.new(bp.outputs['Normal'], b.inputs['Normal'])
+    set_if(b, 'Specular IOR Level', 0.22)
+    return m
+
+
 def simple(name, base, rough=0.6, sss=0.0, sss_r=(0.02, 0.02, 0.02),
-           sheen=0.0, spec=0.5):
+           sheen=0.0, spec=0.5, sheen_tint=(0.34, 0.38, 0.28)):
     m, nt, b = principled(name)
     set_if(b, 'Base Color', (*base, 1))
     set_if(b, 'Roughness', rough)
@@ -508,6 +600,11 @@ def simple(name, base, rough=0.6, sss=0.0, sss_r=(0.02, 0.02, 0.02),
     if sheen:
         set_if(b, 'Sheen Weight', sheen)
         set_if(b, 'Sheen Roughness', 0.35)
+        # The tint is not cosmetic. glTF's KHR_materials_sheen carries a colour
+        # and a roughness and has nowhere to put a weight, so Blender's exporter
+        # writes the tint and drops the weight — leaving this at its default
+        # white shipped a full-strength white gloss over every stem and scape.
+        set_if(b, 'Sheen Tint', (*sheen_tint, 1))
     return m
 
 
@@ -537,11 +634,11 @@ M_LEAF = leaf_material()
 M_STEM = simple("violet_stem", (0.045, 0.085, 0.030), rough=0.72, sss=0.30,
                 sss_r=(0.02, 0.03, 0.01), sheen=0.55)
 M_PETAL = petal_material()
-# An anther is a dry sac covered in pollen, not a bead. At roughness 0.40 these
-# rendered as two glossy yellow spheres, and a hard specular dot on a sphere is
-# about the most plastic thing a render can contain.
-M_EYE = noisy("violet_eye", (0.360, 0.225, 0.018), (0.640, 0.470, 0.055),
-              scale=1400.0, rough=0.86, bump=0.7, detail=9.0)
+# An anther is a dry sac covered in pollen, not a bead. This was a `noisy()`
+# procedural, which was right in Cycles and shipped to the browser as a flat
+# cream colour with no relief at all — two smooth beads in the middle of every
+# flower. It is a real map now, and `blob()` gives it real UVs to sample.
+M_EYE = anther_material()
 # Hairs are near-colourless and translucent; they read as a pale rim where the
 # light comes through them, which is most of what "velvet" looks like up close.
 M_HAIR = simple("violet_hair", (0.34, 0.40, 0.26), rough=0.42, sheen=0.5)
@@ -815,7 +912,11 @@ def add_leaf(i):
     pending = []          # (vert_index, sv) — bound once the chain exists
 
     # --- petiole: a real tube, because a violet's is fleshy and visible
-    RING, PSTEP = 7, 5
+    # A petiole on a Saintpaulia is thick, fleshy and round, and it is the
+    # nearest thing to the camera on the whole plant when you look down into
+    # the pot. At 7 sides it was visibly a heptagonal tube; 12 is round enough
+    # that the smooth normals have something to work with.
+    RING, PSTEP = 12, 5
     prev = None
     for a in range(PSTEP + 1):
         sv = pf * a / PSTEP
@@ -898,7 +999,7 @@ def add_bloom(j):
     names = chain(f"B{j}", pts, ups)
 
     # --- scape
-    RING, ST = 6, 4
+    RING, ST = 10, 4      # round, for the same reason the petiole is
     prev = None
     for a in range(ST + 1):
         sv = a / ST
@@ -952,7 +1053,13 @@ def add_bloom(j):
         hw = (0.62 if p < 2 else 0.78) * sz
         d_out = (face_ra * math.cos(pa) + ta * math.sin(pa)).normalized()
         d_side = d_out.cross(face_up).normalized()
-        PU, PV = 11, 13
+        # 11 x 13 was not enough to carry the undulation below. The wave
+        # amplitude was landing on a grid coarse enough that every crest came
+        # out as a hard crease between two flat facets, so the whole corolla
+        # read as folded paper — which is the opposite of what the ripple is
+        # there to do. Same shape, four times the quads, still under 200 verts
+        # a lobe.
+        PU, PV = 15, 17
         cols = []
         pstart = len(bm.verts)
         for a in range(PU):
@@ -985,7 +1092,7 @@ def add_bloom(j):
                 ruf = math.sin(su * 3.1 + bt * 8.5 + p * 1.9) * (abs(su) ** 3) * bt
                 pt = (top + d_out * (bt * sz) + d_side * (su * w * hw)
                       + face_up * sz * (-0.09 * bt * bt + 0.035 * (su ** 2) * bt
-                                        + 0.034 * rip * bt + 0.125 * ruf))
+                                        + 0.017 * rip * bt + 0.098 * ruf))
                 v = bm.verts.new(pt)
                 v[varl] = bv
                 col.append(v)
@@ -1004,8 +1111,14 @@ def add_bloom(j):
                     idx = lp.vert.index - pstart
                     lp[uvl].uv = ((idx // PV) / (PU - 1), (idx % PV) / (PV - 1))
 
-    def blob(c, rr, squash, slot):
-        ES = 8
+    def blob(c, rr, squash, slot, ES=12, uv=(0.0, 1.0)):
+        """A small sphere: an anther, or the stigma on the end of the style.
+
+        It carries UVs now. Without them every loop sat at (0, 0) and sampled
+        one texel of whatever map the slot points at — which is why the anthers
+        stayed a single flat colour however good their texture was, and why the
+        corolla tube below came out wearing the white of the throat."""
+        v0, v1 = uv
         rings = []
         for a in range(ES + 1):
             ph = a / ES * math.pi
@@ -1020,16 +1133,26 @@ def add_bloom(j):
         bm.verts.ensure_lookup_table()
         for a in range(ES):
             for k in range(ES):
+                corners = ((rings[a][k],                 k,     a),
+                           (rings[a][(k + 1) % ES],      k + 1, a),
+                           (rings[a + 1][(k + 1) % ES],  k + 1, a + 1),
+                           (rings[a + 1][k],             k,     a + 1))
                 try:
-                    f = bm.faces.new((rings[a][k], rings[a][(k + 1) % ES],
-                                      rings[a + 1][(k + 1) % ES], rings[a + 1][k]))
-                    f.material_index = slot
+                    f = bm.faces.new(tuple(v for v, _, _ in corners))
                 except ValueError:
-                    pass
+                    continue
+                f.material_index = slot
+                # keyed by vertex rather than by loop order, and using k + 1
+                # rather than (k + 1) % ES, so the seam column gets u = 1
+                # instead of wrapping the map backwards in one strip
+                want = {v: (uu / ES, v0 + (v1 - v0) * vv / ES)
+                        for v, uu, vv in corners}
+                for lp in f.loops:
+                    lp[uvl].uv = want[lp.vert]
 
-    def filament(pts, rr, slot):
+    def filament(pts, rr, slot, RING=6, uv=(0.0, 1.0)):
         """A thin tube through `pts` — the style, and the corolla tube."""
-        RING = 6
+        v0, v1 = uv
         prev = None
         for i, c in enumerate(pts):
             if i == 0:
@@ -1050,17 +1173,31 @@ def add_bloom(j):
                 bind(len(bm.verts) - 1, 1.0, names)
             bm.verts.ensure_lookup_table()
             if prev:
+                n = max(1, len(pts) - 1)
                 for k in range(RING):
-                    f = bm.faces.new((prev[k], prev[(k + 1) % RING],
-                                      ring[(k + 1) % RING], ring[k]))
+                    corners = ((prev[k],                 k,     i - 1),
+                               (prev[(k + 1) % RING],    k + 1, i - 1),
+                               (ring[(k + 1) % RING],    k + 1, i),
+                               (ring[k],                 k,     i))
+                    f = bm.faces.new(tuple(v for v, _, _ in corners))
                     f.material_index = slot
+                    want = {v: (uu / RING, v0 + (v1 - v0) * vv / n)
+                            for v, uu, vv in corners}
+                    for lp in f.loops:
+                        lp[uvl].uv = want[lp.vert]
             prev = ring
 
     # The corolla tube. Very short on a violet — but with no tube at all, five
     # petals converge on one point and the centre of the flower reads as a seam.
+    # It samples the middle of the petal map, not the base of it. The map's
+    # v = 0 end is the pale throat, and an untextured tube reading texel (0, 0)
+    # put that white on the *outside* of the corolla — which from behind is the
+    # two pale hexagons visible under every bloom in the game. The back of a
+    # violet's corolla is violet.
     filament([top - face_up * 0.0034 + face_ra * -0.0006,
               top - face_up * 0.0012,
-              top + face_up * 0.0008], 0.0021, SLOT_PETAL)
+              top + face_up * 0.0008], 0.0021, SLOT_PETAL,
+             RING=12, uv=(0.46, 0.76))
 
     # two fat yellow anthers, which is the detail that says Saintpaulia rather
     # than "small purple flower"
@@ -1082,7 +1219,7 @@ def add_bloom(j):
     # 0.22 mm and 5 mm long. The first attempt at this was twice as thick and
     # twice as long, and a style that reads as a stick is worse than no style.
     filament(style, 0.00022, SLOT_STEM)
-    blob(style[-1], 0.00040, 1.0, SLOT_STEM)      # the stigma
+    blob(style[-1], 0.00040, 1.0, SLOT_STEM, ES=6)   # the stigma, 0.4 mm across
 
 
 for i in range(int(P['leaves'])):

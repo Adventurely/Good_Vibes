@@ -1189,6 +1189,14 @@ loader.load('./violet.glb', gltf => {
           if (m.sheenColor) m.sheenColor.setRGB(0.26, 0.30, 0.20);
           m.specularIntensity = 0.10;
         }
+        /* The anthers are pollen, and pollen is dust. They now carry their own
+           albedo, roughness and normal maps, and the one thing that can undo
+           all three is a highlight: two lit beads in the middle of the flower
+           is what made the bloom read as moulded in the first place. */
+        if (/eye/i.test(m.name || '')) {
+          m.specularIntensity = 0.04;
+          m.envMapIntensity = 0.40;
+        }
       });
     }
     if (o.isSkinnedMesh) skinned = o;
@@ -1228,10 +1236,24 @@ loader.load('./violet.glb', gltf => {
       if (!m || !/leaf/i.test(m.name)) return m;
       if (swapped.has(m)) return swapped.get(m);
       const pm = new THREE.MeshPhysicalMaterial({
+        // Named, so the overrides above and anything later can still find it.
+        // Rebuilt anonymously, this material matched none of them and quietly
+        // kept three.js's defaults for everything not listed here.
+        name: 'violet_leaf_web',
         map: m.map, normalMap: m.normalMap, roughnessMap: m.roughnessMap,
         roughness: 1.0, metalness: 0.0, side: THREE.DoubleSide,
-        // the hairs are not in the GLB; sheen stands in for the light they scatter
-        sheen: 0.7, sheenRoughness: 0.5, sheenColor: new THREE.Color(0x8fa07a),
+        /* This was sheen 0.7 in a pale sage, on the stated grounds that the
+           hairs were not in the GLB and sheen had to stand in for the light
+           they scatter. The hairs *are* in the GLB now — two alpha-cut shells
+           over every blade — so the stand-in was being paid twice, and a broad
+           pale sheen at full strength over a leaf is precisely the glare that
+           kept coming back. Weak, wide and dark: enough to soften the terminator,
+           not enough to lie about the surface. */
+        sheen: 0.18, sheenRoughness: 0.80, sheenColor: new THREE.Color(0x3a4230),
+        // Left at their defaults (1.0) this leaf answered the greenhouse sky
+        // like polished stone. A Saintpaulia blade is matte, and its highlight
+        // is the hairs standing on it, not the surface underneath.
+        specularIntensity: 0.06, envMapIntensity: 0.55,
         normalScale: m.normalScale ? m.normalScale.clone() : new THREE.Vector2(1, 1),
       });
       swapped.set(m, pm);
