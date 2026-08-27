@@ -5,3 +5,7 @@ npm-debug.log*
 .DS_Store
 dist/
 .wrangler/
+
+# Blender writes these when a skill script is imported
+__pycache__/
+*.pyc
