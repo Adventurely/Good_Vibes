@@ -928,12 +928,25 @@ def add_leaf(i):
             v = bm.verts.new(W(math.cos(th) * r, y, z + math.sin(th) * r))
             ring.append(v)
             pending.append((len(bm.verts) - 1, sv))
-        if prev:
+        if prev is None:
+            # Close the bottom. The tube was open at both ends: the blade hides
+            # the top one, and the crown below hides this one, but "hidden by
+            # something else" is not the same as closed and a 3 mm hole looking
+            # straight up a petiole is what you get when the camera goes under
+            # the rosette.
+            cap = bm.faces.new(tuple(reversed(ring)))
+            cap.material_index = SLOT_STEM
+        else:
             for k in range(RING):
                 f = bm.faces.new((prev[k], prev[(k + 1) % RING],
                                   ring[(k + 1) % RING], ring[k]))
                 f.material_index = SLOT_STEM
         prev = ring
+    # And the top, where the blade takes over. The blade sits over it but does
+    # not seal it, and a petiole is not always seen from a angle where that
+    # distinction is academic.
+    _pcap = bm.faces.new(tuple(prev))
+    _pcap.material_index = SLOT_STEM
     bm.verts.ensure_lookup_table()
 
     # --- blade: a grid, placed by the same function the solver measured
@@ -959,10 +972,25 @@ def add_leaf(i):
     bm.verts.ensure_lookup_table()
     bm.verts.index_update()
 
+    # Which way round the quads are wound decides which way the blade faces,
+    # and the answer is not obvious: it falls out of the frame `blade_xyz`
+    # builds in, and it came out pointing at the floor. On a double-sided
+    # material that is invisible — right up until something *uses* the normal.
+    # Two things do. Solidify grows away from it, so the thickness was being
+    # added on top of the leaf instead of underneath; and the fuzz shells are
+    # pushed along it, so every hair on the plant ended up hanging under the
+    # leaf it belongs to, which is precisely where a violet has none. Decide it
+    # once from the geometry rather than guessing at the winding.
+    ai, bi = U // 2, V // 2
+    e_b = grid[ai][bi + 1].co - grid[ai][bi].co
+    e_a = grid[ai + 1][bi].co - grid[ai][bi].co
+    up_hint = (W(0.0, 0.0, 1.0) - W(0.0, 0.0, 0.0)).normalized()
+    quad = (((0, 0), (0, 1), (1, 1), (1, 0)) if e_b.cross(e_a).dot(up_hint) >= 0
+            else ((0, 0), (1, 0), (1, 1), (0, 1)))
+
     for a in range(U - 1):
         for b_ in range(V - 1):
-            f = bm.faces.new((grid[a][b_], grid[a][b_ + 1],
-                              grid[a + 1][b_ + 1], grid[a + 1][b_]))
+            f = bm.faces.new(tuple(grid[a + da][b_ + db] for da, db in quad))
             f.material_index = SLOT_LEAF
             for lp in f.loops:
                 idx = lp.vert.index - start
@@ -1011,12 +1039,17 @@ def add_bloom(j):
             v = bm.verts.new((c.x + math.cos(th) * rr, c.y + math.sin(th) * rr, c.z))
             ring.append(v)
             bind(len(bm.verts) - 1, sv, names)
-        if prev:
+        if prev is None:
+            cap = bm.faces.new(tuple(reversed(ring)))     # closed, see add_leaf
+            cap.material_index = SLOT_STEM
+        else:
             for k in range(RING):
                 f = bm.faces.new((prev[k], prev[(k + 1) % RING],
                                   ring[(k + 1) % RING], ring[k]))
                 f.material_index = SLOT_STEM
         prev = ring
+    _scap = bm.faces.new(tuple(prev))       # closed at the top, see add_leaf
+    _scap.material_index = SLOT_STEM
     bm.verts.ensure_lookup_table()
 
     # --- the corolla, as a frame that faces up and leans a little outward,
@@ -1100,10 +1133,18 @@ def add_bloom(j):
             cols.append(col)
         bm.verts.ensure_lookup_table()
         bm.verts.index_update()
+        # Same question as the blade, same answer: decide the winding from the
+        # geometry. A lobe whose normal points into the flower gets its
+        # thickness added on the visible side and its shading fought over.
+        pe_b = cols[PU // 2][PV // 2 + 1].co - cols[PU // 2][PV // 2].co
+        pe_a = cols[PU // 2 + 1][PV // 2].co - cols[PU // 2][PV // 2].co
+        pquad = (((0, 0), (0, 1), (1, 1), (1, 0))
+                 if pe_b.cross(pe_a).dot(face_up) >= 0
+                 else ((0, 0), (1, 0), (1, 1), (0, 1)))
         for a in range(PU - 1):
             for b_ in range(PV - 1):
-                f = bm.faces.new((cols[a][b_], cols[a][b_ + 1],
-                                  cols[a + 1][b_ + 1], cols[a + 1][b_]))
+                f = bm.faces.new(tuple(cols[a + da][b_ + db]
+                                       for da, db in pquad))
                 f.material_index = SLOT_PETAL
                 # `su` across, `bt` along — the same coordinates the petal was
                 # built in, so the texture cannot disagree with the geometry
@@ -1151,8 +1192,12 @@ def add_bloom(j):
                     lp[uvl].uv = want[lp.vert]
 
     def filament(pts, rr, slot, RING=6, uv=(0.0, 1.0)):
-        """A thin tube through `pts` — the style, and the corolla tube."""
+        """A thin tube through `pts` — the style, and the corolla tube.
+
+        Closed at both ends. Every open tube on this plant has turned out to be
+        visible from somewhere."""
         v0, v1 = uv
+        first = None
         prev = None
         for i, c in enumerate(pts):
             if i == 0:
@@ -1172,6 +1217,8 @@ def add_bloom(j):
                 ring.append(bm.verts.new(c + (u * math.cos(th) + w2 * math.sin(th)) * rr))
                 bind(len(bm.verts) - 1, 1.0, names)
             bm.verts.ensure_lookup_table()
+            if first is None:
+                first = ring
             if prev:
                 n = max(1, len(pts) - 1)
                 for k in range(RING):
@@ -1186,6 +1233,13 @@ def add_bloom(j):
                     for lp in f.loops:
                         lp[uvl].uv = want[lp.vert]
             prev = ring
+        for cap, flip in ((first, True), (prev, False)):
+            if cap is None:
+                continue
+            fc = bm.faces.new(tuple(reversed(cap)) if flip else tuple(cap))
+            fc.material_index = slot
+            for lp in fc.loops:
+                lp[uvl].uv = (0.5, v0 if flip else v1)
 
     # The corolla tube. Very short on a violet — but with no tube at all, five
     # petals converge on one point and the centre of the flower reads as a seam.
@@ -1455,6 +1509,62 @@ bpy.ops.mesh.primitive_cylinder_add(vertices=72, radius=0.0535, depth=0.004,
 soil = bpy.context.active_object; soil.name = "soil"
 soil.data.materials.append(M_SOIL)
 sd = soil.modifiers.new("bump", 'SUBSURF'); sd.levels = sd.render_levels = 2
+
+# ---- the crown, which is the stem the petioles actually leave from ---------
+"""There was nothing holding the plant up.
+
+Every petiole starts at `crown_at(...)` — a point `crown_r` off the axis at
+that leaf's own height — and the older a leaf is, the higher its attachment
+sits, up to `stem_rise + max_lift` above the compost. Between those attachment
+points and the soil there was simply nothing drawn, so from any angle below the
+rosette the plant was a bundle of tubes ending in mid-air over a bare pot.
+
+A Saintpaulia has a short, thick, fleshy stem that lengthens as its lowest
+leaves are shed — the "neck" that growers eventually re-pot to bury. That is
+the missing solid, and it is the reason a violet's leaves can attach at
+different heights in the first place.
+
+Separate object, not part of the skinned mesh, on purpose: the crown does not
+droop and does not bend, and an unweighted vertex inside a skinned mesh is a
+vertex that collapses to the origin.
+"""
+CROWN_TOP = max(pl['cz'] for pl in PLACE)
+_cb = bmesh.new()
+_cuv = _cb.loops.layers.uv.new("UVMap")
+_CR = 20
+# Wide enough to swallow the petiole bases at every height: they are centred
+# `crown_r` from the axis and are `0.0029` across, so anything below about
+# 10.1 mm leaves a sliver of open tube showing at the join.
+_z0 = SOIL_Z - 0.006
+_prof = [(_z0 + (CROWN_TOP - _z0) * (t / 9.0),
+          0.0112 - 0.0010 * (t / 9.0) + 0.00035 * math.sin(t * 0.68 + 1.2))
+         for t in range(10)]
+_rings = []
+for (z, r) in _prof:
+    _rings.append([_cb.verts.new((math.cos(k / _CR * math.tau) * r,
+                                  math.sin(k / _CR * math.tau) * r, z))
+                   for k in range(_CR)])
+_apex = _cb.verts.new((0.0, 0.0, CROWN_TOP + 0.0030))
+_cb.verts.ensure_lookup_table()
+for a in range(len(_rings) - 1):
+    for k in range(_CR):
+        f = _cb.faces.new((_rings[a][k], _rings[a][(k + 1) % _CR],
+                           _rings[a + 1][(k + 1) % _CR], _rings[a + 1][k]))
+        for lp, uu, vv in zip(f.loops, (k, k + 1, k + 1, k), (a, a, a + 1, a + 1)):
+            lp[_cuv].uv = (uu / _CR, vv / (len(_rings) - 1))
+for k in range(_CR):                       # a growing point, not a sawn end
+    _cb.faces.new((_rings[-1][k], _rings[-1][(k + 1) % _CR], _apex))
+_cb.faces.new(tuple(_rings[0]))            # and a floor, buried in the compost
+bmesh.ops.recalc_face_normals(_cb, faces=_cb.faces[:])
+_cme = bpy.data.meshes.new("crown")
+_cb.to_mesh(_cme)
+_cb.free()
+_cme.materials.append(M_STEM)
+for _p in _cme.polygons:
+    _p.use_smooth = True
+crown = bpy.data.objects.new("crown", _cme)
+bpy.context.collection.objects.link(crown)
+
 
 bpy.ops.mesh.primitive_plane_add(size=4, location=(0, 0, 0))
 bench = bpy.context.active_object; bench.name = "bench"

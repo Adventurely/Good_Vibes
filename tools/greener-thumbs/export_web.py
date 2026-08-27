@@ -440,7 +440,7 @@ for _li, (_off, (_hi, _lo), _col) in enumerate(FUZZ_LAYERS):
 os.makedirs(OUT_DIR, exist_ok=True)
 glb = os.path.join(OUT_DIR, 'violet.glb')
 
-keep = {plant.name, rig.name, 'pot', 'rim', 'soil'} | {sh.name for sh in shells}
+keep = {plant.name, rig.name, 'pot', 'rim', 'soil', 'crown'} | {sh.name for sh in shells}
 for ob in bpy.context.view_layer.objects:
     ob.select_set(ob.name in keep)
 bpy.context.view_layer.objects.active = plant
@@ -485,8 +485,22 @@ _props = set(bpy.ops.export_scene.gltf.get_rna_type().properties.keys())
 dropped = sorted(k for k in opts if k not in _props)
 bpy.ops.export_scene.gltf(**{k: v for k, v in opts.items() if k in _props})
 
+# Every open tube on this plant has turned out to be visible from somewhere:
+# the petiole bases from under the rosette, the corolla tube from behind a
+# bloom. A boundary edge is a hole, so count them and put the number in the
+# build report rather than waiting to be shown a screenshot of one.
+_hb = bmesh.new()
+_hb.from_mesh(plant.data)
+_holes = {}
+for _e in _hb.edges:
+    if len(_e.link_faces) == 1:
+        _mi = _e.link_faces[0].material_index
+        _holes[_mi] = _holes.get(_mi, 0) + 1
+_hb.free()
+
 result = {
     'glb': glb,
+    'boundary_edges_by_slot': {str(k): v for k, v in sorted(_holes.items())},
     'bytes': os.path.getsize(glb) if os.path.exists(glb) else 0,
     'verts': len(plant.data.vertices),
     'bones': len(rig.pose.bones),

@@ -2,13 +2,29 @@
 #
 # If the deploy job fails in about a second with no logs and no steps at all,
 # nothing here is wrong: GitHub rejected the deployment before the job could
-# start. The `github-pages` environment only accepts deployments from the
-# repository's **default branch** unless somebody widens it, so a run from any
-# other branch dies at the gate with nothing written down. Either make the
-# branch the default (Settings -> General -> Default branch) or allow it in
-# Settings -> Environments -> github-pages -> Deployment branches and tags.
-# That is also why `main` is listed above: it is the branch this repo actually
-# lives on, so publishing follows it by default and `preview` is the extra.
+# start, because the branch is not on the `github-pages` environment's
+# allowlist.
+#
+# Do not go looking at the default branch. That was the guess this comment used
+# to make, and it was wrong — it cost a session. The environment does not track
+# the default branch at all: it is seeded with whatever branch happened to be
+# the Pages source when GitHub first created it, and then it keeps that branch
+# and only that branch forever. Here it was seeded with
+# `claude/node-server-hello-world-28lx0w`, a throwaway from an old session, so
+# every push to `main` died at the gate from the day this file was written
+# until 2026-08-27.
+#
+# To see the actual allowlist, which the Actions UI does not show you:
+#
+#   gh api repos/Adventurely/Good_Vibes/environments/github-pages/deployment-branch-policies
+#
+# To add a branch to it — the fix, and it is per branch:
+#
+#   gh api --method POST -f name=preview -f type=branch
+#     repos/Adventurely/Good_Vibes/environments/github-pages/deployment-branch-policies
+#
+# `main` is on it. `preview` is *not*, so pushing that branch still fails this
+# way until somebody runs the line above.
 #
 # This is the single-player preview channel: Pages is static, so the game is
 # reachable only through its offline ?preview mode — rooms and the WebSocket
