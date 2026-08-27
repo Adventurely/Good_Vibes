@@ -376,15 +376,16 @@ FUZZ_LAYERS = (
     # that has to disappear into the leaf: it is only a shade lighter than the
     # blade under it now, and it is the far layer's job to be visible.
     #
-    # Brightness is the other half of it. A hair is translucent, but it is also
-    # 0.05 mm across, so what a pixel of leaf actually gets is a hair's colour
-    # averaged with the blade behind it. Painted at four times the blade's own
-    # albedo these read as frost on any leaf that was not in direct sun — most
-    # of them, in a greenhouse — so they are closer to the leaf now and it is
-    # the light that is allowed to make them pale, not the paint.
-    (0.00072, (0.906, 0.866), (0.105, 0.130, 0.082, 1.0)),
+    # Brightness is the other half of it, and the mistake was to pick these
+    # colours in the abstract. The blade's own albedo is (0.022, 0.057, 0.019).
+    # At (0.105, 0.130, 0.082) the hairs were 4.7x its red and 2.3x its green —
+    # not merely brighter than the leaf but *desaturated* against it, which is
+    # a grey speck, not a pale hair. They are set as multiples of the blade now
+    # and they keep its hue: about twice its value near the surface, two and a
+    # half at the tips where a hair is catching the sky through itself.
+    (0.00072, (0.906, 0.866), (0.046, 0.112, 0.040, 1.0)),
     # and the tips, sparse enough to read as separate hairs against the sky
-    (0.00160, (0.968, 0.950), (0.225, 0.260, 0.185, 1.0)),
+    (0.00160, (0.968, 0.950), (0.062, 0.148, 0.055, 1.0)),
 )
 
 _r = np.random.default_rng(4)
@@ -422,20 +423,26 @@ for _li, (_off, (_hi, _lo), _col) in enumerate(FUZZ_LAYERS):
     _fb.inputs['Metallic'].default_value = 0.0
     if 'Specular IOR Level' in _fb.inputs:
         _fb.inputs['Specular IOR Level'].default_value = 0.0
-    # What we want is glTF alphaMode MASK — an alpha-blended shell of ten
-    # thousand little quads is ten thousand sorting decisions a depth buffer
-    # cannot make, and a cutout has none to get wrong. Blender 5 removed the
-    # 'CLIP' blend mode the exporter used to turn into MASK, so there is no
-    # longer a way to say it from here: this comes out as BLEND whatever we do,
-    # and the viewer converts it back to a cutout on load.
-    for _bm_name in ('CLIP', 'BLEND'):
-        try:
-            fuzz_mat.blend_method = _bm_name
-            break
-        except Exception:
-            continue
+    # BLEND, and this time on purpose.
+    #
+    # These shipped as alphaMode BLEND and the viewer converted them back to a
+    # cutout on load, on the reasoning that ten thousand alpha-blended quads
+    # are ten thousand sorting decisions a depth buffer cannot make. True, and
+    # beside the point: a cutout has a threshold, and a threshold does not
+    # survive mipmapping. Measured against alphaTest 0.35, the near shell's
+    # mask passes 13.4% of its texels at mip 0, 8.2% at mip 1, 0.7% at mip 2
+    # and nothing at all beyond — so the hairs did not exist at a distance and
+    # covered an eighth of the leaf up close. That is not a look, it is the
+    # camera changing the plant, and it is exactly what "they get brighter as
+    # I zoom in" describes.
+    #
+    # Linear blending has no threshold to collapse. The pixel is
+    # hair * a + leaf * (1 - a), and averaging `a` down the mip chain averages
+    # the result with it: the same 12.2% of hair in the mix at every distance.
+    # Sorting is what we pay, and at these opacities over a shell that hugs the
+    # blade it does not show.
     try:
-        fuzz_mat.alpha_threshold = 0.35
+        fuzz_mat.blend_method = 'BLEND'
     except Exception:
         pass
 

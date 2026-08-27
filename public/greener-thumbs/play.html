@@ -1183,20 +1183,30 @@ loader.load('./violet.glb', gltf => {
       const mats = Array.isArray(o.material) ? o.material : [o.material];
       mats.forEach(m => {
         m.side = THREE.DoubleSide;
-        /* The fuzz shell wants to be a cutout and arrives as a blend.
-           glTF's alphaMode MASK is what this needs, and Blender 5 dropped the
-           only blend mode its exporter turned into MASK — so the shell comes
-           over as alpha-blended, which is ten thousand little quads asking the
-           depth buffer to sort them and getting it wrong. `alphaTest` puts it
-           back: same pixels, no sorting, and it writes depth again so the
-           hairs occlude each other properly. */
+        /* The fuzz shells blend; they do not cut out.
+           This used to force `alphaTest = 0.35` to dodge the sorting cost of
+           ten thousand transparent quads. It bought that at a price nobody
+           measured: a threshold does not survive mipmapping. The near shell's
+           mask passes 13.4% of its texels against 0.35 at mip 0, 8.2% at mip
+           1, 0.7% at mip 2 and none beyond — so the hairs vanished at a
+           distance and covered an eighth of the leaf up close, and the plant
+           got hairier the closer you looked at it.
+           Linear blending has no threshold to collapse. The pixel is
+           hair*a + leaf*(1-a), and averaging `a` down the mip chain averages
+           the result with it, so the mix is the same at every distance.
+           `depthWrite` off because a blended surface that writes depth
+           discards everything behind it, which is the artefact this is
+           avoiding, not the one it is causing. */
         if (/fuzz/i.test(m.name || '')) {
-          m.transparent = false;
-          m.alphaTest = 0.35;
-          m.depthWrite = true;
+          m.transparent = true;
+          m.alphaTest = 0;
+          m.depthWrite = false;
           // barely any environment: a hair catching a sky reflection is a
           // white dot, and there are ten thousand of them
           m.envMapIntensity = 0.25;
+          // the shells are seen most at the silhouette, which is the grazing
+          // angle mipmapping blurs worst
+          if (m.map) m.map.anisotropy = 8;
         }
         /* Sheen has to be set here, not in Blender.
            KHR_materials_sheen carries a colour and a roughness but no weight,

@@ -150,6 +150,40 @@ Two consequences worth knowing:
   wander pinned to zero at both ends, is most of the difference between a plant
   and a length of tapered pipe.
 
+## A threshold does not survive mipmapping
+
+"The hairs get brighter as I zoom in" turned out to be a measurable fact about
+the fuzz shells, not an impression. The shells were cut out with
+`alphaTest = 0.35`, and the fraction of the mask that passes that threshold
+collapses as the mip chain averages a binary noise texture toward its mean:
+
+| mip | texels | passing 0.35 |
+|-----|--------|--------------|
+| 0   | 512    | 13.4%        |
+| 1   | 256    | 8.2%         |
+| 2   | 128    | 0.7%         |
+| 3+  | 64     | 0%           |
+
+So there were no hairs at all at a distance and an eighth of the leaf was
+covered in them up close. That is not a look; it is the camera changing the
+plant.
+
+Linear alpha blending has no threshold to collapse. The pixel is
+`hair * a + leaf * (1 - a)`, and averaging `a` down the mip chain averages the
+result with it, so the mix is identical at every distance — what changes with
+zoom is structure, which is what should change. The price is sorting, and over
+a shell that hugs the blade at these opacities it does not show. `depthWrite`
+has to go off with it: a blended surface that writes depth discards everything
+behind it, which is the artefact this is avoiding, not the one it is causing.
+
+**Pick hair colour as a multiple of the blade, never in the abstract.** The
+shells were painted (0.105, 0.130, 0.082) against a blade albedo of
+(0.022, 0.057, 0.019) — 4.7x its red and 2.3x its green, so they were not
+merely brighter than the leaf, they were *desaturated* against it. That is a
+grey speck, not a pale hair. Read the blade's mean and scale from it; about 2x
+near the surface and 2.5x at the tips lands a soft ~19% lift in value with the
+hue kept, which is what velvet does.
+
 ## Do not judge colour from the Blender render
 
 This has now cost two rounds, on two different materials, for the same reason.
