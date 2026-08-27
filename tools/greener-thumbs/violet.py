@@ -367,6 +367,54 @@ def petal_textures(n):
             make_image("violet_petal_rough", rg))
 
 
+def stem_textures(n):
+    """Petioles and scapes, which are not green.
+
+    In every photograph of a Saintpaulia the stalks are a dusky red-brown for
+    most of their length and only turn green up under the blade, and they are
+    as hairy as the leaves are. This was one flat sage colour with a sheen on
+    it, which is what made the middle of the plant read as a bundle of tubing.
+
+    v runs from the compost to the blade; u runs once around the stalk, with
+    u = 0 on the grooved upper face.
+    """
+    u = np.linspace(0.0, 1.0, n)
+    U, V = np.meshgrid(u, u, indexing='xy')
+    fine = fbm((n, n), 40, octaves=3)
+    ribs = fbm((n, n), 7, octaves=4)
+
+    red = np.array([0.062, 0.019, 0.015])       # where it leaves the compost
+    green = np.array([0.048, 0.079, 0.027])     # and up under the blade
+    # The green is confined to the last stretch under the blade. Blended from
+    # halfway the stalk came out salmon pink, which is a colour no Saintpaulia
+    # has ever been — the photographs are dusky maroon nearly to the top.
+    mix = smoothstep(0.72, 0.99, V)[..., None]
+    col = red[None, None, :] * (1 - mix) + green[None, None, :] * mix
+    # ribbed along its length, which is what a fleshy stalk does, and mottled
+    # across it, which is what stops a tube reading as extruded
+    col = col * (1.0 - 0.26 * (ribs - 0.5))[..., None]
+    col = col * (1.0 + 0.26 * (fine - 0.5))[..., None]
+    # the channel on the upper face sits in its own shadow
+    col = col * (1.0 - 0.20 * np.exp(-((np.minimum(U, 1.0 - U)) / 0.09) ** 2))[..., None]
+
+    alb = np.ones((n, n, 4)); alb[..., :3] = np.clip(col, 0, 1)
+
+    # Hairs as relief. A violet's petiole is as hairy as its blade, and a shell
+    # over something 3 mm across cannot carry all of it — most of what reads as
+    # fuzz on a stalk at arm's length is the way it breaks up the highlight.
+    h = np.clip(0.5 + 0.46 * (fine - 0.5) + 0.30 * (ribs - 0.5), 0, 1)
+    ht = np.ones((n, n, 4)); ht[..., :3] = h[..., None]
+
+    r = np.clip(0.68 + 0.18 * (fine - 0.5) - 0.06 * (ribs - 0.5), 0.42, 0.94)
+    rg = np.ones((n, n, 4)); rg[..., :3] = r[..., None]
+
+    TEX_ARRAYS.update(stem_albedo=alb[..., :3].copy(),
+                      stem_height=h.copy(), stem_rough=r.copy())
+    return (make_image("violet_stem_albedo", alb),
+            make_image("violet_stem_height", ht),
+            make_image("violet_stem_rough", rg))
+
+
 def anther_textures(n):
     """The two yellow anthers, which are the middle of the flower.
 
@@ -424,6 +472,7 @@ ALB, HGT, ROU = leaf_textures(int(P['tex']))
 P_ALB, P_HGT, P_ROU = petal_textures(max(128, int(P['tex']) // 2))
 # 2 mm across on a 55 mm plant. 256 is already more texels than it can show.
 A_ALB, A_HGT, A_ROU = anther_textures(256)
+S_ALB, S_HGT, S_ROU = stem_textures(256)
 
 
 # ---- materials -------------------------------------------------------------
@@ -569,6 +618,30 @@ def petal_material():
     return m
 
 
+def stem_material():
+    """Image-mapped, and still translucent: a petiole held against the light
+    glows, which is half of why a violet looks alive rather than moulded."""
+    m, nt, b = principled("violet_stem")
+    ta = nt.nodes.new('ShaderNodeTexImage'); ta.image = S_ALB; ta.location = (-700, 240)
+    tr = nt.nodes.new('ShaderNodeTexImage'); tr.image = S_ROU; tr.location = (-700, 0)
+    th = nt.nodes.new('ShaderNodeTexImage'); th.image = S_HGT; th.location = (-700, -240)
+    bp = nt.nodes.new('ShaderNodeBump'); bp.location = (-420, -240)
+    bp.inputs['Strength'].default_value = 0.80
+    bp.inputs['Distance'].default_value = 0.0005
+    nt.links.new(ta.outputs['Color'], b.inputs['Base Color'])
+    nt.links.new(tr.outputs['Color'], b.inputs['Roughness'])
+    nt.links.new(th.outputs['Color'], bp.inputs['Height'])
+    nt.links.new(bp.outputs['Normal'], b.inputs['Normal'])
+    set_if(b, 'Subsurface Weight', 0.30)
+    set_if(b, 'Subsurface Radius', (0.02, 0.03, 0.01))
+    set_if(b, 'Subsurface Scale', 0.010)
+    set_if(b, 'Sheen Weight', 0.45)
+    set_if(b, 'Sheen Roughness', 0.35)
+    set_if(b, 'Sheen Tint', (0.34, 0.30, 0.24, 1))
+    set_if(b, 'Specular IOR Level', 0.30)
+    return m
+
+
 def anther_material():
     """Image-mapped, for the same reason the blade and the corolla are: a noise
     node looks right in Cycles and exports as nothing at all."""
@@ -631,8 +704,7 @@ def noisy(name, c1, c2, scale=40.0, rough=0.85, bump=0.3, detail=6.0):
 
 
 M_LEAF = leaf_material()
-M_STEM = simple("violet_stem", (0.045, 0.085, 0.030), rough=0.72, sss=0.30,
-                sss_r=(0.02, 0.03, 0.01), sheen=0.55)
+M_STEM = stem_material()
 M_PETAL = petal_material()
 # An anther is a dry sac covered in pollen, not a bead. This was a `noisy()`
 # procedural, which was right in Cycles and shipped to the browser as a flat
@@ -889,7 +961,6 @@ ROSETTE_TOP = rosette_top()
 
 
 def add_leaf(i):
-    f0 = len(bm.faces)
     segs = int(P['segs'])
     pet, bl = float(P['petiole']), float(P['blade_len'])
     total = pet + bl
@@ -911,29 +982,97 @@ def add_leaf(i):
 
     pending = []          # (vert_index, sv) — bound once the chain exists
 
-    # --- petiole: a real tube, because a violet's is fleshy and visible
-    # A petiole on a Saintpaulia is thick, fleshy and round, and it is the
-    # nearest thing to the camera on the whole plant when you look down into
-    # the pot. At 7 sides it was visibly a heptagonal tube; 12 is round enough
-    # that the smooth normals have something to work with.
-    RING, PSTEP = 12, 5
-    prev = None
+    # --- the stalk: compost to blade, in one piece
+    #
+    # A violet has no trunk. Every petiole and every flower stalk runs the
+    # whole way down into the compost, and they converge so tightly at the
+    # middle that the stem they share is invisible — the stalks themselves are
+    # what fills it. The pass before this one drew that shared stem as a solid
+    # column, which is the one thing a photograph of a Saintpaulia never shows.
+    # Each leaf keeps its own attachment height, because that is what stops
+    # neighbouring petioles growing through one another; it simply carries its
+    # stalk the rest of the way down, in toward the axis, and into the soil.
+    #
+    # Nor is a petiole a tapered cylinder. It is fleshy, thickest where it
+    # leaves the compost, and its upper face carries a channel that runs the
+    # whole length — the groove that makes a violet leaf sit the way it does.
+    # That channel is most of what tells the eye this is a plant and not a
+    # length of dowel, and it costs two lines inside the ring.
+    RING, RSTEP, PSTEP = 14, 6, 6
+    GROOVE = 0.24 + 0.07 * rnd.random()
+    R0 = 0.0031 * scl
+
+    # where it enters the compost: close to the axis, and scattered a little so
+    # that eighteen of them read as a bundle rather than as a starburst
+    _rb = 0.0020 + 0.0028 * rnd.random()
+    _ba = ang + rnd.uniform(-0.40, 0.40)
+    B = Vector((-math.sin(_ba) * _rb, math.cos(_ba) * _rb, SOIL_Z - 0.005))
+    K = Vector(crown)
+    C = Vector((B.x * 0.72 + K.x * 0.28, B.y * 0.72 + K.y * 0.28, K.z))
+
+    raw = []                       # (point, radius scale, sv)
+    for a in range(RSTEP):
+        t = a / RSTEP
+        pt = B * ((1 - t) ** 2) + C * (2 * (1 - t) * t) + K * (t * t)
+        # fleshiest at the compost, easing to the width it carries up the leaf
+        raw.append((pt, 1.22 - 0.22 * t ** 0.8, 0.0))
     for a in range(PSTEP + 1):
         sv = pf * a / PSTEP
+        t = a / PSTEP
         y, z = spine(sv)
-        r = (0.0029 - 0.0009 * (a / PSTEP)) * scl
+        # not a straight draft: a slight swelling a third of the way up, then a
+        # real narrowing where the blade takes over
+        raw.append((W(0.0, y, z),
+                    1.00 - 0.28 * t + 0.09 * math.sin(t * math.pi), sv))
+
+    # and a wander over the whole length, pinned to zero at both ends so the
+    # stalk still meets the compost and the blade exactly where it must
+    _ph = rnd.uniform(0, math.tau)
+    _amp = 0.0013 * scl
+    _side = Vector((math.cos(_ph), math.sin(_ph), 0.0))
+    _n = len(raw) - 1
+    stalk = []
+    for _i, (pt, rs, sv) in enumerate(raw):
+        _s = _i / _n
+        stalk.append((pt + _side * (_amp * math.sin(_s * math.pi) ** 0.9
+                                    * math.sin(_s * 2.7 + _ph)), rs, sv))
+
+    prev = None
+    for _i, (c, rs, sv) in enumerate(stalk):
+        if _i == 0:
+            tan = (stalk[1][0] - c).normalized()
+        elif _i == _n:
+            tan = (c - stalk[_i - 1][0]).normalized()
+        else:
+            tan = (stalk[_i + 1][0] - stalk[_i - 1][0]).normalized()
+        ref = Vector((1, 0, 0)) if abs(tan.z) > 0.94 else Vector((0, 0, 1))
+        uu = (ref - tan * ref.dot(tan)).normalized()     # "up" across the tube
+        ww = tan.cross(uu).normalized()
+        # The cross-section is not the same shape the whole way up, and that is
+        # most of the difference between a stalk and a length of tapered pipe.
+        # Where it leaves the compost it is round and swollen; by the time it
+        # reaches the blade it has flattened and opened the channel that the
+        # midrib sits in. Morphing between the two costs three cosines.
+        _t = _i / _n
+        gr = GROOVE * (0.10 + 0.90 * _t ** 1.4)          # channel deepens
+        flat = 0.05 + 0.13 * _t                          # and it flattens
         ring = []
         for k in range(RING):
-            th = k / RING * math.tau
-            v = bm.verts.new(W(math.cos(th) * r, y, z + math.sin(th) * r))
+            th = k / RING * math.tau                     # th = 0 is the top
+            d = abs(((th + math.pi) % math.tau) - math.pi)
+            rr = R0 * rs * (1.0 - gr * math.exp(-(d / 0.62) ** 2))
+            rr *= 1.0 + flat * math.cos(2 * th)
+            # shallow flutes, drifting round as they climb — a fleshy stalk is
+            # never a surface of revolution
+            rr *= 1.0 + 0.035 * math.cos(5 * th + _t * 2.2 + GROOVE * 9.0)
+            v = bm.verts.new(c + (uu * math.cos(th) + ww * math.sin(th)) * rr)
             ring.append(v)
             pending.append((len(bm.verts) - 1, sv))
         if prev is None:
-            # Close the bottom. The tube was open at both ends: the blade hides
-            # the top one, and the crown below hides this one, but "hidden by
-            # something else" is not the same as closed and a 3 mm hole looking
-            # straight up a petiole is what you get when the camera goes under
-            # the rosette.
+            # Closed. The blade hides the top end and the compost hides this
+            # one, but "hidden by something else" is not the same as closed,
+            # and a 3 mm hole looking straight up a petiole is what you get the
+            # first time the camera goes under the rosette.
             cap = bm.faces.new(tuple(reversed(ring)))
             cap.material_index = SLOT_STEM
         else:
@@ -941,11 +1080,11 @@ def add_leaf(i):
                 f = bm.faces.new((prev[k], prev[(k + 1) % RING],
                                   ring[(k + 1) % RING], ring[k]))
                 f.material_index = SLOT_STEM
+                for lp, _u, _v in zip(f.loops, (k, k + 1, k + 1, k),
+                                      (_i - 1, _i - 1, _i, _i)):
+                    lp[uvl].uv = (_u / RING, _v / _n)
         prev = ring
-    # And the top, where the blade takes over. The blade sits over it but does
-    # not seal it, and a petiole is not always seen from a angle where that
-    # distinction is academic.
-    _pcap = bm.faces.new(tuple(prev))
+    _pcap = bm.faces.new(tuple(prev))     # and the top, where the blade starts
     _pcap.material_index = SLOT_STEM
     bm.verts.ensure_lookup_table()
 
@@ -955,6 +1094,11 @@ def add_leaf(i):
                          np.linspace(0.0, 1.0, V), indexing='ij')
     XYZ, VE = blade_xyz(SU, BT, ang, tilt, scl, pl['cz'], pl['lseed'])
 
+    # The clipping check compares leaf against leaf, and it has to compare
+    # *blades*: eighteen stalks converging on one point in the compost overlap
+    # each other by design, and counting that as clipping buries the real
+    # thing under a hundred false positives.
+    b0 = len(bm.faces)
     start = len(bm.verts)
     grid = []
     for a in range(U):
@@ -995,6 +1139,7 @@ def add_leaf(i):
             for lp in f.loops:
                 idx = lp.vert.index - start
                 lp[uvl].uv = ((idx // V) / (U - 1), (idx % V) / (V - 1))
+    b1 = len(bm.faces)
 
     # --- the chain this leaf bends on
     pts, ups = [], []
@@ -1006,7 +1151,7 @@ def add_leaf(i):
 
     for vi, sv in pending:
         bind(vi, sv, names)
-    LEAF_FACES.append((f0, len(bm.faces)))
+    LEAF_FACES.append((b0, b1))
 
 
 def add_bloom(j):
@@ -1018,35 +1163,77 @@ def add_bloom(j):
     # "clear of the foliage" has to be measured, or it stops being true
     hgt = ROSETTE_TOP + 0.005 + rnd.uniform(0, 0.011)
     op = float(P['bloom_open'])
-    base = Vector((math.sin(ang) * r * 0.35, math.cos(ang) * r * 0.35, CROWN_Z))
+    # The scape starts in the compost too, near the axis, and leans out only
+    # near its head — which is why a violet in bloom reads as a posy held up
+    # over the foliage rather than as a set of spokes stuck into a pot. It used
+    # to begin a third of the way out at crown height, on nothing.
+    _sa = ang + rnd.uniform(-0.35, 0.35)
+    _sr = 0.0016 + 0.0024 * rnd.random()
+    base = Vector((math.sin(_sa) * _sr, math.cos(_sa) * _sr, SOIL_Z - 0.005))
     top = Vector((math.sin(ang) * r, math.cos(ang) * r, hgt))
+    # nearly upright out of the soil, and all the lean in the last third
+    ctrl = Vector((base.x * 0.80 + top.x * 0.20,
+                   base.y * 0.80 + top.y * 0.20,
+                   base.z + (hgt - base.z) * 0.74))
 
-    segs = 2
-    pts = [base + (top - base) * (s / segs) for s in range(segs + 1)]
+    def scape_pt(sv):
+        return (base * ((1 - sv) ** 2) + ctrl * (2 * (1 - sv) * sv)
+                + top * (sv * sv))
+
+    segs = 3
+    pts = [scape_pt(s_ / segs) for s_ in range(segs + 1)]
     ups = [Vector((1, 0, 0)) for _ in pts]
     names = chain(f"B{j}", pts, ups)
 
     # --- scape
-    RING, ST = 10, 4      # round, for the same reason the petiole is
+    RING, ST = 10, 9
+    _sph = rnd.uniform(0, math.tau)
+    _samp = 0.0016
+    _sside = Vector((math.cos(_sph), math.sin(_sph), 0.0))
+    _spine = []
+    for a_ in range(ST + 1):
+        sv = a_ / ST
+        c = scape_pt(sv)
+        # the same pinned wander the petioles get: a flower stalk that is dead
+        # straight is the giveaway that it was extruded rather than grown
+        c = c + _sside * (_samp * math.sin(sv * math.pi) ** 0.9
+                          * math.sin(sv * 2.3 + _sph))
+        # thickest at the compost, narrowing under the head, with the slight
+        # swelling a peduncle carries where the pedicels will come off it
+        rr = 0.00165 * (1.0 - 0.44 * sv + 0.10 * math.sin(sv * math.pi * 1.6))
+        _spine.append((c, rr, sv))
+
     prev = None
-    for a in range(ST + 1):
-        sv = a / ST
-        c = base + (top - base) * sv
-        rr = 0.0013 - 0.0004 * sv
+    for a_, (c, rr, sv) in enumerate(_spine):
+        if a_ == 0:
+            tan = (_spine[1][0] - c).normalized()
+        elif a_ == ST:
+            tan = (c - _spine[a_ - 1][0]).normalized()
+        else:
+            tan = (_spine[a_ + 1][0] - _spine[a_ - 1][0]).normalized()
+        ref = Vector((1, 0, 0)) if abs(tan.z) > 0.94 else Vector((0, 0, 1))
+        uu = (ref - tan * ref.dot(tan)).normalized()
+        ww = tan.cross(uu).normalized()
         ring = []
         for k in range(RING):
             th = k / RING * math.tau
-            v = bm.verts.new((c.x + math.cos(th) * rr, c.y + math.sin(th) * rr, c.z))
+            d = abs(((th + math.pi) % math.tau) - math.pi)
+            # a shallower channel than the petiole's, but a scape has one
+            rq = rr * (1.0 - 0.13 * math.exp(-(d / 0.7) ** 2))
+            v = bm.verts.new(c + (uu * math.cos(th) + ww * math.sin(th)) * rq)
             ring.append(v)
             bind(len(bm.verts) - 1, sv, names)
         if prev is None:
-            cap = bm.faces.new(tuple(reversed(ring)))     # closed, see add_leaf
+            cap = bm.faces.new(tuple(reversed(ring)))
             cap.material_index = SLOT_STEM
         else:
             for k in range(RING):
                 f = bm.faces.new((prev[k], prev[(k + 1) % RING],
                                   ring[(k + 1) % RING], ring[k]))
                 f.material_index = SLOT_STEM
+                for lp, _u, _v in zip(f.loops, (k, k + 1, k + 1, k),
+                                      (a_ - 1, a_ - 1, a_, a_)):
+                    lp[uvl].uv = (_u / RING, _v / ST)
         prev = ring
     _scap = bm.faces.new(tuple(prev))       # closed at the top, see add_leaf
     _scap.material_index = SLOT_STEM
@@ -1509,62 +1696,6 @@ bpy.ops.mesh.primitive_cylinder_add(vertices=72, radius=0.0535, depth=0.004,
 soil = bpy.context.active_object; soil.name = "soil"
 soil.data.materials.append(M_SOIL)
 sd = soil.modifiers.new("bump", 'SUBSURF'); sd.levels = sd.render_levels = 2
-
-# ---- the crown, which is the stem the petioles actually leave from ---------
-"""There was nothing holding the plant up.
-
-Every petiole starts at `crown_at(...)` — a point `crown_r` off the axis at
-that leaf's own height — and the older a leaf is, the higher its attachment
-sits, up to `stem_rise + max_lift` above the compost. Between those attachment
-points and the soil there was simply nothing drawn, so from any angle below the
-rosette the plant was a bundle of tubes ending in mid-air over a bare pot.
-
-A Saintpaulia has a short, thick, fleshy stem that lengthens as its lowest
-leaves are shed — the "neck" that growers eventually re-pot to bury. That is
-the missing solid, and it is the reason a violet's leaves can attach at
-different heights in the first place.
-
-Separate object, not part of the skinned mesh, on purpose: the crown does not
-droop and does not bend, and an unweighted vertex inside a skinned mesh is a
-vertex that collapses to the origin.
-"""
-CROWN_TOP = max(pl['cz'] for pl in PLACE)
-_cb = bmesh.new()
-_cuv = _cb.loops.layers.uv.new("UVMap")
-_CR = 20
-# Wide enough to swallow the petiole bases at every height: they are centred
-# `crown_r` from the axis and are `0.0029` across, so anything below about
-# 10.1 mm leaves a sliver of open tube showing at the join.
-_z0 = SOIL_Z - 0.006
-_prof = [(_z0 + (CROWN_TOP - _z0) * (t / 9.0),
-          0.0112 - 0.0010 * (t / 9.0) + 0.00035 * math.sin(t * 0.68 + 1.2))
-         for t in range(10)]
-_rings = []
-for (z, r) in _prof:
-    _rings.append([_cb.verts.new((math.cos(k / _CR * math.tau) * r,
-                                  math.sin(k / _CR * math.tau) * r, z))
-                   for k in range(_CR)])
-_apex = _cb.verts.new((0.0, 0.0, CROWN_TOP + 0.0030))
-_cb.verts.ensure_lookup_table()
-for a in range(len(_rings) - 1):
-    for k in range(_CR):
-        f = _cb.faces.new((_rings[a][k], _rings[a][(k + 1) % _CR],
-                           _rings[a + 1][(k + 1) % _CR], _rings[a + 1][k]))
-        for lp, uu, vv in zip(f.loops, (k, k + 1, k + 1, k), (a, a, a + 1, a + 1)):
-            lp[_cuv].uv = (uu / _CR, vv / (len(_rings) - 1))
-for k in range(_CR):                       # a growing point, not a sawn end
-    _cb.faces.new((_rings[-1][k], _rings[-1][(k + 1) % _CR], _apex))
-_cb.faces.new(tuple(_rings[0]))            # and a floor, buried in the compost
-bmesh.ops.recalc_face_normals(_cb, faces=_cb.faces[:])
-_cme = bpy.data.meshes.new("crown")
-_cb.to_mesh(_cme)
-_cb.free()
-_cme.materials.append(M_STEM)
-for _p in _cme.polygons:
-    _p.use_smooth = True
-crown = bpy.data.objects.new("crown", _cme)
-bpy.context.collection.objects.link(crown)
-
 
 bpy.ops.mesh.primitive_plane_add(size=4, location=(0, 0, 0))
 bench = bpy.context.active_object; bench.name = "bench"

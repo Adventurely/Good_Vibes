@@ -116,6 +116,62 @@ at. On the anthers that meant a flat colour no texture could fix; on the corolla
 tube it meant the white of the throat, painted on the *outside* of the flower,
 which is the pair of pale hexagons that were visible under every bloom.
 
+## A violet has no trunk
+
+Worth stating plainly, because the obvious fix was the wrong one.
+
+Every petiole starts at `crown_at(...)`, which is a point off the axis at that
+leaf's own height, and the older the leaf the higher that is. Nothing was drawn
+between those attachment points and the compost, so from under the rosette the
+plant was a bundle of tubes ending in mid-air. The first fix was to model the
+stem they share as a solid tapered column — which is defensible botany and
+completely wrong on the reference: a photograph of a Saintpaulia shows no trunk
+at all, because the stalks are packed so tightly around it that they *are* the
+stem. What you see is eighteen fleshy stalks converging into the soil.
+
+So each leaf keeps its own attachment height — that is what stops neighbouring
+petioles growing through one another — and carries its stalk the rest of the
+way down, in toward the axis, and 5 mm under the surface. Eighteen of them
+overlap near the middle, and that overlap is the point. The same goes for every
+scape: a flower stalk leaves the compost almost upright and takes all its lean
+in the last third, which is why a violet in bloom reads as a posy held up over
+the foliage rather than as spokes stuck in a pot.
+
+Two consequences worth knowing:
+
+- **The clipping check has to be scoped to blades.** `LEAF_FACES` used to span
+  the whole leaf, stalk included. Eighteen stalks converging on one point in
+  the compost overlap by design, so the check went from 0 to 102 "intersecting
+  pairs" overnight and would have buried a real one.
+- **A stalk is not a tapered cylinder.** It is fleshy and swollen where it
+  leaves the compost, and by the time it reaches the blade it has flattened and
+  opened the channel the midrib sits in. The cross-section morphs between those
+  two along its length — three cosines in the ring loop — and that, plus a
+  wander pinned to zero at both ends, is most of the difference between a plant
+  and a length of tapered pipe.
+
+## Do not judge colour from the Blender render
+
+This has now cost two rounds, on two different materials, for the same reason.
+
+The authoring scene is lit by one hot area light under AgX. Under it the
+anthers rendered as smooth cream beads and the petioles as salmon pink, and
+both times the map underneath was exactly what had been asked for — the anthers
+mean linear (0.53, 0.41, 0.09), a saturated gold, and the petioles (0.060,
+0.018, 0.014), a dusky maroon. The render was blowing them out; nothing was
+wrong with the texture.
+
+Read the array, not the picture:
+
+```python
+img = bpy.data.images['web_stem_albedo']
+px = np.array(img.pixels[:], dtype=np.float32).reshape(img.size[1], img.size[0], 4)
+[round(float(px[row, :, i].mean()), 4) for i in range(3)]   # row 0 is v = 0
+```
+
+If the numbers are the colour you authored, the render is lying and the fix is
+`scene.view_settings.exposure`, not the texture.
+
 ## Running it
 
 Blender is used as a Python module, so there is nothing to install but a wheel:

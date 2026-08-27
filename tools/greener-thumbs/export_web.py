@@ -207,6 +207,37 @@ if 'Specular IOR Level' in eb.inputs:
 # slot 3 is the anthers — see SLOT_EYE in violet.py
 plant.data.materials[3] = emat
 
+# ---- the stalks, which are the other thing a photograph gets right ----------
+IMG_SALB = as_image("web_stem_albedo", TEX['stem_albedo'], srgb=True)
+IMG_SNRM = as_image("web_stem_normal", normal_from_height(TEX['stem_height'], 2.2), srgb=False)
+IMG_SRGH = as_image("web_stem_rough",
+                    np.repeat(TEX['stem_rough'][..., None], 3, axis=-1), srgb=False)
+
+smat = bpy.data.materials.new("violet_stem_web")
+smat.use_nodes = True
+snt = smat.node_tree
+sb = snt.nodes["Principled BSDF"]
+sa = snt.nodes.new('ShaderNodeTexImage'); sa.image = IMG_SALB; sa.location = (-700, 260)
+sr = snt.nodes.new('ShaderNodeTexImage'); sr.image = IMG_SRGH; sr.location = (-700, 0)
+sn = snt.nodes.new('ShaderNodeTexImage'); sn.image = IMG_SNRM; sn.location = (-700, -260)
+sn.image.colorspace_settings.name = 'Non-Color'
+snm = snt.nodes.new('ShaderNodeNormalMap'); snm.location = (-420, -260)
+snt.links.new(sa.outputs['Color'], sb.inputs['Base Color'])
+snt.links.new(sr.outputs['Color'], sb.inputs['Roughness'])
+snt.links.new(sn.outputs['Color'], snm.inputs['Color'])
+snt.links.new(snm.outputs['Normal'], sb.inputs['Normal'])
+sb.inputs['Metallic'].default_value = 0.0
+# Sheen Tint again, for the third time in this file: the exporter writes the
+# colour and drops the weight, and white is the default.
+for k, v in (('Sheen Roughness', 0.40),
+             ('Sheen Tint', (0.34, 0.30, 0.24, 1.0)),
+             ('Specular IOR Level', 0.10)):
+    if k in sb.inputs:
+        sb.inputs[k].default_value = v
+
+# slot 1 is the petioles and scapes — see SLOT_STEM in violet.py
+plant.data.materials[1] = smat
+
 # The pot, rim and soil are procedural noise, and glTF has no procedural
 # textures — a node-driven Base Color exports as the socket's unlinked default,
 # which is white. Give them the mean of the colours they mix between, so the
@@ -419,8 +450,12 @@ for _li, (_off, (_hi, _lo), _col) in enumerate(FUZZ_LAYERS):
 
     _bm = bmesh.new()
     _bm.from_mesh(shell.data)
-    # keep the blade only — no fuzz on the stems, the petals or the anthers
-    _drop = [f for f in _bm.faces if f.material_index != 0]
+    # Blades *and* stalks. A Saintpaulia petiole is as hairy as its leaf — in
+    # any photograph the fringe along a stalk is as obvious as the one along a
+    # margin — and the stalks are 2.3k triangles against the blade's 24k, so
+    # covering them costs almost nothing. The corolla and the anthers stay
+    # bare: a petal carries its velvet in the material, and pollen is dust.
+    _drop = [f for f in _bm.faces if f.material_index not in (0, 1)]
     bmesh.ops.delete(_bm, geom=_drop, context='FACES')
     _bm.verts.ensure_lookup_table()
     for v in _bm.verts:
@@ -440,7 +475,7 @@ for _li, (_off, (_hi, _lo), _col) in enumerate(FUZZ_LAYERS):
 os.makedirs(OUT_DIR, exist_ok=True)
 glb = os.path.join(OUT_DIR, 'violet.glb')
 
-keep = {plant.name, rig.name, 'pot', 'rim', 'soil', 'crown'} | {sh.name for sh in shells}
+keep = {plant.name, rig.name, 'pot', 'rim', 'soil'} | {sh.name for sh in shells}
 for ob in bpy.context.view_layer.objects:
     ob.select_set(ob.name in keep)
 bpy.context.view_layer.objects.active = plant
