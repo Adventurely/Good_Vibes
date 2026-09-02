@@ -13,7 +13,8 @@ them is expensive; most are a few lines inside a loop you are already writing.
 5. [Close every tube](#5-close-every-tube)
 6. [Build from endpoints, never from guessed rotations](#6-build-from-endpoints-never-from-guessed-rotations)
 7. [Botanical specifics that pay for themselves](#7-botanical-specifics-that-pay-for-themselves)
-8. [Scale is the dimension](#8-scale-is-the-dimension)
+8. [Organs arranged around an axis have an arc budget](#8-organs-arranged-around-an-axis-have-an-arc-budget)
+9. [Scale is the dimension](#9-scale-is-the-dimension)
 
 ---
 
@@ -192,7 +193,55 @@ because they are what an eye uses to identify the plant:
 Look these up per species before modelling; `tools/greener-thumbs/species/` has
 the research for the three planned ones.
 
-## 8. Scale is the dimension
+## 8. Organs arranged around an axis have an arc budget
+
+Anything radially arranged — tepals round a throat, petals round a corolla,
+leaflets round a rachis — is `n` organs sharing one circumference, and the
+budget is exact. At radius `r`, the arc from one midrib to the next is
+`2*pi*r/n`, so two neighbours with half-widths `w1` and `w2` do not overlap
+only while `w1 + w2 < 2*pi*r/n`. Give each organ a named share of that arc and
+clamp its width to it:
+
+```python
+w = min(w_shape(t), sector * 2.0 * math.pi * max(r(t), 1e-5) / n)
+```
+
+Three things this buys, all of which cost a day each to learn the other way:
+
+* **It catches what shape functions cannot see.** A width profile authored to
+  look right at the tip asked for 3.15x the available arc at the daylily's
+  throat and stayed over budget until mid-length — every adjacent pair of every
+  open flower intersected, and the silhouette that was actually being reviewed
+  looked fine.
+
+* **Clamping beats reshaping.** The clamp only binds where the organ is over
+  budget, so the tip — the part a reviewer actually reads — is untouched, and
+  the base becomes the claw that a real tepal, petal or leaflet narrows to
+  anyway. Reach and widest point barely move: the daylily's widest half-width
+  went 16.6 mm to 15.4 mm and its reach did not change at all.
+
+* **It is the only thing that survives a twist.** Confining each organ to its
+  own wedge makes crossing impossible *whatever the spine does in between* —
+  which matters, because a collapsing organ hooks right round until its tip is
+  back on its own base line, and then no amount of shape tuning helps. The arc
+  an organ gives up as it shrivels is exactly the angle a progressive twist may
+  spend, so derive that bound and clamp the twist to it rather than trusting a
+  number:
+
+  ```python
+  slack = math.pi/n - math.atan(sec_a*2*math.pi/n) - math.atan(sec_b*2*math.pi/n)
+  twist = min(P['twist'], math.degrees(slack) * 0.92)
+  ```
+
+  Tuning the twist instead finds isolated values that happen to work — 220°
+  clean, 180° and 150° not — which is a resonance, not a solution, and it
+  breaks at the next seed.
+
+Leave part of the budget unspent. The remainder is the slit of daylight a real
+flower has between its tepals, and it also has to survive Solidify putting a
+rim half a thickness wide on each margin.
+
+## 9. Scale is the dimension
 
 `bpy.ops.mesh.primitive_cube_add(size=1.0)` is already one unit across, so
 scaling by `h / 2` halves it. A whole scene came out at half size that way. When

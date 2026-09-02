@@ -126,6 +126,16 @@ result = {
     'fan_flatness': g['result'].get('fan_flatness'),
     'blade_pairs_same_fan': g['result'].get('blade_pairs_same_fan'),
     'blade_pairs_cross_fan': g['result'].get('blade_pairs_cross_fan'),
+    # The corolla, which had no clipping check at all when this file was
+    # written — which is exactly why six tepals shipped intersecting each
+    # other at the throat, every spent flower shipped as a knot of 2721
+    # face-pairs, and two blooms shipped inside one another on one branch.
+    'tepal_pairs_adjacent': g['result'].get('tepal_pairs_adjacent'),
+    'tepal_pairs_nonadjacent': g['result'].get('tepal_pairs_nonadjacent'),
+    'tepal_pairs_cross_flower': g['result'].get('tepal_pairs_cross_flower'),
+    'tepal_vs_blade': g['result'].get('tepal_vs_blade'),
+    'tepal_in_pot': g['result'].get('tepal_in_pot'),
+    'blooms_demoted_to_buds': g['result'].get('blooms_demoted_to_buds'),
     'unsupported_export_options': dropped,
 }
 print("exported:", result)

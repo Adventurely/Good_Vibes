@@ -83,6 +83,36 @@ def self_intersections(mesh, ranges):
     return hits
 
 
+def between(mesh, ranges_a, ranges_b):
+    """Intersecting face pairs between two DIFFERENT groups of organs.
+
+    `self_intersections` compares every organ with every other one, so asking
+    it "do the flowers touch the leaves" means re-deriving flower-vs-flower and
+    leaf-vs-leaf as well and then filtering them back out. Those two questions
+    have different right answers — leaves of different fans crossing is what a
+    clump does, a petal through a leaf blade is not — so they need separate
+    checks rather than one number.
+
+    Returns a list of [index_in_a, index_in_b, overlapping_face_pairs].
+    """
+    from mathutils.bvhtree import BVHTree
+    co = [v.co for v in mesh.vertices]
+
+    def trees(rs):
+        return [BVHTree.FromPolygons(
+            co, [tuple(f.vertices) for f in mesh.polygons[a:b]],
+            all_triangles=False, epsilon=0.0) for (a, b) in rs]
+
+    ta, tb = trees(ranges_a), trees(ranges_b)
+    hits = []
+    for x, tx in enumerate(ta):
+        for y, ty in enumerate(tb):
+            ov = tx.overlap(ty)
+            if ov:
+                hits.append([x, y, len(ov)])
+    return hits
+
+
 def intersections_with(mesh, ranges, obstacles):
     """Organ faces that intersect a prop — a pot, a rim, a pedestal.
 

@@ -46,7 +46,7 @@ at one moment; a number in the build report is checked forever.
 | Check | Meaning | Want |
 |---|---|---|
 | `boundary_edges_by_slot` | open holes, per material | `{}` |
-| `clipping_pairs` | organ-vs-organ intersections | `0` |
+| `clipping_pairs` | organ-vs-organ intersections, **one entry per organ type**, split by whether the overlap is by design | `0` |
 | `leaves_in_pot` | organ-vs-prop intersections | `0` |
 | `materials` | that the slots hold the *web* materials | no Cycles names |
 | `unsupported_export_options` | options this Blender build dropped | `[]` |
@@ -57,6 +57,28 @@ the compost, a clipping check that spanned the whole leaf went from 0 to 102
 "intersections" — all of them by design, because eighteen stalks meeting in one
 place overlap on purpose. It reads blade faces only now. A check that cries wolf
 is worse than no check, because the next real one gets ignored.
+
+**Every organ type that can overlap needs its own entry, and a new organ ships
+with a new check or it ships unmeasured.** The daylily inherited the violet's
+blade checks and had none at all for its corolla — so it shipped with every
+adjacent pair of tepals in every flower intersecting at the throat, every spent
+flower a knot of 2721 face-pairs, and two open blooms inside one another on one
+branch. Three separate faults, none of them visible in the build report,
+because the report only ever asked about leaves. The fix was one afternoon; the
+reason it was needed for a month is that nothing counted.
+
+Split a clipping number by what the two halves *mean*, or it cannot be read:
+
+| Split | Fault, or by design? |
+|---|---|
+| blades, same fan vs different fans | same fan is a fault — they share a plane and should nest. Different fans is what a clump does |
+| tepals, by angular distance around the flower | six tepals sit 60° apart, so index distance *is* angular distance. Neighbours crossing means the throat is over-subscribed; anything further apart crossing means a tepal has swept most of the way round |
+| tepals, same flower vs different flowers | within a flower is a corolla fault; between flowers is a *placement* fault on the scape, and it is fixed somewhere else entirely |
+
+`mesh_checks.between(mesh, ranges_a, ranges_b)` is for the cross-group
+questions — corolla against foliage — because asking `self_intersections`
+means re-deriving both within-group answers and filtering them back out, and
+those have different right answers.
 
 `scripts/mesh_checks.py` in this skill has all of them ready to import.
 

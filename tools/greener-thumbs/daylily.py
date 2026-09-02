@@ -91,6 +91,31 @@ P = dict(
     necrosis    = 0.0,      # tip dieback front, 0..1 from the tip inward
     bloom_open  = 1.0,
     spent_t     = 1.0,      # how far yesterday's flowers have twisted shut
+    spent_pinch = 0.36,     # how far in the rag draws toward its own axis at
+                            # the tip
+    spent_recurve = 74.0,   # extra degrees the tip curls over when spent. At
+                            # this value the tip comes back to the tepal's own
+                            # base line — the wad really does hook right round
+                            # — which is why the twist has to be bounded by the
+                            # arc the tepals give up rather than by the shape
+    spent_shell = 0.0024,   # metres the two whorls part radially as they
+                            # collapse: the petals lie over the sepals rather
+                            # than merging into one surface. Appearance only —
+                            # the wedge bound below is what makes the collapse
+                            # safe, and the checks read zero with this at 0
+    spent_narrow = 0.42,    # the share of its open arc a crumpled tepal keeps.
+                            # This is what buys the twist its room: the arc a
+                            # tepal gives up is the angle it can rotate through
+                            # without reaching its neighbour
+    spent_twist = 34.0,     # degrees the rag winds through, base to tip. It is
+                            # CLAMPED to the slack computed in add_flower, so
+                            # raising it past what the tepals have given up
+                            # does nothing rather than producing a knot. The
+                            # spent tepal curls almost right round — its tip
+                            # comes back to its own base line — so a twist that
+                            # crosses a wedge boundary walks one tepal's tip
+                            # through the next one's waist, and no reshaping
+                            # downstream recovers it
 
     # --- production
     seed        = 11,
@@ -261,6 +286,12 @@ BLADE_FACES = []      # (first, last) face index per blade
 FREE_FACES = []       # and the distal part of each, which is what may not cross
 BLADE_FAN = []        # which fan each blade belongs to, for the flatness check
 FREE_FROM = 7         # station at which a blade has left the sheathing bundle
+TEPAL_FACES = []      # (first, last) face index per tepal, six per flower
+TEPAL_FLOWER = []     # which flower each tepal belongs to
+TEPAL_WHORL = []      # 0 = outer whorl (sepal), 1 = inner whorl (petal)
+TWIST_SLACK = []      # (asked, available, used) degrees of spent twist
+BLOOMS = []           # (world centre, radius) of every corolla already placed
+DEMOTED = []          # blooms that found nowhere to go and carry a bud instead
 
 
 def frame(az, origin):
@@ -561,7 +592,52 @@ def bezier(a, c, b, s):
 TEP_NS, TEP_NW = 15, 15
 
 
-def tepal(Wf, ang, half_w, L, th0, th1, ruffle_amp, lobes, chan, slot, spent):
+def tepal_spine(half_w, L, th0, th1, spent, sector):
+    """Stations down one tepal's midrib, with the half-width allowed at each.
+
+    `tepal()` builds from this and the placement solver measures from it, so
+    the two cannot disagree about where a corolla reaches or how wide it gets.
+    A solver working from `flower_d` instead understates the reach by about a
+    fifth, because a tepal is measured along an arc that curves over.
+    """
+    # A rag shrinks in both directions. Shortening it alone left a full-width
+    # tepal on a third-length spine — wider than the radius it sits at along
+    # its whole length — which is why every tepal of every spent flower passed
+    # through every other one, 2721 face-pairs a flower against the open
+    # bloom's 78.
+    Lf = L * lerp(1.0, 0.30, spent)
+    half_wf = half_w * lerp(1.0, 0.34, spent)
+    th1f = th1 + math.radians(float(P['spent_recurve'])) * spent
+    dirs = []
+    for i in range(TEP_NS + 1):
+        s = i / TEP_NS
+        th = th0 + (th1f - th0) * (s ** 1.35)
+        dirs.append(Vector((math.sin(th), 0.0, math.cos(th))))
+    pts = [Vector((TUBE_R, 0.0, TUBE_L))]
+    ds = Lf / TEP_NS
+    for i in range(TEP_NS):
+        pts.append(pts[-1] + dirs[i] * ds)
+    ws = []
+    for i in range(TEP_NS + 1):
+        t = i / TEP_NS
+        # Widest just past halfway and drawn to a point. At (1.02 - t)**0.55
+        # the tip was still 11% of full width, which renders as a squared-off
+        # notch with the backface showing through it.
+        w = half_wf * (((t + 0.10) ** 0.55) * ((1.005 - t) ** 0.80) / 0.4655)
+        # ...but never wider than the arc this tepal owns. Six tepals sit at 60
+        # degree intervals, so at radius r the arc from one midrib to the next
+        # is pi*r/3, and `sector` is this tepal's share of it. The shape
+        # function alone asks for 3.15x that at the throat and stays over one
+        # until mid-length, which is exactly the span where adjacent tepals
+        # used to intersect. Clamping rather than reshaping leaves the tip
+        # silhouette — the part that is actually read — untouched, and turns
+        # the base into the claw a Hemerocallis tepal really has.
+        ws.append(min(w, sector * math.pi * max(pts[i].x, 1e-5) / 3.0))
+    return pts, dirs, ws
+
+
+def tepal(Wf, ang, half_w, L, th0, th1, ruffle_amp, lobes, chan, slot, spent,
+          sector=1.0, shell=0.0, twist=0.0):
     """One tepal, built in the flower's frame and rotated into place.
 
     Sepals and petals are the same builder at different widths and ruffle: the
@@ -576,18 +652,8 @@ def tepal(Wf, ang, half_w, L, th0, th1, ruffle_amp, lobes, chan, slot, spent):
     That needs the twist and the radial pinch; a scale alone reads as a shrunken
     flower, and then the plant looks sick every day of the game.
     """
-    Lf = L * lerp(1.0, 0.30, spent)
-    th1f = th1 + math.radians(74.0) * spent
+    pts, dirs, ws = tepal_spine(half_w, L, th0, th1, spent, sector)
     ca, sa = math.cos(ang), math.sin(ang)
-
-    dirs, pts = [], [Vector((TUBE_R, 0.0, TUBE_L))]
-    for i in range(TEP_NS + 1):
-        s = i / TEP_NS
-        th = th0 + (th1f - th0) * (s ** 1.35)
-        dirs.append(Vector((math.sin(th), 0.0, math.cos(th))))
-    ds = Lf / TEP_NS
-    for i in range(TEP_NS):
-        pts.append(pts[-1] + dirs[i] * ds)
 
     rows = []
     b0 = len(bm.faces)
@@ -599,21 +665,39 @@ def tepal(Wf, ang, half_w, L, th0, th1, ruffle_amp, lobes, chan, slot, spent):
         # Widest just past halfway and drawn to a point. At (1.02 - t)**0.55
         # the tip was still 11% of full width, which renders as a squared-off
         # notch with the backface showing through it.
-        w = half_w * (((t + 0.10) ** 0.55) * ((1.005 - t) ** 0.80) / 0.4655)
+        w = ws[i]
+        # At the mouth the tepals are still effectively fused, so they have to
+        # tile the throat rather than cut across it as flat chords. Lay the row
+        # on the arc there and let it flatten into a strap by mid-length; for
+        # small angles the two agree, so the blend is seamless.
+        wrap = max(0.0, 1.0 - t / 0.45) ** 1.5
         row = []
         for k in range(TEP_NW):
             su = (k / (TEP_NW - 1)) * 2.0 - 1.0
-            off = (across * (su * w)
-                   + upv * (chan * w * (su * su)
-                            + ruffle_amp * math.sin(su * lobes * math.pi)
-                            * (abs(su) ** 2.2) * (t ** 0.7)))
-            p = c + off
+            lat = su * w
+            up = (chan * w * (su * su)
+                  + ruffle_amp * math.sin(su * lobes * math.pi)
+                  * (abs(su) ** 2.2) * (t ** 0.7))
+            if wrap > 0.0:
+                phi = lat / max(c.x, 1e-5)
+                p = Vector((c.x, lat, c.z)).lerp(
+                    Vector((c.x * math.cos(phi), c.x * math.sin(phi), c.z)),
+                    wrap) + upv * up
+            else:
+                p = c + across * lat + upv * up
             if spent > 0.0:
-                a = spent * math.radians(430.0) * (t ** 1.2)
+                a = spent * math.radians(twist) * (t ** 1.2)
                 cb, sb = math.cos(a), math.sin(a)
                 p = Vector((p.x * cb - p.y * sb, p.x * sb + p.y * cb, p.z))
-                kk = lerp(1.0, 0.36, spent * (t ** 0.8))
+                kk = lerp(1.0, float(P['spent_pinch']), spent * (t ** 0.8))
                 p = Vector((p.x * kk, p.y * kk, p.z))
+                if shell:
+                    # and each whorl onto its own radius, ramped in from the
+                    # tube so the throat stays fused
+                    rr = math.hypot(p.x, p.y)
+                    if rr > 1e-6:
+                        k2 = 1.0 + shell * spent * (t ** 0.8) / rr
+                        p = Vector((p.x * k2, p.y * k2, p.z))
             q = Vector((p.x * ca - p.y * sa, p.x * sa + p.y * ca, p.z))
             row.append(bm.verts.new(Wf(q)))
         rows.append(row)
@@ -635,6 +719,102 @@ def tepal(Wf, ang, half_w, L, th0, th1, ruffle_amp, lobes, chan, slot, spent):
     return b0, len(bm.faces)
 
 
+def whorl_sectors(spent):
+    """Each whorl's share of the 60 degrees between one midrib and the next,
+    and the twist that share leaves free.
+
+    The two shares are in the same proportion as the two whorls' widths, so a
+    wider `sepal_ratio` moves the slit rather than making the sepals overlap,
+    and they sum to less than one — the remainder is the gap you can see
+    daylight through between two tepals, which a real flower has and which also
+    has to survive Solidify putting a 0.4 mm rim on each margin.
+
+    A collapsed tepal is crumpled, so it keeps only part of the arc it held
+    open — and the arc it gives up is exactly the budget the progressive twist
+    may spend. Every pair of tepals is at least 60 degrees apart at the centre,
+    so if no tepal's margin can reach its neighbour's, nothing can cross
+    whatever the spine does in between. That last clause is the whole point:
+    the spent spine hooks right round until its tip is back on its own base
+    line, so the shape offers no help and only the angle bound does.
+    """
+    _sr = float(P['sepal_ratio'])
+    SEC_GAP = 0.86
+    narrow = lerp(1.0, float(P['spent_narrow']), spent)
+    sec_p = SEC_GAP / (1.0 + _sr) * narrow
+    sec_s = SEC_GAP * _sr / (1.0 + _sr) * narrow
+    slack = math.degrees(math.pi / 3.0
+                         - math.atan(sec_p * math.pi / 3.0)
+                         - math.atan(sec_s * math.pi / 3.0))
+    tw = min(float(P['spent_twist']), slack * 0.92) if spent > 0.0 else 0.0
+    return sec_p, sec_s, slack, tw
+
+
+def corolla_bound(scale=1.0, spent=0.0, open_t=1.0):
+    """A sphere containing the whole corolla: (depth along the axis, radius).
+
+    Walked from `tepal_spine` with the same collapse applied, so the placement
+    solver measures the flower that will actually be built rather than a
+    nominal one. Sizing it from `flower_d` instead understates the reach by
+    about a fifth, because a tepal is measured along an arc that curves over.
+    """
+    R = float(P['flower_d']) * 0.5 * scale
+    Lt = R * 1.48
+    sec_p, sec_s, _sl, _tw = whorl_sectors(spent)
+    th0 = math.radians(22.0)
+    th1 = math.radians(74.0 + float(P['recurve']) * open_t)
+    ring = []
+    for half_w, L, th1w, sec in ((R * 0.30 * float(P['sepal_ratio']),
+                                  Lt * 0.94, th1 + math.radians(9.0), sec_s),
+                                 (R * 0.30, Lt, th1, sec_p)):
+        pts, _d, ws = tepal_spine(half_w, L, th0, th1w, spent, sec)
+        for i, c in enumerate(pts):
+            t = i / TEP_NS
+            kk = lerp(1.0, float(P['spent_pinch']), spent * (t ** 0.8))
+            rho = c.x * kk + float(P['spent_shell']) * spent * (t ** 0.8)
+            w = ws[i] * kk
+            ring.append((rho + w, c.z, w))
+    lo = min(z for _r, z, _w in ring)
+    hi = max(z for _r, z, _w in ring)
+    best = None
+    for k in range(41):                     # slide the centre along the axis
+        zc = lo + (hi - lo) * k / 40.0
+        rad = max(math.hypot(r, z - zc) + 0.4 * w for r, z, w in ring)
+        if best is None or rad < best[1]:
+            best = (zc, rad)
+    return best
+
+
+def corolla_swept(scale=1.0, spent=0.0, open_t=1.0):
+    """The corolla as spheres down its six tepal midribs, in the flower's frame.
+
+    `corolla_bound` is most of the way empty — a corolla is a shallow bowl of
+    six straps, not a ball — so refusing every placement whose bounding spheres
+    touch throws out arrangements a real clump makes every day. This is the
+    same walk kept local, used as the second opinion when the cheap test fails.
+    """
+    R = float(P['flower_d']) * 0.5 * scale
+    Lt = R * 1.48
+    sec_p, sec_s, _sl, tw = whorl_sectors(spent)
+    th0 = math.radians(22.0)
+    th1 = math.radians(74.0 + float(P['recurve']) * open_t)
+    out = []
+    for half_w, L, th1w, sec, shell, aoff in (
+            (R * 0.30 * float(P['sepal_ratio']), Lt * 0.94,
+             th1 + math.radians(9.0), sec_s, -float(P['spent_shell']), 0.0),
+            (R * 0.30, Lt, th1, sec_p, float(P['spent_shell']), 0.5)):
+        pts, _d, ws = tepal_spine(half_w, L, th0, th1w, spent, sec)
+        for j in range(3):
+            ang = (j + aoff) * math.tau / 3.0
+            for i in range(0, TEP_NS + 1, 2):
+                t = i / TEP_NS
+                kk = lerp(1.0, float(P['spent_pinch']), spent * (t ** 0.8))
+                rho = pts[i].x * kk + shell * spent * (t ** 0.8)
+                a = ang + spent * math.radians(tw) * (t ** 1.2)
+                out.append((Vector((rho * math.cos(a), rho * math.sin(a),
+                                    pts[i].z)), ws[i] * kk * 1.25))
+    return out
+
+
 def add_flower(origin, axis, scale=1.0, spent=0.0, open_t=1.0):
     """A whole Hemerocallis flower: tube, two whorls, six stamens and a style."""
     Wf = organ_frame(origin, axis)
@@ -654,19 +834,31 @@ def add_flower(origin, axis, scale=1.0, spent=0.0, open_t=1.0):
     tube(tp, tr, SLOT_SCAPE, RING=12)
 
     faces = []
+    fi = len(TEPAL_FACES) // 6        # six tepals per flower, always
     th0 = math.radians(22.0)
     th1 = math.radians(74.0 + float(P['recurve']) * open_t)
+    sec_p, sec_s, slack, tw = whorl_sectors(spent)
+    TWIST_SLACK.append((round(float(P['spent_twist']), 1), round(slack, 1),
+                        round(tw, 1)))
     for j in range(3):
         # outer whorl: sepals, narrower and almost unruffled
         faces.append(tepal(Wf, j * math.tau / 3.0, sw, Lt * 0.94,
                            th0, th1 + math.radians(9.0),
                            float(P['ruffle']) * 0.22 * scale, 3.0, 0.16,
-                           SLOT_TEPAL, spent))
+                           SLOT_TEPAL, spent, sec_s,
+                           -float(P['spent_shell']), tw))
+        TEPAL_FACES.append(faces[-1])
+        TEPAL_FLOWER.append(fi)
+        TEPAL_WHORL.append(0)
         # inner whorl: petals, wider and carrying the frill
         faces.append(tepal(Wf, (j + 0.5) * math.tau / 3.0, pw, Lt,
                            th0, th1,
                            float(P['ruffle']) * scale, 5.0, 0.22,
-                           SLOT_TEPAL, spent))
+                           SLOT_TEPAL, spent, sec_p,
+                           float(P['spent_shell']), tw))
+        TEPAL_FACES.append(faces[-1])
+        TEPAL_FLOWER.append(fi)
+        TEPAL_WHORL.append(1)
 
     if spent > 0.55:
         return faces                  # the sexual parts collapse with the rag
@@ -781,7 +973,7 @@ def add_scape(fan_az, crown, tag):
          svs=[i / n for i in range(n + 1)])
 
     nb = max(1, int(P['branches']))
-    slots = []
+    cand = []
     for bi in range(nb):
         u = 0.66 + 0.28 * (bi / max(1, nb - 1))
         o = pts[int(u * n)]
@@ -794,28 +986,93 @@ def add_scape(fan_az, crown, tag):
         bp = [bezier(o, bctl, btip, i / 6.0) for i in range(7)]
         br = [r0 * 0.58 * (1.0 - 0.45 * (i / 6.0)) for i in range(7)]
         tube(bp, br, SLOT_SCAPE, RING=7, names=names, svs=[u] * 7)
-        for j in (5, 6):
-            slots.append((bp[j], bdir, u))
-    slots.append((pts[n], (pts[n] - pts[n - 1]).normalized(), 1.0))
+        # Two pedicels per branch, and far enough apart on it to matter. They
+        # used to be bp[5] and bp[6] — adjacent points on a 6-17 cm branch, so
+        # about 2 cm apart carrying flowers 11 cm across.
+        for j in (2, 6):
+            cand.append((j // 4, bi, bp[j], bdir, u))
+    cand.append((2, nb, pts[n], (pts[n] - pts[n - 1]).normalized(), 1.0))
+    # Stride across the branches rather than filling them one at a time. The
+    # plan is ordered spent, spent, open, open, buds — so consecutive filling
+    # put both open blooms on the SAME branch, which is where the two
+    # interpenetrating corollas came from. Sorting by rung-then-branch spreads
+    # each kind over branches that point 100+ degrees apart.
+    cand.sort(key=lambda c: (c[0], c[1]))
+    slots = [(o, d, u) for _r, _b, o, d, u in cand]
 
     plan = scape_organs(len(slots))
     for (o, bdir, u), (kind, val) in zip(slots, plan):
-        pl = rnd.uniform(0.018, 0.042)
-        pdir = Vector((bdir.x * 0.80, bdir.y * 0.80, 0.60)).normalized()
-        pe = o + pdir * pl
-        pp = [bezier(o, o + pdir * (pl * 0.55), pe, i / 4.0) for i in range(5)]
+        pl0 = rnd.uniform(0.018, 0.042)
+        yaw0 = math.atan2(bdir.y, bdir.x)
+
+        def aim_at(yaw, pl, kind):
+            """Pedicel direction, its tip, and the face the flower presents."""
+            bx, by = math.cos(yaw), math.sin(yaw)
+            pdir = Vector((bx * 0.80, by * 0.80, 0.60)).normalized()
+            out = Vector((bx, by, 0.0)).normalized()
+            if kind == 'open':
+                # a daylily presents its face outward and a little up, on a
+                # short pedicel, generally at or above foliage height
+                ax = (out * 0.72 + Vector((0.0, 0.0, 1.0)) * 0.58).normalized()
+            else:
+                # and yesterday's hangs limp off the same pedicel
+                ax = (out * 0.34 - Vector((0.0, 0.0, 1.0)) * 0.82).normalized()
+            return pdir, o + pdir * pl, ax
+
+        pdir, pe, axis = aim_at(yaw0, pl0, kind)
+        if kind in ('open', 'spent'):
+            sp = float(P['spent_t']) if kind == 'spent' else 0.0
+            ot = 1.0 if kind == 'spent' else float(P['bloom_open'])
+            depth, crad = corolla_bound(1.0, sp, ot)
+            # Solve the placement instead of trusting the layout. Ordering the
+            # plan across branches stopped two blooms sharing one branch at the
+            # seed this plant ships at, and still fouled at four of the other
+            # seeds tried — two scapes lean together and their corollas meet in
+            # the middle, which no ordering rule can see. A pedicel is 1.5-5 cm
+            # and free to point anywhere off its branch, so there is real room
+            # to search; take the best gap found and only give up if none of it
+            # clears.
+            swept = corolla_swept(1.0, sp, ot)
+            best = None
+            for att in range(32):
+                yaw = yaw0 + ((att % 8) - 3.5) * 0.40
+                pl = min(0.050, pl0 * (1.0 + 0.18 * (att // 8)))
+                pd2, pe2, ax2 = aim_at(yaw, pl, kind)
+                centre = pe2 + ax2 * depth
+                near = [b for b in BLOOMS
+                        if (centre - b[0]).length < crad + b[1]]
+                world = None
+                if not near:
+                    gap = 1.0
+                else:
+                    Wf2 = organ_frame(pe2, ax2)
+                    world = [(Wf2(q), r) for q, r in swept]
+                    gap = min((pw - qw).length - (r1 + r2)
+                              for pw, r1 in world
+                              for b in near for qw, r2 in b[2])
+                if best is None or gap > best[0]:
+                    best = (gap, pd2, pe2, ax2, centre, world)
+                if gap >= 0.0:
+                    break
+            gap, pdir, pe, axis, centre, world = best
+            if gap < 0.0:
+                # Nowhere on this pedicel clears. A bud is a truthful thing for
+                # a scape to be carrying, and it is the only option here that
+                # does not ship two corollas inside each other.
+                DEMOTED.append((kind, round(gap, 4)))
+                kind, val = 'bud', 0.68
+            else:
+                if world is None:
+                    Wf2 = organ_frame(pe, axis)
+                    world = [(Wf2(q), r) for q, r in swept]
+                BLOOMS.append((centre, crad, world))
+        pp = [bezier(o, o + pdir * ((pe - o).length * 0.55), pe, i / 4.0)
+              for i in range(5)]
         tube(pp, [r0 * 0.34, r0 * 0.31, r0 * 0.29, r0 * 0.27, r0 * 0.26],
              SLOT_SCAPE, RING=6, names=names, svs=[u] * 5)
-        out = Vector((bdir.x, bdir.y, 0.0))
-        out = out.normalized() if out.length > 1e-6 else Vector((1.0, 0.0, 0.0))
         if kind == 'open':
-            # a daylily presents its face outward and a little up, on a short
-            # pedicel, generally at or above foliage height
-            axis = (out * 0.72 + Vector((0.0, 0.0, 1.0)) * 0.58).normalized()
             add_flower(pe, axis, 1.0, 0.0, float(P['bloom_open']))
         elif kind == 'spent':
-            # and yesterday's hangs limp off the same pedicel
-            axis = (out * 0.34 - Vector((0.0, 0.0, 1.0)) * 0.82).normalized()
             add_flower(pe, axis, 1.0, float(P['spent_t']), 1.0)
         else:
             add_bud(pe, pdir, val)
@@ -1369,6 +1626,34 @@ def _checks():
             1 for h in _hits if BLADE_FAN[h[0]] != BLADE_FAN[h[1]])
         out['blades_in_pot'] = len(
             mesh_checks.intersections_with(me, FREE_FACES, [pot, rim]))
+        # The corolla, split the same way and for the same reason. A flower's
+        # six tepals sit at 60 degree intervals, so index distance IS angular
+        # distance: 1 apart are the neighbours whose margins nearly touch, and
+        # anything further apart crossing means a tepal has swept most of the
+        # way round the flower. Two *different* flowers crossing is a placement
+        # fault on the scape, not a corolla fault, so it is counted separately.
+        _tp = mesh_checks.self_intersections(me, TEPAL_FACES)
+        _adj = _far = _xf = 0
+        for i, j, _n in _tp:
+            if TEPAL_FLOWER[i] != TEPAL_FLOWER[j]:
+                _xf += 1
+            elif min((i - j) % 6, (j - i) % 6) == 1:
+                _adj += 1
+            else:
+                _far += 1
+        out['tepal_pairs_adjacent'] = _adj
+        out['tepal_pairs_nonadjacent'] = _far
+        out['tepal_pairs_cross_flower'] = _xf
+        # And the corolla against the foliage. A tepal through a leaf blade is
+        # never right, unlike two blades of different fans crossing, so it gets
+        # its own number rather than being folded into a total.
+        out['tepal_vs_blade'] = sum(
+            h[2] for h in mesh_checks.between(me, TEPAL_FACES, FREE_FACES))
+        out['tepal_in_pot'] = len(
+            mesh_checks.intersections_with(me, TEPAL_FACES, [pot, rim]))
+        out['blooms_demoted_to_buds'] = len(DEMOTED)
+        out['spent_twist_asked_avail_used'] = (
+            sorted(set(TWIST_SLACK))[-1] if TWIST_SLACK else None)
         out['blade_facing'] = mesh_checks.facing(me, SLOT_LEAF)
         out['fan_flatness'] = _flatness()
     except Exception as e:
