@@ -172,6 +172,13 @@ const SPECIES = {
   violet: {
     glb: 'violet.glb', name: 'African Violet', latin: 'Saintpaulia ionantha',
     leafBone: /^L(\d+)_(\d+)$/, establish: 15.0, close: 1.45,
+    /* The flower stalks. A plant whose leaves collapse while its blooms stand
+       up straight is the clearest possible tell that the wilt is a rig effect
+       and not a plant, and for a long time that is exactly what this did — the
+       loop below only ever matched `leafBone`. Magnitudes and shares are the
+       ones in violet.py; the browser runs the Blender rig rather than
+       approximating it. */
+    stalkBone: /^B(\d+)_(\d+)$/, stalkDeg: 62, stalkShare: [0.22, 0.34, 0.44],
     // Matte and velvety: the hairs are real geometry, so the sheen here is
     // only softening the terminator, and the surface itself barely specs.
     leaf: { name: 'violet_leaf_web', sheen: 0.18, sheenRough: 0.80,
@@ -181,6 +188,8 @@ const SPECIES = {
     glb: 'daylily.glb', name: 'Orange Daylily', latin: 'Hemerocallis fulva',
     // bones are per fan here, so the name carries the fan as well as the rank
     leafBone: /^F(\d+)L(\d+)_(\d+)$/, establish: 3.2, close: 1.35,
+    // the scape, which lodges rather than folds — a stout stalk, so less of it
+    stalkBone: /^S(\d+)_(\d+)$/, stalkDeg: 34, stalkShare: [0.14, 0.20, 0.24, 0.20, 0.22],
     // The opposite surface. A daylily is glabrous — no trichomes anywhere —
     // and semi-glossy on the upper face, so it takes no sheen at all and a
     // real specular. Inheriting the violet's velvet here made the blades look
@@ -1191,7 +1200,11 @@ function timeFromClock(){
 // ---- model -----------------------------------------------------------------
 const SHARE = [0.10, 0.20, 0.32, 0.38];   // must match violet.py
 const LEAF_BONE = PLANT.leafBone;
-const leafBones = [];                      // {bone, share, k}
+const STALK_BONE = PLANT.stalkBone || null;
+const STALK_SHARE = PLANT.stalkShare || [1];
+const leafBones = [];                      // {bone, share, k, limit}
+const stalkBones = [];                     // the flower stalks, same rig
+let droopLimits = null;                    // radians per leaf, from the rig's extras
 let skinned = null, leafMat = null, helper = null;
 let baseColor = new THREE.Color(1,1,1);
 
@@ -1277,6 +1290,13 @@ loader.load('./' + PLANT.glb, gltf => {
     }
     if (o.isSkinnedMesh) skinned = o;
     if (o.isBone) {
+      const sm = STALK_BONE && STALK_BONE.exec(o.name);
+      if (sm) {
+        const j = +sm[1], s = +sm[2];
+        stalkBones.push({ bone:o, share: STALK_SHARE[s] ?? STALK_SHARE.at(-1),
+                          k: 1.0 + 0.18 * Math.sin(j * 1.7),
+                          base: o.rotation.clone() });
+      }
       const m = LEAF_BONE.exec(o.name);
       if (m) {
         const i = +m[1], s = +m[2];
@@ -1289,10 +1309,22 @@ loader.load('./' + PLANT.glb, gltf => {
            round until the plant tied itself in a knot. */
         leafBones.push({ bone:o, share:SHARE[s] ?? SHARE.at(-1),
                          k: 1.0 + 0.25 * Math.sin(i * 2.4),
+                         leaf: i,
                          base: o.rotation.clone() });
       }
     }
   });
+  /* How far each leaf may fall before it comes to rest — on the pot rim, or on
+     the leaf beneath it. Solved in the species file by the code that knows
+     where every blade is, and carried here as glTF node extras on the rig,
+     because this slider moves live: a budget that existed only in Blender
+     would keep the render honest and let the browser go on clipping.
+     Radians, indexed by leaf. Absent means unlimited. */
+  root.traverse(o => {
+    const dl = o.userData && o.userData.droop_limits;
+    if (Array.isArray(dl)) droopLimits = dl;
+  });
+
   // the specimen stands on the pedestal, not on the floor
   root.position.y = PEDESTAL_TOP;
   scene.add(root);
@@ -1459,8 +1491,28 @@ renderer.setAnimationLoop(() => {
      violet.py; the browser runs the Blender rig rather than approximating it. */
   if (leafBones.length){
     const total = THREE.MathUtils.degToRad(78) * ui.droop;
-    for (const {bone, share, k, base} of leafBones){
-      bone.rotation.x = base.x - total * share * k;
+    /* The limits are per LEAF, not per bone, and the shares sum to 1 — so the
+       tip's whole rotation is `total * k`, and clamping that one number is the
+       same clamp violet.py applies before it bakes the rest pose. */
+    const scale = new Map();
+    if (droopLimits){
+      for (const b of leafBones){
+        const lim = droopLimits[b.leaf];
+        if (typeof lim !== 'number') continue;
+        const want = total * b.k;
+        if (want > lim) scale.set(b.leaf, lim / (want || 1));
+      }
+    }
+    for (const {bone, share, k, base, leaf} of leafBones){
+      const kk = k * (scale.get(leaf) ?? 1);
+      bone.rotation.x = base.x - total * share * kk;
+      bone.rotation.z = base.z;
+    }
+  }
+  if (stalkBones.length){
+    const st = THREE.MathUtils.degToRad(PLANT.stalkDeg || 0) * ui.droop;
+    for (const {bone, share, k, base} of stalkBones){
+      bone.rotation.x = base.x - st * share * k;
       bone.rotation.z = base.z;
     }
   }

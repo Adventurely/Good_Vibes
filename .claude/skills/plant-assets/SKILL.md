@@ -68,13 +68,41 @@ separate wilted model — `droop`, `chlorosis` and `bloom_open` are parameters t
 same generator is run at. Anything a species needs that the shared vocabulary
 does not have is a conversation about the vocabulary, not a local addition.
 
-**3. Solve placement, then build.** Leaves that clip are a solver problem, not a
-modelling problem. `solve_rosette()` places every leaf by measuring the ones
+**3. Solve placement, then build — and solve it for every pose the plant has.**
+Leaves that clip are a solver problem, not a modelling problem. `solve_rosette()` places every leaf by measuring the ones
 already placed, `rim_safe_tilt()` raises only the blades that actually foul the
 pot rim, `rosette_top()` measures the foliage so the flowers can clear it. The
 rule that keeps this honest: **the solver and the mesh builder must call the same
 function.** `blade_xyz()` is used by both, so they cannot disagree about where a
 leaf is — and if they could, the solver would certify geometry it had never seen.
+
+A rosette spaced only at rest is spaced for one pose out of the range the plant
+actually occupies. Wilting rotates every leaf down about its own base, so leaves
+that merely cleared each other standing up converge and pass through — and the
+same rotation walks them straight through the pot. Both are budget problems with
+the same shape as `rim_safe_tilt`: solve **how far each organ may fall** before
+it comes to rest on the rim, or on the organ beneath it, and clamp there. A real
+leaf does the same thing; it drapes over the rim rather than through it.
+
+Two traps in that budget, both of which cost a round:
+
+* Test for **passing through**, not for proximity. "Overlapping in plan and
+  within `gap` in height" flags two leaves lying against each other, which is
+  what a rosette does at rest and much more of when it wilts. Clamp on that and
+  the plant stops drooping at all. The test that works is a change of side:
+  where they overlap, take the sign of the height difference in the undrooped
+  pose and fail it only when that sign reverses.
+* The viewer drives the rig **live off a slider**, so a budget solved in Blender
+  has to reach it. Object custom properties export as glTF node `extras` and
+  bone ones do not — put the per-organ limits on the armature object as a list
+  and set `export_extras=True`, or the render stays honest while the browser
+  goes on clipping.
+
+**And flowers wilt with the leaves.** The shared parameter model calls out scape
+lodging and a daffodil gooseneck by name — one wilt rig, every organ. A plant
+whose foliage has collapsed while its blooms stand up straight is the clearest
+possible tell that the wilt is a rig effect rather than a plant, and it is what
+both species did until somebody looked.
 
 **4. Build organs that have grown.** See `references/organic-form.md`. The short
 version: a tapered cylinder is never right, cross-sections change along their
@@ -106,6 +134,10 @@ result = {
     'clipping_pairs': ...,             # organ-vs-organ intersections
     'boundary_edges_by_slot': {...},   # open holes, per material slot
     'unsupported_export_options': [],  # options this Blender build dropped
+    'shell_displacement_max': ...,     # a shell must not move the surface
+                                       # further than the shell — see gltf-traps
+    'leaf_pairs_at_droop_1': ...,      # the checks above, on the DEFORMED mesh,
+    'leaves_in_pot_at_droop_1': ...,   # at both ends of the condition range
 }
 ```
 

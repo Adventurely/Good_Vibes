@@ -222,6 +222,10 @@ def export_opts(glb):
         filepath=glb, export_format='GLB', use_selection=True,
         export_apply=False, export_animations=False, export_skins=True,
         export_yup=True, export_materials='EXPORT',
+        # Bone custom properties ride out as glTF node `extras`, which is how a
+        # per-organ limit solved in Blender reaches the viewer. Without it the
+        # browser can only approximate the rig it is supposed to be running.
+        export_extras=True,
         export_draco_mesh_compression_enable=True,
         export_draco_mesh_compression_level=7,
         export_draco_position_quantization=14,

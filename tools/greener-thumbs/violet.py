@@ -60,6 +60,15 @@ P = dict(
     cup         = 0.30,     # how much the blade curls up at the edges
     quilt       = 0.45,     # the bullate puffing between veins
     droop       = 0.0,      # 0 turgid, 1 collapsed — this is thirst
+    # `flex_magnitude_deg` of the shared wilt rig, one per organ. The rig is
+    # meant to drive every organ a species has — the parameter model calls out
+    # scape lodging and a daffodil gooseneck by name — and for a long time this
+    # file only ever bent the leaves, so a thirsty violet held its flowers up
+    # while its foliage went over the pot.
+    flex_leaf_deg   = 78.0,
+    flex_stalk_deg  = 62.0,   # a peduncle is thinner than a petiole and has a
+                              # bloom on the end of it, so it gives up sooner —
+                              # but it is shorter, so it has less to give
     chlorosis   = 0.0,      # 0 green, 1 yellow — this is nutrient or overwater
     blooms      = 6,
     bloom_open  = 1.0,
@@ -845,6 +854,38 @@ def spine_lowest_over_rim(tilt, scl, cz):
     return lo
 
 
+def rim_droop_budget(tilt, scl, cz):
+    """How far this leaf may rotate DOWN before its blade reaches the rim.
+
+    `rim_safe_tilt` solves the same geometry upward — the smallest tilt that
+    carries the blade over the rim — and wilting is that question backwards: a
+    leaf bending under thirst is a leaf whose tilt is falling, and it may fall
+    exactly as far as the clearance it started with.
+
+    Without this the rosette simply rotates through the pot. Measured on the
+    deformed mesh, the violet went from 0 leaf-vs-pot intersections turgid to 9
+    at a quarter thirsty and 27 collapsed, and nothing said a word, because the
+    build report runs on the REST mesh and droop is a pose.
+
+    A real leaf does not pass through the pot either: it comes to rest ON the
+    rim and drapes over it, which is what clamping here produces.
+    """
+    need = RIM_TOP + float(P['rim_clear'])
+    if spine_lowest_over_rim(tilt, scl, cz) is None:
+        return math.radians(180.0)       # never reaches the rim; nothing to hit
+    lo_t, hi_t = -math.radians(30.0), tilt
+    if spine_lowest_over_rim(hi_t, scl, cz) is not None and             spine_lowest_over_rim(hi_t, scl, cz) < need:
+        return 0.0                       # already resting on it; do not go lower
+    for _ in range(40):
+        mid = 0.5 * (lo_t + hi_t)
+        z = spine_lowest_over_rim(mid, scl, cz)
+        if z is None or z >= need:
+            hi_t = mid
+        else:
+            lo_t = mid
+    return max(0.0, tilt - hi_t)
+
+
 def rim_safe_tilt(tilt, scl, cz):
     """Raise a leaf just enough to carry its blade over the rim, not through it.
 
@@ -875,6 +916,13 @@ def rim_safe_tilt(tilt, scl, cz):
     return hi_t
 
 
+# The grid the rosette is sampled on. At module scope because the droop budget
+# solves against the same clouds, and two grids that differ by a point would be
+# two different plants agreeing that they do not touch.
+SU, BT = np.meshgrid(np.linspace(-1.0, 1.0, 9),
+                     np.linspace(0.0, 1.0, 11), indexing='ij')
+
+
 def solve_rosette():
     """Lay the leaves down oldest first, lifting each to clear what is already
     there.
@@ -888,8 +936,6 @@ def solve_rosette():
     n = int(P['leaves'])
     near = float(P['xy_near'])
     gap = float(P['clearance'])
-    SU, BT = np.meshgrid(np.linspace(-1.0, 1.0, 9),
-                         np.linspace(0.0, 1.0, 11), indexing='ij')
     placed, samples = [], []
     for i in range(n):
         age = i / max(1, n - 1)
@@ -908,6 +954,7 @@ def solve_rosette():
         # which only ever raises the leaf further, so this stays conservative.
         tilt = rim_safe_tilt(tilt, scl, cz)
         lseed = rnd.randrange(1, 10 ** 6)
+
         pts, _ = blade_xyz(SU, BT, ang, tilt, scl, cz, lseed)
         pts = pts.reshape(-1, 3)
 
@@ -1571,15 +1618,113 @@ for pb in rig.pose.bones:
     pb.rotation_mode = 'XYZ'
 
 droop = float(P['droop'])
-total_droop = math.radians(78) * droop
+total_droop = math.radians(float(P['flex_leaf_deg'])) * droop
+
+# How far each leaf is allowed to fall before it is resting on the rim. Solved
+# once here from the same `spine_lowest_over_rim` the placement used, and
+# published onto the bone as a custom property so the VIEWER can apply the same
+# limit — it drives this rig live off a slider, so a budget that existed only in
+# Blender would keep the render honest and let the browser go on clipping.
+def _blade_cloud(pl, fall, step=1):
+    """The leaf as a point cloud, at a given fall. Same `blade_xyz` the mesh is
+    built from, subsampled — the budget below needs shape, not resolution."""
+    pts, _ = blade_xyz(SU, BT, pl['ang'], pl['tilt'] - fall, pl['scl'],
+                       pl['cz'], pl['lseed'])
+    return pts.reshape(-1, 3)[::step]
+
+
+def _passes_through(a, a0, b, near, gap):
+    """Has blade `a` gone THROUGH blade `b`, rather than come to rest on it?
+
+    The distinction matters and the obvious test gets it wrong. "Overlapping in
+    plan and within `gap` in height" flags two leaves lying against each other,
+    which is what a rosette does at rest and what a wilting one does much more
+    of — clamp on that and the plant stops drooping at all, which is what the
+    first version of this did.
+
+    So the test is a change of SIDE. Where the two overlap in plan, take the
+    sign of the height difference in the leaf's undrooped pose `a0`; a crossing
+    is that sign reversing by more than `gap`. Resting is allowed; passing
+    through is not.
+    """
+    d = np.hypot(a[:, None, 0] - b[None, :, 0], a[:, None, 1] - b[None, :, 1])
+    over = d < near
+    if not over.any():
+        return False
+    was = a0[:, None, 2] - b[None, :, 2]
+    now = a[:, None, 2] - b[None, :, 2]
+    flipped = (was > 0) & (now < -gap)          # was above, is now below
+    return bool((over & flipped).any())
+
+
+# How far each leaf may fall. Two limits, solved together: the rim it must not
+# go through, and the leaves already placed, which it must come to rest ON
+# rather than pass through. A wilting rosette really does pile up on itself —
+# clamping is what that looks like, and it is also why the outer leaves still
+# fall furthest, since they are the ones with room underneath them.
+#
+# Published onto each leaf's root bone as a custom property, because the VIEWER
+# drives this rig live off a slider: a budget that existed only in Blender would
+# keep the render honest and let the browser go on clipping.
+_near, _gap = float(P['xy_near']), float(P['clearance'])
+DROOP_LIMIT = []
+_settled = []
+for _i, _pl in enumerate(PLACE):
+    _k = 1.0 + 0.25 * math.sin(_i * 2.4)
+    _hi = min(math.radians(float(P['flex_leaf_deg'])) * _k,
+              rim_droop_budget(_pl['tilt'], _pl['scl'], _pl['cz']))
+    _lo = 0.0
+    _rest = _blade_cloud(_pl, 0.0)
+    if _settled and _hi > 0.0:
+        def _bad(f):
+            mine = _blade_cloud(_pl, f)
+            return any(_passes_through(mine, _rest, _c, _near, _gap)
+                       or _passes_through(_c, _c, mine, _near, _gap)
+                       for _c in _settled)
+        if _bad(_hi):
+            for _ in range(14):
+                _mid = 0.5 * (_lo + _hi)
+                if _bad(_mid):
+                    _hi = _mid
+                else:
+                    _lo = _mid
+            _hi = _lo
+    DROOP_LIMIT.append(_hi)
+    _settled.append(_blade_cloud(_pl, _hi))
+
 for i in range(int(P['leaves'])):
     # outer leaves give up first; the crown is the last thing to go
     k = 1.0 + 0.25 * math.sin(i * 2.4)
+    limit = DROOP_LIMIT[i] if i < len(DROOP_LIMIT) else math.radians(180.0)
+    # SHARE sums to 1, so the tip's total rotation is `total_droop * k` and the
+    # clamp is one division rather than a search.
+    if total_droop * k > limit:
+        k = limit / total_droop if total_droop > 1e-9 else 0.0
     for s in range(int(P['segs'])):
         nm = f"L{i}_{s}"
         if nm in rig.pose.bones:
             share = SHARE[s] if s < len(SHARE) else SHARE[-1]
-            rig.pose.bones[nm].rotation_euler.x = -total_droop * share * k
+            pb = rig.pose.bones[nm]
+            pb.rotation_euler.x = -total_droop * share * k
+
+# Carried to the viewer on the ARMATURE OBJECT, not on the bones: Blender's
+# glTF exporter writes object custom properties into node `extras` and does not
+# do the same for bone ones — the first attempt put them on `pb.bone` and the
+# GLB came out with extras on nought of its 97 nodes. Indexed by leaf, radians.
+rig["droop_limits"] = [float(v) for v in DROOP_LIMIT]
+
+# The flowers go over with the foliage. A violet whose leaves have collapsed
+# while its blooms stand up straight is the single most obvious tell that the
+# wilt is a rig effect rather than a plant.
+STALK_SHARE = [0.22, 0.34, 0.44]
+stalk_droop = math.radians(float(P['flex_stalk_deg'])) * droop
+for j in range(int(P['blooms'])):
+    kk = 1.0 + 0.18 * math.sin(j * 1.7)
+    for s in range(3):
+        nm = f"B{j}_{s}"
+        if nm in rig.pose.bones:
+            share = STALK_SHARE[s] if s < len(STALK_SHARE) else STALK_SHARE[-1]
+            rig.pose.bones[nm].rotation_euler.x = -stalk_droop * share * kk
 
 wind = float(P['wind'])
 FR = int(P['frames'])
@@ -1889,11 +2034,48 @@ def check_pot_clipping(mesh, ranges, obstacles):
 _clip = check_clipping(me, LEAF_FACES)
 _pot = check_pot_clipping(me, LEAF_FACES, [pot, rim])
 
+# The same two questions asked of the plant as it will be SEEN, at both ends of
+# the thirst range. The pair above run on the mesh this file built; wilt is a
+# pose, so they cannot see it, and they read exactly the same on a collapsed
+# plant as on a turgid one while the collapsed one had 22 leaf faces inside its
+# own pot and 33 pairs of leaves through each other.
+import importlib as _il, sys as _sys
+_sys.path.insert(0, r"E:\Claude\Good-Vibe-Games\Good_Vibes\.claude\skills\plant-assets\scripts")
+import mesh_checks as _mc
+_il.reload(_mc)
+_wilt = {}
+for _d in (0.0, 1.0):
+    _td = math.radians(float(P['flex_leaf_deg'])) * _d
+    for _i in range(int(P['leaves'])):
+        _k = 1.0 + 0.25 * math.sin(_i * 2.4)
+        _lim = DROOP_LIMIT[_i] if _i < len(DROOP_LIMIT) else math.radians(180.0)
+        if _td * _k > _lim:
+            _k = _lim / _td if _td > 1e-9 else 0.0
+        for _s in range(int(P['segs'])):
+            _nm = f"L{_i}_{_s}"
+            if _nm in rig.pose.bones:
+                _sh = SHARE[_s] if _s < len(SHARE) else SHARE[-1]
+                rig.pose.bones[_nm].rotation_euler.x = -_td * _sh * _k
+    _sd = math.radians(float(P['flex_stalk_deg'])) * _d
+    for _j in range(int(P['blooms'])):
+        _kk = 1.0 + 0.18 * math.sin(_j * 1.7)
+        for _s in range(3):
+            _nm = f"B{_j}_{_s}"
+            if _nm in rig.pose.bones:
+                _sh = STALK_SHARE[_s] if _s < len(STALK_SHARE) else STALK_SHARE[-1]
+                rig.pose.bones[_nm].rotation_euler.x = -_sd * _sh * _kk
+    _dm, _was = _mc.deformed(plant)
+    _wilt['leaf_pairs_at_droop_%g' % _d] = len(_mc.self_intersections(_dm, LEAF_FACES))
+    _wilt['leaves_in_pot_at_droop_%g' % _d] = len(
+        _mc.intersections_with(_dm, LEAF_FACES, [pot, rim]))
+    _mc.restore(_was)
+
 result = {
     'leaf_pairs_intersecting': len(_clip),
     'clip_detail': _clip[:8],
     'leaves_in_pot': len(_pot),
     'pot_detail': _pot[:8],
+    **_wilt,
     'verts': len(me.vertices),
     'polys': len(me.polygons),
     'bones': len(rig.pose.bones),

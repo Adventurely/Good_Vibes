@@ -82,6 +82,43 @@ those have different right answers.
 
 `scripts/mesh_checks.py` in this skill has all of them ready to import.
 
+### Run them on the DEFORMED mesh, and at both ends of every condition
+
+This is the same trap as the authoring render, one level down, and it hid three
+separate faults on the violet for as long as the rig existed.
+
+Wilt is a **pose on the armature**. Every check above runs on the mesh the
+species file *built*, so they do not move by a single face between a turgid
+plant and a collapsed one. The violet reported `leaf_pairs_intersecting: 0` and
+`leaves_in_pot: 0` at `droop = 1.0` while the plant a player was actually
+looking at had **22 leaf faces inside its own pot and 33 pairs of leaves through
+each other.**
+
+```python
+me, was = mesh_checks.deformed(plant)      # armature only; asserts topology
+result['leaves_in_pot_at_droop_1'] = len(
+    mesh_checks.intersections_with(me, LEAF_FACES, [pot, rim]))
+mesh_checks.restore(was)
+```
+
+Two things that will bite:
+
+* **Only the armature may be evaluated.** Every range these checks take —
+  `LEAF_FACES`, `TEPAL_FACES` — is an index into the BASE mesh. Subdivision
+  renumbers faces, so with it on the ranges point at arbitrary geometry and the
+  check returns confident nonsense. An earlier version of this measurement did
+  exactly that and reported crossings on a plant that had none. `deformed()`
+  asserts the face count is unchanged for this reason.
+
+* **Sweep the parameter, do not sample the shipped value.** The GLB is built at
+  one `droop` and the viewer animates the whole range off a slider, so "clean at
+  the value we exported" is not the claim that matters. Put both ends in the
+  report: `leaf_pairs_at_droop_0` and `leaf_pairs_at_droop_1`.
+
+The rule generalises past wilt. `droop`, `chlorosis`, `bloom_open` and `spent_t`
+are all points the same generator is run at, and a check performed at one point
+says nothing about the others.
+
 ## 3. Isolation testing: prove which term it is
 
 When something looks wrong and you have a hypothesis, do not tune — **zero

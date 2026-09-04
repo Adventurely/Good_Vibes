@@ -509,6 +509,14 @@ opts = dict(filepath=glb, export_format='GLB', use_selection=True,
             # detail anybody inspects at 1:1, so lossy is the right trade.
             export_image_format='WEBP',
             export_image_quality=92,
+
+            # Object custom properties ride out as glTF node `extras`. That is
+            # the channel the per-leaf droop limits use to reach the viewer,
+            # which drives this rig live off a slider and would otherwise be
+            # approximating a budget solved in Blender. (Bone properties are
+            # NOT exported this way — the first attempt set them on the bones
+            # and the GLB came out with extras on nought of its 97 nodes.)
+            export_extras=True,
             )
 
 # Option names drift between Blender versions, and one unknown key is a

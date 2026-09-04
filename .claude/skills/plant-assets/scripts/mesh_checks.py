@@ -83,6 +83,40 @@ def self_intersections(mesh, ranges):
     return hits
 
 
+def deformed(plant, keep=('ARMATURE',)):
+    """The mesh as it will actually be seen, with the rig applied.
+
+    Every check in this file runs on the mesh a species file BUILT. Wilt is a
+    pose on the armature, so none of them move by a single face between a
+    turgid plant and a collapsed one — which means every fault that only exists
+    in the wilted state has been invisible for as long as the rig has existed.
+    On the violet the numbers were identical at droop 0 and droop 1 while the
+    drooped plant put 22 leaf faces through its own pot.
+
+    Only the armature is evaluated. Anything that changes topology - Subdivision
+    especially - renumbers the faces, and every range in this file (LEAF_FACES,
+    TEPAL_FACES) is an index into the BASE mesh, so with subsurf on they point
+    at arbitrary geometry and the checks return confident nonsense. An earlier
+    version of this measurement did exactly that. The caller must restore the
+    modifier flags; the assert is here so a silent renumbering cannot happen.
+    """
+    import bpy
+    was = [(m, m.show_viewport) for m in plant.modifiers]
+    for m in plant.modifiers:
+        if m.type not in keep:
+            m.show_viewport = False
+    dg = bpy.context.evaluated_depsgraph_get()
+    me = plant.evaluated_get(dg).to_mesh()
+    assert len(me.polygons) == len(plant.data.polygons), (
+        'topology changed under the checks; face ranges would be meaningless')
+    return me, was
+
+
+def restore(was):
+    for m, v in was:
+        m.show_viewport = v
+
+
 def between(mesh, ranges_a, ranges_b):
     """Intersecting face pairs between two DIFFERENT groups of organs.
 
