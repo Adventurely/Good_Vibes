@@ -84,7 +84,37 @@ the same shape as `rim_safe_tilt`: solve **how far each organ may fall** before
 it comes to rest on the rim, or on the organ beneath it, and clamp there. A real
 leaf does the same thing; it drapes over the rim rather than through it.
 
-Two traps in that budget, both of which cost a round:
+**Clamp per BONE, not per organ — that is the difference between resting and
+draping.** A cap on the whole leaf makes it stop dead the moment any part of it
+meets anything, which is not what a wilting leaf does: the cell walls go soft, it
+comes to rest where it touches, and the rest of it carries on over the edge. So
+solve a cap on the CUMULATIVE bend at each bone boundary, base outward, and let
+the segments past a contact keep falling.
+
+That needs the bend to vary along the organ, which costs one line if the geometry
+function is already shared: `blade_xyz` took a scalar `tilt` and applied it
+rigidly, and `np.cos`/`np.sin` in place of `math.cos`/`math.sin` lets it take one
+angle per point. The profile is the rig's own — `fall * cum_share(sv)`, where
+`cum_share` interpolates the cumulative bone shares — so the solver bends the
+leaf exactly the way the armature will.
+
+Three things that cost a round each:
+
+* **Every stage must answer for the WHOLE organ**, not just the segment it is
+  solving. Checking only up to the current boundary lets a cap be set early that
+  the tip then violates, and no later stage can undo it: 2 crossing pairs became
+  20 that way.
+* **The proximity radius has to suit the sampling.** A 9x11 grid over a violet
+  leaf puts samples about 5 mm apart, and a 6 mm test lets a bending leaf slip
+  between its neighbour's samples — 16 crossings at that radius, 3 at twice it,
+  2 at four times.
+* **Ask whether the organ ENTERED the obstacle, not whether it is inside one.**
+  A violet's crown sits below the pot rim, so the inner end of every blade is
+  inside the pot's volume before anything droops; testing "is it in the pot"
+  outright forbids the plant from existing. Compare against the rest pose, the
+  same way the leaf-vs-leaf test does.
+
+Two more traps in the budget itself, both of which also cost a round:
 
 * Test for **passing through**, not for proximity. "Overlapping in plan and
   within `gap` in height" flags two leaves lying against each other, which is

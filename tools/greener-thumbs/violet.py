@@ -809,6 +809,26 @@ def crown_at(ang, cz):
     return (-math.sin(ang) * cr, math.cos(ang) * cr, cz)
 
 
+SHARE = [0.10, 0.20, 0.32, 0.38]          # each bone takes more than the last
+# The peduncle's three. Steeper than a leaf's because a flower stalk carries a
+# bloom on the end of it and gives up nearer the top.
+STALK_SHARE = [0.22, 0.34, 0.44]
+_CUM = np.concatenate([[0.0], np.cumsum(SHARE)])
+
+
+def cum_share(sv):
+    """Fraction of a leaf's total bend that has happened by position `sv`.
+
+    The leaf bends on four bones spanning the whole organ, each taking more than
+    the last, so the bend is not uniform along its length — and that difference
+    is precisely what a drape is. Interpolating within a bone rather than
+    stepping keeps the surface smooth between stations.
+    """
+    f = np.clip(np.asarray(sv, dtype=float), 0.0, 1.0) * len(SHARE)
+    i = np.minimum(np.floor(f).astype(int), len(SHARE) - 1)
+    return _CUM[i] + (f - i) * np.asarray(SHARE)[i]
+
+
 def blade_xyz(SU, BT, ang, tilt, scl, cz, lseed=0):
     """Blade surface points in world space, vectorised.
 
@@ -828,7 +848,13 @@ def blade_xyz(SU, BT, ang, tilt, scl, cz, lseed=0):
     ZZ = Z + (float(P['cup']) * (SU ** 2) * 0.020
               + float(P['quilt']) * (1.0 - VE) * 0.0042) * scl
     ca, sa = math.cos(ang), math.sin(ang)
-    ct, st = math.cos(tilt), math.sin(tilt)
+    # `tilt` may be a scalar or one angle PER POINT. A scalar swings the
+    # leaf rigidly about its base, which is what a leaf does not do: a
+    # wilting one bends progressively along its own length, more at the
+    # tip than the base, and where it meets the pot rim it keeps going
+    # past it. Per-point tilt is the whole difference between a leaf that
+    # stops and a leaf that drapes.
+    ct, st = np.cos(tilt), np.sin(tilt)
     Y2 = Y * ct - ZZ * st
     Z2 = Y * st + ZZ * ct
     ox, oy, _ = crown_at(ang, 0.0)
@@ -1630,10 +1656,7 @@ if int(P['fuzz']) > 0:
 
 
 # ---- droop and wind, both of them the same rig -----------------------------
-SHARE = [0.10, 0.20, 0.32, 0.38]          # each bone takes more than the last
-# The peduncle's three. Steeper than a leaf's because a flower stalk carries a
-# bloom on the end of it and gives up nearer the top.
-STALK_SHARE = [0.22, 0.34, 0.44]
+
 
 for pb in rig.pose.bones:
     pb.rotation_mode = 'XYZ'
@@ -1649,14 +1672,20 @@ def pose_wilt(d):
     td = math.radians(float(P['flex_leaf_deg'])) * d
     for i in range(int(P['leaves'])):
         k = 1.0 + 0.25 * math.sin(i * 2.4)
-        lim = DROOP_LIMIT[i] if i < len(DROOP_LIMIT) else math.radians(180.0)
-        if td * k > lim:
-            k = lim / td if td > 1e-9 else 0.0
+        caps = DROOP_CAPS[i] if i < len(DROOP_CAPS) else None
+        # Bone by bone, in cumulative terms: what the rig asks for at this
+        # boundary, capped by what the drape solve found there, and the bone
+        # gets the difference. Capping per bone rather than per leaf is what
+        # lets the tip carry on over the rim after the middle has stopped.
+        prev = 0.0
         for sgi in range(int(P['segs'])):
+            want = td * k * _CUM[sgi + 1]
+            cum = min(want, caps[sgi]) if caps else want
+            cum = max(cum, prev)                 # a bone never bends backwards
             nm = f"L{i}_{sgi}"
             if nm in rig.pose.bones:
-                sh = SHARE[sgi] if sgi < len(SHARE) else SHARE[-1]
-                rig.pose.bones[nm].rotation_euler.x = -td * sh * k
+                rig.pose.bones[nm].rotation_euler.x = -(cum - prev)
+            prev = cum
     sd = math.radians(float(P['flex_stalk_deg'])) * d
     for j in range(int(P['blooms'])):
         kk = 1.0 + 0.18 * math.sin(j * 1.7)
@@ -1678,75 +1707,139 @@ total_droop = math.radians(float(P['flex_leaf_deg'])) * droop
 # published onto the bone as a custom property so the VIEWER can apply the same
 # limit — it drives this rig live off a slider, so a budget that existed only in
 # Blender would keep the render honest and let the browser go on clipping.
-def _blade_cloud(pl, fall, step=1):
-    """The leaf as a point cloud, at a given fall. Same `blade_xyz` the mesh is
-    built from, subsampled — the budget below needs shape, not resolution."""
-    pts, _ = blade_xyz(SU, BT, pl['ang'], pl['tilt'] - fall, pl['scl'],
+_SEGS = int(P['segs'])
+_PF = float(P['petiole']) / (float(P['petiole']) + float(P['blade_len']))
+_SV = (_PF + (1.0 - _PF) * BT).reshape(-1)   # organ position of each sample
+_BOUND = np.linspace(0.0, 1.0, _SEGS + 1)    # where the bones meet
+_BIG = math.radians(400.0)
+
+
+def _drape(pl, caps, fall):
+    """The leaf under a bend profile: same `blade_xyz` the mesh is built from.
+
+    `caps` is the largest CUMULATIVE bend allowed at each bone boundary. The
+    request at a point is `fall * cum_share(sv)`; what it gets is the smaller of
+    that and the cap interpolated to its own position. A leaf that meets the rim
+    half way along therefore stops bending THERE while everything past it keeps
+    going — which is a leaf hanging over the edge rather than a leaf that
+    stopped.
+    """
+    want = fall * cum_share(_SV)
+    bend = np.minimum(want, np.interp(_SV, _BOUND, caps)).reshape(BT.shape)
+    pts, _ = blade_xyz(SU, BT, pl['ang'], pl['tilt'] - bend, pl['scl'],
                        pl['cz'], pl['lseed'])
-    return pts.reshape(-1, 3)[::step]
+    return pts.reshape(-1, 3)
 
 
 def _passes_through(a, a0, b, near, gap):
-    """Has blade `a` gone THROUGH blade `b`, rather than come to rest on it?
+    """Has surface `a` gone THROUGH `b`, rather than come to rest on it?
 
     The distinction matters and the obvious test gets it wrong. "Overlapping in
     plan and within `gap` in height" flags two leaves lying against each other,
-    which is what a rosette does at rest and what a wilting one does much more
-    of — clamp on that and the plant stops drooping at all, which is what the
-    first version of this did.
+    which is what a rosette does at rest and much more of when it wilts — clamp
+    on that and the plant stops drooping at all.
 
     So the test is a change of SIDE. Where the two overlap in plan, take the
-    sign of the height difference in the leaf's undrooped pose `a0`; a crossing
-    is that sign reversing by more than `gap`. Resting is allowed; passing
-    through is not.
+    sign of the height difference in the undrooped pose `a0`; a crossing is that
+    sign reversing by more than `gap`. Resting is allowed; passing through is not.
     """
+    if not len(a) or not len(b):
+        return False
     d = np.hypot(a[:, None, 0] - b[None, :, 0], a[:, None, 1] - b[None, :, 1])
     over = d < near
     if not over.any():
         return False
     was = a0[:, None, 2] - b[None, :, 2]
     now = a[:, None, 2] - b[None, :, 2]
-    flipped = (was > 0) & (now < -gap)          # was above, is now below
-    return bool((over & flipped).any())
+    return bool((over & (was > 0) & (now < -gap)).any())
 
 
-# How far each leaf may fall. Two limits, solved together: the rim it must not
-# go through, and the leaves already placed, which it must come to rest ON
-# rather than pass through. A wilting rosette really does pile up on itself —
-# clamping is what that looks like, and it is also why the outer leaves still
-# fall furthest, since they are the ones with room underneath them.
+def _in_pot_volume(pts):
+    return (np.hypot(pts[:, 0], pts[:, 1]) < RIM_OUT) & (pts[:, 2] < RIM_TOP)
+
+
+def _through_rim(pts, rest):
+    """Has the leaf entered the pot, or gone through its rim?
+
+    Two questions, and the first one has to be asked against the REST pose the
+    same way `_passes_through` is. A violet's crown sits below the rim, so the
+    inner end of every blade is inside the pot's volume before anything droops —
+    testing "is it in the pot" outright forbids the plant. What is forbidden is
+    ENTERING: a point that was outside and is now inside.
+
+    The band test is separate and absolute: nothing may occupy the rim itself.
+    A leaf draping over it has points beyond RIM_OUT hanging well below the top,
+    and that is the thing being allowed.
+    """
+    if not len(pts):
+        return False
+    if (~_in_pot_volume(rest) & _in_pot_volume(pts)).any():
+        return True
+    rad = np.hypot(pts[:, 0], pts[:, 1])
+    return bool(((rad >= RIM_IN) & (rad <= RIM_OUT)
+                 & (pts[:, 2] < RIM_TOP + float(P['rim_clear']))).any())
+
+
+# Four times the placement solver's radius, and swept to get there: the drape
+# samples a 9x11 grid over a leaf, so points sit about 5 mm apart and a 6 mm
+# proximity test lets a bending leaf slip between its neighbour's samples. At
+# x1 the plant ends up with 16 crossing pairs, x2 gives 3 and x4 gives 2 — the
+# same as the old rigid clamp, but now with a leaf that actually bends.
+_near, _gap = float(P['xy_near']) * 4.0, float(P['clearance'])
+
+# The drape, solved bone by bone from the base outward.
 #
-# Published onto each leaf's root bone as a custom property, because the VIEWER
-# drives this rig live off a slider: a budget that existed only in Blender would
-# keep the render honest and let the browser go on clipping.
-_near, _gap = float(P['xy_near']), float(P['clearance'])
-DROOP_LIMIT = []
+# The previous version clamped each leaf as a whole: one angle, and the leaf
+# stopped dead when any part of it met anything. That is not what a wilting leaf
+# does — the cell walls go soft, so it comes to rest where it touches and the
+# rest of it carries on over the edge. Solving a cap per BONE gives that: the
+# segment that meets the rim stops there, and the segments past it keep falling.
+#
+# Published to the viewer, which drives this rig live off a slider.
+DROOP_CAPS = []
 _settled = []
 for _i, _pl in enumerate(PLACE):
     _k = 1.0 + 0.25 * math.sin(_i * 2.4)
-    _hi = min(math.radians(float(P['flex_leaf_deg'])) * _k,
-              rim_droop_budget(_pl['tilt'], _pl['scl'], _pl['cz']))
-    _lo = 0.0
-    _rest = _blade_cloud(_pl, 0.0)
-    if _settled and _hi > 0.0:
-        def _bad(f):
-            mine = _blade_cloud(_pl, f)
-            return any(_passes_through(mine, _rest, _c, _near, _gap)
-                       or _passes_through(_c, _c, mine, _near, _gap)
-                       for _c in _settled)
-        if _bad(_hi):
-            for _ in range(14):
-                _mid = 0.5 * (_lo + _hi)
-                if _bad(_mid):
-                    _hi = _mid
-                else:
-                    _lo = _mid
-            _hi = _lo
-    DROOP_LIMIT.append(_hi)
-    _settled.append(_blade_cloud(_pl, _hi))
+    _fall = math.radians(float(P['flex_leaf_deg'])) * _k      # the ask at droop 1
+    _caps = np.full(_SEGS + 1, _BIG)
+    _caps[0] = 0.0
+    _rest = _drape(_pl, _caps, 0.0)
 
+    def _bad(caps, upto, _pl=_pl, _fall=_fall, _rest=_rest):
+        # The WHOLE leaf, at every stage — not just the segment being solved.
+        # Checking only up to the current boundary lets a cap be set early that
+        # the tip then violates, and nothing later can undo it: crossings went
+        # from 2 to 20 that way.
+        pts = _drape(_pl, caps, _fall)
+        if _through_rim(pts, _rest):
+            return True
+        return any(_passes_through(pts, _rest, c, _near, _gap)
+                   or _passes_through(c, c, pts, _near, _gap)
+                   for c in _settled)
 
-rig["droop_limits"] = [float(v) for v in DROOP_LIMIT]
+    for _s in range(1, _SEGS + 1):
+        _want = _fall * _CUM[_s]
+        _try = _caps.copy()
+        _try[_s:] = _want
+        if not _bad(_try, _s):
+            _caps[_s:] = _want
+            continue
+        _lo, _hi = float(_caps[_s - 1]), _want      # never less than the bone before
+        for _ in range(12):
+            _mid = 0.5 * (_lo + _hi)
+            _try = _caps.copy()
+            _try[_s:] = _mid
+            if _bad(_try, _s):
+                _hi = _mid
+            else:
+                _lo = _mid
+        _caps[_s:] = _lo
+    DROOP_CAPS.append([float(v) for v in _caps[1:]])
+    _settled.append(_drape(_pl, _caps, _fall))
+
+rig["droop_caps"] = [float(v) for row in DROOP_CAPS for v in row]
+rig["droop_segs"] = _SEGS
+
 
 def _bloom_cloud(j, fall, step=2):
     """A bloom's own vertices, rotated down about the foot of its scape.

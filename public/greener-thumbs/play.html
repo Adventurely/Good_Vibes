@@ -1204,7 +1204,15 @@ const STALK_BONE = PLANT.stalkBone || null;
 const STALK_SHARE = PLANT.stalkShare || [1];
 const leafBones = [];                      // {bone, share, k, limit}
 const stalkBones = [];                     // the flower stalks, same rig
-let droopLimits = null;                    // radians per leaf, from the rig's extras
+/* The drape, solved in the species file and carried here as glTF node extras
+   on the rig: the largest CUMULATIVE bend each of a leaf's bones may take
+   before that part of it is resting on the pot rim or on the leaf beneath.
+   Flat, `droopSegs` values per leaf. Per BONE rather than per leaf is the whole
+   point — a leaf that meets the rim half way along stops bending there while
+   everything past it keeps going, which is a leaf hanging over an edge instead
+   of a leaf that stopped. */
+let droopCaps = null, droopSegs = 0;
+const CUM = SHARE.reduce((a, v) => (a.push(a[a.length - 1] + v), a), [0]);
 let skinned = null, leafMat = null, helper = null;
 let baseColor = new THREE.Color(1,1,1);
 
@@ -1309,7 +1317,7 @@ loader.load('./' + PLANT.glb, gltf => {
            round until the plant tied itself in a knot. */
         leafBones.push({ bone:o, share:SHARE[s] ?? SHARE.at(-1),
                          k: 1.0 + 0.25 * Math.sin(i * 2.4),
-                         leaf: i,
+                         leaf: i, seg: s,
                          base: o.rotation.clone() });
       }
     }
@@ -1321,8 +1329,9 @@ loader.load('./' + PLANT.glb, gltf => {
      would keep the render honest and let the browser go on clipping.
      Radians, indexed by leaf. Absent means unlimited. */
   root.traverse(o => {
-    const dl = o.userData && o.userData.droop_limits;
-    if (Array.isArray(dl)) droopLimits = dl;
+    const u = o.userData || {};
+    if (Array.isArray(u.droop_caps)) droopCaps = u.droop_caps;
+    if (typeof u.droop_segs === 'number') droopSegs = u.droop_segs;
   });
 
   // the specimen stands on the pedestal, not on the floor
@@ -1494,19 +1503,18 @@ renderer.setAnimationLoop(() => {
     /* The limits are per LEAF, not per bone, and the shares sum to 1 — so the
        tip's whole rotation is `total * k`, and clamping that one number is the
        same clamp violet.py applies before it bakes the rest pose. */
-    const scale = new Map();
-    if (droopLimits){
-      for (const b of leafBones){
-        const lim = droopLimits[b.leaf];
-        if (typeof lim !== 'number') continue;
-        const want = total * b.k;
-        if (want > lim) scale.set(b.leaf, lim / (want || 1));
-      }
-    }
-    for (const {bone, share, k, base, leaf} of leafBones){
-      const kk = k * (scale.get(leaf) ?? 1);
-      bone.rotation.x = base.x - total * share * kk;
+    /* Bone by bone, in cumulative terms: what the rig asks for at this
+       boundary, capped by what the drape solve found there, and the bone gets
+       the difference. Same arithmetic as violet.py's `pose_wilt`. */
+    const prev = new Map();
+    for (const {bone, seg, k, base, leaf} of leafBones){
+      const want = total * k * CUM[seg + 1];
+      const cap = droopCaps && droopSegs ? droopCaps[leaf * droopSegs + seg] : Infinity;
+      const p = prev.get(leaf) ?? 0;
+      const cum = Math.max(Math.min(want, cap ?? Infinity), p);
+      bone.rotation.x = base.x - (cum - p);
       bone.rotation.z = base.z;
+      prev.set(leaf, cum);
     }
   }
   if (stalkBones.length){
