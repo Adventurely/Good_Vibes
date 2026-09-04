@@ -627,8 +627,9 @@ What it stops is the Wizard walking off with a crate of pipe he cannot read.
 
 Routing is pure and shared for the usual reason: the room has to be able to
 check that a click was reachable rather than trust a client that says it walked
-there. BFS rather than A* because the site is 30x17, so the whole board is
-cheaper to flood than a heuristic is to tune.
+there. BFS rather than A* because the site is a few hundred tiles — 38x17 at
+the time of writing, and the figure lives in `MAP_W`/`MAP_H`, not here — so the
+whole board is cheaper to flood than a heuristic is to tune.
 
 The spawner uses the same flood. Terrain rolls islands — a pocket of grass
 behind a pond — and a Cellsap on one is a node the player can see, walk at, and

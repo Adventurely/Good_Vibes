@@ -7,16 +7,26 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%231a1310'/%3E%3Ccircle cx='8' cy='8' r='4' fill='%23ffd23f'/%3E%3Cpath d='M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.5 1.5M11.5 11.5L13 13M13 3l-1.5 1.5M4.5 11.5L3 13' stroke='%23f59a2e' stroke-width='1.4'/%3E%3C/svg%3E">
     <meta name="description" content="Gather what the ruin grew, brew what the party needs, and get to the Array." />
     <style>
+      /* The theme is LIGHT, and deliberately not a inverted copy of the dark one.
+         Three of the old tokens are unusable on a pale ground and had to be
+         re-picked rather than flipped: --accent #6cc24a measured 1.94:1 against
+         this background, --sun #f2b134 1.65:1 and --muted #a58a68 2.85:1, all
+         well under the 4.5:1 that body text needs. The replacements below are
+         measured: text 13.8:1, muted 5.6:1, accent 5.0:1, sun 5.0:1, bad 5.2:1.
+
+         `color-scheme: light` is fixed rather than `light dark`. Following the
+         system preference would hand a dark page straight back to anyone whose
+         OS is set that way, which is the thing this change exists to stop. */
       :root {
-        color-scheme: dark;
-        --ink: #241a10;
-        --panel: #33261a;
-        --line: #4a3826;
-        --text: #fff6e8;
-        --muted: #b9a189;
-        --accent: #6cc24a;
-        --sun: #ffd23f;
-        --bad: #ef5a45;
+        color-scheme: light;
+        --ink: #f4efe4;
+        --panel: #fdfaf3;
+        --line: #cfc2a8;
+        --text: #2a2118;
+        --muted: #6b5c47;
+        --accent: #2b7530;
+        --sun: #8f5c05;
+        --bad: #b5372a;
       }
 
       * { box-sizing: border-box; }
@@ -25,7 +35,7 @@
         margin: 0;
         padding: 1.5rem 1rem 3rem;
         background: var(--ink);
-        background-image: radial-gradient(circle at 50% -20%, #3d2c1c 0%, #241a10 70%);
+        background-image: radial-gradient(circle at 50% -20%, #fffdf6 0%, #efe7d7 70%);
         color: var(--text);
         font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         line-height: 1.6;
@@ -39,11 +49,12 @@
         gap: 1.25rem;
       }
 
-      /* The map is the game, so the game gets the width. 30 tiles at 16px is
-         480 canvas pixels, and integer scaling means the page must offer at
-         least 960 before the map earns 2x — inside a 46rem column it would
-         floor to 1x and stay a postage stamp. Lobby and join keep the narrow
-         column; the run does not. */
+      /* The map is the game, so the game gets the width. Integer scaling means
+         the page has to offer twice the canvas width before the map earns 2x,
+         and inside a 46rem column it would floor to 1x and stay a postage
+         stamp. Lobby and join keep the narrow column; the run does not.
+         Deliberately no pixel figures here — they are MAP_W * TILE, and a
+         second copy of that arithmetic in a comment is one that goes stale. */
       body[data-view='run'] .wrap,
       body[data-view='combat'] .wrap {
         max-width: 78rem;
@@ -564,9 +575,12 @@
              out here, because the header has no room for a sentence. -->
         <p id="level-note" style="margin-bottom:1rem"></p>
 
-        <!-- Sized from MAP_W/MAP_H at boot so the canvas cannot drift from the
-             grid it draws. These are the current values, not the authority. -->
-        <canvas id="map" width="384" height="240" tabindex="0"
+        <!-- No width or height here on purpose. They are set from MAP_W/MAP_H
+             at boot (the only authority), and a second copy of the numbers in
+             the markup is a copy that goes stale: these said 384x240 — a 24x14
+             map — for as long as the grid was 30x17. The section is hidden
+             until render() unhides it, so there is nothing to see meanwhile. -->
+        <canvas id="map" tabindex="0"
                 aria-label="The site. Click anywhere to walk there, or step with the arrow keys; walking onto a herb picks it up."></canvas>
 
         <div class="ready-line">
@@ -988,6 +1002,9 @@
          coordinates so it never shimmers between redraws. */
       const EDGE = {
         grass:  { over: 3, keys: ['g', 'G'] },
+        meadow:  { over: 3, keys: ['g', 'a'] },
+        array:   { over: 1, keys: ['j'] },
+        bramble: { over: 3, keys: ['v', 'G'] },
         tree:   { over: 3, keys: ['g', 'G'] },
         hill:   { over: 2, keys: ['t', 'T'] },
         floor:  { over: 1, keys: ['M'] },
@@ -1256,6 +1273,19 @@
         // Ground first, everything else on top of it. Stamped from the cache:
         // the picture only changes when the terrain or the hour does.
         mctx.drawImage(groundFor(room.terrain, MAP_H, 'grass', room.round || 1), 0, HEADER);
+
+        /* Seed heads drifting over the site.
+         *
+         * The surge has had these since it was written and the build phase
+         * never did, which is most of why one screen reads as a place and the
+         * other as a grid: the ground here is a still image stamped from a
+         * cache, so without something moving over it nothing on screen is
+         * alive between clicks. Same function, same hour, one pixel each, and
+         * off entirely under prefers-reduced-motion like everything else. */
+        if(!stillness()) driftSeeds(mctx, {
+          width: MAP_PX_W, height: MAP_PX_H, round: room.round || 1,
+          now, top: HEADER, count: 30,
+        });
 
         // Items sit low in their tile so the sprite reads as standing on the
         // ground rather than floating in the middle of it. Three kinds, one

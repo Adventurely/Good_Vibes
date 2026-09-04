@@ -33,7 +33,28 @@ import {
   seededRandom, playableClasses,
 } from './content.js';
 
-export const SCENE_W = MAP_W * TILE;      // 480
+/* The scene is a CROP of the site, not the whole of it.
+ *
+ * It already cropped vertically — eleven rows of seventeen — and the width was
+ * the one dimension still wired straight to the map. That made `MAP_W` a title
+ * screen parameter as much as a gameplay one: widening the site to give players
+ * more ground also stretched this canvas, and past 992 pixels it falls off
+ * integer scaling onto the fractional downscale in index.html. The logo has a
+ * floor too — 'GOOD VIBES' at scale 6 is 354 pixels wide.
+ *
+ * So the width is the composition's to choose. The window is centred on the
+ * camp, because the camp is the subject: with the crop pinned at the left edge
+ * instead, a site wider than the window pushes the tent and the fire off toward
+ * the right and the logo no longer sits over anything.
+ */
+export const VISIBLE_COLS = Math.min(MAP_W, 30);
+export const SCENE_W = VISIBLE_COLS * TILE;
+
+/* The left-hand column of that window, clamped so the crop never runs off
+   either end of a site narrower than it expects. */
+export const COL0 = Math.max(0,
+  Math.min(MAP_W - VISIBLE_COLS, CAMP_X - Math.floor(VISIBLE_COLS / 2)));
+const CROP_X = COL0 * TILE;
 
 /* The sky the logo sits on, and the reason it exists.
  *
@@ -65,8 +86,11 @@ export const SCENE_H = SKY_H + VISIBLE_ROWS * TILE;
    left after the filter is what the party actually has to walk to. */
 const SPAWNS = { herbs: 10, salvage: 8, pages: 6 };
 
-/* Only what the frame can show. */
-const inFrame = node => node.y < VISIBLE_ROWS;
+/* Only what the frame can show — both axes now that the width is a crop too.
+   A node outside the window is a walker strolling off screen to gather
+   something nobody can see, which is two people and a gap. */
+const inFrame = node =>
+  node.y < VISIBLE_ROWS && node.x >= COL0 && node.x < COL0 + VISIBLE_COLS;
 
 /* Tiles a second. Slow enough to read as walking rather than sliding, fast
    enough that a visitor sees somebody arrive somewhere before they leave. */
@@ -108,6 +132,9 @@ const tileArt = (kind, x, y) => {
    screens agree about what a shoreline looks like. */
 const FRINGE = {
   grass:   { over: 3, keys: ['g', 'G'] },
+  meadow:  { over: 3, keys: ['g', 'a'] },
+  array:   { over: 1, keys: ['j'] },
+  bramble: { over: 3, keys: ['v', 'G'] },
   tree:    { over: 3, keys: ['g', 'G'] },
   hill:    { over: 2, keys: ['t', 'T'] },
   floor:   { over: 1, keys: ['M'] },
@@ -120,7 +147,7 @@ function paintGround(ctx, terrain){
   for(let y = 0; y < MAP_H; y++){
     for(let x = 0; x < MAP_W; x++){
       const kind = tileAt(terrain, x, y) || 'grass';
-      blit(ctx, tileArt(TERRAIN_VARIANTS[kind] ? kind : 'grass', x, y), x * TILE, y * TILE);
+      blit(ctx, tileArt(TERRAIN_VARIANTS[kind] ? kind : 'grass', x, y), x * TILE - CROP_X, y * TILE);
     }
   }
   // The edges, softened. A hard tile boundary between grass and water is what
@@ -137,7 +164,7 @@ function paintGround(ctx, terrain){
         if(!other || other === kind) continue;
         if((FRINGE[other] || { over: 0 }).over >= mine.over) continue;
         const seed = hash2(x * 4 + dx + 2, y * 4 + dy + 2);
-        const bx = (x + dx) * TILE, by = ny * TILE;
+        const bx = (x + dx) * TILE - CROP_X, by = ny * TILE;
         for(let i = 0; i < TILE; i++){
           const roll = (seed >> (i % 28)) & 7;
           if(roll < 3) continue;
@@ -262,7 +289,7 @@ export function createTitleScene(canvas, { reducedMotion = () => false } = {}){
     // ground, in the colour of the thing that was picked up.
     for(let i = 0; i < 3; i++){
       motes.push({
-        x: node.x * TILE + TILE / 2 + ((hash2(i, node.x + node.y) % 9) - 4),
+        x: node.x * TILE - CROP_X + TILE / 2 + ((hash2(i, node.x + node.y) % 9) - 4),
         y: node.y * TILE + TILE / 2 + SKY_H,
         born: now,
         key: colour || 'w',
@@ -329,7 +356,9 @@ export function createTitleScene(canvas, { reducedMotion = () => false } = {}){
     // happens.
     const stand = (mapY, art, x, extra = {}) => {
       const groundY = mapY + SKY_H;
-      standing.push({ groundY, art, x, top: groundY - art.length, ...extra });
+      // Every sprite in the scene comes through here, so the horizontal crop is
+      // applied once rather than at each of the six call sites.
+      standing.push({ groundY, art, x: x - CROP_X, top: groundY - art.length, ...extra });
     };
 
     const tent = PROP_ART.tent;
@@ -401,12 +430,18 @@ export function createTitleScene(canvas, { reducedMotion = () => false } = {}){
     banner();
   }
 
-  /* Warm light off the fire, so the camp is the brightest thing on the site. */
+  /* Warm light off the fire.
+   *
+   * At dusk this was the focal mechanism — the camp was simply the brightest
+   * thing on the site. In daylight it cannot be, and piling on more alpha to
+   * try only makes an orange smear on green. So it drops to a hint of warmth
+   * on the ground around the fire, and the job of pulling the eye to the middle
+   * moves to the vignette below. */
   function firelight(cx, cy){
     const flicker = 0.9 + Math.sin(now / 90) * 0.1;
     for(let r = 46; r > 0; r -= 8){
-      ctx.globalAlpha = 0.05 * flicker;
-      ctx.fillStyle = '#ffb35c';
+      ctx.globalAlpha = 0.032 * flicker;
+      ctx.fillStyle = '#ffa23c';
       ctx.beginPath();
       ctx.arc(cx, cy - 4, r, 0, Math.PI * 2);
       ctx.fill();
@@ -427,8 +462,11 @@ export function createTitleScene(canvas, { reducedMotion = () => false } = {}){
     const edge = ctx.createRadialGradient(
       SCENE_W / 2, SCENE_H / 2, SCENE_H * 0.3,
       SCENE_W / 2, SCENE_H / 2, SCENE_H * 0.85);
-    edge.addColorStop(0, 'rgba(24,12,4,0)');
-    edge.addColorStop(1, 'rgba(24,12,4,0.55)');
+    // Cool and light-handed. The old brown at 0.55 was reading as dirt in the
+    // corners the moment the sky stopped being brown; a cool shade is what
+    // distance looks like on a bright day, and it still pulls the eye inward.
+    edge.addColorStop(0, 'rgba(58,96,132,0)');
+    edge.addColorStop(1, 'rgba(58,96,132,0.32)');
     ctx.fillStyle = edge;
     ctx.fillRect(0, 0, SCENE_W, SCENE_H);
   }
@@ -448,20 +486,26 @@ export function createTitleScene(canvas, { reducedMotion = () => false } = {}){
     [15, 7, 13, 5],
   ];
 
-  /* Dusk over the ruin: five bands, dithered between each pair, warmest at the
-     horizon. The sun sits low and just off centre so the logo does not land in
-     a halo, and a treeline runs along the seam where the ground begins. */
-  const DUSK = ['#2b1b3f', '#5a2f4a', '#93463f', '#c76a34', '#e79a3c'];
+  /* Daylight over the ruin: five bands, dithered between each pair, deepest at
+     the top and palest at the horizon — which is the way round a real sky goes,
+     and the opposite of the dusk this used to be. The sun sits low and centred
+     so the logo does not land in a halo, and a treeline runs along the seam
+     where the ground begins.
+
+     The band order matters more than the hues. A sky that is pale at the top
+     and dark at the horizon reads as weather rather than as height, and the
+     ground — which is bright green — then has nothing to sit against. */
+  const DAY = ['#3f86c8', '#69a8dd', '#9ccbec', '#c9e6f5', '#e9f3e6'];
 
   function sky(){
-    const bands = DUSK.length - 1;
+    const bands = DAY.length - 1;
     for(let y = 0; y < SKY_H; y++){
       const t = (y / (SKY_H - 1)) * bands;
       const i = Math.min(bands - 1, Math.floor(t));
       const mix = t - i;                       // 0 at this band, 1 at the next
       for(let x = 0; x < SCENE_W; x++){
         const over = BAYER[y & 3][x & 3] / 16 < mix;
-        ctx.fillStyle = over ? DUSK[i + 1] : DUSK[i];
+        ctx.fillStyle = over ? DAY[i + 1] : DAY[i];
         ctx.fillRect(x, y, 1, 1);
       }
     }
@@ -477,7 +521,9 @@ export function createTitleScene(canvas, { reducedMotion = () => false } = {}){
         const d = Math.hypot(x, y) / sunR;
         if(d > 1) continue;
         if(d > 0.6 && BAYER[(y + 64) & 3][(x + 64) & 3] / 16 < (d - 0.6) / 0.4) continue;
-        ctx.fillStyle = d < 0.5 ? '#ffd98a' : '#ffb45a';
+        // Hot pale core rather than a sunset disc: at midday the sun is glare,
+        // not a colour, and an orange ball on a blue sky reads as evening.
+        ctx.fillStyle = d < 0.5 ? '#fffdf2' : '#ffeeb4';
         ctx.fillRect((sunX + x) | 0, py | 0, 1, 1);
       }
     }
@@ -492,7 +538,9 @@ export function createTitleScene(canvas, { reducedMotion = () => false } = {}){
       const y = 8 + (seed % (SKY_H - 34));
       const x = ((seed % SCENE_W) - (now / 1000) * speed) % (SCENE_W + w + 40);
       const at = x < -w ? x + SCENE_W + w + 40 : x;
-      ctx.fillStyle = y > SKY_H * 0.55 ? '#f0a85e' : '#7d3f52';
+      // Lit from above now, not from below: the low cloud takes the warm
+      // white nearest the haze and the high cloud stays cooler.
+      ctx.fillStyle = y > SKY_H * 0.55 ? '#fdfdf4' : '#c2dcef';
       ctx.fillRect(at | 0, y, w, 2);
       ctx.fillRect((at + 6) | 0, y - 2, Math.max(4, w - 16), 2);
     }
@@ -502,10 +550,13 @@ export function createTitleScene(canvas, { reducedMotion = () => false } = {}){
     // the first row of tiles rather than on top of them.
     for(let x = 0; x < SCENE_W; x++){
       const h = 4 + (hash2(x >> 2, 7) % 7) + (hash2(x >> 3, 11) % 4);
-      ctx.fillStyle = '#1d3a1f';
+      // Lifted out of near-black. Against a dusk sky the treeline was a
+      // silhouette; against a bright one that reads as a hole, so it takes a
+      // real mid-green and a lit top edge.
+      ctx.fillStyle = '#2f5b2c';
       ctx.fillRect(x, SKY_H - h, 1, h);
       if(h > 8){
-        ctx.fillStyle = '#2a5127';
+        ctx.fillStyle = '#54893c';
         ctx.fillRect(x, SKY_H - h, 1, 2);
       }
     }

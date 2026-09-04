@@ -849,7 +849,15 @@ export function placeRefusal(id, { terrain, buildings, nodes, x, y }){
   if(!rule) return null;
 
   const around = NEIGHBOURS.map(([dx, dy]) => ({ x: x + dx, y: y + dy }));
-  const terrainAt = (t) => around.some(c => tileAt(terrain, c.x, c.y) === t);
+  /* A rule naming 'water' means wetness, not that one literal kind.
+     `shoreline()` relabels exactly the water tiles that touch land — which is
+     every tile a building could ever stand beside — so a strict comparison
+     asked for the one thing the generator had just renamed. It cost the Rain
+     Cistern and the Pulp Press a legal tile anywhere on 90.4% of 500 seeds,
+     and with them the Reed Bed and the Mycelial Filter that hang off the
+     cistern: the whole mend line and the pages income, silently unbuildable. */
+  const sameKind = (kind, t) => (t === 'water' ? isWater(kind) : kind === t);
+  const terrainAt = (t) => around.some(c => sameKind(tileAt(terrain, c.x, c.y), t));
   const buildingAt = (bid) =>
     (buildings || []).some(b => b.id === bid && around.some(c => c.x === b.x && c.y === b.y));
 
@@ -866,10 +874,11 @@ export function placeRefusal(id, { terrain, buildings, nodes, x, y }){
   if(rule.near && !terrainAt(rule.near)){
     return `Has to touch ${TERRAIN[rule.near].name.toLowerCase()}.`;
   }
-  if(rule.on && !rule.on.includes(tileAt(terrain, x, y))){
+  if(rule.on && !rule.on.some(t => sameKind(tileAt(terrain, x, y), t))){
     return `Only on ${rule.on.map(t => TERRAIN[t].name.toLowerCase()).join(' or ')}.`;
   }
-  if(rule.onOrNear && tileAt(terrain, x, y) !== rule.onOrNear && !terrainAt(rule.onOrNear)){
+  if(rule.onOrNear && !sameKind(tileAt(terrain, x, y), rule.onOrNear)
+     && !terrainAt(rule.onOrNear)){
     return `Has to be on or against ${TERRAIN[rule.onOrNear].name.toLowerCase()}.`;
   }
   if(rule.clearOf){
@@ -2963,7 +2972,7 @@ export function materialFor(roll){
 /* Sized for a walk, not just a base. The features — water, hills, trees,
    crevices — need room to read as landscape rather than as noise, and at
    24x14 three blobs already touched. */
-export const MAP_W = 30;
+export const MAP_W = 38;
 export const MAP_H = 17;
 
 /* The smallest connected buildable area a generated site is allowed to have.
@@ -2992,6 +3001,18 @@ export const TERRAIN = {
   shoreSW: { name: 'Shallows',    walk: false, build: false, grows: false },
   shoreW:  { name: 'Shallows',    walk: false, build: false, grows: false },
   shoreNW: { name: 'Shallows',    walk: false, build: false, grows: false },
+  /* Three biomes added because a generated site was 81% one green and the
+     ground had no shape to it. Each one is here for a different job:
+     `meadow` is more of the same ground with colour in it, `array` is the
+     ruin the game is named after showing through, and `bramble` is the only
+     new kind that stops you — terrain you have to walk around is what makes
+     a site have a route rather than an open field.
+
+     They are not walkable-and-buildable by default: a panel field is a laid
+     surface you can cross but not raise anything on, and a thicket is neither. */
+  meadow:  { name: 'Wildflower',  walk: true,  build: true,  grows: true },
+  array:   { name: 'Panel array', walk: true,  build: false, grows: false },
+  bramble: { name: 'Bramble',     walk: false, build: false, grows: false },
   /* Landscape, not just obstacle. Hills can be walked but not built on — the
      ground is not flat enough; trees grow herbs at their feet but block the
      tile; a crevice blocks everything, including the eye line. */
@@ -3114,15 +3135,27 @@ export function generateTerrain(random){
   // Sized to leave the map mostly open. Obstacles are scenery here — they make
   // the ground have a shape — and a site you cannot fit a base on is a site
   // nobody wants to have rolled. largestBuildableArea is what holds that line.
-  blob(cells, random, 'water', 30);
-  blob(cells, random, 'water', 18);
-  blob(cells, random, 'hill', 24);
-  blob(cells, random, 'hill', 14);
-  blob(cells, random, 'crevice', 10);
-  blob(cells, random, 'rubble', 20);
-  blob(cells, random, 'rubble', 12);
-  blob(cells, random, 'floor', 24);
-  blob(cells, random, 'floor', 14);
+  /* Sized as a fraction of the map rather than in absolute steps. The site grew
+     from 30x17 to 38x17, and a fixed step count would have made the wider ruin
+     an emptier one — the same features spread over 27% more ground.
+     
+     The budgets themselves were then swept rather than chosen. At the original
+     sizes a generated site was 81.4% grass, which is what "the map is boring"
+     measures as; the whole point of the new kinds is lost if they are specks.
+     Multiplying every budget by 2.5 puts grass at 48.5% with the smallest
+     connected buildable area over 200 seeds still at 196 — more than three
+     times BASE_ROOM. Past that it keeps improving the picture and starts
+     costing the promise: at x3 grass is 43.2% but the worst site drops to 123. */
+  const AREA = (n) => Math.round(n * (MAP_W * MAP_H) / 510);
+  blob(cells, random, 'water', AREA(95));
+  blob(cells, random, 'water', AREA(60));
+  blob(cells, random, 'hill', AREA(75));
+  blob(cells, random, 'hill', AREA(45));
+  blob(cells, random, 'crevice', AREA(35));
+  blob(cells, random, 'rubble', AREA(65));
+  blob(cells, random, 'rubble', AREA(40));
+  blob(cells, random, 'floor', AREA(70));
+  blob(cells, random, 'floor', AREA(40));
 
   // Two smoothing passes before the trees go in. A raw drunkard's walk leaves
   // single-tile spurs and pinholes, and those hard right angles are what read
@@ -3132,6 +3165,18 @@ export function generateTerrain(random){
   smooth(cells);
   smooth(cells);
 
+  // The three new biomes go in AFTER the smoothing, on purpose. A blob laid
+  // before it erodes to roughly a third of its size — which is why `crevice`
+  // averaged under two tiles and was missing from half of all sites — and
+  // these are meant to be places, not specks. The cost is that their edges
+  // stay blobbier than the older kinds'; the fringe pass in the renderer is
+  // what softens that, and it reads as growth rather than as geology.
+  blob(cells, random, 'meadow', AREA(75));
+  blob(cells, random, 'meadow', AREA(50));
+  blob(cells, random, 'array', AREA(55));
+  blob(cells, random, 'bramble', AREA(40));
+  blob(cells, random, 'bramble', AREA(28));
+
   // Trees are dotted, not blobbed — a copse is single trunks with light
   // between them, and a solid mass of them would read as one green rock.
   //
@@ -3140,7 +3185,7 @@ export function generateTerrain(random){
   // whole camp — which happened on about half of all sites. The margin is what
   // a canopy can reach from outside it. Tested on the same draw, so the number
   // of calls to random() is unchanged and the replay guarantee holds.
-  for(let i = 0; i < 14; i++){
+  for(let i = 0; i < AREA(70); i++){
     const index = Math.floor(random() * cells.length);
     const x = index % MAP_W, y = Math.floor(index / MAP_W);
     if(cells[index] === 'grass' && !inCamp(x, y, 2)) cells[index] = 'tree';
@@ -3236,6 +3281,14 @@ function smooth(cells){
  */
 const AROUND = [[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]];
 
+/* The eight directions a shore can name, as offsets. Iteration order is the
+   tie-break when two banks pull equally, so it is fixed here rather than built
+   where it is used. */
+const SHORE_OFF = {
+  N: [0, -1], NE: [1, -1], E: [1, 0], SE: [1, 1],
+  S: [0, 1], SW: [-1, 1], W: [-1, 0], NW: [-1, -1],
+};
+
 export function shoreline(cells, height = MAP_H){
   const before = cells.slice();
   const at = (x, y) => (x >= 0 && y >= 0 && x < MAP_W && y < height ? before[y * MAP_W + x] : 'water');
@@ -3261,6 +3314,25 @@ export function shoreline(cells, height = MAP_H){
       let dir = '';
       if(ay * 2 > ax) dir += sy < 0 ? 'N' : 'S';
       if(ax * 2 > ay) dir += sx > 0 ? 'E' : 'W';
+
+      /* An average can point at the one thing it is describing the absence of.
+         Land wraps more than halfway round a tile wherever the water runs as a
+         diagonal channel — banks on five sides, water on three — and the mean
+         of those five then snaps to the gap between two of them, which is
+         water. A shore drawn pointing into the pond is the exact fault this
+         function exists to prevent, so when the average lands on water, take
+         the single strongest bank instead of the average of them all.
+         Deterministic: fixed iteration order, first maximum wins, and not one
+         call to random(). */
+      if(dir && isWater(at(x + SHORE_OFF[dir][0], y + SHORE_OFF[dir][1]))){
+        let best = '', bestPull = 0;
+        for(const [d, [dx, dy]] of Object.entries(SHORE_OFF)){
+          if(isWater(at(x + dx, y + dy))) continue;
+          const pull = dx && dy ? 1 : 2;
+          if(pull > bestPull){ bestPull = pull; best = d; }
+        }
+        if(best) dir = best;
+      }
       cells[y * MAP_W + x] = 'shore' + dir;
     }
   }

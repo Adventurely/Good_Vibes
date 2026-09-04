@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Good Vibes — a co-op solarpunk roguelike</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%231a1310'/%3E%3Ccircle cx='8' cy='8' r='4' fill='%23ffd23f'/%3E%3Cpath d='M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.5 1.5M11.5 11.5L13 13M13 3l-1.5 1.5M4.5 11.5L3 13' stroke='%23f59a2e' stroke-width='1.4'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23f4efe4'/%3E%3Ccircle cx='8' cy='8' r='4' fill='%23ffd23f'/%3E%3Cpath d='M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.5 1.5M11.5 11.5L13 13M13 3l-1.5 1.5M4.5 11.5L3 13' stroke='%23f59a2e' stroke-width='1.4'/%3E%3C/svg%3E">
     <meta
       name="description"
       content="Walk a ruin, gather what grew in it, and hold the site when the blight surges. A co-op solarpunk deckbuilding roguelike for up to five players, in the browser."
@@ -13,15 +13,25 @@
       /* The page is the frame; the canvas is the game. Everything here is
          quiet on purpose — a landing page that competes with the art it is
          framing is a landing page nobody looks past. */
+      /* The theme is LIGHT, and deliberately not a inverted copy of the dark one.
+         Three of the old tokens are unusable on a pale ground and had to be
+         re-picked rather than flipped: --accent #6cc24a measured 1.94:1 against
+         this background, --sun #f2b134 1.65:1 and --muted #a58a68 2.85:1, all
+         well under the 4.5:1 that body text needs. The replacements below are
+         measured: text 13.8:1, muted 5.6:1, accent 5.0:1, sun 5.0:1, bad 5.2:1.
+
+         `color-scheme: light` is fixed rather than `light dark`. Following the
+         system preference would hand a dark page straight back to anyone whose
+         OS is set that way, which is the thing this change exists to stop. */
       :root {
-        color-scheme: dark;
-        --ink: #140c06;
-        --panel: #1d130a;
-        --line: #4a3320;
-        --text: #f3e4c8;
-        --muted: #a58a68;
-        --accent: #6cc24a;
-        --sun: #f2b134;
+        color-scheme: light;
+        --ink: #f4efe4;
+        --panel: #fdfaf3;
+        --line: #cfc2a8;
+        --text: #2a2118;
+        --muted: #6b5c47;
+        --accent: #2b7530;
+        --sun: #8f5c05;
       }
 
       * { box-sizing: border-box; }
@@ -31,7 +41,7 @@
         padding: 1.5rem 1rem 3rem;
         background: var(--ink);
         /* Warm from the middle out, like the fire in the scene. */
-        background-image: radial-gradient(circle at 50% 18%, #33200f 0%, #140c06 62%);
+        background-image: radial-gradient(circle at 50% 18%, #fffdf6 0%, #efe7d7 62%);
         color: var(--text);
         font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         line-height: 1.6;
@@ -49,7 +59,7 @@
         border: 2px solid var(--line);
         border-radius: 6px;
         background: #000;
-        box-shadow: 0 0 0 4px #140c06, 0 22px 60px rgb(0 0 0 / 0.65);
+        box-shadow: 0 0 0 4px #e6dcc7, 0 18px 46px rgb(74 51 32 / 0.22);
         overflow: hidden;
         /* The whole screen breathes in on load, once. */
         animation: rise 0.7s ease-out both;
@@ -101,7 +111,7 @@
         padding: 0.85rem 2.4rem;
         border: 2px solid var(--accent);
         border-radius: 5px;
-        background: #23331a;
+        background: #eaf3e2;
         color: var(--text);
         text-align: center;
         letter-spacing: 0.1em;
@@ -109,7 +119,7 @@
         font-size: 0.95rem;
         transition: transform 0.12s ease, background 0.12s ease;
       }
-      .play:hover, .play:focus-visible { background: #2e4322; transform: translateY(-2px); }
+      .play:hover, .play:focus-visible { background: #dcecd0; transform: translateY(-2px); }
       .play small {
         display: block;
         margin-top: 0.2rem;
@@ -167,7 +177,7 @@
         border: 1px solid var(--line);
         border-radius: 5px;
         padding: 0.7rem 0.8rem;
-        background: rgb(29 19 10 / 0.6);
+        background: rgb(255 253 246 / 0.75);
       }
       .role canvas { image-rendering: pixelated; flex: none; }
       .role b { display: block; color: var(--text); font-weight: 400; }
@@ -219,18 +229,6 @@
         letter-spacing: 0.12em;
         text-transform: uppercase;
       }
-      .swatches {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
-        gap: 0.4rem;
-        padding: 0;
-        margin: 1rem 0 0;
-        list-style: none;
-      }
-      .swatches li { display: flex; align-items: center; gap: 0.5rem; font-size: 0.68rem; }
-      .chip { width: 1.5rem; height: 1.5rem; border-radius: 3px; border: 1px solid var(--line); flex: none; }
-      .chip-name { display: block; color: var(--text); }
-      .chip-hex { display: block; color: var(--muted); font-size: 0.6rem; }
 
       footer {
         margin-top: 3rem;
@@ -313,20 +311,6 @@
           down. The fight levels itself to how many of you turned up.
         </li>
       </ul>
-
-      <details>
-        <summary>For builders — the palette</summary>
-        <p style="font-size:0.78rem;color:var(--muted);margin-top:0.9rem">
-          Everything on this page and in the game is drawn from data: sprites
-          are arrays of strings, one character per pixel, each character a key
-          into the palette below. Nothing is an image file. The tables live in
-          <code>public/art.js</code>, the rules in <code>public/content.js</code>,
-          and the same modules are imported by the browser and by the
-          authoritative room on the server, so the two ends cannot disagree
-          about what a potion does.
-        </p>
-        <ul class="swatches" id="swatches"></ul>
-      </details>
 
       <footer>Good Vibes &middot; good-vibe-games.com</footer>
     </div>
@@ -486,32 +470,6 @@
         roles.append(li);
       }
 
-      /* ---- the palette, for anyone who opens the drawer -------------------- */
-
-      const swatches = document.getElementById('swatches');
-      const NAMES = {
-        k: 'Ink', w: 'Bone', s: 'Skin', S: 'Shade', y: 'Sun', Y: 'Gold',
-        o: 'Ember', r: 'Rust', e: 'Blood', g: 'Leaf', G: 'Canopy', l: 'Shoot',
-        c: 'Dew', b: 'Deep', v: 'Bloom', p: 'Petal', P: 'Plum', m: 'Steel',
-        M: 'Panel', x: 'Slag', t: 'Loam', T: 'Spoil', n: 'Bark', N: 'Root',
-        d: 'Dusk', D: 'Night', f: 'Flame', F: 'Coal',
-      };
-      for(const [key, value] of Object.entries(PALETTE)){
-        const li = document.createElement('li');
-        const chip = document.createElement('span');
-        chip.className = 'chip';
-        chip.style.background = value;
-        const label = document.createElement('span');
-        const nameEl = document.createElement('span');
-        nameEl.className = 'chip-name';
-        nameEl.textContent = NAMES[key] || key;
-        const hexEl = document.createElement('span');
-        hexEl.className = 'chip-hex';
-        hexEl.textContent = `${key} · ${value}`;
-        label.append(nameEl, hexEl);
-        li.append(chip, label);
-        swatches.append(li);
-      }
     </script>
   </body>
 </html>

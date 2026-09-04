@@ -1,16 +1,25 @@
 /* Good Vibes — sprite art.
  *
- * 24 wide and 32 tall, rows of palette keys, '.' transparent. No image files:
+ * 32 wide and 40 tall, rows of palette keys, '.' transparent. No image files:
  * the art is text, so a character can be edited in place and a diff of a
  * change to someone's face is readable.
+ *
+ * (This said 24x32 for a long time after the grid had grown, and the column
+ * numbers in the skeleton below said 24 too. Anyone authoring from those wrote
+ * a sprite that failed the suite, or worse, one that passed while sitting two
+ * pixels off centre. If the grid changes again, this line changes with it.)
  *
  * The conventions are Save Solarium's, deliberately — the two games sit on the
  * same shelf and should look like the same world. In short:
  *
  *   Taller than wide. At 24x24 a full body leaves a head nine pixels across,
- *   which holds two eyes and nothing else. Eight more rows buy a twelve-pixel
- *   head with room for brows, a nose and a jaw, which is the difference
- *   between a face and two dots. Stardew's proportion, for Stardew's reason.
+ *   which holds two eyes and nothing else. The extra rows buy a head with room
+ *   for brows, a nose and a jaw, which is the difference between a face and
+ *   two dots. Stardew's proportion, for Stardew's reason.
+ *
+ *   And spend them on the BODY, not the head. The cast was 2.7 heads tall for
+ *   a long while — a head of fifteen rows in a figure of forty — which reads
+ *   as a bobblehead however well the face is drawn. It is 3.5 now.
  *
  *   Warm dark-brown outlines (#) rather than black, two-tone shading (every
  *   hue has a light key and a shadow key), saturated but soft colour. The
@@ -83,258 +92,276 @@ const sprite = (rows, split, eyes) => {
 
 /* ============================================================== heroes === */
 
-/* One skeleton under the whole cast, so they read as the same species and a
- * change to one can be reasoned about for all:
+/* One skeleton under the whole cast, so they read as the same species — and
+ * only the skeleton. Three of these classes were once BYTE-IDENTICAL in
+ * outline and told apart purely by colour, which is no use at all on a map
+ * where a hero is sixteen pixels tall. What is shared is the build; what is
+ * not is the shape.
  *
- *   rows 1-12   head, 12 wide at columns 6-17, with hair or hood down the
- *               sides at 7 and 16 framing an 8-wide face
- *   row  13     neck
- *   rows 14-20  torso at columns 7-16, arms at 4-5 and 18-19 held off it by
- *               their own outline column, hands at row 20
- *   rows 21-23  belt and hips
- *   rows 24-30  legs and boots
+ * Shared:
+ *   rows 1-11   head, about 11 rows, framed by hair or a hood
+ *   row  12-13  neck
+ *   rows 14-25  torso and arms
+ *   rows 26-30  belt and hips
+ *   rows 31-39  legs and boots, sole on row 39
  *
- * Brows at row 4, a two-pixel eye at rows 6-7 with the pupil out and a
- * highlight in, a nose at row 8, cheeks at 9, mouth at 10.
+ *   The face is lit from the upper left and modelled with the warm ladder
+ *   w > s > W > i > S > t > I > n > T > N rather than with two tones. Brow,
+ *   a two-pixel eye with the pupil out and a highlight in, a nostril shadow,
+ *   a mouth, a lit chin. Vary brow angle, eye spacing, jaw width and
+ *   complexion between classes — never the skull.
+ *
+ * Not shared, and deliberately: the silhouette. The Engineer is widest at the
+ * deltoids with goggles pushed up so the head is wider above the brow than
+ * below it; the Wizard is a triangle with no leg gap; the Hauler's pack breaks
+ * the outline above the shoulders; the Grafter's hat brim overhangs and its
+ * legs are staggered; the Alchemist is the leanest, with a crossed forearm.
+ *
+ * Two mechanics constrain all of it. `lift` draws every row above `split` one
+ * pixel higher and nothing refills the line that vacates, so the figure tears
+ * a 1px gap as wide as row (split - 1) is painted — put the split at a waist,
+ * and separate arms from the torso with a TRANSPARENT column rather than a '#'
+ * one, which is ink and tears with everything else. `flip` mirrors by reading
+ * the columns backwards with no exception list, so anything asymmetric swaps
+ * sides when walking left; no class read may depend on which side it is on.
  */
 
 export const HERO_ART = {
-  /* The Alchemist. Violet headscarf tied under the chin, cream shirt under a
-     leaf-green work apron, and a bandolier with two bottles on it — one cyan,
-     one caught sunlight — so the silhouette says "carries things" from across
-     the screen. */
+  /* The Alchemist. The leanest of the five and slightly stooped, which is what
+     someone who spends the day bent over a bench looks like. The read from
+     across the map is the bandolier running shoulder to hip with a cyan and a
+     gold bottle on it, the apron flaring below the belt, and the crossed
+     forearm holding a flask up beside the chin — that cocked elbow is the
+     asymmetry, and it survives being mirrored when walking left. */
   alchemist: sprite([
-    '................................',
-    '........################........',
-    '........#pppppppppppppp#........',
-    '........#PPPPPPPPPPPPPP#........',
-    '........#pPssssssssssPp#........',
-    '........#pPss==ss==ssPp#........',
-    '........#pPss#wssw#ssPp#........',
-    '........#pPssssssssssPp#........',
-    '........#pPssssSSssssPp#........',
-    '........#pPsSssssssSsPp#........',
-    '........#pPsssS==SsssPp#........',
-    '........#pPssssssssssPp#........',
-    '........#pPsSSssssSSsPp#........',
-    '........#ppsssssssssspp#........',
-    '........#PPPPPPPPPPPPPP#........',
-    '.........##############.........',
-    '..............#ss#..............',
-    '.....#gG#gwwwwwwwwwwwwg#gG#.....',
-    '.....#gG#gwcwwwwwwwwYwg#gG#.....',
-    '.....#gG#gggggggggggggg#gG#.....',
-    '.....#gG#gGGllllllllGGg#gG#.....',
-    '.....#gG#gGGGGGGGGGGGGg#gG#.....',
-    '.....#gG#gGGGGGGGGGGGGg#gG#.....',
-    '.....#gG#gGGGGGGGGGGGGg#gG#.....',
-    '.....#ss#gGGGGGGGGGGGGg#ss#.....',
-    '.....####gttttttttttttG####.....',
-    '........#gTTTTTTTTTTTTG#........',
-    '........#gGGGGGGGGGGGGg#........',
-    '........#TTTT#....#TTTT#........',
-    '........#TTTT#....#TTTT#........',
-    '........#TTTT#....#TTTT#........',
-    '........#TTTT#....#TTTT#........',
-    '........#TTTT#....#TTTT#........',
-    '........#NNNN#....#NNNN#........',
-    '........#NNNN#....#NNNN#........',
-    '........#NNNN#....#NNNN#........',
-    '........#NNNN#....#NNNN#........',
-    '........#NNNN#....#NNNN#........',
-    '........######....######........',
-    '................................',
-  ], 16, [[13, 6], [18, 6]]),
+    '..........##########............',
+    '.........##pppPPPPP##...........',
+    '.........#ppppppPPPP#...........',
+    '.........#psswssiStP#...........',
+    '.........#psnnssnnSP#...........',
+    '.........#pi#WssW#tP#...........',
+    '.........#psiSssSStP#...........',
+    '.........#pssssSiitP#...........',
+    '.........#PissnnSitP#...........',
+    '.........##psssSStP##...........',
+    '.........##ppP=PPPp#............',
+    '.........#=N#iStT###............',
+    '........##mM#iStT####...........',
+    '........#mwpPissiGWi##..........',
+    '.....####mppPissiGWnN####.......',
+    '.....#WiWmpPPHHHGGnNtWiW#.......',
+    '.....#wW#MpPsswGGnNvi#Ww#.......',
+    '.....#Wi#=PPsswSnNvvi#iW#.......',
+    '.....#sS#n=n#sswSGvvi#St#.......',
+    '.....#sS#mwcy##ssSSvi#St#.......',
+    '.....#st#wcuYYO##ssSS#St#.......',
+    '.....#sS#ccuYOOGG###sSSt#.......',
+    '.....#ss#cuUYORGGGvv=SSt#.......',
+    '.....#sS#=UUOR=GGGvv#=S##.......',
+    '.....#####nN=R=GGGvvi####.......',
+    '........#=NNNNoYNNNN=#..........',
+    '.......##ghhHHGGGvvv=#..........',
+    '.......#gghhHHGGGvvv=#..........',
+    '......##gghHHGGvGGvvv##.........',
+    '.....##gghHHGGvvGGGvvv##........',
+    '.....#ggghHHGvvGGGvvvv=#........',
+    '.....#GgHHGGvvGGGGvvvv=#........',
+    '.....#####tITT###tITT###........',
+    '.........#tITT#.#tITT#..........',
+    '.........#t=TT#.#t=TT#..........',
+    '........##tITT#.#tITT##.........',
+    '........#nnNN=#.#nNN==#.........',
+    '........#nN===#.#N====#.........',
+    '........#######.#######.........',
+  ], 26, [[12, 5], [17, 5]]),
 
-  /* The Engineer. Goggles pushed up onto the forehead rather than worn, which
-     is what someone who has been working looks like; rust-orange jacket over a
-     steel collar, and a tool belt heavy enough to change how they stand. Warm
-     metal against the Alchemist's green, so the two read apart at one pixel a
-     tile on the map. */
+  /* The Engineer. The broadest, 28 pixels across the deltoids, planted square.
+     Goggles pushed up onto the forehead rather than worn — the head is genuinely
+     wider above the brow than below it, so the outline says it before the colour
+     does — a tool belt at the split, and a ring wrench hanging low and clear of
+     the leg. */
   engineer: sprite([
-    '................................',
     '........################........',
-    '........#nnnnnnnnnnnnnn#........',
-    '........#NNNNNNNNNNNNNN#........',
-    '........#nNMccMMMMccMNn#........',
-    '........#nNss==ss==ssNn#........',
-    '........#nNss#wssw#ssNn#........',
-    '........#nNssssssssssNn#........',
-    '........#nNssssSSssssNn#........',
-    '........#nNsSssssssSsNn#........',
-    '........#nNsssS==SsssNn#........',
-    '........#nNssssssssssNn#........',
-    '........#nNsSSssssSSsNn#........',
-    '........#nnssssssssssnn#........',
-    '........#NNNNNNNNNNNNNN#........',
-    '.........##############.........',
-    '..............#ss#..............',
-    '.....#rR#rmmmmmmmmmmmmr#rR#.....',
-    '.....#rR#rRRRRRRRRRRRRr#rR#.....',
-    '.....#rR#rRRRRRRRRRRRRr#rR#.....',
-    '.....#rR#rRRoooooooRRRr#rR#.....',
-    '.....#rR#rRRRRRRRRRRRRr#rR#.....',
-    '.....#rR#rRRRRRRRRRRRRr#rR#.....',
-    '.....#rR#rRRRRRRRRRRRRr#rR#.....',
-    '.....#ss#rRRRRRRRRRRRRr#ss#.....',
-    '.....####rMMMMMMMMMMMMR####.....',
-    '........#rxxxxxxxxxxxxR#........',
-    '........#rTTTTTTTTTTTTr#........',
-    '........#MMMM#....#MMMM#........',
-    '........#MMMM#....#MMMM#........',
-    '........#MMMM#....#MMMM#........',
-    '........#MMMM#....#MMMM#........',
-    '........#MMMM#....#MMMM#........',
-    '........#xxxx#....#xxxx#........',
-    '........#xxxx#....#xxxx#........',
-    '........#xxxx#....#xxxx#........',
-    '........#xxxx#....#xxxx#........',
-    '........#xxxx#....#xxxx#........',
-    '........######....######........',
-    '................................',
-  ], 16, [[13, 6], [18, 6]]),
+    '........#xMmmMMjjMMMMMx#........',
+    '........#xJmJJJjjJJmJJx#........',
+    '.........#nissssWWiitN#.........',
+    '.........#ntIItiitIITN#.........',
+    '.........#nS#wissiw#tN#.........',
+    '.........#ntSisssiiStN#.........',
+    '.........#ntSiisiSiStN#.........',
+    '.........#ntiStsitSStN#.........',
+    '.........#ntSitIItiStN#.........',
+    '..........#tSissWiStI#..........',
+    '.........####ItSStI####.........',
+    '........#OR##ItSStI##RO#........',
+    '......##OrroMjMmmMjMrrrO##......',
+    '....##ooroorRRRRRRRrOOORrO##....',
+    '..##ooooRooorRRRRROrrOOROrOR##..',
+    '..#Oroor#roMMrrRRrrOOOR#OrOOR#..',
+    '...#OOrr#rooorrRRrrOORR#OORR#...',
+    '....#Orr##roorrRRrrOOR##OOR#....',
+    '.....#Mj#.#roorRRrrOR#.#jM#.....',
+    '.....#St#.#==N====N==#.#tS#.....',
+    '....#Ss#.#=NYyYN==jMj=#.#sS#....',
+    '....#Ss#.#N=YYY=N=jj=N#.#sS#....',
+    '....#sS#.#==NYN===xx==#.#Ss#....',
+    '..##sS#..#jjxxxxxJJJJJ#.#Sss#...',
+    '..#Ssn#..#jxxxx##JJJJJ#.#nsS#...',
+    '..#nSn#..#jxxJ#..#JxxJ#.#####...',
+    '..#mM#..#jjxxJ#..#Jxxjj#........',
+    '..#mM#..#jjxxJ#..#Jxxjj#........',
+    '..#mM#..#jxxJJ#..#JJxxj#........',
+    '.#MmmM#.#jxxJ#....#JxxJ#........',
+    '.#M##M#.#jxxJ#....#JxxJ#........',
+    '.#MmmM#.#jxxJ#....#JxxJ#........',
+    '.######.#jxxJ#....#JxxJ#........',
+    '........#TT=N#....#N=TT#........',
+    '......##ttTNN#....#NNTtt##......',
+    '......#TtTNNN#....#NNNTtT#......',
+    '......#NNNN==#....#==NNNN#......',
+    '......########....########......',
+  ], 20, [[12, 5], [19, 5]]),
 
-  /* The Wizard. Deep violet robe with no armour anywhere on it — the
-     silhouette is the warning label. A page tucked into the belt glows faintly
-     gold, and the hood is worn up, because the rain and the pages disagree.
-     Violet against the Alchemist's green and the Engineer's rust, so all three
-     read apart at map scale. */
+  /* The Wizard. The only triangle in a cast of rectangles: 14 wide at the cowl,
+     cinched to 10 at the sash, opening to 20 at the hem with no leg gap at all.
+     It was the flattest sprite in the game at nine palette keys total; the robe
+     folds are shaded now. */
   wizard: sprite([
-    '................................',
-    '........################........',
-    '........#PPPPPPPPPPPPPP#........',
-    '........#pppppppppppppp#........',
-    '........#PpsssssssssspP#........',
-    '........#Ppss==ss==sspP#........',
-    '........#Ppss#wssw#sspP#........',
-    '........#PpsssssssssspP#........',
-    '........#PpssssSSsssspP#........',
-    '........#PpsSssssssSspP#........',
-    '........#PpsssS==SssspP#........',
-    '........#PpsssssssssspP#........',
-    '........#PpsSSssssSSspP#........',
-    '........#PPssssssssssPP#........',
-    '........#pppppppppppppp#........',
-    '.........##############.........',
-    '..............#ss#..............',
-    '.....#pP#pwwwwwwwwwwwwp#pP#.....',
-    '.....#pP#pwPPPPPPPPPPwp#pP#.....',
-    '.....#pP#pPPPPPPPPPPPPp#pP#.....',
-    '.....#pP#pPPyYyyYyPPPPp#pP#.....',
-    '.....#pP#pPPyyyyyyPPPPp#pP#.....',
-    '.....#pP#pPPPPPPPPPPPPp#pP#.....',
-    '.....#pP#pPPPPPPPPPPPPp#pP#.....',
-    '.....#ss#pPPPPPPPPPPPPp#ss#.....',
-    '.....####pwwwwwwwwwwwwP####.....',
-    '........#pPPPPPPPPPPPPP#........',
-    '........#pPPPPPPPPPPPPp#........',
-    '........#PPPP#....#PPPP#........',
-    '........#PPPP#....#PPPP#........',
-    '........#PPPP#....#PPPP#........',
-    '........#PPPP#....#PPPP#........',
-    '........#PPPP#....#PPPP#........',
-    '........#PPPP#....#PPPP#........',
-    '........#PPPP#....#PPPP#........',
-    '........#PPPP#....#PPPP#........',
-    '........#PPPP#....#PPPP#........',
-    '........#PPPP#....#PPPP#........',
-    '........######....######........',
-    '................................',
-  ], 16, [[13, 6], [18, 6]]),
+    '...........................yy...',
+    '.........................yYwwYy.',
+    '............########.....yYwYYy.',
+    '..........##ppPPPPPB##....yYYy..',
+    '.........#ppPtSiiSIPPB#....#IT#.',
+    '.........#pPTiissiiTPB#....#IT#.',
+    '.........#pSTTissiTTSP#....#TN#.',
+    '.........#piS#wssw#SiP#....#TN#.',
+    '.........#piSissssiSiP#....#IT#.',
+    '.........#piisWwSssiiP#....#IT#.',
+    '.........#pSisswnssiSP#....#IT#.',
+    '.........#pSissNNssiSP#....#IT#.',
+    '.........#pPSiswwsiSPP#....#TN#.',
+    '..........#PP=nSSn=PP#.....#IT#.',
+    '..........#PPP=nn=PPP#.....#IT#.',
+    '.........#mmmmmmmMMMMM#....#IT#.',
+    '.........#ppPPPmMPPPPB#....#IT#.',
+    '..........#pPPPmMPPPB#######TN#.',
+    '..........#pPPPmMPPBB#pPmssSTN#.',
+    '..........#pPPPmMPPBd#PBMSSnn=#.',
+    '..........#pPPPmMPPBB#######nN#.',
+    '...........#pPPmMPBB#......#nN#.',
+    '...........#mmMyYMMj#......#mM#.',
+    '...........#pPPPPPPB#......#Nn#.',
+    '..........#pPPPPPpBPB#.....#IT#.',
+    '..........#pPPPPPpBPB#.....#TN#.',
+    '..........#pPPPPPpBPB#.....#IT#.',
+    '.........#ppPpBPPpBPBB#....#IT#.',
+    '.........#ppPpBPPpBPBB#....#IT#.',
+    '.........#ppPpBPPpBPBB#....#IT#.',
+    '........#ppPpBPPPpBPPBd#...#TN#.',
+    '........#ppPpBPPPpBPPBd#...#TN#.',
+    '........#ppPpBPPPpBPPBd#...#IT#.',
+    '.......#ppBPpBPPPPpBPBBd#..#IT#.',
+    '.......#ppBPpBPPPPpBPBBd#..#IT#.',
+    '.......#ppBPpBPPPPpBPBBd#..#IT#.',
+    '......#ppPPPpBPPPPpBPPBBd#.#TN#.',
+    '......#mmmmmmMmmmmmMmmMMj#.#IT#.',
+    '......#PPBBBPdBBBBPdBBddd#.#N=#.',
+    '......####################.#==#.',
+  ], 22, [[13, 7], [18, 7]]),
 
-  /* The Hauler. No hood and no hat: the front line is the seat whose face you
-     can see, and every other silhouette in the cast is a column, so this one is
-     a T — a padded yoke in the class blue laid flat across two whole rows and
-     running out past the arm columns, so he is wider at the shoulders than at
-     his own hips. It is the only sprite you can pick out of a five-person line
-     by outline alone, which is the job of the person standing in front. */
+  /* The Hauler. The only silhouette broken ABOVE the shoulders — the loaded pack
+     rises behind the head, which is the whole read at a distance — with a strap
+     over each shoulder and a forward lean from the weight. 70% of the cell grid
+     is painted, against 47% for the leanest, and that is the class. */
   hauler: sprite([
-    '................................',
-    '........################........',
-    '........#NNNNNNNNNNNNNN#........',
-    '........#nnnnnnnnnnnnnn#........',
-    '........#nNsssssssssssn#........',
-    '........#nNss==ss==sssn#........',
-    '........#nNss#wssw#sssn#........',
-    '........#nNsssssssssssn#........',
-    '........#nNssssSSssssSn#........',
-    '........#nNsSssssssSssn#........',
-    '........#nNsssS==Sssssn#........',
-    '........#nNsssssssssssn#........',
-    '........#nNssSSssssSSsn#........',
-    '........#nnsssssssssssn#........',
-    '........#NNNNNNNNNNNNNN#........',
-    '.........##############.........',
-    '..............#ss#..............',
-    '...##########################...',
-    '...#bbbbbbbbbbbbbbbbbbbbbbbb#...',
-    '...#BbbbbbbbbbbbbbbbbbbbbbbB#...',
-    '...#BBBBBBBBBBBBBBBBBBBBBBBB#...',
-    '.....#bB#bWWWWWWWWWWWWb#Bb#.....',
-    '.....#bB#bWwwwwwwwwwwWb#Bb#.....',
-    '.....#bB#bWwwwwwwwwwwWb#Bb#.....',
-    '.....#bB#bWwwwwwwwwwwWb#Bb#.....',
-    '.....#ss#bNNNNNNNNNNNNb#ss#.....',
-    '.....####bNyYYYYYYYYyNb####.....',
-    '........#bNNNNNNNNNNNNb#........',
-    '........#bxxxxxxxxxxxxb#........',
-    '........#xxxx#....#xxxx#........',
-    '........#xxxx#....#xxxx#........',
-    '........#xxxx#....#xxxx#........',
-    '........#xxxx#....#xxxx#........',
-    '........#Mxxx#....#xxxM#........',
-    '........#Mxxx#....#xxxM#........',
-    '........#NNNN#....#NNNN#........',
-    '........#NNNN#....#NNNN#........',
-    '........#nnnn#....#nnnn#........',
-    '........######....######........',
-  ], 16),
-  /* The Grafter. The only headgear in the cast that leaves the twelve-pixel
-     head: a wide flat canvas brim overhanging the skull on both sides and
-     throwing a shadow band across the brows, over a long dust-coloured coat
-     down to the boot tops. Exactly one saturated cluster on the whole sprite —
-     a live cutting splinted to the right forearm — because a class about a
-     thing growing where you put it should have that be the only green on it. */
+    '......############..............',
+    '.....#iixiiiiiixii#.............',
+    '....#ttiMjiiiijMitt#............',
+    '....#tiittttttttiit#............',
+    '....#ittIT##############........',
+    '....#ittIT#=kk======kk=#........',
+    '....#ittIT#k=nSsswssS=k#........',
+    '....#iMjIT#knTNTSSTNTnk#........',
+    '....#ittIT#nS#wSSSSw#Sn#........',
+    '....#ITTNN#TnTWSsiSWTnT#........',
+    '....#ittIT#TSnSTsiTSnST#........',
+    '....#ittIT#nnSsNttNsSnn#........',
+    '....#ittIT##SWt====tWS##........',
+    '....#ittIN###nSssSSnT###........',
+    '....#ITTNN####TnnnnT####........',
+    '.#############TNnnNT###########.',
+    '.#it#dBBUUTIddddddddITUUBBd#ti#.',
+    '.#it#dBUUbUTIBBBBBBITUbUUBd#ti#.',
+    '.#it#dBUbbUUTIMjjMITUUbbUBd#ti#.',
+    '.#it#dBUb#UUUTIBBITUUU#bUBd#ti#.',
+    '.#it#dBUb#UUTIUUUUITUU#bUBd#ti#.',
+    '.#jI#dBUb#UTIUUUUUUITU#bUBd#Ij#.',
+    '.#it#dBUB#TIUUUUUUUUIT#BUBd#ti#.',
+    '.#TT#dBUB#UdBdUUUUdBdU#BUBd#TT#.',
+    '.#IT#dBUB#UdddUUUUdddU#BUBd#TI#.',
+    '.####====###dBBBBBBd###====####.',
+    '....#=NN=#.#ItMjjMtI#.#=NN=#....',
+    '....#nSsn##ItNNNNNNtI##nsSn#....',
+    '....#SssS#dBBUUUUUUBBd#SssS#....',
+    '....######dBUUd##dUUBd######....',
+    '.......#JxxxxJ#..#JxxxxJ#.......',
+    '.......#JxMxxJ#..#JxxMxJ#.......',
+    '.......#JxxxxJ#..#JxxxxJ#.......',
+    '.......#JIttIJ#..#JIttIJ#.......',
+    '.......#JITTIJ#..#JITTIJ#.......',
+    '.......#N====N#..#N====N#.......',
+    '.....#=NNNNNN=#..#=NNNNNN=#.....',
+    '.....#=MjjjjM=#..#=MjjjjM=#.....',
+    '.....#=kkkkkk=#..#=kkkkkk=#.....',
+    '.....##########..##########.....',
+  ], 31, [[13, 8], [20, 8]]),
+
+  /* The Grafter. A scout, caught mid-step rather than standing square: one
+     shoulder lower, legs staggered. The brim of the hat genuinely overhangs and
+     puts the brow in shadow, and the satchel sits on one hip. The most
+     asymmetric of the five by design. */
   grafter: sprite([
-    '................................',
-    '....########################....',
-    '....#TTTTTTTTTTTTTTTTTTTTTT#....',
-    '....#tttttttttttttttttttttt#....',
-    '........#TTTTTTTTTTTTTT#........',
-    '........#tTssssssssssTt#........',
-    '........#tT==ssss==sTTt#........',
-    '........#tTs#wssw#sssTt#........',
-    '........#tTssssssssssTt#........',
-    '........#tTsssSSsssssTt#........',
-    '........#tTsSsssssSssTt#........',
-    '........#tTsssS==SsssTt#........',
-    '........#tTssssssssssTt#........',
-    '........#ttsSSssssSSsTt#........',
-    '........#TTTTTTTTTTTTTT#........',
-    '.........##############.........',
-    '..............#ss#..............',
-    '.....#tT#tTTTTTTTTTTTTt#Tt#.....',
-    '.....#tT#tTttttttttttTt#Tt#.....',
-    '.....#tT#tTttttttttttTt#Tt#.....',
-    '.....#tT#tTtvvGGvvttTTt#gl#.....',
-    '.....#tT#tTttGllGtttTTt#lG#.....',
-    '.....#tT#tTttvGGvtttTTt#Gv#.....',
-    '.....#tT#tTttttttttttTt#gN#.....',
-    '.....#ss#tTttttttttttTt#ss#.....',
-    '.....####tNNNNNNNNNNNNt####.....',
-    '........#tTyYYYYYYYYyTt#........',
-    '........#tNNNNNNNNNNNNt#........',
-    '........#tTttttttttttTt#........',
-    '........#TttT#....#TttT#........',
-    '........#TttT#....#TttT#........',
-    '........#TttT#....#TttT#........',
-    '........#TttT#....#TttT#........',
-    '........#TttT#....#TttT#........',
-    '........#NNNN#....#NNNN#........',
-    '........#NNNN#....#NNNN#........',
-    '........#nnnn#....#nnnn#........',
-    '........######....######........',
-  ], 16),
+    '............#iittII#............',
+    '...........#iittttII#...........',
+    '..........#NNNNNNNhHA#..........',
+    '..#iiiiiiittttttttttIIIIIII#....',
+    '.#=IIITTTTTTTTNNNNTTTTIII=#.....',
+    '..#########NNNNNNNNNN######.....',
+    '..........#NTTIIIITTN#..........',
+    '..........#n==IttI==n#..........',
+    '..........#S#WSiiS#WS#..........',
+    '..........#TnSSiSSSnT#..........',
+    '..........#TSssWSSStT#..........',
+    '..........#TtsnwnSStT#..........',
+    '..........#TtsSssSStT#..........',
+    '..........#Tts===SItT#..........',
+    '...........#TISssSIT#...........',
+    '............########............',
+    '.............#nSSn#.............',
+    '..........#=tttttttt=#..........',
+    '........#iiaAAttttIII#..........',
+    '.......#iittaAAtttIII#tI#.......',
+    '......#itI#itaAAttIII#tI#M#M#...',
+    '......#itI#ittaAAtIII#tI#MjM#...',
+    '......#sSn#itttaAAIII#sn#jxj#...',
+    '......#sSn#NNNNMMNNNN#nnnnnN#...',
+    '.......#iittttttttIII#nnMMnN#...',
+    '.......#itttttttTTTTT#======#...',
+    '.......#tIIIIIIIIIIIT#nnnnNN#...',
+    '.......#tIIIIT#IIITTT#NnnNNN#...',
+    '......#tIIIIT#.#IITTTT#######...',
+    '......#tIIIIT#.#IITTTT#.........',
+    '......#tIIIIT#..#IITTTT#........',
+    '......#ttIIIT#..#IItTTT#........',
+    '.......#tIIIIT#..#IITTTT#.......',
+    '.......#ttIIIT#..#IITTTT#.......',
+    '........#tIIIT#..#IITTT#........',
+    '........#nNNNT#..#NNTTT#........',
+    '.......#nNNNNT#..#NNTTTT#.......',
+    '.......#NNNNNT#..#NNTTTT#.......',
+    '.....#nNNNNNNT#..#NNTTTTTT#.....',
+    '.....##########..##########.....',
+  ], 17, [[12, 8], [18, 8]]),
 };
 
 /* ============================================================== enemies === */
@@ -2524,6 +2551,359 @@ export const TERRAIN_VARIANTS = {
       'FfhFhFGGHfhgfhfv',
       'HflFGFFGFfHHGHHH',
       'HHHHHfGvGGFFGHGH',
+    ],
+  ],
+  /* Wildflower. The kind that exists because 81% of a site was one green.
+     It carries the warm end of the green ladder plus real flower heads — 7.2%
+     of its pixels, in clusters of three to five, never singles, because a
+     one-pixel gold at 16px is dust rather than a bloom. Heads are placed from
+     centres that may hang over the tile border and clip, which is what keeps
+     them out of the middle: a motif kept off the edge to buy a clean seam is
+     a motif that repeats dead centre instead. */
+  meadow: [
+    [
+      'ignhhnlaiihssaha',
+      'hggnaahlsiasiall',
+      'ngnatnlahilhsalh',
+      'hnnTAgAnaYyYahhg',
+      'ttAnggainlghiYAa',
+      'AAAngonAanngYyoA',
+      'hThagooiniaAaYhg',
+      'nAggnYAAghatngia',
+      'tnTAnAppphAntanA',
+      'nnAnnispaagnghTn',
+      'nngngglnnhaglnnn',
+      'gntgAgtYhigalAga',
+      'hhngaaAoYhiiaAaA',
+      'Ahhgangyslghnhaa',
+      'aingnAhllghlgnha',
+      'ahnatggihhshgiha',
+    ],
+    [
+      'ighNngaahlhlghag',
+      'gagtnAliihlllslg',
+      'lannaiashhhllasl',
+      'ggnnAnahgaglgghl',
+      'haglallhlllhlhaA',
+      'hilinnlalaallohA',
+      'glhtangliaagtooa',
+      'anAnaghhahnnaYng',
+      'ggnlaslAhltnTNTn',
+      'nTAhyYhhhnnnNnnn',
+      'nnngiYhnnnngnToo',
+      'tghhhagntgtaAagY',
+      'iahihhnngnhnnAhg',
+      'lallalAgnhppnhga',
+      'ygilhhnntngpnagA',
+      'YohhihhglaailalA',
+    ],
+    [
+      'gAgthnAlhglslllg',
+      'alglhaahsalhllgl',
+      'hahlhhlathinAAnl',
+      'lahsllYyannanAgh',
+      'halllgYhAntiAppg',
+      'hllghnlgihaggphh',
+      'ghnAnnnnngTAnnan',
+      'aannnnotAnnnghna',
+      'nnatnooYnahggtAA',
+      'aaaAAnogAalhhtla',
+      'nnnggghaATlYatan',
+      'iaggnggnTnnyYnga',
+      'ggaaAtgignAonhhh',
+      'lhgaiAnhiaagaaat',
+      'ghhnAnngAYYythni',
+      'nhggihgaaaollgha',
+    ],
+    [
+      'aanniAgiaaashall',
+      'hAgnatAlhagihhlt',
+      'loYYniiglngghihl',
+      'ggyghAahhihhiilh',
+      'thggnngaYsAggagl',
+      'llniinnaYohlgaas',
+      'ahiAanAhyhppphil',
+      'tllagghlllhpaahl',
+      'iailhalslslAghAn',
+      'gglsslslYyihiath',
+      'nggsihssYshlagTA',
+      'nggshihhaillhagg',
+      'lahiahnlalghhhgi',
+      'higlloaalllgttaa',
+      'gnAahoYlhnahgiaA',
+      'nigtngoalhntnaah',
+    ],
+    [
+      'laiahiAAlhliglah',
+      'aitaahngghhighhg',
+      'gginalaaalilanal',
+      'Aaglhlsslhllhnng',
+      'alhlalhsppslatat',
+      'alaaglhhsphhanhh',
+      'gaahYlshalslagnh',
+      'inalyYahlaosannt',
+      'TgaAongaAAooAAhg',
+      'gaNntAnnhnYhthaa',
+      'gAnnngTnghhhhhig',
+      'YYotTtgghaAgaain',
+      'gyhaAnnaannihAgn',
+      'ghlalnngnnhalaga',
+      'ashnAYoannllhhhg',
+      'AaiAgoglaiiilhnt',
+    ],
+    [
+      'tgnNtanhYYssiagg',
+      'gaAnhgnhyhhlahtn',
+      'hanntiglihggnnnh',
+      'lAhnTallhlagglig',
+      'gtanniilsihAAlll',
+      'hinngtghastaaahh',
+      'ppnnTgghhaAtgthl',
+      'apagahaalhhaalgh',
+      'gATNAnhslaAllYan',
+      'AAgnYyAsshlllYon',
+      'nNTNYolssahhlayn',
+      'agNnnnhhlahlllhi',
+      'lhnTooYlghlalllg',
+      'haitionllhlhalhg',
+      'hhaAglaAhhislilg',
+      'igagaahgaillgghi',
+    ],
+  ],
+  /* The broken photovoltaic field, and the game's own lore as ground: the
+     lights went out and something under The Array started drawing power again.
+     It is the darkest and coolest kind on the map, which is the job — the
+     composition has nothing to sit against otherwise.
+
+     Its first draft passed the seam metric by banning three of its twelve keys
+     from the tile border outright, which bought a clean join at the price of
+     parking the steel dead centre of every tile. That is why the checks now
+     measure per-key border bias as well as the seam itself. */
+  array: [
+    [
+      'BUdBBBdBdUBddBBB',
+      'dUBddBxBdBBBBdUU',
+      'dBdBddJUUMUddddd',
+      'dBBBdxjUUMUdkddd',
+      'UddBBJBBBBuddddB',
+      'BBBBUxUMMbBddMMd',
+      'MdBMMBUBUBUdkdkk',
+      'JvFvJdddddxxBBdd',
+      'kddddBBddBBMdddd',
+      'kkddddBddddMdddk',
+      'ddddBddxdddMdBdB',
+      'dddBddddxdddBddd',
+      'ddkBddBBBBxUBdBB',
+      'dkdddkdBdUxUUUdd',
+      'BBddddBdddBBUBBd',
+      'BddddBdddBBMBBdB',
+    ],
+    [
+      'dBdddddkddddBddd',
+      'UBxdkdddddBddddd',
+      'UdxdkkkdddkdddBd',
+      'UddkkddkdddddBdd',
+      'ddxJddJdBkdxBUBB',
+      'BBxJdddJddBBdBxB',
+      'kkBddkdkdddBUxdd',
+      'dkJdddJJddMMMvFd',
+      'dddBddMMBBddBdJx',
+      'ddBkkkkkddddBddd',
+      'BdBkkkdkdddddBBd',
+      'dBMkdddkddBkdBBB',
+      'BBMkkkdkkdddBddd',
+      'ddMkkkkkdddddBdd',
+      'dUUBBxBddBBBdBdB',
+      'BUxJddxBdBddddBd',
+    ],
+    [
+      'UxxxdBBBdBxxddxx',
+      'dkdxddddBdBdBBUU',
+      'ddkkdBBdBBdBBdBB',
+      'dkdkddddBdddBBBd',
+      'kdkkBMBddBdBdBBB',
+      'dkkkddMBdddBxBBd',
+      'ddBBBddMdkkxkkdk',
+      'ddBMBBdBUkxkkkdk',
+      'kddMBBddBkkkkkdd',
+      'dkUBdBBddkkdkkdd',
+      'ddUdBdBBBkkkkkUB',
+      'ddBMBdBddUUuUuUB',
+      'JdUMddBddBuUbUUB',
+      'dBdMvBdddubuuUdd',
+      'BUUvddddBUBBdUBU',
+      'UbUBBBdBBUBddBBU',
+    ],
+    [
+      'dBdddddBdUBdBduU',
+      'dMJdMdFvvMMBBUUb',
+      'MMJxxMMMUJJuxxxU',
+      'dddBdddUbBUBBdBd',
+      'BdBdBddbUbUUddBB',
+      'dddBdddBUBBBddBB',
+      'dddBdBdBBddBdddd',
+      'kdddBdBUBBdBdBdk',
+      'kBxBBBBddddBkddk',
+      'ddxBUBUBddBBddkk',
+      'ddxBBBddddBddddd',
+      'ddUUBBdBdBdddBdd',
+      'ddBBUdddBBBBBMdd',
+      'dxBBUBUdddBdBBMB',
+      'BxBBBBUdddddBBdM',
+      'ddUBddBddBBddddB',
+    ],
+    [
+      'jxBBdddddBBdBdUB',
+      'dxddBdddkddUBdBU',
+      'BBBBdkkddkBUBUBB',
+      'BBUdddkddkbBUUUB',
+      'xMMUBdkkddBUUbxx',
+      'BdBBddBdBdddUBBB',
+      'kkdddBddMdUddddk',
+      'kkBBddddMdBdBBdk',
+      'kddBdddvvBUUBBdk',
+      'kdddBdkdFddBBBkd',
+      'ddddBkddxdBUBBdB',
+      'ddBdddddxdBBBxdd',
+      'dBddddkBddddxBBd',
+      'dddBdxdddBBddUdB',
+      'BdddxdddBxBBdBdB',
+      'BdBxdBBBBxdBdBBd',
+    ],
+    [
+      'BdMBdddxBBddddMB',
+      'ddMBBBBxdUdBdBBM',
+      'UdMBBBBxBBUBBddB',
+      'dBdddBBUBBdUUBBB',
+      'dMdddBBBBUUdBddU',
+      'dMddBBddBBdUBdBB',
+      'kddBdUBdddddJBdk',
+      'ddxBBBBMddddJdkd',
+      'kdxBUjxMddddJddd',
+      'kddUBjBUBBkBdBdk',
+      'BdxUBUUxdddddBdB',
+      'dUxBddBxdddddBBB',
+      'dBUBBddxdddBBddB',
+      'dJxBddBddBdkdddd',
+      'dJxdBddxddBdddUB',
+      'FFBBBdBMxdddBddB',
+    ],
+  ],
+  /* Dense thicket, and the only new kind that blocks. Terrain that stops you
+     is what gives a site a route through it rather than an open field; before
+     this, rubble, crevice, trees and water together were under 5% of the map.
+
+     Its deep shade is 'k', not '#'. Every hero and enemy draws its contour in
+     '#', so a biome filled with it eats the silhouette of anyone standing
+     against it — and a hero is about three tiles tall. No sprite uses 'k'. */
+  bramble: [
+    [
+      'kHvvvvvkkvvfFNkh',
+      'kvkGFvHFGhfFvNFv',
+      'vFGFFhvGvvNkNvvv',
+      'vFvGFFFGvFFFvFvf',
+      'vThFFvvFFFvFFvvv',
+      'vvFvvGFvvTvFvkFv',
+      'FvvFFFvFTkvHvFFF',
+      'ffFFfFFTvvkvHffH',
+      'GvFvFFFvkvvvvkhF',
+      'ffFGfvhTvvkkvvvv',
+      'GkfFHvFhTFvvvkvH',
+      'vkGFHvFvNNFkGGFT',
+      'FFFFGFFNFGfvNTTf',
+      'FFvvvFhFfFkvNTfF',
+      'FFvfGGvvFHFNHfFF',
+      'vvkFvhFFvFvFkkvv',
+    ],
+    [
+      'fkFvvFFvvNhHkvvF',
+      'vffvvFvkNvGGfkFv',
+      'FvvFGkvNvvfFvHhv',
+      'FvvFvkvkFvFfvvFh',
+      'FvFFFvvFFvvFhvFv',
+      'vFvvvvvkkGGGFGGF',
+      'vFkvhGvvFffTvFfk',
+      'vHvhNNNGFFFFfFff',
+      'FvNNNNffFNfHHFFF',
+      'vFFFFvfGHNFFFvFH',
+      'FHNFGFffHNFNvFTT',
+      'FFNvfHvfGfHNFhvf',
+      'fFNFhfHFHHFNFkFF',
+      'vHHFTFGvvfFvvHFv',
+      'hkFvvFFvvFHvvvkk',
+      'vFFvvvvvhFvFkkvF',
+    ],
+    [
+      'FFvvhNvFFFGFFFvv',
+      'kFvFvhGFFvFkvvkf',
+      'vvkvvvvFvkvvFvfk',
+      'GFvGFffFvvFhkfkF',
+      'GFFFfFHvkvvkFFvv',
+      'FHFvvFvfFvvvFFFF',
+      'hvvFFFFFGvFkkFvv',
+      'FFFFvvvFvFGFkHFG',
+      'GvFkvTFvvFFkvFhF',
+      'HFFvFTHkvvFFFFvH',
+      'FFvFFFfFGNFvvvvf',
+      'FHvFFkkTNFvvkhvf',
+      'FkvGFvkkFFFNFvvF',
+      'GFNNNNGvFvTNvvkF',
+      'vGfFFfvThfTNvvFk',
+      'FkfFFvFvkhHHvkNv',
+    ],
+    [
+      'kFkkvFHFFFFvvkNF',
+      'kFkvFHFFvvvFvvkN',
+      'FvFFkNhFNFfFvffH',
+      'FFvFkFvFFffFFfFv',
+      'kvkkvFvFGGFFFFvf',
+      'FkkkvvHFfFFFfNFv',
+      'vGkFvFFvvvfffNFf',
+      'vvkkFkFNNNNFfFHG',
+      'fGkvvvHfHFHfHHFF',
+      'vFGvvvFvFvFGvvfG',
+      'FhFvvvGvGFvvvFHG',
+      'vGFFvGFvvGFGkFHF',
+      'FFGvvFvfhfvTkkFF',
+      'FvvGFHHNFNGHFvhv',
+      'vvvvffvFNNfFFffH',
+      'vFvFFFFvFNfvFFFT',
+    ],
+    [
+      'vkFvHvHvfvFvkvkv',
+      'FFvfvNNhFhfFFFkv',
+      'vvvFFFNvkkNfFvFv',
+      'kFFhFGfvkvvfvvGF',
+      'vvGvfFfGFFvvFvkk',
+      'FFFFFkFHHkGvkFFH',
+      'FFvvFFvkkFkvvvvH',
+      'FvFvvkhvvhkfvvvF',
+      'NTTTvfvvvvFfFFFH',
+      'FfFkfffkFGGHGvGF',
+      'GFvfvfkvNvvFFFhH',
+      'fvvvfvvFNFFFGFvf',
+      'fhvvFvTvNkvFFvFF',
+      'FGvThTFFGGFvvFvv',
+      'FNNNkvGvvvFFvFvv',
+      'NkvkFvFfHfvFFvkv',
+    ],
+    [
+      'FTHvkFvfvFvFkvFv',
+      'vFTHFhFkkFFvkkFk',
+      'FTTTTvvGkfFvvhvv',
+      'kkHFvFFvNFHvvkfh',
+      'kGFvFvvGNvkkvhkf',
+      'FGGFGfFNNvhkkvvF',
+      'TffFNNNGNFvkFkkG',
+      'TFFHFvvfvFfvNvvF',
+      'HGFFvfvNvvffvFvh',
+      'FFfFvvvffvFNfGGF',
+      'FvFvFkGkFHNGFFvG',
+      'fvFvFhFkFHHFFvfF',
+      'GhvvvvffFvFFFGFv',
+      'FvGvvFGvFGFFGFvF',
+      'vFFFvFGFGFGvvvvF',
+      'vkFkvFFFkFGFkkFv',
     ],
   ],
 };

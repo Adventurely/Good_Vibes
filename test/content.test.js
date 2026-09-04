@@ -653,6 +653,37 @@ test('nodes land in bounds, on legal ground, and never stack', () => {
   }
 });
 
+test('a building whose rule names terrain has somewhere legal on nearly every site', () => {
+  /* The Rain Cistern and the Pulp Press asked to stand `near: 'water'`, which
+     compared against the literal kind — and `shoreline()` renames exactly the
+     water tiles that touch land, which are the only ones a building could ever
+     be beside. Both were unbuildable anywhere on 90.4% of sites, and the Reed
+     Bed and Mycelial Filter that need a cistern standing went with them. It
+     cost the mend line and the pages income, and nothing failed. */
+  const rules = Object.entries(BUILDINGS).filter(([, b]) => b.place
+    && (b.place.near || b.place.on || b.place.onOrNear));
+  assert.ok(rules.length, 'no building has a terrain placement rule to check');
+
+  const SEEDS = 60;
+  for (const [id, building] of rules) {
+    let dead = 0;
+    for (let seed = 1; seed <= SEEDS; seed++) {
+      const { terrain, nodes } = generateMap(seededRandom(seed));
+      let legal = false;
+      for (let y = 0; y < MAP_H && !legal; y++) {
+        for (let x = 0; x < MAP_W && !legal; x++) {
+          if (!placeRefusal(id, { terrain, buildings: [], nodes, x, y })) legal = true;
+        }
+      }
+      if (!legal) dead++;
+    }
+    // A site with no water at all is a legitimate roll, so this is not zero —
+    // it is the line between "sometimes dry" and "the building does not exist".
+    assert.ok(dead <= SEEDS * 0.2,
+      `${building.name} has nowhere legal on ${dead}/${SEEDS} sites`);
+  }
+});
+
 test('herb ids are unique, which is what gather intents address', () => {
   const { nodes } = generateMap(seededRandom(7));
   const ids = nodes.map((n) => n.id);
@@ -773,8 +804,28 @@ test('a shore points the way the land actually is', () => {
         }
         assert.ok(banks > 0, `${where} is a ${kind} in the middle of open water`);
 
+        // Stronger than the direction test below and always answerable: the
+        // tile a shore names must be land. This is what caught a shoreSE whose
+        // south-east neighbour was open water, on a site where the pond ran as
+        // a diagonal channel with banks on five sides.
         const [nx, ny] = OFFSET[kind.slice(5)];
-        assert.ok(nx * sx + ny * sy > 0, `${where} is a ${kind} pointing away from its bank`);
+        const named = tileAt(terrain, x + nx, y + ny);
+        assert.ok(named && !isWater(named),
+          `${where} is a ${kind} but the tile it names is ${named}, not a bank`);
+
+        // Not "points the way the bank averages" — that is unsatisfiable in
+        // two real cases. Where the banks cancel exactly, no direction has a
+        // positive projection at all. And where the average points at water —
+        // a pond running as a diagonal channel has banks on five sides, and
+        // the mean of them lands in one of the three gaps — `shoreline` now
+        // takes the strongest actual bank instead, which can be perpendicular
+        // to the average. Both are better pictures than the alternative.
+        //
+        // What still has to hold, and does: a shore never points AGAINST its
+        // bank. That is the fault worth catching, and unlike the projection
+        // being strictly positive, it is always answerable.
+        assert.ok(nx * sx + ny * sy >= 0,
+          `${where} is a ${kind} pointing away from its bank`);
       }
     }
   }
