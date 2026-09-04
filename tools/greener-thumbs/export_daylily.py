@@ -93,7 +93,7 @@ W.flatten_procedurals({
 # A blade is fleshy at about 1.2 mm; a tepal is a third of that and thin enough
 # to glow. Scapes, pedicels, buds, filaments, anthers and the perianth tube are
 # closed tubes and spheres with volume already, so they take nothing.
-_snap, _welded = W.apply_solidify(
+_snap, _welded, _shell = W.apply_solidify(
     plant,
     {SLOT_LEAF: 1.00, SLOT_TEPAL: 0.34, SLOT_SCAPE: 0.0, SLOT_EYE: 0.0},
     0.0012)
@@ -120,6 +120,10 @@ result = {
     'bones': len(rig.pose.bones),
     'materials': [m.name for m in plant.data.materials],
     'welded_faces': _welded,
+    # How far the solidify moved the surface it was given. It must stay at the
+    # shell thickness; anything larger means the modifier is inventing geometry,
+    # which is what turned every collapsed flower into a spike.
+    'shell_displacement_max': round(_shell, 5),
     # Post-Solidify, so this is the whole plant and it has to be empty: the rim
     # faces Solidify adds are what close an open blade or an open tepal.
     'boundary_edges_by_slot': mesh_checks.boundary_edges_by_slot(plant.data),

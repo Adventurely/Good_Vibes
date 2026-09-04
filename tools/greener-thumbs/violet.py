@@ -1477,13 +1477,17 @@ for poly in me.polygons:
     poly.use_smooth = True
 
 plant = bpy.data.objects.new("violet", me)
-bpy.context.collection.objects.link(plant)
+# `context.collection` is the ACTIVE collection, and in background Blender
+# there is no active one - it is None, and this file could only ever be built
+# from the GUI. `scene.collection` is the master collection and always exists,
+# so the violet can now be rebuilt headless the way the daylily can.
+bpy.context.scene.collection.objects.link(plant)
 
 
 # ---- the armature ----------------------------------------------------------
 arm_data = bpy.data.armatures.new("violet_rig")
 rig = bpy.data.objects.new("violet_rig", arm_data)
-bpy.context.collection.objects.link(rig)
+bpy.context.scene.collection.objects.link(rig)
 # A freshly linked object is not in the view layer until it is resynced, and
 # mode_set polls the view layer rather than the collection. Selecting forces it.
 bpy.context.view_layer.update()

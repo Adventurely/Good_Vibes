@@ -288,7 +288,18 @@ for m in list(plant.modifiers):
 _sol = next(m for m in plant.modifiers if m.type == 'SOLIDIFY')
 _sol.thickness = LEAF_THICK
 _sol.offset = -1.0                    # inward, so the lit surface does not move
-_sol.use_even_offset = True
+# Measured before it was trusted. Even Thickness divides the offset by the sine
+# of the angle between adjacent faces, and on the daylily's collapsed flowers -
+# every crease acute - it displaced a 0.4 mm shell by up to 62 mm and shipped
+# them as spikes. The violet is broad gently-curved leaves with one keel, so it
+# is nowhere near that; the number below says how near, and it is reported in
+# the build report now rather than assumed.
+from mathutils.kdtree import KDTree as _KDT
+_pre = _KDT(len(plant.data.vertices))
+for _i, _v in enumerate(plant.data.vertices):
+    _pre.insert(_v.co, _i)
+_pre.balance()
+_sol.use_even_offset = False
 _sol.use_rim = True                   # the rim faces *are* the visible edge
 _sol.use_rim_only = False
 _sol.vertex_group = _vg.name
@@ -299,6 +310,10 @@ for ob in bpy.context.view_layer.objects:
 plant.select_set(True)
 bpy.context.view_layer.objects.active = plant
 bpy.ops.object.modifier_apply(modifier=_sol.name)
+
+_shell_disp = 0.0
+for _v in plant.data.vertices:
+    _shell_disp = max(_shell_disp, _pre.find(_v.co)[2])
 
 # The zero-weight slots came through as a duplicate of themselves in the same
 # place — coincident, reversed, and z-fighting. Welding at a micron collapses
@@ -523,6 +538,8 @@ result = {
     'bytes': os.path.getsize(glb) if os.path.exists(glb) else 0,
     'verts': len(plant.data.vertices),
     'bones': len(rig.pose.bones),
+    # A shell of LEAF_THICK must not move the surface further than LEAF_THICK.
+    'shell_displacement_max': round(_shell_disp, 5),
     'materials': [m.name for m in plant.data.materials],
     'petal_albedo_srgb': IMG_PALB.colorspace_settings.name,
     'fuzz_tris': [len(sh.data.polygons) for sh in shells],

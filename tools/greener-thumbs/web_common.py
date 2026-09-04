@@ -133,9 +133,21 @@ def apply_solidify(plant, weights, thickness, base_snapshot=False):
     `offset = -1` grows the thickness inward, which keeps the lit surface where
     anything positioned against it — a hair shell, say — expects to find it.
 
-    Returns (base_mesh_copy or None, welded_face_count).
+    Returns (base_mesh_copy or None, welded_face_count, worst_displacement).
+
+    That third number is the guard. A shell of `thickness` should not move any
+    vertex further than `thickness` off the surface it was built on, so the
+    measurement is simply: for every vertex afterwards, the distance to the
+    nearest vertex before. It reads 0.0004 m on the daylily, which is the shell.
+    It read 0.062 m for as long as Even Thickness was on, and nothing said so -
+    the render that gets looked at is `daylily.py`, which never runs this file.
     """
     snap = plant.data.copy() if base_snapshot else None
+    from mathutils.kdtree import KDTree
+    _before = KDTree(len(plant.data.vertices))
+    for _vi, _v in enumerate(plant.data.vertices):
+        _before.insert(_v.co, _vi)
+    _before.balance()
 
     w = {}
     for poly in plant.data.polygons:
@@ -153,7 +165,27 @@ def apply_solidify(plant, weights, thickness, base_snapshot=False):
     sol = next(m for m in plant.modifiers if m.type == 'SOLIDIFY')
     sol.thickness = thickness
     sol.offset = -1.0
-    sol.use_even_offset = True
+    # Even Thickness OFF, and this is the whole reason the spent daylily flowers
+    # shipped as origami cranes.
+    #
+    # It divides the offset by the sine of the angle between adjacent faces, so
+    # that a folded surface keeps its thickness through the fold. On gentle
+    # geometry that is free. On a collapsed tepal - hooked right round by
+    # `spent_recurve` and then twisted - every crease is acute, the divisor goes
+    # to nothing, and a 0.4 mm shell displaces vertices by up to 62 mm. Measured
+    # over the whole plant: with it on, 301 spent-tepal vertices and 67 open ones
+    # move more than 2 mm off the surface they were built on; with it off, the
+    # worst displacement anywhere is 0.0004 m, which is the shell.
+    #
+    # It cost the OPEN flowers 24 mm too - they just carried it better, which is
+    # why one bloom looked beautiful and the one below it looked folded.
+    #
+    # What is given up is real but invisible at this scale: a shell measured
+    # along the normal rather than perpendicular to the fold, so a crease is
+    # thinner than the flat either side of it by the cosine of half its angle.
+    # On 0.4 mm of tepal and 1.2 mm of blade that is nothing. NON_MANIFOLD mode
+    # was tried too and is worse here: 41 mm on the spent flowers.
+    sol.use_even_offset = False
     sol.use_rim = True
     sol.use_rim_only = False
     sol.vertex_group = vg.name
@@ -165,6 +197,10 @@ def apply_solidify(plant, weights, thickness, base_snapshot=False):
     bpy.context.view_layer.objects.active = plant
     bpy.ops.object.modifier_apply(modifier=sol.name)
 
+    worst = 0.0
+    for _v in plant.data.vertices:
+        worst = max(worst, _before.find(_v.co)[2])
+
     bm = bmesh.new()
     bm.from_mesh(plant.data)
     before = len(bm.faces)
@@ -174,7 +210,7 @@ def apply_solidify(plant, weights, thickness, base_snapshot=False):
     bm.to_mesh(plant.data)
     bm.free()
     plant.data.polygons.foreach_set('use_smooth', [True] * len(plant.data.polygons))
-    return snap, welded
+    return snap, welded, worst
 
 
 def export_opts(glb):

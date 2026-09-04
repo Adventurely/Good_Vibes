@@ -157,6 +157,45 @@ bmesh.ops.dissolve_degenerate(_bm, dist=1e-6, edges=_bm.edges[:])
 Subdivision stays off. It quadruples every face on the plant *and* on the shells
 that copy it, for smoothing Draco's normal quantisation would eat half of.
 
+### Turn Even Thickness OFF, and measure that you did
+
+`use_even_offset` divides the offset by the sine of the angle between adjacent
+faces, so a folded surface keeps its thickness *through* the fold. On gentle
+geometry it is free. On anything tightly creased the divisor goes to nothing and
+the modifier throws vertices into the next postcode.
+
+The daylily shipped for a month with every collapsed flower as a spiky origami
+crane, because a spent tepal is hooked right round and then twisted — nothing but
+acute creases. Measured over the whole plant, a **0.4 mm shell displaced vertices
+by up to 62 mm.** It cost the open flowers 24 mm too; they simply carried it
+better, which is why one bloom looked beautiful and the one below it looked
+folded. `solidify_mode = 'NON_MANIFOLD'` is not the answer either — 41 mm on the
+same geometry. Plain extrude is: 0.0004 m, which is the shell.
+
+What you give up is real and invisible: a shell measured along the normal rather
+than perpendicular to the fold, so a crease is thinner than the flat either side
+of it by the cosine of half its angle. On a millimetre of leaf that is nothing.
+
+**This is the trap's real shape, and it is why it survived so long: the render
+everybody looks at is the species file, and the species file never runs the
+exporter.** Cycles showed a correct, shrivelled little flower the whole time.
+Only the GLB had spikes. So put a number on it, in the build report:
+
+```python
+_pre = KDTree(len(plant.data.vertices))          # before the modifier
+for i, v in enumerate(plant.data.vertices):
+    _pre.insert(v.co, i)
+_pre.balance()
+...
+worst = max(_pre.find(v.co)[2] for v in plant.data.vertices)   # after
+result['shell_displacement_max'] = round(worst, 5)
+```
+
+A shell of `thickness` must not move any vertex further than `thickness` off the
+surface it was built on. Both species read exactly their own shell now — the
+daylily 0.0012, the violet 0.0011. Anything larger is the modifier inventing
+geometry, and no screenshot of the authoring render will ever show it to you.
+
 ## 6. Applying modifiers to a skinned mesh
 
 Do not rely on `export_apply=True` for a mesh with an armature. Apply Solidify by
