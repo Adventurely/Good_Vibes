@@ -29,7 +29,7 @@ or `-- key=value` on a headless command line.
 """
 import bpy, bmesh, math, os, sys
 import numpy as np
-from mathutils import Vector, Euler
+from mathutils import Vector, Euler, Quaternion
 
 # ---- the whole plant, as numbers ------------------------------------------
 P = dict(
@@ -66,9 +66,16 @@ P = dict(
     # file only ever bent the leaves, so a thirsty violet held its flowers up
     # while its foliage went over the pot.
     flex_leaf_deg   = 78.0,
-    flex_stalk_deg  = 62.0,   # a peduncle is thinner than a petiole and has a
+    flex_stalk_deg  = 22.0,   # a peduncle is thinner than a petiole and has a
                               # bloom on the end of it, so it gives up sooner —
-                              # but it is shorter, so it has less to give
+                              # but it is shorter, so it has less to give, and
+                              # what it mostly has under it is its own leaves.
+                              # Swept against `bloom_vs_leaf_at_droop_1`, which
+                              # is the corolla inside the foliage: 62 deg gives
+                              # 167 face-pairs of it, 45 gives 99, 32 gives 22
+                              # and 22 gives none. A nod, which is what a
+                              # thirsty violet does — its flowers come down onto
+                              # the leaves and stop there.
     chlorosis   = 0.0,      # 0 green, 1 yellow — this is nutrient or overwater
     blooms      = 6,
     bloom_open  = 1.0,
@@ -1201,6 +1208,13 @@ def add_leaf(i):
     LEAF_FACES.append((b0, b1))
 
 
+BLOOM_ANG = []        # the azimuth each bloom faces, for its fall axis
+BLOOM_BASE = []       # where each bloom's scape leaves the crown
+BLOOM_FACES = []      # (first, last) face index per bloom — the corolla was
+                      # never checked against anything, exactly as the daylily's
+                      # was not until it shipped six tepals inside each other
+
+
 def add_bloom(j):
     """Five petals and a yellow eye on a scape that clears the rosette."""
     ang = (j / max(1, int(P['blooms']))) * math.tau + 0.7 + rnd.uniform(-0.2, 0.2)
@@ -1222,6 +1236,8 @@ def add_bloom(j):
     ctrl = Vector((base.x * 0.80 + top.x * 0.20,
                    base.y * 0.80 + top.y * 0.20,
                    base.z + (hgt - base.z) * 0.74))
+    BLOOM_BASE.append(Vector(base))
+    BLOOM_ANG.append(ang)
 
     def scape_pt(sv):
         return (base * ((1 - sv) ** 2) + ctrl * (2 * (1 - sv) * sv)
@@ -1513,7 +1529,9 @@ def add_bloom(j):
 for i in range(int(P['leaves'])):
     add_leaf(i)
 for j in range(int(P['blooms'])):
+    _f0 = len(bm.faces)
     add_bloom(j)
+    BLOOM_FACES.append((_f0, len(bm.faces)))
 
 me = bpy.data.meshes.new("violet")
 bm.to_mesh(me)
@@ -1613,9 +1631,44 @@ if int(P['fuzz']) > 0:
 
 # ---- droop and wind, both of them the same rig -----------------------------
 SHARE = [0.10, 0.20, 0.32, 0.38]          # each bone takes more than the last
+# The peduncle's three. Steeper than a leaf's because a flower stalk carries a
+# bloom on the end of it and gives up nearer the top.
+STALK_SHARE = [0.22, 0.34, 0.44]
 
 for pb in rig.pose.bones:
     pb.rotation_mode = 'XYZ'
+
+def pose_wilt(d):
+    """Put the whole plant at thirst `d`, limits and all.
+
+    The build and the checks both call this. They used to pose the rig
+    separately — the same shares written out twice — and the check went on
+    reporting 746 face-pairs of corolla inside leaf after the limit that fixed
+    it existed, because its copy did not apply one.
+    """
+    td = math.radians(float(P['flex_leaf_deg'])) * d
+    for i in range(int(P['leaves'])):
+        k = 1.0 + 0.25 * math.sin(i * 2.4)
+        lim = DROOP_LIMIT[i] if i < len(DROOP_LIMIT) else math.radians(180.0)
+        if td * k > lim:
+            k = lim / td if td > 1e-9 else 0.0
+        for sgi in range(int(P['segs'])):
+            nm = f"L{i}_{sgi}"
+            if nm in rig.pose.bones:
+                sh = SHARE[sgi] if sgi < len(SHARE) else SHARE[-1]
+                rig.pose.bones[nm].rotation_euler.x = -td * sh * k
+    sd = math.radians(float(P['flex_stalk_deg'])) * d
+    for j in range(int(P['blooms'])):
+        kk = 1.0 + 0.18 * math.sin(j * 1.7)
+        lim = BLOOM_LIMIT[j] if j < len(BLOOM_LIMIT) else math.radians(180.0)
+        if sd * kk > lim:
+            kk = lim / sd if sd > 1e-9 else 0.0
+        for sgi in range(3):
+            nm = f"B{j}_{sgi}"
+            if nm in rig.pose.bones:
+                sh = STALK_SHARE[sgi] if sgi < len(STALK_SHARE) else STALK_SHARE[-1]
+                rig.pose.bones[nm].rotation_euler.x = -sd * sh * kk
+
 
 droop = float(P['droop'])
 total_droop = math.radians(float(P['flex_leaf_deg'])) * droop
@@ -1692,39 +1745,75 @@ for _i, _pl in enumerate(PLACE):
     DROOP_LIMIT.append(_hi)
     _settled.append(_blade_cloud(_pl, _hi))
 
-for i in range(int(P['leaves'])):
-    # outer leaves give up first; the crown is the last thing to go
-    k = 1.0 + 0.25 * math.sin(i * 2.4)
-    limit = DROOP_LIMIT[i] if i < len(DROOP_LIMIT) else math.radians(180.0)
-    # SHARE sums to 1, so the tip's total rotation is `total_droop * k` and the
-    # clamp is one division rather than a search.
-    if total_droop * k > limit:
-        k = limit / total_droop if total_droop > 1e-9 else 0.0
-    for s in range(int(P['segs'])):
-        nm = f"L{i}_{s}"
-        if nm in rig.pose.bones:
-            share = SHARE[s] if s < len(SHARE) else SHARE[-1]
-            pb = rig.pose.bones[nm]
-            pb.rotation_euler.x = -total_droop * share * k
 
-# Carried to the viewer on the ARMATURE OBJECT, not on the bones: Blender's
-# glTF exporter writes object custom properties into node `extras` and does not
-# do the same for bone ones — the first attempt put them on `pb.bone` and the
-# GLB came out with extras on nought of its 97 nodes. Indexed by leaf, radians.
 rig["droop_limits"] = [float(v) for v in DROOP_LIMIT]
 
-# The flowers go over with the foliage. A violet whose leaves have collapsed
-# while its blooms stand up straight is the single most obvious tell that the
-# wilt is a rig effect rather than a plant.
-STALK_SHARE = [0.22, 0.34, 0.44]
-stalk_droop = math.radians(float(P['flex_stalk_deg'])) * droop
-for j in range(int(P['blooms'])):
-    kk = 1.0 + 0.18 * math.sin(j * 1.7)
-    for s in range(3):
-        nm = f"B{j}_{s}"
-        if nm in rig.pose.bones:
-            share = STALK_SHARE[s] if s < len(STALK_SHARE) else STALK_SHARE[-1]
-            rig.pose.bones[nm].rotation_euler.x = -stalk_droop * share * kk
+def _bloom_cloud(j, fall, step=2):
+    """A bloom's own vertices, rotated down about the foot of its scape.
+
+    Sampled from the mesh rather than re-derived: a corolla is five lobes, a
+    tube, an eye and a scape, and re-deriving that would be a second opinion
+    about where the flower is - which is the thing this file exists not to have.
+    """
+    base = BLOOM_BASE[j]
+    ax = Vector((-math.sin(BLOOM_ANG[j]), math.cos(BLOOM_ANG[j]), 0.0))
+    q = Quaternion(ax, -fall)
+    a, b = BLOOM_FACES[j]
+    vs = set()
+    for f in me.polygons[a:b]:
+        vs.update(f.vertices)
+    out = []
+    for n, vi in enumerate(sorted(vs)):
+        if n % step:
+            continue
+        p = me.vertices[vi].co - base
+        p.rotate(q)
+        out.append(p + base)
+    return np.array([[p.x, p.y, p.z] for p in out]) if out else np.zeros((0, 3))
+
+
+# How far each bloom may fall before it is resting on the foliage. Same question
+# as the leaves and the same answer: a violet's flowers come down ONTO its
+# leaves, they do not go through them. Unmeasured until now, and it showed —
+# 746 face-pairs of corolla inside leaf at full thirst.
+#
+# HONEST LIMIT of this budget, and why `flex_stalk_deg` carries the rest of the
+# work: it rotates the bloom rigidly about the foot of its scape, while the rig
+# bends it progressively along three bones about each bone's own local axis. The
+# two motions are not the same, so the budget is an approximation and it stops
+# improving — tightening the sampling from every 6th vertex to every 2nd moved
+# the result from 174 face-pairs to 167. It is a safety net, not the guarantee;
+# the guarantee is the swept angle, and `bloom_vs_leaf_at_droop_1` in the build
+# report is what says so.
+BLOOM_LIMIT = []
+for _j in range(len(BLOOM_FACES)):
+    _hi = math.radians(float(P['flex_stalk_deg'])) * (1.0 + 0.18 * math.sin(_j * 1.7))
+    _rest = _bloom_cloud(_j, 0.0)
+    _lo = 0.0
+
+    def _bad_bloom(f, _j=_j, _rest=_rest):
+        mine = _bloom_cloud(_j, f)
+        if not len(mine):
+            return False
+        return any(_passes_through(mine, _rest, _c, _near, _gap)
+                   or _passes_through(_c, _c, mine, _near, _gap)
+                   for _c in _settled)
+
+    if _bad_bloom(_hi):
+        for _ in range(14):
+            _mid = 0.5 * (_lo + _hi)
+            if _bad_bloom(_mid):
+                _hi = _mid
+            else:
+                _lo = _mid
+        _hi = _lo
+    BLOOM_LIMIT.append(_hi)
+
+rig["bloom_limits"] = [float(v) for v in BLOOM_LIMIT]
+
+# Now that both budgets exist, put the plant at the thirst it was asked for.
+pose_wilt(droop)
+
 
 wind = float(P['wind'])
 FR = int(P['frames'])
@@ -2045,30 +2134,21 @@ import mesh_checks as _mc
 _il.reload(_mc)
 _wilt = {}
 for _d in (0.0, 1.0):
-    _td = math.radians(float(P['flex_leaf_deg'])) * _d
-    for _i in range(int(P['leaves'])):
-        _k = 1.0 + 0.25 * math.sin(_i * 2.4)
-        _lim = DROOP_LIMIT[_i] if _i < len(DROOP_LIMIT) else math.radians(180.0)
-        if _td * _k > _lim:
-            _k = _lim / _td if _td > 1e-9 else 0.0
-        for _s in range(int(P['segs'])):
-            _nm = f"L{_i}_{_s}"
-            if _nm in rig.pose.bones:
-                _sh = SHARE[_s] if _s < len(SHARE) else SHARE[-1]
-                rig.pose.bones[_nm].rotation_euler.x = -_td * _sh * _k
-    _sd = math.radians(float(P['flex_stalk_deg'])) * _d
-    for _j in range(int(P['blooms'])):
-        _kk = 1.0 + 0.18 * math.sin(_j * 1.7)
-        for _s in range(3):
-            _nm = f"B{_j}_{_s}"
-            if _nm in rig.pose.bones:
-                _sh = STALK_SHARE[_s] if _s < len(STALK_SHARE) else STALK_SHARE[-1]
-                rig.pose.bones[_nm].rotation_euler.x = -_sd * _sh * _kk
+    pose_wilt(_d)
     _dm, _was = _mc.deformed(plant)
     _wilt['leaf_pairs_at_droop_%g' % _d] = len(_mc.self_intersections(_dm, LEAF_FACES))
     _wilt['leaves_in_pot_at_droop_%g' % _d] = len(
         _mc.intersections_with(_dm, LEAF_FACES, [pot, rim]))
+    # The corolla, which nothing had ever asked about. A bloom sits among the
+    # leaves it just cleared, so it has the same two questions to answer.
+    _wilt['bloom_vs_leaf_at_droop_%g' % _d] = sum(
+        h[2] for h in _mc.between(_dm, BLOOM_FACES, LEAF_FACES))
+    _wilt['bloom_pairs_at_droop_%g' % _d] = len(
+        _mc.self_intersections(_dm, BLOOM_FACES))
+    _wilt['blooms_in_pot_at_droop_%g' % _d] = len(
+        _mc.intersections_with(_dm, BLOOM_FACES, [pot, rim]))
     _mc.restore(_was)
+pose_wilt(droop)
 
 result = {
     'leaf_pairs_intersecting': len(_clip),

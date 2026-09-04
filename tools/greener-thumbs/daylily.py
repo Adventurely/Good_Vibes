@@ -637,7 +637,7 @@ def tepal_spine(half_w, L, th0, th1, spent, sector):
 
 
 def tepal(Wf, ang, half_w, L, th0, th1, ruffle_amp, lobes, chan, slot, spent,
-          sector=1.0, shell=0.0, twist=0.0):
+          sector=1.0, shell=0.0, twist=0.0, names=None, sv=0.0):
     """One tepal, built in the flower's frame and rotated into place.
 
     Sepals and petals are the same builder at different widths and ruffle: the
@@ -700,6 +700,8 @@ def tepal(Wf, ang, half_w, L, th0, th1, ruffle_amp, lobes, chan, slot, spent,
                         p = Vector((p.x * k2, p.y * k2, p.z))
             q = Vector((p.x * ca - p.y * sa, p.x * sa + p.y * ca, p.z))
             row.append(bm.verts.new(Wf(q)))
+            if names:
+                bind(len(bm.verts) - 1, sv, names)
         rows.append(row)
     bm.verts.ensure_lookup_table()
 
@@ -815,8 +817,14 @@ def corolla_swept(scale=1.0, spent=0.0, open_t=1.0):
     return out
 
 
-def add_flower(origin, axis, scale=1.0, spent=0.0, open_t=1.0):
-    """A whole Hemerocallis flower: tube, two whorls, six stamens and a style."""
+def add_flower(origin, axis, scale=1.0, spent=0.0, open_t=1.0, names=None, sv=0.0):
+    """A whole Hemerocallis flower: tube, two whorls, six stamens and a style.
+
+    `names`/`sv` weight the whole corolla to the scape chain at the point the
+    pedicel leaves it. Without them the flower carries NO bone weight at all —
+    11,574 tepal vertices and 720 anther ones frozen — so a wilting plant bent
+    its scape and left its flowers hanging in the air where they had been.
+    """
     Wf = organ_frame(origin, axis)
     R = float(P['flower_d']) * 0.5 * scale
     pw = R * 0.30                     # petal half-width
@@ -831,7 +839,7 @@ def add_flower(origin, axis, scale=1.0, spent=0.0, open_t=1.0):
     npt = 6
     tp = [Wf(Vector((0.0, 0.0, TUBE_L * i / npt))) for i in range(npt + 1)]
     tr = [lerp(0.0026, TUBE_R, (i / npt) ** 1.6) * scale for i in range(npt + 1)]
-    tube(tp, tr, SLOT_SCAPE, RING=12)
+    tube(tp, tr, SLOT_SCAPE, RING=12, names=names, svs=[sv] * (npt + 1))
 
     faces = []
     fi = len(TEPAL_FACES) // 6        # six tepals per flower, always
@@ -846,7 +854,7 @@ def add_flower(origin, axis, scale=1.0, spent=0.0, open_t=1.0):
                            th0, th1 + math.radians(9.0),
                            float(P['ruffle']) * 0.22 * scale, 3.0, 0.16,
                            SLOT_TEPAL, spent, sec_s,
-                           -float(P['spent_shell']), tw))
+                           -float(P['spent_shell']), tw, names, sv))
         TEPAL_FACES.append(faces[-1])
         TEPAL_FLOWER.append(fi)
         TEPAL_WHORL.append(0)
@@ -855,7 +863,7 @@ def add_flower(origin, axis, scale=1.0, spent=0.0, open_t=1.0):
                            th0, th1,
                            float(P['ruffle']) * scale, 5.0, 0.22,
                            SLOT_TEPAL, spent, sec_p,
-                           float(P['spent_shell']), tw))
+                           float(P['spent_shell']), tw, names, sv))
         TEPAL_FACES.append(faces[-1])
         TEPAL_FLOWER.append(fi)
         TEPAL_WHORL.append(1)
@@ -871,7 +879,8 @@ def add_flower(origin, axis, scale=1.0, spent=0.0, open_t=1.0):
         tip = Vector((math.cos(a) * fl * 0.62, math.sin(a) * fl * 0.62, TUBE_L + fl * 0.74))
         ctl = Vector((math.cos(a) * fl * 0.10, math.sin(a) * fl * 0.10, TUBE_L + fl * 0.62))
         pts = [Wf(bezier(base, ctl, tip, i / 7.0)) for i in range(8)]
-        tube(pts, [0.0011 * scale] * 8, SLOT_SCAPE, RING=6)
+        tube(pts, [0.0011 * scale] * 8, SLOT_SCAPE, RING=6,
+             names=names, svs=[sv] * 8)
         # the anther is hinged across the filament, not along it — "versatile",
         # and it is why a daylily's anthers hang at an angle to their stalks
         d = (pts[-1] - pts[-2]).normalized()
@@ -880,7 +889,8 @@ def add_flower(origin, axis, scale=1.0, spent=0.0, open_t=1.0):
         al = 0.009 * scale
         ap = [pts[-1] + side * (al * (i / 4.0 - 0.5)) for i in range(5)]
         ar = [0.0009, 0.0021, 0.0024, 0.0021, 0.0009]
-        tube(ap, [r * scale for r in ar], SLOT_EYE, RING=6)
+        tube(ap, [r * scale for r in ar], SLOT_EYE, RING=6,
+             names=names, svs=[sv] * 5)
 
     # one style, exceeding the anthers by 0.5-2 cm, with a capitate stigma
     sl = R * 1.30
@@ -888,14 +898,16 @@ def add_flower(origin, axis, scale=1.0, spent=0.0, open_t=1.0):
     tip = Vector((sl * 0.50, 0.0, TUBE_L + sl * 0.80))
     ctl = Vector((sl * 0.06, 0.0, TUBE_L + sl * 0.66))
     pts = [Wf(bezier(base, ctl, tip, i / 8.0)) for i in range(9)]
-    tube(pts, [0.0010 * scale] * 9, SLOT_SCAPE, RING=6)
+    tube(pts, [0.0010 * scale] * 9, SLOT_SCAPE, RING=6,
+         names=names, svs=[sv] * 9)
     d = (pts[-1] - pts[-2]).normalized()
     tube([pts[-1] - d * 0.0012, pts[-1] + d * 0.0016],
-         [0.0016 * scale, 0.0013 * scale], SLOT_SCAPE, RING=6)
+         [0.0016 * scale, 0.0013 * scale], SLOT_SCAPE, RING=6,
+         names=names, svs=[sv] * 2)
     return faces
 
 
-def add_bud(origin, axis, stage, scale=1.0):
+def add_bud(origin, axis, stage, scale=1.0, names=None, sv=0.0):
     """Stages 0-2: pinhead green, elongating spindle, full size with colour break.
 
     A scape must hold buds at every maturity at once — fat colour-broken ones low
@@ -924,9 +936,9 @@ def add_bud(origin, axis, stage, scale=1.0):
         # before it opens, which is the transition the player wakes up to.
         cut = int(n * 0.80)
         slots = [SLOT_SCAPE if i < cut else SLOT_TEPAL for i in range(n)]
-        tube(pts, radii, slots, RING=9)
+        tube(pts, radii, slots, RING=9, names=names, svs=[sv] * (n + 1))
     else:
-        tube(pts, radii, SLOT_SCAPE, RING=9)
+        tube(pts, radii, SLOT_SCAPE, RING=9, names=names, svs=[sv] * (n + 1))
 
 
 # ---- the scape, and everything hanging off it ------------------------------
@@ -1071,11 +1083,11 @@ def add_scape(fan_az, crown, tag):
         tube(pp, [r0 * 0.34, r0 * 0.31, r0 * 0.29, r0 * 0.27, r0 * 0.26],
              SLOT_SCAPE, RING=6, names=names, svs=[u] * 5)
         if kind == 'open':
-            add_flower(pe, axis, 1.0, 0.0, float(P['bloom_open']))
+            add_flower(pe, axis, 1.0, 0.0, float(P['bloom_open']), names, u)
         elif kind == 'spent':
-            add_flower(pe, axis, 1.0, float(P['spent_t']), 1.0)
+            add_flower(pe, axis, 1.0, float(P['spent_t']), 1.0, names, u)
         else:
-            add_bud(pe, pdir, val)
+            add_bud(pe, pdir, val, 1.0, names, u)
     return names
 
 
