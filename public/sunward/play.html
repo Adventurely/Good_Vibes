@@ -34,7 +34,9 @@
 
       body {
         margin: 0;
-        padding: 1rem 1rem 3rem;
+        /* Tight side padding on a narrow screen, so the lot still gets its
+           whole 320 pixels at the width most phones actually are. */
+        padding: 1rem clamp(0.4rem, 2.5vw, 1rem) 3rem;
         background: var(--ink);
         background-image: radial-gradient(circle at 50% -10%, #fffdf6 0%, #efe7d7 68%);
         color: var(--text);
@@ -92,7 +94,14 @@
          it — some pixels land on two screen pixels and others on three, and a
          drawing that scales unevenly stops reading as pixel art and starts
          reading as a broken image. */
-      #lot { cursor: pointer; touch-action: manipulation; margin: 0 auto; }
+      /* `max-width` is the one place the whole-number rule is allowed to give
+         way. `fitCanvas` never returns a scale below 1, so on a 320px viewport
+         — which is what WCAG names, and what 400% zoom on a desktop produces —
+         a 320px canvas inside a 288px column was cut off at the right-hand
+         edge with nothing to say so. A slightly soft scene beats a scene with
+         a piece missing. */
+      #lot { cursor: pointer; touch-action: manipulation; margin: 0 auto;
+             max-width: 100%; height: auto; }
       #lot:focus-visible { outline: 3px solid var(--sun); outline-offset: -3px; }
 
       /* The readout sits on the picture rather than under it, because the
@@ -181,9 +190,17 @@
         background: var(--panel); border: 1px solid var(--line); border-radius: 5px;
         cursor: pointer; color: inherit;
       }
-      .row:hover:not(:disabled) { background: #fffdf6; border-color: var(--accent); }
-      .row:disabled { cursor: not-allowed; opacity: 0.62; }
-      .row canvas { width: 2.4rem; height: 2.4rem; image-rendering: pixelated; }
+      .row:hover:not([aria-disabled='true']) { background: #fffdf6; border-color: var(--accent); }
+      /* `aria-disabled`, not `disabled`. A real `disabled` on the button you
+         just pressed drops focus to <body>, so buying ten growers by keyboard
+         meant ten full traversals of the page back to the row. This keeps the
+         row focusable and lets the click through to the refusal, which says
+         how much light you are short — which is more use than a dead button. */
+      .row[aria-disabled='true'] { cursor: not-allowed; opacity: 0.62; }
+      /* 48px for a 24px sprite: two whole pixels each. At 2.4rem it was 1.6x,
+         which puts some rows of a sprite on two screen pixels and others on
+         three — the exact thing the canvas rule exists to stop. */
+      .row canvas { width: 48px; height: 48px; image-rendering: pixelated; }
       .row .name { font-weight: 700; font-size: 0.88rem; }
       .row .note { display: block; font-size: 0.72rem; color: var(--muted); }
       .row .cost { text-align: right; font-size: 0.82rem; font-weight: 700; color: var(--sun); }
@@ -218,7 +235,12 @@
       tbody tr:last-child td { border-bottom: 0; }
       td.num { font-variant-numeric: tabular-nums; }
 
-      #graph { width: 100%; height: auto; border: 1px solid var(--line); border-radius: 4px; background: #0d0b1f; }
+      /* Width is set from the element's own CSS width at boot, so the graph is
+         drawn one canvas pixel to one screen pixel. Left at 320 internal and
+         100% wide it rendered at 1.19x, and the 5x7 labels came out with some
+         rows a pixel tall and others two — legible, but wrong in the one way
+         this repo has a rule about. */
+      #graph { width: 100%; border: 1px solid var(--line); border-radius: 4px; background: #0d0b1f; }
 
       .medals { display: grid; grid-template-columns: repeat(auto-fill, minmax(6.6rem, 1fr)); gap: 0.3rem; }
       .medal { border: 1px solid var(--line); border-radius: 4px; padding: 0.3rem 0.4rem;
@@ -239,7 +261,11 @@
       .btn:hover:not(:disabled) { background: #fffdf6; }
       .btn:disabled { opacity: 0.5; cursor: not-allowed; }
       .btn-go { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
-      .btn-go:hover:not(:disabled) { background: #37903c; }
+      /* Darker on hover, not lighter. #37903c measured 4.03:1 against white —
+         under the 4.5:1 body text needs — which put the reset button at its
+         worst contrast at the exact moment somebody is reading it to decide.
+         This one measures 6.5:1. */
+      .btn-go:hover:not(:disabled) { background: #256b28; }
       .btn-quiet { font-size: 0.72rem; color: var(--muted); }
 
       .toasts { position: fixed; left: 50%; bottom: 1rem; transform: translateX(-50%);
@@ -277,7 +303,13 @@
                what pressing it does. -->
           <canvas id="lot" width="320" height="180" tabindex="0" role="button"
                   aria-label="The lot. Click, or press Enter, to draw light from the tree."></canvas>
-          <div class="readout" aria-hidden="true">
+          <!-- Not aria-hidden. This is the only place the light in hand is
+               written down, and hiding it meant a screen reader could hear
+               every price in the shop and nothing about whether any of them
+               was affordable. It is not a live region either: it changes
+               several times a second, and announcing that would make the page
+               unusable. It is here to be read on demand. -->
+          <div class="readout">
             <div>
               <div class="light" id="light">0</div>
               <div class="rate" id="rate">0 per second</div>
@@ -387,12 +419,12 @@
        */
       import {
         newGame, fromSave, toSave, tick, tap, plant, plantRefusal, study, studyRefusal,
-        prestige, prestigeRefusal, pendingSeeds, seedsFrom, lightForSeeds, seedBonus,
-        catchUp, offlineGain, OFFLINE_CAP, GROWERS, GROWER_BY_ID, GROWER_IDS,
-        UPGRADES, growerCost, bulkCost, affordable, bonuses, totalRate, steadyRate,
+        prestige, prestigeRefusal, pendingSeeds, lightForSeeds, seedBonus, MAX_TICK,
+        catchUp, OFFLINE_CAP, GROWERS, GROWER_BY_ID, GROWER_IDS,
+        bulkCost, affordable, bonuses, totalRate, steadyRate,
         tapValue, snapshot, offered, award, breakdown, note, sample, tapRate,
-        dayPhase, phaseName, sunHeight, DAY_LENGTH, HISTORY_STEP, HISTORY_SPAN,
-        STAT_KEYS, STAT_LABELS, formatLight, formatTime, formatStat,
+        dayPhase, phaseName, sunHeight, HISTORY_STEP,
+        STAT_KEYS, STAT_LABELS, STAT_SHORT, formatLight, formatTime, formatStat,
         ACHIEVEMENTS, UPGRADE_BY_ID,
       } from './content.js';
       import { createLot, growthFor, treeBounds, PROP_ART, drawProp, SCENE_W, SCENE_H, hex }
@@ -503,10 +535,10 @@
       /* ---- taps ---------------------------------------------------------- */
 
       function doTap(x, y){
-        const value = tap(state);
         const now = performance.now() / 1000;
         taps.push(now);
         while(taps.length && taps[0] < now - 60) taps.shift();
+        const value = tap(state, tapRate(taps, now));
         floaters.push({ x, y, text: '+' + formatLight(value), born: performance.now() });
         while(floaters.length > 24) floaters.shift();
         shake = Math.min(3, shake + 1.4);
@@ -525,6 +557,11 @@
          only verb is a mouse gesture is a game some people cannot play. */
       ui.lot.addEventListener('keydown', event => {
         if(event.key !== 'Enter' && event.key !== ' ') return;
+        // Held keys repeat at whatever the OS says, which in Chrome is about
+        // thirty a second — enough to win both of the taps-a-second medals by
+        // leaning on the return key, and to out-earn a mouse on every upgrade
+        // that pays per tap.
+        if(event.repeat) return;
         event.preventDefault();
         const bounds = treeBounds(growthFor(growers()));
         doTap(bounds.x + bounds.w / 2, bounds.y + bounds.h * 0.4);
@@ -552,11 +589,23 @@
       function buyUpgrade(id){
         const refusal = studyRefusal(state, id);
         if(refusal) return say(refusal);
+        /* Where the bought row was in the list. Buying rebuilds the panel and
+           the row is gone, so without this the keyboard lands on <body> and
+           the next Tab starts again at the top of the page. */
+        const rows = [...ui.upgrades.querySelectorAll('[data-up]')];
+        const wasAt = rows.findIndex(row => row.dataset.up === id);
+        const hadFocus = document.activeElement === rows[wasAt];
+
         const up = study(state, id);
         note(state, `Bought ${up.name}.`);
         say(up.flavour, up.name);
         logMilestones();
         drawShop();
+
+        if(hadFocus){
+          const left = [...ui.upgrades.querySelectorAll('[data-up]')];
+          (left[Math.min(wasAt, left.length - 1)] || els('tab-study')).focus();
+        }
       }
 
       /* ---- the shop ------------------------------------------------------ */
@@ -607,7 +656,13 @@
         }
       }
 
-      let shopKey = '';
+      /* `null`, not `''`. An empty string is the key an empty shop produces —
+         which is exactly the state after a reset, when every unlock has just
+         gone back to zero — so using it as the force-a-rebuild flag meant the
+         one moment the panel had to be rebuilt was the one moment it was not.
+         The "Bought" grid kept listing the upgrades from the run you had just
+         given back. */
+      let shopKey = null;
       function drawShop(){
         const snap = snapshot(state);
         const list = offered(state, snap);
@@ -650,7 +705,8 @@
         if(e.clickMult) return `A tap is worth ${e.clickMult}&times; as much.`;
         if(e.allMult) return `Everything makes ${Math.round((e.allMult - 1) * 100)}% more.`;
         if(e.fingers) return `A tap also pays ${(e.fingers * 100).toFixed(0)}% of your light per second.`;
-        if(e.steady) return `The day and night swing shrinks by ${Math.round(e.steady * 100)} points.`;
+        if(e.steady) return `Bad hours get less bad: everything marked day or night`
+          + ` makes about ${(e.steady / Math.PI * 100).toFixed(0)}% more over a day.`;
         if(e.grower) return `${GROWER_BY_ID[e.grower].name}s make ${e.mult}&times; as much.`;
         return up.flavour;
       }
@@ -664,7 +720,7 @@
           const price = bulkCost(g, owned, count);
           const afford = state.light >= price;
           row.dataset.afford = String(afford);
-          row.disabled = !afford;
+          row.setAttribute('aria-disabled', String(!afford));
           const each = g.rate * bonus.grower[g.id] * bonus.allMult * bonus.seedMult;
           note.textContent = owned
             ? `${owned} planted · ${formatLight(each * owned)}/s`
@@ -678,7 +734,7 @@
           if(!row) continue;
           const afford = state.light >= up.cost;
           row.dataset.afford = String(afford);
-          row.disabled = !afford;
+          row.setAttribute('aria-disabled', String(!afford));
         }
         ui.studyDot.hidden = !list.some(up => state.light >= up.cost);
       }
@@ -696,9 +752,15 @@
       function drawRecord(){
         const live = tapRate(taps, performance.now() / 1000);
 
+        /* The short headings on a narrow screen. "Best light per second" wraps
+           to three lines in a 380px panel and pushes its own row's numbers out
+           of line; STAT_SHORT is the table's own answer to that and went unused
+           for a while, which made it a name that could be edited with no
+           effect on anything. */
+        const tight = innerWidth < 30 * 16;
         ui.counters.replaceChildren(...STAT_KEYS.map(key => {
           const tr = document.createElement('tr');
-          tr.innerHTML = `<th scope="row">${STAT_LABELS[key]}</th>`
+          tr.innerHTML = `<th scope="row">${tight ? STAT_SHORT[key] : STAT_LABELS[key]}</th>`
             + `<td class="num">${formatStat(key, state.session[key])}</td>`
             + `<td class="num">${formatStat(key, state.run[key])}</td>`
             + `<td class="num">${formatStat(key, state.life[key])}</td>`;
@@ -747,7 +809,23 @@
        * round, which is the one thing a clicker's output graph does not usually
        * have and the reason this screen is worth opening.
        */
+      /* One canvas pixel per screen pixel. It cannot be done once at boot: the
+         Record tab starts hidden, a hidden element has a `clientWidth` of zero,
+         and the fallback left the graph drawn at 320 inside a 380px box — 1.19x,
+         which gave the 5x7 labels rows one pixel tall next to rows two pixels
+         tall. So it is measured every time the graph is drawn, and setting
+         `width` resets the context, which is why the smoothing flag goes back
+         off underneath. */
+      function sizeGraph(){
+        const wide = Math.max(160, Math.round(ui.graph.clientWidth));
+        if(!wide || wide === ui.graph.width) return false;
+        ui.graph.width = wide;
+        graphCtx.imageSmoothingEnabled = false;
+        return true;
+      }
+
       function drawGraph(live){
+        sizeGraph();
         const W = ui.graph.width, H = ui.graph.height;
         graphCtx.fillStyle = hex('k');
         graphCtx.fillRect(0, 0, W, H);
@@ -758,14 +836,29 @@
           return;
         }
 
-        const top = Math.max(1, ...series);
+        /* The axis runs from the lowest sample to the highest rather than from
+           zero, and it is logarithmic between them.
+
+           Zero-floored was the first cut and it hid the thing the graph is for.
+           A rate crosses three orders of magnitude over an evening, so a log
+           axis is the only readable one — but the day/night wave only spans a
+           factor of three, and against a floor of zero the whole wave squashed
+           into the top two pixels and drew as a straight line. Anchoring the
+           floor to the series' own minimum spends the height on the range that
+           is actually there, whether that range is a wave or a climb. */
+        const top = Math.max(...series);
+        const floor = Math.min(...series.filter(value => value > 0));
+        const hi = Math.log10(Math.max(top, 1e-9) * 1.08);
+        const lo = Math.log10(Math.max(Number.isFinite(floor) ? floor : top, 1e-9) / 1.08);
+        const flat = !(hi - lo > 0.01);
         const scale = value => {
-          const t = Math.log10(1 + Math.max(0, value)) / Math.log10(1 + top);
-          return H - 9 - t * (H - 14);
+          if(flat) return Math.round(H / 2);
+          const t = (Math.log10(Math.max(value, 1e-9)) - lo) / (hi - lo);
+          return H - 9 - Math.max(0, Math.min(1, t)) * (H - 16);
         };
 
-        // A rule per decade, so the eye has something to measure against.
-        for(let power = 0; Math.pow(10, power) <= top; power++){
+        // A rule per decade, where a decade falls inside what is on screen.
+        for(let power = Math.floor(lo); power <= Math.ceil(hi); power++){
           const y = Math.round(scale(Math.pow(10, power)));
           if(y < 4 || y > H - 10) continue;
           graphCtx.fillStyle = hex('d');
@@ -798,7 +891,14 @@
         }
 
         drawText(graphCtx, formatLight(top) + '/S', 2, 2, 'y', 1);
-        drawText(graphCtx, formatTime(HISTORY_SPAN) + ' AGO', 2, H - 8, 's', 1);
+        // The floor as well as the ceiling: an axis that does not start at zero
+        // has to say where it does start, or the wave on it means nothing.
+        if(!flat) drawText(graphCtx, formatLight(Math.pow(10, lo)) + '/S', 2, H - 16, 'o', 1);
+        // How far back it actually reaches, not how far back it can reach. A
+        // new run's first two minutes were labelled "10M 00S AGO", and so was
+        // every run's first ten minutes after a reset.
+        const span = (series.length - 1) * HISTORY_STEP;
+        drawText(graphCtx, formatTime(span) + ' AGO', 2, H - 8, 's', 1);
         const nowLabel = formatLight(live) + ' T/S';
         drawText(graphCtx, nowLabel, W - textWidth(nowLabel, 1) - 2, H - 8, 'c', 1);
       }
@@ -837,7 +937,7 @@
         note(state, `Gave the lot back. ${state.seeds} seeds held.`);
         say(`${state.seeds} seeds held — everything makes ${Math.round((seedBonus(state.seeds) - 1) * 100)}% more.`,
           'Let it seed');
-        shopKey = '';
+        shopKey = null;
         drawShop();
         writeSave();
       });
@@ -913,10 +1013,15 @@
         const dt = (now - last) / 1000;
         last = now;
 
-        /* A gap this long is a tab that was asleep, not a slow frame, and it is
-           paid at the offline rate — the sky did not move while it was shut, so
-           ticking it live would pay a night's output at noon. */
-        if(dt > 20) catchUp(state, dt);
+        /* A gap longer than one tick is a tab that was asleep, not a slow
+           frame, and it is paid at the offline rate.
+           
+           The threshold is MAX_TICK and not a round twenty seconds, because
+           `tick` silently clamps anything above MAX_TICK: with the two numbers
+           apart, every gap between five and twenty seconds — a glance at
+           another tab — paid five seconds and dropped the rest on the floor,
+           with no notice and nothing in the log. */
+        if(dt > MAX_TICK) catchUp(state, dt);
         else if(dt > 0) tick(state, dt);
 
         // One history sample every two seconds of game time, at both series.
@@ -963,11 +1068,15 @@
 
         // The numbers that drift off the tree, drawn in the game's own font so
         // they belong to the picture rather than sitting on top of it.
+        /* They drift up and fade. Under `prefers-reduced-motion` they do not
+           drift at all — every tap is the one gesture this game has, so a
+           label sliding up the screen on each of them is the most repeated
+           motion on the page and the last one that should have been left in. */
         for(let i = floaters.length - 1; i >= 0; i--){
           const f = floaters[i];
           const age = (now - f.born) / 1100;
           if(age >= 1){ floaters.splice(i, 1); continue; }
-          const y = f.y - age * 26;
+          const y = still.matches ? f.y : f.y - age * 26;
           const key = age > 0.7 ? 'o' : 'y';
           drawText(lotCtx, f.text, Math.round(f.x - textWidth(f.text, 1) / 2), Math.round(y), 'k', 1);
           drawText(lotCtx, f.text, Math.round(f.x - textWidth(f.text, 1) / 2) - 1, Math.round(y) - 1, key, 1);
@@ -1007,11 +1116,16 @@
          `maxHeightFraction` keeps the lot from taking the whole screen on a
          short landscape window, where a 3x canvas would push the shop off the
          bottom. */
-      const resize = () => fitCanvas(ui.lot, SCENE_W, SCENE_H,
-        { container: ui.lot.parentElement.parentElement, maxHeightFraction: 0.56 });
+      function resize(){
+        fitCanvas(ui.lot, SCENE_W, SCENE_H,
+          { container: ui.lot.parentElement.parentElement, maxHeightFraction: 0.56 });
+        sizeGraph();
+      }
       resize();
       addEventListener('resize', resize);
 
+      // Save when the page goes away as well as on the timer: a tab closed
+      // nine seconds after a purchase should not lose the purchase.
       addEventListener('visibilitychange', () => { if(document.hidden) writeSave(); });
       addEventListener('pagehide', writeSave);
 

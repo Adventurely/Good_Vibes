@@ -17,7 +17,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import {
-  DAY_LENGTH, DAY_START, SWING, dayPhase, sunHeight, phaseName, PHASE_NAMES,
+  DAY_LENGTH, DAY_START, SWING, dayPhase, sunHeight, phaseName, PHASE_NAMES, averageFactor,
   GROWERS, GROWER_IDS, GROWER_BY_ID, COST_GROWTH, growerCost, bulkCost, affordable,
   UPGRADES, UPGRADE_BY_ID, ACHIEVEMENTS, ACHIEVEMENT_BY_ID,
   STAT_KEYS, STAT_LABELS, STAT_SHORT, PEAK_KEYS, blankStats, score,
@@ -141,6 +141,47 @@ test('the day turns, and a whole one averages out to nothing', () => {
       `a whole day of "${phase}" averaged ${(total / steps).toFixed(4)}, not 1`);
   }
   assert.equal(phaseFactor('any', 123), 1, 'an "any" grower must not feel the sky at all');
+});
+
+test('a bought trough is worth something, and worth exactly what it says', () => {
+  /* These shaved the swing from both ends for a while, which is worth nothing
+     at all: the swing already cancels over a day, so taking the same slice off
+     each end changes the shape of the line and not the area under it. Three
+     upgrades, at 8M, 900M and 7T light, that a player could buy and measure no
+     difference from. They lift the bottom only now. */
+  for(const lift of [0.1, 0.2, 0.5]){
+    for(const phase of ['day', 'night']){
+      let total = 0;
+      const steps = 4000;
+      for(let i = 0; i < steps; i++) total += phaseFactor(phase, (i / steps) * DAY_LENGTH, SWING, lift);
+      const sampled = total / steps;
+      assert.ok(Math.abs(sampled - averageFactor(phase, lift)) < 0.002,
+        `a day at lift ${lift} sampled ${sampled.toFixed(4)}, and averageFactor says ${averageFactor(phase, lift).toFixed(4)}`);
+      assert.ok(sampled > 1.01, `lift ${lift} left the day averaging ${sampled.toFixed(4)} — the upgrade does nothing`);
+    }
+  }
+  assert.equal(averageFactor('any', 0.5), 1, 'an "any" grower has no trough to lift');
+
+  // And the peak must be untouched: it is the trough that moves.
+  assert.equal(phaseFactor('day', DAY_LENGTH * 0.25, SWING, 0.3),
+    phaseFactor('day', DAY_LENGTH * 0.25, SWING, 0), 'noon must not change');
+  assert.ok(phaseFactor('day', DAY_LENGTH * 0.75, SWING, 0.3) >
+    phaseFactor('day', DAY_LENGTH * 0.75, SWING, 0), 'midnight must');
+});
+
+test('every upgrade in the shop is worth buying', () => {
+  /* The failure this exists for is not a crash: it is a row that charges for a
+     multiplier that multiplies nothing. Each one is bought against a lot that
+     owns some of everything, and the steady rate has to move. */
+  for(const up of UPGRADES){
+    const state = newGame();
+    for(const g of GROWERS) state.owned[g.id] = 20;
+    const before = { rate: steadyRate(state), tap: tapValue(state) };
+    state.bought[up.id] = true;
+    const after = { rate: steadyRate(state), tap: tapValue(state) };
+    assert.ok(after.rate > before.rate || after.tap > before.tap,
+      `"${up.id}" costs ${formatLight(up.cost)} and changes neither the rate nor the tap`);
+  }
 });
 
 test('the swing is real enough to notice and never pays a negative', () => {
@@ -327,6 +368,21 @@ test('the milestone log keeps the last entries and no more', () => {
 
 /* -------------------------------------------------------------- the play */
 
+test('a tap records how fast the hand was going', () => {
+  /* "Best taps per second" was a row on the record that nothing ever wrote to:
+     the medal for ten taps a second was being awarded while the counter for the
+     same thing sat at zero in all three columns, forever. The page owns the
+     clock, so it measures the rate and hands it in. */
+  const state = newGame();
+  tap(state, 7.5);
+  tap(state, 3);
+  assert.equal(state.life.peakTaps, 7.5, 'a peak must not be walked back down');
+  assert.equal(state.run.peakTaps, 7.5);
+  assert.equal(state.session.peakTaps, 7.5);
+  tap(state);
+  assert.equal(state.life.peakTaps, 7.5, 'a tap with no rate given must not clear it');
+});
+
 test('a tap pays, and it pays more once the hand is upgraded', () => {
   const state = newGame();
   assert.equal(tapValue(state), 1, 'a bare hand is worth one');
@@ -465,6 +521,28 @@ test('time away pays at half rate and stops at the cap', () => {
   assert.equal(fortnight.capped, true, 'and it must say that it did');
 });
 
+test('the history clock starts where the run does', () => {
+  /* At zero, with `elapsed` already at DAY_START, the page had forty seconds of
+     absence to make up before it had drawn a frame, and spent twenty-one of the
+     graph's three hundred points on copies of the same moment. */
+  const state = newGame();
+  assert.equal(state.sampledAt, state.elapsed);
+  state.life.earned = 1e9;
+  prestige(state);
+  assert.equal(state.sampledAt, state.elapsed, 'and a reset must leave it there too');
+});
+
+test('a long absence starts the graph again rather than filling it with a guess', () => {
+  const state = newGame();
+  state.owned.moss = 50;
+  for(let i = 0; i < 40; i++) sample(state.history, state.elapsed + i * 2, 100 + i, 1);
+  catchUp(state, 7 * 86400);
+  assert.equal(state.history.at.length, 0,
+    'a week is a hole in a ten-minute graph, and filling it in is drawing income nobody earned');
+  assert.equal(state.sampledAt, state.elapsed,
+    'and leaving the sample clock behind makes the page walk the whole gap two seconds at a time');
+});
+
 test('catching up moves the sky but does not claim you were here', () => {
   const state = newGame();
   state.owned.moss = 100;
@@ -555,6 +633,13 @@ test('numbers are readable at every size a run reaches', () => {
   assert.equal(formatLight(412.6), '412');
   assert.equal(formatLight(1000), '1.00K');
   assert.equal(formatLight(999999.7), '1.00M', 'rounding at the edge must carry, not read as 1000.0K');
+  /* The band below every suffix. With three digits and no decimals, toFixed
+     rounds 999.5 up to "1000", so a single carry threshold on the unrounded
+     mantissa printed "1000K" — the exact unit the carry exists to prevent. */
+  assert.equal(formatLight(999500), '1.00M');
+  assert.equal(formatLight(999999), '1.00M');
+  assert.equal(formatLight(999.6e9), '1.00T');
+  assert.match(formatLight(9.999e35), /^1\.00e36$/, 'and past the suffixes it must reach the exponent');
   assert.equal(formatLight(1.234e6), '1.23M');
   assert.equal(formatLight(-2500), '-2.50K');
   assert.match(formatLight(1e40), /e40$/, 'past the named suffixes it should say the exponent');

@@ -42,7 +42,15 @@ export const DAY_LENGTH = 240;
    is a lot: at midnight a field of panels is making half what the shop said it
    would. That is the point — the shop's number is an average, and the game
    says so on the row — and it is what makes a night grower worth buying when
-   you already have twelve panels. Upgrades shave this down; see `steady`. */
+   you already have twelve panels.
+
+   The `steady` upgrades shave the swing, and they shave it off the BOTTOM
+   only: a bought one lifts the trough without touching the peak. Shrinking it
+   from both ends, which is what they did at first, is worth exactly nothing —
+   the swing already averages to one over a day, so a symmetric shave changes
+   the shape of the line and not the area under it, and three upgrades costing
+   8M, 900M and 7T light bought a player a bit-identical income. See
+   `averageFactor` for what the asymmetric version is worth. */
 export const SWING = 0.5;
 
 /* Where a fresh run starts on the clock. Not zero: zero is first light, the
@@ -219,16 +227,24 @@ export const UPGRADES = [
   { id: 'old-weather', name: 'The old weather', cost: 4e14, effect: { allMult: 1.25 },
     need: { runEarned: 8e14 }, flavour: 'Rain when it should rain. Nobody thought it would come back.' },
 
-  /* --- the swing --------------------------------------------------------- */
-  /* Both halves of the cycle, bought separately, because the interesting hour
-     is the one where you have flattened your nights and not your days. */
-  { id: 'night-bloom', name: 'Night bloom', cost: 8e6, effect: { steady: 0.15 },
+  /* --- the trough --------------------------------------------------------- */
+  /* Each of these lifts the bottom of the swing without touching the top, so
+     a bad hour gets less bad and a good one stays as good. Worth lift/pi on
+     everything marked day or night, forever — about 6% each for the first two
+     and 3% for the last, which takes the trough all the way up to flat.
+
+     They shaved the swing symmetrically at first and were worth exactly
+     nothing: the swing already averages out over a day, so taking the same
+     slice off both ends changes the shape of the line and not the area under
+     it. Three upgrades at 8M, 900M and 7T light, sold as improvements, that a
+     player could buy and measure no difference from at all. */
+  { id: 'night-bloom', name: 'Night bloom', cost: 1.5e6, effect: { steady: 0.2 },
     need: { owned: { id: 'mushroom', count: 5 } },
     flavour: 'Flowers that open at dusk, for the things that fly then.' },
-  { id: 'dawn-chorus', name: 'Dawn chorus', cost: 9e8, effect: { steady: 0.15 },
+  { id: 'dawn-chorus', name: 'Dawn chorus', cost: 4e7, effect: { steady: 0.2 },
     need: { owned: { id: 'glasshouse', count: 5 } },
     flavour: 'Everything wakes fifteen minutes earlier than it used to.' },
-  { id: 'even-keel', name: 'Even keel', cost: 7e12, effect: { steady: 0.15 },
+  { id: 'even-keel', name: 'Even keel', cost: 8e10, effect: { steady: 0.1 },
     need: { owned: { id: 'canopy', count: 10 } },
     flavour: 'Enough of it now that a cloudy week is just a week.' },
 
@@ -529,7 +545,12 @@ export function newGame(){
     life: blankStats(),
     log: [],
     history: freshHistory(),
-    sampledAt: 0,        // elapsed at the last history sample
+    /* Elapsed at the last history sample, and it starts where `elapsed` does.
+       At zero, with elapsed already at DAY_START, the page's catch-up loop had
+       forty seconds of absence to make up before it had even drawn a frame and
+       spent twenty-one of the graph's three hundred points on copies of the
+       same moment. */
+    sampledAt: DAY_START,
     decade: 0,           // biggest power of ten of lifetime light already logged
   };
 }
@@ -546,6 +567,7 @@ export function bonuses(state){
     allMult: 1,
     fingers: 0,
     swing: SWING,
+    lift: 0,
     grower: Object.fromEntries(GROWER_IDS.map(id => [id, 1])),
     seedMult: seedBonus(state.seeds),
   };
@@ -558,7 +580,7 @@ export function bonuses(state){
     if(e.clickMult) out.clickMult *= e.clickMult;
     if(e.allMult) out.allMult *= e.allMult;
     if(e.fingers) out.fingers += e.fingers;
-    if(e.steady) out.swing = Math.max(0, out.swing - e.steady);
+    if(e.steady) out.lift = Math.min(out.swing, out.lift + e.steady);
     if(e.grower && out.grower[e.grower] !== undefined) out.grower[e.grower] *= e.mult;
   }
   return out;
@@ -572,13 +594,31 @@ export const SEED_RATE = 0.02;
 export const seedBonus = seeds => 1 + SEED_RATE * seeds;
 
 /* How much a grower's phase is worth right now: 1 at the equinox points, up to
-   1 + swing at its best hour and down to 1 - swing at its worst. An `any`
-   grower ignores the sky entirely. */
-export function phaseFactor(phase, at, swing = SWING){
+   1 + swing at its best hour, and down to 1 - (swing - lift) at its worst. An
+   `any` grower ignores the sky entirely.
+
+   `lift` is what the steady upgrades have bought, and it only applies on the
+   way down. That asymmetry is the whole value of them: the peak is untouched,
+   the trough comes up, and the area under the day goes with it. */
+export function phaseFactor(phase, at, swing = SWING, lift = 0){
   if(phase === 'any') return 1;
   const h = sunHeight(dayPhase(at));
-  return 1 + (phase === 'day' ? h : -h) * swing;
+  const signed = phase === 'day' ? h : -h;
+  return 1 + signed * (signed < 0 ? Math.max(0, swing - lift) : swing);
 }
+
+/* What a marked grower makes over a whole day, as a multiple of its rated
+ * output.
+ *
+ * With nothing bought this is exactly 1 — the swing cancels, which is what
+ * lets a shop row quote an average and be telling the truth. With `lift`
+ * bought the negative half is shallower than the positive one and the day
+ * comes out ahead by lift/pi: the mean of sin over half a cycle is 2/pi, each
+ * half is half the day, and the two halves differ by `lift`, so the surplus is
+ * (1/2)(lift)(2/pi). A sixth of a swing is worth about 5% forever.
+ */
+export const averageFactor = (phase, lift = 0, swing = SWING) =>
+  phase === 'any' ? 1 : 1 + Math.min(Math.max(0, lift), swing) / Math.PI;
 
 /* What one kind is making per second, right now. */
 export function rateOf(state, id, bonus = bonuses(state)){
@@ -587,7 +627,7 @@ export function rateOf(state, id, bonus = bonuses(state)){
   const owned = state.owned[id] || 0;
   if(!owned) return 0;
   return owned * g.rate * bonus.grower[id] * bonus.allMult * bonus.seedMult
-    * phaseFactor(g.phase, state.elapsed, bonus.swing);
+    * phaseFactor(g.phase, state.elapsed, bonus.swing, bonus.lift);
 }
 
 /* The whole lot, per second, right now. */
@@ -607,7 +647,11 @@ export function steadyRate(state, bonus = bonuses(state)){
     const g = GROWER_BY_ID[id];
     const owned = state.owned[id] || 0;
     if(!owned) continue;
-    sum += owned * g.rate * bonus.grower[id] * bonus.allMult * bonus.seedMult;
+    // Through `averageFactor` rather than as a bare rate: once a steady
+    // upgrade is bought the day really does come out ahead of the rated
+    // number, and this figure is what pays for time away.
+    sum += owned * g.rate * bonus.grower[id] * bonus.allMult * bonus.seedMult
+      * averageFactor(g.phase, bonus.lift, bonus.swing);
   }
   return sum;
 }
@@ -724,13 +768,22 @@ export function tick(state, dt){
 }
 
 /* One tap. Returns what it paid, which is what the number that floats off the
-   tree is showing. */
-export function tap(state){
+ * tree is showing.
+ *
+ * `rate` is how fast the hand is going right now, which only the page can know
+ * — it owns the clock and the list of tap times. It is passed in rather than
+ * measured here because this module has no clock, and it is passed in at all
+ * because "best taps per second" was a row on the record that nothing ever
+ * wrote to: the medal for ten taps a second was being awarded while the
+ * counter for the same thing sat at zero.
+ */
+export function tap(state, rate = 0){
   const value = tapValue(state);
   state.light += value;
   score(state, 'taps', 1);
   score(state, 'tapped', value);
   score(state, 'earned', value);
+  if(rate > 0) score(state, 'peakTaps', rate);
   state.pending = pendingSeeds(state);
   return value;
 }
@@ -830,7 +883,7 @@ export function prestige(state){
   state.run = blankStats();
   state.log = [];
   state.history = freshHistory();
-  state.sampledAt = 0;
+  state.sampledAt = state.elapsed;
   return won;
 }
 
@@ -878,6 +931,24 @@ export function catchUp(state, seconds){
     score(state, 'earned', gain.light);
   }
   state.elapsed += Math.max(0, seconds);
+
+  /* The graph is ten minutes of contiguous game time, and an absence is a hole
+   * in it. Two things went wrong when this was left to the caller. The page
+   * walked the whole gap in two-second steps to catch the sample clock up —
+   * 300,000 iterations for a week away, a frozen tab for seconds before the
+   * first frame — and every one of those samples recorded the live rate at the
+   * moment of return, so a week away drew ten minutes of income that was never
+   * earned at a rate that was never in effect.
+   *
+   * Starting the series again is the honest answer: the graph's left edge is
+   * labelled with how far back it actually reaches, and it fills in live over
+   * the next ten minutes.
+   */
+  if(seconds > HISTORY_STEP){
+    state.history = freshHistory();
+    state.sampledAt = state.elapsed;
+  }
+
   state.pending = pendingSeeds(state);
   return gain;
 }
@@ -992,12 +1063,23 @@ export function formatLight(n){
 
   let tier = Math.floor(Math.log10(value) / 3);
   let scaled = value / Math.pow(1000, tier);
-  // Rounding at the edge: 999,999.7 is tier 1 by the logarithm and reads as
-  // 1000.0K, which is a unit nobody uses. Carry it.
-  if(scaled >= 999.9995){ tier += 1; scaled = value / Math.pow(1000, tier); }
+
+  /* Rounding at the edge: 999,999.7 is tier 1 by the logarithm and would read
+     as 1000.0K, which is a unit nobody uses. Carrying it is not as simple as
+     one threshold, because how far it has to be from 1000 to be safe depends
+     on how many decimals are about to be printed — at three digits and no
+     decimals, anything from 999.5 up rounds to "1000". So the places are
+     chosen first, the rounding is done, and the carry asks the rounded number
+     rather than the raw one. A single 999.9995 cut got 999,500 wrong for a
+     whole band below every suffix. */
+  let places = scaled < 10 ? 2 : scaled < 100 ? 1 : 0;
+  if(Number(scaled.toFixed(places)) >= 1000){
+    tier += 1;
+    scaled = value / Math.pow(1000, tier);
+    places = scaled < 10 ? 2 : scaled < 100 ? 1 : 0;
+  }
   if(tier >= SUFFIXES.length) return sign + value.toExponential(2).replace('e+', 'e');
 
-  const places = scaled < 10 ? 2 : scaled < 100 ? 1 : 0;
   return sign + scaled.toFixed(places) + SUFFIXES[tier];
 }
 

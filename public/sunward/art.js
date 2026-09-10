@@ -33,7 +33,7 @@
  * colours at noon and sixteen colours at midnight; different sixteen.
  */
 
-import { PALETTE, hex, drawText, textWidth } from '../good-vibes/pixel.js';
+import { PALETTE, hex } from '../good-vibes/pixel.js';
 
 export { PALETTE, hex };
 
@@ -629,7 +629,7 @@ export function footing(ctx, x, y, w, light){
   }
 }
 
-function lotPieces(owned, growth){
+function lotPieces(owned){
   const pieces = [];
   for(const [id, rows] of Object.entries(PROP_ART)){
     const spots = PROP_SPOTS[id] || [];
@@ -680,7 +680,7 @@ export function paintLot(ctx, {
   drawClouds(ctx, now, light);
   drawGround(ctx, light);
 
-  const pieces = lotPieces(owned, growth);
+  const pieces = lotPieces(owned);
   // Everything behind the tree, then the tree, then everything in front of it.
   for(const p of pieces) if(p.ground <= TREE_Y) drawPiece(ctx, p, light);
   drawTree(ctx, growth, { sway, light, sunSide, shake });
@@ -741,7 +741,7 @@ export function createLot(){
       drawGround(ground.ctx, light);
     }
 
-    const pieces = lotPieces(owned, growth);
+    const pieces = lotPieces(owned);
     const nextProps = pieces.map(p => `${p.x},${p.ground}`).join('|') + '@' + nextGround;
     if(nextProps !== propKey){
       propKey = nextProps;
@@ -763,4 +763,3 @@ export function createLot(){
   };
 }
 
-export { drawText, textWidth };

@@ -70,9 +70,9 @@ test('each game is a title screen with a way in', async () => {
 });
 
 test('each game keeps its own modules', async () => {
-  /* Both games ship a content.js and an art.js. They are different files with
-     different tables, and the only thing keeping them apart is the directory —
-     so check the right one answers on each path. */
+  /* Three of the games ship a content.js and an art.js. They are different
+     files with different tables, and the only thing keeping them apart is the
+     directory — so check the right one answers on each path. */
   const gv = await fetch(`${baseUrl}/good-vibes/content.js`);
   assert.equal(gv.status, 200);
   assert.match(gv.headers.get('content-type'), /javascript/);
