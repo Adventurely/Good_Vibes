@@ -78,6 +78,10 @@ const GLYPHS = {
   ',': '.....,.....,.....,.....,.....,..#..,.#...',
   "'": '..#..,..#..,.....,.....,.....,.....,.....',
   '-': '.....,.....,.....,.###.,.....,.....,.....',
+  /* Added for Sunward, where every tap puts a "+1" on the screen and the
+     fallback glyph turned all of them into "?1". Additive: a character that
+     was not in the table could not have been drawn by anything before. */
+  '+': '.....,..#..,..#..,#####,..#..,..#..,.....',
   ':': '.....,..#..,.....,.....,..#..,.....,.....',
   '?': '.###.,#...#,....#,...#.,..#..,.....,..#..',
   '/': '....#,...#.,...#.,..#..,.#...,.#...,#....',

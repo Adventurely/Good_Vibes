@@ -1,10 +1,11 @@
 # Good Vibe Games
 
-Two games and the site that serves them: **Good Vibes**, built here, and
-**Save Solarium**, which moved in from another repo. One Worker, one domain,
-one deploy.
+Four games and the site that serves them: **Good Vibes**, built here;
+**Save Solarium**, which moved in from another repo; **Sunward**, a clicker
+with no server at all; and **Greener Thumbs**, still being built. One Worker,
+one domain, one deploy.
 
-> ## Pushing to `main` deploys both games
+> ## Pushing to `main` deploys every game
 >
 > `main` builds and deploys **good-vibe-games.com**. Each game's client and its
 > rules ship in the same Worker from the same commit, so they cannot end up
@@ -166,22 +167,40 @@ to read apart at a glance converge on the same dim brown.
 
 ## Hosting
 
-One Worker on **good-vibe-games.com** serves the shelf and both games.
+One Worker on **good-vibe-games.com** serves the shelf and every game on it.
 
     good-vibe-games.com
       ├── /                    the shelf: public/index.html
       ├── /good-vibes/         Good Vibes
       ├── /solarium/           Save Solarium
+      ├── /sunward/            Sunward          — no socket; the save is the browser's
+      ├── /greener-thumbs/     Greener Thumbs   — no socket either
       ├── /api/good-vibes/ws   src/worker.js → GameRoom,     one per room code
       └── /api/solarium/ws     src/worker.js → SolariumRoom, one per room code
+
+**Two of the four never touch the Worker.** Sunward and Greener Thumbs are one
+player and a save file, so they are files in `public/` and nothing else — no
+route, no Durable Object, no binding, and nothing to go down. A single-player
+game that needs a server to be played is a single-player game that stops
+working when somebody else's deploy fails.
 
 `public/` ships verbatim, no build step. The Worker is not invoked for files at
 all — assets are matched first — so the clients cost zero Worker calls and each
 socket costs one.
 
-**Each game keeps its own directory**, and it has to: both ship a `content.js`
-and an `art.js`, they are entirely different tables, and the directory is the
-only thing keeping them apart. A test asserts each path answers with its own.
+**Each game keeps its own directory**, and it has to: three of them ship a
+`content.js` and an `art.js`, they are entirely different tables, and the
+directory is the only thing keeping them apart. A test asserts each path
+answers with its own.
+
+The one thing they do share is `good-vibes/pixel.js` — the sixteen colours, the
+5&times;7 font and the integer-scaling helper — which Sunward imports rather
+than copying. Good Vibes keeps a *copy* of Solarium's palette instead, and says
+why in its own header: those two are synced from different repositories, so an
+import would only resolve on the deployed site. Sunward lives here and ships in
+this deploy, so the copy would buy nothing and drift the first time a colour was
+tuned. `test/server.test.js` pins the import, because if that file ever moves,
+Sunward is a blank page and nothing else in the suite would notice.
 
 **The rules exist once per game.** `src/room-do.js` imports `Room` from
 `src/rooms.js`, and `src/solarium-do.js` imports `src/solarium.js`, which in
@@ -326,9 +345,21 @@ src/solarium.js     Save Solarium's rules engine: pure functions over a state
 src/worker.js       the deployed front door: assets, and both socket routes
 src/room-do.js      one Durable Object per Good Vibes room code
 src/solarium-do.js  one Durable Object per Save Solarium room code
-public/index.html   the shelf: both games, thumbnails painted by their own
+public/index.html   the shelf: every game, thumbnails painted by their own
                     renderers rather than screenshotted
 public/solarium/    Save Solarium, client and content
+public/sunward/content.js  Sunward as data — the twelve growers and their curve,
+                    the forty-two upgrades, the medals, the day, the record, and
+                    the pure functions over all of it. No DOM, no clock, no save
+public/sunward/art.js  the lot: sky, ground, twelve prop sprites, and a tree
+                    that is grown by a recursion rather than drawn as a sprite
+public/sunward/index.html  Sunward's title screen: the lot, running, with the
+                    sky doing a day every twenty seconds
+public/sunward/play.html   the game: the lot, the shop, and the record
+public/greener-thumbs/  Greener Thumbs, three.js and a greenhouse
+test/sunward.test.js  Sunward's tables and the balance of them: that no tier is
+                    a dead row, that a save full of rubbish still loads, and
+                    that asking a question does not change the answer
 wrangler.jsonc      what Cloudflare builds and what it binds
 src/server.js       the local server: http + the socket route
 src/app.js          static files out of public/, for local work only
@@ -1423,6 +1454,118 @@ written as their own kinds rather than a `targets: 'all'` flag, because "who doe
 this land on" is the first thing a player reads off a card and a flag is not
 something you can read. `test/rooms.test.js` fails if any of them resolves to no
 animation or no sound.
+
+## Sunward
+
+A clicker, and the first game here with no server in it at all. You tap a tree
+for light, spend the light on things that make their own, and the lot fills in
+around you. `public/sunward/content.js` is the whole game as data; `art.js`
+draws it; the two HTML files are a title screen and a shop. Nothing else in the
+repository knows it exists, which is the point of the directory rule.
+
+**The day is the mechanic.** A day runs four real minutes. Every grower is
+marked `day`, `night` or `any`, and a marked one makes half again as much at its
+best hour and half as much at its worst — so a lot of nothing but solar panels
+watches its income halve every two minutes, and the fix is to own some
+mushrooms. Three upgrades shave the swing down for anyone who would rather it
+stopped.
+
+The number on a shop row is the **average over a whole day**, not the current
+one, and `test/sunward.test.js` samples two thousand points of a day to check
+the swing really does cancel. Anything else would have the shop lying twice a
+day, and the readout says which way the live figure is off the average so a
+player watching their income fall for two minutes is told it is the night and
+not something they did.
+
+**The curve is one number.** Costs multiply by about 11.2 a tier and output by
+about 6.4, so each tier pays for itself in 1.75&times; the time the one below it
+does: two minutes for a moss bed, most of a day for an orbital mirror. Flat, and
+the newest tier is always the right buy — the shop becomes a list with one live
+row. Much steeper and the top tiers are ornaments. The test asserts the ratio
+stays between 1.3 and 2.6 for every pair, because a tier that pays back *faster*
+than the one below it makes every tier below it a mistake and nothing on screen
+would say so.
+
+The rest of the numbers came off a simulation rather than off a feel.
+`test/sunward-balance.mjs` plays a day of it against the real content module —
+it taps for fifteen minutes and then saves for whichever grower pays for itself
+soonest — and prints when each kind first gets planted:
+
+```bash
+node test/sunward-balance.mjs               # a day, at four taps a second
+node test/sunward-balance.mjs 345600 8      # four days, at eight
+```
+
+It runs as part of `npm test`, the way `test/balance.mjs` does for Good Vibes,
+and it carries three coarse guardrails: something is making light after a
+minute, three kinds are planted within the hour, and the first seed is inside an
+evening. The shape of the curve is pinned in `test/sunward.test.js`; this
+measures what a player actually ends up holding.
+
+Two numbers moved because of it. The second upgrade for each grower unlocked at
+fifty owned, which the model reaches after about four days, and is now
+twenty-five, which is the same evening. And the lot's sprites appeared at 1, 10,
+25 and 60 owned, which drew four things for a garden of ninety-one — the picture
+was a third of the way through the game while the shop was most of the way.
+
+**Upgrades unlock on the run, medals on all time.** Upgrades are spent at a
+reset, so their unlocks reset with them — measured against a lifetime total, a
+returning player is handed the whole shop at once on their second run and the
+middle of the game disappears. Medals are the opposite: a record you can lose is
+not a record. A test pins which keys each may be written against.
+
+**The record is the second half of the game.** Ten counters in three scopes at
+once — this sitting, this run, all time — because they answer three different
+questions and "am I doing better than yesterday" is not served by a number that
+resets. Taps a second is measured over a ten-second window rather than counted
+per second: a player doing eight a second in bursts reads as zero on every
+second they pause, and a number that flickers to zero while you are still
+clicking is a number nobody believes. Ten minutes of history is kept at
+two-second resolution and drawn on a log axis, because the rate crosses three
+orders of magnitude in an evening and on a linear axis every minute before the
+last one is a flat line on the floor. The wave in that graph is the day going
+round, which is the one thing a clicker's output graph does not usually have.
+
+### Art conventions
+
+| Thing | Convention |
+| --- | --- |
+| Resolution | 320 &times; 180 internal, scaled by whole numbers only |
+| Palette | Good Vibes' sixteen, imported rather than copied |
+| Font | the same 5 &times; 7 bitmap, from `pixel.js` |
+| Sky | two ordered dithers at once — down the frame, and across the clock |
+| Night | a palette remap through `shade`, never a wash over the top |
+| Props | 10&ndash;19px sprites, four copies each, hand-placed |
+| The tree | a recursion over limbs, not a sprite |
+| Depth | sorted by ground line in pixels, never by list order |
+
+**The tree is grown, not drawn.** There is no tree sprite: it is a recursion
+whose depth, length and trunk width all come off how many growers are on the
+lot, so a player who planted forty things sees a bigger tree than one who
+planted four and nobody had to author either. Nothing in it is random — the
+angles are fixed and the only thing that moves is a sway term — so the same lot
+draws the same tree every session.
+
+**Night is a remap.** Every pixel is one flat opaque palette colour, so
+darkening by painting black over the top at low alpha would put two hundred
+blended colours on a sixteen-colour screen. `shade` swaps each key for a darker
+key from the same palette instead, one step below the horizon and two in the
+small hours. The props stop at one step: at two, a full lot at midnight was an
+empty lot with a faint bruise on it.
+
+**Nine sky stops, not four.** An ordered dither between two colours that are far
+apart does not read as a blend, it reads as speckle — halfway between midnight
+ink and dawn plum is black with bright pink dots in a 4&times;4 grid, which
+looks like a fault in the screen. Every neighbouring pair in `SKIES` is one or
+two steps apart in the palette, and that is the whole fix.
+
+**The sky is cached and the tree is not.** The sky alone is 320 by 134 pixels of
+ordered dither, which is forty-three thousand `fillRect` calls; it is a pure
+function of the time of day, so it is painted once a second into an offscreen
+canvas and stamped back with one `drawImage` — the same trick the build map in
+Good Vibes uses. The tree sways, so it is different on every frame by design,
+and it is drawn in horizontal spans rather than pixel by pixel precisely so it
+can be.
 
 ## Multi-tile buildings (not built yet)
 

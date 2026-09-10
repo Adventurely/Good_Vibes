@@ -1,0 +1,681 @@
+/* Sunward's rules, and the balance of them.
+ *
+ * The whole game is pure functions over data tables — no DOM, no clock, no
+ * storage — precisely so this file can drive a run of it in Node and check
+ * that the curve is the curve. A clicker's failure mode is not a crash; it is
+ * a tier nobody would ever buy, an upgrade that unlocks four days after it
+ * would have mattered, or a save that loads as NaN and takes the whole economy
+ * with it. None of those show up on screen until somebody has played for a
+ * week, so they are checked here.
+ *
+ * The art is checked here too. It is client-only and cannot break the site,
+ * but a sprite with a ragged row draws a diagonal tear and a sprite naming a
+ * palette key that does not exist draws nothing at all.
+ */
+
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+
+import {
+  DAY_LENGTH, DAY_START, SWING, dayPhase, sunHeight, phaseName, PHASE_NAMES,
+  GROWERS, GROWER_IDS, GROWER_BY_ID, COST_GROWTH, growerCost, bulkCost, affordable,
+  UPGRADES, UPGRADE_BY_ID, ACHIEVEMENTS, ACHIEVEMENT_BY_ID,
+  STAT_KEYS, STAT_LABELS, STAT_SHORT, PEAK_KEYS, blankStats, score,
+  HISTORY_STEP, HISTORY_SAMPLES, freshHistory, sample, tapRate, MILESTONES, note,
+  SAVE_VERSION, newGame, freshOwned, bonuses, SEED_RATE, seedBonus, phaseFactor,
+  rateOf, totalRate, steadyRate, tapValue, snapshot, meets, offered, award,
+  MAX_TICK, tick, tap, plantRefusal, plant, studyRefusal, study,
+  SEED_SCALE, seedsFrom, pendingSeeds, lightForSeeds, prestigeRefusal, prestige,
+  OFFLINE_RATE, OFFLINE_CAP, offlineGain, catchUp,
+  toSave, fromSave, formatLight, formatTime, formatStat, breakdown,
+} from '../public/sunward/content.js';
+
+import {
+  SCENE_W, SCENE_H, GROUND_Y, PALETTE, shade, SKIES, skyBlend,
+  PROP_ART, PROP_SPOTS, PROP_STEPS, propCount, growthFor, treeBounds, TREE_X, TREE_Y,
+} from '../public/sunward/art.js';
+
+/* ------------------------------------------------------------ the growers */
+
+test('every grower carries the fields the game reads', () => {
+  for(const g of GROWERS){
+    const where = `grower "${g.id}"`;
+    assert.match(g.id, /^[a-z][a-z0-9-]*$/, `${where}: id must be kebab-case`);
+    for(const field of ['name', 'flavour', 'art']){
+      assert.equal(typeof g[field], 'string', `${where}: ${field} must be a string`);
+      assert.ok(g[field].length, `${where}: ${field} must not be empty`);
+    }
+    assert.ok(['day', 'night', 'any'].includes(g.phase), `${where}: phase must be day, night or any`);
+    assert.ok(g.cost > 0, `${where}: cost must be positive`);
+    assert.ok(g.rate > 0, `${where}: rate must be positive, or it is scenery`);
+  }
+});
+
+test('grower ids are unique and every one has a sprite and somewhere to stand', () => {
+  assert.equal(new Set(GROWER_IDS).size, GROWER_IDS.length, 'duplicate grower id');
+  for(const g of GROWERS){
+    assert.ok(PROP_ART[g.art], `grower "${g.id}" has no art key "${g.art}"`);
+    const spots = PROP_SPOTS[g.art];
+    assert.ok(Array.isArray(spots) && spots.length >= PROP_STEPS.length,
+      `grower "${g.id}" needs a spot for each of the ${PROP_STEPS.length} copies it can show`);
+  }
+});
+
+test('the tiers are in order and none of them is a dead row', () => {
+  /* The two things that ruin a clicker's shop. A tier that costs more and makes
+     less than the one below it is never the right purchase; a tier that pays
+     back FASTER than the one below it makes every tier below it pointless the
+     moment it unlocks. Both are invisible on screen and obvious here. */
+  for(let i = 1; i < GROWERS.length; i++){
+    const below = GROWERS[i - 1], here = GROWERS[i];
+    assert.ok(here.cost > below.cost, `"${here.id}" costs less than "${below.id}"`);
+    assert.ok(here.rate > below.rate, `"${here.id}" makes less than "${below.id}"`);
+    const paybackBelow = below.cost / below.rate;
+    const payback = here.cost / here.rate;
+    assert.ok(payback > paybackBelow,
+      `"${here.id}" pays for itself faster than "${below.id}", which makes every tier below it a mistake`);
+    const step = payback / paybackBelow;
+    assert.ok(step > 1.3 && step < 2.6,
+      `"${here.id}" pays back ${step.toFixed(2)}x slower than "${below.id}" — the curve wants 1.3 to 2.6`);
+  }
+});
+
+test('the first grower is a handful of taps and the last is a long evening', () => {
+  // The opening has to be reachable by hand: twelve taps at one light each.
+  assert.ok(GROWERS[0].cost <= 20, 'the first grower must be affordable by tapping alone');
+  const top = GROWERS[GROWERS.length - 1];
+  assert.ok(top.cost / top.rate > 3600, 'the top tier should not pay for itself inside an hour');
+});
+
+/* --------------------------------------------------------------- the cost */
+
+test('each one bought makes the next cost more, and the bulk price is the sum', () => {
+  const g = GROWER_BY_ID.moss;
+  assert.equal(growerCost(g, 0), Math.ceil(g.cost));
+  assert.ok(growerCost(g, 1) > growerCost(g, 0), 'the second must cost more than the first');
+
+  for(const count of [1, 2, 7, 25, 100]){
+    let sum = 0;
+    for(let i = 0; i < count; i++) sum += g.cost * Math.pow(COST_GROWTH, i);
+    // The closed form is used on every frame; a loop is used here on purpose,
+    // so the two are not the same arithmetic checked against itself.
+    assert.ok(Math.abs(bulkCost(g, 0, count) - Math.ceil(sum)) <= 1,
+      `bulk price for ${count} disagrees with adding them up one at a time`);
+  }
+  assert.equal(bulkCost(g, 0, 0), 0, 'nothing costs nothing');
+});
+
+test('the max button never asks for light you do not have', () => {
+  const g = GROWER_BY_ID.fern;
+  for(const owned of [0, 3, 40, 200]){
+    for(const light of [0, 1, 129, 130, 1e4, 1e9, 1e18]){
+      const n = affordable(g, owned, light);
+      assert.ok(Number.isInteger(n) && n >= 0, `affordable returned ${n}`);
+      if(n > 0){
+        assert.ok(bulkCost(g, owned, n) <= light,
+          `max offered ${n} at ${light} light, which costs ${bulkCost(g, owned, n)}`);
+      }
+      // And it must not be shy either: one more has to be out of reach.
+      assert.ok(bulkCost(g, owned, n + 1) > light,
+        `max offered ${n} when ${n + 1} was affordable`);
+    }
+  }
+});
+
+/* ------------------------------------------------------------- the day */
+
+test('the day turns, and a whole one averages out to nothing', () => {
+  assert.equal(dayPhase(0), 0);
+  assert.ok(Math.abs(dayPhase(DAY_LENGTH * 1.25) - 0.25) < 1e-9, 'the clock must wrap');
+  assert.ok(sunHeight(0.25) > 0.99, 'noon is the top of the arc');
+  assert.ok(sunHeight(0.75) < -0.99, 'midnight is the bottom of it');
+
+  /* The rate on a row is the average, and it is only honest if the swing
+     really does cancel over a day. Sampled rather than reasoned about, because
+     the thing being checked is the code and not the trigonometry. */
+  for(const phase of ['day', 'night']){
+    let total = 0;
+    const steps = 2000;
+    for(let i = 0; i < steps; i++) total += phaseFactor(phase, (i / steps) * DAY_LENGTH);
+    assert.ok(Math.abs(total / steps - 1) < 0.001,
+      `a whole day of "${phase}" averaged ${(total / steps).toFixed(4)}, not 1`);
+  }
+  assert.equal(phaseFactor('any', 123), 1, 'an "any" grower must not feel the sky at all');
+});
+
+test('the swing is real enough to notice and never pays a negative', () => {
+  assert.ok(SWING > 0.2, 'a swing nobody can see is a mechanic nobody will learn');
+  for(let i = 0; i <= 100; i++){
+    const at = (i / 100) * DAY_LENGTH;
+    for(const phase of ['day', 'night', 'any']){
+      assert.ok(phaseFactor(phase, at) >= 0, 'a grower must never make negative light');
+    }
+  }
+});
+
+test('every phase of the day has a name, and a fresh run starts in daylight', () => {
+  for(let i = 0; i <= 40; i++){
+    const name = phaseName(i / 40);
+    assert.equal(typeof name, 'string');
+    assert.ok(name.length, `no name for phase ${i / 40}`);
+  }
+  assert.ok(PHASE_NAMES.length >= 4, 'the day wants more than four names in it');
+  assert.ok(sunHeight(dayPhase(DAY_START)) > 0.3,
+    'a new lot must open with the sun up — dawn is the most saturated sky there is');
+});
+
+/* ---------------------------------------------------------- the upgrades */
+
+test('every upgrade is buyable, does something, and names things that exist', () => {
+  for(const up of UPGRADES){
+    const where = `upgrade "${up.id}"`;
+    assert.match(up.id, /^[a-z][a-z0-9-]*$/, `${where}: id must be kebab-case`);
+    assert.ok(up.name && up.name.length, `${where}: needs a name`);
+    assert.ok(up.flavour && up.flavour.length, `${where}: needs a line of flavour`);
+    assert.ok(up.cost > 0, `${where}: must cost something`);
+
+    const e = up.effect;
+    const does = ['clickMult', 'allMult', 'fingers', 'steady', 'grower'].filter(k => e[k]);
+    assert.equal(does.length, 1, `${where}: must do exactly one thing, does ${does.length}`);
+    if(e.grower){
+      assert.ok(GROWER_BY_ID[e.grower], `${where}: multiplies unknown grower "${e.grower}"`);
+      assert.ok(e.mult > 1, `${where}: a multiplier of ${e.mult} is not an upgrade`);
+    }
+    if(e.allMult) assert.ok(e.allMult > 1, `${where}: allMult must be more than one`);
+    if(e.clickMult) assert.ok(e.clickMult > 1, `${where}: clickMult must be more than one`);
+    if(e.steady) assert.ok(e.steady > 0 && e.steady <= SWING, `${where}: steady must fit inside the swing`);
+
+    if(up.need && up.need.owned){
+      assert.ok(GROWER_BY_ID[up.need.owned.id], `${where}: unlocks on unknown grower "${up.need.owned.id}"`);
+      assert.ok(up.need.owned.count > 0, `${where}: an unlock at zero owned is not an unlock`);
+    }
+  }
+  const ids = UPGRADES.map(u => u.id);
+  assert.equal(new Set(ids).size, ids.length, 'duplicate upgrade id');
+});
+
+test('upgrades unlock on this run, not on all time', () => {
+  /* Upgrades are spent at a reset, so their unlocks have to reset with them.
+     Measured against a lifetime total instead, a returning player is handed the
+     whole shop on their second run and the middle of the game disappears. */
+  for(const up of UPGRADES){
+    for(const key of Object.keys(up.need || {})){
+      assert.ok(['runTaps', 'runEarned', 'owned'].includes(key),
+        `upgrade "${up.id}" unlocks on "${key}", which does not reset when the lot does`);
+    }
+  }
+});
+
+test('every grower can be improved, and the steady upgrades come in a pair at least', () => {
+  const helped = new Set(UPGRADES.filter(u => u.effect.grower).map(u => u.effect.grower));
+  for(const g of GROWERS){
+    assert.ok(helped.has(g.id), `nothing in the shop ever improves "${g.id}"`);
+  }
+  assert.ok(UPGRADES.filter(u => u.effect.clickMult).length >= 4, 'the hand needs a line of upgrades');
+  assert.ok(UPGRADES.filter(u => u.effect.fingers).length >= 2,
+    'without these the hand is left behind by the garden within the hour');
+});
+
+test('the shop opens one row at a time', () => {
+  const state = newGame();
+  assert.equal(offered(state).length, 0, 'a fresh lot must not open with the shop already full');
+  state.run.taps = 15;
+  const first = offered(state);
+  assert.equal(first.length, 1, 'fifteen taps should be worth exactly one row');
+  assert.equal(first[0].id, 'warm-hands');
+});
+
+/* -------------------------------------------------------- the achievements */
+
+test('every medal is winnable and names things that exist', () => {
+  const ids = ACHIEVEMENTS.map(a => a.id);
+  assert.equal(new Set(ids).size, ids.length, 'duplicate achievement id');
+  const known = new Set([...STAT_KEYS, 'taps', 'runTaps', 'tapRate', 'lifetime', 'runEarned',
+    'light', 'rate', 'growers', 'kinds', 'owned', 'upgrades', 'prestiges', 'seeds', 'seconds', 'days']);
+  for(const a of ACHIEVEMENTS){
+    assert.match(a.id, /^[a-z][a-z0-9-]*$/, `medal "${a.id}": id must be kebab-case`);
+    assert.ok(a.name && a.blurb, `medal "${a.id}" needs a name and a blurb`);
+    assert.ok(Object.keys(a.need).length, `medal "${a.id}" is won by doing nothing`);
+    for(const key of Object.keys(a.need)){
+      assert.ok(known.has(key), `medal "${a.id}" is won on "${key}", which nothing reports`);
+      if(key === 'owned') assert.ok(GROWER_BY_ID[a.need.owned.id], `medal "${a.id}": unknown grower`);
+    }
+  }
+});
+
+test('a condition that names a key nothing reports is false, not true', () => {
+  // A typo in a table should hide a row, never hand it out for free.
+  const snap = snapshot(newGame());
+  assert.equal(meets({ nonsense: 1 }, snap), false);
+  assert.equal(meets({}, snap), true, 'an empty condition is trivially met');
+});
+
+test('medals are awarded once and kept through a reset', () => {
+  const state = newGame();
+  state.life.taps = 1;
+  const won = award(state);
+  assert.ok(won.some(a => a.id === 'first-light'), 'one tap must win First light');
+  assert.equal(award(state).length, 0, 'a medal must not be won twice');
+
+  state.life.earned = 1e9;
+  prestige(state);
+  assert.ok(state.medals['first-light'], 'a reset must not take the medals');
+});
+
+/* ------------------------------------------------------------- the record */
+
+test('the record has a label and a column heading for every counter', () => {
+  for(const key of STAT_KEYS){
+    assert.equal(typeof STAT_LABELS[key], 'string', `"${key}" has no label`);
+    assert.ok(STAT_LABELS[key].length, `"${key}" has an empty label`);
+    assert.ok(STAT_SHORT[key] && STAT_SHORT[key].length <= 10,
+      `"${key}" needs a short column heading that fits a table`);
+  }
+  const blank = blankStats();
+  assert.deepEqual(Object.keys(blank), STAT_KEYS);
+  assert.ok(STAT_KEYS.every(key => blank[key] === 0));
+});
+
+test('scoring hits all three scopes, and a peak is a high-water mark', () => {
+  const state = newGame();
+  score(state, 'taps', 3);
+  for(const scope of ['session', 'run', 'life']){
+    assert.equal(state[scope].taps, 3, `${scope} did not count the taps`);
+  }
+  for(const key of PEAK_KEYS){
+    score(state, key, 10);
+    score(state, key, 4);
+    assert.equal(state.life[key], 10, `"${key}" is a peak and must not be walked back down`);
+  }
+});
+
+test('a reset keeps the lifetime record and clears the run', () => {
+  const state = newGame();
+  score(state, 'earned', 1e9);
+  state.life.earned = 1e9;
+  score(state, 'taps', 500);
+  prestige(state);
+  assert.equal(state.life.taps, 500, 'the all-time count must survive a reset');
+  assert.equal(state.run.taps, 0, 'the run count must not');
+  assert.equal(state.session.taps, 500, 'the sitting is not over just because the run is');
+});
+
+test('the history keeps ten minutes and drops the oldest first', () => {
+  const history = freshHistory();
+  for(let i = 0; i < HISTORY_SAMPLES + 40; i++) sample(history, i * HISTORY_STEP, i, 0);
+  assert.equal(history.at.length, HISTORY_SAMPLES, 'the buffer must not grow without end');
+  assert.equal(history.rate.length, HISTORY_SAMPLES);
+  assert.equal(history.rate[history.rate.length - 1], HISTORY_SAMPLES + 39, 'the newest sample must be kept');
+  assert.equal(history.rate[0], 40, 'the oldest must be the one dropped');
+});
+
+test('the tap rate is measured over a window, not counted per second', () => {
+  const times = [];
+  for(let i = 0; i < 50; i++) times.push(100 + i * 0.1);   // five a second for ten seconds
+  assert.ok(Math.abs(tapRate(times, 110, 10) - 5) < 0.11, 'five a second should read as five');
+  // And it decays honestly once the hand stops rather than sticking.
+  assert.ok(tapRate(times, 125, 10) === 0, 'fifteen seconds after the last tap it must read zero');
+  assert.equal(tapRate([], 10), 0, 'no taps is no rate, not a divide by zero');
+});
+
+test('the milestone log keeps the last entries and no more', () => {
+  const state = newGame();
+  for(let i = 0; i < MILESTONES + 25; i++) note(state, `thing ${i}`);
+  assert.equal(state.log.length, MILESTONES);
+  assert.equal(state.log[state.log.length - 1].text, `thing ${MILESTONES + 24}`);
+});
+
+/* -------------------------------------------------------------- the play */
+
+test('a tap pays, and it pays more once the hand is upgraded', () => {
+  const state = newGame();
+  assert.equal(tapValue(state), 1, 'a bare hand is worth one');
+  assert.equal(tap(state), 1);
+  assert.equal(state.light, 1);
+  assert.equal(state.life.taps, 1);
+  assert.equal(state.life.tapped, 1);
+
+  state.bought['warm-hands'] = true;
+  assert.equal(tapValue(state), 2, 'a doubling upgrade must double it');
+});
+
+test('the hand borrows from the garden once it can', () => {
+  const state = newGame();
+  state.owned.moss = 100;              // ten light a second
+  state.bought.gleaning = true;        // a tap is worth a further 1% of that
+  const rate = totalRate(state);
+  assert.ok(Math.abs(tapValue(state) - (1 + rate * 0.01)) < 1e-9,
+    'a tap must be worth its base plus its share of the rate');
+});
+
+test('a tick pays what the rate says and no more', () => {
+  const state = newGame();
+  state.owned.moss = 10;
+  const rate = totalRate(state);
+  const paid = tick(state, 1);
+  assert.ok(Math.abs(paid - rate) < 1e-6, 'one second must pay one second of rate');
+  assert.ok(Math.abs(state.light - paid) < 1e-9);
+  assert.ok(Math.abs(state.earnedBy.moss - paid) < 1e-9, 'the table must know which kind paid');
+  assert.ok(Math.abs(state.life.grown - paid) < 1e-9);
+});
+
+test('a tick is clamped, because a closed laptop is not a slow frame', () => {
+  const state = newGame();
+  state.owned.moss = 10;
+  const rate = steadyRate(state);
+  const paid = tick(state, 6 * 3600);
+  assert.ok(paid < rate * MAX_TICK * 1.6,
+    'six hours in one tick must not be paid as six hours at the live rate');
+});
+
+test('planting spends the light and refuses when it cannot', () => {
+  const state = newGame();
+  assert.match(plantRefusal(state, 'moss', 1), /short/, 'an empty purse must say so');
+  assert.equal(plant(state, 'moss', 1), null, 'a refused purchase must change nothing');
+  assert.equal(state.owned.moss, 0);
+
+  state.light = 1000;
+  const cost = plant(state, 'moss', 3);
+  assert.equal(state.owned.moss, 3);
+  assert.equal(state.light, 1000 - cost);
+  assert.equal(state.life.spent, cost);
+  assert.equal(state.life.planted, 3);
+
+  assert.match(plantRefusal(state, 'nothing-like-this', 1), /no such grower/);
+  assert.match(plantRefusal(state, 'moss', 0), /at least/);
+  assert.match(plantRefusal(state, 'moss', 1.5), /at least/);
+});
+
+test('an upgrade is bought once, and only when it has unlocked', () => {
+  const state = newGame();
+  state.light = 1e9;
+  assert.match(studyRefusal(state, 'warm-hands'), /Not yet/, 'a locked upgrade must not be for sale');
+  state.run.taps = 20;
+  assert.equal(studyRefusal(state, 'warm-hands'), null);
+  assert.equal(study(state, 'warm-hands').id, 'warm-hands');
+  assert.match(studyRefusal(state, 'warm-hands'), /already/);
+  assert.match(studyRefusal(state, 'not-a-thing'), /no such upgrade/);
+});
+
+test('seeds pay for themselves across everything', () => {
+  const state = newGame();
+  state.owned.moss = 50;
+  const before = totalRate(state);
+  state.seeds = 10;
+  assert.ok(Math.abs(seedBonus(10) - (1 + SEED_RATE * 10)) < 1e-12);
+  assert.ok(Math.abs(totalRate(state) / before - seedBonus(10)) < 1e-9,
+    'seeds must lift the growers');
+  assert.ok(Math.abs(tapValue(state) - seedBonus(10)) < 1e-9, 'and the hand with them');
+});
+
+/* ------------------------------------------------------------ the reset */
+
+test('the seed formula is a cube root and nothing is lost by resetting late', () => {
+  assert.equal(seedsFrom(0), 0);
+  assert.equal(seedsFrom(SEED_SCALE), 1, 'the first seed is one million light');
+  assert.equal(seedsFrom(1e9), 10);
+  assert.equal(seedsFrom(1e12), 100);
+  for(const seeds of [1, 7, 40, 300]){
+    assert.equal(seedsFrom(lightForSeeds(seeds)), seeds,
+      'the bar and the payout must agree about where the next seed is');
+  }
+
+  // Late is never worse than on time: the banked seeds are subtracted, so the
+  // total only ever depends on the lifetime figure.
+  const early = newGame();
+  early.life.earned = 1e9;
+  prestige(early);
+  early.life.earned = 8e9;
+  assert.equal(early.seeds + pendingSeeds(early), seedsFrom(8e9));
+});
+
+test('a reset refuses until it would pay something', () => {
+  const state = newGame();
+  assert.match(prestigeRefusal(state), /Not yet/);
+  assert.equal(prestige(state), null, 'a refused reset must change nothing');
+  assert.equal(state.prestiges, 0);
+
+  state.life.earned = 2e9;
+  state.light = 500;
+  state.owned.moss = 12;
+  state.bought['warm-hands'] = true;
+  assert.equal(prestigeRefusal(state), null);
+  assert.equal(prestige(state), 12);
+  assert.equal(state.seeds, 12);
+  assert.equal(state.light, 0);
+  assert.equal(state.owned.moss, 0);
+  assert.deepEqual(state.bought, {});
+  assert.equal(state.prestiges, 1);
+  assert.deepEqual(state.owned, freshOwned());
+});
+
+/* ----------------------------------------------------------- while away */
+
+test('time away pays at half rate and stops at the cap', () => {
+  const state = newGame();
+  state.owned.moss = 100;
+  const rate = steadyRate(state);
+
+  const hour = offlineGain(state, 3600);
+  assert.ok(Math.abs(hour.light - rate * OFFLINE_RATE * 3600) < 1e-6);
+  assert.equal(hour.capped, false);
+
+  const fortnight = offlineGain(state, 14 * 86400);
+  assert.equal(fortnight.seconds, OFFLINE_CAP, 'the payout must stop at the cap');
+  assert.equal(fortnight.capped, true, 'and it must say that it did');
+});
+
+test('catching up moves the sky but does not claim you were here', () => {
+  const state = newGame();
+  state.owned.moss = 100;
+  state.owned.fern = 50;
+  const before = state.life.seconds;
+  const gain = catchUp(state, 7200);
+
+  assert.ok(gain.light > 0);
+  assert.equal(state.life.seconds, before, 'two hours with the tab shut is not two hours of tending');
+  assert.ok(Math.abs(state.elapsed - (DAY_START + 7200)) < 1e-9, 'but the world kept turning');
+  const shared = state.earnedBy.moss + state.earnedBy.fern;
+  assert.ok(Math.abs(shared - gain.light) < 1e-6,
+    'the whole payout must be attributed to the growers that made it');
+  // Fern banks, not moss beds: fifty ferns make 32.5 a second and a hundred
+  // moss beds make ten, which is the whole point of the tiers.
+  assert.ok(state.earnedBy.fern > state.earnedBy.moss,
+    'the split must follow what each kind makes, not how many of them there are');
+});
+
+/* ------------------------------------------------------------- the save */
+
+test('a save round-trips everything that matters and drops the sitting', () => {
+  const state = newGame();
+  state.light = 12345.6;
+  state.owned.panel = 9;
+  state.bought['warm-hands'] = true;
+  state.medals['first-light'] = true;
+  state.seeds = 4;
+  state.prestiges = 2;
+  state.decade = 7;
+  score(state, 'taps', 88);
+  note(state, 'something happened');
+  sample(state.history, 2, 5, 1);
+
+  const back = fromSave(JSON.parse(JSON.stringify(toSave(state))));
+  assert.equal(back.light, state.light);
+  assert.equal(back.owned.panel, 9);
+  assert.equal(back.bought['warm-hands'], true);
+  assert.equal(back.medals['first-light'], true);
+  assert.equal(back.seeds, 4);
+  assert.equal(back.prestiges, 2);
+  assert.equal(back.decade, 7);
+  assert.equal(back.life.taps, 88);
+  assert.equal(back.run.taps, 88);
+  assert.equal(back.log.length, 1);
+  assert.equal(back.history.rate.length, 1);
+  assert.equal(back.session.taps, 0, 'the sitting must not survive a reload');
+  assert.equal(toSave(state).version, SAVE_VERSION);
+});
+
+test('a save full of rubbish loads as a playable game', () => {
+  /* Saves are hand-edited, truncated by a full disk and written by older builds
+     of this file. Any of those arriving as a string or a NaN turns the whole
+     economy into NaN one tick later and never recovers. */
+  for(const junk of [null, undefined, 42, 'nonsense', [], {}, { light: 'lots' },
+    { owned: { moss: 'many', ghost: 4 } }, { life: { taps: NaN } },
+    { bought: { 'no-such-upgrade': true } }, { medals: { 'no-such-medal': true } },
+    { history: { at: [1, 2], rate: [1], taps: null } }, { log: [null, { text: 5 }, { at: 'x', text: 'ok' }] }]){
+    const state = fromSave(junk);
+    assert.ok(Number.isFinite(state.light), `light came back as ${state.light}`);
+    for(const id of GROWER_IDS){
+      assert.ok(Number.isInteger(state.owned[id]) && state.owned[id] >= 0,
+        `"${id}" came back as ${state.owned[id]}`);
+    }
+    for(const key of STAT_KEYS) assert.ok(Number.isFinite(state.life[key]), `life.${key} is not a number`);
+    assert.ok(Number.isFinite(totalRate(state)), 'the rate must still be a number');
+    tick(state, 1);
+    assert.ok(Number.isFinite(state.light), 'and it must still be one after a tick');
+    for(const id of Object.keys(state.bought)) assert.ok(UPGRADE_BY_ID[id], `kept unknown upgrade "${id}"`);
+    for(const id of Object.keys(state.medals)) assert.ok(ACHIEVEMENT_BY_ID[id], `kept unknown medal "${id}"`);
+    const h = state.history;
+    assert.equal(h.at.length, h.rate.length, 'the graph series must be the same length');
+    assert.equal(h.at.length, h.taps.length);
+  }
+});
+
+test('an upgrade deleted from the table does not break a save that names it', () => {
+  const state = newGame();
+  state.bought['gone-tomorrow'] = true;    // as if this file had dropped a row
+  assert.ok(Number.isFinite(bonuses(state).allMult), 'an unknown upgrade must be ignored, not thrown on');
+});
+
+/* -------------------------------------------------------------- reading */
+
+test('numbers are readable at every size a run reaches', () => {
+  assert.equal(formatLight(0), '0');
+  assert.equal(formatLight(0.4), '0.4');
+  assert.equal(formatLight(412.6), '412');
+  assert.equal(formatLight(1000), '1.00K');
+  assert.equal(formatLight(999999.7), '1.00M', 'rounding at the edge must carry, not read as 1000.0K');
+  assert.equal(formatLight(1.234e6), '1.23M');
+  assert.equal(formatLight(-2500), '-2.50K');
+  assert.match(formatLight(1e40), /e40$/, 'past the named suffixes it should say the exponent');
+  assert.equal(formatLight(NaN), '—');
+  assert.equal(formatLight(Infinity), '—');
+
+  assert.equal(formatTime(12), '12s');
+  assert.equal(formatTime(75), '1m 15s');
+  assert.equal(formatTime(3600), '1h 00m');
+  assert.equal(formatTime(90000), '1d 01h');
+  assert.equal(formatTime(-1), '—');
+
+  assert.equal(formatStat('seconds', 3600), '1h 00m');
+  assert.equal(formatStat('earned', 1500), '1.50K');
+  assert.equal(formatStat('taps', 12345), '12,345');
+});
+
+test('the breakdown accounts for the whole rate, biggest first', () => {
+  const state = newGame();
+  state.owned.moss = 20;
+  state.owned.panel = 5;
+  const rows = breakdown(state);
+  assert.equal(rows.length, 2, 'only what is planted belongs on the table');
+  assert.ok(rows[0].rate >= rows[1].rate, 'the table is sorted by what is paying most');
+  const share = rows.reduce((sum, row) => sum + row.share, 0);
+  assert.ok(Math.abs(share - 1) < 1e-9, `the shares add to ${share}, not 1`);
+  const rate = rows.reduce((sum, row) => sum + row.rate, 0);
+  assert.ok(Math.abs(rate - totalRate(state)) < 1e-9, 'and the rates add to the whole rate');
+  assert.deepEqual(breakdown(newGame()), [], 'an empty lot has an empty table');
+});
+
+test('asking a question does not change the answer', () => {
+  /* Everything that is not one of the verbs has to be safe to call from a
+     render loop. One of these mutated the state through a shared object once,
+     and the symptom was a rate that crept up while the stats screen was open. */
+  const state = newGame();
+  state.owned.moss = 12;
+  state.light = 500;
+  state.run.taps = 40;
+  const before = JSON.stringify(state);
+  totalRate(state); steadyRate(state); tapValue(state); bonuses(state);
+  snapshot(state); offered(state); breakdown(state);
+  plantRefusal(state, 'moss', 5); studyRefusal(state, 'warm-hands');
+  pendingSeeds(state); prestigeRefusal(state); offlineGain(state, 3600);
+  assert.equal(JSON.stringify(state), before, 'a question changed the state');
+});
+
+/* ----------------------------------------------------------------- art */
+
+test('every sprite is a rectangle of palette keys', () => {
+  for(const [id, rows] of Object.entries(PROP_ART)){
+    assert.ok(rows.length, `sprite "${id}" is empty`);
+    const width = rows[0].length;
+    for(const row of rows){
+      assert.equal(row.length, width, `sprite "${id}" has a ragged row`);
+      for(const key of row){
+        assert.ok(key === '.' || PALETTE[key], `sprite "${id}" uses "${key}", which is not a palette key`);
+      }
+    }
+  }
+});
+
+test('nothing on the lot is drawn off the edge of it', () => {
+  for(const [id, spots] of Object.entries(PROP_SPOTS)){
+    const rows = PROP_ART[id];
+    assert.ok(rows, `"${id}" has somewhere to stand but nothing to draw`);
+    for(const spot of spots){
+      assert.ok(spot.x >= 0 && spot.x + rows[0].length <= SCENE_W,
+        `"${id}" at x=${spot.x} runs off the side`);
+      assert.ok(spot.y - rows.length >= 0 && spot.y <= SCENE_H,
+        `"${id}" at y=${spot.y} runs off the top or the bottom`);
+    }
+  }
+});
+
+test('the lot fills up as it is planted, and stops', () => {
+  assert.equal(propCount(0), 0, 'nothing owned is nothing drawn');
+  assert.equal(propCount(1), 1);
+  for(let i = 1; i < PROP_STEPS.length; i++){
+    assert.ok(PROP_STEPS[i] > PROP_STEPS[i - 1], 'the steps must climb');
+    assert.equal(propCount(PROP_STEPS[i]), i + 1);
+  }
+  assert.equal(propCount(1e9), PROP_STEPS.length, 'and it must stop before it is a wall of sprites');
+});
+
+test('the tree grows with the lot and can always be hit', () => {
+  assert.equal(growthFor(0), 0);
+  assert.ok(growthFor(10) > growthFor(0));
+  assert.ok(growthFor(400) > growthFor(100), 'it must still be growing well past a hundred');
+  assert.ok(growthFor(1e9) <= 1, 'and never past full');
+
+  for(const growers of [0, 1, 50, 400, 5000]){
+    const box = treeBounds(growthFor(growers));
+    assert.ok(box.w > 24 && box.h > 24, `at ${growers} growers the tap target is ${box.w}x${box.h}`);
+    assert.ok(box.x < TREE_X && box.x + box.w > TREE_X, 'the trunk must be inside its own hit box');
+    assert.ok(box.y < TREE_Y, 'and the box must reach above the ground line');
+  }
+});
+
+test('night is a palette remap and never leaves the palette', () => {
+  for(const key of Object.keys(PALETTE)){
+    for(const light of [1, 0.5, 0, -0.5, -1]){
+      assert.ok(PALETTE[shade(key, light)], `"${key}" at light ${light} shaded to a colour that is not in the palette`);
+    }
+  }
+  assert.notEqual(shade('g', -1), 'g', 'a green leaf must not be the same green at midnight');
+  assert.equal(shade('g', 1), 'g', 'and it must be untouched at noon');
+});
+
+test('the sky has a stop for every part of the day and neighbours that are close', () => {
+  assert.ok(SKIES.length >= 6, 'too few stops and the dither between them reads as speckle');
+  for(let i = 1; i < SKIES.length; i++){
+    assert.ok(SKIES[i].at > SKIES[i - 1].at, 'the stops must be in order');
+  }
+  for(const at of [0, 0.13, 0.25, 0.5, 0.62, 0.75, 0.99]){
+    const { a, b, t } = skyBlend(at);
+    assert.ok(a && b, `no sky at ${at}`);
+    assert.ok(t >= 0 && t <= 1, `blend at ${at} is ${t}`);
+    for(const stop of ['top', 'mid', 'low']){
+      assert.ok(PALETTE[a[stop]] && PALETTE[b[stop]], `sky at ${at} names a colour outside the palette`);
+    }
+  }
+  assert.ok(GROUND_Y > 0 && GROUND_Y < SCENE_H, 'the horizon must be somewhere on the canvas');
+});

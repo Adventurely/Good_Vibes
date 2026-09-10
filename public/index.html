@@ -84,6 +84,12 @@
          image-rendering: pixelated; background: var(--edge);
          border-bottom: 2px solid var(--edge); }
 
+  /* Sunward draws at 320x180 rather than the 320x190 the other two cards use.
+     Giving it its own ratio keeps its pixels square; stretching it into the
+     taller box would put a 5% squash on the one card whose whole subject is a
+     grid of squares. */
+  .shot.lot{ aspect-ratio: 320 / 180; }
+
   /* One card is a photograph rather than a pixel drawing, and `pixelated` is
      inherited from the rule above — on a rendered image it turns a soft
      gradient into visible blocks, so it has to be turned back off explicitly. */
@@ -154,6 +160,21 @@
       </ul>
     </div>
   </a>
+  <a class="game" href="/sunward/">
+    <canvas class="shot lot" id="shot-sw" width="320" height="180"
+            aria-label="A lot at low sun: one big tree in the middle of a field filling up with beehives, glasshouses, solar panels and turbines."></canvas>
+    <div class="about">
+      <h2>Sunward</h2>
+      <p>Tap a bare lot into a canopy. Spend the light on things that make
+         their own, and watch the day turn while you do.</p>
+      <ul class="tags">
+        <li>Single player</li>
+        <li class="sun">Clicker</li>
+        <li class="sky">Idle</li>
+      </ul>
+    </div>
+  </a>
+
   <a class="game" href="/greener-thumbs/">
     <img class="shot photo" src="/greener-thumbs/bonsai-thumb.webp" width="640" height="380"
          loading="lazy" decoding="async"
@@ -185,6 +206,8 @@ import { PALETTE as GV_PAL, HERO_ART as GV_HERO, ENEMY_ART as GV_ENEMY } from '.
 
 import { buildScene, paintScene } from './solarium/scene.js';
 import { PALETTE as SS_PAL, HERO_ART as SS_HERO, ENEMY_ART as SS_ENEMY } from './solarium/art.js';
+
+import { createLot, growthFor } from './sunward/art.js';
 
 const W = 320, H = 190;
 const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -322,11 +345,41 @@ function paintSolarium(now){
   });
 }
 
-/* One loop for both cards. Nothing here is the game, so it can afford to be
-   lazy: the turbines and the seeds are the only things that move. */
+/* ---- Sunward: a lot most of the way through a run --------------------- */
+
+const swCanvas = document.getElementById('shot-sw');
+const sw = swCanvas.getContext('2d', { alpha: false });
+sw.imageSmoothingEnabled = false;
+const paintSunwardLot = createLot();
+
+/* A lot somebody has played rather than an empty field, and low sun rather
+   than noon: the card has to say what the game is in one glance, and "a tree
+   in a field of things you built, at golden hour" is the sentence. */
+const SW_OWNED = { moss: 40, fern: 36, panel: 30, hive: 24, mushroom: 20, orchard: 15,
+                   turbine: 11, glasshouse: 8, mycelium: 6, reef: 4, canopy: 3, mirror: 1 };
+const SW_GROWERS = Object.values(SW_OWNED).reduce((a, b) => a + b, 0);
+
+function paintSunward(now){
+  paintSunwardLot(sw, {
+    // A day every twenty seconds while the page is open, parked at afternoon
+    // when motion is off. Four minutes is the game's own clock and is far too
+    // slow for a card somebody looks at for two.
+    phase: still ? 0.4 : (now / 20000) % 1,
+    growth: growthFor(SW_GROWERS),
+    owned: SW_OWNED,
+    growers: SW_GROWERS,
+    now: still ? 0 : now,
+    sway: still ? 0 : Math.sin(now / 1400) * 0.05,
+  });
+}
+
+/* One loop for all three cards. Nothing here is the game, so it can afford to
+   be lazy: the turbines, the seeds and Sunward's sky are the only things that
+   move. */
 function frame(now){
   paintGoodVibes(now);
   paintSolarium(now);
+  paintSunward(now);
   if(!still) requestAnimationFrame(frame);
 }
 

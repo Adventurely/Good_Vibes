@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sunward — a clicker about growing something back</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230d0b1f'/%3E%3Ccircle cx='8' cy='4' r='2.6' fill='%23ffd34e'/%3E%3Cpath d='M8 15V8' stroke='%23c07a58' stroke-width='1.6'/%3E%3Cpath d='M8 9C8 6.5 6 5 3.6 5 3.6 7.5 5.6 9 8 9zM8 10c0-2.5 2-4 4.4-4 0 2.5-2 4-4.4 4z' fill='%233fa34d'/%3E%3C/svg%3E">
+<meta name="description" content="A clicker about growing something back. Tap a bare lot into a canopy, spend the light on things that grow it for you, and watch the day turn while you do.">
+<style>
+  /* Dark, unlike the game's own page, and on purpose: the title screen is the
+     lot at dusk with the sky doing the work, and a pale frame around a night
+     scene fights it. The game page is light because it is mostly a shop. */
+  :root{
+    --ink:      #0d0b1f;
+    --paper:    #fdf6e3;
+    --muted:    #a99cc0;
+    --leaf:     #3fa34d;
+    --leaf-up:  #7ff0d3;
+    --sun:      #ffd34e;
+    --edge:     #3b2b5a;
+  }
+  *{ box-sizing: border-box; }
+  html, body{ height: 100%; }
+  body{
+    margin: 0;
+    background: var(--ink);
+    color: var(--paper);
+    font: 16px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    overflow: hidden;
+  }
+
+  /* The backdrop is the game's own scene, painted by the game's own renderer
+     at the size the game draws at and blown up to fill the window. It is not
+     an illustration of Sunward — it is Sunward, running, with nobody playing
+     it. A drawn title screen goes stale the first time somebody repaints a
+     sky; this one cannot. */
+  /* Sized by script to a whole multiple of 320x180 and centred, rather than
+     stretched with `object-fit: cover`. Cover keeps the aspect ratio but not
+     the pixel grid: at 4.44x some pixels get four screen pixels and their
+     neighbours get five, which is the one thing that makes a pixel drawing
+     read as a broken image rather than as a style. */
+  #plate{
+    position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    image-rendering: pixelated; image-rendering: crisp-edges;
+    z-index: 0;
+  }
+  .veil{
+    position: fixed; inset: 0; z-index: 1;
+    background:
+      /* A pool of dark under the words, then the frame. Without the first one
+         the paragraph sat on a dithered sunset and could not be read at all. */
+      radial-gradient(60% 42% at 50% 46%, rgba(13,11,31,.88) 0%, rgba(13,11,31,.55) 60%, rgba(13,11,31,0) 100%),
+      linear-gradient(180deg, rgba(13,11,31,.86) 0%, rgba(13,11,31,.30) 40%,
+                              rgba(13,11,31,.58) 74%, rgba(13,11,31,.94) 100%);
+  }
+
+  main{
+    position: fixed; inset: 0; z-index: 2;
+    display: grid; grid-template-rows: 1fr auto 1fr;
+    justify-items: center; text-align: center;
+    padding: clamp(1.2rem, 4vw, 3rem);
+  }
+  .wrap{ grid-row: 2; max-width: 46rem; width: 100%; }
+
+  .eyebrow{
+    margin: 0 0 .6rem; font-size: clamp(.68rem, 2vw, .8rem);
+    letter-spacing: .34em; text-transform: uppercase; color: var(--leaf-up);
+  }
+  h1{
+    margin: 0;
+    font-size: clamp(2.4rem, 11vw, 5.4rem);
+    line-height: .92; letter-spacing: -.02em; font-weight: 800;
+    background: linear-gradient(180deg, var(--sun) 0%, #f08c33 116%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: 0 2px 30px rgba(0,0,0,.5);
+  }
+  .tag{ margin: 1rem auto 0; max-width: 34rem; color: var(--paper);
+        font-size: clamp(.9rem, 2.6vw, 1.02rem);
+        text-shadow: 0 1px 0 rgba(13,11,31,.9), 0 0 12px rgba(13,11,31,.9); }
+  .tag b{ color: var(--sun); font-weight: 700; }
+
+  .enter{
+    display: inline-block; margin-top: clamp(1.4rem, 4vw, 2.2rem);
+    padding: .8rem 2.6rem; border: 0; border-radius: 999px;
+    background: linear-gradient(180deg, var(--leaf) 0%, #245f3c 100%);
+    color: #06120a; font: inherit; font-weight: 800; font-size: 1.02rem;
+    letter-spacing: .06em; text-transform: uppercase; text-decoration: none;
+    box-shadow: 0 10px 30px rgba(0,0,0,.5);
+    transition: transform .12s ease, filter .12s ease;
+  }
+  .enter:hover, .enter:focus-visible{ transform: translateY(-2px); filter: brightness(1.1); }
+  .enter:focus-visible{ outline: 3px solid var(--sun); outline-offset: 3px; }
+
+  /* What the game is, in four lines, because a clicker that does not say what
+     its twist is reads as every other clicker. */
+  .facts{
+    margin: 1.6rem auto 0; padding: 0; list-style: none;
+    display: flex; flex-wrap: wrap; gap: .4rem; justify-content: center;
+  }
+  .facts li{
+    font-size: .72rem; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--leaf-up); border: 1px solid var(--edge); border-radius: 999px;
+    padding: .18rem .7rem; background: rgba(13,11,31,.5);
+  }
+  .facts li.sun{ color: var(--sun); }
+
+  .saved{ margin-top: 1.1rem; font-size: .74rem; color: var(--muted);
+          text-shadow: 0 1px 0 rgba(13,11,31,.9); }
+
+  .back{ grid-row: 3; align-self: end; color: var(--muted); font-size: .8rem; text-decoration: none; }
+  .back:hover, .back:focus-visible{ color: var(--paper); }
+
+  @media (prefers-reduced-motion: reduce){
+    .enter{ transition: none; }
+    .enter:hover, .enter:focus-visible{ transform: none; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="plate" width="320" height="180" aria-hidden="true"></canvas>
+<div class="veil"></div>
+
+<main>
+  <div class="wrap">
+    <p class="eyebrow">Good Vibe Games</p>
+    <h1>Sunward</h1>
+    <p class="tag">A bare lot, one small tree, and a very long afternoon.
+       Tap it for light, spend the light on things that make their own, and
+       watch the whole thing fill in. <b>The day turns while you play</b> &mdash;
+       what pays at noon is not what pays at midnight.</p>
+
+    <a class="enter" id="enter" href="./play.html">Plant the lot</a>
+
+    <ul class="facts">
+      <li>Single player</li>
+      <li class="sun">Clicker</li>
+      <li>12 growers, 42 upgrades</li>
+      <li>Keeps going while you are away</li>
+    </ul>
+    <p class="saved" id="saved">Nothing is sent anywhere: the lot is saved in this browser.</p>
+  </div>
+
+  <a class="back" href="/">&larr; all Good Vibe Games</a>
+</main>
+
+<script type="module">
+/* The plate is the scene, painted once per frame at a slow clock so the sky
+ * moves visibly while somebody reads the page. It runs a day in twenty seconds
+ * rather than four minutes: this screen is a shop window, and a shop window
+ * should show the whole day in the time it takes to decide.
+ */
+import { createLot, growthFor, SCENE_W, SCENE_H } from './art.js';
+import { formatLight, GROWERS, UPGRADES, newGame, fromSave } from './content.js';
+
+const canvas = document.getElementById('plate');
+const ctx = canvas.getContext('2d', { alpha: false });
+ctx.imageSmoothingEnabled = false;
+const paint = createLot();
+const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* Whole-number scaling, big enough to cover the window in both directions.
+   `ceil` rather than `floor`: this one is a backdrop, so overflowing the
+   viewport and being cropped is right where leaving a gap would not be. */
+function fitPlate(){
+  const scale = Math.max(1, Math.ceil(Math.max(innerWidth / SCENE_W, innerHeight / SCENE_H)));
+  canvas.style.width = `${SCENE_W * scale}px`;
+  canvas.style.height = `${SCENE_H * scale}px`;
+}
+fitPlate();
+addEventListener('resize', fitPlate);
+
+/* A lot worth looking at: most of the way through a run, so the picture is of
+   a game somebody has played rather than of an empty field. */
+const OWNED = { moss: 44, fern: 40, panel: 34, hive: 28, mushroom: 24, orchard: 18,
+                turbine: 14, glasshouse: 11, mycelium: 8, reef: 6, canopy: 4, mirror: 2 };
+const GROWERS_ON_LOT = Object.values(OWNED).reduce((a, b) => a + b, 0);
+
+/* If there is a save here already, say so — a returning player should not have
+   to click through to find out the lot is still there. Read through the game's
+   own loader so a save it would refuse is a save this does not boast about. */
+try {
+  const raw = localStorage.getItem('sunward:save');
+  if(raw){
+    const state = fromSave(JSON.parse(raw));
+    const planted = GROWERS.reduce((n, g) => n + (state.owned[g.id] || 0), 0);
+    if(planted > 0 || state.life.earned > 0){
+      document.getElementById('enter').textContent = 'Back to the lot';
+      document.getElementById('saved').textContent =
+        `${planted} growers planted, ${formatLight(state.life.earned)} light earned all told`
+        + `${state.seeds ? `, ${state.seeds} seeds held` : ''}.`;
+    }
+  }
+} catch { /* private window, or a save this build cannot read. Say nothing. */ }
+
+function frame(now){
+  paint(ctx, {
+    phase: still ? 0.42 : (now / 20000) % 1,
+    growth: growthFor(GROWERS_ON_LOT),
+    owned: OWNED,
+    growers: GROWERS_ON_LOT,
+    now,
+    sway: still ? 0 : Math.sin(now / 1400) * 0.05,
+  });
+  if(!still) requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// Enter on the page, not just on the button — a title screen should take the
+// most obvious key there is.
+addEventListener('keydown', event => {
+  if(event.key === 'Enter' && event.target === document.body) document.getElementById('enter').click();
+});
+</script>
+</body>
+</html>

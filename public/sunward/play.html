@@ -1,0 +1,1021 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sunward</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23f4efe4'/%3E%3Ccircle cx='8' cy='4' r='2.6' fill='%23ffd23f'/%3E%3Cpath d='M8 15V8' stroke='%23a97142' stroke-width='1.6'/%3E%3Cpath d='M8 9C8 6.5 6 5 3.6 5 3.6 7.5 5.6 9 8 9zM8 10c0-2.5 2-4 4.4-4 0 2.5-2 4-4.4 4z' fill='%233fa34d'/%3E%3C/svg%3E">
+    <meta name="description" content="Tap a bare lot into a canopy. Light pays for growers, growers pay while you are away, and the day turns while you spend it." />
+    <style>
+      /* The page is the frame and the canvas is the game, so the frame is
+         quiet: the same warm light theme the other two games' pages use, the
+         same monospace, and no colour anywhere that competes with the lot.
+
+         Contrast is measured against --ink #f4efe4: text 13.8:1, muted 5.6:1,
+         accent 5.0:1, sun 5.0:1, bad 5.2:1. `color-scheme: light` is fixed
+         rather than `light dark` — following the system preference would hand
+         a dark page to anyone whose OS is set that way, and the palette below
+         is not an inverted copy of anything. */
+      :root {
+        color-scheme: light;
+        --ink: #f4efe4;
+        --panel: #fdfaf3;
+        --sunk: #ece2cd;
+        --line: #cfc2a8;
+        --text: #2a2118;
+        --muted: #6b5c47;
+        --accent: #2b7530;
+        --sun: #8f5c05;
+        --bad: #b5372a;
+        --night: #3b2b5a;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        padding: 1rem 1rem 3rem;
+        background: var(--ink);
+        background-image: radial-gradient(circle at 50% -10%, #fffdf6 0%, #efe7d7 68%);
+        color: var(--text);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        line-height: 1.55;
+        font-size: 15px;
+      }
+
+      .wrap {
+        max-width: 74rem;
+        margin: 0 auto;
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: minmax(0, 1fr) 25rem;
+        align-items: start;
+      }
+      /* One column below the width where a 320-pixel canvas at 2x and a 25rem
+         panel stop fitting side by side. Nothing is hidden in the narrow
+         layout — a stats screen you cannot reach on a phone is the one thing
+         this game must not do. */
+      @media (max-width: 61rem) {
+        .wrap { grid-template-columns: minmax(0, 1fr); }
+      }
+
+      header {
+        grid-column: 1 / -1;
+        display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap;
+        border-bottom: 2px solid var(--line);
+        padding-bottom: 0.5rem;
+      }
+      header h1 { margin: 0; font-size: 1.15rem; letter-spacing: 0.02em; }
+      header .sub { color: var(--muted); font-size: 0.8rem; }
+      header .away { margin-left: auto; display: flex; gap: 0.5rem; align-items: center; }
+
+      a { color: var(--accent); }
+      a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
+        outline: 2px solid var(--accent); outline-offset: 2px;
+      }
+
+      /* --- the lot ------------------------------------------------------- */
+
+      .screen {
+        position: relative;
+        width: max-content; max-width: 100%; margin: 0 auto;
+        border: 2px solid var(--line);
+        border-radius: 6px;
+        background: #0d0b1f;
+        box-shadow: 0 0 0 4px #e6dcc7, 0 14px 34px rgb(74 51 32 / 0.18);
+        overflow: hidden;
+        line-height: 0;
+      }
+      canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
+      /* No width here on purpose. `fitCanvas` sets it to a whole multiple of
+         320 at boot and on resize: at 2.39x — which is what `width: 100%` gave
+         it — some pixels land on two screen pixels and others on three, and a
+         drawing that scales unevenly stops reading as pixel art and starts
+         reading as a broken image. */
+      #lot { cursor: pointer; touch-action: manipulation; margin: 0 auto; }
+      #lot:focus-visible { outline: 3px solid var(--sun); outline-offset: -3px; }
+
+      /* The readout sits on the picture rather than under it, because the
+         number you are making is the thing you are watching and a number that
+         moves your eye off the tree is a number in the wrong place. */
+      .readout {
+        position: absolute; inset: 0.5rem 0.5rem auto 0.5rem;
+        display: flex; align-items: flex-start; justify-content: space-between;
+        gap: 0.5rem; pointer-events: none; line-height: 1.3;
+        text-shadow: 0 1px 0 rgb(13 11 31 / 0.85), 0 0 6px rgb(13 11 31 / 0.6);
+      }
+      .readout .light { font-size: clamp(1.1rem, 3.6vw, 1.6rem); font-weight: 700; color: #fdf6e3; }
+      .readout .rate { font-size: 0.8rem; color: #ffd34e; }
+      .readout .sky { text-align: right; font-size: 0.78rem; color: #fdf6e3; }
+      .readout .sky b { display: block; font-size: 0.95rem; color: #7ff0d3; font-weight: 700; }
+
+      /* On a phone the canvas is 320 wide and the readout is the same size it
+         is at 640: the light number, the rate under it and the sky note all
+         land on top of the sun. The number stays — it is what you are watching
+         — and the two supporting lines go, because the strip immediately below
+         is already showing the rate and the shop row shows the rest. */
+      @media (max-width: 30rem) {
+        .readout .rate { display: none; }
+        .readout .sky span { display: none; }
+        .readout .light { font-size: 1.15rem; }
+      }
+
+      /* --- the always-on strip ------------------------------------------- */
+
+      /* Four numbers that never go away, under the picture. The stats screen
+         has forty and this has the four somebody actually watches. */
+      .strip {
+        display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 1px; margin-top: 0.5rem;
+        background: var(--line); border: 1px solid var(--line); border-radius: 6px;
+        overflow: hidden;
+      }
+      .strip div { background: var(--panel); padding: 0.4rem 0.5rem; }
+      .strip dt { margin: 0; font-size: 0.66rem; letter-spacing: 0.08em;
+                  text-transform: uppercase; color: var(--muted); }
+      .strip dd { margin: 0; font-size: 0.95rem; font-weight: 700; }
+      @media (max-width: 30rem) { .strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+      /* --- the reset --------------------------------------------------- */
+
+      .seedbox {
+        margin-top: 0.75rem; padding: 0.6rem 0.75rem;
+        border: 1px solid var(--line); border-radius: 6px; background: var(--panel);
+        display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
+      }
+      .seedbox .grow { flex: 1 1 12rem; min-width: 0; }
+      .seedbox p { margin: 0; font-size: 0.78rem; color: var(--muted); }
+      .meter { height: 6px; background: var(--sunk); border-radius: 999px; margin-top: 0.35rem; overflow: hidden; }
+      .meter i { display: block; height: 100%; background: var(--accent); width: 0; }
+
+      /* --- panel and tabs ------------------------------------------------ */
+
+      .panel {
+        border: 2px solid var(--line); border-radius: 6px; background: var(--panel);
+        display: flex; flex-direction: column; min-height: 0;
+      }
+      .tabs { display: flex; border-bottom: 2px solid var(--line); }
+      .tabs button {
+        flex: 1; font: inherit; font-size: 0.8rem; letter-spacing: 0.06em;
+        text-transform: uppercase; padding: 0.5rem 0.25rem;
+        background: var(--sunk); border: 0; border-right: 1px solid var(--line);
+        color: var(--muted); cursor: pointer;
+      }
+      .tabs button:last-child { border-right: 0; }
+      .tabs button[aria-selected='true'] { background: var(--panel); color: var(--text); font-weight: 700;
+        box-shadow: inset 0 -3px 0 var(--accent); }
+      .tabs .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+        background: var(--sun); margin-left: 0.25rem; vertical-align: 0.1em; }
+      .tabs .dot[hidden] { display: none; }
+
+      .sheet { padding: 0.5rem; overflow-y: auto; max-height: 40rem; }
+      @media (max-width: 61rem) { .sheet { max-height: none; } }
+
+      /* --- a row you can buy --------------------------------------------- */
+
+      .row {
+        width: 100%; text-align: left; font: inherit;
+        display: grid; grid-template-columns: 2.6rem minmax(0, 1fr) auto;
+        gap: 0.5rem; align-items: center;
+        padding: 0.45rem 0.5rem; margin-bottom: 0.35rem;
+        background: var(--panel); border: 1px solid var(--line); border-radius: 5px;
+        cursor: pointer; color: inherit;
+      }
+      .row:hover:not(:disabled) { background: #fffdf6; border-color: var(--accent); }
+      .row:disabled { cursor: not-allowed; opacity: 0.62; }
+      .row canvas { width: 2.4rem; height: 2.4rem; image-rendering: pixelated; }
+      .row .name { font-weight: 700; font-size: 0.88rem; }
+      .row .note { display: block; font-size: 0.72rem; color: var(--muted); }
+      .row .cost { text-align: right; font-size: 0.82rem; font-weight: 700; color: var(--sun); }
+      .row .cost small { display: block; font-weight: 400; color: var(--muted); font-size: 0.68rem; }
+      .row[data-afford='true'] .cost { color: var(--accent); }
+      .when { font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase;
+              border: 1px solid currentColor; border-radius: 999px; padding: 0 0.32rem;
+              margin-left: 0.3rem; vertical-align: 0.1em; font-weight: 400; }
+      .row[data-kind='night'] .when { color: var(--night); }
+      .row[data-kind='day'] .when { color: var(--sun); }
+      .row[data-kind='any'] .when { color: var(--muted); }
+
+      .bulk { display: flex; gap: 0.35rem; margin-bottom: 0.5rem; }
+      .bulk button {
+        font: inherit; font-size: 0.75rem; padding: 0.2rem 0.6rem; cursor: pointer;
+        background: var(--sunk); border: 1px solid var(--line); border-radius: 999px; color: var(--muted);
+      }
+      .bulk button[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+
+      .empty { color: var(--muted); font-size: 0.8rem; padding: 0.75rem 0.5rem; margin: 0; }
+
+      /* --- the record ---------------------------------------------------- */
+
+      h2 { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em;
+           color: var(--muted); margin: 0.9rem 0 0.4rem; font-weight: 700; }
+      h2:first-child { margin-top: 0.2rem; }
+
+      table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+      th, td { text-align: right; padding: 0.18rem 0.3rem; border-bottom: 1px solid var(--sunk); }
+      th:first-child, td:first-child { text-align: left; }
+      thead th { color: var(--muted); font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.05em; }
+      tbody tr:last-child td { border-bottom: 0; }
+      td.num { font-variant-numeric: tabular-nums; }
+
+      #graph { width: 100%; height: auto; border: 1px solid var(--line); border-radius: 4px; background: #0d0b1f; }
+
+      .medals { display: grid; grid-template-columns: repeat(auto-fill, minmax(6.6rem, 1fr)); gap: 0.3rem; }
+      .medal { border: 1px solid var(--line); border-radius: 4px; padding: 0.3rem 0.4rem;
+               font-size: 0.68rem; background: var(--sunk); color: var(--muted); }
+      .medal b { display: block; font-size: 0.74rem; }
+      .medal[data-won='true'] { background: #eef7e9; border-color: var(--accent); color: var(--text); }
+
+      .log { list-style: none; margin: 0; padding: 0; font-size: 0.74rem; }
+      .log li { display: flex; gap: 0.5rem; border-bottom: 1px solid var(--sunk); padding: 0.15rem 0; }
+      .log time { color: var(--muted); flex: 0 0 4.2rem; font-variant-numeric: tabular-nums; }
+
+      /* --- buttons and toasts -------------------------------------------- */
+
+      .btn {
+        font: inherit; font-size: 0.8rem; padding: 0.35rem 0.9rem; cursor: pointer;
+        background: var(--sunk); border: 1px solid var(--line); border-radius: 5px; color: var(--text);
+      }
+      .btn:hover:not(:disabled) { background: #fffdf6; }
+      .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+      .btn-go { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+      .btn-go:hover:not(:disabled) { background: #37903c; }
+      .btn-quiet { font-size: 0.72rem; color: var(--muted); }
+
+      .toasts { position: fixed; left: 50%; bottom: 1rem; transform: translateX(-50%);
+                display: flex; flex-direction: column; gap: 0.3rem; align-items: center;
+                pointer-events: none; z-index: 5; }
+      .toast { background: var(--text); color: var(--ink); padding: 0.35rem 0.9rem;
+               border-radius: 999px; font-size: 0.8rem; animation: pop 0.25s ease-out both; }
+      .toast b { color: #ffd34e; }
+      @keyframes pop { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+      footer { grid-column: 1 / -1; color: var(--muted); font-size: 0.72rem;
+               display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center;
+               border-top: 1px solid var(--line); padding-top: 0.6rem; }
+      footer .spacer { flex: 1; }
+
+      @media (prefers-reduced-motion: reduce) {
+        .toast { animation: none; }
+      }
+    </style>
+  </head>
+  <body data-tab="grow">
+    <div class="wrap">
+      <header>
+        <h1>Sunward</h1>
+        <span class="sub">tap the tree &mdash; everything you plant keeps working</span>
+        <span class="away">
+          <button class="btn btn-quiet" id="wipe" type="button">Start over</button>
+        </span>
+      </header>
+
+      <main>
+        <div class="screen">
+          <!-- The canvas takes the tap. It is a button in everything but name:
+               focusable, keyboard-operable, and labelled with what it is and
+               what pressing it does. -->
+          <canvas id="lot" width="320" height="180" tabindex="0" role="button"
+                  aria-label="The lot. Click, or press Enter, to draw light from the tree."></canvas>
+          <div class="readout" aria-hidden="true">
+            <div>
+              <div class="light" id="light">0</div>
+              <div class="rate" id="rate">0 per second</div>
+            </div>
+            <div class="sky">
+              <b id="phase">Dawn</b>
+              <span id="phase-note">day growers at full</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- The four numbers that never go away. `aria-live` is off: these
+             change several times a second and a screen reader reading them
+             aloud would make the game unusable. The stats screen is the one
+             that is meant to be read. -->
+        <dl class="strip" id="strip">
+          <div><dt>Per second</dt><dd id="s-rate">0</dd></div>
+          <div><dt>Taps</dt><dd id="s-taps">0</dd></div>
+          <div><dt>Taps a second</dt><dd id="s-taprate">0</dd></div>
+          <div><dt>Per tap</dt><dd id="s-tap">1</dd></div>
+        </dl>
+
+        <div class="seedbox">
+          <div class="grow">
+            <p id="seed-line">Nothing to give back yet.</p>
+            <div class="meter"><i id="seed-meter"></i></div>
+          </div>
+          <button class="btn btn-go" id="reset" type="button" disabled>Let it seed</button>
+        </div>
+      </main>
+
+      <div class="panel">
+        <div class="tabs" role="tablist" aria-label="What to do with the light">
+          <button role="tab" id="tab-grow" aria-controls="sheet-grow" aria-selected="true" type="button">Grow</button>
+          <button role="tab" id="tab-study" aria-controls="sheet-study" aria-selected="false" type="button">
+            Upgrades<span class="dot" id="study-dot" hidden></span>
+          </button>
+          <button role="tab" id="tab-record" aria-controls="sheet-record" aria-selected="false" type="button">Record</button>
+        </div>
+
+        <section class="sheet" id="sheet-grow" role="tabpanel" aria-labelledby="tab-grow">
+          <div class="bulk" role="group" aria-label="How many to plant at once">
+            <button type="button" data-bulk="1" aria-pressed="true">&times;1</button>
+            <button type="button" data-bulk="10" aria-pressed="false">&times;10</button>
+            <button type="button" data-bulk="100" aria-pressed="false">&times;100</button>
+            <button type="button" data-bulk="max" aria-pressed="false">max</button>
+          </div>
+          <div id="growers"></div>
+        </section>
+
+        <section class="sheet" id="sheet-study" role="tabpanel" aria-labelledby="tab-study" hidden>
+          <div id="upgrades"></div>
+          <h2>Bought</h2>
+          <div id="bought" class="medals"></div>
+        </section>
+
+        <section class="sheet" id="sheet-record" role="tabpanel" aria-labelledby="tab-record" hidden>
+          <h2>The last ten minutes</h2>
+          <canvas id="graph" width="320" height="76"
+                  aria-label="Light per second and taps per second over the last ten minutes."></canvas>
+          <p class="empty" id="graph-note">Light per second, on a log scale. The wave is the day going round.</p>
+
+          <h2>Counters</h2>
+          <table id="counters">
+            <thead><tr><th>&nbsp;</th><th>This sitting</th><th>This run</th><th>All time</th></tr></thead>
+            <tbody></tbody>
+          </table>
+
+          <h2>Where the light comes from</h2>
+          <table id="sources">
+            <thead><tr><th>Grower</th><th>Owned</th><th>Now</th><th>Share</th><th>Made</th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <p class="empty" id="sources-note" hidden>Nothing planted yet.</p>
+
+          <h2>Medals <span id="medal-count" class="btn-quiet"></span></h2>
+          <div class="medals" id="medals"></div>
+
+          <h2>What happened</h2>
+          <ul class="log" id="log"></ul>
+        </section>
+      </div>
+
+      <footer>
+        <a href="./">&larr; Sunward</a>
+        <a href="/">all Good Vibe Games</a>
+        <span class="spacer"></span>
+        <span id="saved">saving&hellip;</span>
+      </footer>
+    </div>
+
+    <div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
+
+    <noscript>
+      <p style="max-width:40rem;margin:2rem auto">Sunward runs in the browser and needs JavaScript.
+      There is no server: the lot is saved on this device and nowhere else.</p>
+    </noscript>
+
+    <script type="module">
+      /* Sunward, in the browser.
+       *
+       * The rules are in content.js and none of them are here: this file owns
+       * the clock, the save file, the canvas and the DOM, and asks content.js
+       * every question about the game. That split is what lets the whole
+       * economy be tested in Node with no browser anywhere near it, and it is
+       * why there is no arithmetic below that decides anything.
+       */
+      import {
+        newGame, fromSave, toSave, tick, tap, plant, plantRefusal, study, studyRefusal,
+        prestige, prestigeRefusal, pendingSeeds, seedsFrom, lightForSeeds, seedBonus,
+        catchUp, offlineGain, OFFLINE_CAP, GROWERS, GROWER_BY_ID, GROWER_IDS,
+        UPGRADES, growerCost, bulkCost, affordable, bonuses, totalRate, steadyRate,
+        tapValue, snapshot, offered, award, breakdown, note, sample, tapRate,
+        dayPhase, phaseName, sunHeight, DAY_LENGTH, HISTORY_STEP, HISTORY_SPAN,
+        STAT_KEYS, STAT_LABELS, formatLight, formatTime, formatStat,
+        ACHIEVEMENTS, UPGRADE_BY_ID,
+      } from './content.js';
+      import { createLot, growthFor, treeBounds, PROP_ART, drawProp, SCENE_W, SCENE_H, hex }
+        from './art.js';
+      import { drawText, textWidth, fitCanvas } from '../good-vibes/pixel.js';
+
+      const els = id => document.getElementById(id);
+      const ui = {
+        lot: els('lot'), light: els('light'), rate: els('rate'),
+        phase: els('phase'), phaseNote: els('phase-note'),
+        sRate: els('s-rate'), sTaps: els('s-taps'), sTapRate: els('s-taprate'), sTap: els('s-tap'),
+        growers: els('growers'), upgrades: els('upgrades'), bought: els('bought'),
+        counters: els('counters').querySelector('tbody'),
+        sources: els('sources').querySelector('tbody'), sourcesNote: els('sources-note'),
+        medals: els('medals'), medalCount: els('medal-count'), log: els('log'),
+        graph: els('graph'), toasts: els('toasts'), saved: els('saved'),
+        seedLine: els('seed-line'), seedMeter: els('seed-meter'), reset: els('reset'),
+        studyDot: els('study-dot'), wipe: els('wipe'),
+      };
+
+      /* ---- the save file ------------------------------------------------ */
+
+      /* One key, and every read and write guarded: localStorage throws outright
+         in a private window, and a game that will not load is better than a
+         page that will not render. */
+      const SAVE_KEY = 'sunward:save';
+
+      function readSave(){
+        try {
+          const raw = localStorage.getItem(SAVE_KEY);
+          if(!raw) return { state: newGame(), away: 0, fresh: true };
+          const data = JSON.parse(raw);
+          const at = Number(data.at);
+          const away = Number.isFinite(at) ? Math.max(0, (Date.now() - at) / 1000) : 0;
+          return { state: fromSave(data), away, fresh: false };
+        } catch {
+          return { state: newGame(), away: 0, fresh: true };
+        }
+      }
+
+      let canSave = true;
+      function writeSave(){
+        if(!canSave) return;
+        try {
+          localStorage.setItem(SAVE_KEY, JSON.stringify({ ...toSave(state), at: Date.now() }));
+          ui.saved.textContent = 'saved on this device';
+        } catch {
+          canSave = false;
+          ui.saved.textContent = 'this browser will not save';
+        }
+      }
+
+      const boot = readSave();
+      const state = boot.state;
+
+      /* ---- the sitting -------------------------------------------------- */
+
+      const still = matchMedia('(prefers-reduced-motion: reduce)');
+      const taps = [];          // when each tap happened, for the rate window
+      const floaters = [];      // the numbers that drift off the tree
+      let shake = 0;            // how hard the tree is still ringing
+      let bulk = 1;             // 1, 10, 100 or 'max'
+
+      const paintLot = createLot();
+      const lotCtx = ui.lot.getContext('2d', { alpha: false });
+      lotCtx.imageSmoothingEnabled = false;
+      const graphCtx = ui.graph.getContext('2d', { alpha: false });
+      graphCtx.imageSmoothingEnabled = false;
+
+      const growers = () => GROWER_IDS.reduce((n, id) => n + (state.owned[id] || 0), 0);
+
+      /* ---- what happened, written down ---------------------------------- */
+
+      /* Four at a time, oldest dropped. Coming back from a night away can win
+         eleven medals in one frame, and eleven of these stacked up the middle
+         of the screen hid the game behind the news about the game. */
+      const TOASTS = 4;
+
+      function say(text, kind = ''){
+        const el = document.createElement('div');
+        el.className = 'toast';
+        el.innerHTML = kind ? `<b>${kind}</b> ${text}` : text;
+        ui.toasts.append(el);
+        while(ui.toasts.children.length > TOASTS) ui.toasts.firstElementChild.remove();
+        setTimeout(() => el.remove(), 3600);
+      }
+
+      /* The milestone log. Firsts, medals, every power of ten of light, and
+         every reset — which between them is a readable history of a run
+         rather than a scroll of everything that ever happened. */
+      function logMilestones(){
+        const won = award(state, snapshot(state, { taps: tapRate(taps, performance.now() / 1000) }));
+        for(const medal of won) note(state, `Medal: ${medal.name}.`);
+        // Every one goes in the log; only a couple are announced. A handful at
+        // once means something big just happened — a reset, or a long night
+        // away — and the honest report of that is one line, not eleven.
+        if(won.length > 2) say(`${won.length} medals. They are all on the record.`, 'Well done');
+        else for(const medal of won) say(medal.blurb, medal.name);
+        const decade = Math.floor(Math.log10(Math.max(1, state.life.earned)));
+        if(decade > state.decade){
+          if(decade >= 3 && state.decade >= 3){
+            note(state, `Earned ${formatLight(Math.pow(10, decade))} light, all told.`);
+          }
+          state.decade = decade;
+        }
+      }
+
+      /* ---- taps ---------------------------------------------------------- */
+
+      function doTap(x, y){
+        const value = tap(state);
+        const now = performance.now() / 1000;
+        taps.push(now);
+        while(taps.length && taps[0] < now - 60) taps.shift();
+        floaters.push({ x, y, text: '+' + formatLight(value), born: performance.now() });
+        while(floaters.length > 24) floaters.shift();
+        shake = Math.min(3, shake + 1.4);
+        logMilestones();
+      }
+
+      ui.lot.addEventListener('pointerdown', event => {
+        event.preventDefault();
+        const box = ui.lot.getBoundingClientRect();
+        const x = (event.clientX - box.left) / box.width * SCENE_W;
+        const y = (event.clientY - box.top) / box.height * SCENE_H;
+        doTap(x, y);
+      });
+
+      /* The keyboard gets the same tap, aimed at the tree, because a game whose
+         only verb is a mouse gesture is a game some people cannot play. */
+      ui.lot.addEventListener('keydown', event => {
+        if(event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        const bounds = treeBounds(growthFor(growers()));
+        doTap(bounds.x + bounds.w / 2, bounds.y + bounds.h * 0.4);
+      });
+
+      /* ---- buying -------------------------------------------------------- */
+
+      function howMany(grower){
+        if(bulk !== 'max') return bulk;
+        return Math.max(1, affordable(grower, state.owned[grower.id] || 0, state.light));
+      }
+
+      function buyGrower(id){
+        const grower = GROWER_BY_ID[id];
+        const count = howMany(grower);
+        const refusal = plantRefusal(state, id, count);
+        if(refusal) return say(refusal);
+        const had = state.owned[id];
+        plant(state, id, count);
+        if(!had) note(state, `Planted the first ${grower.name.toLowerCase()}.`);
+        logMilestones();
+        drawShop();
+      }
+
+      function buyUpgrade(id){
+        const refusal = studyRefusal(state, id);
+        if(refusal) return say(refusal);
+        const up = study(state, id);
+        note(state, `Bought ${up.name}.`);
+        say(up.flavour, up.name);
+        logMilestones();
+        drawShop();
+      }
+
+      /* ---- the shop ------------------------------------------------------ */
+
+      /* Every grower has a row from the start, greyed until it is affordable —
+         a shop that hides what you are saving for is a shop with no middle
+         distance in it. Upgrades are the opposite and appear as they unlock,
+         because forty rows of things you cannot see the point of yet is a wall.
+         The rows are built once and only their numbers are rewritten, so the
+         eight-a-second refresh is text and a class and never a reflow of the
+         whole panel. */
+      const growerRows = new Map();
+
+      /* What a grower's phase is called on its row. Words rather than a sun and
+         a moon glyph: neither character is in the monospace stack the page asks
+         for, and Chromium substituted them for '*' and '(' — which reads as a
+         typo rather than as a symbol. */
+      const WHEN = { day: 'day', night: 'night', any: 'always' };
+
+      function iconFor(id){
+        const canvas = document.createElement('canvas');
+        canvas.width = 24; canvas.height = 24;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        const rows = PROP_ART[id];
+        const x = Math.floor((24 - rows[0].length) / 2);
+        const y = Math.floor((24 - rows.length) / 2);
+        drawProp(ctx, rows, x, y, 1);
+        return canvas;
+      }
+
+      function buildShop(){
+        for(const g of GROWERS){
+          const row = document.createElement('button');
+          row.type = 'button';
+          row.className = 'row';
+          row.dataset.kind = g.phase;
+          row.append(iconFor(g.id));
+          const mid = document.createElement('span');
+          mid.innerHTML = `<span class="name">${g.name}`
+            + `<span class="when">${WHEN[g.phase]}</span></span><span class="note"></span>`;
+          const cost = document.createElement('span');
+          cost.className = 'cost';
+          row.append(mid, cost);
+          row.addEventListener('click', () => buyGrower(g.id));
+          ui.growers.append(row);
+          growerRows.set(g.id, { row, note: mid.querySelector('.note'), cost });
+        }
+      }
+
+      let shopKey = '';
+      function drawShop(){
+        const snap = snapshot(state);
+        const list = offered(state, snap);
+        const key = list.map(u => u.id).join(',');
+        if(key !== shopKey){
+          shopKey = key;
+          ui.upgrades.replaceChildren();
+          if(!list.length){
+            const p = document.createElement('p');
+            p.className = 'empty';
+            p.textContent = 'Nothing new to learn yet. Plant more, or tap more.';
+            ui.upgrades.append(p);
+          }
+          for(const up of list){
+            const row = document.createElement('button');
+            row.type = 'button';
+            row.className = 'row';
+            row.dataset.up = up.id;
+            row.style.gridTemplateColumns = 'minmax(0, 1fr) auto';
+            row.innerHTML = `<span><span class="name">${up.name}</span>`
+              + `<span class="note">${describe(up)}</span></span>`
+              + `<span class="cost">${formatLight(up.cost)}</span>`;
+            row.addEventListener('click', () => buyUpgrade(up.id));
+            ui.upgrades.append(row);
+          }
+          const owned = Object.keys(state.bought).map(id => UPGRADE_BY_ID[id]).filter(Boolean);
+          ui.bought.replaceChildren(...owned.map(up => {
+            const el = document.createElement('div');
+            el.className = 'medal';
+            el.dataset.won = 'true';
+            el.innerHTML = `<b>${up.name}</b>${describe(up)}`;
+            return el;
+          }));
+        }
+        refreshShop();
+      }
+
+      function describe(up){
+        const e = up.effect;
+        if(e.clickMult) return `A tap is worth ${e.clickMult}&times; as much.`;
+        if(e.allMult) return `Everything makes ${Math.round((e.allMult - 1) * 100)}% more.`;
+        if(e.fingers) return `A tap also pays ${(e.fingers * 100).toFixed(0)}% of your light per second.`;
+        if(e.steady) return `The day and night swing shrinks by ${Math.round(e.steady * 100)} points.`;
+        if(e.grower) return `${GROWER_BY_ID[e.grower].name}s make ${e.mult}&times; as much.`;
+        return up.flavour;
+      }
+
+      function refreshShop(){
+        const bonus = bonuses(state);
+        for(const g of GROWERS){
+          const { row, note, cost } = growerRows.get(g.id);
+          const owned = state.owned[g.id] || 0;
+          const count = howMany(g);
+          const price = bulkCost(g, owned, count);
+          const afford = state.light >= price;
+          row.dataset.afford = String(afford);
+          row.disabled = !afford;
+          const each = g.rate * bonus.grower[g.id] * bonus.allMult * bonus.seedMult;
+          note.textContent = owned
+            ? `${owned} planted · ${formatLight(each * owned)}/s`
+            : g.flavour;
+          cost.innerHTML = `${formatLight(price)}<small>${count > 1 ? '&times;' + count + ' · ' : ''}`
+            + `+${formatLight(each * count)}/s</small>`;
+        }
+        const list = offered(state);
+        for(const up of list){
+          const row = ui.upgrades.querySelector(`[data-up="${up.id}"]`);
+          if(!row) continue;
+          const afford = state.light >= up.cost;
+          row.dataset.afford = String(afford);
+          row.disabled = !afford;
+        }
+        ui.studyDot.hidden = !list.some(up => state.light >= up.cost);
+      }
+
+      /* ---- the record ---------------------------------------------------- */
+
+      /* The stats screen is the second half of the game and is written as such:
+       * every counter in all three scopes, where the light is coming from right
+       * now, ten minutes of history, every medal, and a log of what happened.
+       *
+       * It is rebuilt twice a second and only while its tab is open. A stats
+       * screen nobody is looking at should cost nothing, and this one is forty
+       * table cells and a canvas.
+       */
+      function drawRecord(){
+        const live = tapRate(taps, performance.now() / 1000);
+
+        ui.counters.replaceChildren(...STAT_KEYS.map(key => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<th scope="row">${STAT_LABELS[key]}</th>`
+            + `<td class="num">${formatStat(key, state.session[key])}</td>`
+            + `<td class="num">${formatStat(key, state.run[key])}</td>`
+            + `<td class="num">${formatStat(key, state.life[key])}</td>`;
+          return tr;
+        }));
+
+        const rows = breakdown(state);
+        ui.sourcesNote.hidden = rows.length > 0;
+        ui.sources.replaceChildren(...rows.map(row => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<th scope="row">${row.name}`
+            + `<span class="when">${WHEN[row.phase]}</span></th>`
+            + `<td class="num">${row.owned}</td>`
+            + `<td class="num">${formatLight(row.rate)}/s</td>`
+            + `<td class="num">${Math.round(row.share * 100)}%</td>`
+            + `<td class="num">${formatLight(row.earned)}</td>`;
+          return tr;
+        }));
+
+        const won = ACHIEVEMENTS.filter(a => state.medals[a.id]).length;
+        ui.medalCount.textContent = `${won} of ${ACHIEVEMENTS.length}`;
+        ui.medals.replaceChildren(...ACHIEVEMENTS.map(a => {
+          const el = document.createElement('div');
+          el.className = 'medal';
+          el.dataset.won = String(Boolean(state.medals[a.id]));
+          el.innerHTML = `<b>${a.name}</b>${a.blurb}`;
+          return el;
+        }));
+
+        ui.log.replaceChildren(...state.log.slice().reverse().map(entry => {
+          const li = document.createElement('li');
+          li.innerHTML = `<time>${formatTime(entry.at)}</time><span></span>`;
+          li.querySelector('span').textContent = entry.text;
+          return li;
+        }));
+
+        drawGraph(live);
+      }
+
+      /* Ten minutes of light per second, on a log scale, with taps per second
+       * over the top of it.
+       *
+       * Log rather than linear because the rate crosses three orders of
+       * magnitude in an evening, and on a linear axis every minute before the
+       * last one is a flat line on the floor. The wave in it is the day going
+       * round, which is the one thing a clicker's output graph does not usually
+       * have and the reason this screen is worth opening.
+       */
+      function drawGraph(live){
+        const W = ui.graph.width, H = ui.graph.height;
+        graphCtx.fillStyle = hex('k');
+        graphCtx.fillRect(0, 0, W, H);
+
+        const series = state.history.rate;
+        if(series.length < 2){
+          drawText(graphCtx, 'not enough yet', 8, H / 2 - 3, 's', 1);
+          return;
+        }
+
+        const top = Math.max(1, ...series);
+        const scale = value => {
+          const t = Math.log10(1 + Math.max(0, value)) / Math.log10(1 + top);
+          return H - 9 - t * (H - 14);
+        };
+
+        // A rule per decade, so the eye has something to measure against.
+        for(let power = 0; Math.pow(10, power) <= top; power++){
+          const y = Math.round(scale(Math.pow(10, power)));
+          if(y < 4 || y > H - 10) continue;
+          graphCtx.fillStyle = hex('d');
+          graphCtx.fillRect(0, y, W, 1);
+        }
+
+        const step = W / (series.length - 1);
+        graphCtx.fillStyle = hex('y');
+        for(let i = 0; i < series.length; i++){
+          const x = Math.round(i * step);
+          const y = Math.round(scale(series[i]));
+          graphCtx.fillRect(x, y, 2, 2);
+          if(i > 0){
+            // Join the dots: a scatter of two-pixel marks at this width reads
+            // as a dotted line with holes in it wherever the rate jumped.
+            const py = Math.round(scale(series[i - 1]));
+            const from = Math.min(py, y), to = Math.max(py, y);
+            graphCtx.fillRect(x, from, 1, to - from + 1);
+          }
+        }
+
+        const tapsSeries = state.history.taps;
+        const tapTop = Math.max(1, ...tapsSeries);
+        graphCtx.fillStyle = hex('c');
+        for(let i = 0; i < tapsSeries.length; i++){
+          if(!tapsSeries[i]) continue;
+          const x = Math.round(i * step);
+          const y = Math.round(H - 9 - (tapsSeries[i] / tapTop) * (H - 16));
+          graphCtx.fillRect(x, y, 1, 1);
+        }
+
+        drawText(graphCtx, formatLight(top) + '/S', 2, 2, 'y', 1);
+        drawText(graphCtx, formatTime(HISTORY_SPAN) + ' AGO', 2, H - 8, 's', 1);
+        const nowLabel = formatLight(live) + ' T/S';
+        drawText(graphCtx, nowLabel, W - textWidth(nowLabel, 1) - 2, H - 8, 'c', 1);
+      }
+
+      /* ---- the reset ------------------------------------------------------ */
+
+      function drawSeeds(){
+        const pending = pendingSeeds(state);
+        const want = lightForSeeds(state.seeds + 1);
+        const held = state.seeds;
+        const bonusNow = Math.round((seedBonus(held) - 1) * 100);
+        const after = Math.round((seedBonus(held + pending) - 1) * 100);
+
+        ui.reset.disabled = pending < 1;
+        if(pending >= 1){
+          ui.seedLine.textContent = `Give the lot back for ${pending} seed${pending === 1 ? '' : 's'}`
+            + ` — everything you plant next time makes ${after}% more instead of ${bonusNow}%.`;
+        } else if(held > 0){
+          ui.seedLine.textContent = `${held} seed${held === 1 ? '' : 's'} held, worth ${bonusNow}% on everything.`
+            + ` Next seed at ${formatLight(want)} lifetime light.`;
+        } else {
+          ui.seedLine.textContent = `Nothing to give back yet — the first seed wants ${formatLight(want)} light, all told.`;
+        }
+        const floor = lightForSeeds(state.seeds);
+        const span = Math.max(1, want - floor);
+        ui.seedMeter.style.width = `${Math.max(0, Math.min(1, (state.life.earned - floor) / span)) * 100}%`;
+      }
+
+      ui.reset.addEventListener('click', () => {
+        const pending = pendingSeeds(state);
+        const refusal = prestigeRefusal(state);
+        if(refusal) return say(refusal);
+        if(!confirm(`Give the lot back?\n\nYou keep ${state.seeds + pending} seeds, every medal and the`
+          + ` all-time record. The light, the growers and the upgrades all start again.`)) return;
+        prestige(state);
+        note(state, `Gave the lot back. ${state.seeds} seeds held.`);
+        say(`${state.seeds} seeds held — everything makes ${Math.round((seedBonus(state.seeds) - 1) * 100)}% more.`,
+          'Let it seed');
+        shopKey = '';
+        drawShop();
+        writeSave();
+      });
+
+      ui.wipe.addEventListener('click', () => {
+        if(!confirm('Throw the whole save away — seeds, medals, the lot? This cannot be undone.')) return;
+        try { localStorage.removeItem(SAVE_KEY); } catch { /* nothing to remove */ }
+        location.reload();
+      });
+
+      /* ---- tabs ----------------------------------------------------------- */
+
+      const tabs = [...document.querySelectorAll('[role="tab"]')];
+      function showTab(id){
+        document.body.dataset.tab = id;
+        for(const tab of tabs){
+          const on = tab.id === `tab-${id}`;
+          tab.setAttribute('aria-selected', String(on));
+          els(tab.getAttribute('aria-controls')).hidden = !on;
+        }
+        if(id === 'record') drawRecord();
+      }
+      for(const tab of tabs){
+        tab.addEventListener('click', () => showTab(tab.id.replace('tab-', '')));
+      }
+
+      for(const button of document.querySelectorAll('[data-bulk]')){
+        button.addEventListener('click', () => {
+          bulk = button.dataset.bulk === 'max' ? 'max' : Number(button.dataset.bulk);
+          for(const other of document.querySelectorAll('[data-bulk]')){
+            other.setAttribute('aria-pressed', String(other === button));
+          }
+          refreshShop();
+        });
+      }
+
+      /* ---- the loop -------------------------------------------------------- */
+
+      /* One requestAnimationFrame drives everything, and three different things
+       * happen at three different rates inside it:
+       *
+       *   every frame     the lot, because it sways and the numbers drift off it
+       *   eight a second  the shop's costs and the headline numbers
+       *   twice a second  the record, and only while its tab is open
+       *
+       * Rewriting forty table cells sixty times a second is how a clicker ends
+       * up warming a room.
+       */
+      let last = performance.now();
+      let sinceShop = 0, sinceRecord = 0, sinceSave = 0;
+
+      function headline(){
+        const bonus = bonuses(state);
+        const live = totalRate(state, bonus);
+        const steady = steadyRate(state, bonus);
+        const phase = dayPhase(state.elapsed);
+        const height = sunHeight(phase);
+
+        ui.light.textContent = formatLight(state.light);
+        ui.rate.textContent = `${formatLight(live)} per second`;
+        ui.phase.textContent = phaseName(phase);
+        ui.phaseNote.textContent = steady > 0
+          ? `${live >= steady ? '+' : ''}${Math.round((live / steady - 1) * 100)}% on the average`
+          : (height > 0 ? 'day growers at their best' : 'night growers at their best');
+
+        ui.sRate.textContent = formatLight(live);
+        ui.sTaps.textContent = Math.floor(state.life.taps).toLocaleString('en-US');
+        ui.sTapRate.textContent = (Math.round(tapRate(taps, performance.now() / 1000) * 10) / 10).toFixed(1);
+        ui.sTap.textContent = formatLight(tapValue(state, bonus));
+      }
+
+      function frame(now){
+        const dt = (now - last) / 1000;
+        last = now;
+
+        /* A gap this long is a tab that was asleep, not a slow frame, and it is
+           paid at the offline rate — the sky did not move while it was shut, so
+           ticking it live would pay a night's output at noon. */
+        if(dt > 20) catchUp(state, dt);
+        else if(dt > 0) tick(state, dt);
+
+        // One history sample every two seconds of game time, at both series.
+        while(state.elapsed - state.sampledAt >= HISTORY_STEP){
+          state.sampledAt += HISTORY_STEP;
+          sample(state.history, state.sampledAt, totalRate(state),
+            tapRate(taps, performance.now() / 1000, HISTORY_STEP));
+        }
+        sinceShop += dt; sinceRecord += dt; sinceSave += dt;
+        if(sinceShop >= 0.125){
+          sinceShop = 0;
+          logMilestones();
+          headline();
+          /* drawShop rather than refreshShop: an upgrade unlocks because a
+             counter crossed a line, and nothing else was going to notice. The
+             call is cheap when nothing changed — it compares the offered list
+             to the one on screen and only rebuilds when they differ — and with
+             refreshShop here instead, a newly unlocked upgrade did not appear
+             until the next time you bought something. */
+          drawShop(); drawSeeds();
+        }
+        if(document.body.dataset.tab === 'record' && sinceRecord >= 0.5){ sinceRecord = 0; drawRecord(); }
+        if(sinceSave >= 10){ sinceSave = 0; writeSave(); }
+
+        paint(now);
+        requestAnimationFrame(frame);
+      }
+
+      function paint(now){
+        const phase = dayPhase(state.elapsed);
+        const planted = growers();
+        const sway = still.matches ? 0 : Math.sin(now / 1400) * 0.05 + Math.sin(now / 620) * 0.015;
+
+        shake = Math.max(0, shake - 0.12);
+        paintLot(lotCtx, {
+          phase,
+          growth: growthFor(planted),
+          owned: state.owned,
+          growers: planted,
+          now: still.matches ? 0 : now,
+          sway,
+          shake: still.matches ? 0 : Math.sin(now / 40) * shake,
+        });
+
+        // The numbers that drift off the tree, drawn in the game's own font so
+        // they belong to the picture rather than sitting on top of it.
+        for(let i = floaters.length - 1; i >= 0; i--){
+          const f = floaters[i];
+          const age = (now - f.born) / 1100;
+          if(age >= 1){ floaters.splice(i, 1); continue; }
+          const y = f.y - age * 26;
+          const key = age > 0.7 ? 'o' : 'y';
+          drawText(lotCtx, f.text, Math.round(f.x - textWidth(f.text, 1) / 2), Math.round(y), 'k', 1);
+          drawText(lotCtx, f.text, Math.round(f.x - textWidth(f.text, 1) / 2) - 1, Math.round(y) - 1, key, 1);
+        }
+      }
+
+      /* ---- boot ------------------------------------------------------------ */
+
+      /* What the growers made while the tab was shut. Announced rather than
+         silently added: a number that goes up by a million between one look and
+         the next, with no explanation, reads as a bug. */
+      if(boot.away > 60 && steadyRate(state) > 0){
+        const gain = catchUp(state, boot.away);
+        if(gain.light > 0){
+          note(state, `Away ${formatTime(gain.seconds)} — the lot made ${formatLight(gain.light)}.`);
+          say(`Away for ${formatTime(boot.away)}. The lot made ${formatLight(gain.light)} at half rate`
+            + `${gain.capped ? `, counting the first ${formatTime(OFFLINE_CAP)}` : ''}.`, 'Back');
+        }
+      } else if(boot.away > 60){
+        state.elapsed += boot.away;
+      }
+
+      if(boot.fresh){
+        note(state, 'Found a bare lot and one small tree.');
+      }
+
+      buildShop();
+      drawShop();
+      headline();
+      drawSeeds();
+      showTab('grow');
+      writeSave();
+
+      // Save when the page goes away as well as on the timer: a tab closed
+      // nine seconds after a purchase should not lose the purchase.
+      /* Whole-number scaling, recomputed when the column changes width. The
+         `maxHeightFraction` keeps the lot from taking the whole screen on a
+         short landscape window, where a 3x canvas would push the shop off the
+         bottom. */
+      const resize = () => fitCanvas(ui.lot, SCENE_W, SCENE_H,
+        { container: ui.lot.parentElement.parentElement, maxHeightFraction: 0.56 });
+      resize();
+      addEventListener('resize', resize);
+
+      addEventListener('visibilitychange', () => { if(document.hidden) writeSave(); });
+      addEventListener('pagehide', writeSave);
+
+      requestAnimationFrame(frame);
+    </script>
+  </body>
+</html>

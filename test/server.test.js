@@ -28,21 +28,24 @@ test('GET / returns the shelf, not a game', async () => {
   assert.match(res.headers.get('content-type'), /text\/html/);
   const html = await res.text();
   assert.match(html, /Good Vibe Games/);
-  // Both games, both reachable. A landing page that lists one of them is a
-  // landing page that has quietly lost the other.
+  // Every game, every one reachable. A landing page that lists three of them
+  // is a landing page that has quietly lost the fourth.
   assert.match(html, /href="\/good-vibes\/"/);
   assert.match(html, /href="\/solarium\/"/);
+  assert.match(html, /href="\/sunward\/"/);
+  assert.match(html, /href="\/greener-thumbs\/"/);
   // The thumbnails are canvases painted by the games' own renderers, so an
   // import that stops resolving should fail here rather than on the page.
   assert.match(html, /id="shot-gv"/);
   assert.match(html, /id="shot-ss"/);
+  assert.match(html, /id="shot-sw"/);
 });
 
 test('a directory is served as its index', async () => {
   /* Cloudflare's asset store does this in production. Without the same rule
      locally, /good-vibes/ is a 404 on a laptop and a game everywhere else —
      the kind of difference that gets found by somebody else, later. */
-  for(const dir of ['/good-vibes/', '/solarium/']){
+  for(const dir of ['/good-vibes/', '/solarium/', '/sunward/', '/greener-thumbs/']){
     const res = await fetch(`${baseUrl}${dir}`);
     assert.equal(res.status, 200, `${dir} returned ${res.status}`);
     assert.match(res.headers.get('content-type'), /text\/html/);
@@ -59,6 +62,11 @@ test('each game is a title screen with a way in', async () => {
   assert.match(ss, /Save Solarium/);
   // It came from another site and used to link back to it two levels up.
   assert.doesNotMatch(ss, /Tool Haven/);
+
+  const sw = await (await fetch(`${baseUrl}/sunward/`)).text();
+  assert.match(sw, /Sunward/);
+  assert.match(sw, /<canvas[^>]*id="plate"/);
+  assert.match(sw, /href="\.\/play\.html"/);
 });
 
 test('each game keeps its own modules', async () => {
@@ -73,6 +81,22 @@ test('each game keeps its own modules', async () => {
   const ss = await fetch(`${baseUrl}/solarium/content.js`);
   assert.equal(ss.status, 200);
   assert.match(await ss.text(), /SOLAR_PER_ROUND|buildEncounter/);
+
+  const sw = await fetch(`${baseUrl}/sunward/content.js`);
+  assert.equal(sw.status, 200);
+  assert.match(await sw.text(), /GROWERS|DAY_LENGTH/);
+});
+
+test('Sunward reaches the font it borrows', async () => {
+  /* Its art.js imports the palette and the 5x7 font out of Good Vibes rather
+     than keeping a second copy of sixteen hex values. That is a cross-game
+     import and the only thing holding it up is the directory layout, so it is
+     worth a test: if good-vibes/pixel.js ever moves, Sunward is a blank page
+     and nothing else in the suite would notice. */
+  const res = await fetch(`${baseUrl}/good-vibes/pixel.js`);
+  assert.equal(res.status, 200);
+  const art = await (await fetch(`${baseUrl}/sunward/art.js`)).text();
+  assert.match(art, /from '\.\.\/good-vibes\/pixel\.js'/);
 });
 
 test('modules are served with a JavaScript type', async () => {
