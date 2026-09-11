@@ -470,10 +470,11 @@ function drawPrediction(chart, view, pos){
   const burns = pred.events.filter(e => e.kind === 'burn');
   let burnIx = 0;
   let short = false;
-  /* Two lines, and the eye should never have to work out which is which.
-     White and solid is the road you are on. Yellow and dashed is the road the
-     burn you are editing would put you on — and it is drawn only while you
-     are editing it, so a chart with nothing open has exactly one line on it. */
+  /* Two lines, always both once a burn is written down: white up to the burn,
+     yellow after it. Which one is solid says which one you are working on.
+     At rest the white road you are actually flying is solid and the yellow
+     one it would become is dashed; open the burn and they swap, so the road
+     your presses are moving is the bright, continuous one. */
   const editing = !!view.editing;
   const afterBurnAt = si => pred.segments.slice(0, si).some(sg => sg.reason === 'burn');
   for(let si = 0; si < pred.segments.length; si++){
@@ -486,10 +487,11 @@ function drawPrediction(chart, view, pos){
       if(b && b.short) short = true;
     }
     const afterBurn = afterBurnAt(si);
-    if(afterBurn && !editing) continue;          // put away until a burn is open
+    const dashed = editing ? !afterBurn : afterBurn;
     ctx.strokeStyle = short ? PALETTE.pathShort : afterBurn ? PALETTE.pathPlan : PALETTE.pathNow;
-    ctx.lineWidth = afterBurn ? 1.75 : 2;
-    ctx.setLineDash(afterBurn ? [7, 5] : []);
+    ctx.lineWidth = dashed ? 1.5 : 2;
+    ctx.globalAlpha = dashed ? 0.75 : 1;
+    ctx.setLineDash(dashed ? [7, 5] : []);
     ctx.beginPath();
     const screenPts = [];
     for(let i = 0; i < pts.length; i++){
@@ -499,6 +501,7 @@ function drawPrediction(chart, view, pos){
     }
     ctx.stroke();
     ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
     chart.hits.pathSegs.push({ seg, screenPts });
 
     if(seg.reason === 'crash'){
@@ -529,7 +532,6 @@ function drawApses(chart, view, pos, afterBurnAt){
     const seg = view.prediction.segments[a.segIndex];
     if(!seg || !pos.has(seg.body)) continue;
     const afterBurn = afterBurnAt(a.segIndex);
-    if(afterBurn && !view.editing) continue;     // a mark on a road that is not drawn
     const p = chart.toScreen(add(pos.get(seg.body).r, a.r));
     if(p[0] < -60 || p[1] < -30 || p[0] > chart.width + 60 || p[1] > chart.height + 30) continue;
     const colour = afterBurn ? PALETTE.pathPlan : PALETTE.apsis;
@@ -550,7 +552,6 @@ function drawCrossing(chart, view, pos, afterBurnAt){
   const seg = view.prediction.segments[c.segIndex];
   if(!seg || !pos.has(seg.body)) return;
   const afterBurn = afterBurnAt(c.segIndex);
-  if(afterBurn && !view.editing) return;
   const colour = afterBurn ? PALETTE.pathPlan : PALETTE.crossing;
   const anchor = pos.get(seg.body).r;
   const p = chart.toScreen(add(anchor, seg.r1));

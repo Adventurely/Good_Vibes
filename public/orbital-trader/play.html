@@ -441,11 +441,11 @@ function replan(force = false){
   if(!force && predictedAt >= 0 && nowReal - predictedReal < 280) return;
   predictedReal = nowReal;
   predictedAt = state.t;
-  /* Editing a burn is what puts the planned road on the chart. With nothing
-     open, the road drawn is the one the ship is actually on — a whole lap of
-     it, not the stub that ends where a burn happens to sit. */
-  const editing = selectedNode >= 0 && !!state.nodes[selectedNode];
-  prediction = S.planImmediate(state, editing);
+  /* A burn that is written down is on the chart whether or not it is open:
+     the white road runs up to it and the yellow road carries on from it. With
+     nothing written down at all there is one road, a whole lap of the orbit
+     the ship is actually on. */
+  prediction = S.planImmediate(state);
   if(!prediction){ nodePositions = []; apses = []; return; }
   nodePositions = state.nodes.map(n => locateOnPrediction(world, prediction, n.t));
   /* The low point and the high point of every closed leg on the drawn road.
