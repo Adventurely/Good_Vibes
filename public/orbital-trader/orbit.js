@@ -877,3 +877,23 @@ export function segmentPeriapsis(seg, mu){
   const s = propagate(mu, seg.r0, seg.v0, dt);
   return { t: seg.t0 + dt, r: s.r, distance: el.rp };
 }
+
+/* Both ends of a leg's conic: the low point and, if the conic closes and the
+ * leg lasts long enough to get there, the high point. These are the two marks
+ * the chart puts on an orbit, and the two numbers a pilot steers by. */
+export function segmentApses(seg, mu){
+  const el = seg.elements;
+  const out = [];
+  const at = nu => {
+    const dt = timeToAnomaly(mu, seg.r0, seg.v0, nu);
+    if(dt == null || dt > seg.t1 - seg.t0) return null;
+    return { t: seg.t0 + dt, r: propagate(mu, seg.r0, seg.v0, dt).r };
+  };
+  const pe = at(0);
+  if(pe) out.push({ kind: 'periapsis', distance: el.rp, ...pe });
+  if(Number.isFinite(el.period) && el.ra != null){
+    const ap = at(Math.PI);
+    if(ap) out.push({ kind: 'apoapsis', distance: el.ra, ...ap });
+  }
+  return out;
+}

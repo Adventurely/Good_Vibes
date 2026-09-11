@@ -407,12 +407,37 @@
   "lanternArrival": "You have come as far as anyone goes. The light is there, exactly where the Chorus pointed their observatory, and it is not a star and not a ship.\nIt blinks. You wait, and it blinks again, and the gap is not the same gap. There is no pattern in it that you can hold.\nThe Chorus built a silent room nine astronomical units back and aimed it at this. They left no doors, no stairs, no seats, and no explanation. Why does a thing at the edge of a system blink at all, if not for somebody?"
  },
 
+ "opening": {
+  "title": "A crate of gear oil for Pip",
+  "line": "The dockhands at Pip have been asking after this for a week. No rush they can name, but they will notice if it is slow.",
+  "briefing": "You are in orbit above Tessel with one crate aboard and nowhere to be but Pip, the little moon of dry docks a short hop out. Tap your path, push forward, and go and deliver it."
+ },
  "tutorial": [
-  { "step": "castoff", "title": "Cast off", "body": "You are tied up at Tessel. Open the Shipyard and cast off: the ship drops into a slow circle around the world, going the way the world goes." },
-  { "step": "mark", "title": "Write down a burn", "body": "Tap your path to leave a mark on it. Nothing is spent yet. A mark is a burn you have written down for later, and you can move it, change it, or scrap it." },
-  { "step": "pull", "title": "Pull forward until you reach Bramble", "body": "Drag the forward handle, or use the steppers, until the far end of your path touches Bramble's reach. Then open Target, pick Bramble, and press Aim for it to tidy the last few metres per second." },
-  { "step": "warp", "title": "Wind the clock to the burn", "body": "Use 'warp to burn'. The clock runs, the sky turns, and everything stops a moment before the burn so you can watch it go." },
-  { "step": "dock", "title": "Get close, get slow, tie up", "body": "Inside Bramble's reach, aim for kissing distance inside the harbour mouth, then burn back to shed speed. Close enough and slow enough, and Bramble takes your lines." }
+  {
+   "step": "mark",
+   "title": "Tap your path",
+   "body": "You are already in orbit around Tessel, with a crate for Pip in the hold. Tap the bright line you are riding and choose 'Burn here'. That puts a mark on it: a burn written down for later. Nothing is spent yet, and you can move it or scrap it."
+  },
+  {
+   "step": "push",
+   "title": "Press the green arrow",
+   "body": "Prograde pushes you forward and lifts the far side of your orbit. Press it until the far side of your path reaches out to Pip's circle. Retrograde, the orange one, takes it back."
+  },
+  {
+   "step": "aim",
+   "title": "Line it up with Pip",
+   "body": "Open Target, pick Pip, and press Aim for it. That tidies the last few metres per second so your path runs into Pip's reach instead of past it."
+  },
+  {
+   "step": "skip",
+   "title": "Let the clock run to it",
+   "body": "Tap your road where the burn sits, or press 'Skip to it' on the burn's card. The game tells you how long the wait is, runs the sky at whatever speed covers it in about ten seconds, and stops itself a moment before the burn so you can watch it go."
+  },
+  {
+   "step": "dock",
+   "title": "Get close, get slow, tie up",
+   "body": "Inside Pip's reach the chart swings round to Pip and draws your orbit there. Aim for kissing distance inside the harbour mouth, then burn back to shed speed. Close enough and slow enough, and Pip takes your lines and your crate."
+  }
  ],
  "contractsIntro": "Cargo pays the fuel. People are why anyone flies at all: they want somewhere by some day, and they remember whether you managed it.",
 

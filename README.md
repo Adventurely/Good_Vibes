@@ -1636,6 +1636,38 @@ document asks for that, and it buys a system where a moon can never wander out
 of its planet's reach and where Grumm's approach can be made as generous as it
 needs to be.
 
+### The road, the lock, and the clock
+
+Three rules decide what the chart shows, and all three are about showing less.
+
+**The road stops at the next thing that happens.** It draws the orbit you are
+on and exactly one crossing after it: a stable lap with its low and high points
+marked, or the arc out to the edge of this world's reach and one lap of what
+that leaves you on, or the arc in to a moon and the path around it. Nothing
+past that first crossing is chased. `planImmediate` picks the horizon that ends
+the last drawn leg exactly one lap in, then cuts.
+
+**The view is locked to the world you are going round** — the smallest reach
+holding the ship — and swings when that changes. There is no panning. The zoom
+follows the drawn road and re-frames when it grows off the screen or shrinks to
+a knot.
+
+**The clock has no ladder.** ×1 is ten real minutes to a lap of the parking
+orbit at Tessel, which is slow enough that nothing appears to move, and that is
+the point. Time is skipped by tapping somewhere on your road: the game says how
+far off it is and how long you will wait, and then runs at whatever rate covers
+it in about ten seconds and stops itself. A burn, a change of reach or a
+harbour mouth cancels the skip.
+
+### Flying it
+
+Tap your road. You get two choices at that moment: write a burn down, or run
+the clock there. A burn is four buttons on two axes — **Forward**, **Back**,
+**Out**, **In** — and one press is half a percent of how fast you are going at
+that mark, so the same press means the same thing round a moon and round the
+Lamp. Hold a button and it repeats. There is nothing to type and nothing to
+drag.
+
 The one search in the whole kernel is *when* a conic crosses a sphere of
 influence. It is done by conservative advancement: each step is bounded by the
 clearance to the nearest boundary divided by the fastest either side could
@@ -1649,6 +1681,7 @@ timestep anywhere, and nothing tunnels through a small moon at high warp.
 | Time | days (Tessel's year is 360 of them) |
 | Speed, Δv | au/day inside; 1 au/day shows as 1706 km/s, so Tessel's orbit reads 29.8 km/s |
 | Fuel | *is* the Δv budget. A burn subtracts its own size. No mass, no rocket equation |
+| Clock | ×1 is 0.0014875 days a second: ten real minutes to a lap of Tessel's parking orbit |
 
 ### Aiming
 
@@ -1682,6 +1715,10 @@ node tools/orbital-trader/build-content.mjs
 The game imports the generated modules rather than fetching the JSON: a module
 is cacheable, importable by the tests under Node, and cannot 404 into a page
 that draws nothing.
+
+You begin **in orbit**, not at a mooring — there is no landing in this game,
+and every harbour is a parking orbit you match — with one crate in the hold for
+Pip, the nearest moon. That first delivery is the whole opening brief.
 
 **The sky has to pass its own checker** before it is worth building:
 
@@ -1722,9 +1759,9 @@ Nothing here can cost the save. A dry tank calls a tow, for money and days. So
 does flying into something, at half again the price. A cat toll in the Scatter
 takes a share and never the hold, never a passenger, and never from a ship with
 nothing worth taking. Money can go below zero, and then it is a debt to Ledger,
-who are delighted. Warp drops to ×1 at every change of reach, every burn and
-every harbour mouth — and a step of flight *stops* at the first of those, so a
-frame at ×2500 can never carry you clean through a moon you were aiming at.
+who are delighted. A skip ends at every change of reach, every burn and every
+harbour mouth — and a step of flight *stops* at the first of those, so even the
+fastest skip can never carry you clean through a moon you were aiming at.
 
 ### Playing it
 

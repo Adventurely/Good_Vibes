@@ -17,7 +17,7 @@
  * 2. Pixels come from au through one number, `zoom` (pixels per au), on a
  *    logarithmic wheel. The whole system is a few hundred pixels across at
  *    zoom 30; a moon system needs zoom 30,000. Sizes that should stay legible
- *    (dots, labels, handles) are in pixels; things that are real (orbits,
+ *    (dots, labels, markers) are in pixels; things that are real (orbits,
  *    SOI rings, docking zones) are in au and grow with the zoom.
  */
 
@@ -44,8 +44,17 @@ export const PALETTE = {
   beltBand:   'rgba(122,104,88,0.08)',
   debris:     'rgba(107,95,79,0.9)',
   path:       ['#ffd23f', '#6cc24a', '#3fa9dd', '#cfa8ff', '#ffb26b', '#7ff0d3'],
+  /* The road has exactly three voices: the orbit you are on, the orbit your
+     burns put you on, and the orbit waiting on the far side of the next
+     crossing. Three colours, never a rotating palette — the colour has to
+     mean the same thing every time you look at it. */
+  pathNow:    '#ffd23f',
+  pathPlan:   '#6cc24a',
+  pathNext:   '#cfa8ff',
   pathDim:    'rgba(255,210,63,0.28)',
   pathShort:  'rgba(111,97,85,0.7)',
+  apsis:      '#f5ead6',
+  crossing:   '#cfa8ff',
   ship:       '#f5ead6',
   shipEdge:   '#120e0c',
   node:       '#ffd23f',
@@ -77,19 +86,26 @@ export function bodyColour(body){
   return speciesColour(body.species ?? 'none');
 }
 
-const MIN_ZOOM = 8, MAX_ZOOM = 4e5;
+/* A lap of Tessel is 0.0007 au across and a lap of Pip is 0.00003; the chart
+   has to frame both, so the ceiling is set by the smallest moon rather than
+   by the biggest orbit. */
+const MIN_ZOOM = 8, MAX_ZOOM = 2e7;
 
 export function createChart(canvas, world, opts = {}){
   const ctx = canvas.getContext('2d', { alpha: false });
   const chart = {
     canvas, ctx, world,
     width: 0, height: 0, dpr: 1,
-    camera: { cx: 0, cy: 0, zoom: 240, follow: 'ship' },
+    /* `follow` is not a preference. The chart is always centred on the body
+       whose reach the ship is in — the smallest one holding it — and it
+       changes when that changes. Panning is not offered: a view that can be
+       lost is a view somebody has to get back. */
+    camera: { cx: 0, cy: 0, zoom: 240, follow: null },
     /* Screen-pixel shift of the follow centre: negative x when a panel covers
        the right of the chart, negative y when a sheet covers the bottom. */
     offset: [0, 0],
     /* Last frame's screen-space records, for hit testing. */
-    hits: { bodies: [], nodes: [], handles: [], pathSegs: [] },
+    hits: { bodies: [], nodes: [], pathSegs: [] },
     reducedMotion: !!opts.reducedMotion,
     /* The scale bar is a navigation tool. On a thumbnail or behind a title it
        is a stray measurement in the corner of a picture. */
@@ -131,17 +147,16 @@ export function createChart(canvas, world, opts = {}){
     cam.cx += before[0] - after[0];
     cam.cy += before[1] - after[1];
   };
-  chart.panBy = (dx, dy) => {
-    chart.camera.cx -= dx / chart.camera.zoom;
-    chart.camera.cy += dy / chart.camera.zoom;
-    chart.camera.follow = null;
-  };
-  /* Follow a body or the ship, and pick a zoom that frames it. */
+  /* Lock onto a body and pick a zoom that frames its reach. */
   chart.focus = (what, view, frame = true) => {
     chart.camera.follow = what;
     if(!frame) return;
-    if(what === 'ship') return;
     const b = world.get(what);
+    if(!b) return;
+    chart.frameBody(what);
+  };
+  chart.frameBody = id => {
+    const b = world.get(id);
     if(!b) return;
     const span = b.soi ?? (b.zoneRadius ? b.zoneRadius * 6 : 0.2);
     chart.camera.zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, (Math.min(chart.width, chart.height) * 0.36) / span));
@@ -172,13 +187,18 @@ function draw(chart, view){
   const { ctx, world, camera } = chart;
   const W = chart.width, H = chart.height;
   const t = view.t;
-  chart.hits = { bodies: [], nodes: [], handles: [], pathSegs: [] };
+  chart.hits = { bodies: [], nodes: [], pathSegs: [] };
 
   // Positions of every body now, once per frame.
   const pos = new Map();
   for(const b of world.bodies) pos.set(b.id, absState(world, b.id, t));
 
-  // Camera follow.
+  /* The lock. The centre of the chart is the body the ship is going round —
+     the smallest reach containing it — unless a page has asked for something
+     else on purpose (the title screen turns about the Lamp). */
+  if(view.lockTo && pos.has(view.lockTo)){
+    camera.follow = view.lockTo;
+  }
   if(camera.follow === 'ship' && view.shipAbs){
     camera.cx = view.shipAbs.r[0]; camera.cy = view.shipAbs.r[1];
   }else if(camera.follow && pos.has(camera.follow)){
@@ -437,76 +457,55 @@ function crosshair(ctx, p, r){
 function drawPrediction(chart, view, pos){
   const { ctx, world, camera } = chart;
   const pred = view.prediction;
-  let colourIx = 0;
-  let short = false;
-  let burnIx = 0;
-  /* A road that grazes the same moon on nine laps earns nine identical labels,
-     and the chart turns into a list. Name the first few crossings and let the
-     markers speak for the rest. */
-  let named = 0;
-  const NAME_LIMIT = 3;
+  const afterFrom = pred.afterFrom ?? pred.segments.length;
   const burns = pred.events.filter(e => e.kind === 'burn');
+  let burnIx = 0;
+  let short = false;
   for(let si = 0; si < pred.segments.length; si++){
     const seg = pred.segments[si];
     const anchor = pos.get(seg.body).r;
     const pts = seg.points;
     if(!pts.length) continue;
-    // Colour: advance at each burn boundary.
     if(si > 0 && pred.segments[si - 1].reason === 'burn'){
       const b = burns[burnIx++];
       if(b && b.short) short = true;
-      colourIx++;
     }
-    ctx.strokeStyle = short ? PALETTE.pathShort : PALETTE.path[colourIx % PALETTE.path.length];
-    ctx.lineWidth = short ? 1 : 1.5;
-    ctx.setLineDash(seg.body === view.shipBody && si === 0 ? [] : [6, 4]);
+    /* Three voices. Before the first burn is the orbit you are already on;
+       after it is the orbit you have written down; past the crossing is a
+       different world's orbit entirely. */
+    const past = si >= afterFrom;
+    const planned = !past && si > 0;
+    ctx.strokeStyle = short ? PALETTE.pathShort : past ? PALETTE.pathNext : planned ? PALETTE.pathPlan : PALETTE.pathNow;
+    ctx.lineWidth = short ? 1 : past ? 1.5 : 2;
+    ctx.setLineDash(past ? [7, 5] : []);
     ctx.beginPath();
-    let first = true;
     const screenPts = [];
     for(let i = 0; i < pts.length; i++){
-      const s = chart.toScreen(add(anchor, pts[i]));
-      screenPts.push(s);
-      if(first){ ctx.moveTo(s[0], s[1]); first = false; } else ctx.lineTo(s[0], s[1]);
+      const sp = chart.toScreen(add(anchor, pts[i]));
+      screenPts.push(sp);
+      if(i === 0) ctx.moveTo(sp[0], sp[1]); else ctx.lineTo(sp[0], sp[1]);
     }
     ctx.stroke();
     ctx.setLineDash([]);
     chart.hits.pathSegs.push({ seg, screenPts });
 
-    // Where the leg ends: an SOI marker, a crash, or the edge of the plan.
-    const endS = chart.toScreen(add(anchor, seg.r1));
-    if(seg.reason === 'exit' || seg.reason === 'enter'){
-      ctx.fillStyle = PALETTE.marker;
-      diamond(ctx, endS, 4);
-      if(named < NAME_LIMIT && (camera.zoom * (world.get(seg.body).soi ?? 1) > 40 || seg.reason === 'enter')){
-        named++;
-        ctx.fillStyle = PALETTE.textDim;
-        ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
-        const to = seg.reason === 'exit' ? world.get(world.get(seg.body).parent) : pred.events.find(e => e.kind === 'soi' && Math.abs(e.t - seg.t1) < 1e-6);
-        const name = seg.reason === 'exit' ? (to ? labelFor(to) : '') : (to ? labelFor(world.get(to.to)) : '');
-        if(name) ctx.fillText((seg.reason === 'exit' ? 'out to ' : 'into ') + name, endS[0] + 7, endS[1] + 4);
-      }
-    }else if(seg.reason === 'crash'){
+    if(seg.reason === 'crash'){
+      const endS = chart.toScreen(add(anchor, seg.r1));
       ctx.strokeStyle = PALETTE.crash; ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(endS[0] - 5, endS[1] - 5); ctx.lineTo(endS[0] + 5, endS[1] + 5);
       ctx.moveTo(endS[0] + 5, endS[1] - 5); ctx.lineTo(endS[0] - 5, endS[1] + 5);
       ctx.stroke();
     }
-    // Kissing distance of this leg, when it is a real approach to a world.
-    if(view.periapses){
-      const pe = view.periapses.find(p => p.segIndex === si);
-      if(pe && camera.zoom * pe.distance > 12){
-        const s = chart.toScreen(add(anchor, pe.r));
-        ctx.fillStyle = PALETTE.textDim;
-        ctx.beginPath(); ctx.arc(s[0], s[1], 2.5, 0, Math.PI * 2); ctx.fill();
-      }
-    }
   }
+
+  drawApses(chart, view, pos);
+  drawCrossing(chart, view, pos);
 
   // Closest approach to the target: the ship's point on its leg, the target's
   // ghost where it will be, both in that leg's frame.
   const ca = view.approach;
-  if(ca && ca.segBody){
+  if(ca && ca.segBody && pos.has(ca.segBody)){
     const anchor = pos.get(ca.segBody).r;
     const shipS = chart.toScreen(add(anchor, ca.shipLocal));
     const tgS = chart.toScreen(add(anchor, ca.targetLocal));
@@ -522,6 +521,51 @@ function drawPrediction(chart, view, pos){
       ctx.fillText(ca.label, tgS[0] + rpx + 6, tgS[1] - 6);
     }
   }
+}
+
+/* The two marks that describe an orbit at a glance: the low point and the
+ * high point. A filled dot sits at the low one, a hollow ring at the high
+ * one, and both carry their height so the numbers a pilot steers by are on
+ * the chart rather than in a panel. */
+function drawApses(chart, view, pos){
+  const { ctx, camera } = chart;
+  if(!view.apses) return;
+  ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
+  for(const a of view.apses){
+    const seg = view.prediction.segments[a.segIndex];
+    if(!seg || !pos.has(seg.body)) continue;
+    const p = chart.toScreen(add(pos.get(seg.body).r, a.r));
+    if(p[0] < -60 || p[1] < -30 || p[0] > chart.width + 60 || p[1] > chart.height + 30) continue;
+    const dim = a.segIndex >= (view.prediction.afterFrom ?? 1e9);
+    ctx.strokeStyle = ctx.fillStyle = dim ? PALETTE.pathNext : PALETTE.apsis;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(p[0], p[1], 4, 0, Math.PI * 2);
+    if(a.kind === 'periapsis') ctx.fill(); else ctx.stroke();
+    if(a.label){
+      ctx.fillStyle = dim ? PALETTE.pathNext : PALETTE.text;
+      ctx.fillText(a.label, p[0] + 8, p[1] + 4);
+    }
+  }
+}
+
+/* Where this road leaves one world's reach for another's: the single event
+ * the chart promises to show, so it gets a mark you cannot miss. */
+function drawCrossing(chart, view, pos){
+  const { ctx, world } = chart;
+  const c = view.prediction?.crossing;
+  if(!c) return;
+  const seg = view.prediction.segments[c.segIndex];
+  if(!seg || !pos.has(seg.body)) return;
+  const p = chart.toScreen(add(pos.get(seg.body).r, seg.r1));
+  ctx.strokeStyle = PALETTE.crossing; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(p[0], p[1], 7, 0, Math.PI * 2); ctx.stroke();
+  ctx.fillStyle = PALETTE.crossing;
+  diamond(ctx, p, 3.5);
+  const to = c.to ? world.get(c.to) : null;
+  if(!to) return;
+  ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
+  ctx.fillStyle = PALETTE.text;
+  ctx.fillText(`${c.kind === 'exit' ? 'out to' : 'into'} ${labelFor(to)}`, p[0] + 11, p[1] + 4);
 }
 
 function diamond(ctx, p, r){
@@ -550,18 +594,21 @@ function drawShip(chart, view){
   }
 }
 
-/* Maneuver nodes: a ring on the path at the node's time, with a prograde /
- * retrograde pair of handles along the local velocity and a radial pair
- * across it. Handles are pixels, not au, so they are the same size to grab
- * at any zoom; the hit radius is bigger than the drawn handle. */
-const HANDLE_OFFSET = 30;
+/* Maneuver nodes: a ring on the path at the moment the burn fires, with the
+ * four directions the pad pushes drawn around it. The arrows are a legend,
+ * not a control — the burn itself is set with four buttons, and a chart you
+ * have to drag a handle on with any accuracy is a chart that has already
+ * asked too much. An arrow grows with the burn written down along it, so the
+ * pad and the chart are saying the same thing.
+ */
+const HANDLE_OFFSET = 26;
 function drawNodes(chart, view, pos){
   const { ctx } = chart;
   const nodes = view.nodes;
   for(let i = 0; i < nodes.length; i++){
     const n = nodes[i];
     const where = view.nodePositions?.[i];
-    if(!where) continue;
+    if(!where || !pos.has(where.body)) continue;
     const anchor = pos.get(where.body).r;
     const p = chart.toScreen(add(anchor, where.r));
     const vdir = unit(where.v);
@@ -572,27 +619,28 @@ function drawNodes(chart, view, pos){
     ctx.beginPath(); ctx.arc(p[0], p[1], selected ? 11 : 8, 0, Math.PI * 2); ctx.stroke();
     ctx.fillStyle = PALETTE.node;
     ctx.beginPath(); ctx.arc(p[0], p[1], 3.5, 0, Math.PI * 2); ctx.fill();
-    chart.hits.nodes.push({ index: i, x: p[0], y: p[1], r: 16 });
+    chart.hits.nodes.push({ index: i, x: p[0], y: p[1], r: 18 });
     if(!selected) continue;
-    const handles = [
-      ['prograde', pro, PALETTE.prograde, 1],
-      ['retrograde', [-pro[0], -pro[1]], PALETTE.retrograde, -1],
-      ['radialOut', radS, PALETTE.radial, 1],
-      ['radialIn', [-radS[0], -radS[1]], PALETTE.radial, -1],
+    /* How far each arrow reaches: a stub when nothing is written down that
+       way, growing to the full length as the burn on that axis gets big. */
+    const reach = amount => HANDLE_OFFSET * (0.45 + 0.55 * Math.min(1, Math.abs(amount) / (0.28 * Math.max(1e-9, norm(where.v)))));
+    const arrows = [
+      [pro, PALETTE.prograde, n.prograde > 0 ? n.prograde : 0],
+      [[-pro[0], -pro[1]], PALETTE.retrograde, n.prograde < 0 ? n.prograde : 0],
+      [radS, PALETTE.radial, n.radial > 0 ? n.radial : 0],
+      [[-radS[0], -radS[1]], PALETTE.radial, n.radial < 0 ? n.radial : 0],
     ];
-    for(const [kind, d, colour] of handles){
-      const h = [p[0] + d[0] * HANDLE_OFFSET, p[1] + d[1] * HANDLE_OFFSET];
-      ctx.strokeStyle = colour; ctx.lineWidth = 1.25;
-      ctx.beginPath(); ctx.moveTo(p[0] + d[0] * 12, p[1] + d[1] * 12); ctx.lineTo(h[0], h[1]); ctx.stroke();
+    for(const [d, colour, amount] of arrows){
+      const len = reach(amount);
+      const h = [p[0] + d[0] * len, p[1] + d[1] * len];
+      ctx.globalAlpha = amount ? 1 : 0.4;
+      ctx.strokeStyle = colour; ctx.lineWidth = amount ? 2 : 1;
+      ctx.beginPath(); ctx.moveTo(p[0] + d[0] * 13, p[1] + d[1] * 13); ctx.lineTo(h[0], h[1]); ctx.stroke();
       ctx.fillStyle = colour;
-      if(kind.startsWith('radial')){
-        ctx.beginPath(); ctx.arc(h[0], h[1], 5, 0, Math.PI * 2); ctx.fill();
-      }else{
-        ctx.save(); ctx.translate(h[0], h[1]); ctx.rotate(Math.atan2(d[1], d[0]));
-        ctx.beginPath(); ctx.moveTo(6, 0); ctx.lineTo(-4, 5); ctx.lineTo(-4, -5); ctx.closePath(); ctx.fill();
-        ctx.restore();
-      }
-      chart.hits.handles.push({ index: i, axis: kind, x: h[0], y: h[1], r: 20, dir: d });
+      ctx.save(); ctx.translate(h[0], h[1]); ctx.rotate(Math.atan2(d[1], d[0]));
+      ctx.beginPath(); ctx.moveTo(5, 0); ctx.lineTo(-3.5, 4); ctx.lineTo(-3.5, -4); ctx.closePath(); ctx.fill();
+      ctx.restore();
+      ctx.globalAlpha = 1;
     }
   }
 }
@@ -629,7 +677,6 @@ function hitTest(chart, x, y){
   /* Spread first, name after. A handle record carries its own axis, and
      spreading it over `kind` was how every handle came back as something else
      and dragging one panned the chart. */
-  for(const k of h.handles){ if(Math.hypot(k.x - x, k.y - y) <= k.r) return { ...k, kind: 'handle' }; }
   for(const n of h.nodes){ if(Math.hypot(n.x - x, n.y - y) <= n.r) return { ...n, kind: 'node' }; }
   // Bodies: nearest within its drawn size, so a moon beats the planet it is in
   // front of. The generous margin is for fingers.

@@ -59,12 +59,18 @@ export function hash(...parts){
 
 export function tiers(kind){ return UPGRADES.filter(u => u.kind === kind).sort((a, b) => a.tier - b.tier); }
 
+/* The first delivery: one crate, already aboard, for the nearest moon. It is
+ * the whole of the opening brief. A player who has never flown anything has
+ * somewhere to be before they have learned what a market is, and the road
+ * there is the shortest one in the game. */
+export const FIRST_DELIVERY = { to: 'pip', pay: 420, days: 14, units: 2 };
+
 export function newGame(seed = 1){
   const start = CONST.START_PORT;
   const state = {
     version: 1,
     seed, rng: (seed * 2654435761) >>> 0 || 1,
-    t: 0, warp: 0, paused: false,
+    t: 0, warp: 1, paused: false,
     shipName: TEXT.shipNames[Math.abs(seed) % TEXT.shipNames.length],
     ship: { body: start, r: [0, 0], v: [0, 0] },
     dockedAt: start,
@@ -88,9 +94,31 @@ export function newGame(seed = 1){
   };
   state.tank = auDay(tiers('tank')[0].value);
   state.dv = state.tank;
-  placeDocked(state, start);
+  /* The game opens in flight, not at a mooring. There is no landing in
+     Orbital Trader — every harbour is a parking orbit — so the honest first
+     frame is the ship already going round Tessel with a road drawn ahead of
+     it. Nothing to cast off from, nothing to press before the chart means
+     something. */
+  placeParked(state, start);
+  state.dockedAt = null;
+  state.justLeft = start;          // Tessel's own mouth is where we started; don't offer it back on frame one
   refreshOffers(state, start, true);
-  logLine(state, 'docked', TEXT.logTemplates.docked, { port: portName(start) });
+  const first = TEXT.opening ?? {};
+  state.passengers.push({
+    id: 'opening-pip',
+    kind: 'cargo', species: 'otter',
+    from: start, to: FIRST_DELIVERY.to,
+    pay: FIRST_DELIVERY.pay,
+    deadline: state.t + FIRST_DELIVERY.days,
+    units: FIRST_DELIVERY.units, needs: [], tightness: 'easy',
+    title: first.title ?? 'A crate for Pip',
+    line: first.line ?? '',
+    offeredAt: state.t, takenAt: state.t, opening: true,
+  });
+  state.target = FIRST_DELIVERY.to;
+  logLine(state, 'contractTaken', TEXT.logTemplates.contractTaken, {
+    title: state.passengers[0].title, to: portName(FIRST_DELIVERY.to), pay: fmtMoney(FIRST_DELIVERY.pay),
+  });
   return state;
 }
 
@@ -214,19 +242,19 @@ export function dock(state){
   return { ok: true, port, delivered, events };
 }
 
-export function undock(state){
-  if(!state.dockedAt) return { ok: false };
-  const port = state.dockedAt;
-  const b = world.get(port);
+/* Free flight at a port: the parking orbit a ship sits in when it is not tied
+ * up. A prograde circle at the docking altitude, placed so that the ship's
+ * velocity points the way the port itself is moving, which means the first
+ * burn a beginner makes is already in the right direction. This is also where
+ * a new game begins. */
+function placeParked(state, portId){
+  const b = world.get(portId);
   if(b.mu > 0){
-    // A prograde circular orbit at the docking altitude, placed so that the
-    // ship's velocity points the way the port itself is moving: the first
-    // burn a beginner makes is then already in the right direction.
-    const pv = absState(world, port, state.t).v;
+    const pv = absState(world, portId, state.t).v;
     const dir = norm(pv) > 0 ? unit(pv) : [0, 1];
     const theta = Math.atan2(dir[1], dir[0]) - Math.PI / 2;
     const s = circularState(b.mu, b.dockAlt, theta);
-    state.ship = { body: port, r: s.r, v: s.v };
+    state.ship = { body: portId, r: s.r, v: s.v };
   }else{
     const parent = world.get(b.parent);
     const local = railState(b, parent.mu, state.t);
@@ -234,6 +262,12 @@ export function undock(state){
     const off = scale(unit(local.r), b.zoneRadius * 0.6);
     state.ship = { body: b.parent, r: add(local.r, off), v: [...local.v] };
   }
+}
+
+export function undock(state){
+  if(!state.dockedAt) return { ok: false };
+  const port = state.dockedAt;
+  placeParked(state, port);
   state.dockedAt = null;
   /* Casting off drops you inside the harbour mouth you just left, and a card
      saying "tie up" is not what anybody wants to read one second after leaving.
@@ -261,10 +295,29 @@ export function daysToPeriapsis(bodyId, t){
 
 /* --------------------------------------------------------------- flight */
 
-export function warpRate(state){ return CONST.WARP_LEVELS[state.warp] ?? 1; }
+/* Time has no ladder. There is the clock — ×1, ten minutes to a lap of the
+ * parking orbit — and there is skipping: you point at somewhere on your road,
+ * the game says how long it takes and how long you will be sitting there, and
+ * if you say yes it runs the clock at exactly the rate that covers it in ten
+ * seconds. A rung of warp is a thing to choose; a place on your road is a
+ * thing you already wanted. */
+export const MAX_WARP = CONST.MAX_WARP;
+export const SKIP_SECONDS = CONST.SKIP_SECONDS;
+export function warpRate(state){ return Math.max(1, Math.min(MAX_WARP, state.warp ?? 1)); }
 export function dtForFrame(state, realSeconds){
   if(state.paused || state.pending) return 0;
   return realSeconds * CONST.BASE_RATE_DAYS_PER_SEC * warpRate(state);
+}
+
+/* What skipping to a moment would cost: the rate to use, and the real seconds
+ * it will actually take. The cap is the only reason those two ever disagree,
+ * and when they do the confirmation has to say so rather than promise ten. */
+export function skipPlan(state, t){
+  const days = t - state.t;
+  if(!(days > 1e-9)) return null;
+  const ideal = days / (SKIP_SECONDS * CONST.BASE_RATE_DAYS_PER_SEC);
+  const rate = Math.max(1, Math.min(MAX_WARP, ideal));
+  return { t, days, rate, seconds: days / (rate * CONST.BASE_RATE_DAYS_PER_SEC), capped: ideal > MAX_WARP };
 }
 
 /* The maneuvers the kernel should actually fly: the player's nodes plus any
@@ -455,21 +508,104 @@ export function addNodeAhead(state){
   const el = elementsFromState(b.mu, state.ship.r, state.ship.v);
   const ahead = Number.isFinite(el.period) ? el.period / 8 : 1;
   const last = state.nodes.length ? state.nodes[state.nodes.length - 1].t : state.t;
-  /* Never closer than half a day. An eighth of a low orbit around a moon is
-     under a minute of real time at the slowest warp, which is not enough time
-     to drag a handle — the mark would fire, empty, before it was finished. */
-  return addNode(state, Math.max(state.t, last) + Math.max(0.5, ahead));
+  /* A floor of twenty-five real seconds at x1, which at this clock is most of
+     the way round a small moon: enough to press the pad a few times before
+     the mark arrives and fires whatever it has by then. */
+  const floor = CONST.BASE_RATE_DAYS_PER_SEC * 25;
+  return addNode(state, Math.max(state.t, last) + Math.max(floor, ahead));
 }
 export function planCost(state, horizon){
   if(!state.nodes.length) return 0;
   return markStates(state, horizon).reduce((s, m) => s + m.cost, 0);
 }
 
-/* The plan as the chart will draw it, with what the tank can pay for. */
+/* The plan as the solver reads it: as far ahead as it is asked for. */
 export function plan(state, horizon){
   const nodes = effectiveNodes(state, horizon);
   return predict(world, state.ship, state.t, nodes, horizon, { atmosphere: !state.keys.heatShield, dvAvailable: state.dv });
 }
+
+/* ------------------------------------------------- the immediate orbit */
+
+/* The road the chart draws is deliberately short-sighted. It shows the orbit
+ * you are on and the *one* thing that happens next, and then it stops:
+ *
+ *   stable   one lap of the ellipse, low point and high point marked
+ *   exit     the arc out to the edge of this world's reach, the crossing
+ *            marked, and one lap of the orbit that leaves you in around the
+ *            parent
+ *   enter    the arc in to a moon's reach, the crossing marked, and the
+ *            path around the moon with its low point marked
+ *
+ * Nothing past that first crossing is chased. A road that predicts nine
+ * encounters is a road nobody can read, and every one of them past the first
+ * is a guess that a single burn will erase anyway.
+ *
+ * `predict` gives a leg per reach and per burn; all this does is choose a
+ * horizon that ends the last drawn leg exactly one lap in, then cut. Two
+ * passes: one to find out when the crossing happens and what conic it leaves
+ * you on, one to draw that conic for precisely one lap.
+ */
+const OPEN_LEG_DAYS = 720;     // an unbound leg has no lap; draw this much of it
+const IMMEDIATE_CAP = 6000;
+
+function lapOf(elements){
+  const p = elements?.period;
+  return Number.isFinite(p) && p > 0 ? p : OPEN_LEG_DAYS;
+}
+
+/* The leg the drawn road ends on: the one after the first crossing, or the
+ * last one there is. */
+function finalLeg(pred){
+  const segs = pred.segments;
+  if(!segs.length) return null;
+  const crossed = segs.findIndex(sg => sg.reason === 'exit' || sg.reason === 'enter');
+  return segs[crossed >= 0 ? Math.min(crossed + 1, segs.length - 1) : segs.length - 1];
+}
+const settled = pred => pred.segments.some(sg => sg.reason === 'crash' || sg.reason === 'partial');
+
+export function planImmediate(state){
+  if(state.dockedAt) return null;
+  const b = world.get(state.ship.body);
+  const el = elementsFromState(b.mu, state.ship.r, state.ship.v);
+  const lastNode = state.nodes.length ? state.nodes[state.nodes.length - 1].t : state.t;
+  const lead = Math.max(0, lastNode - state.t);
+  /* The opening guess: every burn, then one lap of the conic we are on now.
+     A crossing inside that lap turns up in the first pass, and the passes
+     after it only correct the lap length for the conic the crossing (or the
+     last burn) actually leaves us on. */
+  let horizon = Math.min(IMMEDIATE_CAP, lead + lapOf(el) * 1.02);
+  let pred = plan(state, horizon);
+  for(let pass = 0; pass < 3 && !settled(pred); pass++){
+    const fin = finalLeg(pred);
+    if(!fin) break;
+    const want = Math.min(IMMEDIATE_CAP, (fin.t0 - state.t) + lapOf(fin.elements));
+    if(Math.abs(want - horizon) <= Math.max(1e-6, horizon * 0.01)) break;
+    horizon = want;
+    pred = plan(state, horizon);
+  }
+  const segs = pred.segments;
+  const crossed = segs.findIndex(sg => sg.reason === 'exit' || sg.reason === 'enter');
+  const keep = crossed >= 0 ? Math.min(crossed + 2, segs.length) : segs.length;
+  const segments = segs.slice(0, keep);
+  const endT = segments.length ? segments[segments.length - 1].t1 : state.t;
+  const events = pred.events.filter(e => e.t <= endT + 1e-9);
+  const crossing = crossed >= 0 && crossed < segments.length ? {
+    segIndex: crossed,
+    kind: segments[crossed].reason,
+    t: segments[crossed].t1,
+    from: segments[crossed].body,
+    to: events.find(e => e.kind === 'soi' && Math.abs(e.t - segments[crossed].t1) < 1e-6)?.to ?? null,
+  } : null;
+  return {
+    ...pred, segments, events, end: endT, horizon,
+    crossing,
+    /* From here on the road is drawn in the second colour: it is a different
+       world's orbit, and it should not read as more of the same one. */
+    afterFrom: crossed >= 0 ? crossed + 1 : segments.length,
+  };
+}
+
 
 /* A first guess good enough to polish: solve for the transfer directly.
  *
@@ -1763,7 +1899,7 @@ export function restore(json){
   s.pending ??= null; s.flags ??= {}; s.stats ??= {}; s.visited ??= [s.dockedAt].filter(Boolean);
   s.toll ??= { lastT: -1e9, inBelt: false };
   s.debt ??= 0; s.target ??= null; s.justLeft ??= null;
-  s.warp = Number.isInteger(s.warp) && s.warp >= 0 && s.warp < CONST.WARP_LEVELS.length ? s.warp : 0;
+  s.warp = Number.isFinite(s.warp) ? Math.max(1, Math.min(CONST.MAX_WARP, s.warp)) : 1;
   s.rng = Number.isFinite(s.rng) ? s.rng : 1;
   s.shipName ??= TEXT.shipNames[0];
   if(s.target && !world.get(s.target)) s.target = null;

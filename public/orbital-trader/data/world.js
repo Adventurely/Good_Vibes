@@ -5,16 +5,12 @@ export const TUNING = {
   "MU_LAMP": 0.00030461741978670857,
   "YEAR_DAYS": 360,
   "KMS_PER_AU_DAY": 1706,
-  "BASE_RATE_DAYS_PER_SEC": 0.1,
-  "WARP_LEVELS": [
-   1,
-   5,
-   25,
-   100,
-   500,
-   2500
-  ],
-  "DV_DISPLAY_NOTE": "1 au/day shows as 1706 km/s, so Tessel's circular speed reads 29.8 km/s like Earth's."
+  "BASE_RATE_DAYS_PER_SEC": 0.0014875,
+  "SKIP_SECONDS": 10,
+  "MAX_WARP": 100000,
+  "DV_DISPLAY_NOTE": "1 au/day shows as 1706 km/s, so Tessel's circular speed reads 29.8 km/s like Earth's.",
+  "RATE_NOTE": "At x1 a lap of the parking orbit at Tessel (0.0007 au, 0.8925 d) takes 600 real seconds: ten minutes, the slowest clock the game ever runs. Nothing in the sky is quicker than that.",
+  "SKIP_NOTE": "There is no ladder of warp speeds. A player points at a place on their road and the clock runs at whatever rate covers it in SKIP_SECONDS, capped at MAX_WARP (about 149 days a second); anything longer than the cap allows simply takes proportionally more than ten seconds, and the confirmation says so."
  },
  "bodies": [
   {

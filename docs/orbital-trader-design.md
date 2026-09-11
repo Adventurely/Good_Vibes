@@ -1,6 +1,6 @@
 # Orbital Trader (Working Title): Design Document
 
-**Status:** Early draft. Sections marked **TBD** are intentionally undecided and collect open questions rather than decisions.
+**Status:** Early draft, revised. Sections 2.2, 2.3, 2.6 and 2.6.1 record decisions made after the first playable build. Sections marked **TBD** are intentionally undecided and collect open questions rather than decisions.
 
 ---
 
@@ -40,11 +40,29 @@ Because the ship follows a single conic inside each SOI, trajectories can be sol
 
 ### 2.2 Maneuver Planning
 
-Players plan burns by placing **maneuver nodes** on their predicted trajectory and adjusting them along prograde/retrograde and radial in/out axes. The predicted path updates live, showing SOI transitions, closest-approach markers with other bodies, and the delta-v cost of the plan. Planning is free: nothing is committed until the player executes.
+**A child should be able to plan a burn.** That is the bar, and it sets the whole shape of the control:
 
-**Proposed:** burns are treated as instantaneous impulses. What you plan is exactly what you get, which removes execution error and keeps the challenge in route design rather than timing reflexes. (See open questions in Section 6.7.)
+**Tap your road.** One gesture on the drawn path is the only way in. It offers two things at that moment — write a burn down here, or run the clock to here — and says how far off the moment is either way.
 
-### 2.3 Forgiveness Systems
+**Two axes, four buttons.** A burn is set with **Forward**, **Back**, **Out** and **In**: prograde and retrograde along the way you are already going, radial out and in across it. Each is one large button with an arrow and a word. There is no typing, no unit to choose, no handle to drag to the right number, and no third axis to discover.
+
+**One press is one step, sized to the orbit.** A press is a fixed fraction (0.5%) of how fast the ship is actually going at the mark, rounded to a number a person would say out loud. The same press is a small change whether you are creeping round a moon at 200 m/s or falling past the Lamp at 30 km/s. Holding a button repeats, and then hurries.
+
+The four directions are drawn around the mark on the chart as well, growing with the burn written down along them, so the pad and the chart say the same thing. They are a legend, not a control: the chart is never something you have to drag accurately.
+
+Planning is free. Nothing is spent until the clock reaches the mark, and a mark can be moved, re-pressed, zeroed or scrapped.
+
+Burns are **instantaneous impulses**. What you plan is exactly what you get, which removes execution error and keeps the challenge in route design rather than timing reflexes.
+
+### 2.3 Arrival, and Why There Is No Landing
+
+**Nothing lands.** Every harbour in the system is an orbit, and docking means matching one: you arrive by getting close enough and slow enough inside a port's **harbour mouth**, and the port's own lighters carry goods the rest of the way down. A world's surface is scenery and a crash hazard, never a destination.
+
+This is a scope decision as much as a fictional one. Landing would need a second control scheme, a second set of physics, and a second art problem, and it would buy nothing the orbital game does not already have. The fiction absorbs it easily: Tessel is an ocean of floating harbour cities that meet ships in orbit, the cats cannot survive a heavy world at all, and the frogs' balloon villages have no ground under them either.
+
+The player therefore **starts in orbit**, not moored. A new game opens with the ship already going round Tessel in its parking orbit, with a road drawn ahead of it and a crate in the hold. There is nothing to cast off from and nothing to press before the chart means something.
+
+### 2.3.1 Forgiveness Systems
 
 Arrival uses a generous **docking zone** around each port. Entering it below a relative-speed threshold counts as arrival. If the player comes in too fast, they can simply plan a correction burn and try again. Mid-course corrections are cheap and encouraged. Planning previews show everything the player needs, so failure comes from choices, not surprises.
 
@@ -56,6 +74,7 @@ The skill curve is built into the physics rather than layered on top.
 
 | Stage | Technique | In-world name | Payoff |
 |---|---|---|---|
+| Opening | Tessel's parking orbit out to Pip, its nearest moon | The first delivery | One tap, one push, one crossing: the whole game in five minutes |
 | Beginner | Moon-to-moon hops around Tessel | "Hopping the rafts" | Learning SOI transitions in a safe space |
 | Beginner | Hohmann transfers | "The slow road" | Cheap, reliable, slow |
 | Intermediate | Faster direct transfers | "Running hot" | Speed at a fuel cost |
@@ -72,9 +91,37 @@ Fuel is the only resource for movement and is displayed to the player as a delta
 
 ### 2.6 Time
 
-The game clock runs continuously, and every body moves along its orbit as time passes. Time is the second currency alongside fuel. Players can time-warp while coasting. Time pressure comes from perishable cargo, passenger deadlines, and scheduled orbital events such as Wanderwell's periapsis market and Merrow's Comet's passes.
+The game clock runs continuously, and every body moves along its orbit as time passes. Time is the second currency alongside fuel. Time pressure comes from perishable cargo, passenger deadlines, and scheduled orbital events such as Wanderwell's periapsis market and Merrow's Comet's passes.
 
-The exact scale (how long a Tessel year lasts in real time, and how much distances are compressed) is a tuning question.
+**The clock is slow on purpose.** At ×1, one lap of the parking orbit at Tessel takes **ten real minutes**. That is the slowest thing in the sky, and everything else is slower still, so at ×1 almost nothing appears to move. That is the intended reading: an orbit is a place you are, not an animation you watch. Watching the sky turn is what skipping is for.
+
+**There is no ladder of warp speeds.** A strip of ×1 / ×10 / ×100 buttons asks the player to answer a question they do not have — *how fast should time go?* — when the question they actually have is *when do I want to be there?* So time is skipped by pointing at a place:
+
+- Tap anywhere on your drawn road and choose **Skip to here**, or press **Skip to it** on a burn, a crossing, or a near pass.
+- A confirmation says how far off that moment is in game time and how long the wait will be in real seconds.
+- On yes, the clock runs at exactly the rate that covers the stretch in **about ten seconds**, and stops itself on arrival.
+
+Anything worth being awake for cancels the skip and drops the clock back to ×1: a burn firing, a change of sphere of influence, a harbour mouth, a toll, a dry tank. The only control the clock has besides skipping is a **hold**.
+
+A cap on the rate means the longest hauls take proportionally more than ten seconds; the confirmation says so rather than promising ten.
+
+### 2.6.1 The Chart
+
+Two rules keep the chart readable, and both of them are about refusing to show things.
+
+**The view is locked to the world you are going round.** The chart is always centred on the smallest sphere of influence containing the ship, and it changes when that changes — crossing into a moon's reach swings the chart to that moon and re-frames it. There is no panning and no free look. A view that can be lost is a view somebody has to get back, and a player who is lost on the chart is lost in the game. The zoom follows the drawn road: it re-frames when the road grows past the edge of the screen or shrinks to a knot in the middle, and leaves the player's own zooming alone in between.
+
+**The road shows the orbit you are on and the one thing that happens next.** Never more. It is always exactly one of three pictures:
+
+| | What is drawn |
+|---|---|
+| **Stable** | One lap of the ellipse, with periapsis and apoapsis marked and labelled with their heights. |
+| **Exit** | The arc out to the edge of this world's reach, the crossing marked, and then one lap of the orbit it leaves you on around the parent, in a second colour. No intercepts are computed in that new orbit. |
+| **Enter** | The arc in to a moon's reach, the crossing marked, and then the path around the moon with its periapsis. Nothing past that first crossing is chased. |
+
+The road has three voices and they always mean the same thing: the orbit you are on now, the orbit your burns put you on, and the orbit waiting on the far side of the crossing.
+
+A road that predicts nine encounters is a road nobody can read, and every prediction past the first is a guess that a single burn will erase anyway. One crossing at a time is enough.
 
 ### 2.7 Trading
 
@@ -138,6 +185,7 @@ One goal should always be in sight at each timescale.
 
 | Layer | Examples |
 |---|---|
+| Opening | One crate, already in the hold, for Pip |
 | Short-term | This delivery, this passenger, this transfer window |
 | Medium-term | A new upgrade, a relationship with a people, reaching a new region |
 | Long-term | The Chorus mystery and the Far Lantern |
@@ -207,7 +255,7 @@ Distances are in AU for reference and will be scaled for gameplay.
 
 ### 4.5 Geography as Design
 
-The layout does design work on its own. **The Scatter is a chokepoint** between the inner and outer systems, which is why the cats control it and why stealth is valuable. **Grumm is a gateway:** its gravity assists are the efficient road to Chime and beyond. **Eccentric orbits are calendars:** Wanderwell's periapsis and Merrow's Comet's passes are events players plan around. **Tessel's moons are a tutorial:** three short, safe hops teach SOI transitions before the player ever leaves home.
+The layout does design work on its own. **The Scatter is a chokepoint** between the inner and outer systems, which is why the cats control it and why stealth is valuable. **Grumm is a gateway:** its gravity assists are the efficient road to Chime and beyond. **Eccentric orbits are calendars:** Wanderwell's periapsis and Merrow's Comet's passes are events players plan around. **Tessel's moons are a tutorial:** the opening delivery goes to Pip, the lowest and cheapest of the three, and Bramble and Ledger are two more short, safe hops after it — all of them teaching SOI transitions before the player ever leaves home.
 
 ---
 
@@ -251,4 +299,6 @@ A fully hand-drawn navigation chart was considered and ruled out as unrealistic 
 
 ### 6.7 Open Technical Questions
 
-Instantaneous burns are proposed but not final; finite burns would add realism at the cost of forgiveness. Game-time scale and distance compression need prototyping. Docking-zone size and speed thresholds need tuning for the right level of forgiveness. The representation of belts, debris fields, and the comet (Section 5) needs a final decision.
+**Decided since the first draft**, and recorded above rather than here: burns are instantaneous impulses (2.2); the control is four buttons on two axes, reached by tapping the road (2.2); there is no landing and the game starts in orbit (2.3); the clock runs at ten real minutes to a lap of the parking orbit, with no warp ladder and skipping by pointing at a place (2.6); the chart is locked to the body the ship orbits and draws only the immediate orbit plus the next crossing (2.6.1); the opening mission is a single delivery to Pip.
+
+**Still open.** Distance compression beyond the inner system needs prototyping. Docking-zone size and speed thresholds need tuning for the right level of forgiveness. The representation of belts, debris fields, and the comet (Section 5) needs a final decision. Whether landing is ever added — and if so, whether it is a third control scheme or a cutscene over an orbital rendezvous — is deferred, not refused.
