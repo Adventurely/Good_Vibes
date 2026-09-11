@@ -34,6 +34,9 @@
 
       body {
         margin: 0;
+        /* A tap near the top or bottom of a phone screen must not hand the
+           scroll to whatever is behind the page. */
+        overscroll-behavior-y: contain;
         /* Tight side padding on a narrow screen, so the lot still gets its
            whole 320 pixels at the width most phones actually are. */
         padding: 1rem clamp(0.4rem, 2.5vw, 1rem) 3rem;
@@ -99,9 +102,21 @@
          — which is what WCAG names, and what 400% zoom on a desktop produces —
          a 320px canvas inside a 288px column was cut off at the right-hand
          edge with nothing to say so. A slightly soft scene beats a scene with
-         a piece missing. */
-      #lot { cursor: pointer; touch-action: manipulation; margin: 0 auto;
-             max-width: 100%; height: auto; }
+         a piece missing.
+
+         `touch-action: none`, not `manipulation`. Manipulation stops the
+         double-tap zoom and still lets a touch that starts on the canvas pan
+         the page, so on a phone every third or fourth tap slid the whole thing
+         under your finger — which in a game whose only verb is tapping is the
+         game moving away from you while you play it. Nothing about a tap on the
+         lot should scroll anything, and there is a whole page below it to
+         scroll from instead. `user-select` and the tap highlight go for the
+         same reason: fast repeated taps were selecting the page and flashing a
+         grey box over the picture. */
+      #lot { cursor: pointer; touch-action: none; margin: 0 auto;
+             max-width: 100%; height: auto;
+             user-select: none; -webkit-user-select: none;
+             -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
       #lot:focus-visible { outline: 3px solid var(--sun); outline-offset: -3px; }
 
       /* The readout sits on the picture rather than under it, because the
@@ -301,7 +316,7 @@
           <!-- The canvas takes the tap. It is a button in everything but name:
                focusable, keyboard-operable, and labelled with what it is and
                what pressing it does. -->
-          <canvas id="lot" width="320" height="180" tabindex="0" role="button"
+          <canvas id="lot" width="320" height="240" tabindex="0" role="button"
                   aria-label="The lot. Click, or press Enter, to draw light from the tree."></canvas>
           <!-- Not aria-hidden. This is the only place the light in hand is
                written down, and hiding it meant a screen reader could hear
@@ -534,19 +549,42 @@
 
       /* ---- taps ---------------------------------------------------------- */
 
+      /* Where each successive tap's number starts, relative to where you
+         tapped. Somebody tapping eight times a second taps the same pixel
+         eight times, and without this every one of those numbers was drawn on
+         top of the last: twenty-four copies of "+1" in the same place, each
+         with its own ink outline, which stacked into a solid black bar sitting
+         in the middle of the sky. Walking them around the tap spot turns that
+         back into what it should be, which is a handful of numbers going up. */
+      const SPREAD = [0, 11, -9, 17, -14, 5, -19, 13, -4, 20, -11, 8];
+      let tapSeq = 0;
+
       function doTap(x, y){
         const now = performance.now() / 1000;
         taps.push(now);
         while(taps.length && taps[0] < now - 60) taps.shift();
         const value = tap(state, tapRate(taps, now));
-        floaters.push({ x, y, text: '+' + formatLight(value), born: performance.now() });
-        while(floaters.length > 24) floaters.shift();
+        const nudge = SPREAD[tapSeq % SPREAD.length];
+        tapSeq++;
+        floaters.push({
+          x: x + nudge,
+          y: y - (tapSeq % 3) * 5,
+          drift: 24 + (tapSeq % 4) * 5,
+          text: '+' + formatLight(value),
+          born: performance.now(),
+        });
+        while(floaters.length > 12) floaters.shift();
         shake = Math.min(3, shake + 1.4);
         logMilestones();
       }
 
       ui.lot.addEventListener('pointerdown', event => {
+        /* preventDefault stops the browser's own focus, text selection and
+           touch-scroll handling, so the focus is moved by hand — and with
+           `preventScroll`, because scrolling the canvas into view is the very
+           thing a tap must not do. */
         event.preventDefault();
+        ui.lot.focus({ preventScroll: true });
         const box = ui.lot.getBoundingClientRect();
         const x = (event.clientX - box.left) / box.width * SCENE_W;
         const y = (event.clientY - box.top) / box.height * SCENE_H;
@@ -1074,9 +1112,9 @@
            motion on the page and the last one that should have been left in. */
         for(let i = floaters.length - 1; i >= 0; i--){
           const f = floaters[i];
-          const age = (now - f.born) / 1100;
+          const age = (now - f.born) / 900;
           if(age >= 1){ floaters.splice(i, 1); continue; }
-          const y = still.matches ? f.y : f.y - age * 26;
+          const y = still.matches ? f.y : f.y - age * f.drift;
           const key = age > 0.7 ? 'o' : 'y';
           drawText(lotCtx, f.text, Math.round(f.x - textWidth(f.text, 1) / 2), Math.round(y), 'k', 1);
           drawText(lotCtx, f.text, Math.round(f.x - textWidth(f.text, 1) / 2) - 1, Math.round(y) - 1, key, 1);
@@ -1116,10 +1154,43 @@
          `maxHeightFraction` keeps the lot from taking the whole screen on a
          short landscape window, where a 3x canvas would push the shop off the
          bottom. */
+      /* How tall the lot is allowed to get, as a share of the window. Enough
+         that it is the thing you are looking at; not so much that the shop is
+         always below the fold. */
+      const LOT_SHARE = 0.62;
+
       function resize(){
-        fitCanvas(ui.lot, SCENE_W, SCENE_H,
-          { container: ui.lot.parentElement.parentElement, maxHeightFraction: 0.56 });
+        const room = ui.lot.parentElement.parentElement.clientWidth;
+        const scale = fitCanvas(ui.lot, SCENE_W, SCENE_H,
+          { container: ui.lot.parentElement.parentElement, maxHeightFraction: LOT_SHARE });
+        widen(scale, room);
         sizeGraph();
+      }
+
+      /* Whole-number scaling leaves a lot of a phone unused: 320 pixels of
+       * scene on a 390-pixel screen is a fifth of the width wasted, on the one
+       * device where there is least of it to spare and where the next whole
+       * step up — 640 — does not begin to fit.
+       *
+       * So on a dense screen only, the lot is stretched to whatever width is
+       * actually there. At two or three device pixels to the CSS pixel, a
+       * source pixel lands on three or four device pixels rather than a clean
+       * four, and that unevenness is a third of a CSS pixel wide — invisible at
+       * the distance a phone is held. At one device pixel to the CSS pixel it
+       * is the difference between a one-pixel line and a two-pixel one, which
+       * is the "reads as a broken image" failure the rule exists to prevent, so
+       * a desktop keeps its whole number and its margins.
+       */
+      function widen(scale, room){
+        if(devicePixelRatio < 2) return;
+        const drawn = SCENE_W * scale;
+        // The frame draws a 2px border and sits inside the column, so the
+        // canvas has to stop short of it or the ring overflows.
+        const cap = Math.min(room - 4, (innerHeight * LOT_SHARE) * SCENE_W / SCENE_H);
+        const width = Math.floor(cap);
+        if(width <= drawn) return;
+        ui.lot.style.width = `${width}px`;
+        ui.lot.style.height = `${Math.round(width * SCENE_H / SCENE_W)}px`;
       }
       resize();
       addEventListener('resize', resize);

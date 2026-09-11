@@ -38,13 +38,20 @@ import { PALETTE, hex } from '../good-vibes/pixel.js';
 export { PALETTE, hex };
 
 /* The scene's own size. Both callers author against these rather than against
-   whatever their canvas happens to be, and scale the element instead. */
-export const SCENE_W = 320;
-export const SCENE_H = 180;
+   whatever their canvas happens to be, and scale the element instead.
 
-/* Where the lot's floor is. Everything that stands on the ground is anchored
-   to this line and nothing hardcodes 134 anywhere else. */
-export const GROUND_Y = 134;
+   Four by three rather than sixteen by nine, which is where this started. A
+   320x180 letterbox on a phone held upright is a strip across the top of a
+   screen with six hundred pixels of nothing under it, and the thing the strip
+   is showing is a tall tree. The extra sixty rows go mostly to the sky, which
+   is where the sun spends its day, and the rest to the lot. */
+export const SCENE_W = 320;
+export const SCENE_H = 240;
+
+/* Where the lot's floor is: seven tenths of the way down, so the sky gets the
+   larger share. Everything that stands on the ground is anchored to this line
+   and nothing hardcodes the number anywhere else. */
+export const GROUND_Y = 168;
 
 /* ------------------------------------------------------------------ light */
 
@@ -144,7 +151,7 @@ function skyStop(sky, v){
    the same places every night. */
 const starAt = i => {
   const h = Math.imul(i + 1, 2654435761) >>> 0;
-  return { x: h % SCENE_W, y: 4 + ((h >>> 9) % 68), bright: ((h >>> 20) & 3) };
+  return { x: h % SCENE_W, y: 4 + ((h >>> 9) % 130), bright: ((h >>> 20) & 3) };
 };
 
 /* The sky is two dithers at once: down the frame between three stops, and
@@ -161,7 +168,7 @@ export function drawSky(ctx, phase, light){
        equal stripes, which reads as a flag rather than as a sky; the curve
        gives the top colour most of the height and squeezes the warm horizon
        colours into the bottom third, where a horizon actually is. */
-    const v = Math.pow(y / (GROUND_Y - 1), 1.5);
+    const v = Math.pow(y / (GROUND_Y - 1), 1.9);
     const stopA = skyStop(a, v);
     const stopB = skyStop(b, v);
     const rowA = stopA.t * 16;
@@ -196,7 +203,7 @@ export function drawSkyBodies(ctx, phase, light){
   ];
   for(const body of bodies){
     const x = Math.round(SCENE_W / 2 - Math.cos(body.angle) * (SCENE_W / 2 - 18));
-    const y = Math.round(GROUND_Y - 14 - Math.sin(body.angle) * 86);
+    const y = Math.round(GROUND_Y - 16 - Math.sin(body.angle) * 112);
     if(y > GROUND_Y - 6) continue;
     for(let dy = -body.r - 1; dy <= body.r + 1; dy++){
       for(let dx = -body.r - 1; dx <= body.r + 1; dx++){
@@ -216,9 +223,9 @@ export function drawSkyBodies(ctx, phase, light){
    which at this size is more convincing than any one cloud could be. */
 export function drawClouds(ctx, now, light){
   const shapes = [
-    { y: 20, w: 38, h: 7, speed: 0.0040 },
-    { y: 40, w: 26, h: 5, speed: 0.0065 },
-    { y: 56, w: 46, h: 6, speed: 0.0028 },
+    { y: 26, w: 38, h: 7, speed: 0.0040 },
+    { y: 52, w: 26, h: 5, speed: 0.0065 },
+    { y: 76, w: 46, h: 6, speed: 0.0028 },
   ];
   for(let i = 0; i < shapes.length; i++){
     const c = shapes[i];
@@ -240,7 +247,7 @@ export function drawClouds(ctx, now, light){
    "the world carries on past the fence". */
 export function drawGround(ctx, light){
   for(let x = 0; x < SCENE_W; x++){
-    const ridge = 9 + Math.sin(x * 0.031) * 5 + Math.sin(x * 0.0117 + 2) * 4;
+    const ridge = 12 + Math.sin(x * 0.031) * 6 + Math.sin(x * 0.0117 + 2) * 5;
     const top = Math.round(GROUND_Y - ridge);
     for(let y = top; y < GROUND_Y; y++){
       // Further away is lighter and bluer, which is the depth rule the other
@@ -263,7 +270,7 @@ export function drawGround(ctx, light){
   ditherRect(ctx, 0, SCENE_H - 3, SCENE_W, 3, 'G', 'N', 0.55, light);
 
   // Tufts, on a hash so they do not crawl between frames.
-  for(let i = 0; i < 90; i++){
+  for(let i = 0; i < 140; i++){
     const h = Math.imul(i + 7, 2246822519) >>> 0;
     const x = h % SCENE_W;
     const y = GROUND_Y + 3 + ((h >>> 8) % (SCENE_H - GROUND_Y - 8));
@@ -472,18 +479,18 @@ export function drawProp(ctx, rows, x, y, light){
  * of it, so a thing standing further forward is painted over the thing behind.
  */
 export const PROP_SPOTS = {
-  orchard:    [{ x: 4, y: 144 }, { x: 24, y: 149 }, { x: 46, y: 141 }, { x: 66, y: 146 }],
-  reef:       [{ x: 88, y: 141 }, { x: 106, y: 146 }, { x: 70, y: 139 }, { x: 124, y: 143 }],
-  glasshouse: [{ x: 196, y: 143 }, { x: 218, y: 148 }, { x: 176, y: 140 }, { x: 240, y: 145 }],
-  turbine:    [{ x: 276, y: 141 }, { x: 262, y: 147 }, { x: 292, y: 145 }, { x: 248, y: 140 }],
-  hive:       [{ x: 62, y: 159 }, { x: 76, y: 164 }, { x: 48, y: 163 }, { x: 90, y: 158 }],
-  panel:      [{ x: 212, y: 157 }, { x: 230, y: 162 }, { x: 246, y: 156 }, { x: 196, y: 163 }],
-  canopy:     [{ x: 296, y: 158 }, { x: 282, y: 164 }, { x: 306, y: 167 }, { x: 270, y: 160 }],
-  moss:       [{ x: 20, y: 176 }, { x: 40, y: 171 }, { x: 4, y: 168 }, { x: 58, y: 179 }],
-  mushroom:   [{ x: 92, y: 173 }, { x: 108, y: 179 }, { x: 76, y: 177 }, { x: 122, y: 171 }],
-  mycelium:   [{ x: 140, y: 180 }, { x: 158, y: 176 }, { x: 176, y: 180 }, { x: 122, y: 177 }],
-  fern:       [{ x: 246, y: 172 }, { x: 262, y: 178 }, { x: 230, y: 177 }, { x: 278, y: 173 }],
-  mirror:     [{ x: 26, y: 30 }, { x: 258, y: 22 }, { x: 140, y: 16 }, { x: 76, y: 44 }],
+  orchard:    [{ x: 4, y: 184 }, { x: 24, y: 191 }, { x: 46, y: 179 }, { x: 66, y: 187 }],
+  reef:       [{ x: 88, y: 179 }, { x: 106, y: 187 }, { x: 70, y: 176 }, { x: 124, y: 182 }],
+  glasshouse: [{ x: 196, y: 182 }, { x: 218, y: 190 }, { x: 176, y: 177 }, { x: 240, y: 185 }],
+  turbine:    [{ x: 276, y: 179 }, { x: 262, y: 188 }, { x: 292, y: 185 }, { x: 248, y: 177 }],
+  hive:       [{ x: 62, y: 207 }, { x: 76, y: 215 }, { x: 48, y: 213 }, { x: 90, y: 206 }],
+  panel:      [{ x: 212, y: 204 }, { x: 230, y: 212 }, { x: 246, y: 202 }, { x: 196, y: 213 }],
+  canopy:     [{ x: 296, y: 206 }, { x: 282, y: 215 }, { x: 306, y: 220 }, { x: 270, y: 209 }],
+  moss:       [{ x: 20, y: 234 }, { x: 40, y: 226 }, { x: 4, y: 221 }, { x: 58, y: 238 }],
+  mushroom:   [{ x: 92, y: 229 }, { x: 108, y: 238 }, { x: 76, y: 235 }, { x: 122, y: 226 }],
+  mycelium:   [{ x: 140, y: 240 }, { x: 158, y: 234 }, { x: 176, y: 240 }, { x: 122, y: 235 }],
+  fern:       [{ x: 246, y: 227 }, { x: 262, y: 237 }, { x: 230, y: 235 }, { x: 278, y: 229 }],
+  mirror:     [{ x: 26, y: 38 }, { x: 258, y: 28 }, { x: 140, y: 20 }, { x: 76, y: 55 }],
 };
 
 /* How many you have to own before the second, third and fourth copies appear.
@@ -509,7 +516,7 @@ const DAY_BUCKETS = 240;
 /* Where it stands. The lot is drawn around this, so it is the one coordinate
    in the file that other things are placed relative to. */
 export const TREE_X = 160;
-export const TREE_Y = 150;
+export const TREE_Y = 192;
 
 /* How big the tree is for a given number of growers. Logarithmic, because the
    difference between nothing and ten things planted deserves to be visible and
@@ -592,23 +599,29 @@ export function drawTree(ctx, growth, { sway = 0, light = 1, sunSide = -1, shake
   const depth = 3 + Math.round(g * 3);
   const o = {
     sway, light, sunSide, depth,
-    leaf: 2.6 + g * 4.6,
+    // Bigger blobs on a young tree than the growth curve alone would give it.
+    // A sapling drawn with a one-pixel trunk and eight two-pixel leaves is a
+    // thread with specks on it, not a plant somebody wants to look after.
+    leaf: 3.6 + g * 4.0,
   };
   /* Nine pixels tall was the first cut of a fresh lot, and a nine-pixel sapling
-     on a 320-pixel canvas is not a thing anybody is going to want to tap four
-     thousand times — it read as a weed. A new lot starts at twenty-four, which
-     is a plant, and the whole range from there to ninety is still three and a
-     half times bigger by the end. */
-  limb(ctx, TREE_X + shake, TREE_Y, -Math.PI / 2, (24 + g * 58) * 0.44,
-    1 + g * 5, depth, o);
+     is not a thing anybody is going to want to tap four thousand times — it
+     read as a weed. Twenty-six was the second, and it was right for a 180-tall
+     frame and lost in a 240-tall one: the number that matters is the share of
+     the picture the tree takes, and growing the frame by a third shrank it. A
+     new lot is fifty-six, which draws about eighty-four pixels of tree — a
+     third of the frame — and a full one is nearly twice that. The thing you
+     are here to tap should be the thing you look at first. */
+  limb(ctx, TREE_X + shake, TREE_Y, -Math.PI / 2, (56 + g * 48) * 0.44,
+    2 + g * 5, depth, o);
 }
 
 /* The area a tap should feel like it landed on. Generous on purpose: a target
    you have to aim at is a target that hurts to click four thousand times. */
 export function treeBounds(growth){
   const g = Math.max(0, Math.min(1, growth));
-  const reach = 20 + g * 44;
-  const height = 30 + g * 74;
+  const reach = 32 + g * 46;
+  const height = 66 + g * 90;
   return { x: TREE_X - reach, y: TREE_Y - height, w: reach * 2, h: height + 6 };
 }
 
@@ -655,7 +668,7 @@ function drawMotes(ctx, now, light, growers){
   for(let i = 0; i < many; i++){
     const h = Math.imul(i + 3, 374761393) >>> 0;
     const baseX = h % SCENE_W;
-    const baseY = 96 + ((h >>> 7) % 56);
+    const baseY = 120 + ((h >>> 7) % 70);
     const x = baseX + Math.sin(now / (900 + (h & 511)) + i) * 14;
     const y = baseY + Math.cos(now / (1300 + (h & 255)) + i * 2) * 7;
     const blink = Math.sin(now / 320 + i * 1.7);

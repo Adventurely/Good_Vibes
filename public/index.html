@@ -84,11 +84,11 @@
          image-rendering: pixelated; background: var(--edge);
          border-bottom: 2px solid var(--edge); }
 
-  /* Sunward draws at 320x180 rather than the 320x190 the other two cards use.
+  /* Sunward draws at 320x240 rather than the 320x190 the other two cards use.
      Giving it its own ratio keeps its pixels square; stretching it into the
-     taller box would put a 5% squash on the one card whose whole subject is a
-     grid of squares. */
-  .shot.lot{ aspect-ratio: 320 / 180; }
+     shorter box would put a 26% squash on the one card whose whole subject is
+     a grid of squares. */
+  .shot.lot{ aspect-ratio: 320 / 240; }
 
   /* One card is a photograph rather than a pixel drawing, and `pixelated` is
      inherited from the rule above — on a rendered image it turns a soft
@@ -161,7 +161,7 @@
     </div>
   </a>
   <a class="game" href="/sunward/">
-    <canvas class="shot lot" id="shot-sw" width="320" height="180"
+    <canvas class="shot lot" id="shot-sw" width="320" height="240"
             aria-label="A lot at low sun: one big tree in the middle of a field filling up with beehives, glasshouses, solar panels and turbines."></canvas>
     <div class="about">
       <h2>Sunward</h2>
