@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orbital Trader</title>
+<meta name="description" content="A cozy single-player orbital trading game. Plan burns, borrow speed from a grumpy gas giant, and carry goods between four peoples around a warm orange star.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230b0d17'/%3E%3Ccircle cx='8' cy='8' r='2.6' fill='%23f7a531'/%3E%3Cellipse cx='8' cy='8' rx='6.5' ry='4.2' fill='none' stroke='%23ffd23f' stroke-width='1' transform='rotate(-25 8 8)'/%3E%3Ccircle cx='13.2' cy='5.2' r='1.2' fill='%236cc24a'/%3E%3C/svg%3E">
+<style>
+  /* The same company as the other games, at night: the site's dark ground,
+     the Lamp's gold for anything you can press, and the chart itself as the
+     backdrop — the real renderer, drawing the real sky, from the same
+     modules the game plays on. A picture of the game would go stale the
+     first time somebody moved a moon. */
+  :root{
+    --space:#120e0c; --ink:#f5ead6; --muted:#b9a68c; --faint:#6f6155;
+    --gold:#ffd23f; --gold-deep:#f59a2e; --mint:#7ff0d3; --line:#3a2b22;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; }
+  body{
+    margin:0; background:var(--space); color:var(--ink);
+    font:16px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    overflow:hidden;
+  }
+  #sky{ position:fixed; inset:0; width:100%; height:100%; display:block; }
+  .veil{
+    position:fixed; inset:0; z-index:1; pointer-events:none;
+    /* Enough to read the words over, not so much that the sky behind them
+       turns into a dark rectangle. */
+    background:
+      linear-gradient(180deg, rgba(18,14,12,.62) 0%, rgba(18,14,12,.10) 34%, rgba(18,14,12,.10) 62%, rgba(18,14,12,.88) 100%),
+      radial-gradient(70% 46% at 50% 30%, rgba(18,14,12,.55) 0%, rgba(18,14,12,0) 100%);
+  }
+  main{
+    position:fixed; inset:0; z-index:2;
+    display:grid; grid-template-rows:1fr auto 1fr; justify-items:center;
+    padding:clamp(1.2rem, 4vw, 3rem); text-align:center;
+  }
+  .wrap{ grid-row:2; max-width:46rem; width:100%; }
+  .eyebrow{ margin:0 0 .5rem; font-size:clamp(.7rem, 2vw, .82rem); letter-spacing:.34em; text-transform:uppercase; color:var(--gold-deep); }
+  h1{
+    margin:0; font-size:clamp(2.3rem, 8.5vw, 5.4rem); line-height:.95; letter-spacing:-.02em; font-weight:800;
+    background:linear-gradient(180deg, #fff3cf 0%, var(--gold) 70%, var(--gold-deep) 120%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    text-shadow:0 2px 30px rgba(0,0,0,.6);
+  }
+  .tag{ margin:.9rem auto 0; max-width:36rem; color:var(--muted); font-size:clamp(.95rem, 2.6vw, 1.08rem); }
+  .actions{ margin-top:clamp(1.4rem, 4vw, 2.2rem); display:flex; flex-wrap:wrap; gap:.8rem; justify-content:center; align-items:center; }
+  .enter{
+    display:inline-block; padding:.85rem 2.4rem; border:0; border-radius:999px;
+    background:linear-gradient(180deg, var(--gold) 0%, var(--gold-deep) 100%); color:#1a1310;
+    font:inherit; font-weight:800; font-size:1.02rem; letter-spacing:.04em; text-transform:uppercase; text-decoration:none;
+    cursor:pointer; box-shadow:0 10px 30px rgba(0,0,0,.5); transition:transform .12s ease, filter .12s ease;
+  }
+  .enter:hover, .enter:focus-visible{ transform:translateY(-2px); filter:brightness(1.06); }
+  .enter:focus-visible{ outline:3px solid var(--mint); outline-offset:3px; }
+  .enter.quiet{ background:rgba(26,20,16,.88); color:var(--ink); border:1px solid var(--line); box-shadow:none; font-weight:600; }
+  .enter[hidden]{ display:none; }
+  .saved{ margin:.6rem 0 0; color:var(--faint); font-size:.85rem; min-height:1.3em; }
+  .peoples{
+    margin:clamp(1.4rem, 4vw, 2.4rem) auto 0; padding:0; list-style:none;
+    display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:.6rem; max-width:44rem; text-align:left;
+  }
+  .peoples li{ background:rgba(20,16,13,.78); border:1px solid var(--line); border-radius:10px; padding:.55rem .7rem; font-size:.84rem; color:var(--muted); backdrop-filter:blur(6px); }
+  .peoples b{ display:block; font-size:.92rem; margin-bottom:.1rem; }
+  .p-e b{ color:#ff8c42; } .p-o b{ color:#6cc24a; } .p-c b{ color:#e9dcc0; } .p-f b{ color:#5fb9e6; }
+  .back{ grid-row:3; align-self:end; color:var(--faint); font-size:.85rem; text-decoration:none; }
+  .back:hover{ color:var(--ink); }
+  .wip{ display:inline-block; margin-top:.9rem; padding:.18rem .6rem; border-radius:999px; border:1px solid var(--line); color:var(--muted); font-size:.72rem; letter-spacing:.12em; text-transform:uppercase; }
+  @media (prefers-reduced-motion: reduce){ .enter{ transition:none; } .enter:hover{ transform:none; } }
+  @media (max-height: 600px){ .peoples{ display:none; } }
+</style>
+</head>
+<body>
+
+<canvas id="sky" aria-hidden="true"></canvas>
+<div class="veil"></div>
+
+<main>
+  <div class="wrap">
+    <p class="eyebrow">Good Vibe Games</p>
+    <h1>Orbital Trader</h1>
+    <p class="tag">A small merchant ship, a warm orange star, and four peoples who each want what
+       the others make. You do not steer. You plan burns, and you watch your path bend.</p>
+
+    <div class="actions">
+      <a class="enter" id="continue" href="./play.html" hidden>Continue</a>
+      <a class="enter quiet" id="new" href="./play.html?new">New game</a>
+    </div>
+    <p class="saved" id="saved"></p>
+
+    <ul class="peoples">
+      <li class="p-e"><b>Emberkin</b>Hot, fast, and fifteen years old at most. They pay for speed.</li>
+      <li class="p-o"><b>Otters</b>At home anywhere. Haggling is manners. The starting port is theirs.</li>
+      <li class="p-c"><b>Cats</b>Born weightless. They keep the belt, by oath, and never take everything.</li>
+      <li class="p-f"><b>Frogs</b>Cold, slow, and centuries long. They own nothing and give freely.</li>
+    </ul>
+    <span class="wip">Single player &middot; early build</span>
+  </div>
+
+  <a class="back" href="/">&larr; all Good Vibe Games</a>
+</main>
+
+<script type="module">
+import { createChart } from './render.js';
+import { BODIES, CONST, BELT_ROCKS, ARC_DEBRIS } from './content.js';
+import { makeWorld } from './orbit.js';
+import { restore } from './sim.js';
+
+/* Continue only if there is something to continue. localStorage can throw
+   in a private window; the page must render fine having learned nothing. */
+/* Offer Continue only for a save the game will actually take. Checking the
+   version alone offered it for saves play.html then threw away, which is a
+   worse welcome than no button at all. */
+const SAVE_KEY = 'ot:save:v1';
+let save = null;
+try{
+  const raw = localStorage.getItem(SAVE_KEY);
+  if(raw) save = restore(raw);
+}catch{ save = null; }
+if(save){
+  const cont = document.getElementById('continue');
+  cont.hidden = false;
+  const y = Math.floor(save.t / CONST.YEAR_DAYS) + 1, d = Math.floor(save.t % CONST.YEAR_DAYS) + 1;
+  document.getElementById('saved').textContent = `${save.shipName ?? 'Your ship'} · year ${y}, day ${d} · ${save.dockedAt ? 'docked at ' + (BODIES.find(b => b.id === save.dockedAt)?.name ?? save.dockedAt) : 'under way'}`;
+  document.getElementById('new').classList.add('quiet');
+}else{
+  document.getElementById('new').classList.remove('quiet');
+}
+document.getElementById('new').addEventListener('click', e => {
+  if(save && !confirm('Start over? The saved ship at ' + (save.dockedAt ?? 'sea') + ' is replaced.')) e.preventDefault();
+});
+
+/* The sky: the real chart, at a slow warp, looking at the inner system so
+   the moons of Tessel and Wanderwell's long ellipse both read. */
+const world = makeWorld(BODIES);
+const canvas = document.getElementById('sky');
+const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const chart = createChart(canvas, world, {
+  reducedMotion: still, starSeed: 3, showScale: false,
+  // The title, the cards and the link along the bottom own those strips.
+  labelInsets: { top: 60, right: 20, bottom: 70, left: 20 },
+});
+const belt = { inner: CONST.BELT.inner, outer: CONST.BELT.outer, rocks: BELT_ROCKS, debris: ARC_DEBRIS };
+/* Put the Lamp low and left, so the orbits sweep up behind the title instead
+   of sitting under the button, and frame about seven au: Cinder through the
+   Scatter, with Wanderwell's long ellipse crossing all of it. */
+function fit(){
+  chart.resize();
+  chart.camera.follow = null;
+  chart.camera.zoom = Math.min(chart.width, chart.height) / 7.0;
+  const want = [chart.width * 0.26, chart.height * 0.78];
+  chart.camera.cx = (chart.width / 2 - want[0]) / chart.camera.zoom;
+  chart.camera.cy = (want[1] - chart.height / 2) / chart.camera.zoom;
+}
+fit();
+addEventListener('resize', fit);
+// Start the clock somewhere in the save, or at a day that puts Wanderwell in the sky.
+let t = save?.t ?? 140;
+let last = performance.now();
+function frame(now){
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  if(!still) t += dt * 1.5;   // a day and a half per second: the moons visibly turn
+  chart.draw({ t, now, shipAbs: null, prediction: null, nodes: [], belt, target: null });
+  if(!still) requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+addEventListener('keydown', e => { if(e.key === 'Enter' && e.target === document.body) (document.getElementById('continue').hidden ? document.getElementById('new') : document.getElementById('continue')).click(); });
+</script>
+</body>
+</html>

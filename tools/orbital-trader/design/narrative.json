@@ -1,0 +1,461 @@
+{
+ "glossary": [
+  { "term": "kissing distance", "plain": "periapsis", "tip": "The closest your path comes to whatever you are going round. Everything cheap happens here." },
+  { "term": "the long look", "plain": "apoapsis", "tip": "The far end of your path, where you are slowest and a small burn moves the other end a long way." },
+  { "term": "a festival", "plain": "transfer window", "tip": "The days when two worlds line up for the cheapest crossing. Everyone throws a party; the honest ones admit it is about the fuel." },
+  { "term": "the slow road", "plain": "Hohmann transfer", "tip": "One burn out, one burn in, and a long wait between them. The cheapest way anywhere, and the reason cargo is patient." },
+  { "term": "borrowing from Grumm", "plain": "gravity assist", "tip": "Fall past a heavy world and leave faster than you arrived. Grumm never notices; the Emberkin insist it sulks." },
+  { "term": "a world's reach", "plain": "sphere of influence", "tip": "How far a world's pull decides your path. Cross the line and everything is measured from somewhere new." },
+  { "term": "what you have left", "plain": "delta-v", "tip": "Not fuel in a tank so much as speed you are still allowed to change. Spend it on the right day and it goes a long way." },
+  { "term": "forward", "plain": "prograde", "tip": "The way you are already going. Burning forward raises the far end of your path." },
+  { "term": "back", "plain": "retrograde", "tip": "Against your own motion. Burning back lowers the far end, and is how you stop." },
+  { "term": "out and in", "plain": "radial", "tip": "Sideways, away from or towards what you are orbiting. It turns your path without much changing its size." },
+  { "term": "matching", "plain": "rendezvous", "tip": "Arriving where something is, at the speed it is going. Cats are born knowing how; everyone else practises." },
+  { "term": "skimming", "plain": "aerobraking", "tip": "Grazing a world's air to shed speed for free. Wonderful with a heat shield. Brief without one." },
+  { "term": "winding the clock", "plain": "time warp", "tip": "Running the sky faster while you coast. It slows down again the moment anything happens." },
+  { "term": "the harbour mouth", "plain": "docking zone", "tip": "Close enough and slow enough, and a port will take your lines. Generous, on purpose." },
+  { "term": "getting out", "plain": "escape", "tip": "Going fast enough that a world stops holding you at all." },
+  { "term": "getting caught", "plain": "capture", "tip": "Burning back hard enough that a world starts holding you. The expensive half of every journey." },
+  { "term": "the near pass", "plain": "closest approach", "tip": "The best your current path will do against something you are chasing. Improve it before you spend anything." },
+  { "term": "a mark", "plain": "maneuver node", "tip": "A burn written down for later. Costs nothing until the clock reaches it." }
+ ],
+
+ "ports": {
+  "cinder": {
+   "blurb": "A world tide-locked to the Lamp, with a molten face, a frozen back, and every Emberkin city crowded into the twilight between. The year lasts fifty-nine days, so the New Year party has never entirely stopped. The best engines anywhere are built here by people who will not live to see them wear out.",
+   "arrival": [
+    "The dock crew has your lines tied before you have finished thinking about it.",
+    "Somebody is already asking what you brought, what it cost, and whether you will take a letter back.",
+    "The twilight band glows orange on one horizon and blue on the other, and nobody here has ever looked at it."
+   ],
+   "trade": [
+    "Prices are chalked on a board that is rewritten twice a day, and the boy with the chalk is bored.",
+    "Last season's colours are worthless. This season's are worth double. Next season starts on Tuesday.",
+    "They quote you a price, then a better one, before you have said anything at all."
+   ],
+   "rumours": [
+    "Wanderwell is coming in. Half this dock will be on it by the festival, selling the same fashions at four times the price.",
+    "A smith three streets over will trade a heat shield for anything that came from outside this orbit.",
+    "They keep records of every ship that has ever docked here, going back nine hundred Cinder years. That is about forty-five of yours."
+   ]
+  },
+  "wanderwell": {
+   "blurb": "A summer colony on an orbit that cannot make up its mind, swinging from scorched to frozen and back over three years. At kissing distance the Emberkin arrive in their thousands and the market fills a valley. On the way out they leave, all at once, and the otters of Tagalong turn the lights down.",
+   "arrival": [
+    "The valley is one enormous awning, and under it everything in the inner system is for sale.",
+    "Somebody hands you a drink before you have said who you are.",
+    "Half the stalls are already packing. The other half are pretending not to notice."
+   ],
+   "trade": [
+    "Everything costs what it costs today, and today is nearly over.",
+    "A trader sells you the last crate of something, then produces another last crate.",
+    "Nobody here haggles. There is no time; the world is leaving."
+   ],
+   "rumours": [
+    "The colony shuts when the sky gets cold. If you want off, do not be last.",
+    "Somebody swears they saw the comet's lights from the ridge. Somebody else says that was a lantern.",
+    "The frogs sent a song down from Grumm once, years ago. An Emberkin scribe wrote it out and nobody has translated it."
+   ]
+  },
+  "tagalong": {
+   "blurb": "A pebble of a moon with a raft of otters on it, minding an empty colony through a winter that lasts two years. There is a dock, a stove, and a great deal of conversation saved up. Their stock is thin, and their welcome is not.",
+   "arrival": [
+    "Four otters come out to meet one ship, which is three more than the job needs.",
+    "Somebody asks how long you are staying before you have finished tying up.",
+    "The colony below is dark except for the lights they keep on out of habit."
+   ],
+   "trade": [
+    "They have what they have, and they will talk about the price for as long as you let them.",
+    "The price goes down if you stay for the story that comes with it.",
+    "It is not much of a market, and they are not pretending otherwise."
+   ],
+   "rumours": [
+    "Wanderwell's kiss is what they count the days to, and they will tell you exactly how many.",
+    "A cat captain wintered here once and left a gift nobody has worked out the meaning of.",
+    "They hear things from every ship that passes and remember every one."
+   ]
+  },
+  "tessel": {
+   "blurb": "An ocean with cities floating on it, tied together in rafts that drift and re-tie as the families argue and forgive. Every rumour in the system lands here first and leaves improved. If anyone has gone somewhere new, Tessel heard about it before they came back.",
+   "arrival": [
+    "The harbour is a hundred hulls lashed together, and all of them are talking.",
+    "Somebody knows your ship. Somebody always does.",
+    "Three separate people offer you tea before you reach the end of the pier."
+   ],
+   "trade": [
+    "Every price here is an opening offer, and refusing to argue is the rudest thing you can do.",
+    "They name a number, wince at it themselves, and wait.",
+    "The haggle takes longer than the loading. That is not a complaint."
+   ],
+   "rumours": [
+    "Bramble and Ledger are not speaking again. Or still. It is hard to tell from here.",
+    "Somebody's cousin took the slow road to Grumm and came back saying the frogs gave her things for nothing.",
+    "The shipwrights at Pip will fit anything to anything, and will have opinions about your paint."
+   ]
+  },
+  "pip": {
+   "blurb": "A small moon that is mostly dry dock, crane, and argument about tolerances. The otters here will fit your ship with anything they have and tell you what they think of what you already have. They think a great deal about paint.",
+   "arrival": [
+    "A crane swings over before you are tied up, on the assumption that you want something.",
+    "Two shipwrights are disagreeing loudly about your hull and neither has looked at you yet.",
+    "Somebody is already sanding something off your ship that you had grown attached to."
+   ],
+   "trade": [
+    "They quote in parts and hours, then knock some off because they like the look of the job.",
+    "The price includes advice you did not ask for.",
+    "Pay them and they will argue you into a discount out of sheer habit."
+   ],
+   "rumours": [
+    "A cold hold is what stops frog cargo arriving as soup. They fit those here.",
+    "A ship came through with a hull nobody could name the metal of. Arc salvage, probably.",
+    "Whatever you are planning, somebody on this moon has already told you it will not work."
+   ]
+  },
+  "bramble": {
+   "blurb": "A moon under hedgerows, feeding half the inner system out of fields that were terraced by somebody's great-grandmother. The otters here work with their hands and distrust anyone who does not. They mean Ledger.",
+   "arrival": [
+    "The air smells of cut hedge and wet soil, which no ship's air ever does.",
+    "Somebody is loading grain sacks by hand, badly, and refusing help.",
+    "A dog that is not a dog follows you the length of the field."
+   ],
+   "trade": [
+    "They weigh it, they name a price, and they wait to see if you have the sense to argue.",
+    "The price drops if you carry it yourself. It drops further if you carry it well.",
+    "They will not take a promissory note. They will explain why, at length, with names in it."
+   ],
+   "rumours": [
+    "Ledger is charging interest on weather now, apparently.",
+    "The fruit goes bad in twenty days and every buyer knows exactly when you loaded it.",
+    "Somebody's nephew flew the Bramble–Ledger hop on a single burn and has not stopped mentioning it."
+   ]
+  },
+  "ledger": {
+   "blurb": "Vaults, counting houses, and the calm of people who have read the whole contract. Most trade ventures in the inner system were financed here, which is why Ledger is quietly certain of its own importance. It refers to Bramble as the dirt.",
+   "arrival": [
+    "A clerk takes your ship's name, your cargo, and a guess at your margin, in that order.",
+    "Somebody offers to lend you money before you have said you need any.",
+    "The corridors are quiet in a way that costs money to maintain."
+   ],
+   "trade": [
+    "They open at a fair price and enjoy being talked down from it, which is its own kind of haggling.",
+    "Everything is written down twice. One copy is for you.",
+    "They price the risk out loud, which is either honest or a tactic."
+   ],
+   "rumours": [
+    "Bramble has been paying in fruit again and calling it a settlement.",
+    "Somebody is quietly buying every relic that comes off the Arc and not saying why.",
+    "If your tank ever runs dry out there, Ledger will pay for the tow. Ledger will remember paying for the tow."
+   ]
+  },
+  "arc": {
+   "blurb": "The last unbroken segment of a Chorus ring, turning slowly with its own wreckage strung out behind it along the same orbit. Cats work it in the weightlessness they were born for, cutting out pieces of something nobody can read. It is the best salvage in the system and nobody is comfortable there.",
+   "arrival": [
+    "The segment is smooth on every surface, and none of the surfaces are floors.",
+    "A salvager drifts past upside down, relative to nothing, and nods.",
+    "The wreckage behind it goes on further than the chart bothers to draw."
+   ],
+   "trade": [
+    "They will trade, and they will talk about the trade afterwards, for years.",
+    "The price is whatever makes the better story, which is not always the higher number.",
+    "Nothing here has a fixed value, because nobody knows what any of it is."
+   ],
+   "rumours": [
+    "There are marked sites further down the debris that you need long-range sensors to find.",
+    "None of it has a door, a stair, or a seat. Whatever built it did not sit down.",
+    "A crew went inside the sealed end once. They came out fine. They will not talk about it."
+   ]
+  },
+  "clawrock": {
+   "blurb": "A rock with a tavern in it, in the middle of a belt everyone has to cross. The cats keep the Scatter by oath rather than by force, and Claw Rock is where the oaths get argued over. The tavern is genuinely very good.",
+   "arrival": [
+    "You match speeds with a rock and somebody opens a door in it.",
+    "Half the tavern turns to see how you came in, and grades it.",
+    "A captain buys you a drink to establish that she could have taken one instead."
+   ],
+   "trade": [
+    "They trade by custom, not by price list, and the custom is older than any of them.",
+    "Somebody names a figure, and somebody else tells the story of a worse one.",
+    "Nobody here has ever taken everything. It is the whole point."
+   ],
+   "rumours": [
+    "The tolls are lighter on ships that yield and heavier on ships that lecture.",
+    "Something at Hush deadens sound. A crew came back from there with nothing but a headache and a story.",
+    "The exiles at Widdershins pay well, if you can stomach the approach."
+   ]
+  },
+  "lillimoor": {
+   "blurb": "Ammonia seas under a violet sky, with lily-pad villages spread across them and frogs who will still be having this conversation when you get back. They have no property and no hurry. They give you things, and they remember.",
+   "arrival": [
+    "The cold outside the hull is the kind that has no opinion about you at all.",
+    "A frog greets you slowly enough that the greeting is still arriving as you tie up.",
+    "Somewhere across the water a song is going on that started before you were born."
+   ],
+   "trade": [
+    "Nothing here is for sale. Things are given, and remembered.",
+    "They take what you brought without haggling and hand you something better without comment.",
+    "There is no price. There is a long memory, which turns out to be worth more."
+   ],
+   "rumours": [
+    "They sing about Chime. Nobody is sure the song is theirs.",
+    "Mossback's heartbeat can be heard through a hull if you get close and stay quiet.",
+    "Skimming Grumm's clouds is free braking, they say, with the right shield. Without one it is free anyway, once."
+   ]
+  },
+  "widdershins": {
+   "blurb": "A captured moon going the wrong way round Grumm, with cat exiles on it who chose the expense of the approach as a kind of door. Their goods are rare because getting here costs what it costs. They like it that way.",
+   "arrival": [
+    "Everything outside the port is moving the wrong way, and your inner ear says so for an hour.",
+    "Nobody asks why you came. They know what it cost you.",
+    "The exiles watch the burn you came in on more closely than they watch you."
+   ],
+   "trade": [
+    "They price by what the trip took out of you, and they can tell.",
+    "A fair trade here is one both sides can tell a story about later.",
+    "They keep the good stock for people who arrived without complaining."
+   ],
+   "rumours": [
+    "Going against the grain costs twice. That is the door, and it is meant to be shut.",
+    "Somebody here was a captain in the Scatter once and will not say which.",
+    "The Arc's sealed end has a twin somewhere out past Chime, if you believe the drunk in the corner."
+   ]
+  },
+  "mossback": {
+   "blurb": "A moon-sized creature asleep in a close orbit around Grumm, its shell grown over with forests. It has not moved in anyone's memory. Pilgrims come to put their hands on the moss and listen, and go home changed in ways they cannot explain to anyone who has not.",
+   "arrival": [
+    "The moss goes on for miles, and under it something enormous is breathing very slowly.",
+    "Nobody speaks above the sound of the wind here, and the wind is quiet.",
+    "A pilgrim sits with her hand flat on the shell, counting something out."
+   ],
+   "trade": [
+    "There is nothing to buy here, and everyone seems relieved about it.",
+    "Somebody offers you bread and will not take anything for it.",
+    "The only trade is in stories, and the rate is one for one."
+   ],
+   "rumours": [
+    "The heartbeat comes about once an hour. Some people wait a week to hear two.",
+    "Nothing has ever woken it. Nobody has tried very hard.",
+    "The frogs will not say what they think it is, which for frogs is unusual."
+   ]
+  },
+  "chime": {
+   "blurb": "A cold world where glass falls from the sky as snow and the whole planet rings, faintly, all the time. The Chorus did something here and did not write down what. Almost nobody has been, and the ones who have do not describe it well.",
+   "arrival": [
+    "The note arrives through the hull before anything else does.",
+    "Glass snow lands on the viewport, ticking, and does not melt.",
+    "The ringing changes pitch when you move. That may be the planet, or it may not."
+   ],
+   "trade": [
+    "There is nobody to trade with. There is a great deal to take.",
+    "Whatever you carry out of here will be worth more than it looks.",
+    "Every piece of it is tuned to something. Nothing says to what."
+   ],
+   "rumours": [
+    "The frogs' oldest songs and this planet's ringing use the same intervals. Somebody checked.",
+    "Hush is up there, dark and silent, with something pointed at the edge of everything.",
+    "The glass grows back. Whatever is making it is still making it."
+   ]
+  },
+  "hush": {
+   "blurb": "A dark moon over a ringing world, where the ringing stops completely. The Chorus built a dampener here, and an observatory under it, and pointed the observatory at the Far Lantern. The silence inside is not the absence of sound. It is the presence of something taking it away.",
+   "arrival": [
+    "The ringing cuts out as you cross the line, and the quiet is worse.",
+    "The observatory is open, unlit, and aimed at the far edge of the system.",
+    "Nothing in here is worn. Nothing in here was ever touched by hands."
+   ],
+   "trade": [
+    "There is nobody here. There has been nobody here for a very long time.",
+    "You take what you can carry, and you feel watched doing it.",
+    "Whatever these were worth to the people who made them, it was not money."
+   ],
+   "rumours": [
+    "The dampener is still running. Nobody has found what runs it.",
+    "The observatory tracks. Slowly, but it tracks.",
+    "Take something from here and the cats in the Scatter will not see you coming."
+   ]
+  },
+  "merrow": {
+   "blurb": "A comet with a bazaar on it, the only place all four peoples live in the same rooms. It falls through the inner system once in nineteen years, and the rest of the time it is out in the dark keeping its own hours. Catching it is a thing people become known for.",
+   "arrival": [
+    "The bazaar is strung through the ice in tunnels that everyone agrees are temporary.",
+    "An Emberkin, an otter, a cat and a frog are arguing about a price, happily, in four registers.",
+    "Somebody applauds your approach. You are not sure it was sincere."
+   ],
+   "trade": [
+    "Four peoples' ideas about what a price is, in one room, all day.",
+    "They sell things here that exist nowhere else and will not explain where they came from.",
+    "The haggling is a performance, and the audience is the point."
+   ],
+   "rumours": [
+    "Long-range sensors are the only way to find this thing before it finds you.",
+    "A frog here knows verses about Chime that the Lillimoor singers do not.",
+    "Somebody sold a tank out here once that nobody at Pip could have built."
+   ]
+  },
+  "lantern": {
+   "blurb": "Something at the edge of the system, eighteen astronomical units out, that blinks at intervals nobody has found a pattern in. The Chorus built an observatory at Hush and pointed it here. That is everything anyone knows.",
+   "arrival": [
+    "It is not a star, and it is not a ship, and at this distance those were the only two guesses left.",
+    "The blinking is not regular. You watch it for a long time to be sure.",
+    "Your instruments agree that it is there. They agree about nothing else."
+   ],
+   "trade": [
+    "There is nothing here to trade and nobody to trade with.",
+    "You came all this way with a full hold and no use for it.",
+    "Whatever this is, it does not want anything."
+   ],
+   "rumours": [
+    "Hush's observatory was aimed here, and the aim still tracks.",
+    "The frogs have a verse that counts something in sevens. Nobody knows what.",
+    "Every story about this place was told by somebody who never came."
+   ]
+  }
+ },
+
+ "species": {
+  "emberkin": {
+   "passengerRequests": [
+    "A courier with a sealed case and a deadline she regards as generous.",
+    "A smith going to see an engine he built, before it outlives him.",
+    "A fashion buyer who will ask you three times whether you can go faster.",
+    "An archivist carrying nine hundred years of dock records, by her reckoning.",
+    "An apprentice with a letter of introduction and no patience whatsoever."
+   ],
+   "onFastArrival": "She is out of the airlock before the lines are tied, delighted, already late for something else.",
+   "onLateArrival": "He says nothing about the delay, which from an Emberkin is the loudest thing available.",
+   "onGift": "They write down what you did, which is how the Emberkin say thank you.",
+   "greeting": "Everything here happens quickly, and they will assume you want it to."
+  },
+  "otter": {
+   "passengerRequests": [
+    "Cousins, a wedding, and a cake that must not be tilted.",
+    "A shipwright going out to look at somebody's terrible repair job.",
+    "A banker with a case she will not discuss and a manner that invites you to try.",
+    "Relief caretakers, plus three months of gossip in written form.",
+    "A farmer who has never left the moon he was born on and is not sure about it."
+   ],
+   "onFastArrival": "She tells the whole dock how you flew it, twice, with improvements.",
+   "onLateArrival": "He says it is fine, and means it, and will still mention it in a year.",
+   "onGift": "You are fed before you can refuse, and introduced to eleven people.",
+   "greeting": "Nobody here does anything alone, and they will wonder why you do."
+  },
+  "cat": {
+   "passengerRequests": [
+    "A crew on leave, bound for the tavern, who will critique every burn.",
+    "A salvager with a crate she keeps between her feet.",
+    "An oath-witness travelling to settle somebody else's argument.",
+    "A young cat going to meet a captain, terrified and pretending otherwise.",
+    "An exile going home the long way round, on purpose."
+   ],
+   "onFastArrival": "She tells you it was adequate, then tells everyone else it was not.",
+   "onLateArrival": "He shrugs. The story is better with the delay in it, and both of you know it.",
+   "onGift": "A gift comes back later, larger, from somebody you did not expect.",
+   "greeting": "They cannot land on heavy worlds, so everything here happens in the air."
+  },
+  "frog": {
+   "passengerRequests": [
+    "A song-keeper who has waited ninety years for a ride and can wait a little longer.",
+    "Pilgrims for Mossback, who ask only that you keep the hold cold.",
+    "An elder going to see a sea she has been told about.",
+    "A healer carrying cultures that must not warm, travelling at whatever speed suits them.",
+    "Someone who wishes to sit near a window for the whole journey and say almost nothing."
+   ],
+   "onFastArrival": "She thanks you for the haste and does not appear to have noticed it.",
+   "onLateArrival": "He had not been counting. He offers you something warm and asks how you are.",
+   "onGift": "They give you more than you brought, and will still be giving in a generation.",
+   "greeting": "A conversation here may outlast your visit, and nobody minds."
+  }
+ },
+
+ "events": {
+  "tollOffer": [
+   { "captain": "Captain Sixstring", "line": "Easy now. The belt is ours and the rate is the rate. Coin or crates, your choice, and you keep the rest." },
+   { "captain": "Captain Ashgrin", "line": "Nicely flown. That costs you nothing. Crossing our belt does. Pick what you would rather lose." },
+   { "captain": "Captain Weft", "line": "We take a share, never the hold. Yield and nobody has a bad day, least of all you." }
+  ],
+  "tollPaidCoin": "You hand over {amount}. {captain} counts it once, calls it fair, and tells you where the rocks are thin this year.",
+  "tollPaidCargo": "They take {cargo} and leave the rest lashed down properly, which was not required of them. {captain} salutes on the way out.",
+  "tollStealth": "Something aboard swallows your wake, and the Scatter lets you through without a hail. It feels like cheating, because it is.",
+  "tollGiftLater": "A crate arrives at the dock with no sender and no note, worth {amount}. A cat captain, somewhere, is telling this story better than you could.",
+  "tollWaved": "{captain} looks over an empty hold, laughs, and waves you through with something close to sympathy.",
+
+  "towDry": [
+   "A tug comes out at its own pace. The pilot does not ask how it happened, which is worse.",
+   "Somebody's cousin has a tug and a great deal to say about fuel planning.",
+   "They tow you in slowly, with the whole raft watching, and nobody says a word about it for at least an hour."
+  ],
+  "towCrash": [
+   "They pick the ship up in pieces and put most of them back. The dent stays.",
+   "A salvage crew arrives before the tug does, looks disappointed, and helps anyway.",
+   "You are fished out, dusted off, and handed a bill written in a very steady hand."
+  ],
+  "towAtmosphere": "The clouds took the hull without a shield on it. The frogs fished you out and hummed the whole time they were doing it.",
+  "ledgerDebt": "Ledger covers what you could not, at interest, with a copy of the paperwork for your records.",
+
+  "wanderwellOpening": "Wanderwell is coming to kissing distance. The valley market opens, and half the inner system is already on its way.",
+  "wanderwellClosing": "Wanderwell is heading out. The stalls are down, the awning is rolled, and the otters of Tagalong are turning the lights off behind everyone.",
+  "cometSighted": "Your sensors find Merrow's Comet out in the dark, falling inward on its nineteen-year swing.",
+  "cometCaught": "You match speeds with a comet, and somebody opens a door in the ice. Four peoples are arguing about a price inside, and all four stop to see who managed it.",
+
+  "firstSoiChange": "You cross a line that is not drawn on anything, and the numbers all change frame. That was a world letting go of you and another one taking hold.",
+  "firstTransfer": "You are out of every world's reach now, on the Lamp's own books. The slow road starts here and ends wherever you aimed it.",
+  "firstAssist": "You fell past Grumm and came out faster than you went in, with the tank untouched. The frogs call that borrowing. Grumm has not noticed.",
+  "firstAerobrake": "The shield takes the heat, the clouds take the speed, and you come out the other side slower for free.",
+
+  "mossbackHeartbeat": "You put a hand flat on the hull and wait. After a long while, something the size of a moon beats once, and the sound goes through the deck and through you.",
+  "hushRelic": "The ringing stops at the line, and inside there is an observatory nobody has dusted in an age, still tracking the far edge of the system. You take a small tuned thing from a shelf that was never a shelf. The silence lets you.",
+  "chimeArrival": "Glass falls past the viewport and the whole planet rings underneath you, one note, patiently, the way it has since before anyone was counting.",
+  "lanternArrival": "You have come as far as anyone goes. The light is there, exactly where the Chorus pointed their observatory, and it is not a star and not a ship.\nIt blinks. You wait, and it blinks again, and the gap is not the same gap. There is no pattern in it that you can hold.\nThe Chorus built a silent room nine astronomical units back and aimed it at this. They left no doors, no stairs, no seats, and no explanation. Why does a thing at the edge of a system blink at all, if not for somebody?"
+ },
+
+ "tutorial": [
+  { "step": "castoff", "title": "Cast off", "body": "You are tied up at Tessel. Open the Shipyard and cast off: the ship drops into a slow circle around the world, going the way the world goes." },
+  { "step": "mark", "title": "Write down a burn", "body": "Tap your path to leave a mark on it. Nothing is spent yet. A mark is a burn you have written down for later, and you can move it, change it, or scrap it." },
+  { "step": "pull", "title": "Pull forward until you reach Bramble", "body": "Drag the forward handle, or use the steppers, until the far end of your path touches Bramble's reach. Then open Target, pick Bramble, and press Aim for it to tidy the last few metres per second." },
+  { "step": "warp", "title": "Wind the clock to the burn", "body": "Use 'warp to burn'. The clock runs, the sky turns, and everything stops a moment before the burn so you can watch it go." },
+  { "step": "dock", "title": "Get close, get slow, tie up", "body": "Inside Bramble's reach, aim for kissing distance inside the harbour mouth, then burn back to shed speed. Close enough and slow enough, and Bramble takes your lines." }
+ ],
+ "contractsIntro": "Cargo pays the fuel. People are why anyone flies at all: they want somewhere by some day, and they remember whether you managed it.",
+
+ "shipNames": [
+  "Slow Road", "Kissing Distance", "Second Cousin", "Hedge Money", "Borrowed Speed",
+  "Wet Paint", "The Long Look", "Ninth Cousin Twice", "Festival Weather", "Cold Hold",
+  "Ledger's Regret", "Two Burns Out"
+ ],
+ "captainLines": {
+  "onBurn": [
+   "Burn made. The far end of the path has moved; go and look at it.",
+   "That is spent. What is left is what is left.",
+   "Clean burn. The numbers agree with the plan, which is not always true.",
+   "Done. The sky has rearranged itself around the decision."
+  ],
+  "onLongCoast": [
+   "Nothing to do for a while but watch the worlds go round, which is not nothing.",
+   "Coasting. The cargo is fine. The passengers are reading.",
+   "Long quiet stretch. Somebody once wrote a whole book on one of these.",
+   "The hold is steady and the Lamp is where it should be."
+  ],
+  "onStranded": [
+   "The tank is dry. Nothing is on fire; we simply cannot change our mind about anything now.",
+   "Out of what you had left. The path we are on is the path we get, unless somebody comes out.",
+   "Dry. A tow costs money and days. It has happened to better pilots, most of whom deny it."
+  ]
+ },
+
+ "logTemplates": {
+  "docked": "Tied up at {port}.",
+  "undocked": "Cast off from {port}.",
+  "burn": "Burn: {dv}. Tank {left}.",
+  "soiEnter": "Into {body}'s reach.",
+  "soiExit": "Out of {body}'s reach, into {parent}'s.",
+  "aerobrake": "Skimmed {body}: {dv} shed to the clouds.",
+  "sold": "Sold {qty} × {good} at {port} for {price}.",
+  "bought": "Bought {qty} × {good} at {port} for {price}.",
+  "contractTaken": "Took on {title}, for {to}, {pay}.",
+  "contractDone": "Delivered {title} at {port}. Paid {pay}.",
+  "contractLate": "Delivered {title} at {port}, late. Paid {pay}.",
+  "towed": "Towed to {port}: {cost}, {days}.",
+  "tolled": "Paid the Scatter toll to {captain}.",
+  "refuelled": "Took on {amount} at {port} for {price}.",
+  "upgraded": "Fitted {name} at {port}."
+ }
+}

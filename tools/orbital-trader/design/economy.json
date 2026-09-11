@@ -1,0 +1,2113 @@
+{
+  "startingMoney": 350,
+  "currencyName": "cowries",
+  "goods": [
+    {
+      "id": "grain",
+      "name": "Hedgerow grain",
+      "category": "bulk",
+      "basePrice": 8,
+      "units": 1,
+      "lifetimeDays": null,
+      "needsRefrigeration": false,
+      "producedAt": [
+        "bramble"
+      ],
+      "demandBy": {
+        "otter": 1,
+        "emberkin": 1.15,
+        "cat": 1.3,
+        "frog": 0.7
+      },
+      "blurb": "Sacks of Bramble barley, still smelling of hedgerow. Cats will pay for anything that did not come out of a tube."
+    },
+    {
+      "id": "paper",
+      "name": "Bond-paper & ink",
+      "category": "bulk",
+      "basePrice": 9,
+      "units": 1,
+      "lifetimeDays": null,
+      "needsRefrigeration": false,
+      "producedAt": [
+        "ledger"
+      ],
+      "demandBy": {
+        "otter": 1,
+        "emberkin": 1.6,
+        "cat": 0.6,
+        "frog": 0.4
+      },
+      "blurb": "Ledger-pressed paper and squid ink. The Emberkin write everything down and are always out of both."
+    },
+    {
+      "id": "parts",
+      "name": "Ship fittings",
+      "category": "bulk",
+      "basePrice": 18,
+      "units": 2,
+      "lifetimeDays": null,
+      "needsRefrigeration": false,
+      "producedAt": [
+        "pip"
+      ],
+      "demandBy": {
+        "otter": 0.9,
+        "emberkin": 1.1,
+        "cat": 1.5,
+        "frog": 0.8
+      },
+      "blurb": "Crates of Pip-made valves, seals and struts. Far from any dry dock, cats keep ships flying with these and oaths."
+    },
+    {
+      "id": "rope",
+      "name": "Kelp rope & sailcloth",
+      "category": "bulk",
+      "basePrice": 10,
+      "units": 1,
+      "lifetimeDays": null,
+      "needsRefrigeration": false,
+      "producedAt": [
+        "tessel"
+      ],
+      "demandBy": {
+        "otter": 0.8,
+        "emberkin": 1.2,
+        "cat": 1.3,
+        "frog": 1
+      },
+      "blurb": "Tessel harbor cordage. Every port in the system tethers something with it."
+    },
+    {
+      "id": "ore",
+      "name": "Scatter ore",
+      "category": "bulk",
+      "basePrice": 14,
+      "units": 2,
+      "lifetimeDays": null,
+      "needsRefrigeration": false,
+      "producedAt": [
+        "clawrock",
+        "arc"
+      ],
+      "demandBy": {
+        "emberkin": 1.5,
+        "otter": 1.1,
+        "cat": 0.6,
+        "frog": 0.5
+      },
+      "blurb": "Nickel-iron chipped off belt rocks. The engine smiths of Cinder melt it into things that go very fast."
+    },
+    {
+      "id": "ice",
+      "name": "Ring ice",
+      "category": "bulk",
+      "basePrice": 6,
+      "units": 2,
+      "lifetimeDays": null,
+      "needsRefrigeration": false,
+      "producedAt": [
+        "widdershins",
+        "merrow",
+        "tagalong"
+      ],
+      "demandBy": {
+        "emberkin": 1.7,
+        "otter": 1,
+        "cat": 1.2,
+        "frog": 0.3
+      },
+      "blurb": "Blocks of clean outer-system ice. Parched Cinder pays for every drop; the frogs cannot imagine why."
+    },
+    {
+      "id": "sulfur",
+      "name": "Ember-salt",
+      "category": "bulk",
+      "basePrice": 11,
+      "units": 2,
+      "lifetimeDays": null,
+      "needsRefrigeration": false,
+      "producedAt": [
+        "cinder",
+        "wanderwell"
+      ],
+      "demandBy": {
+        "otter": 1.2,
+        "emberkin": 0.5,
+        "cat": 1,
+        "frog": 1.3
+      },
+      "blurb": "Yellow sulfur salts raked from Cinder's dayside. Fertilizer for Bramble, heater chemistry for the frogs."
+    },
+    {
+      "id": "produce",
+      "name": "Hedgerow fruit",
+      "category": "perishable",
+      "basePrice": 14,
+      "units": 1,
+      "lifetimeDays": 40,
+      "needsRefrigeration": false,
+      "producedAt": [
+        "bramble"
+      ],
+      "demandBy": {
+        "otter": 0.9,
+        "emberkin": 1.5,
+        "cat": 1.6,
+        "frog": 0.8
+      },
+      "blurb": "Plums, pears and hedge-berries. Nothing tastes better in microgravity, and nothing rots faster."
+    },
+    {
+      "id": "oysters",
+      "name": "Tidepool oysters",
+      "category": "perishable",
+      "basePrice": 20,
+      "units": 1,
+      "lifetimeDays": 20,
+      "needsRefrigeration": false,
+      "producedAt": [
+        "tessel"
+      ],
+      "demandBy": {
+        "otter": 0.8,
+        "emberkin": 1.4,
+        "cat": 1.6,
+        "frog": 0.6
+      },
+      "blurb": "Packed in wet kelp. Twenty days of shelf life if you are lucky, and cats are never lucky enough."
+    },
+    {
+      "id": "fashions",
+      "name": "Cinder fashions",
+      "category": "perishable",
+      "basePrice": 45,
+      "units": 1,
+      "lifetimeDays": 90,
+      "needsRefrigeration": false,
+      "producedAt": [
+        "cinder"
+      ],
+      "demandBy": {
+        "emberkin": 1.8,
+        "otter": 1.3,
+        "cat": 1,
+        "frog": 0.3
+      },
+      "blurb": "This week's Emberkin look, folded in heat-paper. Worth a fortune fresh and an embarrassment in three months."
+    },
+    {
+      "id": "tideglass",
+      "name": "Tideglass lanterns",
+      "category": "luxury",
+      "basePrice": 80,
+      "units": 1,
+      "lifetimeDays": null,
+      "needsRefrigeration": false,
+      "producedAt": [
+        "tessel"
+      ],
+      "demandBy": {
+        "emberkin": 1.5,
+        "frog": 1.7,
+        "cat": 1.3,
+        "otter": 0.7
+      },
+      "blurb": "Otter glasswork that glows sea-green in the dark. The frogs hang them under the lily-pads and sing to them."
+    },
+    {
+      "id": "emberwork",
+      "name": "Ember filigree",
+      "category": "luxury",
+      "basePrice": 110,
+      "units": 1,
+      "lifetimeDays": null,
+      "needsRefrigeration": false,
+      "producedAt": [
+        "cinder",
+        "wanderwell"
+      ],
+      "demandBy": {
+        "otter": 1.3,
+        "frog": 1.6,
+        "cat": 1.4,
+        "emberkin": 0.6
+      },
+      "blurb": "Brass and obsidian filigree forged in a week and treasured for a lifetime, which for the maker is about the same thing."
+    },
+    {
+      "id": "frogsong",
+      "name": "Song-shells",
+      "category": "luxury",
+      "basePrice": 130,
+      "units": 1,
+      "lifetimeDays": null,
+      "needsRefrigeration": false,
+      "producedAt": [
+        "lillimoor",
+        "chime"
+      ],
+      "demandBy": {
+        "otter": 1.5,
+        "emberkin": 1.4,
+        "cat": 1.2,
+        "frog": 0.3
+      },
+      "blurb": "Resonant shells that hold a frog song for centuries. Tessel plays them at parties; Cinder scholars transcribe them."
+    },
+    {
+      "id": "shadowsilk",
+      "name": "Widdershins shadow-silk",
+      "category": "luxury",
+      "basePrice": 160,
+      "units": 1,
+      "lifetimeDays": null,
+      "needsRefrigeration": false,
+      "producedAt": [
+        "widdershins"
+      ],
+      "demandBy": {
+        "otter": 1.5,
+        "emberkin": 1.6,
+        "frog": 1.2,
+        "cat": 0.7
+      },
+      "blurb": "Spun by the exiles from something they will not name. Drinks light. Rare because the approach is backwards."
+    },
+    {
+      "id": "cometdust",
+      "name": "Merrow tail-dust",
+      "category": "luxury",
+      "basePrice": 200,
+      "units": 1,
+      "lifetimeDays": null,
+      "needsRefrigeration": false,
+      "producedAt": [
+        "merrow"
+      ],
+      "demandBy": {
+        "emberkin": 1.6,
+        "otter": 1.3,
+        "cat": 1.3,
+        "frog": 1.3
+      },
+      "blurb": "Glittering dust swept from the comet's tail by the bazaar folk. Fireworks on Cinder, wedding confetti on Tessel."
+    },
+    {
+      "id": "lilywine",
+      "name": "Lillimoor ice-wine",
+      "category": "cold",
+      "basePrice": 90,
+      "units": 1,
+      "lifetimeDays": null,
+      "needsRefrigeration": true,
+      "producedAt": [
+        "lillimoor"
+      ],
+      "demandBy": {
+        "otter": 1.6,
+        "emberkin": 1.3,
+        "cat": 1.5,
+        "frog": 0.4
+      },
+      "blurb": "Fermented under ammonia ice over a frog lifetime. Boils into vinegar above freezing, so keep it cold."
+    },
+    {
+      "id": "cultures",
+      "name": "Cold cultures",
+      "category": "cold",
+      "basePrice": 60,
+      "units": 1,
+      "lifetimeDays": null,
+      "needsRefrigeration": true,
+      "producedAt": [
+        "lillimoor",
+        "chime"
+      ],
+      "demandBy": {
+        "otter": 1.6,
+        "emberkin": 1.2,
+        "cat": 1.3,
+        "frog": 0.5
+      },
+      "blurb": "Living medicinal cultures from the lily-pad apothecaries. Otter healers swear by them; warmth kills them."
+    },
+    {
+      "id": "chorustube",
+      "name": "Chorus tube-segment",
+      "category": "relic",
+      "basePrice": 600,
+      "units": 3,
+      "lifetimeDays": null,
+      "needsRefrigeration": false,
+      "producedAt": [
+        "arc"
+      ],
+      "demandBy": {
+        "emberkin": 1.5,
+        "otter": 1.2,
+        "frog": 1.3,
+        "cat": 1
+      },
+      "blurb": "A length of seamless Chorus tube cut from the Arc. Hums when you tap it. Nobody knows what it was for."
+    },
+    {
+      "id": "ringglass",
+      "name": "Ringing glass",
+      "category": "relic",
+      "basePrice": 900,
+      "units": 2,
+      "lifetimeDays": null,
+      "needsRefrigeration": false,
+      "producedAt": [
+        "chime"
+      ],
+      "demandBy": {
+        "emberkin": 1.5,
+        "frog": 1.6,
+        "otter": 1.3,
+        "cat": 1
+      },
+      "blurb": "Glass snow from Chime, still faintly ringing the note the Chorus tuned the planet to."
+    },
+    {
+      "id": "hushshard",
+      "name": "Dampener shard",
+      "category": "relic",
+      "basePrice": 1400,
+      "units": 2,
+      "lifetimeDays": null,
+      "needsRefrigeration": false,
+      "producedAt": [
+        "hush"
+      ],
+      "demandBy": {
+        "emberkin": 1.6,
+        "otter": 1.4,
+        "frog": 1.4,
+        "cat": 1.1
+      },
+      "blurb": "A splinter of the Hush dampener. Sound dies within a hand of it. The engine smiths want it very badly."
+    },
+    {
+      "id": "pax_otter",
+      "name": "Otter travelers",
+      "category": "passenger",
+      "basePrice": 40,
+      "units": 4,
+      "lifetimeDays": null,
+      "needsRefrigeration": false,
+      "producedAt": [
+        "tessel",
+        "pip",
+        "bramble",
+        "ledger",
+        "tagalong",
+        "merrow"
+      ],
+      "demandBy": {
+        "otter": 1,
+        "emberkin": 1.1,
+        "cat": 1.1,
+        "frog": 1.2
+      },
+      "blurb": "Cousins visiting cousins. They will talk the whole way and know everyone at the other end."
+    },
+    {
+      "id": "pax_ember",
+      "name": "Emberkin travelers",
+      "category": "passenger",
+      "basePrice": 55,
+      "units": 4,
+      "lifetimeDays": null,
+      "needsRefrigeration": false,
+      "producedAt": [
+        "cinder",
+        "wanderwell",
+        "merrow"
+      ],
+      "demandBy": {
+        "otter": 1.1,
+        "emberkin": 1,
+        "cat": 1,
+        "frog": 1
+      },
+      "blurb": "In heated suits, tapping their feet. They pay most for speed and remind you of the deadline hourly."
+    },
+    {
+      "id": "pax_cat",
+      "name": "Cat crew on leave",
+      "category": "passenger",
+      "basePrice": 50,
+      "units": 4,
+      "lifetimeDays": null,
+      "needsRefrigeration": false,
+      "producedAt": [
+        "arc",
+        "clawrock",
+        "widdershins",
+        "hush",
+        "merrow"
+      ],
+      "demandBy": {
+        "otter": 1,
+        "emberkin": 1,
+        "cat": 1,
+        "frog": 1.1
+      },
+      "blurb": "Lanky, bored, and full of opinions about your approach vector. Never carry them to a heavy world."
+    },
+    {
+      "id": "pax_frog",
+      "name": "Frog pilgrims",
+      "category": "passenger",
+      "basePrice": 75,
+      "units": 4,
+      "lifetimeDays": null,
+      "needsRefrigeration": true,
+      "producedAt": [
+        "lillimoor",
+        "chime",
+        "merrow"
+      ],
+      "demandBy": {
+        "otter": 1.1,
+        "emberkin": 1,
+        "cat": 1,
+        "frog": 1
+      },
+      "blurb": "Bound for Mossback to hear the heartbeat. They need the hold kept cold and will hum the entire way."
+    }
+  ],
+  "ports": {
+    "cinder": {
+      "name": "Cinder",
+      "species": "emberkin",
+      "climate": "hot",
+      "orbitAu": 0.3,
+      "parent": null,
+      "marketSize": 1.5,
+      "fuelPricePerKms": 6,
+      "shipyard": true,
+      "upgrades": [
+        "engine_1",
+        "engine_2",
+        "hold_1",
+        "heatshield"
+      ],
+      "sells": [
+        {
+          "good": "fashions",
+          "stock": 40,
+          "regenPerDay": 3,
+          "priceMul": 0.7
+        },
+        {
+          "good": "emberwork",
+          "stock": 20,
+          "regenPerDay": 0.8,
+          "priceMul": 0.85
+        },
+        {
+          "good": "sulfur",
+          "stock": 200,
+          "regenPerDay": 10,
+          "priceMul": 0.7
+        }
+      ],
+      "buys": [
+        {
+          "good": "grain",
+          "priceMul": 1.2
+        },
+        {
+          "good": "produce",
+          "priceMul": 1.3
+        },
+        {
+          "good": "oysters",
+          "priceMul": 1.3
+        },
+        {
+          "good": "paper",
+          "priceMul": 1.3
+        },
+        {
+          "good": "ice",
+          "priceMul": 1.4
+        },
+        {
+          "good": "ore",
+          "priceMul": 1.2
+        },
+        {
+          "good": "rope",
+          "priceMul": 1.1
+        },
+        {
+          "good": "parts",
+          "priceMul": 1
+        },
+        {
+          "good": "tideglass",
+          "priceMul": 1.2
+        },
+        {
+          "good": "frogsong",
+          "priceMul": 1.2
+        },
+        {
+          "good": "lilywine",
+          "priceMul": 1.2
+        },
+        {
+          "good": "cultures",
+          "priceMul": 1.1
+        },
+        {
+          "good": "shadowsilk",
+          "priceMul": 1.2
+        },
+        {
+          "good": "cometdust",
+          "priceMul": 1.2
+        },
+        {
+          "good": "chorustube",
+          "priceMul": 1.3
+        },
+        {
+          "good": "ringglass",
+          "priceMul": 1.3
+        },
+        {
+          "good": "hushshard",
+          "priceMul": 1.3
+        }
+      ],
+      "notes": "Engine smiths; the cheapest fuel in the system straight from the refineries."
+    },
+    "wanderwell": {
+      "name": "Wanderwell",
+      "species": "emberkin",
+      "climate": "hot",
+      "orbitAu": 0.5,
+      "parent": null,
+      "openWhen": {
+        "rAuBelow": 1.2
+      },
+      "marketSize": 1.5,
+      "fuelPricePerKms": 14,
+      "shipyard": false,
+      "upgrades": [],
+      "sells": [
+        {
+          "good": "emberwork",
+          "stock": 12,
+          "regenPerDay": 0.6,
+          "priceMul": 0.9
+        },
+        {
+          "good": "sulfur",
+          "stock": 120,
+          "regenPerDay": 6,
+          "priceMul": 0.75
+        }
+      ],
+      "buys": [
+        {
+          "good": "grain",
+          "priceMul": 1.3
+        },
+        {
+          "good": "produce",
+          "priceMul": 1.4
+        },
+        {
+          "good": "oysters",
+          "priceMul": 1.4
+        },
+        {
+          "good": "ice",
+          "priceMul": 1.5
+        },
+        {
+          "good": "paper",
+          "priceMul": 1.2
+        },
+        {
+          "good": "rope",
+          "priceMul": 1.2
+        },
+        {
+          "good": "fashions",
+          "priceMul": 1
+        },
+        {
+          "good": "tideglass",
+          "priceMul": 1.3
+        },
+        {
+          "good": "lilywine",
+          "priceMul": 1.3
+        },
+        {
+          "good": "cultures",
+          "priceMul": 1
+        },
+        {
+          "good": "frogsong",
+          "priceMul": 1.2
+        },
+        {
+          "good": "shadowsilk",
+          "priceMul": 1.3
+        },
+        {
+          "good": "cometdust",
+          "priceMul": 1.3
+        }
+      ],
+      "notes": "The periapsis festival market. Closed (market empty) whenever Wanderwell is beyond 1.2 au."
+    },
+    "tagalong": {
+      "name": "Tagalong",
+      "species": "otter",
+      "climate": "varies",
+      "orbitAu": 2,
+      "parent": "wanderwell",
+      "marketSize": 0.3,
+      "fuelPricePerKms": 16,
+      "shipyard": false,
+      "upgrades": [],
+      "sells": [
+        {
+          "good": "ice",
+          "stock": 20,
+          "regenPerDay": 0.5,
+          "priceMul": 0.9
+        },
+        {
+          "good": "emberwork",
+          "stock": 4,
+          "regenPerDay": 0.05,
+          "priceMul": 1
+        }
+      ],
+      "buys": [
+        {
+          "good": "grain",
+          "priceMul": 1.3
+        },
+        {
+          "good": "produce",
+          "priceMul": 1.2
+        },
+        {
+          "good": "oysters",
+          "priceMul": 1.2
+        },
+        {
+          "good": "paper",
+          "priceMul": 1.1
+        },
+        {
+          "good": "rope",
+          "priceMul": 1.1
+        },
+        {
+          "good": "fashions",
+          "priceMul": 1.1
+        },
+        {
+          "good": "parts",
+          "priceMul": 1.2
+        }
+      ],
+      "notes": "Off-season caretakers. Thin stock, and a few filigree pieces left behind by the summer crowd."
+    },
+    "tessel": {
+      "name": "Tessel",
+      "species": "otter",
+      "climate": "temperate",
+      "orbitAu": 1,
+      "parent": null,
+      "marketSize": 2,
+      "fuelPricePerKms": 10,
+      "shipyard": false,
+      "upgrades": [],
+      "sells": [
+        {
+          "good": "tideglass",
+          "stock": 30,
+          "regenPerDay": 1,
+          "priceMul": 0.85
+        },
+        {
+          "good": "rope",
+          "stock": 150,
+          "regenPerDay": 8,
+          "priceMul": 0.8
+        },
+        {
+          "good": "oysters",
+          "stock": 60,
+          "regenPerDay": 6,
+          "priceMul": 0.75
+        }
+      ],
+      "buys": [
+        {
+          "good": "grain",
+          "priceMul": 1.1
+        },
+        {
+          "good": "produce",
+          "priceMul": 1.1
+        },
+        {
+          "good": "ice",
+          "priceMul": 1
+        },
+        {
+          "good": "ore",
+          "priceMul": 1
+        },
+        {
+          "good": "sulfur",
+          "priceMul": 1.1
+        },
+        {
+          "good": "fashions",
+          "priceMul": 1.3
+        },
+        {
+          "good": "emberwork",
+          "priceMul": 1.2
+        },
+        {
+          "good": "frogsong",
+          "priceMul": 1.4
+        },
+        {
+          "good": "lilywine",
+          "priceMul": 1.3
+        },
+        {
+          "good": "cultures",
+          "priceMul": 1.2
+        },
+        {
+          "good": "shadowsilk",
+          "priceMul": 1.3
+        },
+        {
+          "good": "cometdust",
+          "priceMul": 1.2
+        },
+        {
+          "good": "chorustube",
+          "priceMul": 1.1
+        },
+        {
+          "good": "ringglass",
+          "priceMul": 1.1
+        },
+        {
+          "good": "hushshard",
+          "priceMul": 1.1
+        }
+      ],
+      "notes": "The gossip hub and starting port. Big market, honest prices, terrible secrets."
+    },
+    "pip": {
+      "name": "Pip",
+      "species": "otter",
+      "climate": "temperate",
+      "orbitAu": 1,
+      "parent": "tessel",
+      "marketSize": 0.8,
+      "fuelPricePerKms": 9,
+      "shipyard": true,
+      "upgrades": [
+        "tank_0",
+        "tank_1",
+        "tank_2",
+        "engine_0",
+        "hold_0",
+        "hold_1",
+        "hold_2",
+        "refrigeration"
+      ],
+      "sells": [
+        {
+          "good": "parts",
+          "stock": 60,
+          "regenPerDay": 3,
+          "priceMul": 0.85
+        }
+      ],
+      "buys": [
+        {
+          "good": "ore",
+          "priceMul": 1.4
+        },
+        {
+          "good": "sulfur",
+          "priceMul": 1.3
+        },
+        {
+          "good": "rope",
+          "priceMul": 1.1
+        },
+        {
+          "good": "grain",
+          "priceMul": 1.1
+        },
+        {
+          "good": "produce",
+          "priceMul": 1.1
+        },
+        {
+          "good": "oysters",
+          "priceMul": 1
+        },
+        {
+          "good": "paper",
+          "priceMul": 1
+        },
+        {
+          "good": "chorustube",
+          "priceMul": 1.4
+        },
+        {
+          "good": "ringglass",
+          "priceMul": 1.1
+        },
+        {
+          "good": "hushshard",
+          "priceMul": 1.2
+        }
+      ],
+      "notes": "Dry docks and cranes. Tanks, holds and refrigeration are fitted here, with commentary."
+    },
+    "bramble": {
+      "name": "Bramble",
+      "species": "otter",
+      "climate": "temperate",
+      "orbitAu": 1,
+      "parent": "tessel",
+      "marketSize": 1,
+      "fuelPricePerKms": 12,
+      "shipyard": false,
+      "upgrades": [],
+      "sells": [
+        {
+          "good": "grain",
+          "stock": 150,
+          "regenPerDay": 8,
+          "priceMul": 0.8
+        },
+        {
+          "good": "produce",
+          "stock": 80,
+          "regenPerDay": 6,
+          "priceMul": 0.8
+        }
+      ],
+      "buys": [
+        {
+          "good": "paper",
+          "priceMul": 1.15
+        },
+        {
+          "good": "parts",
+          "priceMul": 1.25
+        },
+        {
+          "good": "sulfur",
+          "priceMul": 1.4
+        },
+        {
+          "good": "ice",
+          "priceMul": 0.9
+        },
+        {
+          "good": "rope",
+          "priceMul": 1.1
+        },
+        {
+          "good": "fashions",
+          "priceMul": 1
+        },
+        {
+          "good": "lilywine",
+          "priceMul": 1.3
+        },
+        {
+          "good": "emberwork",
+          "priceMul": 1
+        }
+      ],
+      "notes": "Farming raft. Will sell you grain and fruit and ask where you bank."
+    },
+    "ledger": {
+      "name": "Ledger",
+      "species": "otter",
+      "climate": "temperate",
+      "orbitAu": 1,
+      "parent": "tessel",
+      "marketSize": 1,
+      "fuelPricePerKms": 13,
+      "shipyard": false,
+      "upgrades": [],
+      "sells": [
+        {
+          "good": "paper",
+          "stock": 100,
+          "regenPerDay": 6,
+          "priceMul": 0.85
+        }
+      ],
+      "buys": [
+        {
+          "good": "grain",
+          "priceMul": 1.5
+        },
+        {
+          "good": "produce",
+          "priceMul": 1.4
+        },
+        {
+          "good": "oysters",
+          "priceMul": 1.3
+        },
+        {
+          "good": "tideglass",
+          "priceMul": 1
+        },
+        {
+          "good": "emberwork",
+          "priceMul": 1.3
+        },
+        {
+          "good": "frogsong",
+          "priceMul": 1.3
+        },
+        {
+          "good": "shadowsilk",
+          "priceMul": 1.4
+        },
+        {
+          "good": "cometdust",
+          "priceMul": 1.4
+        },
+        {
+          "good": "lilywine",
+          "priceMul": 1.2
+        },
+        {
+          "good": "fashions",
+          "priceMul": 1.2
+        },
+        {
+          "good": "parts",
+          "priceMul": 1
+        },
+        {
+          "good": "chorustube",
+          "priceMul": 1.4
+        },
+        {
+          "good": "ringglass",
+          "priceMul": 1.4
+        },
+        {
+          "good": "hushshard",
+          "priceMul": 1.4
+        }
+      ],
+      "notes": "Banking raft. Pays well for fresh food it cannot grow and relics it can lock in a vault."
+    },
+    "arc": {
+      "name": "The Arc",
+      "species": "cat",
+      "climate": "chill",
+      "orbitAu": 2.2,
+      "parent": null,
+      "marketSize": 0.6,
+      "fuelPricePerKms": null,
+      "shipyard": false,
+      "upgrades": [
+        "sensors"
+      ],
+      "sells": [
+        {
+          "good": "chorustube",
+          "stock": 6,
+          "regenPerDay": 0.05,
+          "priceMul": 1
+        },
+        {
+          "good": "ore",
+          "stock": 80,
+          "regenPerDay": 2,
+          "priceMul": 0.9
+        }
+      ],
+      "buys": [
+        {
+          "good": "grain",
+          "priceMul": 1.3
+        },
+        {
+          "good": "produce",
+          "priceMul": 1.3
+        },
+        {
+          "good": "oysters",
+          "priceMul": 1.3
+        },
+        {
+          "good": "rope",
+          "priceMul": 1.2
+        },
+        {
+          "good": "parts",
+          "priceMul": 1.3
+        },
+        {
+          "good": "fashions",
+          "priceMul": 1
+        },
+        {
+          "good": "tideglass",
+          "priceMul": 1.1
+        },
+        {
+          "good": "emberwork",
+          "priceMul": 1.1
+        },
+        {
+          "good": "lilywine",
+          "priceMul": 1.2
+        },
+        {
+          "good": "cometdust",
+          "priceMul": 1.1
+        },
+        {
+          "good": "ice",
+          "priceMul": 1
+        },
+        {
+          "good": "paper",
+          "priceMul": 1
+        }
+      ],
+      "notes": "Cat salvagers on the last Chorus ring segment. No fuel; bring your own or beg."
+    },
+    "clawrock": {
+      "name": "Claw Rock",
+      "species": "cat",
+      "climate": "chill",
+      "orbitAu": 2.9,
+      "parent": null,
+      "marketSize": 0.8,
+      "fuelPricePerKms": 22,
+      "shipyard": false,
+      "upgrades": [],
+      "sells": [
+        {
+          "good": "ore",
+          "stock": 120,
+          "regenPerDay": 5,
+          "priceMul": 0.75
+        }
+      ],
+      "buys": [
+        {
+          "good": "grain",
+          "priceMul": 1.3
+        },
+        {
+          "good": "produce",
+          "priceMul": 1.4
+        },
+        {
+          "good": "oysters",
+          "priceMul": 1.4
+        },
+        {
+          "good": "rope",
+          "priceMul": 1.2
+        },
+        {
+          "good": "parts",
+          "priceMul": 1.3
+        },
+        {
+          "good": "sulfur",
+          "priceMul": 1
+        },
+        {
+          "good": "ice",
+          "priceMul": 1.1
+        },
+        {
+          "good": "fashions",
+          "priceMul": 1.1
+        },
+        {
+          "good": "tideglass",
+          "priceMul": 1
+        },
+        {
+          "good": "emberwork",
+          "priceMul": 1.2
+        },
+        {
+          "good": "lilywine",
+          "priceMul": 1.3
+        },
+        {
+          "good": "cultures",
+          "priceMul": 1.2
+        },
+        {
+          "good": "cometdust",
+          "priceMul": 1.1
+        },
+        {
+          "good": "frogsong",
+          "priceMul": 1.1
+        },
+        {
+          "good": "paper",
+          "priceMul": 1
+        }
+      ],
+      "notes": "The Scatter haven. Tolls collected outside, drinks poured inside. Fuel is dear this far out."
+    },
+    "lillimoor": {
+      "name": "Lillimoor",
+      "species": "frog",
+      "climate": "cold",
+      "orbitAu": 5,
+      "parent": "grumm",
+      "marketSize": 1.2,
+      "fuelPricePerKms": 24,
+      "shipyard": false,
+      "upgrades": [],
+      "sells": [
+        {
+          "good": "lilywine",
+          "stock": 40,
+          "regenPerDay": 1.5,
+          "priceMul": 0.8
+        },
+        {
+          "good": "cultures",
+          "stock": 40,
+          "regenPerDay": 2,
+          "priceMul": 0.8
+        },
+        {
+          "good": "frogsong",
+          "stock": 12,
+          "regenPerDay": 0.3,
+          "priceMul": 0.7
+        }
+      ],
+      "buys": [
+        {
+          "good": "tideglass",
+          "priceMul": 1.25
+        },
+        {
+          "good": "emberwork",
+          "priceMul": 1.2
+        },
+        {
+          "good": "cometdust",
+          "priceMul": 1.2
+        },
+        {
+          "good": "grain",
+          "priceMul": 1
+        },
+        {
+          "good": "rope",
+          "priceMul": 1.1
+        },
+        {
+          "good": "sulfur",
+          "priceMul": 1.2
+        },
+        {
+          "good": "paper",
+          "priceMul": 1
+        },
+        {
+          "good": "parts",
+          "priceMul": 1
+        },
+        {
+          "good": "shadowsilk",
+          "priceMul": 1
+        },
+        {
+          "good": "ore",
+          "priceMul": 0.9
+        },
+        {
+          "good": "chorustube",
+          "priceMul": 1.25
+        },
+        {
+          "good": "ringglass",
+          "priceMul": 1.25
+        },
+        {
+          "good": "hushshard",
+          "priceMul": 1.25
+        }
+      ],
+      "gifts": {
+        "perVisitValue": 40,
+        "perRepPoint": 12,
+        "goods": [
+          "cultures",
+          "lilywine",
+          "frogsong"
+        ]
+      },
+      "notes": "Frog homeworld and the trade window for Grumm's balloon villages. No haggling; prices are exchange rates and goodwill."
+    },
+    "widdershins": {
+      "name": "Widdershins",
+      "species": "cat",
+      "climate": "cold",
+      "orbitAu": 5,
+      "parent": "grumm",
+      "retrograde": true,
+      "marketSize": 0.5,
+      "fuelPricePerKms": 34,
+      "shipyard": false,
+      "upgrades": [],
+      "sells": [
+        {
+          "good": "shadowsilk",
+          "stock": 15,
+          "regenPerDay": 0.4,
+          "priceMul": 0.85
+        },
+        {
+          "good": "ice",
+          "stock": 100,
+          "regenPerDay": 4,
+          "priceMul": 0.6
+        }
+      ],
+      "buys": [
+        {
+          "good": "grain",
+          "priceMul": 1.4
+        },
+        {
+          "good": "produce",
+          "priceMul": 1.5
+        },
+        {
+          "good": "oysters",
+          "priceMul": 1.5
+        },
+        {
+          "good": "rope",
+          "priceMul": 1.3
+        },
+        {
+          "good": "parts",
+          "priceMul": 1.4
+        },
+        {
+          "good": "fashions",
+          "priceMul": 1.2
+        },
+        {
+          "good": "emberwork",
+          "priceMul": 1.3
+        },
+        {
+          "good": "lilywine",
+          "priceMul": 1.4
+        },
+        {
+          "good": "cultures",
+          "priceMul": 1.3
+        },
+        {
+          "good": "tideglass",
+          "priceMul": 1.2
+        },
+        {
+          "good": "cometdust",
+          "priceMul": 1.2
+        },
+        {
+          "good": "sulfur",
+          "priceMul": 1.2
+        },
+        {
+          "good": "paper",
+          "priceMul": 1.1
+        },
+        {
+          "good": "frogsong",
+          "priceMul": 1.2
+        }
+      ],
+      "notes": "Cat exiles on a backwards moon. Rare goods, ruinous fuel, and no questions."
+    },
+    "mossback": {
+      "name": "Mossback",
+      "species": "none",
+      "climate": "cold",
+      "orbitAu": 5,
+      "parent": "grumm",
+      "marketSize": 0,
+      "fuelPricePerKms": null,
+      "shipyard": false,
+      "upgrades": [],
+      "sells": [],
+      "buys": [],
+      "passengerDestination": true,
+      "notes": "Pilgrimage site. No market. Pilgrims disembark to hear the heartbeat."
+    },
+    "chime": {
+      "name": "Chime",
+      "species": "frog",
+      "climate": "cold",
+      "orbitAu": 9,
+      "parent": null,
+      "marketSize": 0.4,
+      "fuelPricePerKms": 36,
+      "shipyard": false,
+      "upgrades": [],
+      "sells": [
+        {
+          "good": "ringglass",
+          "stock": 5,
+          "regenPerDay": 0.04,
+          "priceMul": 1
+        },
+        {
+          "good": "frogsong",
+          "stock": 6,
+          "regenPerDay": 0.15,
+          "priceMul": 0.75
+        },
+        {
+          "good": "cultures",
+          "stock": 15,
+          "regenPerDay": 0.5,
+          "priceMul": 0.9
+        }
+      ],
+      "buys": [
+        {
+          "good": "tideglass",
+          "priceMul": 1.4
+        },
+        {
+          "good": "emberwork",
+          "priceMul": 1.4
+        },
+        {
+          "good": "cometdust",
+          "priceMul": 1.3
+        },
+        {
+          "good": "grain",
+          "priceMul": 1.2
+        },
+        {
+          "good": "rope",
+          "priceMul": 1.3
+        },
+        {
+          "good": "sulfur",
+          "priceMul": 1.4
+        },
+        {
+          "good": "parts",
+          "priceMul": 1.2
+        },
+        {
+          "good": "paper",
+          "priceMul": 1.1
+        }
+      ],
+      "gifts": {
+        "perVisitValue": 60,
+        "perRepPoint": 15,
+        "goods": [
+          "cultures",
+          "frogsong"
+        ]
+      },
+      "notes": "A frog song-keepers' listening camp among the ringing ruins. Almost nobody comes."
+    },
+    "hush": {
+      "name": "Hush",
+      "species": "cat",
+      "climate": "cold",
+      "orbitAu": 9,
+      "parent": "chime",
+      "marketSize": 0.3,
+      "fuelPricePerKms": null,
+      "shipyard": false,
+      "upgrades": [
+        "stealth"
+      ],
+      "sells": [
+        {
+          "good": "hushshard",
+          "stock": 3,
+          "regenPerDay": 0.02,
+          "priceMul": 1
+        }
+      ],
+      "buys": [
+        {
+          "good": "grain",
+          "priceMul": 1.5
+        },
+        {
+          "good": "produce",
+          "priceMul": 1.5
+        },
+        {
+          "good": "oysters",
+          "priceMul": 1.5
+        },
+        {
+          "good": "rope",
+          "priceMul": 1.3
+        },
+        {
+          "good": "parts",
+          "priceMul": 1.4
+        },
+        {
+          "good": "lilywine",
+          "priceMul": 1.4
+        },
+        {
+          "good": "cultures",
+          "priceMul": 1.4
+        },
+        {
+          "good": "fashions",
+          "priceMul": 1.2
+        },
+        {
+          "good": "emberwork",
+          "priceMul": 1.2
+        },
+        {
+          "good": "tideglass",
+          "priceMul": 1.2
+        },
+        {
+          "good": "cometdust",
+          "priceMul": 1.2
+        },
+        {
+          "good": "paper",
+          "priceMul": 1.2
+        },
+        {
+          "good": "sulfur",
+          "priceMul": 1.2
+        },
+        {
+          "good": "ice",
+          "priceMul": 1.2
+        }
+      ],
+      "notes": "A silent cat salvage crew camped in the empty observatory. No fuel. The dampener is here."
+    },
+    "merrow": {
+      "name": "Merrow's Comet",
+      "species": "all",
+      "climate": "varies",
+      "orbitAu": 1.5,
+      "parent": null,
+      "marketSize": 1.5,
+      "fuelPricePerKms": 11,
+      "shipyard": false,
+      "upgrades": [
+        "tank_1",
+        "tank_2"
+      ],
+      "sells": [
+        {
+          "good": "cometdust",
+          "stock": 10,
+          "regenPerDay": 0.3,
+          "priceMul": 1
+        },
+        {
+          "good": "ice",
+          "stock": 60,
+          "regenPerDay": 2,
+          "priceMul": 0.8
+        },
+        {
+          "good": "fashions",
+          "stock": 10,
+          "regenPerDay": 0.4,
+          "priceMul": 1.1
+        },
+        {
+          "good": "emberwork",
+          "stock": 6,
+          "regenPerDay": 0.2,
+          "priceMul": 1.1
+        },
+        {
+          "good": "lilywine",
+          "stock": 8,
+          "regenPerDay": 0.3,
+          "priceMul": 1.1
+        },
+        {
+          "good": "tideglass",
+          "stock": 8,
+          "regenPerDay": 0.3,
+          "priceMul": 1.1
+        },
+        {
+          "good": "shadowsilk",
+          "stock": 4,
+          "regenPerDay": 0.1,
+          "priceMul": 1.1
+        },
+        {
+          "good": "frogsong",
+          "stock": 4,
+          "regenPerDay": 0.1,
+          "priceMul": 1.1
+        },
+        {
+          "good": "parts",
+          "stock": 20,
+          "regenPerDay": 1,
+          "priceMul": 1.1
+        }
+      ],
+      "buys": [
+        {
+          "good": "grain",
+          "priceMul": 0.8
+        },
+        {
+          "good": "produce",
+          "priceMul": 0.8
+        },
+        {
+          "good": "oysters",
+          "priceMul": 0.8
+        },
+        {
+          "good": "ore",
+          "priceMul": 0.8
+        },
+        {
+          "good": "sulfur",
+          "priceMul": 0.8
+        },
+        {
+          "good": "rope",
+          "priceMul": 0.8
+        },
+        {
+          "good": "paper",
+          "priceMul": 0.8
+        },
+        {
+          "good": "cultures",
+          "priceMul": 0.8
+        },
+        {
+          "good": "chorustube",
+          "priceMul": 1.2
+        },
+        {
+          "good": "ringglass",
+          "priceMul": 1.2
+        },
+        {
+          "good": "hushshard",
+          "priceMul": 1.2
+        }
+      ],
+      "notes": "The travelling bazaar. Every species, exotic stock, fair fuel. Orbit radius here is the sim's assumed intercept point."
+    },
+    "lantern": {
+      "name": "The Far Lantern",
+      "species": "unknown",
+      "climate": "dark",
+      "orbitAu": 18,
+      "parent": null,
+      "marketSize": 0,
+      "fuelPricePerKms": null,
+      "shipyard": false,
+      "upgrades": [],
+      "sells": [],
+      "buys": [],
+      "notes": "No market. Something blinks."
+    }
+  },
+  "upgrades": [
+    {
+      "id": "tank_0",
+      "name": "Slack tank",
+      "kind": "tank",
+      "tier": 0,
+      "price": 1200,
+      "soldAt": [
+        "pip"
+      ],
+      "starter": true,
+      "effect": "Starter Δv budget (size from tuning).",
+      "unlocks": "Tessel's moons and the slow road to Cinder or Wanderwell with a refuel."
+    },
+    {
+      "id": "tank_1",
+      "name": "Long-haul tank",
+      "kind": "tank",
+      "tier": 1,
+      "price": 3600,
+      "soldAt": [
+        "pip",
+        "merrow"
+      ],
+      "effect": "Larger Δv budget (size from tuning).",
+      "unlocks": "Comfortable Hohmann to the Arc and the Scatter; Grumm with careful routing."
+    },
+    {
+      "id": "tank_2",
+      "name": "Deep-sky tank",
+      "kind": "tank",
+      "tier": 2,
+      "price": 11500,
+      "soldAt": [
+        "pip",
+        "merrow"
+      ],
+      "effect": "Largest Δv budget (size from tuning).",
+      "unlocks": "Direct Grumm runs, Chime, and running hot with perishables."
+    },
+    {
+      "id": "engine_0",
+      "name": "Pip putter",
+      "kind": "engine",
+      "tier": 0,
+      "price": 900,
+      "soldAt": [
+        "pip"
+      ],
+      "starter": true,
+      "effect": "Starter fuel efficiency: km/s bought per cowrie at the pump (factor from tuning).",
+      "unlocks": "Nothing; it is what you came with."
+    },
+    {
+      "id": "engine_1",
+      "name": "Cinder fastburn",
+      "kind": "engine",
+      "tier": 1,
+      "price": 3000,
+      "soldAt": [
+        "cinder"
+      ],
+      "effect": "Better fuel efficiency: more km/s per cowrie when refuelling (factor from tuning).",
+      "unlocks": "Cheaper hot transfers; the Cinder run stops eating your margin."
+    },
+    {
+      "id": "engine_2",
+      "name": "Smith's masterwork",
+      "kind": "engine",
+      "tier": 2,
+      "price": 9000,
+      "soldAt": [
+        "cinder"
+      ],
+      "effect": "Best fuel efficiency (factor from tuning).",
+      "unlocks": "Outer-system fuel prices stop mattering as much."
+    },
+    {
+      "id": "hold_0",
+      "name": "Starter hold",
+      "kind": "hold",
+      "tier": 0,
+      "price": 800,
+      "soldAt": [
+        "pip"
+      ],
+      "starter": true,
+      "effect": "Starter cargo capacity (units from tuning; the sim assumes 24).",
+      "unlocks": "Nothing; it is what you came with."
+    },
+    {
+      "id": "hold_1",
+      "name": "Raft hold",
+      "kind": "hold",
+      "tier": 1,
+      "price": 2800,
+      "soldAt": [
+        "pip",
+        "cinder"
+      ],
+      "effect": "Larger cargo capacity (units from tuning).",
+      "unlocks": "Bulk runs that actually pay; two passenger cabins plus cargo."
+    },
+    {
+      "id": "hold_2",
+      "name": "Barge hold",
+      "kind": "hold",
+      "tier": 2,
+      "price": 8500,
+      "soldAt": [
+        "pip"
+      ],
+      "effect": "Largest cargo capacity (units from tuning).",
+      "unlocks": "Relic hauls and full frog gift-exchanges in one trip."
+    },
+    {
+      "id": "heatshield",
+      "name": "Ember heat shield",
+      "kind": "key",
+      "tier": 0,
+      "price": 4600,
+      "soldAt": [
+        "cinder"
+      ],
+      "effect": "Survive atmosphere skims; enables aerobraking at Grumm.",
+      "unlocks": "Free braking at Grumm (\"Skimming\"); the fast cheap road to Lillimoor."
+    },
+    {
+      "id": "refrigeration",
+      "name": "Cold hold",
+      "kind": "key",
+      "tier": 0,
+      "price": 2400,
+      "soldAt": [
+        "pip"
+      ],
+      "effect": "Hold can carry goods and passengers flagged needsRefrigeration.",
+      "unlocks": "Ice-wine, cold cultures and frog pilgrims."
+    },
+    {
+      "id": "sensors",
+      "name": "Long-range sensors",
+      "kind": "key",
+      "tier": 0,
+      "price": 3500,
+      "soldAt": [
+        "arc"
+      ],
+      "effect": "Shows Merrow's Comet and Arc salvage sites on the chart with intercept predictions.",
+      "unlocks": "Comet-intercept contracts, the bazaar, salvage contracts."
+    },
+    {
+      "id": "stealth",
+      "name": "Hush dampener",
+      "kind": "key",
+      "tier": 0,
+      "price": null,
+      "soldAt": null,
+      "foundAt": "hush",
+      "effect": "Cat toll intercepts in the Scatter no longer trigger unless you dock at Claw Rock.",
+      "unlocks": "Toll-free Scatter crossings."
+    }
+  ],
+  "formulas": {
+    "price": {
+      "description": "You pay base*sells.priceMul*(1-repDiscount)*haggle. A port pays base*demandBy[species]*buys.priceMul*alignment*saturation*perishable*haggle*(1+volatility wobble). Merrow (\"all\") uses the mean of the four species demands."
+    },
+    "alignment": {
+      "description": "For a good at buyer port B, d = current distance to the good's nearest producer port A. With dmin/dmax the geometric min/max separation of the two orbits (capped at maxSeparationAu), x = clamp((d-dmin)/(dmax-dmin),0,1); mul = clamp(1 + k*(x-0.5), minMul, maxMul). Same-parent pairs (dmax-dmin < 0.05 au) get mul 1. Close worlds flood the market, far worlds go hungry.",
+      "k": 0.6,
+      "maxSeparationAu": 12,
+      "minMul": 0.7,
+      "maxMul": 1.3
+    },
+    "saturation": {
+      "description": "Each port remembers recentSold[good] (items), decaying with half-life halfLifeDays. The k-th item you sell fetches q0eff/(q0eff+recentSold) of the price, q0eff = q0*port.marketSize, updated after every item.",
+      "halfLifeDays": 20,
+      "q0": 48
+    },
+    "perishable": {
+      "description": "Perishable value multiplier = floor + (1-floor)*max(0, 1 - ageDays/lifetimeDays); linear decay to the floor, shown in the UI as \"loses X% per day\".",
+      "floor": 0.1
+    },
+    "reputation": {
+      "description": "Reputation is 0..10 points per species. Purchases and fuel at that species' ports are discounted by min(maxDiscount, discountPerPoint*points). Frog gifts scale with frog reputation; cat tolls fall by the same fraction.",
+      "discountPerPoint": 0.015,
+      "maxDiscount": 0.15,
+      "maxPoints": 10
+    },
+    "toll": {
+      "description": "A Scatter toll intercept takes min(cap, fraction*cargoValue) in goods, chosen by the cats; nothing if cargoValue < minCargoValue (they never take everything, never touch passengers, and never harm a ship that yields). Stealth suppresses intercepts.",
+      "fraction": 0.15,
+      "cap": 600,
+      "minCargoValue": 200
+    },
+    "tow": {
+      "description": "A stranded or crashed ship is towed to the nearest port: cost = base + perAu*distanceAu, time = max(3, daysPerAu*distanceAu) days. If you cannot pay, Ledger fronts it and the debt is deducted from sales.",
+      "base": 60,
+      "perAu": 40,
+      "daysPerAu": 45
+    },
+    "contract": {
+      "description": "Pay = basePerAu*max(minAu, separationAu)*deadlineDays[tightness]*speciesMul[species]*template.payMul per passenger or cargo lot, plus the boarding fee; deadline = tightnessOverHohmann[tightness]*HohmannDays; earlyBonus fraction extra if delivered within half the deadline.",
+      "basePerAu": 60,
+      "minAu": 0.3,
+      "deadlineDays": {
+        "relaxed": 1,
+        "brisk": 1.5,
+        "urgent": 2.4
+      },
+      "tightnessOverHohmann": {
+        "relaxed": 2,
+        "brisk": 1.2,
+        "urgent": 0.8
+      },
+      "speciesMul": {
+        "emberkin": 1.3,
+        "otter": 1,
+        "cat": 1.1,
+        "frog": 0.9,
+        "any": 1
+      },
+      "earlyBonus": 0.25
+    },
+    "haggle": {
+      "description": "Otter ports: each visit rolls a uniform spread of +-spread on every price, then a haggle mini-exchange lets you keep the good end of the roll. Frogs never haggle (spread 0). Cats and Emberkin do not haggle either.",
+      "spread": 0.07
+    },
+    "volatility": {
+      "description": "Daily random-walk wobble on what a port pays, amplitude by species. Emberkin markets are the most volatile.",
+      "bySpecies": {
+        "emberkin": 0.15,
+        "cat": 0.05,
+        "otter": 0,
+        "frog": 0
+      }
+    },
+    "speciesRules": {
+      "otter": "Haggle spread on every price; refusing to haggle is rude (small rep loss).",
+      "emberkin": "Volatile prices; perishable fashions; contracts pay the most for speed (speciesMul 1.3, earlyBonus counts double).",
+      "cat": "Tolls in the Scatter under strict custom (never everything, never passengers). Impress a captain and a gift may follow.",
+      "frog": "No haggling. \"Prices\" are exchange rates: you are paid in trade credit at the stall plus goodwill (reputation), and every visit ends with a gift."
+    }
+  },
+  "contracts": {
+    "templates": [
+      {
+        "species": "emberkin",
+        "fromPorts": [
+          "cinder"
+        ],
+        "toPorts": [
+          "tessel",
+          "wanderwell",
+          "ledger"
+        ],
+        "needs": [],
+        "payMul": 1.3,
+        "text": "A crate of this season's fashions. Next season starts in a month. Fly."
+      },
+      {
+        "species": "emberkin",
+        "fromPorts": [
+          "cinder",
+          "wanderwell"
+        ],
+        "toPorts": [
+          "tessel",
+          "pip"
+        ],
+        "needs": [],
+        "payMul": 1.2,
+        "text": "An Emberkin apprentice with a letter of introduction to the Pip shipwrights and no patience whatsoever."
+      },
+      {
+        "species": "emberkin",
+        "fromPorts": [
+          "cinder"
+        ],
+        "toPorts": [
+          "mossback"
+        ],
+        "needs": [],
+        "payMul": 1.8,
+        "text": "An elderly scholar (she is four) wants to hear Mossback's heartbeat before she dies of old age."
+      },
+      {
+        "species": "otter",
+        "fromClimate": "temperate",
+        "toClimate": "temperate",
+        "needs": [],
+        "payMul": 0.8,
+        "text": "Cousins, a wedding, and a cake that must not be tilted."
+      },
+      {
+        "species": "otter",
+        "fromPorts": [
+          "tessel"
+        ],
+        "toPorts": [
+          "tagalong"
+        ],
+        "needs": [],
+        "payMul": 1.1,
+        "text": "Relief caretakers for Tagalong, plus three months of gossip in written form."
+      },
+      {
+        "species": "otter",
+        "fromPorts": [
+          "ledger"
+        ],
+        "toPorts": [
+          "merrow"
+        ],
+        "needs": [
+          "sensors"
+        ],
+        "payMul": 1.5,
+        "text": "A Ledger banker with a sealed case wants to be at the comet bazaar before it leaves. Do not ask."
+      },
+      {
+        "species": "otter",
+        "fromPorts": [
+          "bramble"
+        ],
+        "toClimate": "chill",
+        "needs": [],
+        "payMul": 1.1,
+        "text": "A load of Bramble fruit for the Claw Rock tavern. It pays by the crate that arrives edible."
+      },
+      {
+        "species": "cat",
+        "fromPorts": [
+          "arc",
+          "widdershins",
+          "hush"
+        ],
+        "toPorts": [
+          "clawrock"
+        ],
+        "needs": [],
+        "payMul": 1.1,
+        "text": "A crew on leave, bound for the tavern. They will critique every burn."
+      },
+      {
+        "species": "cat",
+        "fromPorts": [
+          "arc"
+        ],
+        "toPorts": [
+          "cinder",
+          "pip"
+        ],
+        "needs": [
+          "sensors"
+        ],
+        "payMul": 1.4,
+        "text": "A salvage lot from a marked Arc site, to be delivered to a buyer who will pretend not to know what it is."
+      },
+      {
+        "species": "cat",
+        "fromPorts": [
+          "clawrock"
+        ],
+        "toPorts": [
+          "widdershins"
+        ],
+        "needs": [],
+        "payMul": 1.3,
+        "text": "A parcel for the exiles. The retrograde approach is your problem."
+      },
+      {
+        "species": "frog",
+        "fromPorts": [
+          "lillimoor",
+          "chime",
+          "merrow"
+        ],
+        "toPorts": [
+          "mossback"
+        ],
+        "needs": [
+          "refrigeration"
+        ],
+        "payMul": 1.2,
+        "text": "Pilgrims for Mossback. Keep the hold cold and do not hurry them."
+      },
+      {
+        "species": "frog",
+        "fromPorts": [
+          "lillimoor"
+        ],
+        "toPorts": [
+          "chime"
+        ],
+        "needs": [
+          "refrigeration"
+        ],
+        "payMul": 1.6,
+        "text": "A song-keeper who has waited ninety years for a ride to Chime and can wait a little longer, in the cold."
+      },
+      {
+        "species": "frog",
+        "fromPorts": [
+          "lillimoor"
+        ],
+        "toPorts": [
+          "pip",
+          "tessel"
+        ],
+        "needs": [
+          "refrigeration"
+        ],
+        "payMul": 1.3,
+        "text": "A crate of cold cultures for the Tessel healers, given freely; the healers will pay you."
+      },
+      {
+        "species": "any",
+        "fromPorts": [
+          "merrow"
+        ],
+        "toClimate": "temperate",
+        "needs": [],
+        "payMul": 1.2,
+        "text": "A bazaar family heading home. They know a route you do not."
+      }
+    ]
+  },
+  "sim": {
+    "starterHoldUnits": 24,
+    "starterTankKms": 7,
+    "tesselLillimoorDvKms": 9,
+    "kmsPerAuDay": 1706,
+    "tesselYearDays": 360,
+    "moonHop": {
+      "days": 3,
+      "dvKms": 0.6
+    },
+    "notes": "orbitAu per port is the circular radius used for straight-line distance and Hohmann estimates; Wanderwell uses its periapsis (market open r<1.2 au), Tagalong its off-season mean, Merrow an assumed 1.5 au intercept."
+  }
+}

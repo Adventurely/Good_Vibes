@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Good Vibe Games</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%231a1310'/%3E%3Ccircle cx='8' cy='8' r='4' fill='%23ffd23f'/%3E%3Cpath d='M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.5 1.5M11.5 11.5L13 13M13 3l-1.5 1.5M4.5 11.5L3 13' stroke='%23f59a2e' stroke-width='1.4'/%3E%3C/svg%3E">
-<meta name="description" content="Two co-op deck-building games you play with friends in a browser. No install, no account — share a room code.">
+<meta name="description" content="Co-op deck-builders and single-player games you play in a browser. No install, no account — share a room code, or just start.">
 <style>
   /* The palette is the games' own: warm dark ground, sunlight, leaf green.
      Nothing here is loaded from anywhere — no fonts, no images, no scripts but
@@ -175,6 +175,20 @@
     </div>
   </a>
 
+  <a class="game" href="/orbital-trader/">
+    <canvas class="shot photo" id="shot-ot" width="320" height="190"
+            aria-label="A navigation chart: a warm orange star with a ring of worlds around it, a long comet ellipse, and a belt of rocks, all turning."></canvas>
+    <div class="about">
+      <h2>Orbital Trader</h2>
+      <p>Plan burns, borrow speed from a grumpy gas giant, and carry goods
+         between four peoples around a warm orange star.</p>
+      <ul class="tags">
+        <li>Single player</li>
+        <li class="sun">Orbital mechanics</li>
+        <li class="sky">Trading</li>
+      </ul>
+    </div>
+  </a>
   <a class="game" href="/greener-thumbs/">
     <img class="shot photo" src="/greener-thumbs/bonsai-thumb.webp" width="640" height="380"
          loading="lazy" decoding="async"
@@ -205,6 +219,10 @@ import { paintStage, driftSeeds, stageHedgeFoot } from './good-vibes/stage.js';
 import { PALETTE as GV_PAL, HERO_ART as GV_HERO, ENEMY_ART as GV_ENEMY } from './good-vibes/art.js';
 
 import { buildScene, paintScene } from './solarium/scene.js';
+
+import { createChart } from './orbital-trader/render.js';
+import { BODIES as OT_BODIES, CONST as OT_CONST, BELT_ROCKS as OT_ROCKS, ARC_DEBRIS as OT_DEBRIS } from './orbital-trader/content.js';
+import { makeWorld as otWorld } from './orbital-trader/orbit.js';
 import { PALETTE as SS_PAL, HERO_ART as SS_HERO, ENEMY_ART as SS_ENEMY } from './solarium/art.js';
 
 import { createLot, growthFor } from './sunward/art.js';
@@ -373,13 +391,41 @@ function paintSunward(now){
   });
 }
 
-/* One loop for all three cards. Nothing here is the game, so it can afford to
-   be lazy: the turbines, the seeds and Sunward's sky are the only things that
-   move. */
+/* ---- Orbital Trader: the inner system, turning --------------------- */
+
+/* The chart is the game's own renderer on the game's own sky. It is a vector
+   drawing, so it sits in the `photo` class: nearest-neighbour would turn its
+   orbits into staircases. The clock runs at a day and a half a second, which
+   is fast enough for Tessel's moons to visibly move and slow enough that the
+   planets look like planets rather than sparks. */
+const otCanvas = document.getElementById('shot-ot');
+const ot = createChart(otCanvas, otWorld(OT_BODIES), { reducedMotion: still, starSeed: 3, showScale: false });
+const otBelt = { inner: OT_CONST.BELT.inner, outer: OT_CONST.BELT.outer, rocks: OT_ROCKS, debris: OT_DEBRIS };
+function otFit(){
+  ot.resize();
+  ot.camera.follow = null;
+  ot.camera.cx = 0.3; ot.camera.cy = 0;
+  ot.camera.zoom = ot.height / 7.4;
+}
+otFit();
+addEventListener('resize', otFit);
+let otT = 140;
+let otLast = 0;
+function paintOrbitalTrader(now){
+  const dt = otLast ? Math.min(0.1, (now - otLast) / 1000) : 0;
+  otLast = now;
+  if(!still) otT += dt * 1.5;
+  ot.draw({ t: otT, now, shipAbs: null, prediction: null, nodes: [], belt: otBelt, target: null });
+}
+
+/* One loop for all the cards. Nothing here is the game, so it can afford to be
+   lazy: the turbines, the seeds, Sunward's sky and the moons are the only
+   things that move. */
 function frame(now){
   paintGoodVibes(now);
   paintSolarium(now);
   paintSunward(now);
+  paintOrbitalTrader(now);
   if(!still) requestAnimationFrame(frame);
 }
 

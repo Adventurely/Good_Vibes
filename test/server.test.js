@@ -28,24 +28,26 @@ test('GET / returns the shelf, not a game', async () => {
   assert.match(res.headers.get('content-type'), /text\/html/);
   const html = await res.text();
   assert.match(html, /Good Vibe Games/);
-  // Every game, every one reachable. A landing page that lists three of them
-  // is a landing page that has quietly lost the fourth.
+  // Every game, every one reachable. A landing page that lists four of them is
+  // a landing page that has quietly lost the fifth.
   assert.match(html, /href="\/good-vibes\/"/);
   assert.match(html, /href="\/solarium\/"/);
   assert.match(html, /href="\/sunward\/"/);
   assert.match(html, /href="\/greener-thumbs\/"/);
+  assert.match(html, /href="\/orbital-trader\/"/);
   // The thumbnails are canvases painted by the games' own renderers, so an
   // import that stops resolving should fail here rather than on the page.
   assert.match(html, /id="shot-gv"/);
   assert.match(html, /id="shot-ss"/);
   assert.match(html, /id="shot-sw"/);
+  assert.match(html, /id="shot-ot"/);
 });
 
 test('a directory is served as its index', async () => {
   /* Cloudflare's asset store does this in production. Without the same rule
      locally, /good-vibes/ is a 404 on a laptop and a game everywhere else —
      the kind of difference that gets found by somebody else, later. */
-  for(const dir of ['/good-vibes/', '/solarium/', '/sunward/', '/greener-thumbs/']){
+  for(const dir of ['/good-vibes/', '/solarium/', '/sunward/', '/orbital-trader/', '/greener-thumbs/']){
     const res = await fetch(`${baseUrl}${dir}`);
     assert.equal(res.status, 200, `${dir} returned ${res.status}`);
     assert.match(res.headers.get('content-type'), /text\/html/);
@@ -67,6 +69,38 @@ test('each game is a title screen with a way in', async () => {
   assert.match(sw, /Sunward/);
   assert.match(sw, /<canvas[^>]*id="plate"/);
   assert.match(sw, /href="\.\/play\.html"/);
+
+  const ot = await (await fetch(`${baseUrl}/orbital-trader/`)).text();
+  assert.match(ot, /Orbital Trader/);
+  assert.match(ot, /href="\.\/play\.html\?new"/);
+  assert.match(ot, /<canvas[^>]*id="sky"/);
+});
+
+test('Orbital Trader ships its own modules, and they are pure', async () => {
+  /* The game has no server: its rules and its sky are modules in public/,
+     imported by the browser and by the tests alike. A content module that
+     stopped answering, or answered as text/plain, is a page that draws
+     nothing and says nothing. */
+  for(const file of ['orbit.js', 'sim.js', 'content.js', 'render.js', 'data/world.js', 'data/economy.js', 'data/text.js']){
+    const res = await fetch(`${baseUrl}/orbital-trader/${file}`);
+    assert.equal(res.status, 200, `${file} returned ${res.status}`);
+    assert.match(res.headers.get('content-type'), /javascript/, `${file} content type`);
+    const text = await res.text();
+    assert.doesNotMatch(text, /from 'node:|require\(|process\.env|Buffer\./, `${file} reaches for Node`);
+  }
+  /* Most of this game's code is inline in its two pages, and a check that
+     skips them is a check that covers a third of it. */
+  for(const page of ['play.html', 'index.html']){
+    const res = await fetch(`${baseUrl}/orbital-trader/${page}`);
+    assert.equal(res.status, 200, `${page} returned ${res.status}`);
+    assert.match(res.headers.get('content-type'), /text\/html/);
+    const html = await res.text();
+    const scripts = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]).join('\n');
+    assert.ok(scripts.length > 1000, `${page}: no inline script found to check`);
+    assert.doesNotMatch(scripts, /from 'node:|require\(|process\.env|Buffer\./, `${page} reaches for Node`);
+    // And nothing loaded from anywhere but here.
+    assert.doesNotMatch(html, /<(script|link|img)[^>]+(src|href)=["']https?:/, `${page} loads something from off-site`);
+  }
 });
 
 test('each game keeps its own modules', async () => {

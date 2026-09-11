@@ -1,0 +1,1348 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Orbital Trader</title>
+<meta name="description" content="A cozy single-player orbital trading game. Plan burns, borrow speed from a grumpy gas giant, and carry goods between four peoples around a warm orange star.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230b0d17'/%3E%3Ccircle cx='8' cy='8' r='2.6' fill='%23f7a531'/%3E%3Cellipse cx='8' cy='8' rx='6.5' ry='4.2' fill='none' stroke='%23ffd23f' stroke-width='1' transform='rotate(-25 8 8)'/%3E%3Ccircle cx='13.2' cy='5.2' r='1.2' fill='%236cc24a'/%3E%3C/svg%3E">
+<style>
+  /* The chart is the page. Everything else floats over it in glass panels
+     the same dark as space, so the eye stays on the sky. Warm gold is the
+     one accent, the Lamp's colour, used for anything you can press. */
+  :root{
+    --space:#0b0d17; --glass:rgba(14,17,30,.82); --glass-2:rgba(20,24,40,.92);
+    --line:#2a3048; --line-2:#3b4468;
+    --ink:#e8e2d4; --dim:#a39d90; --faint:#6f6a60;
+    --gold:#ffd23f; --gold-2:#f59a2e; --mint:#7ff0d3; --rose:#f08c9a; --sky:#8fb8ff; --leaf:#6cc24a;
+    --bad:#ff5f5f;
+    --emberkin:#ff8c42; --otter:#6cc24a; --cat:#e9dcc0; --frog:#5fb9e6; --chorus:#b48cff;
+    --radius:12px;
+    --panel-w:350px;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; margin:0; }
+  body{
+    background:var(--space); color:var(--ink);
+    font:14px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    overflow:hidden; overscroll-behavior:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+  button{ font:inherit; color:inherit; }
+  #chart{ position:fixed; inset:0; width:100%; height:100%; display:block; touch-action:none; cursor:crosshair; }
+  #chart.grab{ cursor:grabbing; }
+
+  /* ---- HUD: one strip along the top ---------------------------------- */
+  #hud{
+    position:fixed; top:0; left:0; right:0; z-index:5;
+    display:flex; flex-wrap:wrap; gap:.35rem .9rem; align-items:center;
+    padding:.45rem .8rem; padding-top:max(.45rem, env(safe-area-inset-top));
+    background:linear-gradient(180deg, rgba(11,13,23,.92), rgba(11,13,23,.55) 80%, transparent);
+    pointer-events:none; font-variant-numeric:tabular-nums;
+  }
+  #hud > *{ pointer-events:auto; }
+  .stat{ display:flex; flex-direction:column; line-height:1.15; min-width:0; }
+  .stat small{ font-size:.66rem; letter-spacing:.12em; text-transform:uppercase; color:var(--faint); }
+  .stat b{ font-weight:600; font-size:.92rem; white-space:nowrap; }
+  .stat.warn b{ color:var(--rose); }
+  #dvbar{ width:120px; height:5px; background:#1c2136; border-radius:3px; overflow:hidden; margin-top:3px; }
+  #dvbar i{ display:block; height:100%; background:linear-gradient(90deg, var(--gold-2), var(--gold)); width:100%; transition:width .2s; }
+  #dvbar i.low{ background:var(--rose); }
+  #where{ flex:1 1 auto; text-align:right; }
+  #where b{ color:var(--dim); font-weight:500; }
+  #dockhint{ color:var(--mint); font-size:.85rem; }
+  #dockhint.far{ color:var(--dim); }
+
+  /* ---- Warp controls: bottom left ------------------------------------ */
+  #warp{
+    position:fixed; left:.8rem; bottom:max(.8rem, env(safe-area-inset-bottom)); z-index:5;
+    display:flex; flex-wrap:wrap; gap:.35rem; align-items:center;
+    background:var(--glass); border:1px solid var(--line); border-radius:999px;
+    padding:.3rem .45rem; backdrop-filter:blur(8px);
+  }
+  #warp button, .chip{
+    min-width:40px; height:34px; padding:0 .6rem; border-radius:999px;
+    border:1px solid transparent; background:transparent; color:var(--dim); cursor:pointer;
+  }
+  #warp button:hover{ color:var(--ink); border-color:var(--line-2); }
+  #warp button[aria-pressed="true"]{ background:var(--gold); color:#1a1310; font-weight:700; }
+  #warp button.go{ color:var(--mint); }
+  #warp button:disabled{ opacity:.35; cursor:default; }
+  #warp .sep{ width:1px; height:22px; background:var(--line-2); margin:0 .2rem; flex:0 0 auto; }
+  /* The levels are wrapped in a span for grouping; `contents` hands its
+     children straight to the strip's flex row, which is what stops them
+     stacking into a column when the strip is told not to wrap. */
+  #w-levels{ display:contents; }
+  #warp button:focus-visible, .btn:focus-visible, .tab:focus-visible{ outline:2px solid var(--gold); outline-offset:2px; }
+
+  /* ---- Chart controls: bottom right ---------------------------------- */
+  #view{
+    position:fixed; right:.8rem; bottom:max(.8rem, env(safe-area-inset-bottom)); z-index:7;
+    display:flex; flex-direction:column; gap:.35rem;
+  }
+  /* The panel owns the right gutter while it is open, so the view buttons step
+     out of it: they used to sit underneath it, where a press meant to zoom in
+     landed on whatever the market had in that spot. */
+  body.panel-open #view{ right: calc(.8rem + var(--panel-w) + .8rem); }
+  #view button{
+    width:40px; height:40px; border-radius:10px; border:1px solid var(--line);
+    background:var(--glass); color:var(--dim); cursor:pointer; backdrop-filter:blur(8px); font-size:1.05rem;
+  }
+  #view button:hover{ color:var(--ink); border-color:var(--line-2); }
+  #view button[aria-pressed="true"]{ color:var(--gold); border-color:var(--gold-2); }
+
+  /* ---- The panel: right column on wide screens, a sheet on narrow ---- */
+  #panel{
+    position:fixed; top:64px; right:.8rem; bottom:64px; width:min(var(--panel-w), calc(100vw - 5.5rem)); z-index:6;
+    display:flex; flex-direction:column;
+    background:var(--glass-2); border:1px solid var(--line); border-radius:var(--radius);
+    backdrop-filter:blur(10px); overflow:hidden;
+    transition:transform .2s ease, opacity .2s ease;
+  }
+  #panel.closed{ transform:translateX(calc(100% + 1rem)); opacity:0; pointer-events:none; }
+  #tabs{ display:flex; gap:2px; padding:.4rem .4rem 0; border-bottom:1px solid var(--line); overflow-x:auto; scrollbar-width:none; }
+  .tab{
+    flex:1 0 auto; padding:.5rem .55rem; border:0; border-bottom:2px solid transparent; background:none;
+    color:var(--dim); cursor:pointer; font-size:.82rem; letter-spacing:.04em; white-space:nowrap;
+  }
+  .tab[aria-selected="true"]{ color:var(--gold); border-bottom-color:var(--gold); }
+  #tabbody{ flex:1; overflow-y:auto; padding:.75rem .85rem 1rem; }
+  #tabbody h2{ margin:0 0 .25rem; font-size:1.05rem; }
+  #tabbody h3{ margin:1rem 0 .35rem; font-size:.72rem; letter-spacing:.14em; text-transform:uppercase; color:var(--faint); }
+  #tabbody p{ margin:.3rem 0; color:var(--dim); }
+  #tabbody p.say{ color:var(--ink); font-style:italic; border-left:2px solid var(--line-2); padding-left:.6rem; }
+  .sp-emberkin{ color:var(--emberkin); } .sp-otter{ color:var(--otter); } .sp-cat{ color:var(--cat); } .sp-frog{ color:var(--frog); } .sp-chorus{ color:var(--chorus); } .sp-mixed{ color:var(--gold); }
+  #grab{ display:none; }
+
+  /* Two lines, always: name and price on the first, the description and the
+     buttons on the second. A one-line row looked tidier until a good with a
+     sentence of flavour squeezed the price into a column one word wide. */
+  .row{ display:grid; grid-template-columns:1fr auto; gap:.15rem .5rem; padding:.5rem 0; border-bottom:1px solid var(--line); }
+  .row:last-child{ border-bottom:0; }
+  .row .name{ min-width:0; }
+  .row .name b{ display:block; font-weight:600; }
+  .row .name small{ display:block; color:var(--dim); font-size:.78rem; margin-top:.1rem; }
+  .row .price{ font-variant-numeric:tabular-nums; white-space:nowrap; text-align:right; align-self:start; }
+  .row .price small{ display:block; color:var(--dim); font-size:.74rem; }
+  .row .btns{ grid-column:1 / -1; justify-content:flex-end; margin-top:.2rem; }
+  .up{ color:var(--leaf); } .down{ color:var(--rose); } .flat{ color:var(--dim); }
+  .fresh{ display:inline-block; width:46px; height:4px; background:#1c2136; border-radius:2px; vertical-align:middle; overflow:hidden; }
+  .fresh i{ display:block; height:100%; background:var(--leaf); }
+  .fresh i.mid{ background:var(--gold); } .fresh i.low{ background:var(--rose); }
+  .btns{ display:flex; gap:.3rem; flex-wrap:wrap; }
+  .btn{
+    min-height:32px; padding:.25rem .6rem; border-radius:8px; border:1px solid var(--line-2);
+    background:#1a1f33; color:var(--ink); cursor:pointer; font-size:.82rem;
+  }
+  .btn:hover{ border-color:var(--gold-2); }
+  .btn.primary{ background:var(--gold); color:#1a1310; border-color:var(--gold); font-weight:700; }
+  .btn.primary:hover{ filter:brightness(1.06); }
+  .btn.danger{ border-color:#7a3226; color:#ffd9d2; }
+  .btn:disabled{ opacity:.4; cursor:default; }
+  .btn.sm{ min-height:28px; padding:.1rem .45rem; font-size:.76rem; }
+  .btn.wide{ width:100%; margin-top:.4rem; }
+  .kv{ display:grid; grid-template-columns:auto 1fr; gap:.15rem .8rem; font-variant-numeric:tabular-nums; }
+  .kv dt{ color:var(--dim); } .kv dd{ margin:0; text-align:right; }
+  .lock{ color:var(--faint); font-size:.78rem; }
+  .node{ border:1px solid var(--line); border-radius:10px; padding:.5rem .6rem; margin:.4rem 0; }
+  .node.sel{ border-color:var(--gold-2); }
+  .node .grid{ display:grid; grid-template-columns:auto 1fr auto; gap:.3rem .5rem; align-items:center; margin-top:.35rem; }
+  .node .grid span{ font-size:.78rem; color:var(--dim); }
+  .node .val{ font-variant-numeric:tabular-nums; text-align:right; min-width:72px; }
+  .step{ display:flex; gap:2px; }
+  .step .btn{ min-width:34px; }
+  #log{ list-style:none; margin:0; padding:0; font-size:.84rem; }
+  #log li{ padding:.3rem 0; border-bottom:1px solid var(--line); color:var(--dim); }
+  #log li b{ color:var(--faint); font-weight:500; font-variant-numeric:tabular-nums; margin-right:.4rem; }
+  #log li.story{ color:var(--ink); }
+  .empty{ color:var(--faint); font-style:italic; }
+  select{ font:inherit; background:#1a1f33; color:var(--ink); border:1px solid var(--line-2); border-radius:8px; padding:.35rem .5rem; width:100%; }
+
+  /* ---- Toasts, modal, tutorial ---------------------------------------- */
+  #toasts{ position:fixed; left:50%; top:72px; transform:translateX(-50%); z-index:8; display:flex; flex-direction:column; gap:.4rem; align-items:center; pointer-events:none; width:min(92vw, 520px); }
+  .toast{ background:var(--glass-2); border:1px solid var(--line-2); border-radius:10px; padding:.5rem .8rem; color:var(--ink); font-size:.88rem; box-shadow:0 8px 24px -10px #000; animation:toast .25s ease; max-width:100%; }
+  .toast.story{ border-color:var(--gold-2); }
+  .toast.bad{ border-color:var(--bad); }
+  @keyframes toast{ from{ opacity:0; transform:translateY(-6px);} }
+
+  dialog{
+    background:var(--glass-2); color:var(--ink); border:1px solid var(--line-2); border-radius:14px;
+    padding:1.1rem 1.25rem; width:min(92vw, 460px); backdrop-filter:blur(12px);
+  }
+  dialog::backdrop{ background:rgba(3,4,8,.55); }
+  dialog h2{ margin:0 0 .5rem; font-size:1.15rem; }
+  dialog p{ color:var(--dim); margin:.4rem 0; }
+  dialog p.say{ color:var(--ink); font-style:italic; border-left:2px solid var(--gold-2); padding-left:.7rem; }
+  dialog .btns{ margin-top:1rem; justify-content:flex-end; }
+
+  #dockcard{
+    position:fixed; left:50%; bottom:calc(64px + env(safe-area-inset-bottom)); transform:translateX(-50%); z-index:7;
+    width:min(92vw, 440px); background:var(--glass-2); border:1px solid var(--line-2); border-radius:12px;
+    padding:.6rem .85rem; box-shadow:0 12px 30px -12px #000;
+  }
+  #dockcard.ready{ border-color:var(--leaf); }
+  #dockcard.fast{ border-color:var(--gold-2); }
+  #dockcard p{ margin:0 0 .45rem; font-size:.9rem; }
+  #dockcard .btns{ justify-content:flex-end; }
+  #dockcard[hidden]{ display:none; }
+  /* The lesson steps aside when there is a dock to take. */
+  #dockcard:not([hidden]) ~ #tut{ bottom:calc(150px + env(safe-area-inset-bottom)); }
+
+  /* Centred on the chart rather than on the window, so that with the panel
+     open they do not slide under it. */
+  body.panel-open #dockcard, body.panel-open #tut{
+    left: calc(50% - (var(--panel-w) + 1.6rem) / 2);
+  }
+
+  #tut{
+    position:fixed; left:50%; bottom:calc(64px + env(safe-area-inset-bottom)); transform:translateX(-50%); z-index:7;
+    width:min(92vw, 440px); background:var(--glass-2); border:1px solid var(--gold-2); border-radius:12px;
+    padding:.7rem .9rem; box-shadow:0 12px 30px -12px #000;
+  }
+  #tut small{ color:var(--gold); letter-spacing:.14em; text-transform:uppercase; font-size:.66rem; }
+  #tut h3{ margin:.15rem 0 .2rem; font-size:1rem; }
+  #tut p{ margin:0; color:var(--dim); font-size:.88rem; }
+  #tut .btns{ margin-top:.5rem; justify-content:flex-end; }
+  #tut[hidden]{ display:none; }
+
+  #back{ position:fixed; left:.8rem; top:calc(46px + env(safe-area-inset-top)); z-index:5; color:var(--faint); font-size:.78rem; text-decoration:none; }
+  #back:hover{ color:var(--ink); }
+
+  /* Phone. The chart is the point, so nothing may stack on top of it: the HUD
+     is two tight rows, the warp chips and the view buttons share one strip
+     under them, the panel is a sheet that starts closed, and the cards that
+     matter sit along the bottom where a thumb is. */
+  @media (max-width: 760px){
+    :root{ --panel-w:100%; }
+    #hud{ gap:.15rem .6rem; padding:.3rem .6rem; padding-top:max(.3rem, env(safe-area-inset-top)); }
+    .stat small{ font-size:.6rem; letter-spacing:.08em; }
+    .stat b{ font-size:.82rem; }
+    #dvbar{ width:64px; height:4px; }
+    #where{ flex:1 1 8rem; text-align:left; }
+    #where b, #dockhint{ font-size:.78rem; }
+    /* Two rows is the budget; the back link moves into the Shipyard tab. */
+    #back{ display:none; }
+
+    #warp{
+      top:calc(74px + env(safe-area-inset-top)); bottom:auto; left:.4rem; right:3.4rem;
+      padding:.15rem .25rem; overflow-x:auto; scrollbar-width:none; justify-content:flex-start;
+      flex-wrap:nowrap;
+    }
+    #warp::-webkit-scrollbar{ display:none; }
+    #warp button{ min-width:34px; height:30px; padding:0 .4rem; font-size:.8rem; flex:0 0 auto; }
+    #warp .sep{ height:18px; }
+
+    #view{
+      top:calc(74px + env(safe-area-inset-top)); bottom:auto; right:.4rem;
+      flex-direction:column; gap:.25rem;
+    }
+    #view button{ width:32px; height:30px; border-radius:8px; font-size:.95rem; }
+    /* Only the panel toggle stays on top; the rest tuck under it in a column
+       that the chart can still be seen around. */
+    #view button:not(#v-panel){ opacity:.85; }
+
+    #panel{
+      top:auto; left:0; right:0; bottom:0; width:100%; height:min(64vh, 560px);
+      border-radius:16px 16px 0 0; border-bottom:0;
+      padding-bottom:env(safe-area-inset-bottom);
+    }
+    #panel.closed{ transform:translateY(100%); opacity:1; pointer-events:none; }
+    #grab{ display:block; width:44px; height:5px; border-radius:3px; background:var(--line-2); margin:.45rem auto 0; }
+
+    /* Bottom cards, stacked: the docking card closest to the thumb. */
+    #dockcard{ left:.5rem; right:.5rem; transform:none; width:auto; bottom:calc(.6rem + env(safe-area-inset-bottom)); }
+    #tut{ left:.5rem; right:.5rem; transform:none; width:auto; bottom:calc(.6rem + env(safe-area-inset-bottom)); }
+    #dockcard:not([hidden]) ~ #tut{ bottom:calc(7.4rem + env(safe-area-inset-bottom)); }
+    #tut p{ font-size:.84rem; }
+    #toasts{ top:calc(112px + env(safe-area-inset-top)); width:calc(100vw - 1rem); }
+
+    /* When the sheet is up it owns the bottom of the screen. */
+    body.sheet #dockcard, body.sheet #tut{ display:none; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    #panel, .toast{ transition:none; animation:none; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="chart" aria-label="The navigation chart: the Lamp, its worlds, and your ship's predicted path." role="img"></canvas>
+
+<header id="hud" aria-live="off">
+  <div class="stat"><small>Date</small><b id="h-date">—</b></div>
+  <div class="stat" id="h-dv-wrap"><small>Delta-v</small><b id="h-dv">—</b><div id="dvbar"><i id="h-dvfill"></i></div></div>
+  <div class="stat"><small>Coin</small><b id="h-money">—</b></div>
+  <div class="stat"><small>Hold</small><b id="h-hold">—</b></div>
+  <div class="stat"><small>Warp</small><b id="h-warp">—</b></div>
+  <div class="stat" id="where"><small>Where</small><b id="h-where">—</b><span id="dockhint"></span></div>
+</header>
+<a id="back" href="./">&larr; title</a>
+
+<div id="warp" role="group" aria-label="Time">
+  <button id="w-pause" aria-pressed="false" title="Pause (space)">&#10074;&#10074;</button>
+  <span class="sep"></span>
+  <span id="w-levels"></span>
+  <span class="sep"></span>
+  <button class="go" id="w-burn" title="Warp to the next burn">&rarr; burn</button>
+  <button class="go" id="w-soi" title="Warp to the next change of reach">&rarr; reach</button>
+  <button class="go" id="w-ca" title="Warp to the closest approach with the target">&rarr; approach</button>
+</div>
+
+<div id="view">
+  <button id="v-ship" title="Follow the ship (f)" aria-pressed="true">&#9651;</button>
+  <button id="v-target" title="Look at the target (t)">&#9678;</button>
+  <button id="v-in" title="Zoom in (+)">+</button>
+  <button id="v-out" title="Zoom out (-)">&minus;</button>
+  <button id="v-panel" title="Show or hide the panel (p)" aria-pressed="true">&#9776;</button>
+</div>
+
+<aside id="panel" aria-label="Ship and port">
+  <div id="grab"></div>
+  <div id="tabs" role="tablist"></div>
+  <div id="tabbody" role="tabpanel" tabindex="0"></div>
+</aside>
+
+<div id="toasts" aria-live="polite" aria-atomic="false"></div>
+
+<div id="dockcard" hidden>
+  <p id="dockline"></p>
+  <div class="btns">
+    <button class="btn" id="dock-brake">Mark a brake at the kiss</button>
+    <button class="btn primary" id="dock-go">Dock</button>
+  </div>
+</div>
+
+<div id="tut" hidden>
+  <small id="tut-step"></small>
+  <h3 id="tut-title"></h3>
+  <p id="tut-body"></p>
+  <div class="btns"><button class="btn sm" id="tut-skip">Skip the lesson</button></div>
+</div>
+
+<dialog id="modal"></dialog>
+
+<script type="module">
+import { createChart, PALETTE, locateOnPrediction, approachForChart, fmtAu, bodyColour } from './render.js';
+import * as S from './sim.js';
+import { CONST, PORTS, GOODS, UPGRADES, TEXT, SPECIES, GLOSSARY, BELT_ROCKS, ARC_DEBRIS } from './content.js';
+import { segmentPeriapsis, norm, sub, add, unit, dist, absState, elementsFromState } from './orbit.js';
+
+const world = S.world;
+const $ = id => document.getElementById(id);
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const SAVE_KEY = 'ot:save:v1';
+
+/* ------------------------------------------------------------- state */
+
+const params = new URLSearchParams(location.search);
+let state = null;
+function loadSave(){
+  try{
+    const raw = localStorage.getItem(SAVE_KEY);
+    if(raw) return S.restore(raw);
+  }catch(e){ console.warn('Save could not be read:', e); }
+  return null;
+}
+function save(){
+  if(!state) return;
+  try{ localStorage.setItem(SAVE_KEY, S.serialize(state)); }catch{ /* private window, full disk: play on */ }
+}
+/* A seed can be named in the address. It decides the ship's name and every
+   roll the game will ever make, so two people with the same seed see the same
+   offers — which is what makes a strange one reportable, and what lets the
+   tests fly the same lesson twice. */
+function freshSeed(){
+  const asked = Number(params.get('seed'));
+  return Number.isFinite(asked) && asked > 0 ? Math.floor(asked) : ((Date.now() % 100000) | 1);
+}
+if(params.has('new') || params.has('seed')){
+  state = S.newGame(freshSeed());
+  if(!params.has('seed')) history.replaceState(null, '', location.pathname);
+}else{
+  state = loadSave() || S.newGame(freshSeed());
+}
+
+/* ------------------------------------------------------------- chart */
+
+const canvas = $('chart');
+const chart = createChart(canvas, world, { reducedMotion: reduced });
+/* The strips the HUD, the warp controls and the panel own. Labels keep out of
+   them; the dots still show through. */
+function refreshInsets(){
+  const h = $('hud').getBoundingClientRect().height;
+  const w = $('warp').getBoundingClientRect();
+  const wide = innerWidth > 760;
+  chart.labelInsets = {
+    top: Math.round(h + 6 + (wide ? 0 : w.height + 8)),
+    right: Math.round(panelOpen && wide ? $('panel').getBoundingClientRect().width + 24 : 56),
+    bottom: Math.round(wide ? 64 : 12),
+    left: 8,
+  };
+}
+addEventListener('resize', refreshInsets);
+const belt = { inner: CONST.BELT.inner, outer: CONST.BELT.outer, rocks: BELT_ROCKS, debris: ARC_DEBRIS };
+addEventListener('resize', () => chart.resize());
+
+let prediction = null, nodePositions = [], approach = null, periapses = [], predictedAt = -1, predictedReal = -1e9;
+let selectedNode = -1;
+let panelOpen = innerWidth > 760;
+let tab = null;
+
+/* How far ahead to draw. Enough to show the whole of the next orbit or
+   transfer, never so far that a moon's rails cost the frame. */
+function horizonFor(){
+  const b = world.get(state.ship.body);
+  const el = elementsFromState(b.mu, state.ship.r, state.ship.v);
+  let h = 0;
+  if(Number.isFinite(el.period)) h = Math.max(h, Math.min(el.period * 2.2, 900));
+  else h = Math.max(h, 120);
+  if(state.nodes.length) h = Math.max(h, state.nodes[state.nodes.length - 1].t - state.t + Math.max(90, Number.isFinite(el.period) ? el.period : 0));
+  if(b.id === 'lamp') h = Math.max(h, 900);
+  if(state.target){
+    const tb = world.get(state.target);
+    if(tb.parent === 'lamp' && b.id === 'lamp'){
+      const hh = S.slowRoad(state, state.target);
+      if(hh) h = Math.max(h, hh.time * 1.4);
+    }
+  }
+  return Math.min(h, 5000);
+}
+
+function replan(force = false){
+  if(state.dockedAt){ prediction = null; nodePositions = []; approach = null; periapses = []; return; }
+  /* Re-solving the whole road is the most expensive thing this page does, so
+     it happens on a real-time budget rather than a game-time one: at most a few
+     times a second, whatever the warp. Measuring it in game days got it wrong
+     in both directions — a stray factor of sixty once let the drawn road go
+     stale for four hundred days at the top warp, and taking the factor out
+     made it re-solve so often at ×1 that the frame rate, and with it the
+     clock, dropped to a third of real time. */
+  const nowReal = performance.now();
+  if(!force && predictedAt >= 0 && nowReal - predictedReal < 280) return;
+  predictedReal = nowReal;
+  predictedAt = state.t;
+  prediction = S.plan(state, horizonFor());
+  nodePositions = state.nodes.map(n => locateOnPrediction(world, prediction, n.t));
+  periapses = [];
+  prediction.segments.forEach((seg, i) => {
+    const b = world.get(seg.body);
+    if(b.id === 'lamp' && seg.elements.e < 0.05) return;
+    const pe = segmentPeriapsis(seg, b.mu);
+    if(pe) periapses.push({ segIndex: i, ...pe });
+  });
+  const ca = S.approachTo(state, prediction, state.target);
+  approach = ca ? { ...approachForChart(world, prediction, ca, state.target), label: `${fmtAu(ca.distance)} · ${S.fmtKms(ca.relSpeed)} · in ${S.fmtDays(ca.t - state.t)}` } : null;
+  if(approach) approach.ca = ca;
+}
+
+/* ------------------------------------------------------------- loop */
+
+let last = performance.now();
+let saveTimer = 0;
+let firstStoryDone = false;
+function frame(now){
+  const real = Math.min(0.1, (now - last) / 1000);
+  last = now;
+  const dt = S.dtForFrame(state, real);
+  if(dt > 0){
+    const wasDocked = state.dockedAt;
+    const events = S.tick(state, dt);
+    handleEvents(events);
+    if(!wasDocked && state.dockedAt) replan(true);
+    else if(events.length) replan(true);
+    else replan(false);
+  }
+  saveTimer += real;
+  if(saveTimer > 30){ saveTimer = 0; save(); }
+  const docking = state.dockedAt ? null : S.dockingStatus(state);
+  if(docking && docking.inZone && state.warp > 1 && !state.flags.zoneWarpDropped){ setWarp(1, false); state.flags.zoneWarpDropped = true; }
+  if(!docking) state.flags.zoneWarpDropped = false;
+  if(state.dockedAt) warpTarget = null;
+  if(warpTarget != null){
+    if(state.t >= warpTarget){ warpTarget = null; setWarp(0, false); }
+    else{
+      // Ease down as the moment comes, and back up after an encounter has
+      // dropped the warp: the point of "warp to" is to get there, not to be
+      // re-pressed after every change of reach.
+      const want = warpLevelFor(warpTarget - state.t);
+      if(want !== state.warp) setWarp(want, false);
+    }
+  }
+  const shipAbs = state.dockedAt ? { r: absState(world, state.dockedAt, state.t).r, v: absState(world, state.dockedAt, state.t).v } : { r: S.shipAbsPos(state), v: S.shipAbsVel(state) };
+  chart.draw({
+    t: state.t, now, shipAbs, shipBody: state.ship.body, docked: !!state.dockedAt,
+    prediction, nodes: state.nodes, nodePositions, selectedNode, target: state.target, approach, periapses,
+    belt, nearPort: docking?.port ?? null, docking,
+  });
+  renderHud(docking);
+  renderDockCard(docking);
+  requestAnimationFrame(frame);
+}
+
+function handleEvents(events){
+  for(const e of events){
+    if(e.kind === 'soi' || e.kind === 'burn'){ setWarp(Math.min(state.warp, 1), false); }
+    if(e.kind === 'burn') { save(); toast(`Burned ${S.fmtKms(e.magnitude)}.`); if(tab === 'plan') renderTab(); }
+    if(e.kind === 'short') toast(`The tank ran short: ${S.fmtKms(e.got)} of ${S.fmtKms(e.wanted)}.`, 'bad');
+    if(e.kind === 'soi'){ const to = world.get(e.to); toast(`Now in ${to.name}'s reach.`); tutorialCheck(); }
+    if(e.kind === 'story') toast(e.text, 'story', 9000);
+    if(e.kind === 'toll'){ setWarp(0, false); showToll(e.pending); }
+    if(e.kind === 'crash'){ setWarp(0, false); showCrash(e.body); }
+    if(e.kind === 'dry'){ setWarp(Math.min(state.warp, 1), false); toast(TEXT.captainLines.onStranded[1] ?? 'The tank is dry.', 'bad', 8000); if(tab === 'plan') renderTab(); }
+    if(e.kind === 'late') toast(`${e.contract.title}: you are late.`, 'bad');
+    if(e.kind === 'missed'){ toast(e.count > 1 ? `${e.count} marks went by unspent.` : 'That mark went by unspent.', 'bad'); if(tab === 'plan') renderTab(); }
+  }
+}
+
+/* ------------------------------------------------------------- HUD */
+
+function renderHud(docking){
+  $('h-date').textContent = S.calendar(state.t).text;
+  $('h-dv').textContent = `${S.fmtKms(state.dv)} / ${S.fmtKms(state.tank)}`;
+  const fill = $('h-dvfill');
+  const frac = state.tank > 0 ? state.dv / state.tank : 0;
+  fill.style.width = `${Math.round(frac * 100)}%`;
+  fill.classList.toggle('low', frac < 0.15);
+  $('h-dv-wrap').classList.toggle('warn', frac < 0.15);
+  $('h-money').textContent = S.fmtMoney(state.money) + (state.debt > 0 ? ` (owe ${S.fmtMoney(state.debt)})` : '');
+  $('h-hold').textContent = `${S.usedUnits(state)} / ${S.holdUnits(state)}`;
+  $('h-warp').textContent = state.paused ? 'paused' : `×${S.warpRate(state)}`;
+  const b = world.get(state.ship.body);
+  $('h-where').textContent = state.dockedAt ? `Docked at ${S.portName(state.dockedAt)}` : `In ${b.name}'s reach`;
+  const hint = $('dockhint');
+  if(!docking){ hint.textContent = ''; return; }
+  const pb = world.get(docking.port);
+  if(docking.ok) { hint.textContent = ` · in ${pb.name}'s zone — dock`; hint.className = ''; }
+  else if(docking.inZone) { hint.textContent = ` · ${pb.name}: ${S.fmtKms(docking.relSpeed - docking.dockSpeed)} too fast`; hint.className = 'far'; }
+  else { hint.textContent = ` · ${pb.name} ${fmtAu(docking.distance)} · ${S.fmtKms(docking.relSpeed)}`; hint.className = 'far'; }
+}
+
+/* The docking card. Four states, in the order a pilot meets them: nowhere
+   near, coming in with the kiss inside the mouth, inside but too fast, and
+   tie up. Only the last one can be pressed. */
+function renderDockCard(docking){
+  const card = $('dockcard');
+  if(state.dockedAt || !docking){ card.hidden = true; return; }
+  const b = world.get(docking.port);
+  const line = $('dockline');
+  const k = S.kiss(state);
+  card.hidden = false;
+  card.classList.toggle('ready', !!docking.ok);
+  card.classList.toggle('fast', !!docking.inZone && !docking.ok);
+  $('dock-go').disabled = !docking.ok;
+  const digsIn = k && k.crashes;
+  const atKiss = !digsIn && k && k.inMouth && k.over > 0 && k.t > state.t + 0.02;
+  const brakeNow = !digsIn && !atKiss && docking.inZone && !docking.ok;
+  $('dock-brake').hidden = !(digsIn || atKiss || brakeNow);
+  if(digsIn) $('dock-brake').textContent = 'Lift the kiss clear of ' + b.name;
+  else if(atKiss) $('dock-brake').textContent = 'Mark a brake at the kiss (' + S.fmtDays(k.t - state.t) + ')';
+  else if(brakeNow) $('dock-brake').textContent = 'Mark a brake now (' + S.fmtKms(docking.over) + ')';
+  if(docking.ok) line.textContent = 'In ' + b.name + "'s harbour mouth, slow enough. Tie up.";
+  else if(docking.inZone) line.textContent = 'In ' + b.name + "'s harbour mouth, " + S.fmtKms(docking.over) + ' too fast.';
+  else if(k && k.crashes) line.textContent = 'This path goes through ' + b.name + '. Raise the kiss before it arrives.';
+  else if(k && k.inMouth) line.textContent = 'Kissing distance inside ' + b.name + "'s mouth in " + S.fmtDays(k.t - state.t) + ', ' + S.fmtKms(k.over) + ' over. Ease off at the kiss.';
+  else line.textContent = b.name + ' ' + fmtAu(docking.distance) + ' off, ' + S.fmtKms(docking.relSpeed) + ' across. Its mouth is ' + fmtAu(docking.zoneRadius) + ' wide.';
+}
+$('dock-go').addEventListener('click', () => doDock());
+$('dock-brake').addEventListener('click', () => {
+  const before = S.kiss(state);
+  const ix = S.brakeAtKiss(state);
+  if(ix < 0){ toast('Nothing to brake for yet.', 'bad'); return; }
+  selectedNode = ix; replan(true); setTab('plan');
+  const mark = state.nodes[ix];
+  const dv = S.fmtKms(Math.hypot(mark.prograde, mark.radial));
+  toast(before?.crashes
+    ? 'Written down: ' + dv + ' to lift the kiss clear. Brake once it is out of the ground.'
+    : 'A brake is written down: ' + dv + ' at the kiss.');
+});
+
+/* ------------------------------------------------------------- warp */
+
+let warpTarget = null;
+const levels = $('w-levels');
+CONST.WARP_LEVELS.forEach((w, i) => {
+  const b = document.createElement('button');
+  b.textContent = `${w}`; b.title = `Warp ×${w}`;
+  b.addEventListener('click', () => setWarp(i, true));
+  levels.appendChild(b);
+});
+function setWarp(i, manual){
+  state.warp = Math.max(0, Math.min(CONST.WARP_LEVELS.length - 1, i));
+  if(manual){ state.paused = false; warpTarget = null; }
+  [...levels.children].forEach((b, k) => b.setAttribute('aria-pressed', String(k === state.warp && !state.paused)));
+  $('w-pause').setAttribute('aria-pressed', String(state.paused));
+}
+$('w-pause').addEventListener('click', () => { state.paused = !state.paused; warpTarget = null; setWarp(state.warp, false); });
+
+/* "Warp to": run the clock at whatever speed still leaves a few seconds of
+   real time before the moment, easing down as it approaches and stopping just
+   short of it. Chosen every frame rather than once, so a coast of two years
+   starts at the top speed and arrives gently instead of overshooting. */
+const WARP_LEAD_SECONDS = 3;
+function warpLevelFor(remainingDays){
+  let ix = 0;
+  for(let i = 0; i < CONST.WARP_LEVELS.length; i++){
+    if(remainingDays / (CONST.WARP_LEVELS[i] * CONST.BASE_RATE_DAYS_PER_SEC) > WARP_LEAD_SECONDS) ix = i;
+  }
+  return ix;
+}
+function warpTo(t){
+  if(t == null || t <= state.t) return;
+  warpTarget = t - 0.02;
+  state.paused = false;
+  setWarp(warpLevelFor(t - state.t), false);
+}
+$('w-burn').addEventListener('click', () => { const n = state.nodes.find(n => n.t > state.t); if(n) warpTo(n.t - 0.05); });
+$('w-soi').addEventListener('click', () => { const e = prediction?.events.find(e => e.kind === 'soi' && e.t > state.t); if(e) warpTo(e.t); });
+$('w-ca').addEventListener('click', () => { if(approach?.ca) warpTo(approach.ca.t); });
+
+/* ------------------------------------------------------------- view */
+
+$('v-ship').addEventListener('click', () => { chart.focus('ship'); syncView(); });
+$('v-target').addEventListener('click', () => { if(state.target){ chart.focus(state.target); syncView(); } });
+$('v-in').addEventListener('click', () => chart.zoomBy(1.6));
+$('v-out').addEventListener('click', () => chart.zoomBy(1 / 1.6));
+$('v-panel').addEventListener('click', () => togglePanel());
+function syncView(){
+  $('v-ship').setAttribute('aria-pressed', String(chart.camera.follow === 'ship'));
+  $('v-target').setAttribute('aria-pressed', String(!!state.target && chart.camera.follow === state.target));
+}
+function togglePanel(open = !panelOpen){
+  panelOpen = open;
+  $('panel').classList.toggle('closed', !panelOpen);
+  $('v-panel').setAttribute('aria-pressed', String(panelOpen));
+  // On a phone the sheet covers the bottom of the chart, so the cards that
+  // live there stand down while it is up.
+  document.body.classList.toggle('sheet', panelOpen && innerWidth <= 760);
+  document.body.classList.toggle('panel-open', panelOpen && innerWidth > 760);
+  applyOffset();
+}
+/* The panel covers part of the chart, so shift the follow centre out from
+   under it: left on a wide screen, up when it is a sheet across a phone. */
+function applyOffset(){
+  refreshInsets();
+  if(!panelOpen){ chart.offset = [0, 0]; return; }
+  const r = $('panel').getBoundingClientRect();
+  chart.offset = innerWidth > 760 ? [-r.width / 2 - 8, 0] : [0, -Math.min(r.height, innerHeight * 0.62) / 2];
+}
+// A window that changes width changes which layout it is in, so the classes
+// that depend on the width have to be worked out again.
+addEventListener('resize', () => togglePanel(panelOpen));
+
+/* ------------------------------------------------------------- input */
+
+let drag = null;
+let pinch = null;
+const pointers = new Map();
+canvas.addEventListener('pointerdown', e => {
+  canvas.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, [e.clientX, e.clientY]);
+  if(pointers.size === 2){
+    const [a, b] = [...pointers.values()];
+    pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]) };
+    drag = null; return;
+  }
+  const hit = chart.hitTest(e.clientX, e.clientY);
+  if(hit?.kind === 'handle'){
+    drag = { kind: 'handle', hit, x: e.clientX, y: e.clientY, node: { ...state.nodes[hit.index] }, moved: false };
+    return;
+  }
+  if(hit?.kind === 'node'){
+    selectedNode = hit.index; drag = { kind: 'node', index: hit.index, x: e.clientX, y: e.clientY, moved: false };
+    if(tab === 'plan') renderTab(); else if(!state.dockedAt){ setTab('plan'); }
+    return;
+  }
+  drag = { kind: 'pan', x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: false, hit };
+});
+canvas.addEventListener('pointermove', e => {
+  if(pointers.has(e.pointerId)) pointers.set(e.pointerId, [e.clientX, e.clientY]);
+  if(pinch && pointers.size === 2){
+    const [a, b] = [...pointers.values()];
+    const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+    if(d > 0 && pinch.d > 0) chart.zoomBy(d / pinch.d, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]);
+    pinch.d = d; return;
+  }
+  if(!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  if(drag.kind === 'pan'){
+    if(Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > 4) drag.moved = true;
+    if(drag.moved){ chart.panBy(dx, dy); canvas.classList.add('grab'); syncView(); }
+    drag.x = e.clientX; drag.y = e.clientY; return;
+  }
+  if(drag.kind === 'handle'){
+    drag.moved = true;
+    const h = drag.hit;
+    const along = (e.clientX - drag.x) * h.dir[0] + (e.clientY - drag.y) * h.dir[1];
+    const fine = e.shiftKey ? 0.1 : 1;
+    const perPx = S.auDay(0.012) * fine;      // 12 m/s per pixel; a screen-width pull is a real burn
+    const n = state.nodes[h.index];
+    if(!n) return;
+    const sign = h.axis === 'prograde' || h.axis === 'radialOut' ? 1 : -1;
+    if(h.axis === 'prograde' || h.axis === 'retrograde') n.prograde = drag.node.prograde + sign * along * perPx;
+    else n.radial = drag.node.radial + sign * along * perPx;
+    replan(true); if(tab === 'plan') renderTab();
+    return;
+  }
+  if(drag.kind === 'node'){
+    if(Math.hypot(dx, dy) > 4) drag.moved = true;
+    if(!drag.moved || !prediction) return;
+    const p = chart.nearestPathPoint(e.clientX, e.clientY, prediction, state.t);
+    if(p){
+      const n = state.nodes[drag.index];
+      // Only slide within the leg the node is on, so it cannot jump past a later node.
+      const later = state.nodes.find((o, i) => i !== drag.index && o.t > n.t);
+      const earlier = [...state.nodes].reverse().find((o, i) => state.nodes.indexOf(o) !== drag.index && o.t < n.t);
+      let t = p.t;
+      if(later) t = Math.min(t, later.t - 1e-3);
+      if(earlier) t = Math.max(t, earlier.t + 1e-3);
+      n.t = Math.max(state.t + 1e-3, t);
+      replan(true); if(tab === 'plan') renderTab();
+    }
+  }
+});
+function endPointer(e){
+  pointers.delete(e.pointerId);
+  if(pointers.size < 2) pinch = null;
+  canvas.classList.remove('grab');
+  if(!drag) return;
+  const d = drag; drag = null;
+  if(d.kind === 'pan' && !d.moved){
+    /* A tap: the path takes a burn, a body becomes the target, empty sky
+       deselects. The path wins ties, because a body's hit disc is a generous
+       forty pixels across for fingers and at the zoom you cast off at, the
+       whole parking orbit fits inside Tessel's — which made lesson two
+       impossible to follow by tapping the road it names. */
+    const p = prediction && !state.dockedAt ? chart.nearestPathPoint(e.clientX, e.clientY, prediction, state.t) : null;
+    const onBody = d.hit?.kind === 'body';
+    const insideDrawn = onBody && d.hit.d <= (d.hit.drawn ?? 0) + 2;
+    if(p && !insideDrawn){
+      const ix = S.addNode(state, p.t);
+      if(ix >= 0){ selectedNode = ix; holdForPlanning(ix); replan(true); setTab('plan'); tutorialCheck(); return; }
+    }
+    if(onBody){ setTarget(d.hit.id); return; }
+    selectedNode = -1; if(tab === 'plan') renderTab();
+  }
+  if(d.kind === 'handle' || d.kind === 'node'){ tutorialCheck(); save(); }
+}
+canvas.addEventListener('pointerup', endPointer);
+canvas.addEventListener('pointercancel', endPointer);
+canvas.addEventListener('wheel', e => { e.preventDefault(); chart.zoomBy(Math.pow(1.0015, -e.deltaY), [e.clientX, e.clientY]); }, { passive: false });
+canvas.addEventListener('dblclick', e => { const hit = chart.hitTest(e.clientX, e.clientY); if(hit?.kind === 'body'){ chart.focus(hit.id); syncView(); } });
+
+/* A shortcut must never fire while somebody is typing into a control, and must
+   never steal a browser's own combination. */
+function typing(e){
+  const t = e.target;
+  if(!t) return false;
+  if(t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable) return true;
+  /* Space and Enter belong to whatever the keyboard is on. Taking Space for
+     pause meant no button in the game could be pressed without a mouse. */
+  return typeof t.closest === 'function' && !!t.closest('button, a[href], [role="button"], [tabindex]');
+}
+addEventListener('keydown', e => {
+  if(typing(e) || e.ctrlKey || e.metaKey || e.altKey) return;
+  if($('modal').open) return;
+  const fine = e.shiftKey ? S.auDay(0.001) : S.auDay(0.01);
+  switch(e.key){
+    case ' ': e.preventDefault(); $('w-pause').click(); break;
+    case ',': setWarp(state.warp - 1, true); break;
+    case '.': setWarp(state.warp + 1, true); break;
+    case '+': case '=': chart.zoomBy(1.4); break;
+    case '-': case '_': chart.zoomBy(1 / 1.4); break;
+    case 'f': chart.focus('ship'); syncView(); break;
+    case 't': if(state.target){ chart.focus(state.target); syncView(); } break;
+    case 'p': togglePanel(); break;
+    case 'Escape': if(selectedNode >= 0){ selectedNode = -1; renderTab(); } else togglePanel(false); break;
+    case 'Delete': case 'Backspace': if(state.nodes[selectedNode]){ S.removeNode(state, selectedNode); selectedNode = -1; replan(true); renderTab(); } break;
+    case 'ArrowRight': if(state.nodes[selectedNode]){ e.preventDefault(); state.nodes[selectedNode].prograde += fine; replan(true); renderTab(); } break;
+    case 'ArrowLeft': if(state.nodes[selectedNode]){ e.preventDefault(); state.nodes[selectedNode].prograde -= fine; replan(true); renderTab(); } break;
+    case 'ArrowUp': if(state.nodes[selectedNode]){ e.preventDefault(); state.nodes[selectedNode].radial += fine; replan(true); renderTab(); } break;
+    case 'ArrowDown': if(state.nodes[selectedNode]){ e.preventDefault(); state.nodes[selectedNode].radial -= fine; replan(true); renderTab(); } break;
+  }
+});
+
+/* Planning is free, and it should not be a race. A mark written down for a
+   moment that is nearly here stops the clock, so the handles can be dragged
+   before it arrives; anything further off leaves the clock alone. */
+function holdForPlanning(ix){
+  const n = state.nodes[ix];
+  if(!n || state.paused) return;
+  if(n.t - state.t > 1.5) return;
+  state.paused = true;
+  setWarp(state.warp, false);
+  toast('Clock held while you plan. Space, or a warp button, starts it again.');
+}
+
+/* Frame the orbit the ship is actually on. Casting off at whatever zoom the
+   chart happened to be at left the whole parking orbit as a twenty-pixel loop
+   inside the planet's own dot, which is not a road anybody can tap. */
+function frameShipOrbit(){
+  if(state.dockedAt) return;
+  const b = world.get(state.ship.body);
+  const el = elementsFromState(b.mu, state.ship.r, state.ship.v);
+  const span = Number.isFinite(el.ra) ? el.ra : Math.max(norm(state.ship.r), b.soi ?? 0.01);
+  const usable = Math.min(chart.width - (panelOpen && innerWidth > 760 ? $('panel').getBoundingClientRect().width : 0), chart.height) * 0.36;
+  if(span > 0 && usable > 0) chart.camera.zoom = Math.max(8, Math.min(4e5, usable / span));
+}
+
+function setTarget(id){
+  state.target = state.target === id ? null : id;
+  replan(true);
+  if(!state.dockedAt && tab !== 'plan') setTab('target'); else if(tab === 'target' || tab === 'plan') renderTab();
+  syncView();
+}
+
+/* ------------------------------------------------------------- panel */
+
+const TABS_DOCKED = [['market', 'Market'], ['passengers', 'Passengers'], ['shipyard', 'Shipyard'], ['talk', 'Talk'], ['log', 'Log']];
+const TABS_FLIGHT = [['plan', 'Plan'], ['target', 'Target'], ['ship', 'Ship'], ['log', 'Log']];
+let lastDockedMode = null;
+function renderTabs(){
+  const mode = state.dockedAt ? 'docked' : 'flight';
+  if(mode === lastDockedMode) return;
+  lastDockedMode = mode;
+  const tabs = mode === 'docked' ? TABS_DOCKED : TABS_FLIGHT;
+  const bar = $('tabs'); bar.innerHTML = '';
+  for(const [id, label] of tabs){
+    const b = document.createElement('button');
+    b.className = 'tab'; b.role = 'tab'; b.dataset.tab = id; b.textContent = label;
+    b.addEventListener('click', () => setTab(id));
+    bar.appendChild(b);
+  }
+  if(!tabs.some(t => t[0] === tab)) tab = tabs[0][0];
+  setTab(tab, panelOpen);
+}
+function setTab(id, open = true){
+  tab = id;
+  [...$('tabs').children].forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === id)));
+  if(open && !panelOpen) togglePanel(true);
+  renderTab();
+}
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const sp = species => `<span class="sp-${species}">${esc(SPECIES[species]?.name ?? species)}</span>`;
+
+function renderTab(){
+  const body = $('tabbody');
+  /* Rebuilding the panel throws away the button the player is standing on, and
+     the keyboard then lands back on the document. Remember which control it
+     was and put it back. */
+  const active = document.activeElement;
+  const was = body.contains(active) ? (active.dataset?.act ?? active.id ?? null) : null;
+  const fn = { market, passengers, shipyard, talk, plan, target: targetTab, ship: shipTab, log: logTab }[tab];
+  body.innerHTML = fn ? fn() : '';
+  wire(body);
+  if(was){
+    const again = body.querySelector(`[data-act="${CSS.escape(was)}"]`) ?? body.querySelector(`#${CSS.escape(was)}`);
+    if(again && typeof again.focus === 'function') again.focus();
+  }
+}
+function wire(root){
+  root.querySelectorAll('[data-act]').forEach(el => {
+    el.addEventListener('click', ev => {
+      // A card is itself an action, and so are the buttons inside it. Only the
+      // innermost one should run: deleting a burn used to re-select the burn
+      // that had just stopped existing.
+      if(ev.target.closest('[data-act]') !== el) return;
+      const [act, ...args] = el.dataset.act.split('|');
+      actions[act]?.(...args, el);
+    });
+  });
+  root.querySelectorAll('select[data-sel]').forEach(el => {
+    el.addEventListener('change', () => actions[el.dataset.sel]?.(el.value));
+  });
+}
+
+const trend = (price, base) => price > base * 1.12 ? '<span class="up">▲</span>' : price < base * 0.88 ? '<span class="down">▼</span>' : '<span class="flat">•</span>';
+const plenty = (state, port, good) => { const m = S.saturationMul(state, port, good); return m >= 0.95 ? '' : ' · ' + S.saturationWords(m); };
+
+function market(){
+  const port = state.dockedAt;
+  const p = PORTS[port];
+  if(!S.portOpen(port, state.t)){
+    const days = S.daysToPeriapsis(port, state.t);
+    return `<h2>${esc(S.portName(port))}</h2><p class="say">${esc(TEXT.events.wanderwellClosing)}</p><p>The colony stands empty. Kissing distance again in ${S.fmtDays(days)}. Tagalong keeps a thin market in the meantime.</p>`;
+  }
+  const lines = TEXT.ports[port]?.trade ?? [];
+  const say = lines.length ? `<p class="say">${esc(lines[Math.floor(S.hash(port, Math.floor(state.t / 3)) * lines.length)])}</p>` : '';
+  let out = `<h2>${esc(S.portName(port))} <small class="lock">${sp(p.species)}</small></h2>${say}`;
+  const nobody = p.species === 'chorus' || p.species === 'none';
+  out += nobody ? '<h3>To be taken</h3>' : '<h3>For sale</h3>';
+  const sells = p.sells.map(s => s.good);
+  if(!sells.length) out += nobody ? '<p class="empty">Nothing here but the quiet.</p>' : '<p class="empty">Nothing for sale here.</p>';
+  for(const gid of sells){
+    const g = S.goodById(gid);
+    const price = S.buyPrice(state, port, gid);
+    const stock = S.stockAvailable(state, port, gid);
+    const c1 = S.canBuy(state, gid, 1);
+    const lock = g.needsRefrigeration && !state.keys.refrigeration ? '<span class="lock">needs refrigeration</span>' : '';
+    const maxQ = Math.min(stock, Math.floor(state.money / price), Math.floor(S.freeUnits(state) / g.units));
+    const back = S.restockIn(state, port, gid);
+    const restock = stock === 0 && back ? (back === Infinity ? ' · <span class="down">none left, and none coming</span>' : ` · <span class="down">none left; more in ${S.fmtDays(back)}</span>`) : '';
+    out += `<div class="row"><div class="name"><b>${esc(g.name)}</b><small>${esc(g.blurb ?? g.category)} · ${stock} in stock${restock} · ${g.units} unit${g.units > 1 ? 's' : ''} each ${lock}</small></div>
+      <div class="price">${S.fmtMoney(price)}<small>${trend(price, g.basePrice)} base ${S.fmtMoney(g.basePrice)}</small></div>
+      <div class="btns"><button class="btn sm" data-act="buy|${gid}|1" ${c1.ok ? '' : 'disabled title="' + esc(c1.reason) + '"'}>+1</button><button class="btn sm" data-act="buy|${gid}|10" ${maxQ >= 10 ? '' : 'disabled'}>+10</button><button class="btn sm" data-act="buy|${gid}|${maxQ}" ${maxQ > 1 ? '' : 'disabled'}>all</button></div></div>`;
+  }
+  out += '<h3>Aboard</h3>';
+  const aboard = new Map();
+  for(const c of state.cargo){ const e = aboard.get(c.good) ?? { qty: 0, oldest: c.t, paid: 0 }; e.qty += c.qty; e.oldest = Math.min(e.oldest, c.t); e.paid += c.price * c.qty; aboard.set(c.good, e); }
+  if(!aboard.size) out += '<p class="empty">The hold is empty.</p>';
+  for(const [gid, e] of aboard){
+    const g = S.goodById(gid);
+    const price = S.sellPrice(state, port, gid, e.oldest);
+    const wants = p.buys.some(b => b.good === gid) || (g.demandBy?.[p.species] ?? 1) > 1;
+    const fr = S.freshness(g, state.t - e.oldest);
+    const fresh = g.lifetimeDays ? `<span class="fresh" title="freshness"><i class="${fr > 0.66 ? '' : fr > 0.33 ? 'mid' : 'low'}" style="width:${Math.round(fr * 100)}%"></i></span> ${esc(S.freshnessWords(g, state.t - e.oldest))}` : '';
+    const avg = e.paid / e.qty;
+    out += `<div class="row"><div class="name"><b>${esc(g.name)}</b><small>${e.qty} aboard · paid ${S.fmtMoney(avg)} each ${fresh}${wants ? ' · <span class="up">wanted here</span>' : ''}${plenty(state, port, gid)}</small></div>
+      <div class="price">${S.fmtMoney(price)}<small>${price > avg ? '<span class="up">' : '<span class="down">'}${price >= avg ? '+' : ''}${S.fmtMoney(price - avg)}</span></small></div>
+      <div class="btns"><button class="btn sm" data-act="sell|${gid}|1">−1</button><button class="btn sm" data-act="sell|${gid}|10" ${e.qty >= 10 ? '' : 'disabled'}>−10</button><button class="btn sm primary" data-act="sell|${gid}|${e.qty}">all</button></div></div>`;
+  }
+  const wants = p.buys.map(b => S.goodById(b.good)).filter(g => !aboard.has(g.id));
+  if(wants.length){
+    out += '<h3>They want</h3><p>' + wants.map(g => `${esc(g.name)} <span class="lock">${S.fmtMoney(S.sellPrice(state, port, g.id))}</span>`).join(' · ') + '</p>';
+  }
+  return out;
+}
+
+function passengers(){
+  const port = state.dockedAt;
+  const offers = S.refreshOffers(state, port);
+  let out = `<h2>Passengers &amp; deliveries</h2>`;
+  if(!state.flags.contractsIntro) out += `<p class="say">${esc(TEXT.contractsIntro)}</p>`;
+  out += '<h3>Looking for a ship</h3>';
+  if(!offers.length) out += '<p class="empty">Nobody is travelling today.</p>';
+  for(const c of offers){
+    const ok = S.canTake(state, c);
+    const days = c.deadline - state.t;
+    out += `<div class="row"><div class="name"><b>${esc(c.title)}</b><small>${sp(c.species)} · to ${esc(S.portName(c.to))} · by day ${S.calendar(c.deadline).day} of year ${S.calendar(c.deadline).year} (${S.fmtDays(days)}) · ${c.units} unit${c.units > 1 ? 's' : ''}${c.needs.includes('refrigeration') ? ' · <span class="lock">needs refrigeration</span>' : ''}</small><small><i>“${esc(c.line)}”</i></small></div>
+      <div class="price">${S.fmtMoney(c.pay)}</div>
+      <div class="btns"><button class="btn sm primary" data-act="take|${c.id}" ${ok.ok ? '' : 'disabled title="' + esc(ok.reason) + '"'}>Take</button></div></div>`;
+  }
+  out += '<h3>Aboard</h3>';
+  if(!state.passengers.length) out += '<p class="empty">No passengers, no parcels.</p>';
+  for(const c of state.passengers){
+    const days = c.deadline - state.t;
+    out += `<div class="row"><div class="name"><b>${esc(c.title)}</b><small>${sp(c.species)} · to ${esc(S.portName(c.to))} · ${days < 0 ? '<span class="down">late</span>' : S.fmtDays(days) + ' left'}</small></div><div class="price">${S.fmtMoney(c.pay)}</div><div class="btns"><button class="btn sm" data-act="target|${c.to}">Target</button></div></div>`;
+  }
+  return out;
+}
+
+function shipyard(){
+  const port = state.dockedAt;
+  const p = PORTS[port];
+  let out = `<h2>${p.shipyard ? 'Shipyard' : 'Dock'}</h2>`;
+  out += '<h3>Fuel</h3>';
+  const fp = S.fuelPrice(state);
+  const room = S.kms(state.tank - state.dv);
+  if(fp == null) out += '<p class="empty">No fuel sold here.</p>';
+  else{
+    out += `<p>${S.fmtMoney(fp)} per km/s · ${room.toFixed(1)} km/s of room.</p><div class="btns">
+      <button class="btn" data-act="fuel|1" ${room >= 0.05 && state.money >= fp ? '' : 'disabled'}>+1 km/s</button>
+      <button class="btn" data-act="fuel|5" ${room >= 0.05 && state.money >= fp ? '' : 'disabled'}>+5 km/s</button>
+      <button class="btn primary" data-act="fuel|999" ${room >= 0.05 && state.money >= fp ? '' : 'disabled'}>Fill (${S.fmtMoney(Math.min(room, state.money / fp) * fp)})</button></div>`;
+  }
+  out += '<h3>Fitted</h3>';
+  const t = state.tiers;
+  out += `<dl class="kv"><dt>Tank</dt><dd>${esc(S.tiers('tank')[t.tank].name)} · ${S.fmtKms(state.tank)}</dd><dt>Engine</dt><dd>${esc(S.tiers('engine')[t.engine].name)}</dd><dt>Hold</dt><dd>${esc(S.tiers('hold')[t.hold].name)} · ${S.holdUnits(state)} units</dd>
+    <dt>Keys</dt><dd>${['heatShield', 'refrigeration', 'sensors', 'stealth'].filter(k => state.keys[k]).map(k => esc(UPGRADES.find(u => u.key === k)?.name ?? k)).join(', ') || '<span class="lock">none yet</span>'}</dd></dl>`;
+  const ups = S.upgradesFor(port);
+  if(ups.length){
+    out += '<h3>On offer</h3>';
+    for(const u of ups){
+      const c = S.canBuyUpgrade(state, u.id);
+      const owned = S.ownsUpgrade(state, u);
+      out += `<div class="row"><div class="name"><b>${esc(u.name)}</b><small>${esc(u.effect)}${u.unlocks ? ' · ' + esc(u.unlocks) : ''}</small></div><div class="price">${owned ? '<span class="lock">fitted</span>' : S.fmtMoney(c.price ?? u.price)}</div>
+        <div class="btns">${owned ? '' : `<button class="btn sm primary" data-act="upgrade|${u.id}" ${c.ok ? '' : 'disabled title="' + esc(c.reason) + '"'}>Fit</button>`}</div></div>`;
+      if(!owned && !c.ok && c.reason !== 'Not enough coin.') out += `<p class="lock">${esc(c.reason)}</p>`;
+    }
+  }
+  out += '<h3>Wait here</h3><div class="btns"><button class="btn" data-act="wait|1">1 day</button><button class="btn" data-act="wait|10">10 days</button><button class="btn" data-act="wait|30">30 days</button>';
+  const ww = S.daysToPeriapsis('wanderwell', state.t);
+  out += `<button class="btn" data-act="wait|${ww.toFixed(2)}">Wanderwell's kissing distance (${S.fmtDays(ww)})</button>`;
+  if(state.keys.sensors){ const mc = S.daysToPeriapsis('merrow', state.t); out += `<button class="btn" data-act="wait|${mc.toFixed(2)}">Merrow's pass (${S.fmtDays(mc)})</button>`; }
+  out += '</div>';
+  out += `<button class="btn primary wide" data-act="undock">Undock</button>`;
+  /* Being stuck at a dock is still being stuck: a ship with a dry tank at a
+     port that sells no fuel needs the same rope as one adrift. */
+  if(S.fuelPrice(state) == null || state.dv <= 1e-9){
+    out += `<p class="lock">${S.fuelPrice(state) == null ? 'Nothing to burn is sold here.' : 'The tank is dry.'}</p><button class="btn wide" data-act="tow">Call for a tow</button>`;
+  }
+  out += `<h3>Ship</h3><p>${esc(state.shipName)} · ${state.stats.docks} dockings · ${S.fmtKms(state.stats.dvSpent)} burned in ${state.stats.burns} burns · farthest ${fmtAu(state.stats.farthest)} from the Lamp.</p>`;
+  out += `<div class="btns"><button class="btn sm danger" data-act="newgame">New game</button><a class="btn sm" href="./">&larr; Title screen</a></div>`;
+  return out;
+}
+
+function talk(){
+  const port = state.dockedAt;
+  const p = PORTS[port];
+  const txt = TEXT.ports[port] ?? {};
+  const b = world.get(port);
+  const k = Math.floor(S.hash(port, Math.floor(state.t / 7)) * 3);
+  let out = `<h2>${esc(b.name)} <small class="lock">${sp(p.species)}</small></h2>`;
+  out += `<p>${esc(txt.blurb ?? '')}</p>`;
+  if(txt.arrival) out += `<p class="say">${esc(txt.arrival[k % txt.arrival.length])}</p>`;
+  if(TEXT.species[p.species]?.greeting) out += `<p>${esc(TEXT.species[p.species].greeting)}</p>`;
+  if(txt.rumours) out += `<h3>Heard at the dock</h3>` + txt.rumours.map((r, i) => `<p>${i === k % txt.rumours.length ? '<b>' : ''}${esc(r)}${i === k % txt.rumours.length ? '</b>' : ''}</p>`).join('');
+  out += '<h3>How they know you</h3><dl class="kv">' + Object.entries(state.rep).map(([s, v]) => `<dt>${sp(s)}</dt><dd>${repWord(v)}</dd>`).join('') + '</dl>';
+  out += '<h3>The sky</h3>';
+  const ww = S.daysToPeriapsis('wanderwell', state.t);
+  const wr = norm(absState(world, 'wanderwell', state.t).r);
+  out += `<p>Wanderwell is ${wr.toFixed(2)} au out, ${S.portOpen('wanderwell', state.t) ? 'and the summer market is open' : `and reaches kissing distance in ${S.fmtDays(ww)}`}.</p>`;
+  if(state.keys.sensors) out += `<p>Merrow's Comet passes the Lamp in ${S.fmtDays(S.daysToPeriapsis('merrow', state.t))}.</p>`;
+  out += `<h3>Glossary</h3>` + GLOSSARY.slice(0, 16).map(g => `<p><b>${esc(g.term)}</b> <span class="lock">(${esc(g.plain)})</span> — ${esc(g.tip)}</p>`).join('');
+  return out;
+}
+function repWord(v){ return v >= 8 ? 'old friends' : v >= 4 ? 'a known name' : v >= 1.5 ? 'a familiar face' : v <= -2 ? 'unwelcome' : v < 0 ? 'a story going round' : 'a stranger'; }
+
+function plan(){
+  let out = '<h2>Plan</h2>';
+  /* What each mark will really cost, measured where it fires: the two numbers
+     on a card are along axes that lean together, so their triangle is not the
+     burn. */
+  const marks = state.nodes.length ? S.markStates(state, horizonFor()) : [];
+  const cost = marks.reduce((s, m) => s + m.cost, 0);
+  const short = cost > state.dv + 1e-9;
+  out += `<p>This plan costs <b class="${short ? 'down' : ''}">${S.fmtKms(cost)}</b> of your ${S.fmtKms(state.dv)}.${short ? ' <span class="down">The tank will not cover it.</span>' : ''}</p>`;
+  if(state.target){
+    const hh = S.slowRoad(state, state.target);
+    if(hh) out += `<p class="lock">The slow road to ${esc(S.portName(state.target))} would be about ${S.fmtKms(hh.total)} and ${S.fmtDays(hh.time)}.</p>`;
+  }
+  const room = state.nodes.length < S.MAX_NODES;
+  out += `<div class="btns"><button class="btn ${state.nodes.length ? '' : 'primary'}" id="addmark" data-act="addmark" ${room ? '' : 'disabled title="Six is plenty for one road."'}>Write down a burn</button></div>`;
+  if(!state.nodes.length) out += '<p class="say">Tap the path to put a burn on it, or use the button. Nothing is spent until the clock reaches it.</p>';
+  state.nodes.forEach((n, i) => {
+    const sel = i === selectedNode;
+    const where = nodePositions[i];
+    const frame = where ? world.get(where.body).name : '?';
+    out += `<div class="node ${sel ? 'sel' : ''}" data-act="selnode|${i}"><div class="row" style="border:0;padding:0"><div class="name"><b>Burn ${i + 1}</b><small>in ${S.fmtDays(n.t - state.t)} · ${esc(frame)}'s reach · ${S.fmtKms(marks[i]?.cost ?? 0)}</small></div><div class="btns"><button class="btn sm" data-act="warpnode|${i}">Warp to</button><button class="btn sm danger" data-act="delnode|${i}">×</button></div></div>`;
+    if(sel){
+      out += `<div class="grid">
+        <span>Prograde</span><div class="step"><button class="btn sm" data-act="nudge|${i}|prograde|-100">−100</button><button class="btn sm" data-act="nudge|${i}|prograde|-10">−10</button><button class="btn sm" data-act="nudge|${i}|prograde|-1">−1</button><button class="btn sm" data-act="nudge|${i}|prograde|1">+1</button><button class="btn sm" data-act="nudge|${i}|prograde|10">+10</button><button class="btn sm" data-act="nudge|${i}|prograde|100">+100</button></div><span class="val">${S.fmtKms(n.prograde)}</span>
+        <span>Radial</span><div class="step"><button class="btn sm" data-act="nudge|${i}|radial|-100">−100</button><button class="btn sm" data-act="nudge|${i}|radial|-10">−10</button><button class="btn sm" data-act="nudge|${i}|radial|-1">−1</button><button class="btn sm" data-act="nudge|${i}|radial|1">+1</button><button class="btn sm" data-act="nudge|${i}|radial|10">+10</button><button class="btn sm" data-act="nudge|${i}|radial|100">+100</button></div><span class="val">${S.fmtKms(n.radial)}</span>
+        <span>Time</span><div class="step"><button class="btn sm" data-act="shift|${i}|-1">−1 d</button><button class="btn sm" data-act="shift|${i}|-0.0416667">−1 h</button><button class="btn sm" data-act="shift|${i}|0.0416667">+1 h</button><button class="btn sm" data-act="shift|${i}|1">+1 d</button></div><span class="val">${S.fmtDays(n.t - state.t)}</span>
+      </div><p class="lock">Steppers are in m/s. Arrow keys nudge the selected burn; hold Shift for fine.</p>`;
+    }
+  });
+  if(prediction){
+    out += '<h3>Ahead</h3>';
+    const evs = prediction.events.filter(e => e.kind !== 'burn' || e.node.aero);
+    if(!evs.length && !prediction.crashed) out += '<p class="lock">Nothing changes along this path.</p>';
+    /* A road that grazes the same moon on nine laps is nine identical lines,
+       which reads as a fault rather than as a road. Say the first few and
+       count the rest. */
+    let shown = 0, repeats = 0, lastLine = '';
+    for(const e of evs){
+      let line = '';
+      if(e.kind === 'soi'){
+        const to = world.get(e.to), from = world.get(e.from);
+        line = `<p>${to.parent === from.id ? 'Into' : 'Out to'} ${esc(to.name)}'s reach in ${S.fmtDays(e.t - state.t)}.</p>`;
+      }else if(e.kind === 'burn' && e.node.aero){
+        line = `<p class="up">Skim ${esc(S.portName(e.node.body))}: shed ${S.fmtKms(e.magnitude)} in ${S.fmtDays(e.t - state.t)}.</p>`;
+      }else if(e.kind === 'crash'){
+        line = `<p class="down">This path strikes ${esc(S.portName(e.body))} in ${S.fmtDays(e.t - state.t)}.</p>`;
+      }
+      if(!line) continue;
+      const shape = line.replace(/in [^.]*\./, '');
+      if(shape === lastLine){ repeats++; continue; }
+      lastLine = shape;
+      if(shown >= 4){ repeats++; continue; }
+      out += line; shown++;
+    }
+    if(repeats) out += `<p class="lock">…and ${repeats} more crossing${repeats > 1 ? 's' : ''} after that.</p>`;
+  }
+  if(state.dv <= 1e-9){
+    const q = S.towQuote(state);
+    out += `<h3>Dry tank</h3><p>${esc(TEXT.captainLines.onStranded[2] ?? '')}</p><p>A tow to ${esc(S.portName(q.port))}: ${S.fmtMoney(q.cost)}, ${S.fmtDays(q.days)}.</p><button class="btn wide" data-act="tow">Call for a tow</button>`;
+  }else{
+    out += `<p class="lock" style="margin-top:1rem">Stuck anywhere? <button class="btn sm" data-act="tow">Call for a tow</button></p>`;
+  }
+  return out;
+}
+
+function targetTab(){
+  let out = '<h2>Target</h2>';
+  const groups = new Map();
+  for(const b of world.bodies){
+    if(b.kind === 'star') continue;
+    if(b.id === 'merrow' && !state.keys.sensors) continue;
+    const g = b.parent === 'lamp' ? b.id : b.parent;
+    if(!groups.has(g)) groups.set(g, []);
+    groups.get(g).push(b);
+  }
+  out += `<select data-sel="target"><option value="">— none —</option>`;
+  for(const [g, list] of groups){
+    const gname = world.get(g).name;
+    out += `<optgroup label="${esc(gname)}">` + list.map(b => `<option value="${b.id}" ${state.target === b.id ? 'selected' : ''}>${esc(b.name)}${b.port ? '' : ' (no port)'}</option>`).join('') + '</optgroup>';
+  }
+  out += '</select>';
+  if(state.target){
+    const tb = world.get(state.target);
+    const tp = PORTS[state.target];
+    out += `<h3>${esc(tb.name)}</h3>`;
+    if(TEXT.ports[state.target]?.blurb) out += `<p>${esc(TEXT.ports[state.target].blurb)}</p>`;
+    if(tp) out += `<p class="lock">${sp(tp.species)} · ${esc(tb.climate)} · ${tp.fuelPricePerKms != null ? 'sells fuel' : 'no fuel'}${tp.shipyard ? ' · shipyard' : ''}</p>`;
+    if(approach?.ca){
+      const ca = approach.ca;
+      const within = tb.soi != null ? ca.distance < tb.soi : ca.distance < (tb.zoneRadius ?? 0) * 3;
+      out += `<dl class="kv"><dt>Closest approach</dt><dd>${fmtAu(ca.distance)}</dd><dt>Relative speed</dt><dd>${S.fmtKms(ca.relSpeed)}</dd><dt>In</dt><dd>${S.fmtDays(ca.t - state.t)}</dd></dl>`;
+      const mouth = tb.zoneRadius ?? 0;
+      if(mouth && ca.distance <= mouth) out += `<p class="up">That pass comes inside ${esc(tb.name)}'s harbour mouth.</p>`;
+      else if(within) out += `<p class="up">That is inside ${esc(tb.name)}'s ${tb.soi != null ? 'reach' : 'zone'}, but wide of the mouth by ${fmtAu(Math.max(0, ca.distance - mouth))}.</p>`;
+      else out += `<p class="lock">Not yet inside ${esc(tb.name)}'s ${tb.soi != null ? 'reach' : 'zone'}${tb.soi != null ? ` (${fmtAu(tb.soi)})` : ''}.</p>`;
+      out += `<div class="btns"><button class="btn sm primary" data-act="aim">Aim for it</button><button class="btn sm" data-act="warpca">Warp to approach</button><button class="btn sm" data-act="look|${state.target}">Look</button></div>`;
+      out += `<p class="lock">Aiming nudges your last burn until the pass is as close as it will go. It spends nothing until the clock reaches the mark.</p>`;
+    }else{
+      out += `<p class="lock">This path does not come near ${esc(tb.name)} within the plan.</p><div class="btns"><button class="btn sm primary" data-act="aim">Aim for it</button><button class="btn sm" data-act="look|${state.target}">Look</button></div>`;
+    }
+    const hh = S.slowRoad(state, state.target);
+    if(hh) out += `<p class="lock">Slow road: about ${S.fmtKms(hh.total)}, ${S.fmtDays(hh.time)}.</p>`;
+    const win = S.nextWindow(state, state.target);
+    if(win && win.days > 0.5) out += `<p class="lock">Next festival to ${esc(S.portName(win.target))}: in ${S.fmtDays(win.days)}, and one comes round every ${S.fmtDays(win.synodic)}.</p><div class="btns"><button class="btn sm" data-act="warpwin|${win.t.toFixed(3)}">Warp to the festival</button></div>`;
+    if(tb.port && tb.zoneRadius) out += `<p class="lock">Docking zone ${fmtAu(tb.zoneRadius)}, under ${S.fmtKms(tb.dockSpeed)} relative.</p>`;
+  }
+  return out;
+}
+
+function shipTab(){
+  const b = world.get(state.ship.body);
+  const el = elementsFromState(b.mu, state.ship.r, state.ship.v);
+  let out = `<h2>${esc(state.shipName)}</h2>`;
+  out += `<dl class="kv"><dt>Reach</dt><dd>${esc(b.name)}</dd><dt>Distance</dt><dd>${fmtAu(norm(state.ship.r))}</dd><dt>Speed</dt><dd>${S.fmtKms(norm(state.ship.v))}</dd>`;
+  out += `<dt>Kissing distance</dt><dd>${fmtAu(el.rp)}</dd><dt>Farthest</dt><dd>${Number.isFinite(el.ra) ? fmtAu(el.ra) : 'escaping'}</dd>`;
+  if(Number.isFinite(el.period)) out += `<dt>Period</dt><dd>${S.fmtDays(el.period)}</dd>`;
+  out += `<dt>Shape</dt><dd>e = ${el.e.toFixed(3)}</dd></dl>`;
+  if(b.atmo){
+    out += el.rp < b.atmo ? (state.keys.heatShield ? `<p class="up">Skimming ${esc(b.name)}'s clouds: the shield will brake you.</p>` : `<p class="down">That kissing distance is inside ${esc(b.name)}'s clouds, and you have no heat shield.</p>`) : '';
+  }
+  out += '<h3>Hold</h3>';
+  if(!state.cargo.length && !state.passengers.length) out += '<p class="empty">Empty.</p>';
+  for(const c of state.cargo){ const g = S.goodById(c.good); out += `<p>${c.qty} × ${esc(g.name)} <span class="lock">from ${esc(S.portName(c.from))}${g.lifetimeDays ? ` · ${Math.round(S.freshness(g, state.t - c.t) * 100)}% fresh` : ''}</span></p>`; }
+  for(const c of state.passengers){ const days = c.deadline - state.t; out += `<p>${esc(c.title)} <span class="lock">→ ${esc(S.portName(c.to))} · ${days < 0 ? 'late' : S.fmtDays(days) + ' left'}</span> <button class="btn sm" data-act="target|${c.to}">Target</button></p>`; }
+  out += '<h3>Fitted</h3>';
+  out += `<p>${esc(S.tiers('tank')[state.tiers.tank].name)}, ${esc(S.tiers('engine')[state.tiers.engine].name)}, ${esc(S.tiers('hold')[state.tiers.hold].name)}.</p>`;
+  out += `<p>${['heatShield', 'refrigeration', 'sensors', 'stealth'].filter(k => state.keys[k]).map(k => esc(UPGRADES.find(u => u.key === k)?.name ?? k)).join(', ') || '<span class="lock">No keys yet.</span>'}</p>`;
+  const line = TEXT.captainLines.onLongCoast[Math.floor(S.hash(Math.floor(state.t / 20)) * TEXT.captainLines.onLongCoast.length)];
+  out += `<p class="say">${esc(line)}</p>`;
+  return out;
+}
+
+function logTab(){
+  return `<h2>Log</h2><ul id="log" aria-live="polite" aria-relevant="additions">` + [...state.log].reverse().map(l => `<li class="${l.kind === 'story' ? 'story' : ''}"><b>${S.calendar(l.t).year}.${S.calendar(l.t).day}</b>${esc(l.text)}</li>`).join('') + '</ul>';
+}
+
+/* ------------------------------------------------------------- actions */
+
+const actions = {
+  buy(gid, q){ const r = S.buy(state, gid, Number(q)); if(!r.ok) toast(r.reason, 'bad'); renderTab(); save(); },
+  sell(gid, q){ const r = S.sell(state, gid, Number(q)); if(!r.ok) toast(r.reason, 'bad'); else toast(`Sold for ${S.fmtMoney(r.total)} (${r.profit >= 0 ? '+' : ''}${S.fmtMoney(r.profit)}).`); renderTab(); save(); },
+  take(id){ const r = S.takeContract(state, id); if(!r.ok) toast(r.reason, 'bad'); renderTab(); save(); tutorialCheck(); },
+  fuel(k){ const r = S.refuel(state, Number(k)); if(!r.ok) toast(r.reason, 'bad'); renderTab(); save(); },
+  upgrade(id){ const r = S.buyUpgrade(state, id); if(!r.ok) toast(r.reason, 'bad'); else toast(`${S.upgradeById(id).name} fitted.`); renderTab(); save(); },
+  wait(d){ const days = Number(d); S.wait(state, days); toast(`${S.fmtDays(days)} pass. ${S.calendar(state.t).text}.`); renderTab(); save(); },
+  undock(){
+    const r = S.undock(state);
+    if(!r.ok) return;
+    selectedNode = -1; replan(true); renderTabs(); chart.focus('ship'); frameShipOrbit(); syncView(); tutorialCheck(); save();
+  },
+  dock(){ doDock(); },
+  target(id){ state.target = id; replan(true); renderTab(); syncView(); },
+  look(id){ chart.focus(id); syncView(); },
+  addmark(){
+    const ix = S.addNodeAhead(state);
+    if(ix < 0){ toast('No room for another burn on this road.', 'bad'); return; }
+    selectedNode = ix; holdForPlanning(ix); replan(true); renderTab(); tutorialCheck();
+  },
+  selnode(i){ selectedNode = Number(i); renderTab(); },
+  delnode(i, el){ S.removeNode(state, Number(i)); selectedNode = -1; replan(true); renderTab(); },
+  warpnode(i){ warpTo(state.nodes[Number(i)].t - 0.05); },
+  nudge(i, axis, ms){ const n = state.nodes[Number(i)]; n[axis] += S.auDay(Number(ms) / 1000); replan(true); renderTab(); tutorialCheck(); },
+  shift(i, d){ const n = state.nodes[Number(i)]; n.t = Math.max(state.t + 1e-3, n.t + Number(d)); state.nodes.sort((a, b) => a.t - b.t); selectedNode = state.nodes.indexOf(n); replan(true); renderTab(); },
+  warpca(){ if(approach?.ca) warpTo(approach.ca.t); },
+  warpwin(t){ warpTo(Number(t)); },
+  aim(el){
+    if(!state.target){ toast('Pick something to aim at first.', 'bad'); return; }
+    // Solving a transfer takes the best part of a second, and a button that
+    // freezes the page without a word reads as a button that killed the game.
+    if(el && el.tagName === 'BUTTON'){ el.textContent = 'Aiming…'; el.disabled = true; }
+    requestAnimationFrame(() => requestAnimationFrame(() => aimNow()));
+  },
+  tow(){ showTow('dry'); },
+  newgame(){ confirmNew(); },
+};
+
+function aimNow(){
+    const tb = world.get(state.target);
+    const r = S.trimToTarget(state, state.target, horizonFor());
+    if(!r.ok){ toast(r.reason, 'bad'); renderTab(); return; }
+    selectedNode = r.index;
+    if(state.nodes[r.index] && state.nodes[r.index].t - state.t < 1.5) holdForPlanning(r.index);
+    replan(true); renderTab();
+    const mouth = tb.zoneRadius ?? 0;
+    const good = mouth && r.distance <= mouth;
+    toast(`${r.added ? 'Wrote down a burn and aimed' : 'Aimed'} at ${S.portName(state.target)}: ${fmtAu(r.distance)} at the near pass, ${S.fmtKms(r.cost)} on the mark.${good ? ' That is inside the mouth.' : ''}`, good ? 'story' : '');
+}
+for(const el of document.querySelectorAll('.node[data-act]')) void el;
+// Node cards select on click, but their buttons should not also select.
+document.addEventListener('click', e => {
+  const card = e.target.closest('.node[data-act]');
+  if(card && !e.target.closest('button')){ selectedNode = Number(card.dataset.act.split('|')[1]); renderTab(); }
+}, true);
+
+function doDock(){
+  const r = S.dock(state);
+  if(!r.ok){ toast(r.reason === 'too fast' ? 'Too fast to dock. Kill some speed first.' : 'No port in reach.', 'bad'); return; }
+  setWarp(0, false);
+  selectedNode = -1; replan(true); renderTabs(); setTab('market');
+  const txt = TEXT.ports[r.port];
+  const line = txt?.arrival?.[Math.floor(S.hash(r.port, Math.floor(state.t)) * txt.arrival.length)];
+  toast(`Docked at ${S.portName(r.port)}.${line ? ' ' + line : ''}`, 'story', 7000);
+  for(const d of r.delivered){ toast(`${d.contract.title}: ${S.fmtMoney(d.pay)}${d.late ? ' (late)' : d.early ? ' (early!)' : ''}. ${d.say ?? ''}`, d.late ? 'bad' : 'story', 8000); }
+  for(const e of r.events ?? []) if(e.kind === 'story') showStory(e.name, e.text);
+  tutorialCheck();
+  save();
+}
+// The dock button lives in the HUD hint: clicking the hint docks when it says so.
+$('dockhint').addEventListener('click', () => { const d = S.dockingStatus(state); if(d?.ok) doDock(); });
+$('dockhint').style.cursor = 'pointer';
+addEventListener('keydown', e => {
+  if(e.key !== 'd' || e.ctrlKey || e.metaKey || e.altKey) return;
+  if($('modal').open || typing(e)) return;
+  const d = S.dockingStatus(state);
+  if(d?.ok) doDock();
+});
+
+/* ------------------------------------------------------------- modals */
+
+const modal = $('modal');
+function openModal(html, wireFn){
+  modal.innerHTML = html;
+  wire(modal);
+  if(wireFn) wireFn(modal);
+  if(!modal.open) modal.showModal();
+  // showModal traps focus by itself; this only decides where it lands, which
+  // should be the thing you are most likely to want.
+  const first = modal.querySelector('.btn.primary') ?? modal.querySelector('button');
+  if(first) first.focus();
+}
+function closeModal(){ if(modal.open) modal.close(); modal.innerHTML = ''; }
+modal.addEventListener('cancel', e => { if(state.pending) e.preventDefault(); });
+
+function showToll(p){
+  openModal(`<h2>A hail from the Scatter</h2><p class="say">${esc(p.line)}</p><p>${esc(p.captain)} asks ${S.fmtMoney(p.amount)}, or the crates to match. Your hold is worth about ${S.fmtMoney(p.cargoValue)}; they will not take it all, and nobody is hurt who yields.</p>
+    <div class="btns"><button class="btn" id="m-cargo">Pay in cargo</button><button class="btn primary" id="m-coin">Pay in coin</button></div>`, m => {
+    m.querySelector('#m-coin').addEventListener('click', () => { const r = S.resolveToll(state, 'coin'); closeModal(); toast(r.text, 'story', 8000); save(); });
+    m.querySelector('#m-cargo').addEventListener('click', () => { const r = S.resolveToll(state, 'cargo'); closeModal(); toast(r.text, 'story', 8000); save(); });
+  });
+}
+function showCrash(bodyId){
+  const b = world.get(bodyId);
+  const atmo = state.pending?.atmosphere;
+  const q = S.towQuote(state);
+  openModal(`<h2>${atmo ? 'Too deep' : 'Hard landing'}</h2><p class="say">${esc(atmo ? TEXT.events.towAtmosphere : TEXT.events.towCrash[0])}</p>
+    <p>${atmo ? `${esc(b.name)}'s clouds took the ship without a heat shield.` : `The ship met ${esc(b.name)} faster than it should have.`} A tow to ${esc(S.portName(q.port))} will cost ${S.fmtMoney(Math.round(q.cost * 1.5))} and ${S.fmtDays(q.days)}. Cargo and passengers ride along.</p>
+    <div class="btns"><button class="btn primary" id="m-tow">Call for a tow</button></div>`, m => {
+    m.querySelector('#m-tow').addEventListener('click', () => { const r = S.callTow(state, atmo ? 'atmosphere' : 'crash'); closeModal(); afterTow(r); });
+  });
+}
+function showTow(reason){
+  const q = S.towQuote(state);
+  openModal(`<h2>Call for a tow</h2><p>The nearest help is at ${esc(S.portName(q.port))}, ${fmtAu(q.distance)} away. They ask ${S.fmtMoney(q.cost)} and it will take ${S.fmtDays(q.days)}. ${state.money < q.cost ? 'What you cannot pay, Ledger will lend.' : ''}</p>
+    <div class="btns"><button class="btn" id="m-no">Not yet</button><button class="btn primary" id="m-tow">Call</button></div>`, m => {
+    m.querySelector('#m-no').addEventListener('click', closeModal);
+    m.querySelector('#m-tow').addEventListener('click', () => { const r = S.callTow(state, reason); closeModal(); afterTow(r); });
+  });
+}
+function afterTow(r){
+  selectedNode = -1; replan(true); renderTabs(); setTab('shipyard'); setWarp(0, false);
+  openModal(`<h2>Towed to ${esc(S.portName(r.port))}</h2><p class="say">${esc(r.story)}</p><p>${S.fmtDays(r.days)} later and ${S.fmtMoney(r.cost)} poorer, you are docked. ${state.debt > 0 ? esc(TEXT.events.ledgerDebt) : ''}</p><div class="btns"><button class="btn primary" id="m-ok">Carry on</button></div>`, m => m.querySelector('#m-ok').addEventListener('click', closeModal));
+  save();
+}
+function showStory(name, text){
+  const paras = String(text).split(/\n+/).map(p => `<p class="say">${esc(p)}</p>`).join('');
+  openModal(`<h2>${esc(storyTitle(name))}</h2>${paras}<div class="btns"><button class="btn primary" id="m-ok">Close</button></div>`, m => m.querySelector('#m-ok').addEventListener('click', closeModal));
+}
+function storyTitle(name){ return { cometCaught: "Merrow's Comet", chimeArrival: 'Chime', mossbackHeartbeat: 'Mossback', hushRelic: 'Hush', lanternArrival: 'The Far Lantern', tollGiftLater: 'A parcel from the Scatter' }[name] ?? 'A note in the log'; }
+function confirmNew(){
+  openModal(`<h2>Start over?</h2><p>This save is replaced by a fresh ship at Tessel. There is one save slot.</p><div class="btns"><button class="btn" id="m-no">Keep playing</button><button class="btn danger" id="m-yes">New game</button></div>`, m => {
+    m.querySelector('#m-no').addEventListener('click', closeModal);
+    m.querySelector('#m-yes').addEventListener('click', () => { closeModal(); state = S.newGame(freshSeed()); save(); selectedNode = -1; lastDockedMode = null; replan(true); renderTabs(); chart.focus('ship'); chart.camera.zoom = 240 * 60; tutorialCheck(); });
+  });
+}
+
+/* ------------------------------------------------------------- toasts */
+
+function toast(text, kind = '', ms = 4200){
+  if(!text) return;
+  const el = document.createElement('div');
+  el.className = `toast ${kind}`; el.textContent = text;
+  $('toasts').appendChild(el);
+  setTimeout(() => el.remove(), ms);
+  while($('toasts').children.length > 4) $('toasts').firstChild.remove();
+}
+
+/* ------------------------------------------------------------- tutorial */
+
+/* The lesson is the first hop: Tessel to Bramble, the raft next door. It
+   watches the state rather than the clicks, so doing a step your own way
+   still counts, and it steps out of the way the moment you are docked. */
+const TUT = TEXT.tutorial;
+function tutorialCheck(){
+  if(state.flags.tutorial >= TUT.length || state.flags.tutorialSkipped){ $('tut').hidden = true; return; }
+  let step = state.flags.tutorial;
+  const target = 'bramble';
+  const reaches = prediction?.events.some(e => e.kind === 'soi' && e.to === target);
+  /* Tied up at the far end is the whole lesson, however you got there — by the
+     steps below, by dragging a handle, or by being towed. Checking it first
+     means the card cannot sit there telling you to do a thing you have done. */
+  if(state.dockedAt === target){
+    state.flags.tutorial = TUT.length;
+    $('tut').hidden = true;
+    if(!state.flags.tutorialDone){ state.flags.tutorialDone = true; toast('Lesson done. The rafts are yours to hop.', 'story'); }
+    return;
+  }
+  if(step === 0 && !state.dockedAt) step = 1;
+  if(step === 1 && state.nodes.length) step = 2;
+  if(step === 2 && reaches) step = 3;
+  if(step === 3 && state.ship.body === target) step = 4;
+  if(step === 4 && state.dockedAt === target) step = 5;
+  if(step >= 2 && !state.nodes.length && state.ship.body !== target && !state.dockedAt) step = 1;
+  if(step === 3 && !reaches && state.ship.body !== target) step = 2;
+  if(state.dockedAt && state.dockedAt !== target && step > 0 && step < 4) step = 0;
+  state.flags.tutorial = step;
+  if(step >= TUT.length){ $('tut').hidden = true; return; }
+  const s = TUT[step];
+  $('tut').hidden = false;
+  $('tut-step').textContent = `Lesson · ${step + 1} of ${TUT.length}`;
+  $('tut-title').textContent = s.title;
+  $('tut-body').textContent = s.body;
+  // Suggest it once. It is the player's chart, not the lesson's.
+  if(step === 0 && state.target == null && !state.flags.tutorialTargeted){ state.target = target; state.flags.tutorialTargeted = true; }
+}
+$('tut-skip').addEventListener('click', () => { state.flags.tutorialSkipped = true; $('tut').hidden = true; save(); });
+setInterval(() => { if(!$('tut').hidden) tutorialCheck(); }, 1500);
+
+/* ------------------------------------------------------------- boot */
+
+$('grab').addEventListener('click', () => togglePanel(false));
+$('grab').setAttribute('role', 'button');
+$('grab').setAttribute('tabindex', '0');
+$('grab').setAttribute('aria-label', 'Close the panel');
+$('grab').addEventListener('keydown', e => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); togglePanel(false); } });
+
+renderTabs();
+togglePanel(panelOpen);
+chart.focus('ship');
+chart.camera.zoom = state.dockedAt ? Math.max(chart.camera.zoom, 240 * 60) : 240 * 20;
+replan(true);
+syncView();
+setWarp(state.warp ?? 0, false);
+tutorialCheck();
+if(state.pending?.kind === 'toll') showToll(state.pending);
+if(state.pending?.kind === 'crash') showCrash(state.pending.body);
+requestAnimationFrame(frame);
+addEventListener('pagehide', save);
+document.addEventListener('visibilitychange', () => { if(document.hidden) save(); else last = performance.now(); });
+</script>
+</body>
+</html>
