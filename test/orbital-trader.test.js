@@ -453,20 +453,33 @@ test('aerobraking: Grumm\'s clouds are a crash without a shield and a brake with
     let tBack = -0.5, st;
     for(let i = 0; i < 200; i++){ st = O.propagate(g.mu, pe.r, pe.v, tBack); if(O.norm(st.r) > g.soi * 0.9) break; tBack *= 1.3; }
     s.ship = { body: 'grumm', r: st.r, v: st.v };
+    const start = { r: st.r, v: st.v };
     const events = [];
     let guard = 0;
-    while(guard++ < 3000 && !s.pending && s.ship.body === 'grumm') events.push(...S.tick(s, 0.2));
-    return { s, events };
+    let after = null;
+    while(guard++ < 3000 && !s.pending && s.ship.body === 'grumm'){
+      const got = S.tick(s, 0.2);
+      events.push(...got);
+      // The state just after the dive, before the ship goes wandering.
+      if(!after && s.flags.firstAerobrake) after = { r: s.ship.r, v: s.ship.v };
+    }
+    return { s, events, start, after: after ?? { r: s.ship.r, v: s.ship.v } };
   };
   const bare = dive(false);
   assert.ok(bare.s.pending && bare.s.pending.kind === 'crash', 'no shield: the clouds take the ship');
   const shielded = dive(true);
   assert.equal(shielded.s.pending, null, 'with a shield the ship survives, pass after pass');
   assert.ok(shielded.s.flags.firstAerobrake, 'the skim was noted');
-  const el = O.elementsFromState(g.mu, shielded.s.ship.r, shielded.s.ship.v);
-  assert.ok(el.e < 1, 'the skim captured the ship into a bound orbit');
-  assert.ok(el.rp > g.radius, 'and never dug it into the planet');
-  assert.ok(shielded.s.dv === shielded.s.tank, 'and it cost no fuel at all');
+  assert.equal(shielded.s.dv, shielded.s.tank, 'and it cost no fuel at all');
+  /* What a skim is for: the ship arrived on an escape trajectory and Grumm's
+     air alone put it into orbit. Measured in Grumm's frame at the moment the
+     dive is done — where it wanders afterwards, past Mossback and the rest, is
+     the pilot's business and another world's arithmetic. */
+  const before = O.elementsFromState(g.mu, shielded.start.r, shielded.start.v);
+  assert.ok(before.e > 1, 'the setup was not an escape trajectory to begin with');
+  const after = O.elementsFromState(g.mu, shielded.after.r, shielded.after.v);
+  assert.ok(after.e < 1, `the clouds did not catch it: e ${after.e}`);
+  assert.ok(after.rp > g.radius, 'and never dug it into the planet');
 });
 
 test('contracts: taken here, paid there, less when late', () => {
@@ -841,17 +854,36 @@ test('casting off with a dry tank does not lock the door behind you', () => {
   assert.ok(S.dock(s).ok);
 });
 
-test('arriving on the end of a rope is still arriving', () => {
-  const s = S.newGame(5);
-  S.undock(s);
-  s.t = 3000;
-  const h = world.get('hush');
-  const at = O.absState(world, 'hush', s.t);
-  s.ship = { body: 'lamp', r: at.r, v: at.v };
-  s.dv = 0;
-  const r = S.callTow(s, 'dry');
+test('arriving on the end of a rope is still arriving, and never at a dead end', () => {
+  /* A crash still has fuel in the tank, so the tug takes the nearest dock —
+     and whatever that place has to say to a first visitor, it says. */
+  const crashed = S.newGame(5);
+  S.undock(crashed);
+  crashed.t = 3000;
+  const at = O.absState(world, 'hush', crashed.t);
+  crashed.ship = { body: 'lamp', r: at.r, v: at.v };
+  const r = S.callTow(crashed, 'crash');
   assert.equal(r.port, 'hush');
-  assert.ok(s.keys.stealth, 'towed to Hush and found nothing there');
-  assert.ok(s.visited.includes('hush'));
-  void h;
+  assert.ok(crashed.keys.stealth, 'towed to Hush and found nothing there');
+  assert.ok(crashed.visited.includes('hush'));
+
+  /* A dry ship is different. Four ports sell nothing to burn, and a tow that
+     leaves a dry ship at one of them has not rescued anybody — it has moved
+     the dead end. */
+  for(const dead of ['hush', 'arc', 'mossback', 'lantern']){
+    const s = S.newGame(5);
+    S.undock(s);
+    s.t = 3000;
+    const p = O.absState(world, dead, s.t);
+    s.ship = { body: 'lamp', r: p.r, v: p.v };
+    s.dv = 0;
+    const q = S.towQuote(s);
+    assert.notEqual(q.port, dead, `a dry ship towed to ${dead}, which sells no fuel`);
+    assert.ok(PORTS[q.port].fuelPricePerKms != null, `${dead}: towed to ${q.port}, which sells no fuel either`);
+  }
+
+  // And a tow never delivers you to the dock you are already tied up at.
+  const docked = S.newGame(5);
+  docked.dv = 0;
+  assert.notEqual(S.towQuote(docked).port, docked.dockedAt);
 });

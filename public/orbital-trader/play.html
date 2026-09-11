@@ -963,6 +963,11 @@ function shipyard(){
   if(state.keys.sensors){ const mc = S.daysToPeriapsis('merrow', state.t); out += `<button class="btn" data-act="wait|${mc.toFixed(2)}">Merrow's pass (${S.fmtDays(mc)})</button>`; }
   out += '</div>';
   out += `<button class="btn primary wide" data-act="undock">Undock</button>`;
+  /* Being stuck at a dock is still being stuck: a ship with a dry tank at a
+     port that sells no fuel needs the same rope as one adrift. */
+  if(S.fuelPrice(state) == null || state.dv <= 1e-9){
+    out += `<p class="lock">${S.fuelPrice(state) == null ? 'Nothing to burn is sold here.' : 'The tank is dry.'}</p><button class="btn wide" data-act="tow">Call for a tow</button>`;
+  }
   out += `<h3>Ship</h3><p>${esc(state.shipName)} · ${state.stats.docks} dockings · ${S.fmtKms(state.stats.dvSpent)} burned in ${state.stats.burns} burns · farthest ${fmtAu(state.stats.farthest)} from the Lamp.</p>`;
   out += `<div class="btns"><button class="btn sm danger" data-act="newgame">New game</button><a class="btn sm" href="./">&larr; Title screen</a></div>`;
   return out;

@@ -288,6 +288,14 @@ export function effectiveNodes(state, horizon){
       if(tp == null || tp > seg.t1 - seg.t0 + 1e-9) continue;
       const tAt = seg.t0 + tp;
       if(list.some(n => n.aero && Math.abs(n.t - tAt) < 1e-3)) continue;
+      /* The skim goes at the bottom of the dive and nowhere else. A retrograde
+         push anywhere else lowers the far end of the path instead of raising
+         it — at the top of the orbit it would drop the ship straight into the
+         planet, and which it did depended on where the search happened to
+         stop, which is to say on the time warp. */
+      const at = propagate(b.mu, seg.r0, seg.v0, tp);
+      if(dot(at.r, at.v) > norm(at.r) * norm(at.v) * 0.02) continue;
+      if(norm(at.r) > b.atmo * 1.001) continue;
       const vp = el.vmax;
       const depth = Math.max(0, Math.min(1, (b.atmo - el.rp) / (b.atmo - b.radius)));
       const wanted = Math.min(FORMULAS.aerobrake.maxFraction, FORMULAS.aerobrake.k * depth) * vp;
@@ -317,7 +325,13 @@ export function tick(state, dtDays){
     ageContracts(state, events);
     return events;
   }
-  const nodes = effectiveNodes(state, dtDays + 1);
+  /* Far enough ahead to see the coming skim. Normally a step only needs to
+     know about the marks inside it, but a dive into a world's clouds has to be
+     written down before the dive begins, and the bottom of it can be months
+     away — which is how a shielded ship sailed straight through Grumm's air
+     without the shield ever being used. */
+  const inAir = world.get(state.ship.body).atmo && state.keys.heatShield;
+  const nodes = effectiveNodes(state, inAir ? Math.max(dtDays + 1, 150) : dtDays + 1);
   // Stop the step at the first change of reach or burn, so warp cannot skip
   // past an encounter the player was warping towards.
   const opts = { atmosphere: !state.keys.heatShield, dvAvailable: state.dv, stopOnSoi: true, stopOnBurn: true };
@@ -1613,18 +1627,29 @@ export function resolveToll(state, choice){
 
 export function nearestPort(state){
   const here = shipAbsPos(state);
-  let best = null;
-  for(const id of portIds){
-    const b = world.get(id);
-    if(!b.port) continue;
-    // A tug will not take you somewhere with nobody in it, and will not chase
-    // a colony that has left for the winter.
-    if(!PORTS[id].towAllowed) continue;
-    if(!portOpen(id, state.t)) continue;
-    const d = dist(here, absState(world, id, state.t).r);
-    if(!best || d < best.d) best = { id, d };
-  }
-  return best;
+  const dry = state.dv <= 1e-9;
+  const pick = requireFuel => {
+    let best = null;
+    for(const id of portIds){
+      const b = world.get(id);
+      if(!b.port) continue;
+      // A tug will not take you somewhere with nobody in it, will not chase a
+      // colony that has left for the winter, and will not tow you to where you
+      // already are.
+      if(!PORTS[id].towAllowed) continue;
+      if(!portOpen(id, state.t)) continue;
+      if(id === state.dockedAt) continue;
+      /* And a tow that leaves a dry ship at a dock with no fuel pump has not
+         rescued anybody: Mossback, Hush, the Arc and the Lantern sell nothing
+         to burn, so a ship towed to one of them could never leave again. The
+         design is explicit that nothing costs the save. */
+      if(requireFuel && PORTS[id].fuelPricePerKms == null) continue;
+      const d = dist(here, absState(world, id, state.t).r);
+      if(!best || d < best.d) best = { id, d };
+    }
+    return best;
+  };
+  return pick(dry) ?? pick(false);
 }
 
 export function towQuote(state){

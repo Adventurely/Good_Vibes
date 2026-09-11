@@ -178,7 +178,15 @@ export const FORMULAS = {
   haggle: F.haggle ?? { spread: 0.07 },
   volatility: F.volatility ?? { bySpecies: {} },
   market: { disinterestMul: 0.6, resaleCap: 0.75 },
-  aerobrake: { k: 0.5, maxFraction: 0.6, floorApo: 1.25 },
+  /* Aerobraking. The shed is a fraction of the speed at the bottom of the
+     dive, scaled by how deep into the air the dive goes — and the fraction has
+     to be small, because the design sells skimming as *free braking*, not as a
+     free crash landing. At half the periapsis speed a single pass dumped the
+     ship into a circle just above the cloud tops, which costs more to climb
+     out of than capturing would have cost in the first place. A few per cent a
+     pass lets a pilot walk an orbit down over several passes and stop where
+     they want to be, which is the technique the design is describing. */
+  aerobrake: { k: 0.04, maxFraction: 0.12, floorApo: 1.25 },
   toll: { ...F.toll, cooldownDays: 30, maxCargoFraction: 0.4, giftRep: 3, giftChance: 0.35 },
   tow: { ...F.tow, minDays: 3, crashMul: 1.5 },
   contract: { ...F.contract, refreshDays: 10, latePayMul: 0.4, earlyFraction: 0.5 },
