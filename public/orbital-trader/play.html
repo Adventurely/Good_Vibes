@@ -602,7 +602,8 @@ $('dock-brake').addEventListener('click', () => {
   const before = S.kiss(state);
   const ix = S.brakeAtKiss(state);
   if(ix < 0){ toast('Nothing to brake for yet.', 'bad'); return; }
-  selectedNode = ix; replan(true); setTab('plan');
+  selectedNode = ix; replan(true);
+  if(tab === 'plan') renderTab();
   const mark = state.nodes[ix];
   const dv = S.fmtKms(Math.hypot(mark.prograde, mark.radial));
   toast(before?.crashes
@@ -685,7 +686,12 @@ function askAtPath(t){
       closeModal();
       const ix = S.addNode(state, t);
       if(ix < 0){ toast('No room for another burn on this road.', 'bad'); return; }
-      selectedNode = ix; holdForPlanning(ix); replan(true); setTab('plan'); tutorialCheck(); save();
+      /* The chart is the editor, so writing a burn down leaves the panel
+         exactly as it was: shoving the side menu open over the sky is the
+         opposite of what somebody who just tapped the sky wanted. */
+      selectedNode = ix; holdForPlanning(ix); replan(true);
+      if(tab === 'plan') renderTab();
+      tutorialCheck(); save();
     });
     m.querySelector('#m-skip').addEventListener('click', () => { closeModal(); skipTo(t); });
   });
