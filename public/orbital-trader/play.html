@@ -362,10 +362,22 @@
     padding:.7rem .9rem; box-shadow:var(--gv-shadow);
   }
   #tut small{ color:var(--gold-ink); letter-spacing:.14em; text-transform:uppercase; font-size:.66rem; }
-  #tut h3{ margin:.15rem 0 .2rem; font-size:1rem; }
+  #tut h3{ margin:.15rem 0 .2rem; font-size:1rem; padding-right:1.6rem; }
   #tut p{ margin:0; color:var(--dim); font-size:.88rem; }
   #tut .btns{ margin-top:.5rem; justify-content:flex-end; }
   #tut[hidden]{ display:none; }
+  /* Fold it away. Theo is good company and still in the way of the sky, so
+     the card keeps its name and its number and loses everything else — one
+     tap to put it down, one to pick it up, and it stays where you left it. */
+  #tut-min{
+    position:absolute; top:.35rem; right:.4rem; width:26px; height:26px; line-height:1;
+    border:1px solid transparent; border-radius:8px; background:transparent;
+    color:var(--dim); cursor:pointer; font-size:1.1rem;
+  }
+  #tut-min:hover{ color:var(--ink); border-color:var(--line-2); }
+  #tut.min{ width:auto; max-width:min(92vw, 440px); padding:.35rem 2.2rem .35rem .7rem; cursor:pointer; }
+  #tut.min h3{ font-size:.86rem; margin:.1rem 0 0; }
+  #tut.min p, #tut.min .btns{ display:none; }
 
   #back{ position:fixed; left:.8rem; top:calc(46px + env(safe-area-inset-top)); z-index:5; color:var(--faint); font-size:.78rem; text-decoration:none; }
   #back:hover{ color:var(--ink); }
@@ -450,10 +462,11 @@
 </div>
 
 <div id="tut" hidden>
+  <button id="tut-min" title="Fold it away" aria-label="Fold this message away" aria-expanded="true">&#8211;</button>
   <small id="tut-step"></small>
   <h3 id="tut-title"></h3>
   <p id="tut-body"></p>
-  <div class="btns"><button class="btn sm" id="tut-skip">Skip the lesson</button></div>
+  <div class="btns"><button class="btn sm" id="tut-skip">Stop writing, Theo</button></div>
 </div>
 
 <dialog id="modal"></dialog>
@@ -1570,7 +1583,7 @@ function tutorialCheck(){
   if(state.dockedAt === target){
     state.flags.tutorial = TUT.length;
     $('tut').hidden = true;
-    if(!state.flags.tutorialDone){ state.flags.tutorialDone = true; toast('Lesson done. The rafts are yours to hop.', 'story'); }
+    if(!state.flags.tutorialDone){ state.flags.tutorialDone = true; toast("Nellie has her crate. Theo says you'll do.", 'story'); }
     return;
   }
   if(step === 0 && marked) step = 1;
@@ -1583,11 +1596,27 @@ function tutorialCheck(){
   if(step >= TUT.length){ $('tut').hidden = true; return; }
   const s = TUT[step];
   $('tut').hidden = false;
-  $('tut-step').textContent = `Lesson · ${step + 1} of ${TUT.length}`;
+  $('tut-step').textContent = `Uncle Theo · ${step + 1} of ${TUT.length}`;
   $('tut-title').textContent = s.title;
   $('tut-body').textContent = s.body;
+  $('tut').classList.toggle('min', !!state.flags.tutorialFolded);
 }
 $('tut-skip').addEventListener('click', () => { state.flags.tutorialSkipped = true; $('tut').hidden = true; save(); });
+
+/* Folded or open, and it stays that way across steps and across sessions:
+   somebody who has put the card down does not want it standing up again every
+   time Theo has a new thought. */
+function setTutFolded(folded){
+  state.flags.tutorialFolded = !!folded;
+  $('tut').classList.toggle('min', !!folded);
+  $('tut-min').textContent = folded ? '+' : '\u2013';
+  $('tut-min').title = folded ? 'Read it' : 'Fold it away';
+  $('tut-min').setAttribute('aria-expanded', String(!folded));
+  save();
+}
+$('tut-min').addEventListener('click', e => { e.stopPropagation(); setTutFolded(!state.flags.tutorialFolded); });
+// Folded, the whole card is the way back open.
+$('tut').addEventListener('click', () => { if(state.flags.tutorialFolded) setTutFolded(false); });
 setInterval(() => { if(!$('tut').hidden) tutorialCheck(); }, 1500);
 
 /* ------------------------------------------------------------- boot */
@@ -1605,6 +1634,7 @@ backToShip(true);
 syncView();
 setRate(state.warp ?? 1);
 tutorialCheck();
+setTutFolded(!!state.flags.tutorialFolded);
 if(state.pending?.kind === 'toll') showToll(state.pending);
 if(state.pending?.kind === 'crash') showCrash(state.pending.body);
 requestAnimationFrame(frame);

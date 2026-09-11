@@ -483,35 +483,35 @@ export const NARRATIVE = {
   "lanternArrival": "You have come as far as anyone goes. The light is there, exactly where the Chorus pointed their observatory, and it is not a star and not a ship.\nIt blinks. You wait, and it blinks again, and the gap is not the same gap. There is no pattern in it that you can hold.\nThe Chorus built a silent room nine astronomical units back and aimed it at this. They left no doors, no stairs, no seats, and no explanation. Why does a thing at the edge of a system blink at all, if not for somebody?"
  },
  "opening": {
-  "title": "A crate of gear oil for Pip",
-  "line": "The dockhands at Pip have been asking after this for a week. No rush they can name, but they will notice if it is slow.",
-  "briefing": "You are in orbit above Tessel with one crate aboard and nowhere to be but Pip, the little moon of dry docks a short hop out. Tap your path, push forward, and go and deliver it."
+  "title": "A crate for your Aunt Nellie",
+  "line": "Theo's writing again: \"She's at the dry docks on Pip. Don't shake it and don't open it.\"",
+  "briefing": "One crate, one moon, one aunt. Everything else can wait."
  },
  "tutorial": [
   {
    "step": "mark",
-   "title": "Tap your path",
-   "body": "You are already in orbit around Tessel, with a crate for Pip in the hold. Tap the white line you are riding and choose 'Plan a burn'. That puts a mark on it: a burn that fires by itself when the clock reaches it. Nothing is spent yet, and you can change it or scrap it."
+   "title": "That crate's for your Aunt Nellie",
+   "body": "Morning. You're in orbit over Tessel and there's a crate in your hold with Nellie's name on it — she runs the dry docks out on Pip. Tap the white line you're riding and pick 'Plan a burn'. That only writes it down. You haven't spent a drop yet."
   },
   {
    "step": "push",
-   "title": "Press the green arrow",
-   "body": "Four arrows sit round the burn's ring on the chart. The green one forward pushes you along the way you are already going and lifts the far side of your orbit; the orange one behind takes it down again. The two blue ones swing it sideways. Tap them, or hold one down, and watch the solid yellow line move. That is the road the burn would put you on; the dashed white one behind it is the orbit you are on until it fires."
+   "title": "Four arrows. Green first",
+   "body": "See the arrows round the mark? Green pushes you the way you're already going and throws the far side of your orbit outward. Orange pulls it back. The two blue ones shove it sideways. Press green a few times and watch the yellow line swing out — that's where the burn leaves you."
   },
   {
    "step": "reach",
-   "title": "Push until the yellow line touches Pip",
-   "body": "The solid yellow line is where the burn would put you. Keep pressing Forward, and nudge Out or In, until it runs into Pip's circle. Tap the burn's ring again when it does, and the arrows put themselves away — the yellow road stays on the chart, dashed, until the burn fires."
+   "title": "Get the yellow out to Pip",
+   "body": "Keep pressing until the yellow line reaches Pip's circle. If it's running wide, tap blue. When it's touching, tap the mark's ring to fold the arrows away. The burn stays written down."
   },
   {
    "step": "skip",
-   "title": "Let the clock run to it",
-   "body": "Tap your road ahead of the burn and choose 'Warp here'. The game tells you how long the wait is, runs the sky at whatever speed covers it in about ten seconds, and stops itself a moment before the burn so you can watch it fire."
+   "title": "Don't sit there watching it",
+   "body": "It's a day and a half of nothing. Tap your road somewhere ahead of the mark and choose 'Warp here' — the clock runs itself there in about ten seconds and stops a moment before the burn. You don't press anything. It goes on its own."
   },
   {
    "step": "dock",
-   "title": "Get close, get slow, tie up",
-   "body": "Inside Pip's reach the chart swings round to Pip and draws your orbit there. Aim for kissing distance inside the harbour mouth, then burn back to shed speed. Close enough and slow enough, and Pip takes your lines and your crate."
+   "title": "Low and slow, and Nellie does the rest",
+   "body": "Once you're in Pip's reach the chart swings round to it. What you want is a tidy little circle close in: burn backward at the low point and drop into one. The moment you've got it an anchor appears with the buttons. Press that. And give her my love."
   }
  ],
  "contractsIntro": "Cargo pays the fuel. People are why anyone flies at all: they want somewhere by some day, and they remember whether you managed it.",
