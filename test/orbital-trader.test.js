@@ -672,3 +672,183 @@ test('a dry ship with an empty purse can still leave the dock', () => {
   fine.money = 0;
   assert.equal(S.fuelCredit(fine), 0);
 });
+
+test('the Scatter toll takes a share by worth, never nothing and never the hold', () => {
+  /* A toll counted in crates took nothing at all from a light hold of valuable
+     things and stripped a heavy hold of cheap ones. It is a share of what the
+     hold is worth, and the cats' oath is the ceiling. */
+  const cases = [
+    ['a light hold of dear things', [{ good: 'tideglass', qty: 3 }]],
+    ['a heavy hold of cheap things', [{ good: 'grain', qty: 24 }]],
+    ['a mixed hold', [{ good: 'tideglass', qty: 4 }, { good: 'grain', qty: 10 }]],
+    ['one crate', [{ good: 'tideglass', qty: 1 }]],
+  ];
+  for(const [name, hold] of cases){
+    const s = S.newGame(13);
+    S.undock(s);
+    s.cargo = hold.map(h => ({ ...h, t: s.t, price: S.goodById(h.good).basePrice, from: 'tessel' }));
+    const worth = S.cargoValue(s);
+    if(worth < FORMULAS.toll.minCargoValue) continue;   // they wave a poor ship through
+    const asked = Math.round(Math.min(FORMULAS.toll.cap, FORMULAS.toll.fraction * worth));
+    s.pending = { kind: 'toll', amount: asked, captain: 'Captain Test', line: '', cargoValue: worth };
+    const before = s.cargo.reduce((a, c) => a + c.qty, 0);
+    const rep0 = s.rep.cat;
+    const r = S.resolveToll(s, 'cargo');
+    assert.ok(r.ok, name);
+    const left = s.cargo.reduce((a, c) => a + c.qty, 0);
+    const tookValue = worth - S.cargoValue(s);
+    const paidCoin = CONST.START_MONEY - s.money;
+    assert.ok(tookValue > 0 || paidCoin > 0, `${name}: nothing changed hands and they thanked you for it`);
+    assert.ok(tookValue <= worth * FORMULAS.toll.maxCargoFraction + 1e-9, `${name}: took ${tookValue} of ${worth}`);
+    // Crates are lumpy: a toll settled in goods can only be made of what is
+    // aboard, and nothing small enough means coin instead of a bigger crate.
+    if(tookValue > 0) assert.ok(tookValue <= asked * 1.1 + 1 || before - left === 1, `${name}: took ${tookValue} against a toll of ${asked}`);
+    assert.ok(left > 0, `${name}: they took the hold`);
+    assert.ok(s.rep.cat > rep0, `${name}: no goodwill for yielding`);
+  }
+  /* A ship with nothing worth taking is never hailed in the first place: the
+     toll is a custom, not a shakedown. */
+  const poor = S.newGame(13);
+  S.undock(poor);
+  poor.cargo = [{ good: 'grain', qty: 1, t: poor.t, price: 8, from: 'bramble' }];
+  poor.ship = { body: 'lamp', ...O.circularState(MU, CONST.BELT.inner - 0.1, 1.0) };
+  poor.ship.v = O.scale(poor.ship.v, 1.12);
+  let guard = 0;
+  while(!poor.toll.inBelt && guard++ < 1200) S.tick(poor, 0.5);
+  assert.ok(poor.toll.inBelt, 'the poor ship never crossed');
+  assert.equal(poor.pending, null, 'a hold worth nothing was still shaken down');
+  assert.ok(poor.log.some(l => /waves you through|laughs/.test(l.text)), 'and nobody said anything about it');
+});
+
+test('a save is refused at the door rather than halfway through a frame', () => {
+  const good = S.serialize(S.newGame(5));
+  assert.ok(S.restore(good));
+  const broken = {
+    'no ship': s => { delete s.ship; },
+    'a ship nowhere': s => { s.ship.body = 'atlantis'; },
+    'a position that is not numbers': s => { s.ship.r = ['x', 2]; },
+    'a time that is not a number': s => { s.t = 'soon'; },
+    'docked at a non-port': s => { s.dockedAt = 'grumm'; },
+    'a hold of something unknown': s => { s.cargo = [{ good: 'moonbeams', qty: 2 }]; },
+    'a plan of nonsense': s => { s.nodes = [{ prograde: 1 }]; },
+    'a tank that does not exist': s => { s.tiers.tank = 9; },
+    'the wrong version': s => { s.version = 2; },
+  };
+  for(const [what, wreck] of Object.entries(broken)){
+    const s = JSON.parse(good);
+    wreck(s);
+    assert.throws(() => S.restore(s), /Not a save/, `${what} was let through`);
+  }
+  // Fields a later version added are filled in quietly rather than refused.
+  const old = JSON.parse(good);
+  for(const k of ['markets', 'offers', 'log', 'rep', 'visited', 'flags', 'justLeft', 'shipName']) delete old[k];
+  old.warp = 99;
+  const back = S.restore(old);
+  assert.ok(back.markets && back.offers && back.log && back.rep.otter === 0 && back.shipName);
+  assert.equal(back.warp, 0);
+});
+
+test('shelves refill at the rate the people behind them work', () => {
+  /* Bramble grows grain by the sackful every day; the Arc cuts a relic out of
+     a ruin twice a year. One decay curve for both made a rare thing as easy to
+     strip-mine as a common one. */
+  const quick = ['bramble', 'grain'], slow = ['arc', 'chorustube'];
+  for(const [port, good] of [quick, slow]){
+    const s = S.newGame(5);
+    const row = PORTS[port].sells.find(r => r.good === good);
+    assert.ok(row, `${port} does not sell ${good}`);
+    const full = S.stockAvailable(s, port, good);
+    s.markets[port] = { sold: {}, bought: { [good]: { q: full, t: s.t } } };
+    assert.equal(S.stockAvailable(s, port, good), 0);
+    const wait = S.restockIn(s, port, good);
+    assert.ok(wait > 0 && Number.isFinite(wait));
+    s.t += wait * 1.01;
+    assert.equal(S.stockAvailable(s, port, good), full, `${port}/${good} did not come back`);
+  }
+  // And the slow one really is slower, by a lot.
+  const s = S.newGame(5);
+  const stock = id => S.stockAvailable(s, id[0], id[1]);
+  const wasQuick = stock(quick), wasSlow = stock(slow);
+  for(const id of [quick, slow]) s.markets[id[0]] = { sold: {}, bought: { [id[1]]: { q: stock(id), t: s.t } } };
+  void wasQuick; void wasSlow;
+  const fullQuick = wasQuick, fullSlow = wasSlow;
+  s.t += 20;
+  assert.ok(S.stockAvailable(s, quick[0], quick[1]) >= fullQuick, 'grain did not grow back in three weeks');
+  assert.ok(S.stockAvailable(s, slow[0], slow[1]) <= fullSlow * 0.25, 'a relic all but grew back in three weeks');
+});
+
+test('a colony that has left for the winter sells nothing at all', () => {
+  const s = S.newGame(5);
+  // Wanderwell, far out and shut.
+  let guard = 0;
+  while(S.portOpen('wanderwell', s.t) && guard++ < 4000) s.t += 1;
+  assert.ok(!S.portOpen('wanderwell', s.t), 'Wanderwell never closes');
+  s.dockedAt = 'wanderwell';
+  assert.equal(S.fuelPrice(s), null, 'the pumps are still running');
+  assert.equal(S.refuel(s, 1).ok, false);
+  assert.equal(S.refreshOffers(s, 'wanderwell', true).length, 0, 'somebody is still hiring');
+  const anyUpgrade = UPGRADES.find(u => u.soldAt?.includes('wanderwell'));
+  if(anyUpgrade) assert.equal(S.canBuyUpgrade(s, anyUpgrade.id).ok, false);
+  // And a tow will not take you to a place with nobody in it.
+  s.dockedAt = null;
+  S.undock(s);
+  for(const id of ['lantern', 'wanderwell']){
+    const b = world.get(id);
+    const at = O.absState(world, id, s.t);
+    s.ship = { body: 'lamp', r: at.r, v: at.v };
+    const q = S.towQuote(s);
+    if(!PORTS[id].towAllowed || !S.portOpen(id, s.t)) assert.notEqual(q.port, id, `towed to ${id}, where nobody is`);
+    void b;
+  }
+});
+
+test('a contract whose day has gone leaves the board', () => {
+  const s = S.newGame(5);
+  const offers = S.refreshOffers(s, 'tessel', true);
+  assert.ok(offers.length);
+  const c = offers[0];
+  s.t = c.deadline + 1;
+  assert.equal(S.canTake(s, c).ok, false, 'a dead contract is still takeable');
+  const after = S.refreshOffers(s, 'tessel');
+  assert.ok(!after.some(o => o.id === c.id), 'a dead contract is still on the board');
+});
+
+test('quantities are whole crates, and at least one', () => {
+  const s = S.newGame(5);
+  const good = PORTS.tessel.sells[0].good;
+  const money = s.money;
+  for(const bad of [-5, 0, 1.5, NaN, '3']){
+    assert.equal(S.canBuy(s, good, bad).ok, false, `buying ${bad} was allowed`);
+    assert.equal(S.buy(s, good, bad).ok, false, `buying ${bad} went through`);
+    assert.equal(S.sell(s, good, bad).ok, false, `selling ${bad} went through`);
+  }
+  assert.equal(s.money, money);
+  assert.equal(S.usedUnits(s), 0);
+});
+
+test('casting off with a dry tank does not lock the door behind you', () => {
+  const s = S.newGame(5);
+  s.dv = 0;
+  S.undock(s);
+  assert.equal(S.dockingStatus(s), null, 'the port asks you straight back');
+  S.tick(s, 0.01);
+  assert.equal(s.justLeft, null, 'a dry ship is shut out of the only port it can reach');
+  const st = S.dockingStatus(s);
+  assert.ok(st && st.port === 'tessel' && st.ok, 'and cannot get back in');
+  assert.ok(S.dock(s).ok);
+});
+
+test('arriving on the end of a rope is still arriving', () => {
+  const s = S.newGame(5);
+  S.undock(s);
+  s.t = 3000;
+  const h = world.get('hush');
+  const at = O.absState(world, 'hush', s.t);
+  s.ship = { body: 'lamp', r: at.r, v: at.v };
+  s.dv = 0;
+  const r = S.callTow(s, 'dry');
+  assert.equal(r.port, 'hush');
+  assert.ok(s.keys.stealth, 'towed to Hush and found nothing there');
+  assert.ok(s.visited.includes('hush'));
+  void h;
+});

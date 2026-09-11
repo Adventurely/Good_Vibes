@@ -789,7 +789,9 @@ function market(){
     const c1 = S.canBuy(state, gid, 1);
     const lock = g.needsRefrigeration && !state.keys.refrigeration ? '<span class="lock">needs refrigeration</span>' : '';
     const maxQ = Math.min(stock, Math.floor(state.money / price), Math.floor(S.freeUnits(state) / g.units));
-    out += `<div class="row"><div class="name"><b>${esc(g.name)}</b><small>${esc(g.blurb ?? g.category)} · ${stock} in stock · ${g.units} unit${g.units > 1 ? 's' : ''} each ${lock}</small></div>
+    const back = S.restockIn(state, port, gid);
+    const restock = stock === 0 && back ? (back === Infinity ? ' · <span class="down">none left, and none coming</span>' : ` · <span class="down">none left; more in ${S.fmtDays(back)}</span>`) : '';
+    out += `<div class="row"><div class="name"><b>${esc(g.name)}</b><small>${esc(g.blurb ?? g.category)} · ${stock} in stock${restock} · ${g.units} unit${g.units > 1 ? 's' : ''} each ${lock}</small></div>
       <div class="price">${S.fmtMoney(price)}<small>${trend(price, g.basePrice)} base ${S.fmtMoney(g.basePrice)}</small></div>
       <div class="btns"><button class="btn sm" data-act="buy|${gid}|1" ${c1.ok ? '' : 'disabled title="' + esc(c1.reason) + '"'}>+1</button><button class="btn sm" data-act="buy|${gid}|10" ${maxQ >= 10 ? '' : 'disabled'}>+10</button><button class="btn sm" data-act="buy|${gid}|${maxQ}" ${maxQ > 1 ? '' : 'disabled'}>all</button></div></div>`;
   }

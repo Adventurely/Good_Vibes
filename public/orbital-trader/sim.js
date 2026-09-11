@@ -363,7 +363,13 @@ export function tick(state, dtDays){
   if(state.justLeft){
     const b = world.get(state.justLeft);
     const here = shipAbsPos(state);
-    if(dist(here, absState(world, state.justLeft, state.t).r) > b.zoneRadius) state.justLeft = null;
+    /* The port goes quiet until the ship is clear of its mouth — or until it
+       is plain the ship is not going anywhere, because a door that locks
+       behind a pilot with a dry tank is exactly the dead end this game is not
+       allowed to have. */
+    const clear = dist(here, absState(world, state.justLeft, state.t).r) > b.zoneRadius;
+    const stuck = state.dv <= 1e-9 && !state.nodes.length;
+    if(clear || stuck) state.justLeft = null;
   }
   if(state.nodes.length){
     const stale = state.nodes.filter(n => n.t < state.t - 1e-9);
@@ -1017,6 +1023,20 @@ function decayed(entry, t){
   return entry.q * Math.pow(0.5, (t - entry.t) / FORMULAS.saturation.halfLifeDays);
 }
 const q0For = portId => FORMULAS.saturation.q0 * (PORTS[portId].marketSize ?? 1);
+
+/* How much of a stall's stock is still missing. Selling into a market and
+ * buying out of one are not the same thing and must not decay the same way:
+ * a market's appetite fades on its own clock, but a shelf refills at the rate
+ * the people behind it can make more. Bramble grows grain by the sackful every
+ * day; the Arc cuts a relic out of a ruin twice a year. A single half-life for
+ * both made a rare thing as easy to strip-mine as a common one. */
+function shortfall(state, portId, goodId){
+  const row = PORTS[portId].sells.find(r => r.good === goodId);
+  const e = state.markets[portId]?.bought?.[goodId];
+  if(!row || !e) return 0;
+  const regen = row.regenPerDay ?? 0;
+  return Math.max(0, e.q - regen * Math.max(0, state.t - e.t));
+}
 export function saturationMul(state, portId, goodId){
   const m = state.markets[portId];
   const q = decayed(m?.sold?.[goodId], state.t);
@@ -1024,9 +1044,7 @@ export function saturationMul(state, portId, goodId){
   return q0 / (q0 + q);
 }
 function scarcityMul(state, portId, goodId){
-  const m = state.markets[portId];
-  const q = decayed(m?.bought?.[goodId], state.t);
-  return 1 + 0.5 * (q / q0For(portId));
+  return 1 + 0.5 * (shortfall(state, portId, goodId) / q0For(portId));
 }
 
 /* Emberkin fashion: a slow wave per good, so what Cinder wants this week is
@@ -1102,14 +1120,22 @@ export function freshness(g, ageDays){
 export function stockAvailable(state, portId, goodId){
   const row = PORTS[portId].sells.find(s => s.good === goodId);
   if(!row) return 0;
-  const m = state.markets[portId];
-  const taken = decayed(m?.bought?.[goodId], state.t);
-  return Math.max(0, Math.round(row.stock - taken));
+  return Math.max(0, Math.round(row.stock - shortfall(state, portId, goodId)));
+}
+/* When a stall expects to have this back on the shelf, in days. Null when it
+ * is not short, or when nobody is making any more of it. */
+export function restockIn(state, portId, goodId){
+  const short = shortfall(state, portId, goodId);
+  if(short <= 0) return null;
+  const regen = PORTS[portId].sells.find(r => r.good === goodId)?.regenPerDay ?? 0;
+  return regen > 0 ? short / regen : Infinity;
 }
 
 function market(state, portId){
   return state.markets[portId] ??= { sold: {}, bought: {} };
 }
+/* The appetite book: how much has been sold into this market lately, fading
+ * exponentially, which is what makes a good pay less the more of it you land. */
 function bump(book, goodId, qty, t){
   const e = book[goodId];
   const q = e ? decayed(e, t) : 0;
@@ -1119,6 +1145,7 @@ function bump(book, goodId, qty, t){
 export function canBuy(state, goodId, qty){
   const port = state.dockedAt;
   if(!port) return { ok: false, reason: 'Not docked.' };
+  if(!Number.isInteger(qty) || qty < 1) return { ok: false, reason: 'That is not a number of crates.' };
   if(!portOpen(port, state.t)) return { ok: false, reason: 'The market is closed.' };
   const g = goodById(goodId);
   const price = buyPrice(state, port, goodId);
@@ -1136,7 +1163,11 @@ export function buy(state, goodId, qty){
   const port = state.dockedAt;
   const total = c.price * qty;
   state.money -= total;
-  bump(market(state, port).bought, goodId, qty, state.t);
+  // The shelf book, which refills at the stall's own rate rather than fading.
+  {
+    const book = market(state, port).bought;
+    book[goodId] = { q: shortfall(state, port, goodId) + qty, t: state.t };
+  }
   // Stacks are split by purchase time, because freshness is per crate.
   const stack = state.cargo.find(s => s.good === goodId && Math.abs(s.t - state.t) < 1e-9 && s.price === c.price);
   if(stack) stack.qty += qty; else state.cargo.push({ good: goodId, qty, t: state.t, price: c.price, from: port });
@@ -1151,9 +1182,10 @@ export function sell(state, goodId, qty){
   const port = state.dockedAt;
   if(!port) return { ok: false, reason: 'Not docked.' };
   if(!portOpen(port, state.t)) return { ok: false, reason: 'The market is closed.' };
+  if(!Number.isInteger(qty) || qty < 1) return { ok: false, reason: 'That is not a number of crates.' };
   const stacks = state.cargo.filter(s => s.good === goodId).sort((a, b) => a.t - b.t);
   const have = stacks.reduce((s, c) => s + c.qty, 0);
-  if(have < qty || qty <= 0) return { ok: false, reason: 'Not that many aboard.' };
+  if(have < qty) return { ok: false, reason: 'Not that many aboard.' };
   let left = qty, total = 0, cost = 0;
   for(const s of stacks){
     if(left <= 0) break;
@@ -1188,6 +1220,7 @@ export function cargoValue(state, portId = null){
 export function fuelPrice(state, portId = state.dockedAt){
   const p = PORTS[portId];
   if(!p || p.fuelPricePerKms == null) return null;
+  if(!portOpen(portId, state.t)) return null;   // the pumps went with the colony
   return p.fuelPricePerKms * fuelPriceMul(state) * (1 - repDiscount(state, p.species) * 0.5);
 }
 /* A ship with no fuel and no coin, tied up at a dock, is a ship that can never
@@ -1240,6 +1273,7 @@ export function canBuyUpgrade(state, id){
   const port = state.dockedAt;
   if(!u || !port) return { ok: false, reason: 'Not docked.' };
   if(!u.soldAt || !u.soldAt.includes(port)) return { ok: false, reason: 'Not sold here.' };
+  if(!portOpen(port, state.t)) return { ok: false, reason: 'The yard is shut for the season.' };
   if(ownsUpgrade(state, u)) return { ok: false, reason: 'Already fitted.' };
   if(u.kind !== 'key' && state.tiers[u.kind] !== u.tier - 1) return { ok: false, reason: 'Needs the tier below first.' };
   if(u.minRep && (state.rep[u.minRep.species] ?? 0) < u.minRep.value) return { ok: false, reason: `${SPECIES[u.minRep.species].plural} do not know you well enough yet.` };
@@ -1299,7 +1333,13 @@ function routeDays(from, to, t){
 
 export function refreshOffers(state, portId, force = false) {
   const existing = state.offers[portId];
-  if(existing && !force && state.t - existing.t < FORMULAS.contract.refreshDays) return existing.contracts;
+  if(existing && !force && state.t - existing.t < FORMULAS.contract.refreshDays){
+    /* Whatever is left of the board, minus anything whose day has been and
+       gone. A deadline in the past is not an offer, it is a trap. */
+    const live = existing.contracts.filter(c => c.deadline > state.t + 0.5);
+    if(live.length !== existing.contracts.length) existing.contracts = live;
+    return live;
+  }
   const p = PORTS[portId];
   const f = FORMULAS.contract;
   const contracts = [];
@@ -1309,7 +1349,7 @@ export function refreshOffers(state, portId, force = false) {
     (tp.species !== 'cat' || isMicro(portId)) &&
     (tp.species !== 'frog' || climateOf(portId) === 'cold') &&
     (tp.species !== 'emberkin' || ['hot', 'temperate'].includes(climateOf(portId))));
-  const want = p.passengers ? 3 + Math.floor(rnd(state) * 3) : 0;
+  const want = p.passengers && portOpen(portId, state.t) ? 3 + Math.floor(rnd(state) * 3) : 0;
   let guard = 0;
   while(contracts.length < want && guard++ < 40 && templates.length){
     const tp = templates[Math.floor(rnd(state) * templates.length)];
@@ -1339,6 +1379,7 @@ export function refreshOffers(state, portId, force = false) {
 
 export function canTake(state, contract){
   if(!state.dockedAt || contract.from !== state.dockedAt) return { ok: false, reason: 'Not here.' };
+  if(contract.deadline <= state.t) return { ok: false, reason: 'That day has gone.' };
   if(state.passengers.some(p => p.id === contract.id)) return { ok: false, reason: 'Already aboard.' };
   if(contract.needs.includes('refrigeration') && !state.keys.refrigeration) return { ok: false, reason: 'Needs refrigeration.' };
   if(freeUnits(state) < contract.units) return { ok: false, reason: 'No room aboard.' };
@@ -1434,22 +1475,48 @@ export function resolveToll(state, choice){
     text = fill(TEXT.events.tollPaidCoin, { amount: fmtMoney(paid), captain: p.captain });
     state.rep.cat += 1;
   }else{
-    // Take crates by value until the toll is met, but never more than the cap of the hold.
-    let owed = p.amount;
-    const maxUnits = Math.floor(usedUnits(state) * f.maxCargoFraction);
-    let takenUnits = 0;
+    /* Crates to the value of the toll, and never past it: they take a share,
+       not the hold. The ceiling is a share of what the hold is *worth* — a
+       ceiling counted in crates took nothing at all from a light hold of
+       valuable things, and let a heavy hold of cheap ones be stripped. And a
+       crate is only taken if it leaves the debt smaller than it found it, so
+       the last one cannot overshoot the toll by its own price. */
+    const value = cargoValue(state);
+    let owed = Math.min(p.amount, value * f.maxCargoFraction);
     const taken = [];
-    for(const s of [...state.cargo].sort((a, b) => goodById(b.good).basePrice - goodById(a.good).basePrice)){
-      const g = goodById(s.good);
-      while(s.qty > 0 && owed > 0 && takenUnits + g.units <= maxUnits){
-        s.qty--; owed -= g.basePrice; takenUnits += g.units;
-        const rec = taken.find(t => t.good === s.good); if(rec) rec.qty++; else taken.push({ good: s.good, qty: 1 });
-      }
+    /* Cheapest first, so the toll is made up of what it takes rather than
+       rounded up to the dearest thing aboard — and so a hold of expensive
+       crates cannot come out untouched because no single crate was small
+       enough to fit under the figure. */
+    const crates = [];
+    for(const stack of state.cargo) for(let i = 0; i < stack.qty; i++) crates.push(stack);
+    crates.sort((a, b) => goodById(a.good).basePrice - goodById(b.good).basePrice);
+    let left = crates.length;
+    for(const stack of crates){
+      const g = goodById(stack.good);
+      if(left <= 1) break;                  // never everything: the oath
+      if(owed < g.basePrice * 0.5) break;
+      stack.qty--; owed -= g.basePrice; left--;
+      const rec = taken.find(t => t.good === stack.good); if(rec) rec.qty++; else taken.push({ good: stack.good, qty: 1 });
+    }
+    /* Nothing aboard is small enough to make up the toll — three crates of
+       glassware against a bill worth half of one. Taking one anyway would be
+       taking more than was asked, which is the thing the oath is about, so
+       they settle in coin instead and say so. */
+    if(!taken.length){
+      const paid = Math.min(p.amount, Math.max(0, state.money) * 0.5);
+      state.money -= paid;
+      state.stats.tolls++;
+      state.pending = null;
+      state.rep.cat += 1;
+      logLine(state, 'tolled', TEXT.logTemplates.tolled, { captain: p.captain });
+      return { ok: true, text: fill(TEXT.events.tollPaidCoin, { amount: fmtMoney(paid), captain: p.captain }) };
     }
     state.cargo = state.cargo.filter(s => s.qty > 0);
     const list = taken.map(t => `${t.qty} ${goodById(t.good).name}`).join(', ') || 'nothing at all';
     text = fill(TEXT.events.tollPaidCargo, { cargo: list, captain: p.captain });
-    state.rep.cat += 1.5;
+    // Goodwill is for what was actually handed over, not for the offer.
+    state.rep.cat += taken.length ? 1.5 : 0;
   }
   state.stats.tolls++;
   state.pending = null;
@@ -1467,7 +1534,10 @@ export function nearestPort(state){
   for(const id of portIds){
     const b = world.get(id);
     if(!b.port) continue;
-    if(!portOpen(id, state.t) && !PORTS[id].towAllowed) continue;
+    // A tug will not take you somewhere with nobody in it, and will not chase
+    // a colony that has left for the winter.
+    if(!PORTS[id].towAllowed) continue;
+    if(!portOpen(id, state.t)) continue;
     const d = dist(here, absState(world, id, state.t).r);
     if(!best || d < best.d) best = { id, d };
   }
@@ -1499,12 +1569,17 @@ export function callTow(state, reason = 'dry'){
   state.stats.tows++;
   const pool = reason === 'crash' ? TEXT.events.towCrash : TEXT.events.towDry;
   const story = reason === 'atmosphere' ? TEXT.events.towAtmosphere : pool[Math.floor(rnd(state) * pool.length)];
+  if(!state.visited.includes(q.port)) state.visited.push(q.port);
   logLine(state, 'towed', TEXT.logTemplates.towed, { port: portName(q.port), cost: fmtMoney(cost), days: fmtDays(q.days) });
   if(state.debt > 0) logLine(state, 'story', TEXT.events.ledgerDebt);
   refreshOffers(state, q.port, true);
   const delivered = deliverHere(state, q.port);
   ageContracts(state);
-  return { ...q, cost, story, delivered };
+  /* Arriving on the end of a rope is still arriving: whatever the place has to
+     say to a first visitor, it says. */
+  const events = [];
+  milestonesOnDock(state, q.port, events);
+  return { ...q, cost, story, delivered, events };
 }
 
 /* Paying Ledger back happens whenever there is coin: quietly, first. */
@@ -1549,13 +1624,39 @@ function milestonesOnDock(state, port, events){
 /* ------------------------------------------------------------ persist */
 
 export function serialize(state){ return JSON.stringify(state); }
+/* What a save must carry to be playable, and what it may simply be missing.
+ * Anything that gets read while drawing a frame has to be right before the
+ * page starts drawing: a save that passes the door and then throws halfway
+ * through a render leaves a black screen and no way back. */
 export function restore(json){
   const s = typeof json === 'string' ? JSON.parse(json) : json;
-  if(!s || s.version !== 1 || !s.ship || !Array.isArray(s.nodes)) throw new Error('Not a save this game understands.');
-  // Old saves may lack later fields; fill quietly.
+  const bad = why => { throw new Error(`Not a save this game understands: ${why}.`); };
+  if(!s || typeof s !== 'object') bad('it is not an object');
+  if(s.version !== 1) bad(`it is version ${s.version}`);
+  if(!s.ship || typeof s.ship !== 'object') bad('it has no ship');
+  if(!world.get(s.ship.body)) bad(`its ship is at "${s.ship.body}", which is nowhere`);
+  for(const k of ['r', 'v']){
+    const vec = s.ship[k];
+    if(!Array.isArray(vec) || vec.length !== 2 || !vec.every(Number.isFinite)) bad(`the ship's ${k === 'r' ? 'position' : 'velocity'} is not a pair of numbers`);
+  }
+  for(const k of ['t', 'money', 'dv', 'tank']){
+    if(!Number.isFinite(s[k])) bad(`${k} is ${s[k]}`);
+  }
+  if(s.dockedAt != null && !PORTS[s.dockedAt]) bad(`it is docked at "${s.dockedAt}", which is not a port`);
+  if(!Array.isArray(s.nodes) || s.nodes.some(n => !n || !Number.isFinite(n.t))) bad('its plan is not a list of marks');
+  if(!Array.isArray(s.cargo) || s.cargo.some(c => !c || !goodById(c.good) || !Number.isFinite(c.qty))) bad('its hold holds something unknown');
+  if(!Array.isArray(s.passengers)) bad('its passenger list is not a list');
+  if(!s.tiers || ['tank', 'engine', 'hold'].some(k => !tiers(k)[s.tiers[k]])) bad('it is fitted with something this game does not have');
+  // Everything below is either filled in or safely absent.
+  s.keys ??= {}; s.markets ??= {}; s.offers ??= {}; s.log ??= [];
+  s.rep = { emberkin: 0, otter: 0, cat: 0, frog: 0, ...(s.rep ?? {}) };
   s.pending ??= null; s.flags ??= {}; s.stats ??= {}; s.visited ??= [s.dockedAt].filter(Boolean);
   s.toll ??= { lastT: -1e9, inBelt: false };
   s.debt ??= 0; s.target ??= null; s.justLeft ??= null;
+  s.warp = Number.isInteger(s.warp) && s.warp >= 0 && s.warp < CONST.WARP_LEVELS.length ? s.warp : 0;
+  s.rng = Number.isFinite(s.rng) ? s.rng : 1;
+  s.shipName ??= TEXT.shipNames[0];
+  if(s.target && !world.get(s.target)) s.target = null;
   return s;
 }
 
