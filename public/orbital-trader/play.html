@@ -458,6 +458,13 @@ function replan(force = false){
         ? `hits ${S.portName(ic.body)}`
         : `${S.portName(ic.body)} ${fmtAu(ic.altitude)} · ${S.fmtKms(ic.speed)}${ic.inMouth ? ' · in the mouth' : ''}`)
     : null;
+  /* The window in the corner already says whose encounter it is, so its line
+     is the numbers only. */
+  insetLabel = ic
+    ? (ic.grazes
+        ? 'this road hits it'
+        : `${fmtAu(ic.altitude)} · ${S.fmtKms(ic.speed)}${ic.inMouth ? ' · in the mouth' : ''}`)
+    : null;
   apses = [];
   prediction.segments.forEach((seg, i) => {
     const b = world.get(seg.body);
@@ -476,7 +483,7 @@ let firstStoryDone = false;
 let lockedTo = null;
 /* The one number the on-chart editor shows. Recomputed when the burn changes,
    not every frame: solving what a mark costs is not free. */
-let nodeLabel = null, nodeLabelKey = '', interceptLabel = null;
+let nodeLabel = null, nodeLabelKey = '', interceptLabel = null, insetLabel = null;
 function refreshNodeLabel(){
   const n = state.nodes[selectedNode];
   if(!n || state.dockedAt){ nodeLabel = null; nodeLabelKey = ''; return; }
@@ -524,7 +531,7 @@ function frame(now){
     prediction, nodes: state.nodes, nodePositions, selectedNode, apses,
     editing: selectedNode >= 0 && !!state.nodes[selectedNode],
     shipLocalV: state.dockedAt ? null : state.ship.v,
-    nodeLabel, interceptLabel,
+    nodeLabel, interceptLabel, insetLabel,
     belt, nearPort: docking?.port ?? null, docking,
   });
   renderHud(docking);
@@ -747,6 +754,7 @@ canvas.addEventListener('pointerdown', e => {
     drag = null; return;
   }
   const hit = chart.hitTest(e.clientX, e.clientY);
+  if(hit?.kind === 'inset'){ lookAtEncounter(); drag = null; return; }
   if(hit?.kind === 'handle'){
     if(hit.axis === 'delete'){
       S.removeNode(state, hit.index); selectedNode = -1; replan(true); renderTab(); save();
@@ -914,6 +922,18 @@ function usableHalf(){
   const w = chart.width - (panelOpen && innerWidth > 760 ? $('panel').getBoundingClientRect().width : 0);
   return Math.min(w, chart.height);
 }
+/* Take the main chart to the encounter the corner window is showing: centre
+   on that world and pick a zoom that frames its reach. This is the one place
+   the game chooses a scale without being asked for a fit, and it is because
+   the player asked for it by tapping the thing. */
+function lookAtEncounter(){
+  const ic = prediction?.intercept;
+  if(!ic) return;
+  chart.focus(ic.body, null, false);
+  chart.frameBody(ic.body);
+  toast(`Looking at ${esc(S.portName(ic.body))}. Press f for your ship.`);
+}
+
 function backToShip(fit = false){ chart.camera.follow = 'ship'; if(fit) frameShipOrbit(); }
 function frameShipOrbit(){
   const span = roadSpan();

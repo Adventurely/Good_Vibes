@@ -118,7 +118,7 @@ export function createChart(canvas, world, opts = {}){
        the right of the chart, negative y when a sheet covers the bottom. */
     offset: [0, 0],
     /* Last frame's screen-space records, for hit testing. */
-    hits: { bodies: [], nodes: [], handles: [], pathSegs: [] },
+    hits: { bodies: [], nodes: [], handles: [], pathSegs: [], inset: null },
     reducedMotion: !!opts.reducedMotion,
     /* The scale bar is a navigation tool. On a thumbnail or behind a title it
        is a stray measurement in the corner of a picture. */
@@ -200,7 +200,7 @@ function draw(chart, view){
   const { ctx, world, camera } = chart;
   const W = chart.width, H = chart.height;
   const t = view.t;
-  chart.hits = { bodies: [], nodes: [], handles: [], pathSegs: [] };
+  chart.hits = { bodies: [], nodes: [], handles: [], pathSegs: [], inset: chart.hits?.inset ?? null };
 
   // Positions of every body now, once per frame.
   const pos = new Map();
@@ -225,6 +225,7 @@ function draw(chart, view){
   if(view.prediction) drawPrediction(chart, view, pos);
   drawShip(chart, view);
   if(view.prediction && view.nodes) drawNodes(chart, view, pos);
+  if(view.prediction) drawEncounterInset(chart, view);
   if(chart.showScale) drawScaleBar(chart);
 }
 
@@ -622,11 +623,9 @@ function drawIntercept(chart, view, anchors, afterBurnAt){
   ctx.moveTo(p[0], p[1] - 10); ctx.lineTo(p[0], p[1] - 3);
   ctx.moveTo(p[0], p[1] + 3); ctx.lineTo(p[0], p[1] + 10);
   ctx.stroke();
-  if(view.interceptLabel){
-    ctx.font = '600 11px ui-sans-serif, system-ui, sans-serif';
-    ctx.fillStyle = ic.grazes ? PALETTE.crash : PALETTE.text;
-    ctx.fillText(view.interceptLabel, p[0] + 13, p[1] + 15);
-  }
+  /* No text here. At the zoom this is usually seen at, the nearest pass, the
+     way out and the moon's own name land on the same twenty pixels; the
+     numbers live in the encounter window instead, where there is room. */
 }
 
 function drawShip(chart, view){
@@ -725,6 +724,123 @@ function drawNodes(chart, view, pos){
   }
 }
 
+/* ------------------------------------------------------- the encounter */
+
+/* A moon's whole sphere of influence is thirty thousand kilometres across and
+ * the orbit you plan it from is a hundred thousand: at the zoom that shows
+ * you the road, the entire encounter is ten pixels, and ten pixels is not a
+ * thing anybody can aim. Zooming to it is no answer either — you would lose
+ * the road you are steering, and the zoom is the player's to set.
+ *
+ * So the encounter gets its own small window in the corner, at its own scale,
+ * drawn in the moon's frame where the geometry is simple: the moon, its
+ * reach, its harbour mouth, the road through it, the door in, the door out,
+ * and the nearest pass. The main chart keeps doing what it was doing. Tap the
+ * window and the main chart goes there.
+ */
+const INSET = 208;
+function drawEncounterInset(chart, view){
+  const { ctx, world } = chart;
+  const ic = view.prediction.intercept;
+  chart.hits.inset = null;
+  if(!ic) return;
+  const b = world.get(ic.body);
+  if(!b) return;
+  const legs = view.prediction.segments.filter(sg => sg.body === ic.body);
+  if(!legs.length) return;
+
+  const ins = chart.labelInsets;
+  const size = Math.min(INSET, chart.width - ins.left - ins.right - 24, chart.height * 0.34);
+  if(size < 90) return;                       // no room: the numbers are in the panel anyway
+  const x0 = ins.left + 12, y0 = ins.top + 10;
+  const cx = x0 + size / 2, cy = y0 + size / 2;
+  chart.hits.inset = { x: x0, y: y0, w: size, h: size, body: ic.body };
+
+  // What has to fit: the reach, and whatever of the road runs inside it.
+  let span = b.soi ?? norm(ic.r) * 2;
+  for(const leg of legs) for(const pt of leg.points) span = Math.max(span, Math.hypot(pt[0], pt[1]));
+  const k = (size * 0.42) / (span * 1.06);
+  const P = p => [cx + p[0] * k, cy - p[1] * k];
+
+  ctx.save();
+  ctx.beginPath();
+  roundRect(ctx, x0, y0, size, size, 12);
+  ctx.fillStyle = 'rgba(8,10,16,0.78)'; ctx.fill();
+  ctx.strokeStyle = PALETTE.pathPlan; ctx.lineWidth = 1; ctx.stroke();
+  ctx.clip();
+
+  // The reach, the mouth, the moon.
+  if(b.soi){
+    ctx.strokeStyle = PALETTE.soiEdge; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.arc(cx, cy, b.soi * k, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  if(b.zoneRadius){
+    ctx.strokeStyle = PALETTE.zone; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, Math.max(2, b.zoneRadius * k), 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.fillStyle = bodyColour(b);
+  ctx.beginPath(); ctx.arc(cx, cy, Math.max(2.5, (b.radius ?? 0) * k), 0, Math.PI * 2); ctx.fill();
+
+  // The road through it, and the doors at each end of each leg.
+  ctx.strokeStyle = PALETTE.pathPlan; ctx.lineWidth = 1.75;
+  for(const leg of legs){
+    ctx.beginPath();
+    leg.points.forEach((pt, i) => { const q = P(pt); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); });
+    ctx.stroke();
+  }
+  const first = legs[0], last = legs[legs.length - 1];
+  for(const [pt, kind] of [[first.r0, 'in'], [last.r1, 'out']]){
+    const q = P(pt);
+    ctx.strokeStyle = PALETTE.crossing; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(q[0], q[1], 4, 0, Math.PI * 2); ctx.stroke();
+    void kind;
+  }
+
+  // The nearest pass.
+  const q = P(ic.r);
+  ctx.strokeStyle = ic.grazes ? PALETTE.crash : PALETTE.apsis; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(q[0], q[1], 5, 0, Math.PI * 2); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(q[0] - 9, q[1]); ctx.lineTo(q[0] - 2, q[1]);
+  ctx.moveTo(q[0] + 2, q[1]); ctx.lineTo(q[0] + 9, q[1]);
+  ctx.moveTo(q[0], q[1] - 9); ctx.lineTo(q[0], q[1] - 2);
+  ctx.moveTo(q[0], q[1] + 2); ctx.lineTo(q[0], q[1] + 9);
+  ctx.stroke();
+
+  // Its name at the top, its numbers along the bottom.
+  ctx.fillStyle = PALETTE.text;
+  ctx.font = '600 11px ui-sans-serif, system-ui, sans-serif';
+  ctx.fillText(labelFor(b), x0 + 9, y0 + 16);
+  /* The numbers along the bottom, wrapped rather than clipped: "in the
+     mouth" is the half of that line a pilot most wants to read and it was
+     the half falling off the edge. */
+  const lines = String(view.insetLabel ?? '').split(' · ');
+  if(lines.length){
+    ctx.font = '10px ui-sans-serif, system-ui, sans-serif';
+    ctx.fillStyle = ic.grazes ? PALETTE.crash : ic.inMouth ? PALETTE.prograde : PALETTE.textDim;
+    const rows = [];
+    let row = '';
+    for(const part of lines){
+      const next = row ? row + ' · ' + part : part;
+      if(ctx.measureText(next).width > size - 18 && row){ rows.push(row); row = part; }
+      else row = next;
+    }
+    if(row) rows.push(row);
+    rows.slice(-2).forEach((r, i, all) => ctx.fillText(r, x0 + 9, y0 + size - 9 - (all.length - 1 - i) * 12));
+  }
+  ctx.restore();
+}
+
+function roundRect(ctx, x, y, w, h, r){
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
 /* A bar that says how long an au is right now, so the zoom is legible. */
 function drawScaleBar(chart){
   const { ctx, camera } = chart;
@@ -754,6 +870,10 @@ export function fmtAu(au){
 
 function hitTest(chart, x, y){
   const h = chart.hits;
+  /* The encounter window is on top of everything and is not part of the sky:
+     a tap inside it is a tap on it, never on whatever it is covering. */
+  const w = h.inset;
+  if(w && x >= w.x && x <= w.x + w.w && y >= w.y && y <= w.y + w.h) return { kind: 'inset', id: w.body };
   /* Spread first, name after. A handle record carries its own axis, and
      spreading it over `kind` was how every handle came back as something else
      and dragging one panned the chart. */
