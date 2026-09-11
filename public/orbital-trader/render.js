@@ -383,7 +383,7 @@ function drawBodies(chart, view, pos, t){
       ctx.beginPath(); ctx.arc(p[0], p[1], rpx + 7, 0, Math.PI * 2); ctx.stroke();
       crosshair(ctx, p, rpx + 7);
     }
-    chart.hits.bodies.push({ id: b.id, x: p[0], y: p[1], r: Math.max(rpx, 10) });
+    chart.hits.bodies.push({ id: b.id, x: p[0], y: p[1], r: Math.max(rpx, 10), drawn: rpx });
 
     // Labels: planets always; moons when their orbit is drawn; zones when
     // they are more than a dot. Never over another label.
@@ -415,7 +415,7 @@ function lanternLit(nowMs){
   let t = 0, i = 0;
   const s = nowMs / 1000;
   while(t < s && i < 100000){
-    const gap = 3 + 8 * ((Math.sin(i * 12.9898) * 43758.5453) % 1 + 1) % 1;
+    const gap = 3 + 8 * (((((Math.sin(i * 12.9898) * 43758.5453) % 1) + 1) % 1));
     if(s >= t + gap && s < t + gap + 0.4) return true;
     t += gap + 0.4; i++;
   }
@@ -440,6 +440,11 @@ function drawPrediction(chart, view, pos){
   let colourIx = 0;
   let short = false;
   let burnIx = 0;
+  /* A road that grazes the same moon on nine laps earns nine identical labels,
+     and the chart turns into a list. Name the first few crossings and let the
+     markers speak for the rest. */
+  let named = 0;
+  const NAME_LIMIT = 3;
   const burns = pred.events.filter(e => e.kind === 'burn');
   for(let si = 0; si < pred.segments.length; si++){
     const seg = pred.segments[si];
@@ -472,7 +477,8 @@ function drawPrediction(chart, view, pos){
     if(seg.reason === 'exit' || seg.reason === 'enter'){
       ctx.fillStyle = PALETTE.marker;
       diamond(ctx, endS, 4);
-      if(camera.zoom * (world.get(seg.body).soi ?? 1) > 40 || seg.reason === 'enter'){
+      if(named < NAME_LIMIT && (camera.zoom * (world.get(seg.body).soi ?? 1) > 40 || seg.reason === 'enter')){
+        named++;
         ctx.fillStyle = PALETTE.textDim;
         ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
         const to = seg.reason === 'exit' ? world.get(world.get(seg.body).parent) : pred.events.find(e => e.kind === 'soi' && Math.abs(e.t - seg.t1) < 1e-6);
@@ -586,7 +592,7 @@ function drawNodes(chart, view, pos){
         ctx.beginPath(); ctx.moveTo(6, 0); ctx.lineTo(-4, 5); ctx.lineTo(-4, -5); ctx.closePath(); ctx.fill();
         ctx.restore();
       }
-      chart.hits.handles.push({ index: i, kind, x: h[0], y: h[1], r: 20, dir: d });
+      chart.hits.handles.push({ index: i, axis: kind, x: h[0], y: h[1], r: 20, dir: d });
     }
   }
 }
@@ -620,13 +626,17 @@ export function fmtAu(au){
 
 function hitTest(chart, x, y){
   const h = chart.hits;
-  for(const k of h.handles){ if(Math.hypot(k.x - x, k.y - y) <= k.r) return { kind: 'handle', ...k }; }
-  for(const n of h.nodes){ if(Math.hypot(n.x - x, n.y - y) <= n.r) return { kind: 'node', ...n }; }
-  // Bodies: nearest within its radius, smallest first so a moon beats its planet.
+  /* Spread first, name after. A handle record carries its own axis, and
+     spreading it over `kind` was how every handle came back as something else
+     and dragging one panned the chart. */
+  for(const k of h.handles){ if(Math.hypot(k.x - x, k.y - y) <= k.r) return { ...k, kind: 'handle' }; }
+  for(const n of h.nodes){ if(Math.hypot(n.x - x, n.y - y) <= n.r) return { ...n, kind: 'node' }; }
+  // Bodies: nearest within its drawn size, so a moon beats the planet it is in
+  // front of. The generous margin is for fingers.
   let best = null;
   for(const b of h.bodies){
     const d = Math.hypot(b.x - x, b.y - y);
-    if(d <= b.r + 4 && (!best || d < best.d)) best = { kind: 'body', id: b.id, d };
+    if(d <= b.r + 4 && (!best || d < best.d)) best = { kind: 'body', id: b.id, d, drawn: b.drawn ?? b.r };
   }
   if(best) return best;
   return null;

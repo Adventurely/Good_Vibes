@@ -77,9 +77,13 @@
 
   /* ---- Chart controls: bottom right ---------------------------------- */
   #view{
-    position:fixed; right:.8rem; bottom:max(.8rem, env(safe-area-inset-bottom)); z-index:5;
+    position:fixed; right:.8rem; bottom:max(.8rem, env(safe-area-inset-bottom)); z-index:7;
     display:flex; flex-direction:column; gap:.35rem;
   }
+  /* The panel owns the right gutter while it is open, so the view buttons step
+     out of it: they used to sit underneath it, where a press meant to zoom in
+     landed on whatever the market had in that spot. */
+  body.panel-open #view{ right: calc(.8rem + var(--panel-w) + .8rem); }
   #view button{
     width:40px; height:40px; border-radius:10px; border:1px solid var(--line);
     background:var(--glass); color:var(--dim); cursor:pointer; backdrop-filter:blur(8px); font-size:1.05rem;
@@ -183,6 +187,12 @@
   #dockcard[hidden]{ display:none; }
   /* The lesson steps aside when there is a dock to take. */
   #dockcard:not([hidden]) ~ #tut{ bottom:calc(150px + env(safe-area-inset-bottom)); }
+
+  /* Centred on the chart rather than on the window, so that with the panel
+     open they do not slide under it. */
+  body.panel-open #dockcard, body.panel-open #tut{
+    left: calc(50% - (var(--panel-w) + 1.6rem) / 2);
+  }
 
   #tut{
     position:fixed; left:50%; bottom:calc(64px + env(safe-area-inset-bottom)); transform:translateX(-50%); z-index:7;
@@ -288,7 +298,7 @@
 </div>
 
 <aside id="panel" aria-label="Ship and port">
-  <div id="grab" aria-hidden="true"></div>
+  <div id="grab"></div>
   <div id="tabs" role="tablist"></div>
   <div id="tabbody" role="tabpanel" tabindex="0"></div>
 </aside>
@@ -357,10 +367,24 @@ if(params.has('new') || params.has('seed')){
 
 const canvas = $('chart');
 const chart = createChart(canvas, world, { reducedMotion: reduced });
+/* The strips the HUD, the warp controls and the panel own. Labels keep out of
+   them; the dots still show through. */
+function refreshInsets(){
+  const h = $('hud').getBoundingClientRect().height;
+  const w = $('warp').getBoundingClientRect();
+  const wide = innerWidth > 760;
+  chart.labelInsets = {
+    top: Math.round(h + 6 + (wide ? 0 : w.height + 8)),
+    right: Math.round(panelOpen && wide ? $('panel').getBoundingClientRect().width + 24 : 56),
+    bottom: Math.round(wide ? 64 : 12),
+    left: 8,
+  };
+}
+addEventListener('resize', refreshInsets);
 const belt = { inner: CONST.BELT.inner, outer: CONST.BELT.outer, rocks: BELT_ROCKS, debris: ARC_DEBRIS };
 addEventListener('resize', () => chart.resize());
 
-let prediction = null, nodePositions = [], approach = null, periapses = [], predictedAt = -1;
+let prediction = null, nodePositions = [], approach = null, periapses = [], predictedAt = -1, predictedReal = -1e9;
 let selectedNode = -1;
 let panelOpen = innerWidth > 760;
 let tab = null;
@@ -387,7 +411,16 @@ function horizonFor(){
 
 function replan(force = false){
   if(state.dockedAt){ prediction = null; nodePositions = []; approach = null; periapses = []; return; }
-  if(!force && predictedAt >= 0 && state.t - predictedAt < 0.25 * S.warpRate(state) * CONST.BASE_RATE_DAYS_PER_SEC * 60) return;
+  /* Re-solving the whole road is the most expensive thing this page does, so
+     it happens on a real-time budget rather than a game-time one: at most a few
+     times a second, whatever the warp. Measuring it in game days got it wrong
+     in both directions — a stray factor of sixty once let the drawn road go
+     stale for four hundred days at the top warp, and taking the factor out
+     made it re-solve so often at ×1 that the frame rate, and with it the
+     clock, dropped to a third of real time. */
+  const nowReal = performance.now();
+  if(!force && predictedAt >= 0 && nowReal - predictedReal < 280) return;
+  predictedReal = nowReal;
   predictedAt = state.t;
   prediction = S.plan(state, horizonFor());
   nodePositions = state.nodes.map(n => locateOnPrediction(world, prediction, n.t));
@@ -425,6 +458,7 @@ function frame(now){
   const docking = state.dockedAt ? null : S.dockingStatus(state);
   if(docking && docking.inZone && state.warp > 1 && !state.flags.zoneWarpDropped){ setWarp(1, false); state.flags.zoneWarpDropped = true; }
   if(!docking) state.flags.zoneWarpDropped = false;
+  if(state.dockedAt) warpTarget = null;
   if(warpTarget != null){
     if(state.t >= warpTarget){ warpTarget = null; setWarp(0, false); }
     else{
@@ -581,16 +615,20 @@ function togglePanel(open = !panelOpen){
   // On a phone the sheet covers the bottom of the chart, so the cards that
   // live there stand down while it is up.
   document.body.classList.toggle('sheet', panelOpen && innerWidth <= 760);
+  document.body.classList.toggle('panel-open', panelOpen && innerWidth > 760);
   applyOffset();
 }
 /* The panel covers part of the chart, so shift the follow centre out from
    under it: left on a wide screen, up when it is a sheet across a phone. */
 function applyOffset(){
+  refreshInsets();
   if(!panelOpen){ chart.offset = [0, 0]; return; }
   const r = $('panel').getBoundingClientRect();
   chart.offset = innerWidth > 760 ? [-r.width / 2 - 8, 0] : [0, -Math.min(r.height, innerHeight * 0.62) / 2];
 }
-addEventListener('resize', applyOffset);
+// A window that changes width changes which layout it is in, so the classes
+// that depend on the width have to be worked out again.
+addEventListener('resize', () => togglePanel(panelOpen));
 
 /* ------------------------------------------------------------- input */
 
@@ -640,8 +678,8 @@ canvas.addEventListener('pointermove', e => {
     const perPx = S.auDay(0.012) * fine;      // 12 m/s per pixel; a screen-width pull is a real burn
     const n = state.nodes[h.index];
     if(!n) return;
-    const sign = h.kind === 'prograde' || h.kind === 'radialOut' ? 1 : -1;
-    if(h.kind === 'prograde' || h.kind === 'retrograde') n.prograde = drag.node.prograde + sign * along * perPx;
+    const sign = h.axis === 'prograde' || h.axis === 'radialOut' ? 1 : -1;
+    if(h.axis === 'prograde' || h.axis === 'retrograde') n.prograde = drag.node.prograde + sign * along * perPx;
     else n.radial = drag.node.radial + sign * along * perPx;
     replan(true); if(tab === 'plan') renderTab();
     return;
@@ -670,12 +708,19 @@ function endPointer(e){
   if(!drag) return;
   const d = drag; drag = null;
   if(d.kind === 'pan' && !d.moved){
-    // A tap: a body targets it; the path places a node; empty sky deselects.
-    if(d.hit?.kind === 'body'){ setTarget(d.hit.id); return; }
-    if(prediction && !state.dockedAt){
-      const p = chart.nearestPathPoint(e.clientX, e.clientY, prediction, state.t);
-      if(p){ const ix = S.addNode(state, p.t); if(ix >= 0){ selectedNode = ix; holdForPlanning(ix); replan(true); setTab('plan'); tutorialCheck(); } return; }
+    /* A tap: the path takes a burn, a body becomes the target, empty sky
+       deselects. The path wins ties, because a body's hit disc is a generous
+       forty pixels across for fingers and at the zoom you cast off at, the
+       whole parking orbit fits inside Tessel's — which made lesson two
+       impossible to follow by tapping the road it names. */
+    const p = prediction && !state.dockedAt ? chart.nearestPathPoint(e.clientX, e.clientY, prediction, state.t) : null;
+    const onBody = d.hit?.kind === 'body';
+    const insideDrawn = onBody && d.hit.d <= (d.hit.drawn ?? 0) + 2;
+    if(p && !insideDrawn){
+      const ix = S.addNode(state, p.t);
+      if(ix >= 0){ selectedNode = ix; holdForPlanning(ix); replan(true); setTab('plan'); tutorialCheck(); return; }
     }
+    if(onBody){ setTarget(d.hit.id); return; }
     selectedNode = -1; if(tab === 'plan') renderTab();
   }
   if(d.kind === 'handle' || d.kind === 'node'){ tutorialCheck(); save(); }
@@ -689,7 +734,11 @@ canvas.addEventListener('dblclick', e => { const hit = chart.hitTest(e.clientX, 
    never steal a browser's own combination. */
 function typing(e){
   const t = e.target;
-  return !!t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+  if(!t) return false;
+  if(t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable) return true;
+  /* Space and Enter belong to whatever the keyboard is on. Taking Space for
+     pause meant no button in the game could be pressed without a mouse. */
+  return typeof t.closest === 'function' && !!t.closest('button, a[href], [role="button"], [tabindex]');
 }
 addEventListener('keydown', e => {
   if(typing(e) || e.ctrlKey || e.metaKey || e.altKey) return;
@@ -705,11 +754,11 @@ addEventListener('keydown', e => {
     case 't': if(state.target){ chart.focus(state.target); syncView(); } break;
     case 'p': togglePanel(); break;
     case 'Escape': if(selectedNode >= 0){ selectedNode = -1; renderTab(); } else togglePanel(false); break;
-    case 'Delete': case 'Backspace': if(selectedNode >= 0){ S.removeNode(state, selectedNode); selectedNode = -1; replan(true); renderTab(); } break;
-    case 'ArrowRight': if(selectedNode >= 0){ e.preventDefault(); state.nodes[selectedNode].prograde += fine; replan(true); renderTab(); } break;
-    case 'ArrowLeft': if(selectedNode >= 0){ e.preventDefault(); state.nodes[selectedNode].prograde -= fine; replan(true); renderTab(); } break;
-    case 'ArrowUp': if(selectedNode >= 0){ e.preventDefault(); state.nodes[selectedNode].radial += fine; replan(true); renderTab(); } break;
-    case 'ArrowDown': if(selectedNode >= 0){ e.preventDefault(); state.nodes[selectedNode].radial -= fine; replan(true); renderTab(); } break;
+    case 'Delete': case 'Backspace': if(state.nodes[selectedNode]){ S.removeNode(state, selectedNode); selectedNode = -1; replan(true); renderTab(); } break;
+    case 'ArrowRight': if(state.nodes[selectedNode]){ e.preventDefault(); state.nodes[selectedNode].prograde += fine; replan(true); renderTab(); } break;
+    case 'ArrowLeft': if(state.nodes[selectedNode]){ e.preventDefault(); state.nodes[selectedNode].prograde -= fine; replan(true); renderTab(); } break;
+    case 'ArrowUp': if(state.nodes[selectedNode]){ e.preventDefault(); state.nodes[selectedNode].radial += fine; replan(true); renderTab(); } break;
+    case 'ArrowDown': if(state.nodes[selectedNode]){ e.preventDefault(); state.nodes[selectedNode].radial -= fine; replan(true); renderTab(); } break;
   }
 });
 
@@ -723,6 +772,18 @@ function holdForPlanning(ix){
   state.paused = true;
   setWarp(state.warp, false);
   toast('Clock held while you plan. Space, or a warp button, starts it again.');
+}
+
+/* Frame the orbit the ship is actually on. Casting off at whatever zoom the
+   chart happened to be at left the whole parking orbit as a twenty-pixel loop
+   inside the planet's own dot, which is not a road anybody can tap. */
+function frameShipOrbit(){
+  if(state.dockedAt) return;
+  const b = world.get(state.ship.body);
+  const el = elementsFromState(b.mu, state.ship.r, state.ship.v);
+  const span = Number.isFinite(el.ra) ? el.ra : Math.max(norm(state.ship.r), b.soi ?? 0.01);
+  const usable = Math.min(chart.width - (panelOpen && innerWidth > 760 ? $('panel').getBoundingClientRect().width : 0), chart.height) * 0.36;
+  if(span > 0 && usable > 0) chart.camera.zoom = Math.max(8, Math.min(4e5, usable / span));
 }
 
 function setTarget(id){
@@ -763,13 +824,26 @@ const sp = species => `<span class="sp-${species}">${esc(SPECIES[species]?.name 
 
 function renderTab(){
   const body = $('tabbody');
+  /* Rebuilding the panel throws away the button the player is standing on, and
+     the keyboard then lands back on the document. Remember which control it
+     was and put it back. */
+  const active = document.activeElement;
+  const was = body.contains(active) ? (active.dataset?.act ?? active.id ?? null) : null;
   const fn = { market, passengers, shipyard, talk, plan, target: targetTab, ship: shipTab, log: logTab }[tab];
   body.innerHTML = fn ? fn() : '';
   wire(body);
+  if(was){
+    const again = body.querySelector(`[data-act="${CSS.escape(was)}"]`) ?? body.querySelector(`#${CSS.escape(was)}`);
+    if(again && typeof again.focus === 'function') again.focus();
+  }
 }
 function wire(root){
   root.querySelectorAll('[data-act]').forEach(el => {
-    el.addEventListener('click', () => {
+    el.addEventListener('click', ev => {
+      // A card is itself an action, and so are the buttons inside it. Only the
+      // innermost one should run: deleting a burn used to re-select the burn
+      // that had just stopped existing.
+      if(ev.target.closest('[data-act]') !== el) return;
       const [act, ...args] = el.dataset.act.split('|');
       actions[act]?.(...args, el);
     });
@@ -949,11 +1023,28 @@ function plan(){
     out += '<h3>Ahead</h3>';
     const evs = prediction.events.filter(e => e.kind !== 'burn' || e.node.aero);
     if(!evs.length && !prediction.crashed) out += '<p class="lock">Nothing changes along this path.</p>';
-    for(const e of evs.slice(0, 8)){
-      if(e.kind === 'soi'){ const to = world.get(e.to); const from = world.get(e.from); out += `<p>${to.parent === from.id ? 'Into' : 'Out to'} ${esc(to.name)}'s reach in ${S.fmtDays(e.t - state.t)}.</p>`; }
-      if(e.kind === 'burn' && e.node.aero) out += `<p class="up">Skim ${esc(S.portName(e.node.body))}: shed ${S.fmtKms(e.magnitude)} in ${S.fmtDays(e.t - state.t)}.</p>`;
-      if(e.kind === 'crash') out += `<p class="down">This path strikes ${esc(S.portName(e.body))} in ${S.fmtDays(e.t - state.t)}.</p>`;
+    /* A road that grazes the same moon on nine laps is nine identical lines,
+       which reads as a fault rather than as a road. Say the first few and
+       count the rest. */
+    let shown = 0, repeats = 0, lastLine = '';
+    for(const e of evs){
+      let line = '';
+      if(e.kind === 'soi'){
+        const to = world.get(e.to), from = world.get(e.from);
+        line = `<p>${to.parent === from.id ? 'Into' : 'Out to'} ${esc(to.name)}'s reach in ${S.fmtDays(e.t - state.t)}.</p>`;
+      }else if(e.kind === 'burn' && e.node.aero){
+        line = `<p class="up">Skim ${esc(S.portName(e.node.body))}: shed ${S.fmtKms(e.magnitude)} in ${S.fmtDays(e.t - state.t)}.</p>`;
+      }else if(e.kind === 'crash'){
+        line = `<p class="down">This path strikes ${esc(S.portName(e.body))} in ${S.fmtDays(e.t - state.t)}.</p>`;
+      }
+      if(!line) continue;
+      const shape = line.replace(/in [^.]*\./, '');
+      if(shape === lastLine){ repeats++; continue; }
+      lastLine = shape;
+      if(shown >= 4){ repeats++; continue; }
+      out += line; shown++;
     }
+    if(repeats) out += `<p class="lock">…and ${repeats} more crossing${repeats > 1 ? 's' : ''} after that.</p>`;
   }
   if(state.dv <= 1e-9){
     const q = S.towQuote(state);
@@ -1044,7 +1135,11 @@ const actions = {
   fuel(k){ const r = S.refuel(state, Number(k)); if(!r.ok) toast(r.reason, 'bad'); renderTab(); save(); },
   upgrade(id){ const r = S.buyUpgrade(state, id); if(!r.ok) toast(r.reason, 'bad'); else toast(`${S.upgradeById(id).name} fitted.`); renderTab(); save(); },
   wait(d){ const days = Number(d); S.wait(state, days); toast(`${S.fmtDays(days)} pass. ${S.calendar(state.t).text}.`); renderTab(); save(); },
-  undock(){ const r = S.undock(state); if(r.ok){ selectedNode = -1; replan(true); renderTabs(); chart.focus('ship'); syncView(); tutorialCheck(); save(); } },
+  undock(){
+    const r = S.undock(state);
+    if(!r.ok) return;
+    selectedNode = -1; replan(true); renderTabs(); chart.focus('ship'); frameShipOrbit(); syncView(); tutorialCheck(); save();
+  },
   dock(){ doDock(); },
   target(id){ state.target = id; replan(true); renderTab(); syncView(); },
   look(id){ chart.focus(id); syncView(); },
@@ -1216,7 +1311,8 @@ function tutorialCheck(){
   $('tut-step').textContent = `Lesson · ${step + 1} of ${TUT.length}`;
   $('tut-title').textContent = s.title;
   $('tut-body').textContent = s.body;
-  if(step === 0 && state.target !== target){ state.target = target; }
+  // Suggest it once. It is the player's chart, not the lesson's.
+  if(step === 0 && state.target == null && !state.flags.tutorialTargeted){ state.target = target; state.flags.tutorialTargeted = true; }
 }
 $('tut-skip').addEventListener('click', () => { state.flags.tutorialSkipped = true; $('tut').hidden = true; save(); });
 setInterval(() => { if(!$('tut').hidden) tutorialCheck(); }, 1500);

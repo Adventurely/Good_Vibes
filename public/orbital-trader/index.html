@@ -106,13 +106,20 @@
 import { createChart } from './render.js';
 import { BODIES, CONST, BELT_ROCKS, ARC_DEBRIS } from './content.js';
 import { makeWorld } from './orbit.js';
+import { restore } from './sim.js';
 
 /* Continue only if there is something to continue. localStorage can throw
    in a private window; the page must render fine having learned nothing. */
+/* Offer Continue only for a save the game will actually take. Checking the
+   version alone offered it for saves play.html then threw away, which is a
+   worse welcome than no button at all. */
 const SAVE_KEY = 'ot:save:v1';
 let save = null;
-try{ const raw = localStorage.getItem(SAVE_KEY); if(raw) save = JSON.parse(raw); }catch{ save = null; }
-if(save && save.version === 1){
+try{
+  const raw = localStorage.getItem(SAVE_KEY);
+  if(raw) save = restore(raw);
+}catch{ save = null; }
+if(save){
   const cont = document.getElementById('continue');
   cont.hidden = false;
   const y = Math.floor(save.t / CONST.YEAR_DAYS) + 1, d = Math.floor(save.t % CONST.YEAR_DAYS) + 1;

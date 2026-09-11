@@ -80,9 +80,19 @@ test('Orbital Trader ships its own modules, and they are pure', async () => {
     const text = await res.text();
     assert.doesNotMatch(text, /from 'node:|require\(|process\.env|Buffer\./, `${file} reaches for Node`);
   }
-  const play = await fetch(`${baseUrl}/orbital-trader/play.html`);
-  assert.equal(play.status, 200);
-  assert.match(play.headers.get('content-type'), /text\/html/);
+  /* Most of this game's code is inline in its two pages, and a check that
+     skips them is a check that covers a third of it. */
+  for(const page of ['play.html', 'index.html']){
+    const res = await fetch(`${baseUrl}/orbital-trader/${page}`);
+    assert.equal(res.status, 200, `${page} returned ${res.status}`);
+    assert.match(res.headers.get('content-type'), /text\/html/);
+    const html = await res.text();
+    const scripts = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]).join('\n');
+    assert.ok(scripts.length > 1000, `${page}: no inline script found to check`);
+    assert.doesNotMatch(scripts, /from 'node:|require\(|process\.env|Buffer\./, `${page} reaches for Node`);
+    // And nothing loaded from anywhere but here.
+    assert.doesNotMatch(html, /<(script|link|img)[^>]+(src|href)=["']https?:/, `${page} loads something from off-site`);
+  }
 });
 
 test('each game keeps its own modules', async () => {
