@@ -560,7 +560,14 @@ function finalLeg(pred){
   const segs = pred.segments;
   if(!segs.length) return null;
   const crossed = segs.findIndex(sg => sg.reason === 'exit' || sg.reason === 'enter');
-  return segs[crossed >= 0 ? Math.min(crossed + 1, segs.length - 1) : segs.length - 1];
+  if(crossed < 0) return segs[segs.length - 1];
+  /* The same rule the drawn road is cut by: everything inside the new reach,
+     burns and all. Stopping at crossed + 1 measured a leg the burn after it
+     replaces, and asked for a 720-day lap of a hyperbola that was over in an
+     afternoon. */
+  let i = Math.min(crossed + 1, segs.length - 1);
+  while(i + 1 < segs.length && segs[i].reason === 'burn') i++;
+  return segs[i];
 }
 const settled = pred => pred.segments.some(sg => sg.reason === 'crash' || sg.reason === 'partial');
 
@@ -589,6 +596,26 @@ function oneLap(seg){
   return { ...seg, points, times, lapped: true };
 }
 
+/* One whole turn of a leg's conic, ignoring whatever boundary cut it short.
+ * The design asks for the orbit an exit leaves you on, drawn as an orbit —
+ * not for the first thing that orbit would run into next spring. So when the
+ * leg after the crossing ends by wandering into some *third* world, its shape
+ * is drawn out to a full lap and that third world is left alone: one crossing
+ * at a time is the whole rule, and a road that chases every encounter it can
+ * find is a road nobody reads. */
+function fullLap(seg, mu){
+  const P = seg.elements?.period;
+  if(!Number.isFinite(P) || P <= 0) return seg;
+  const n = 240;
+  const points = new Array(n + 1), times = new Array(n + 1);
+  for(let i = 0; i <= n; i++){
+    const dt = P * i / n;
+    points[i] = propagate(mu, seg.r0, seg.v0, dt).r;
+    times[i] = seg.t0 + dt;
+  }
+  return { ...seg, points, times, t1: seg.t0 + P, r1: points[n], reason: 'horizon', extended: true };
+}
+
 /* The intercept: how close the road comes to the world it has just entered,
  * and when. Inside that world's reach the ship is on one conic about it, so
  * the nearest point is simply that leg's periapsis — no search, no sampling,
@@ -596,26 +623,40 @@ function oneLap(seg){
  * burn around: not "does this reach Pip" but "how close, and how fast". */
 function interceptOf(segments, crossed){
   if(crossed < 0) return null;
-  const leg = segments[crossed + 1];
-  if(!leg) return null;
-  const b = world.get(leg.body);
+  /* Only an *entry* has an intercept. Climbing out of a world's reach leaves
+     you on an orbit round its parent, and the low point of that orbit is not
+     an encounter with anything — reporting it as one put "the Lamp, eighty
+     million kilometres" on the chart as though it were a near miss. */
+  if(segments[crossed].reason !== 'enter') return null;
+  const first = segments[crossed + 1];
+  if(!first) return null;
+  const b = world.get(first.body);
   if(!b || !(b.mu > 0)) return null;
-  const dt = timeToAnomaly(b.mu, leg.r0, leg.v0, 0);
-  const within = dt != null && dt >= 0 && dt <= leg.t1 - leg.t0;
-  /* A road that leaves again before it gets to the low point never gets its
-     nearest pass; the nearest it manages is wherever the leg ends. */
-  const at = within ? propagate(b.mu, leg.r0, leg.v0, dt) : { r: leg.r1, v: leg.v1 };
-  return {
-    segIndex: crossed + 1,
-    body: leg.body,
-    t: leg.t0 + (within ? dt : leg.t1 - leg.t0),
-    r: at.r,
-    distance: norm(at.r),
-    altitude: Math.max(0, norm(at.r) - (b.radius ?? 0)),
-    speed: norm(at.v ?? leg.v1),
-    grazes: norm(at.r) <= (b.radius ?? 0),
-    inMouth: b.zoneRadius != null && norm(at.r) <= b.zoneRadius,
-  };
+  /* Every leg inside that reach, because a brake written down at the kiss
+     splits it and the nearest pass may be on either side of the burn. */
+  let best = null;
+  for(let i = crossed + 1; i < segments.length && segments[i].body === first.body; i++){
+    const leg = segments[i];
+    const dt = timeToAnomaly(b.mu, leg.r0, leg.v0, 0);
+    const within = dt != null && dt >= 0 && dt <= leg.t1 - leg.t0;
+    /* A leg that ends before it gets to the low point never has its nearest
+       pass on it; the nearest it manages is wherever it stops. */
+    const at = within ? propagate(b.mu, leg.r0, leg.v0, dt) : { r: leg.r1, v: leg.v1 };
+    const d = norm(at.r);
+    if(best && d >= best.distance) continue;
+    best = {
+      segIndex: i,
+      body: leg.body,
+      t: leg.t0 + (within ? dt : leg.t1 - leg.t0),
+      r: at.r,
+      distance: d,
+      altitude: Math.max(0, d - (b.radius ?? 0)),
+      speed: norm(at.v ?? leg.v1),
+      grazes: d <= (b.radius ?? 0),
+      inMouth: b.zoneRadius != null && d <= b.zoneRadius,
+    };
+  }
+  return best;
 }
 
 export function planImmediate(state, flown = true){
@@ -647,10 +688,34 @@ export function planImmediate(state, flown = true){
   }
   const segs = pred.segments;
   const crossed = segs.findIndex(sg => sg.reason === 'exit' || sg.reason === 'enter');
-  const keep = crossed >= 0 ? Math.min(crossed + 2, segs.length) : segs.length;
+  /* Everything up to the crossing, then the road inside the new reach up to
+     whatever ends it. A burn written down inside that reach — the brake that
+     turns a flyby into an arrival — splits it into more than one leg, and
+     cutting at a fixed two segments dropped the half of the encounter the
+     player was actually working on. */
+  let keep = segs.length;
+  if(crossed >= 0){
+    keep = Math.min(crossed + 2, segs.length);
+    while(keep < segs.length && segs[keep - 1].reason === 'burn') keep++;
+  }
   const segments = segs.slice(0, keep).map(oneLap);
+  /* The leg after the crossing may itself end at a door. One of those is part
+     of the same encounter — swinging past a moon and back out to the world it
+     goes round — and is worth marking. Any other is a second encounter, which
+     this road does not chase: draw that leg as the orbit it is and stop. */
+  const last = segments.length - 1;
+  if(crossed >= 0 && last > crossed){
+    const fin = segments[last];
+    const cameFrom = segs[crossed].body;
+    const swingsBackOut = fin.reason === 'exit' && cameFrom !== fin.body;
+    if(!swingsBackOut && (fin.reason === 'enter' || fin.reason === 'exit')){
+      segments[last] = fullLap(fin, world.get(fin.body).mu);
+    }
+  }
   const endT = segments.length ? segments[segments.length - 1].t1 : state.t;
-  const events = pred.events.filter(e => e.t <= endT + 1e-9);
+  const drawnSoi = new Set(segments.filter(sg => sg.reason === 'exit' || sg.reason === 'enter').map(sg => sg.t1.toFixed(9)));
+  const events = pred.events.filter(e =>
+    e.t <= endT + 1e-9 && (e.kind !== 'soi' || drawnSoi.has(e.t.toFixed(9))));
   /* Every door on the drawn road, not just the first. A burn that reaches a
      moon and swings past it has two — the way in and the way out — and a
      chart that marks only one of them is telling half the story. */
