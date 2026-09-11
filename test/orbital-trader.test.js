@@ -234,6 +234,21 @@ test('the text has every line the game asks for', () => {
  * Trader and Tessel's harbour is a parking orbit you match. Tests about
  * markets, contracts and the shipyard want to be tied up, so they start the
  * same way a player does and then tie up. */
+/* Put the ship where a ship would be: in a circular orbit at the docking
+ * altitude, or sitting on a gravity-less port. Dropping it at rest used to
+ * count as arrived; it does not now, and should not — a ship at rest over a
+ * moon is falling into it. */
+function parkAt(s, id){
+  const b = world.get(id);
+  if(b.mu > 0){
+    const st = O.circularState(b.mu, b.dockAlt, 0);
+    s.ship = { body: id, r: st.r, v: st.v };
+  }else{
+    const local = O.railState(b, world.get(b.parent).mu, s.t);
+    s.ship = { body: b.parent, r: [...local.r], v: [...local.v] };
+  }
+}
+
 function newDocked(seed, port = 'tessel'){
   const s = S.newGame(seed);
   if(port !== 'tessel'){ s.dockedAt = port; S.undock(s); }
@@ -521,9 +536,7 @@ test('contracts: taken here, paid there, less when late', () => {
   // Teleport to the destination, late, and dock.
   s.t = c.deadline + 10;
   S.undock(s);
-  const b = world.get(c.to);
-  if(b.mu > 0) s.ship = { body: c.to, r: [b.dockAlt, 0], v: [0, 0] };
-  else { const local = O.railState(b, world.get(b.parent).mu, s.t); s.ship = { body: b.parent, r: local.r, v: local.v }; }
+  parkAt(s, c.to);
   const m0 = s.money;
   const r = S.dock(s);
   assert.ok(r.ok && r.delivered.length === 1 && r.delivered[0].late);
@@ -531,13 +544,39 @@ test('contracts: taken here, paid there, less when late', () => {
   assert.equal(s.passengers.length, 0);
 });
 
+test('a harbour takes you when you are in a stable orbit close in, and not before', () => {
+  /* Docking is an orbit, not a box: bound to the world, low point clear of
+     the ground, high point inside the harbour mouth. The point of the rule is
+     that it is the manoeuvre a pilot was flying anyway. */
+  const b = world.get('pip');
+  const at = (r, v) => { const s = S.newGame(4); s.dockedAt = null; s.justLeft = null; s.ship = { body: 'pip', r, v }; return S.dockingStatus(s); };
+
+  const circ = O.circularState(b.mu, b.dockAlt, 0);
+  assert.ok(at(circ.r, circ.v).ok, 'a circle at the docking altitude is a dock');
+
+  // At rest over a moon you are not in orbit, you are falling into it.
+  assert.equal(at([b.dockAlt, 0], [0, 0]).ok, false);
+  assert.equal(S.dockRefusal(at([b.dockAlt, 0], [0, 0])), 'that orbit goes through it');
+
+  // Fast enough to leave is not an orbit at all.
+  const esc = Math.sqrt(2 * b.mu / b.dockAlt) * 1.05;
+  assert.equal(at([b.dockAlt, 0], [0, esc]).ok, false);
+  assert.equal(S.dockRefusal(at([b.dockAlt, 0], [0, esc])), 'not in orbit');
+
+  // Bound and clear, but swinging out past the mouth: not yet.
+  const wide = Math.sqrt(b.mu * (2 / b.dockAlt - 1 / (b.zoneRadius * 0.9)));
+  const st = at([b.dockAlt, 0], [0, wide]);
+  assert.ok(st.bound && st.clear && !st.close, 'a long ellipse is still an orbit');
+  assert.equal(st.ok, false);
+  assert.equal(S.dockRefusal(st), 'too far out');
+});
+
 test('the Far Lantern and the comet are rendezvous zones, and Hush hands over the dampener', () => {
   for(const id of ['merrow', 'lantern', 'clawrock']){ const b = world.get(id); assert.equal(b.mu, 0); assert.equal(b.soi, null); assert.ok(b.port); }
   const s = S.newGame(2);
   S.undock(s);
   s.t = 1000;
-  const h = world.get('hush');
-  s.ship = { body: 'hush', r: [h.dockAlt, 0], v: [0, 0] };
+  parkAt(s, 'hush');
   const r = S.dock(s);
   assert.ok(r.ok && s.keys.stealth, 'the Hush dampener is found, not bought');
   assert.ok(s.flags.hushRelic);

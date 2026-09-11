@@ -387,12 +387,15 @@ function drawBodies(chart, view, pos, t){
     }
     // Docking zone, when near enough to be about to use it.
     if(b.port && b.zoneRadius && view.nearPort === b.id){
+      /* The mouth: the circle your orbit has to fit inside to tie up. A ring,
+         not a filled disc — with docking now an orbit rather than a box, this
+         is on screen most of the time you are anywhere near a harbour, and a
+         green wash that size swallows the road drawn across it. */
       const zr = Math.max(14, b.zoneRadius * zoom);
       const d = view.docking;
       ctx.beginPath(); ctx.arc(p[0], p[1], zr, 0, Math.PI * 2);
-      if(d?.ok){ ctx.fillStyle = PALETTE.zoneFill; ctx.fill(); }
-      ctx.strokeStyle = d?.inZone && !d.slow ? PALETTE.zoneFast : PALETTE.zone;
-      ctx.lineWidth = 1.5; ctx.setLineDash([2, 3]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.strokeStyle = d?.ok ? PALETTE.zone : PALETTE.soiEdge;
+      ctx.lineWidth = d?.ok ? 1.5 : 1; ctx.setLineDash([2, 3]); ctx.stroke(); ctx.setLineDash([]);
     }
 
     /* The body itself. Each one has a sprite; the dot is what is left when a

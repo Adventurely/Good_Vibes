@@ -125,7 +125,7 @@ export const TUNING = {
    "omega": 0,
    "M0": 0.5,
    "retrograde": false,
-   "mu": 6e-12,
+   "mu": 1.2e-11,
    "soi": 0.00021,
    "radius": 0.00001,
    "dockAlt": 0.00003,

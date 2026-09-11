@@ -88,7 +88,7 @@ export function newGame(seed = 1){
     flags: { tutorial: 0 },
     toll: { lastT: -1e9, inBelt: false },
     pending: null,
-    justLeft: null,
+    justLeft: null, justLeftAt: -1e9,
     stats: { burns: 0, dvSpent: 0, docks: 0, sold: 0, bought: 0, deliveries: 0, tows: 0, tolls: 0, farthest: 0 },
     visited: [start],
   };
@@ -101,7 +101,8 @@ export function newGame(seed = 1){
      something. */
   placeParked(state, start);
   state.dockedAt = null;
-  state.justLeft = start;          // Tessel's own mouth is where we started; don't offer it back on frame one
+  state.justLeft = start;          // Tessel's own mouth is where we started
+  state.justLeftAt = state.t;
   refreshOffers(state, start, true);
   const first = TEXT.opening ?? {};
   state.passengers.push({
@@ -193,39 +194,82 @@ function placeDocked(state, portId){
   }
 }
 
-/* The port the ship could dock at right now, if any, and how far off it is. */
+/* The port the ship could tie up at right now, if any.
+ *
+ * The rule is an orbit, not a box. You may dock at a world when you are in a
+ * **stable orbit close in around it**: bound to it, low point clear of the
+ * ground and of any air, high point inside its harbour mouth. That is the
+ * thing a pilot was trying to achieve anyway, so it needs no separate test
+ * and no separate prompt — get captured, and the harbour is open.
+ *
+ * It replaces "be inside this radius travelling under this speed", which
+ * asked the player to satisfy two numbers that were not the manoeuvre they
+ * were flying, and which let a ship on a wild ellipse tie up because it
+ * happened to be slow at the top of it.
+ *
+ * Things with no gravity — the Arc, Claw Rock, the comet — have no orbit to
+ * be in, so those keep the distance-and-speed test they always had.
+ */
 export function dockingStatus(state){
   if(state.dockedAt) return null;
   const here = world.get(state.ship.body);
   let best = null;
-  const consider = (portId, distance, relSpeed) => {
-    const b = world.get(portId);
-    if(!b.port) return;
-    if(state.justLeft === portId) return;
-    const inZone = distance <= b.zoneRadius;
-    // The limit is excess over a parked orbit at this distance: a ship that has
-    // captured into any bound orbit around the port is slow enough. A zone has
-    // no gravity, so there the limit is the relative speed itself.
-    const parked = b.mu > 0 ? Math.sqrt(b.mu / Math.max(distance, b.radius)) : 0;
-    const slow = relSpeed <= b.dockSpeed + parked;
-    const score = distance / b.zoneRadius;
-    if(!best || score < best.score) best = { port: portId, distance, relSpeed, inZone, slow, ok: inZone && slow, score, zoneRadius: b.zoneRadius, dockSpeed: b.dockSpeed, parked, over: Math.max(0, relSpeed - (b.dockSpeed + parked)), open: portOpen(portId, state.t) };
-  };
-  // The body we orbit.
-  if(here.port) consider(here.id, norm(state.ship.r), norm(state.ship.v));
-  // Gravity-less ports in this frame.
-  for(const c of world.children(here.id)){
-    if(!c.port || c.mu > 0) continue;
-    const s = railState(c, here.mu, state.t);
-    consider(c.id, dist(state.ship.r, s.r), norm(sub(state.ship.v, s.v)));
+  const take = st => { if(!best || st.score < best.score) best = st; };
+
+  // The world we are going round.
+  if(here.port && here.mu > 0 && state.justLeft !== here.id){
+    const el = elementsFromState(here.mu, state.ship.r, state.ship.v);
+    const floor = Math.max(here.radius ?? 0, here.atmo ?? 0);
+    const mouth = here.zoneRadius ?? Infinity;
+    const bound = Number.isFinite(el.period) && el.a > 0;
+    const clear = el.rp > floor;
+    const close = Number.isFinite(el.ra) && el.ra <= mouth;
+    take({
+      port: here.id, kind: 'orbit',
+      distance: norm(state.ship.r), relSpeed: norm(state.ship.v),
+      rp: el.rp, ra: el.ra, floor, mouth,
+      bound, clear, close,
+      ok: bound && clear && close,
+      score: bound && Number.isFinite(el.ra) ? el.ra / mouth : 1e6,
+      open: portOpen(here.id, state.t),
+    });
   }
-  if(best && best.distance > best.zoneRadius * 8) return null;   // nowhere near; do not clutter the HUD
+  // Gravity-less ports in this frame: near enough, slow enough.
+  for(const c of world.children(here.id)){
+    if(!c.port || c.mu > 0 || state.justLeft === c.id) continue;
+    const s = railState(c, here.mu, state.t);
+    const distance = dist(state.ship.r, s.r);
+    const relSpeed = norm(sub(state.ship.v, s.v));
+    const inZone = distance <= c.zoneRadius;
+    const slow = relSpeed <= c.dockSpeed;
+    take({
+      port: c.id, kind: 'zone', distance, relSpeed,
+      mouth: c.zoneRadius, dockSpeed: c.dockSpeed,
+      inZone, slow, ok: inZone && slow,
+      over: Math.max(0, relSpeed - c.dockSpeed),
+      score: distance / c.zoneRadius,
+      open: portOpen(c.id, state.t),
+    });
+  }
+  if(!best) return null;
+  // Nowhere near: do not clutter the HUD with a port you are nothing like at.
+  if(best.kind === 'zone' && best.distance > best.mouth * 8) return null;
+  if(best.kind === 'orbit' && !best.ok && best.distance > best.mouth * 8) return null;
   return best;
+}
+
+/* Why not, in the words a pilot would use. */
+export function dockRefusal(st){
+  if(!st) return 'no port';
+  if(st.kind === 'zone') return st.inZone ? 'too fast' : 'too far';
+  if(!st.bound) return 'not in orbit';
+  if(!st.clear) return 'that orbit goes through it';
+  return 'too far out';
 }
 
 export function dock(state){
   const st = dockingStatus(state);
-  if(!st || !st.ok) return { ok: false, reason: st ? (st.inZone ? 'too fast' : 'too far') : 'no port' };
+  if(!st || !st.ok) return { ok: false, reason: dockRefusal(st) };
   const port = st.port;
   state.dockedAt = port;
   state.nodes = [];
@@ -269,10 +313,11 @@ export function undock(state){
   const port = state.dockedAt;
   placeParked(state, port);
   state.dockedAt = null;
-  /* Casting off drops you inside the harbour mouth you just left, and a card
-     saying "tie up" is not what anybody wants to read one second after leaving.
-     The port goes quiet until the ship is out of its mouth once. */
+  /* Casting off drops you inside the harbour mouth you just left, and an
+     invitation to tie up again one second later is noise. The port goes quiet
+     for a moment — see QUIET_DAYS. */
   state.justLeft = port;
+  state.justLeftAt = state.t;
   logLine(state, 'undocked', TEXT.logTemplates.undocked, { port: portName(port) });
   return { ok: true };
 }
@@ -430,13 +475,16 @@ export function tick(state, dtDays){
   if(state.justLeft){
     const b = world.get(state.justLeft);
     const here = shipAbsPos(state);
-    /* The port goes quiet until the ship is clear of its mouth — or until it
-       is plain the ship is not going anywhere, because a door that locks
-       behind a pilot with a dry tank is exactly the dead end this game is not
-       allowed to have. */
+    /* The port is quiet for a moment after you leave, and then it is open
+       again — it used to stay shut until the ship was clear of its mouth,
+       which a parking orbit never is, so the harbour you started in could
+       never be gone back to. It also opens the moment it is plain the ship is
+       going nowhere, because a door that locks behind a pilot with a dry tank
+       is exactly the dead end this game is not allowed to have. */
+    const quiet = state.t - (state.justLeftAt ?? -1e9) < QUIET_DAYS;
     const clear = dist(here, absState(world, state.justLeft, state.t).r) > b.zoneRadius;
     const stuck = state.dv <= 1e-9 && !state.nodes.length;
-    if(clear || stuck) state.justLeft = null;
+    if(!quiet || clear || stuck) state.justLeft = null;
   }
   if(state.nodes.length){
     const stale = state.nodes.filter(n => n.t < state.t - 1e-9);
@@ -471,6 +519,10 @@ function flag(state, name, events){
 }
 
 /* ------------------------------------------------------------ planning */
+
+/* How long a harbour stays quiet after you cast off from it: a couple of
+ * minutes of real time at x1, and a fifth of a lap of Tessel's parking orbit. */
+export const QUIET_DAYS = 0.2;
 
 export const MAX_NODES = 6;
 export const MIN_LEAD = 0.1;
@@ -2030,7 +2082,7 @@ export function restore(json){
   s.rep = { emberkin: 0, otter: 0, cat: 0, frog: 0, ...(s.rep ?? {}) };
   s.pending ??= null; s.flags ??= {}; s.stats ??= {}; s.visited ??= [s.dockedAt].filter(Boolean);
   s.toll ??= { lastT: -1e9, inBelt: false };
-  s.debt ??= 0; s.target ??= null; s.justLeft ??= null;
+  s.debt ??= 0; s.target ??= null; s.justLeft ??= null; s.justLeftAt ??= -1e9;
   s.warp = Number.isFinite(s.warp) ? Math.max(1, Math.min(CONST.MAX_WARP, s.warp)) : 1;
   s.rng = Number.isFinite(s.rng) ? s.rng : 1;
   s.shipName ??= TEXT.shipNames[0];

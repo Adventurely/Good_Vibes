@@ -1696,6 +1696,20 @@ far off it is and how long you will wait, and then runs at whatever rate covers
 it in about ten seconds and stops itself. A burn, a change of reach or a
 harbour mouth cancels the skip.
 
+### Tying up
+
+Docking is an orbit, not a box. A harbour takes you when you are in a **stable
+orbit close in** around its world: bound to it, the low point clear of the
+ground and of any air, the high point inside the harbour mouth. That is the
+manoeuvre a pilot was flying anyway, so it needs no separate test and no
+prompt — get captured, and an anchor appears in the chart controls. It
+replaced "be inside this radius travelling under this speed", which asked for
+two numbers that were not the manoeuvre, and which let a ship on a wild
+ellipse tie up because it happened to be slow at the top of it.
+
+Things with no gravity — the Arc, Claw Rock, the comet — have no orbit to be
+in, so those keep the near-enough-and-slow-enough rule they always had.
+
 ### Flying it
 
 Tap your road. You get two choices at that moment: write a burn down, or run
