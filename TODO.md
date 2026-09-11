@@ -3,31 +3,21 @@
 Design work I want done, in my words. Nothing here is built yet; this is the
 list, not a plan for how to build it.
 
-## Shape of the game
+Ordered by what blocks what: who the characters are decides what combat is,
+combat decides what the screen has to show, and the art comes last so it is
+not drawn twice.
 
-- [ ] **Remove the whole map in the prep phase.** The build phase stops being a
-      thing you walk around on.
+## Standing constraints
+
+These are not tasks to finish, they are rules every task below obeys.
+
 - [ ] **Focus on desktop GUI.** Desktop is the target; stop designing around
       anything else.
 - [ ] **No scrolling!!!** Everything a player needs is on screen at once.
-- [ ] **Encounters are waves coming towards the base.** Not a site you stand on
-      — a thing that arrives at you.
 
-## Combat
+## 1. The characters
 
-Combat sucks. Specifically:
-
-- [ ] **Unclear ordering.** You cannot tell who acts when.
-- [ ] **Unclear mechanics.** What a thing does is not readable from the table.
-- [ ] **No animations.** Effects need to be shown, not just stated — a physical
-      shield that is actually there, for example.
-- [ ] **Characters feel samey.** Two seats should not play the same way.
-- [ ] **Consequences are not clear enough.** Above all: show the amount of
-      damage about to be taken, before it lands.
-- [ ] **Enemies do single-target attacks now, and the target is known in
-      advance.** No spread damage, no surprise about who gets hit.
-
-## Characters
+Everything else is downstream of this. Do it first.
 
 - [ ] **Completely revamp the characters.** The Wizard is the only one that
       feels good; everyone else is up for rework.
@@ -47,7 +37,34 @@ Combat sucks. Specifically:
 - **Hauler** — Controls enemy targeting. Removes enemy buffs. Defends teammates.
 - **Scout** — Secondary damage dealer. Applies debuffs to the enemies.
 
-## Art
+## 2. What a fight is
+
+The shape of the encounter, which the combat screen then has to show.
+
+- [ ] **Encounters are waves coming towards the base.** Not a site you stand on
+      — a thing that arrives at you.
+- [ ] **Enemies do single-target attacks now, and the target is known in
+      advance.** No spread damage, no surprise about who gets hit.
+- [ ] **Remove the whole map in the prep phase.** The build phase stops being a
+      thing you walk around on.
+
+## 3. Making combat readable
+
+Combat sucks. In the order I would fix it:
+
+- [ ] **Show the amount of damage about to be taken**, before it lands. The
+      consequences are not clear enough and this is the worst of it.
+- [ ] **Unclear ordering.** You cannot tell who acts when.
+- [ ] **Unclear mechanics.** What a thing does is not readable from the table.
+- [ ] **Characters feel samey.** Two seats should not play the same way — the
+      persona work above is half of this, the screen showing the difference is
+      the other half.
+- [ ] **Animations.** Effects need to be shown, not just stated — a physical
+      shield that is actually there, for example.
+
+## 4. Art
+
+Last on purpose: do not draw a character twice.
 
 - [ ] **Art needs a rework, starting with the characters.**
 
