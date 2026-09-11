@@ -5,18 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Greener Thumbs</title>
 <meta name="description" content="Collect plant specimens and keep them alive. A greenhouse, three species, and a season that runs a real week.">
+<link rel="stylesheet" href="../theme.css">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230e1410'/%3E%3Cpath d='M8 14V6' stroke='%236cc24a' stroke-width='1.6'/%3E%3Cpath d='M8 7C8 4 6 2 3 2c0 3 2 5 5 5zM8 9c0-3 2-5 5-5 0 3-2 5-5 5z' fill='%236cc24a'/%3E%3C/svg%3E">
 <style>
-  /* The palette is the site's, shifted green: this is the same company as the
-     other two games, but it is a greenhouse rather than a solarpunk plaza. */
+  /* The site's look, from theme.css: paper, soft ink, and the leaf for what
+     you can press. This page was dark green with green type on it for a
+     while, which read as a terminal in a potting shed. */
   :root{
-    --ink:      #0e1410;
-    --paper:    #eef3e6;
-    --muted:    #9db09a;
-    --leaf:     #6cc24a;
-    --leaf-deep:#3f8f38;
-    --edge:     #2a3a2c;
-    --sun:      #ffd23f;
+    --ink:      var(--gv-paper);
+    --paper:    var(--gv-text);
+    --muted:    var(--gv-muted);
+    --leaf:     var(--gv-leaf);
+    --leaf-deep:var(--gv-leaf);
+    --edge:     var(--gv-line);
+    --sun:      var(--gv-sun);
   }
   *{ box-sizing: border-box; }
   html, body{ height: 100%; }
@@ -24,7 +26,8 @@
     margin: 0;
     background: var(--ink);
     color: var(--paper);
-    font: 16px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font: 16px/1.55 var(--gv-type);
+    -webkit-font-smoothing: antialiased;
     overflow: hidden;
   }
 
@@ -45,9 +48,9 @@
   .veil{
     position: fixed; inset: 0; z-index: 1;
     background:
-      linear-gradient(180deg, rgba(6,10,7,.82) 0%, rgba(6,10,7,.30) 38%,
-                              rgba(6,10,7,.55) 72%, rgba(6,10,7,.92) 100%),
-      radial-gradient(80% 60% at 30% 40%, rgba(6,10,7,0) 0%, rgba(6,10,7,.55) 100%);
+      linear-gradient(180deg, rgba(244,239,228,.90) 0%, rgba(244,239,228,.58) 38%,
+                              rgba(244,239,228,.70) 72%, rgba(244,239,228,.94) 100%),
+      radial-gradient(80% 60% at 30% 40%, rgba(244,239,228,0) 0%, rgba(244,239,228,.55) 100%);
   }
 
   main{
@@ -75,10 +78,9 @@
     line-height: .95;
     letter-spacing: -.02em;
     font-weight: 800;
-    background: linear-gradient(180deg, #eaf7e0 0%, var(--leaf) 118%);
+    background: linear-gradient(180deg, #3f8f38 0%, var(--gv-leaf) 100%);
     -webkit-background-clip: text; background-clip: text;
     color: transparent;
-    text-shadow: 0 2px 30px rgba(0,0,0,.5);
   }
   .tag{
     margin: .9rem auto 0; max-width: 34rem;
@@ -96,16 +98,16 @@
     display: inline-block;
     padding: .85rem 2.6rem;
     border: 0; border-radius: 999px;
-    background: linear-gradient(180deg, var(--leaf) 0%, var(--leaf-deep) 100%);
+    background: linear-gradient(180deg, var(--gv-leaf-soft) 0%, #3fa34d 100%);
     color: #08120a;
     font: inherit; font-weight: 800; font-size: 1.05rem;
     letter-spacing: .04em; text-transform: uppercase; text-decoration: none;
     cursor: pointer;
-    box-shadow: 0 10px 30px rgba(0,0,0,.45);
+    box-shadow: var(--gv-shadow);
     transition: transform .12s ease, filter .12s ease;
   }
   .enter:hover, .enter:focus-visible{ transform: translateY(-2px); filter: brightness(1.08); }
-  .enter:focus-visible{ outline: 3px solid var(--sun); outline-offset: 3px; }
+  .enter:focus-visible{ outline: 3px solid var(--gv-leaf); outline-offset: 3px; }
 
   /* The mode switch. A real control rather than a link, because which mode you
      are entering has to be visible *before* you press the button — the two do
@@ -114,14 +116,14 @@
     display: inline-flex; align-items: center; gap: .8rem;
     padding: .5rem .75rem .5rem 1rem;
     border: 1px solid var(--edge); border-radius: 999px;
-    background: rgba(10,16,11,.72);
+    background: var(--gv-glass);
     backdrop-filter: blur(6px);
   }
   .mode > span{ font-size: .9rem; color: var(--muted); }
   .switch{
     position: relative; width: 3.1rem; height: 1.7rem;
     border: 1px solid var(--edge); border-radius: 999px;
-    background: #1a241b; cursor: pointer; padding: 0;
+    background: var(--gv-sunk); cursor: pointer; padding: 0;
     transition: background .15s ease, border-color .15s ease;
   }
   .switch::after{
@@ -130,21 +132,21 @@
     background: var(--muted);
     transition: transform .15s ease, background .15s ease;
   }
-  .switch[aria-checked="true"]{ background: #1d3a22; border-color: var(--leaf-deep); }
+  .switch[aria-checked="true"]{ background: #d9ecd0; border-color: var(--leaf-deep); }
   .switch[aria-checked="true"]::after{ transform: translateX(1.4rem); background: var(--leaf); }
-  .switch:focus-visible{ outline: 3px solid var(--sun); outline-offset: 3px; }
+  .switch:focus-visible{ outline: 3px solid var(--gv-leaf); outline-offset: 3px; }
 
   .modehint{
     margin: 0; min-height: 1.4em;
     font-size: .86rem; color: var(--muted);
   }
-  .modehint b{ color: var(--paper); font-weight: 600; }
+  .modehint b{ color: var(--gv-text); font-weight: 600; }
 
   .back{
     grid-row: 3; align-self: end;
     color: var(--muted); font-size: .85rem; text-decoration: none;
   }
-  .back:hover{ color: var(--paper); }
+  .back:hover{ color: var(--gv-text); }
 
   .wip{
     display: inline-block; margin-top: .9rem;

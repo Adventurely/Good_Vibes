@@ -198,7 +198,18 @@ socket costs one.
 directory is the only thing keeping them apart. A test asserts each path
 answers with its own.
 
-The one thing they do share is `good-vibes/pixel.js` — the sixteen colours, the
+**Every page wears one look**, and it lives in `public/theme.css`: beige paper,
+soft ink, a rounded system face, and the sun and the leaf kept for the things
+you can press. It is Good Vibes' own page theme promoted to the site — three
+pages were already set in exactly those values, and the other seven had each
+grown a dark theme of their own: a dark brown shelf, a dark green greenhouse
+with green type on it, a black space chart. Each page keeps its own `<style>`
+and its own token names and aliases them onto the shared ones, so the numbers
+live in one file and the names stay local. `test/server.test.js` fetches every
+page and checks the link is there, because a page that forgets it renders with
+every `var()` unset and nothing else in the suite reads the CSS.
+
+The other thing they share is `good-vibes/pixel.js` — the sixteen colours, the
 5&times;7 font and the integer-scaling helper — which Sunward imports rather
 than copying. Good Vibes keeps a *copy* of Solarium's palette instead, and says
 why in its own header: those two are synced from different repositories, so an
@@ -350,6 +361,8 @@ src/solarium.js     Save Solarium's rules engine: pure functions over a state
 src/worker.js       the deployed front door: assets, and both socket routes
 src/room-do.js      one Durable Object per Good Vibes room code
 src/solarium-do.js  one Durable Object per Save Solarium room code
+public/theme.css    the one look every page shares: paper, ink, the rounded
+                    face, and the sun and the leaf for what you can press
 public/index.html   the shelf: every game, thumbnails painted by their own
                     renderers rather than screenshotted
 public/solarium/    Save Solarium, client and content

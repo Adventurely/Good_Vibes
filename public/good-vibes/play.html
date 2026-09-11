@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="../theme.css">
     <title>Good Vibes</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%231a1310'/%3E%3Ccircle cx='8' cy='8' r='4' fill='%23ffd23f'/%3E%3Cpath d='M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.5 1.5M11.5 11.5L13 13M13 3l-1.5 1.5M4.5 11.5L3 13' stroke='%23f59a2e' stroke-width='1.4'/%3E%3C/svg%3E">
     <meta name="description" content="Gather what the ruin grew, brew what the party needs, and get to the Array." />
@@ -37,7 +38,11 @@
         background: var(--ink);
         background-image: radial-gradient(circle at 50% -20%, #fffdf6 0%, #efe7d7 70%);
         color: var(--text);
-        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        /* The site's rounded face, from theme.css. This was the monospace for a
+           long time, and it suited a card table; it also read as a terminal, and
+           the whole site is one look now. */
+        font-family: var(--gv-type);
+        -webkit-font-smoothing: antialiased;
         line-height: 1.6;
       }
 

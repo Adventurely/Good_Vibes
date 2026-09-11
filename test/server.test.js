@@ -121,6 +121,37 @@ test('each game keeps its own modules', async () => {
   assert.match(await sw.text(), /GROWERS|DAY_LENGTH/);
 });
 
+test('every page wears the one theme', async () => {
+  /* The site's look is one file, public/theme.css — the paper, the ink and
+     the rounded face — and each page aliases its own token names onto it. A
+     page that forgets the link renders with every var() unset: black type on
+     a white page in a browser, and nothing in the suite would have noticed,
+     because nothing else reads the CSS. So this does. */
+  const css = await fetch(`${baseUrl}/theme.css`);
+  assert.equal(css.status, 200);
+  assert.match(css.headers.get('content-type'), /text\/css/);
+  const sheet = await css.text();
+  for(const token of ['--gv-type', '--gv-paper', '--gv-text', '--gv-leaf', '--gv-sun']){
+    assert.match(sheet, new RegExp(`${token}:`), `theme.css no longer defines ${token}`);
+  }
+
+  const pages = [
+    '/', '/good-vibes/', '/good-vibes/play.html', '/solarium/',
+    '/greener-thumbs/', '/greener-thumbs/play.html',
+    '/orbital-trader/', '/orbital-trader/play.html',
+    '/sunward/', '/sunward/play.html',
+  ];
+  for(const page of pages){
+    const html = await (await fetch(`${baseUrl}${page}`)).text();
+    assert.match(html, /<link rel="stylesheet" href="(\.\.\/|\.\/)theme\.css">/,
+      `${page} does not link theme.css`);
+    assert.match(html, /var\(--gv-type\)/, `${page} does not set its type from the theme`);
+    // Nothing dark left behind as a page ground. The games' own canvases can
+    // be as dark as they like; the page around them is paper.
+    assert.doesNotMatch(html, /body\s*\{[^}]*background:\s*#[01]/, `${page} still has a dark body`);
+  }
+});
+
 test('Sunward reaches the font it borrows', async () => {
   /* Its art.js imports the palette and the 5x7 font out of Good Vibes rather
      than keeping a second copy of sixteen hex values. That is a cross-game
