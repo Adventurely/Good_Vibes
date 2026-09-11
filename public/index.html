@@ -348,7 +348,7 @@ function paintSolarium(now){
    is fast enough for Tessel's moons to visibly move and slow enough that the
    planets look like planets rather than sparks. */
 const otCanvas = document.getElementById('shot-ot');
-const ot = createChart(otCanvas, otWorld(OT_BODIES), { reducedMotion: still, starSeed: 3 });
+const ot = createChart(otCanvas, otWorld(OT_BODIES), { reducedMotion: still, starSeed: 3, showScale: false });
 const otBelt = { inner: OT_CONST.BELT.inner, outer: OT_CONST.BELT.outer, rocks: OT_ROCKS, debris: OT_DEBRIS };
 function otFit(){
   ot.resize();

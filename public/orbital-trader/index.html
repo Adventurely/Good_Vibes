@@ -13,8 +13,8 @@
      modules the game plays on. A picture of the game would go stale the
      first time somebody moved a moon. */
   :root{
-    --space:#0b0d17; --ink:#e8e2d4; --muted:#a39d90; --faint:#6f6a60;
-    --gold:#ffd23f; --gold-deep:#f59a2e; --mint:#7ff0d3; --line:#2a3048;
+    --space:#120e0c; --ink:#f5ead6; --muted:#b9a68c; --faint:#6f6155;
+    --gold:#ffd23f; --gold-deep:#f59a2e; --mint:#7ff0d3; --line:#3a2b22;
   }
   *{ box-sizing:border-box; }
   html,body{ height:100%; }
@@ -26,8 +26,11 @@
   #sky{ position:fixed; inset:0; width:100%; height:100%; display:block; }
   .veil{
     position:fixed; inset:0; z-index:1; pointer-events:none;
+    /* Enough to read the words over, not so much that the sky behind them
+       turns into a dark rectangle. */
     background:
-      linear-gradient(180deg, rgba(11,13,23,.55) 0%, rgba(11,13,23,.08) 35%, rgba(11,13,23,.15) 70%, rgba(11,13,23,.85) 100%);
+      linear-gradient(180deg, rgba(18,14,12,.62) 0%, rgba(18,14,12,.10) 34%, rgba(18,14,12,.10) 62%, rgba(18,14,12,.88) 100%),
+      radial-gradient(70% 46% at 50% 30%, rgba(18,14,12,.55) 0%, rgba(18,14,12,0) 100%);
   }
   main{
     position:fixed; inset:0; z-index:2;
@@ -52,14 +55,14 @@
   }
   .enter:hover, .enter:focus-visible{ transform:translateY(-2px); filter:brightness(1.06); }
   .enter:focus-visible{ outline:3px solid var(--mint); outline-offset:3px; }
-  .enter.quiet{ background:rgba(20,24,40,.85); color:var(--ink); border:1px solid var(--line); box-shadow:none; font-weight:600; }
+  .enter.quiet{ background:rgba(26,20,16,.88); color:var(--ink); border:1px solid var(--line); box-shadow:none; font-weight:600; }
   .enter[hidden]{ display:none; }
   .saved{ margin:.6rem 0 0; color:var(--faint); font-size:.85rem; min-height:1.3em; }
   .peoples{
     margin:clamp(1.4rem, 4vw, 2.4rem) auto 0; padding:0; list-style:none;
     display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:.6rem; max-width:44rem; text-align:left;
   }
-  .peoples li{ background:rgba(14,17,30,.72); border:1px solid var(--line); border-radius:10px; padding:.55rem .7rem; font-size:.84rem; color:var(--muted); backdrop-filter:blur(6px); }
+  .peoples li{ background:rgba(20,16,13,.78); border:1px solid var(--line); border-radius:10px; padding:.55rem .7rem; font-size:.84rem; color:var(--muted); backdrop-filter:blur(6px); }
   .peoples b{ display:block; font-size:.92rem; margin-bottom:.1rem; }
   .p-e b{ color:#ff8c42; } .p-o b{ color:#6cc24a; } .p-c b{ color:#e9dcc0; } .p-f b{ color:#5fb9e6; }
   .back{ grid-row:3; align-self:end; color:var(--faint); font-size:.85rem; text-decoration:none; }
@@ -127,13 +130,22 @@ document.getElementById('new').addEventListener('click', e => {
 const world = makeWorld(BODIES);
 const canvas = document.getElementById('sky');
 const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const chart = createChart(canvas, world, { reducedMotion: still, starSeed: 3 });
+const chart = createChart(canvas, world, {
+  reducedMotion: still, starSeed: 3, showScale: false,
+  // The title, the cards and the link along the bottom own those strips.
+  labelInsets: { top: 60, right: 20, bottom: 70, left: 20 },
+});
 const belt = { inner: CONST.BELT.inner, outer: CONST.BELT.outer, rocks: BELT_ROCKS, debris: ARC_DEBRIS };
+/* Put the Lamp low and left, so the orbits sweep up behind the title instead
+   of sitting under the button, and frame about seven au: Cinder through the
+   Scatter, with Wanderwell's long ellipse crossing all of it. */
 function fit(){
   chart.resize();
   chart.camera.follow = null;
-  chart.camera.cx = 0.9; chart.camera.cy = -0.2;
-  chart.camera.zoom = Math.min(chart.width, chart.height) / 7.6;
+  chart.camera.zoom = Math.min(chart.width, chart.height) / 7.0;
+  const want = [chart.width * 0.26, chart.height * 0.78];
+  chart.camera.cx = (chart.width / 2 - want[0]) / chart.camera.zoom;
+  chart.camera.cy = (want[1] - chart.height / 2) / chart.camera.zoom;
 }
 fit();
 addEventListener('resize', fit);

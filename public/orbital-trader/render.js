@@ -91,6 +91,12 @@ export function createChart(canvas, world, opts = {}){
     /* Last frame's screen-space records, for hit testing. */
     hits: { bodies: [], nodes: [], handles: [], pathSegs: [] },
     reducedMotion: !!opts.reducedMotion,
+    /* The scale bar is a navigation tool. On a thumbnail or behind a title it
+       is a stray measurement in the corner of a picture. */
+    showScale: opts.showScale !== false,
+    /* Strips of the canvas that something else owns — a title, a HUD, a link
+       along the bottom. Labels keep out of them; dots still show through. */
+    labelInsets: opts.labelInsets ?? { top: 0, right: 0, bottom: 0, left: 0 },
     stars: makeStars(opts.starSeed ?? 7),
     belt: null,
   };
@@ -192,7 +198,7 @@ function draw(chart, view){
   if(view.prediction) drawPrediction(chart, view, pos);
   drawShip(chart, view);
   if(view.prediction && view.nodes) drawNodes(chart, view, pos);
-  drawScaleBar(chart);
+  if(chart.showScale) drawScaleBar(chart);
 }
 
 function drawStars(chart, view){
@@ -393,7 +399,8 @@ function drawBodies(chart, view, pos, t){
     let spot = null;
     for(const c of cand){
       const box = { x: c[0] - 4, y: c[1] - 11, w, h: 14 };
-      if(box.x < 0 || box.y < 0 || box.x + box.w > chart.width || box.y + box.h > chart.height) continue;
+      const ins = chart.labelInsets;
+      if(box.x < ins.left || box.y < ins.top || box.x + box.w > chart.width - ins.right || box.y + box.h > chart.height - ins.bottom) continue;
       if(!placed.some(o => o.x < box.x + box.w && o.x + o.w > box.x && o.y < box.y + box.h && o.y + o.h > box.y)){ spot = c; placed.push(box); break; }
     }
     if(!spot) continue;
