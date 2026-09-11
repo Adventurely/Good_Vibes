@@ -1627,6 +1627,7 @@ socket, no server. One save in `localStorage`.
       sim.js          the rules — no drawing in it at all
       content.js      the world as data, assembled from the design tables
       render.js       the chart
+      sprites.js      the worlds as pixels: sixteen across, drawn once
       data/*.js       generated from tools/orbital-trader/design/*.json
 
 ### How the flying works
@@ -1648,6 +1649,29 @@ digit. It is also why time warp is free — ×2500 costs the same as ×1.
 document asks for that, and it buys a system where a moon can never wander out
 of its planet's reach and where Grumm's approach can be made as generous as it
 needs to be.
+
+### What the worlds look like
+
+Every body used to be a coloured dot, which is honest and forgettable:
+Bramble and Ledger were a green circle and a gold one and nobody ever learned
+which was which. `sprites.js` gives each of them a face, sixteen pixels
+across, drawn once into an offscreen canvas and blitted with smoothing off so
+it stays crunchy at any zoom. Under about seven pixels the dot comes back — a
+sixteen-pixel picture at that size is mush.
+
+The round worlds are **generated**: a lit sphere in a five-step ramp off the
+body's own colour, plus a recipe of features painted onto it — bands,
+continents, craters, ice caps, a storm, city lights that only appear on the
+night side. Generated rather than drawn because sixteen hand-placed spheres
+drift apart in their lighting, and because a recipe is four lines somebody can
+change. The randomness is seeded from the body's own id, so Bramble's
+hedgerows are where they were yesterday.
+
+The things that are not spheres are **drawn**, one character per pixel: the
+Arc's broken ring, Claw Rock (which has ears, and the cats insist that is a
+coincidence), Merrow's bazaar-covered snowball, the Far Lantern, and the ship.
+A silhouette is the whole character of those, and a silhouette is what a
+generator is worst at.
 
 ### The road, the lock, and the clock
 

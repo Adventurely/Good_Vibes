@@ -22,6 +22,7 @@
  */
 
 import { absState, railState, unit, norm, add, sub, scale, perp, dist, propagate } from './orbit.js';
+import { drawSprite } from './sprites.js';
 
 /* The palette: a star chart drawn on paper. The same paper as every page on
  * the site (theme.css), with the orbits inked on it and the Lamp still the
@@ -394,16 +395,24 @@ function drawBodies(chart, view, pos, t){
       ctx.lineWidth = 1.5; ctx.setLineDash([2, 3]); ctx.stroke(); ctx.setLineDash([]);
     }
 
-    let fill = colour;
+    /* The body itself. Each one has a sprite; the dot is what is left when a
+       sprite is too small to say anything — under about seven pixels across a
+       sixteen-pixel picture is mush, and a clean dot reads better. */
+    let alpha = 1;
     if(b.id === 'lantern'){
-      // It blinks at irregular gaps nobody has explained. Under reduced motion it rests, lit, in a ring.
+      // It blinks at irregular gaps nobody has explained. Under reduced motion it rests, lit.
       const lit = chart.reducedMotion || lanternLit(view.now ?? 0);
-      fill = lit ? '#2a2118' : '#b9a98a';
+      alpha = lit ? 1 : 0.35;
     }
-    ctx.beginPath(); ctx.arc(p[0], p[1], rpx, 0, Math.PI * 2);
-    ctx.fillStyle = fill; ctx.fill();
-    if(b.kind === 'star'){ ctx.fillStyle = PALETTE.starCore; ctx.beginPath(); ctx.arc(p[0], p[1], rpx * 0.55, 0, Math.PI * 2); ctx.fill(); }
-    if(b.kind === 'zone' || b.mu === 0){
+    const drew = rpx >= 3.5 && drawSprite(ctx, b.id, p[0], p[1], rpx * 2.4, alpha);
+    if(!drew){
+      ctx.globalAlpha = alpha;
+      ctx.beginPath(); ctx.arc(p[0], p[1], rpx, 0, Math.PI * 2);
+      ctx.fillStyle = colour; ctx.fill();
+      if(b.kind === 'star'){ ctx.fillStyle = PALETTE.starCore; ctx.beginPath(); ctx.arc(p[0], p[1], rpx * 0.55, 0, Math.PI * 2); ctx.fill(); }
+      ctx.globalAlpha = 1;
+    }
+    if((b.kind === 'zone' || b.mu === 0) && !drew){
       // Gravity-less things are hollow: the comet, the Lantern, Claw Rock.
       ctx.strokeStyle = colour; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(p[0], p[1], rpx + 3, 0, Math.PI * 2); ctx.stroke();
@@ -642,10 +651,12 @@ function drawShip(chart, view){
   ctx.save();
   ctx.translate(p[0], p[1]);
   ctx.rotate(ang);
-  ctx.beginPath();
-  ctx.moveTo(9, 0); ctx.lineTo(-6, 5.5); ctx.lineTo(-3, 0); ctx.lineTo(-6, -5.5); ctx.closePath();
-  ctx.fillStyle = PALETTE.ship; ctx.fill();
-  ctx.strokeStyle = PALETTE.shipEdge; ctx.lineWidth = 1; ctx.stroke();
+  if(!drawSprite(ctx, 'ship', 0, 0, 18)){
+    ctx.beginPath();
+    ctx.moveTo(9, 0); ctx.lineTo(-6, 5.5); ctx.lineTo(-3, 0); ctx.lineTo(-6, -5.5); ctx.closePath();
+    ctx.fillStyle = PALETTE.ship; ctx.fill();
+    ctx.strokeStyle = PALETTE.shipEdge; ctx.lineWidth = 1; ctx.stroke();
+  }
   ctx.restore();
   /* A faint halo, so the ship is findable at a glance against a field of
      stars that are the same colour and nearly the same size. */
@@ -779,8 +790,11 @@ function drawEncounterInset(chart, view){
     ctx.strokeStyle = PALETTE.zone; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.arc(cx, cy, Math.max(2, b.zoneRadius * k), 0, Math.PI * 2); ctx.stroke();
   }
-  ctx.fillStyle = bodyColour(b);
-  ctx.beginPath(); ctx.arc(cx, cy, Math.max(2.5, (b.radius ?? 0) * k), 0, Math.PI * 2); ctx.fill();
+  const br = Math.max(3, (b.radius ?? 0) * k);
+  if(!drawSprite(ctx, b.id, cx, cy, Math.max(9, br * 2.4))){
+    ctx.fillStyle = bodyColour(b);
+    ctx.beginPath(); ctx.arc(cx, cy, br, 0, Math.PI * 2); ctx.fill();
+  }
 
   // The road through it, and the doors at each end of each leg.
   ctx.strokeStyle = PALETTE.pathPlan; ctx.lineWidth = 1.75;
