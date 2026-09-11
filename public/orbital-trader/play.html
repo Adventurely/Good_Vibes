@@ -699,7 +699,7 @@ function askAtPath(t){
 
 /* ------------------------------------------------------------- view */
 
-$('v-fit').addEventListener('click', backToShip);
+$('v-fit').addEventListener('click', () => backToShip(true));
 $('v-in').addEventListener('click', () => chart.zoomBy(1.6));
 $('v-out').addEventListener('click', () => chart.zoomBy(1 / 1.6));
 $('v-panel').addEventListener('click', () => togglePanel());
@@ -908,7 +908,7 @@ function usableHalf(){
   const w = chart.width - (panelOpen && innerWidth > 760 ? $('panel').getBoundingClientRect().width : 0);
   return Math.min(w, chart.height);
 }
-function backToShip(){ chart.camera.follow = 'ship'; frameShipOrbit(); }
+function backToShip(fit = false){ chart.camera.follow = 'ship'; if(fit) frameShipOrbit(); }
 function frameShipOrbit(){
   const span = roadSpan();
   const half = usableHalf();
@@ -916,9 +916,12 @@ function frameShipOrbit(){
 }
 
 /* Tap a body and the chart centres on it; tap the ship, or press f, to come
-   back. Nothing is selected and nothing is aimed at — looking is looking. */
+   back. Nothing is selected and nothing is aimed at — looking is looking, and
+   it never changes the zoom: moving the centre and changing the scale at the
+   same time is how you lose track of where you were. The fit button is there
+   for when you do want the scale chosen for you. */
 function lookAt(id){
-  chart.focus(id);
+  chart.focus(id, null, false);
   toast(`Looking at ${esc(world.get(id).name)}. Press f for your ship.`);
 }
 
@@ -1308,7 +1311,7 @@ const actions = {
   undock(){
     const r = S.undock(state);
     if(!r.ok) return;
-    selectedNode = -1; replan(true); renderTabs(); backToShip(); tutorialCheck(); save();
+    selectedNode = -1; replan(true); renderTabs(); backToShip(true); tutorialCheck(); save();
   },
   dock(){ doDock(); },
   addmark(){
@@ -1412,7 +1415,7 @@ function storyTitle(name){ return { cometCaught: "Merrow's Comet", chimeArrival:
 function confirmNew(){
   openModal(`<h2>Start over?</h2><p>This save is replaced by a fresh ship at Tessel. There is one save slot.</p><div class="btns"><button class="btn" id="m-no">Keep playing</button><button class="btn danger" id="m-yes">New game</button></div>`, m => {
     m.querySelector('#m-no').addEventListener('click', closeModal);
-    m.querySelector('#m-yes').addEventListener('click', () => { closeModal(); state = S.newGame(freshSeed()); save(); selectedNode = -1; lastDockedMode = null; replan(true); renderTabs(); backToShip(); tutorialCheck(); });
+    m.querySelector('#m-yes').addEventListener('click', () => { closeModal(); state = S.newGame(freshSeed()); save(); selectedNode = -1; lastDockedMode = null; replan(true); renderTabs(); backToShip(true); tutorialCheck(); });
   });
 }
 
@@ -1480,7 +1483,7 @@ $('grab').addEventListener('keydown', e => { if(e.key === 'Enter' || e.key === '
 renderTabs();
 togglePanel(panelOpen);
 replan(true);
-backToShip();
+backToShip(true);
 syncView();
 setRate(state.warp ?? 1);
 tutorialCheck();
