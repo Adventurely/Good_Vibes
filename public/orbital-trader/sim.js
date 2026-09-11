@@ -16,7 +16,7 @@
 import {
   makeWorld, advance, predict, absState, railState, circularState, elementsFromState,
   timeToAnomaly, propagate, hohmann, lambert, period, norm, sub, add, scale, unit, perp, dist,
-  closestApproach, nodeMagnitude, nodeFromVector, cross, dot, localState, TAU,
+  closestApproach, nodeMagnitude, nodeCost, nodeFromVector, cross, dot, localState, TAU,
 } from './orbit.js';
 import {
   CONST, BODIES, GOODS, PORTS, UPGRADES, FORMULAS, CONTRACT_TEMPLATES, TEXT, SPECIES,
@@ -408,6 +408,24 @@ export function addNode(state, t){
   return state.nodes.findIndex(n => n.t === t);
 }
 export function removeNode(state, index){ state.nodes.splice(index, 1); }
+
+/* Where each mark sits on the current plan, and what it will really cost when
+ * it fires. The two numbers on a mark's card are measured along axes that lean
+ * together, so their triangle is not the burn: only the state at the moment of
+ * firing settles that. */
+export function markStates(state, horizon){
+  const pred = plan(state, horizon ?? 900);
+  return state.nodes.map(n => {
+    for(const seg of pred.segments){
+      if(n.t >= seg.t0 - 1e-9 && n.t <= seg.t1 + 1e-9){
+        const mu = world.get(seg.body).mu;
+        const at = propagate(mu, seg.r0, seg.v0, n.t - seg.t0);
+        return { node: n, body: seg.body, r: at.r, v: at.v, cost: nodeCost(at.r, at.v, n) };
+      }
+    }
+    return { node: n, body: null, r: null, v: null, cost: nodeMagnitude(n) };
+  });
+}
 /* A mark placed without touching the chart: an eighth of an orbit ahead on a
  * closed path, a day ahead on an open one. The keyboard route to a burn, and
  * the one the lesson can point at. */
@@ -422,7 +440,10 @@ export function addNodeAhead(state){
      to drag a handle — the mark would fire, empty, before it was finished. */
   return addNode(state, Math.max(state.t, last) + Math.max(0.5, ahead));
 }
-export function planCost(state){ return state.nodes.reduce((s, n) => s + nodeMagnitude(n), 0); }
+export function planCost(state, horizon){
+  if(!state.nodes.length) return 0;
+  return markStates(state, horizon).reduce((s, m) => s + m.cost, 0);
+}
 
 /* The plan as the chart will draw it, with what the tank can pay for. */
 export function plan(state, horizon){
@@ -477,9 +498,27 @@ function seedFromLambert(state, targetId, node, scoreFn){
   const localSpan = localPeriod ?? Math.max(2, hoh);
   const ccw = cross(sub(startAbs, frameNow.r), sub(add(frameNow.v, [0, 0]), frameNow.v)) >= 0 ? true : true;
   const candidates = [];
-  const depTo = sameFrame ? Math.min(localPeriod ? localPeriod * 2 : hoh, Math.max(2, hoh)) : localSpan;
-  for(let i = 0; i <= 28; i++){
-    const dep = MIN_LEAD + (depTo - MIN_LEAD) * (i / 28);
+  /* How long the search may wait before burning. Leaving a moon for a sibling
+     moon means waiting for them to line up, which takes a synodic period — the
+     time for one to lap the other — so that is the window, not one lap of the
+     parking orbit. */
+  let depTo = sameFrame ? Math.min(localPeriod ? localPeriod * 2 : hoh, Math.max(2, hoh)) : localSpan;
+  if(!sameFrame){
+    const mine = world.get(here.id), theirs = target;
+    if(mine.parent === theirs.parent && mine.parent){
+      const mu = world.get(mine.parent).mu;
+      const n1 = TAU / period(mu, mine.a), n2 = TAU / period(mu, theirs.a);
+      if(Math.abs(n1 - n2) > 1e-12) depTo = Math.min(400, Math.max(depTo, TAU / Math.abs(n1 - n2)));
+    }
+  }
+  /* A long window needs more departures tried and can afford fewer flight
+     times each: this is a button press, and a second of frozen page is a
+     second the player thinks the game has died. */
+  const wide = depTo > (localPeriod ?? 1) * 3;
+  const depSteps = wide ? 44 : 28;
+  const tofSteps = 18;
+  for(let i = 0; i <= depSteps; i++){
+    const dep = MIN_LEAD + (depTo - MIN_LEAD) * (i / depSteps);
     const t1 = state.t + dep;
     const local = propagate(here.mu, state.ship.r, state.ship.v, dep);
     const hereAt = absState(world, here.id, t1);
@@ -488,8 +527,8 @@ function seedFromLambert(state, targetId, node, scoreFn){
     const v1 = sub(add(hereAt.v, local.v), frameAt.v);
     const hereInFrame = { r: sub(hereAt.r, frameAt.r), v: sub(hereAt.v, frameAt.v) };
     const sense = cross(r1, v1) >= 0;
-    for(let j = 0; j <= 18; j++){
-      const tof = hoh * (0.25 + (2.75 * j) / 18);
+    for(let j = 0; j <= tofSteps; j++){
+      const tof = hoh * (0.25 + (2.75 * j) / tofSteps);
       const tgt = railState(target, frame.mu, t1 + tof);
       const side = scale(unit(perp(tgt.v)), offset);
       for(const sign of [1, -1]){
@@ -579,10 +618,12 @@ function pickSeed(state, node, candidates, scoreFn){
   candidates.sort((a, b) => a.key - b.key);
   let best = null;
   for(const c of candidates.slice(0, 8)){
-    node.t = state.t + c.dep;
     const parts = nodeFromVector(c.r, c.v, c.dv);
+    if(!parts) continue;
+    node.t = state.t + c.dep;
     node.prograde = parts.prograde;
     node.radial = parts.radial;
+    node.__r = c.r; node.__v = c.v;
     state.nodes.sort((a, d) => a.t - d.t);
     const s = scoreFn();
     if(!best || s < best.s) best = { s, t: node.t, prograde: node.prograde, radial: node.radial };
@@ -629,6 +670,16 @@ export function trimToTarget(state, targetId, horizon){
   void anchor;
   const span = Math.min(horizon ?? 12000, Math.max(60, laps, slow * 1.6));
   const floor = Math.max(target.radius * 2, (target.zoneRadius ?? 0) * 0.3);
+  /* What a patient transfer to this target ought to take, so that waiting can
+     be priced against it: a pass four slow roads from now is a bad plan even
+     if it is a beautiful one. */
+  const reference = (() => {
+    const a = world.get(state.ship.body), b = target;
+    if(a.id === b.parent && a.mu > 0) return period(a.mu, (norm(state.ship.r) + b.a) / 2) / 2;
+    if(a.parent && a.parent === b.parent) return period(world.get(a.parent).mu, (a.a + b.a) / 2) / 2;
+    if(a.parent === b.id && b.mu > 0) return period(b.mu, (a.a + (b.dockAlt ?? b.radius)) / 2) / 2;
+    return Math.max(2, slow);
+  })();
   const score = () => {
     const pred = plan(state, span);
     const ca = closestApproach(world, pred, targetId);
@@ -638,13 +689,18 @@ export function trimToTarget(state, targetId, horizon){
        and a road that is flung about by three other worlds on the way is worse
        than a quiet one, however pretty its arrival, because the tenth bounce
        is where a plan stops being something you can rely on. */
-    const soon = ((ca.t - state.t) / span) * floor * 0.6;
+    const soon = ((ca.t - state.t) / Math.max(1, reference)) * floor * 0.8;
     const bounces = pred.events.filter(e => e.kind === 'soi' && e.t < ca.t && e.to !== targetId).length;
     /* Flying into something before you get there is not arriving. What the
        road does afterwards is the pilot's business: every arrival is an
        unbraked one until the brake is written down. */
-    const hit = pred.events.some(e => e.kind === 'crash' && e.t <= ca.t + 1e-9) ? floor * 40 : 0;
-    return Math.max(ca.distance, floor) + soon + bounces * floor * 0.25 + hit;
+    const crash = pred.events.find(e => e.kind === 'crash');
+    const hit = crash && (crash.body === targetId || crash.t <= ca.t + 0.5) ? floor * 40 : 0;
+    /* And between two roads that both arrive, the cheaper one is the better
+       one. A tenth of a harbour mouth per km/s: enough to break a tie, not
+       enough to trade an arrival for a saving. */
+    const spend = (nodeCost(node.__r ?? [1, 0], node.__v ?? [0, 1], node) / auDay(1)) * floor * 0.1;
+    return Math.max(ca.distance, floor) + soon + bounces * floor * 0.25 + hit + spend;
   };
   // Which mark to work on: the last one before the encounter, or a new one.
   let ix = -1;
@@ -660,6 +716,7 @@ export function trimToTarget(state, targetId, horizon){
   }
   const node = state.nodes[ix];
   const before = { prograde: node.prograde, radial: node.radial, t: node.t };
+  void node;
   // A mark can be moved as well as pulled. When to burn is most of the art of
   // a transfer — the same push a quarter of an orbit later arrives somewhere
   // else entirely — so the search walks the clock too.
@@ -680,12 +737,22 @@ export function trimToTarget(state, targetId, horizon){
     // The plan does not come near it at all; there is nothing to refine.
     return { ok: false, reason: 'This road does not go near it. Aim it roughly first.' };
   }
-  let step = auDay(0.05);                        // 50 m/s to begin with
-  let tStep = Number.isFinite(el.period) ? el.period / 6 : 1;
+  /* If the solved guess already arrives inside the harbour mouth there is
+     nothing worth a long walk: polish it finely and stop. A button that thinks
+     for four seconds reads as a game that has died. */
+  const mouth = target.zoneRadius ?? target.soi ?? floor;
+  const arrived = () => {
+    const ca = closestApproach(world, plan(state, span), targetId);
+    return ca && ca.distance <= mouth;
+  };
+  const close = seeded && arrived();
+  let step = auDay(close ? 0.004 : 0.05);        // 4 m/s when polishing, 50 to search
+  let tStep = close ? 0.02 : (Number.isFinite(el.period) ? el.period / 6 : 1);
   const finest = auDay(0.0005);                  // half a metre per second
   const tFinest = 0.002;                         // about three minutes
+  const budget = close ? 140 : 900;
   let evaluations = 0;
-  while((step > finest || tStep > tFinest) && evaluations < 900){
+  while((step > finest || tStep > tFinest) && evaluations < budget){
     let improved = false;
     for(const axis of ['prograde', 'radial']){
       if(step <= finest) continue;
@@ -722,7 +789,9 @@ export function trimToTarget(state, targetId, horizon){
   // The score carries penalties; report the distance the player will actually see.
   const pred = plan(state, span);
   const ca = closestApproach(world, pred, targetId);
-  const cost = nodeMagnitude(node);
+  delete node.__r; delete node.__v;
+  const mine = markStates(state, span).find(m => m.node === node);
+  const cost = mine ? mine.cost : nodeMagnitude(node);
   return {
     ok: true, index: state.nodes.indexOf(node), distance: ca ? ca.distance : best, at: ca ? ca.t : null,
     was: start, cost, added, moved: Math.abs(node.t - before.t),
@@ -754,6 +823,14 @@ export function kiss(state){
   const b = world.get(state.ship.body);
   if(!b.port || b.mu <= 0) return null;
   const el = elementsFromState(b.mu, state.ship.r, state.ship.v);
+  /* A ship falling straight down has no periapsis to speak of — the conic is a
+     line through the middle of the world. There is no arithmetic to do and one
+     thing to say about it. */
+  if(Math.abs(el.h) < 1e-14 || el.rp <= b.radius * 0.02){
+    const speed = norm(state.ship.v);
+    const parked = Math.sqrt(b.mu / Math.max(norm(state.ship.r), b.radius));
+    return { port: b.id, t: state.t + 0.01, distance: 0, speed, over: Math.max(0, speed - (b.dockSpeed + parked)), inMouth: true, crashes: true };
+  }
   const tp = timeToAnomaly(b.mu, state.ship.r, state.ship.v, 0);
   if(tp == null) return null;
   const at = propagate(b.mu, state.ship.r, state.ship.v, tp);
@@ -762,12 +839,89 @@ export function kiss(state){
   return { port: b.id, t: state.t + tp, distance: el.rp, speed, over: Math.max(0, speed - (b.dockSpeed + parked)), inMouth: el.rp <= b.zoneRadius, crashes: el.rp <= b.radius };
 }
 
+/* Lift the kiss out of the ground. An approach whose periapsis is inside the
+ * world is a landing at whatever speed you happen to be doing; this writes the
+ * smallest burn that puts it back inside the harbour mouth instead. Radial
+ * first, because pushing sideways moves the far end of the path least. */
+export function raiseKiss(state, wantRp = null){
+  if(state.dockedAt) return -1;
+  const b = world.get(state.ship.body);
+  if(b.mu <= 0) return -1;
+  const target = wantRp ?? Math.max(b.radius * 3, (b.zoneRadius ?? b.radius * 4) * 0.55);
+  const t = state.t + 0.05;
+  const at = propagate(b.mu, state.ship.r, state.ship.v, 0.05);
+  const rpFor = dv => elementsFromState(b.mu, at.r, add(at.v, dv)).rp;
+  if(rpFor([0, 0]) >= target) return -1;
+  /* Try every direction, not only forward and outward. A ship falling almost
+     straight down has hardly any angular momentum, and forward and outward are
+     nearly the same line for it: what lifts that kiss is a push across, and a
+     search along four axes would report that nothing can be done. */
+  const axes = [];
+  for(let i = 0; i < 24; i++){
+    const th = (i / 24) * TAU;
+    axes.push([Math.cos(th), Math.sin(th)]);
+  }
+  let best = null;
+  /* The direct answer, as a candidate of its own: raising a kiss is raising
+     angular momentum, and the push that does it is across the line to the
+     world, of exactly the size the sums say. Sampled directions can miss it by
+     a few degrees, and a few degrees here is a lot of fuel. */
+  {
+    const rn = norm(at.r), vn = norm(at.v);
+    const energy = vn * vn / 2 - b.mu / rn;
+    const vAtRp = Math.sqrt(Math.max(0, 2 * (energy + b.mu / target)));
+    const wantH = target * vAtRp;
+    const haveH = cross(at.r, at.v);
+    const across = perp(unit(at.r));
+    for(const sign of [1, -1]){
+      const need = (sign * wantH - haveH) / rn;
+      if(!Number.isFinite(need) || need === 0) continue;
+      const mag = Math.abs(need);
+      const axis = scale(across, Math.sign(need));
+      if(elementsFromState(b.mu, at.r, add(at.v, scale(axis, mag))).rp >= target * 0.98){
+        if(!best || mag < best.mag) best = { mag, axis };
+      }
+    }
+  }
+  for(const axis of axes){
+    // Grow until it clears, then bisect back to the smallest that does.
+    let hi = auDay(0.005);
+    let ok = false;
+    for(let i = 0; i < 22; i++){
+      if(rpFor(scale(axis, hi)) >= target){ ok = true; break; }
+      hi *= 1.7;
+      if(hi > auDay(20)) break;
+    }
+    if(!ok) continue;
+    let lo = 0;
+    for(let i = 0; i < 40; i++){
+      const mid = (lo + hi) / 2;
+      if(rpFor(scale(axis, mid)) >= target) hi = mid; else lo = mid;
+    }
+    if(!best || hi < best.mag) best = { mag: hi, axis };
+  }
+  if(!best) return -1;
+  // Say nothing rather than something untrue: if the chosen push does not
+  // actually clear the ground, or the two axes cannot express it at all, there
+  // is no mark worth writing down.
+  if(rpFor(scale(best.axis, best.mag)) < target * 0.9) return -1;
+  const parts = nodeFromVector(at.r, at.v, scale(best.axis, best.mag));
+  if(!parts) return -1;
+  const node = { t, ...parts };
+  state.nodes = state.nodes.filter(n => Math.abs(n.t - t) > 1e-6);
+  state.nodes.push(node);
+  state.nodes.sort((a, c) => a.t - c.t);
+  return state.nodes.indexOf(node);
+}
+
 /* Write down the burn that turns an approach into an arrival: at kissing
  * distance if that is still ahead, and otherwise right now, because a ship
  * already inside the harbour mouth and going too fast has no time to wait for
  * the next one. Ordinary node creation — it can be edited or scrapped. */
 export function brakeAtKiss(state){
   const k = kiss(state);
+  // A path through the world is not a path to it: lift it first.
+  if(k && k.crashes) return raiseKiss(state);
   if(k && k.inMouth && !k.crashes && k.over > 0 && k.t > state.t + 0.02) return brakeAt(state, k.port, k.t);
   const st = dockingStatus(state);
   if(st && st.inZone && !st.ok) return brakeAt(state, st.port, state.t + 0.05);
@@ -788,7 +942,9 @@ function brakeAt(state, portId, t){
   const target = parked + b.dockSpeed * 0.7;
   if(speed <= target) return -1;
   const dv = scale(unit(rel), -(speed - target));
-  const node = { t, ...nodeFromVector(s.r, s.v, dv) };
+  const parts = nodeFromVector(s.r, s.v, dv);
+  if(!parts) return -1;
+  const node = { t, ...parts };
   state.nodes = state.nodes.filter(n => Math.abs(n.t - t) > 1e-6);
   state.nodes.push(node);
   state.nodes.sort((a, c) => a.t - c.t);
@@ -1034,20 +1190,40 @@ export function fuelPrice(state, portId = state.dockedAt){
   if(!p || p.fuelPricePerKms == null) return null;
   return p.fuelPricePerKms * fuelPriceMul(state) * (1 - repDiscount(state, p.species) * 0.5);
 }
+/* A ship with no fuel and no coin, tied up at a dock, is a ship that can never
+ * leave — and the design document is clear that nothing may cost the save. So
+ * Ledger will front enough to get going again, at a price, exactly as they do
+ * for a tow. It is a floor, not a facility: it only opens when the tank is
+ * nearly dry and the purse cannot cover it, and only up to what it takes to
+ * reach the next port. */
+export const CREDIT_KMS = 3;
+export function fuelCredit(state){
+  const price = fuelPrice(state);
+  if(price == null) return 0;
+  if(kms(state.dv) >= CREDIT_KMS) return 0;
+  const short = CREDIT_KMS - kms(state.dv);
+  const canPay = state.money / price;
+  return Math.max(0, short - canPay);
+}
+
 export function refuel(state, kmsWanted){
   const price = fuelPrice(state);
   if(price == null) return { ok: false, reason: 'No fuel sold here.' };
   const room = kms(state.tank - state.dv);
   let amount = Math.min(kmsWanted, room);
   if(amount <= 0) return { ok: false, reason: 'The tank is full.' };
-  const affordable = state.money / price;
+  const credit = fuelCredit(state);
+  const affordable = state.money / price + credit;
   if(affordable <= 0) return { ok: false, reason: 'Not enough coin.' };
   amount = Math.min(amount, affordable);
   const cost = amount * price;
+  const borrowed = Math.max(0, cost - state.money);
   state.money -= cost;
+  if(state.money < 0){ state.debt += -state.money; state.money = 0; }
   state.dv = Math.min(state.tank, state.dv + auDay(amount));
   logLine(state, 'refuelled', TEXT.logTemplates.refuelled, { amount: `${amount.toFixed(1)} km/s`, price: fmtMoney(cost), port: portName(state.dockedAt) });
-  return { ok: true, amount, cost };
+  if(borrowed > 0) logLine(state, 'story', TEXT.events.ledgerDebt);
+  return { ok: true, amount, cost, borrowed };
 }
 
 /* ------------------------------------------------------------ upgrades */

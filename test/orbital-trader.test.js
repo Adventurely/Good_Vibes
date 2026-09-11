@@ -574,3 +574,101 @@ test('Lambert: the transfer it solves is the transfer that flies', () => {
   // An impossible ask returns nothing rather than nonsense.
   assert.equal(O.lambert(MU, r1, [1, 0], -5, true), null);
 });
+
+test('an aimed road never flies into the thing it is aimed at', () => {
+  /* Aiming at a moon's centre gets you there at whatever speed you happen to
+     have, which is a landing. Every aim must pass it, not hit it — and the
+     game must always be able to lift a kiss back out of the ground. */
+  for(const [from, to] of [['tessel', 'bramble'], ['tessel', 'pip'], ['tessel', 'ledger'], ['bramble', 'ledger'], ['ledger', 'pip'], ['pip', 'bramble'], ['bramble', 'pip']]){
+    const s = S.newGame(5);
+    s.dockedAt = from;
+    S.undock(s);
+    s.target = to;
+    const r = S.trimToTarget(s, to, 900);
+    assert.ok(r.ok, `${from} -> ${to}: ${r.reason}`);
+    const pred = S.plan(s, 900);
+    const crash = pred.events.find(e => e.kind === 'crash');
+    assert.ok(!crash || crash.t > r.at + 0.5, `${from} -> ${to}: strikes ${crash?.body} on the way in`);
+    assert.ok(r.distance > world.get(to).radius, `${from} -> ${to}: the pass is inside the moon`);
+  }
+});
+
+test('a kiss dug into a moon can always be lifted back out of it', () => {
+  const s = S.newGame(5);
+  S.undock(s);
+  const b = world.get('bramble');
+  // A steep hyperbolic approach whose kiss is buried in the moon.
+  const speed = Math.sqrt(2 * b.mu / b.soi) * 2.2;
+  s.ship = { body: 'bramble', r: [b.soi * 0.95, 0], v: [-speed, speed * 0.1] };
+  const before = S.kiss(s);
+  assert.ok(before && before.crashes, 'the setup does dig in');
+  const ix = S.raiseKiss(s);
+  assert.ok(ix >= 0, 'nothing was offered');
+  let guard = 0;
+  while(s.nodes.length && guard++ < 20000) S.tick(s, 0.002);
+  assert.equal(s.pending, null, 'lifting it flew into the moon anyway');
+  const after = S.kiss(s);
+  assert.ok(after && !after.crashes, 'the kiss is still in the ground');
+  assert.ok(after.distance > b.radius * 2, `kiss only reached ${after.distance}`);
+  assert.ok(s.dv < s.tank, 'it cost something');
+
+  /* A ship falling dead straight at a world is a different matter: forward and
+     outward are the same line for it, so there is no pair of numbers on a mark
+     that adds up to a push across, and the game says nothing rather than
+     offering two enormous opposing ones that cancel. It is still told what is
+     about to happen, and a crash is a tow, not an ending. */
+  const straight = S.newGame(5);
+  S.undock(straight);
+  straight.ship = { body: 'bramble', r: [b.soi * 0.95, 0], v: [-speed, 0] };
+  const k = S.kiss(straight);
+  assert.ok(k && k.crashes, 'a straight drop is not even reported');
+  assert.equal(S.brakeAtKiss(straight), -1, 'a mark was offered that cannot be expressed');
+});
+
+test('what a mark costs is what the tank is charged, on any orbit', () => {
+  /* Prograde and radial only sit at right angles on a circle. Adding the two
+     numbers on a mark's card as a triangle overstates a burn badly on an
+     eccentric orbit — and the tank is charged the real thing, so the two must
+     agree or the plan lies about what it can afford. */
+  const s = S.newGame(5);
+  S.undock(s);
+  const b = world.get('tessel');
+  // A good eccentric orbit, where the two axes lean well apart.
+  s.ship = { body: 'tessel', r: [b.dockAlt, 0], v: [Math.sqrt(b.mu / b.dockAlt) * 0.5, Math.sqrt(b.mu / b.dockAlt) * 1.1] };
+  s.nodes = [{ t: s.t + 0.3, prograde: S.auDay(0.4), radial: S.auDay(-0.3) }];
+  const [mark] = S.markStates(s, 90);
+  assert.ok(mark.body, 'the mark is not on the plan');
+  const shown = S.planCost(s);
+  assert.ok(Math.abs(shown - mark.cost) < 1e-12);
+  const before = s.dv;
+  let guard = 0;
+  while(s.nodes.length && guard++ < 20000) S.tick(s, 0.005);
+  const charged = before - s.dv;
+  assert.ok(Math.abs(charged - shown) < 1e-9, `told ${S.fmtKms(shown)}, charged ${S.fmtKms(charged)}`);
+  // And the naive triangle really is different, so this test has something to say.
+  const naive = Math.hypot(S.auDay(0.4), S.auDay(-0.3));
+  assert.ok(Math.abs(naive - charged) > charged * 0.05, 'the two axes were at right angles after all');
+});
+
+test('a dry ship with an empty purse can still leave the dock', () => {
+  /* Nothing may cost the save, and a ship with no fuel and no coin tied up at
+     a dock would be exactly that. Ledger fronts it, at a price. */
+  const s = S.newGame(5);
+  s.dv = 0;
+  s.money = 0;
+  assert.ok(S.fuelCredit(s) > 0, 'no credit offered');
+  const r = S.refuel(s, 3);
+  assert.ok(r.ok && r.borrowed > 0, 'the tank stayed dry');
+  assert.ok(S.kms(s.dv) >= 2.5, `only got ${S.fmtKms(s.dv)}`);
+  assert.ok(s.debt > 0 && s.money === 0);
+  // And it is a floor, not a facility: a full purse borrows nothing.
+  const rich = S.newGame(5);
+  rich.dv = 0;
+  rich.money = 100000;
+  const r2 = S.refuel(rich, 5);
+  assert.ok(r2.ok && !r2.borrowed && rich.debt === 0);
+  // Nor does a ship that already has fuel.
+  const fine = S.newGame(5);
+  fine.money = 0;
+  assert.equal(S.fuelCredit(fine), 0);
+});

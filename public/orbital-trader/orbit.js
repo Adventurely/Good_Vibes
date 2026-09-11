@@ -601,20 +601,31 @@ export function burnVector(r, v, node, dvAvailable){
   return { dv, magnitude, short };
 }
 
+/* What a mark costs, given where the ship will be when it fires. Prograde and
+ * radial are not at right angles, so the two numbers on the card do not add up
+ * as a triangle — the only honest size of a burn is the length of the velocity
+ * change it actually makes, which is what the tank is charged for. */
+export function nodeCost(r, v, node){
+  return norm(burnVector(r, v, node).dv);
+}
+/* The same, without a state to hand: exact on a circle, an over-estimate
+ * elsewhere. Only for rough bounds — never for what the player is told. */
 export const nodeMagnitude = node => Math.hypot(node.prograde || 0, node.radial || 0);
 
 /* The reverse of burnVector: the prograde and radial numbers that add up to a
- * wanted change of velocity. The two axes are only at right angles on a circle,
- * so this is a 2x2 solve rather than a pair of dot products; when they line up
- * (a straight fall, where radial is all there is) it gives up and puts the
- * whole burn on the prograde axis, which is the same direction anyway. */
+ * wanted change of velocity.
+ *
+ * The two axes are at right angles only on a circle. Everywhere else they lean
+ * together, and on a straight fall they lie on top of each other — at which
+ * point there is no pair of numbers that adds up to a push across the line, and
+ * the honest answer is to say so. The caller decides what to do about it; what
+ * it must not do is hand back two enormous opposing numbers that happen to
+ * cancel, because those are what the player would be charged for.
+ */
 export function nodeFromVector(r, v, dv){
   const p = unit(v), rad = unit(r);
   const det = p[0] * rad[1] - p[1] * rad[0];
-  if(Math.abs(det) < 1e-9){
-    const along = dot(dv, p);
-    return { prograde: along, radial: 0 };
-  }
+  if(Math.abs(det) < 0.02) return null;      // within about a degree of parallel
   return {
     prograde: (dv[0] * rad[1] - dv[1] * rad[0]) / det,
     radial: (p[0] * dv[1] - p[1] * dv[0]) / det,

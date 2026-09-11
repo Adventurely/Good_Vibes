@@ -489,10 +489,12 @@ function renderDockCard(docking){
   card.classList.toggle('ready', !!docking.ok);
   card.classList.toggle('fast', !!docking.inZone && !docking.ok);
   $('dock-go').disabled = !docking.ok;
-  const atKiss = k && k.inMouth && !k.crashes && k.over > 0 && k.t > state.t + 0.02;
-  const brakeNow = !atKiss && docking.inZone && !docking.ok;
-  $('dock-brake').hidden = !(atKiss || brakeNow);
-  if(atKiss) $('dock-brake').textContent = 'Mark a brake at the kiss (' + S.fmtDays(k.t - state.t) + ')';
+  const digsIn = k && k.crashes;
+  const atKiss = !digsIn && k && k.inMouth && k.over > 0 && k.t > state.t + 0.02;
+  const brakeNow = !digsIn && !atKiss && docking.inZone && !docking.ok;
+  $('dock-brake').hidden = !(digsIn || atKiss || brakeNow);
+  if(digsIn) $('dock-brake').textContent = 'Lift the kiss clear of ' + b.name;
+  else if(atKiss) $('dock-brake').textContent = 'Mark a brake at the kiss (' + S.fmtDays(k.t - state.t) + ')';
   else if(brakeNow) $('dock-brake').textContent = 'Mark a brake now (' + S.fmtKms(docking.over) + ')';
   if(docking.ok) line.textContent = 'In ' + b.name + "'s harbour mouth, slow enough. Tie up.";
   else if(docking.inZone) line.textContent = 'In ' + b.name + "'s harbour mouth, " + S.fmtKms(docking.over) + ' too fast.';
@@ -502,10 +504,15 @@ function renderDockCard(docking){
 }
 $('dock-go').addEventListener('click', () => doDock());
 $('dock-brake').addEventListener('click', () => {
+  const before = S.kiss(state);
   const ix = S.brakeAtKiss(state);
   if(ix < 0){ toast('Nothing to brake for yet.', 'bad'); return; }
   selectedNode = ix; replan(true); setTab('plan');
-  toast('A brake is written down: ' + S.fmtKms(Math.abs(state.nodes[ix].prograde)) + ' back at the kiss.');
+  const mark = state.nodes[ix];
+  const dv = S.fmtKms(Math.hypot(mark.prograde, mark.radial));
+  toast(before?.crashes
+    ? 'Written down: ' + dv + ' to lift the kiss clear. Brake once it is out of the ground.'
+    : 'A brake is written down: ' + dv + ' at the kiss.');
 });
 
 /* ------------------------------------------------------------- warp */
@@ -895,7 +902,11 @@ function repWord(v){ return v >= 8 ? 'old friends' : v >= 4 ? 'a known name' : v
 
 function plan(){
   let out = '<h2>Plan</h2>';
-  const cost = S.planCost(state);
+  /* What each mark will really cost, measured where it fires: the two numbers
+     on a card are along axes that lean together, so their triangle is not the
+     burn. */
+  const marks = state.nodes.length ? S.markStates(state, horizonFor()) : [];
+  const cost = marks.reduce((s, m) => s + m.cost, 0);
   const short = cost > state.dv + 1e-9;
   out += `<p>This plan costs <b class="${short ? 'down' : ''}">${S.fmtKms(cost)}</b> of your ${S.fmtKms(state.dv)}.${short ? ' <span class="down">The tank will not cover it.</span>' : ''}</p>`;
   if(state.target){
@@ -909,7 +920,7 @@ function plan(){
     const sel = i === selectedNode;
     const where = nodePositions[i];
     const frame = where ? world.get(where.body).name : '?';
-    out += `<div class="node ${sel ? 'sel' : ''}" data-act="selnode|${i}"><div class="row" style="border:0;padding:0"><div class="name"><b>Burn ${i + 1}</b><small>in ${S.fmtDays(n.t - state.t)} · ${esc(frame)}'s reach · ${S.fmtKms(Math.hypot(n.prograde, n.radial))}</small></div><div class="btns"><button class="btn sm" data-act="warpnode|${i}">Warp to</button><button class="btn sm danger" data-act="delnode|${i}">×</button></div></div>`;
+    out += `<div class="node ${sel ? 'sel' : ''}" data-act="selnode|${i}"><div class="row" style="border:0;padding:0"><div class="name"><b>Burn ${i + 1}</b><small>in ${S.fmtDays(n.t - state.t)} · ${esc(frame)}'s reach · ${S.fmtKms(marks[i]?.cost ?? 0)}</small></div><div class="btns"><button class="btn sm" data-act="warpnode|${i}">Warp to</button><button class="btn sm danger" data-act="delnode|${i}">×</button></div></div>`;
     if(sel){
       out += `<div class="grid">
         <span>Prograde</span><div class="step"><button class="btn sm" data-act="nudge|${i}|prograde|-100">−100</button><button class="btn sm" data-act="nudge|${i}|prograde|-10">−10</button><button class="btn sm" data-act="nudge|${i}|prograde|-1">−1</button><button class="btn sm" data-act="nudge|${i}|prograde|1">+1</button><button class="btn sm" data-act="nudge|${i}|prograde|10">+10</button><button class="btn sm" data-act="nudge|${i}|prograde|100">+100</button></div><span class="val">${S.fmtKms(n.prograde)}</span>
@@ -1033,21 +1044,28 @@ const actions = {
   shift(i, d){ const n = state.nodes[Number(i)]; n.t = Math.max(state.t + 1e-3, n.t + Number(d)); state.nodes.sort((a, b) => a.t - b.t); selectedNode = state.nodes.indexOf(n); replan(true); renderTab(); },
   warpca(){ if(approach?.ca) warpTo(approach.ca.t); },
   warpwin(t){ warpTo(Number(t)); },
-  aim(){
+  aim(el){
     if(!state.target){ toast('Pick something to aim at first.', 'bad'); return; }
+    // Solving a transfer takes the best part of a second, and a button that
+    // freezes the page without a word reads as a button that killed the game.
+    if(el && el.tagName === 'BUTTON'){ el.textContent = 'Aiming…'; el.disabled = true; }
+    requestAnimationFrame(() => requestAnimationFrame(() => aimNow()));
+  },
+  tow(){ showTow('dry'); },
+  newgame(){ confirmNew(); },
+};
+
+function aimNow(){
     const tb = world.get(state.target);
     const r = S.trimToTarget(state, state.target, horizonFor());
-    if(!r.ok){ toast(r.reason, 'bad'); return; }
+    if(!r.ok){ toast(r.reason, 'bad'); renderTab(); return; }
     selectedNode = r.index;
     if(state.nodes[r.index] && state.nodes[r.index].t - state.t < 1.5) holdForPlanning(r.index);
     replan(true); renderTab();
     const mouth = tb.zoneRadius ?? 0;
     const good = mouth && r.distance <= mouth;
     toast(`${r.added ? 'Wrote down a burn and aimed' : 'Aimed'} at ${S.portName(state.target)}: ${fmtAu(r.distance)} at the near pass, ${S.fmtKms(r.cost)} on the mark.${good ? ' That is inside the mouth.' : ''}`, good ? 'story' : '');
-  },
-  tow(){ showTow('dry'); },
-  newgame(){ confirmNew(); },
-};
+}
 for(const el of document.querySelectorAll('.node[data-act]')) void el;
 // Node cards select on click, but their buttons should not also select.
 document.addEventListener('click', e => {
