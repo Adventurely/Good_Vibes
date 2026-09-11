@@ -1,8 +1,11 @@
 # Good Vibe Games
 
-Two games and the site that serves them: **Good Vibes**, built here, and
-**Save Solarium**, which moved in from another repo. One Worker, one domain,
-one deploy.
+The games and the site that serves them: **Good Vibes**, built here, **Save
+Solarium**, which moved in from another repo, **Orbital Trader**, and
+**Greener Thumbs**. One Worker, one domain, one deploy.
+
+The first two are co-op deck-builders and need the socket. The other two are
+single-player and need nothing but the files.
 
 > ## Pushing to `main` deploys both games
 >
@@ -19,7 +22,8 @@ one deploy.
 | --- | --- |
 | ✅ Verified in this repo | `public/` is browser-safe: no Node imports, no `process`, no `Buffer` |
 | ✅ Verified in this repo | `src/rooms.js` runs on Workers: no `node:` built-ins, and no `Date.now()` or `Math.random()` |
-| ✅ Verified in this repo | Both games answer on their own paths, and each keeps its own `content.js` |
+| ✅ Verified in this repo | Every game answers on its own path, and each keeps its own `content.js` |
+| ✅ Verified in this repo | Orbital Trader's sky passes its own checker, and its kernel matches a numerical integrator |
 | ✅ Verified in this repo | Every name `content.js` has ever exported is still exported (a test pins it) |
 | ✅ Verified in this repo | A room survives eviction — `serialize`/`restore`, including the generator's draw count |
 | ✅ Verified in this repo | The Worker builds, binds and bundles — `npm run check` |
@@ -172,6 +176,8 @@ One Worker on **good-vibe-games.com** serves the shelf and both games.
       ├── /                    the shelf: public/index.html
       ├── /good-vibes/         Good Vibes
       ├── /solarium/           Save Solarium
+      ├── /orbital-trader/     Orbital Trader   (no socket: it is single-player)
+      ├── /greener-thumbs/     Greener Thumbs   (likewise)
       ├── /api/good-vibes/ws   src/worker.js → GameRoom,     one per room code
       └── /api/solarium/ws     src/worker.js → SolariumRoom, one per room code
 
@@ -326,9 +332,13 @@ src/solarium.js     Save Solarium's rules engine: pure functions over a state
 src/worker.js       the deployed front door: assets, and both socket routes
 src/room-do.js      one Durable Object per Good Vibes room code
 src/solarium-do.js  one Durable Object per Save Solarium room code
-public/index.html   the shelf: both games, thumbnails painted by their own
+public/index.html   the shelf: every game, thumbnails painted by their own
                     renderers rather than screenshotted
 public/solarium/    Save Solarium, client and content
+public/orbital-trader/  Orbital Trader: kernel, rules, chart, pages. No server
+                    side at all — see "Orbital Trader" below
+tools/orbital-trader/   its design tables, the module generator, and the
+                    checker that holds the sky to what the design promises
 wrangler.jsonc      what Cloudflare builds and what it binds
 src/server.js       the local server: http + the socket route
 src/app.js          static files out of public/, for local work only
@@ -339,6 +349,9 @@ test/rooms.test.js  drives a real room: what a card resolves to, statuses,
                     kills, levelling, and that the client has an animation and
                     a sound for all of it
 test/server.test.js integration tests
+test/orbital-trader.test.js  the kernel against a numerical integrator, the
+                    world against the design, and the first lesson flown end
+                    to end through the real rules
 test/balance.mjs    not a test — a harness. Plays whole runs at every table
                     size and reports the win rate against the 60% target
 ```
@@ -1423,6 +1436,152 @@ written as their own kinds rather than a `targets: 'all'` flag, because "who doe
 this land on" is the first thing a player reads off a card and a flag is not
 something you can read. `test/rooms.test.js` fails if any of them resolves to no
 animation or no sound.
+
+---
+
+## Orbital Trader
+
+A single-player game about **not steering**. You fly a small merchant ship
+around a warm orange star called the Lamp, and you never point it anywhere:
+you write burns down on your predicted path, and you watch that path bend.
+Four peoples live out there and each wants what only the others make, so trade
+is the reason to leave and the physics is the reason it is hard.
+
+It is at `/orbital-trader/` and it is **entirely client-side**: no room, no
+socket, no server. One save in `localStorage`.
+
+    public/orbital-trader/
+      index.html      the title screen, with the real chart turning behind it
+      play.html       the game: chart, HUD, panel, input, dialogs, the lesson
+      orbit.js        the patched-conic kernel — no game in it at all
+      sim.js          the rules — no drawing in it at all
+      content.js      the world as data, assembled from the design tables
+      render.js       the chart
+      data/*.js       generated from tools/orbital-trader/design/*.json
+
+### How the flying works
+
+Bodies are **on rails**: each one is a Kepler ellipse in its parent's frame and
+its position is a function of time, solved in closed form. Nothing about the
+sky is integrated, so a body is in exactly the same place whether you got there
+in one step or ten thousand.
+
+The ship uses **patched conics**: it feels exactly one body at a time, the
+smallest sphere of influence containing it. Inside that sphere it follows one
+conic, propagated with universal variables, which covers ellipse, parabola and
+hyperbola in one routine and jumps to any time directly. That is what makes the
+predicted path *exact* rather than a preview: `predict` and `advance` are the
+same arithmetic, so the road drawn on the chart is the road flown, to the last
+digit. It is also why time warp is free — ×2500 costs the same as ×1.
+
+**Spheres of influence are hand-tuned numbers, not derived ones.** The design
+document asks for that, and it buys a system where a moon can never wander out
+of its planet's reach and where Grumm's approach can be made as generous as it
+needs to be.
+
+The one search in the whole kernel is *when* a conic crosses a sphere of
+influence. It is done by conservative advancement: each step is bounded by the
+clearance to the nearest boundary divided by the fastest either side could
+close it, which is a real lower bound, so a boundary can never be stepped over.
+The crossing is then bisected to a millionth of a day. There is no fixed
+timestep anywhere, and nothing tunnels through a small moon at high warp.
+
+| | |
+| --- | --- |
+| Distance | au (Tessel's orbit is 1) |
+| Time | days (Tessel's year is 360 of them) |
+| Speed, Δv | au/day inside; 1 au/day shows as 1706 km/s, so Tessel's orbit reads 29.8 km/s |
+| Fuel | *is* the Δv budget. A burn subtracts its own size. No mass, no rocket equation |
+
+### Aiming
+
+Reaching a world's sphere of influence and arriving at its harbour are different
+things, and the gap between them is a few tens of metres per second that nobody
+should have to find by dragging a handle. **Aim for it** closes it.
+
+It solves the transfer rather than guessing at it: Lambert's problem, in
+whichever frame the ship and the target share, over a grid of departure and
+flight times, keeping the cheapest the tank can pay for. Leaving a moon is
+solved as a departure instead — the transfer is computed from the moon, and the
+burn is the one that leaves the moon with exactly that much speed left over,
+placed where the ship's own motion already points the right way. Coming home to
+a planet from one of its moons is solved as a descent. Whatever comes out is
+then walked by hand a few metres per second at a time against the real
+predicted road, because the cheapest answer on paper is not always the best
+once the other worlds have had their say.
+
+It writes down an ordinary mark. You can move it, change it, or scrap it, and
+it spends nothing until the clock reaches it.
+
+### What the tables are
+
+The sky, the economy and every line of text are JSON in
+`tools/orbital-trader/design/`, built into `public/orbital-trader/data/` by
+
+```bash
+node tools/orbital-trader/build-content.mjs
+```
+
+The game imports the generated modules rather than fetching the JSON: a module
+is cacheable, importable by the tests under Node, and cannot 404 into a page
+that draws nothing.
+
+**The sky has to pass its own checker** before it is worth building:
+
+```bash
+node tools/orbital-trader/check-tuning.mjs        # check, and print the Δv table
+node tools/orbital-trader/check-tuning.mjs --write  # and record it in tuning.json
+```
+
+It asserts what the design document promises — Tessel's year is exactly 360
+days, no moon can leave its planet's reach, sibling moons never overlap, every
+harbour mouth fits inside a third of its world's reach, Grumm turns a Hohmann
+arrival through at least sixty degrees, Wanderwell reaches kissing distance
+about a year in — and it prints the Δv table the ladder is built on:
+
+| Route | Δv | Time |
+| --- | --- | --- |
+| Bramble → Ledger, the second lesson | 0.9 km/s | 5 d |
+| Tessel dock → Bramble, the first | 2.2 km/s | 2 d |
+| Tessel → Wanderwell at its kiss | 6.6 km/s | 117 d |
+| Tessel → the Arc | 8.6 km/s | 364 d |
+| Tessel → Claw Rock | 10.0 km/s | 490 d |
+| Tessel → Grumm, loose capture | 7.6 km/s | 935 d |
+| Tessel → Lillimoor's height, circular | 10.7 km/s | 935 d |
+| Tessel → Cinder, docked | 15.9 km/s | 94 d |
+| Tessel → Chime, docked, no assist | 13.6 km/s | 2012 d |
+| Tessel → the Far Lantern | 12.6 km/s | 5271 d |
+
+The starter tank is 14 km/s, so that table *is* the map: the rafts, the
+festival at Wanderwell, the belt and Grumm are all open from the first hour,
+and Cinder and Chime wait for a bigger tank. **Falling inward is dearer than
+climbing out** — Cinder sits at 0.3 au and the arrival is most of the bill —
+which is real orbital mechanics and, happily, exactly what the Emberkin would
+tell you.
+
+### Forgiveness, as built
+
+Nothing here can cost the save. A dry tank calls a tow, for money and days. So
+does flying into something, at half again the price. A cat toll in the Scatter
+takes a share and never the hold, never a passenger, and never from a ship with
+nothing worth taking. Money can go below zero, and then it is a debt to Ledger,
+who are delighted. Warp drops to ×1 at every change of reach, every burn and
+every harbour mouth — and a step of flight *stops* at the first of those, so a
+frame at ×2500 can never carry you clean through a moon you were aiming at.
+
+### Playing it
+
+```bash
+npm start     # then http://localhost:3000/orbital-trader/
+npm test      # test/orbital-trader.test.js, among the rest
+```
+
+The tests check the kernel against a numerical integrator on every kind of
+conic, fly the whole first lesson through the real rules, and assert that the
+aim lands inside the harbour mouth from every raft to every other. There is
+also a headless-browser playtest that plays the lesson through the page's own
+controls; it lives outside the repository because it needs a browser, and what
+it proved is written down here instead.
 
 ## Multi-tile buildings (not built yet)
 

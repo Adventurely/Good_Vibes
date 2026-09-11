@@ -32,17 +32,19 @@ test('GET / returns the shelf, not a game', async () => {
   // landing page that has quietly lost the other.
   assert.match(html, /href="\/good-vibes\/"/);
   assert.match(html, /href="\/solarium\/"/);
+  assert.match(html, /href="\/orbital-trader\/"/);
   // The thumbnails are canvases painted by the games' own renderers, so an
   // import that stops resolving should fail here rather than on the page.
   assert.match(html, /id="shot-gv"/);
   assert.match(html, /id="shot-ss"/);
+  assert.match(html, /id="shot-ot"/);
 });
 
 test('a directory is served as its index', async () => {
   /* Cloudflare's asset store does this in production. Without the same rule
      locally, /good-vibes/ is a 404 on a laptop and a game everywhere else —
      the kind of difference that gets found by somebody else, later. */
-  for(const dir of ['/good-vibes/', '/solarium/']){
+  for(const dir of ['/good-vibes/', '/solarium/', '/orbital-trader/', '/greener-thumbs/']){
     const res = await fetch(`${baseUrl}${dir}`);
     assert.equal(res.status, 200, `${dir} returned ${res.status}`);
     assert.match(res.headers.get('content-type'), /text\/html/);
@@ -59,6 +61,28 @@ test('each game is a title screen with a way in', async () => {
   assert.match(ss, /Save Solarium/);
   // It came from another site and used to link back to it two levels up.
   assert.doesNotMatch(ss, /Tool Haven/);
+
+  const ot = await (await fetch(`${baseUrl}/orbital-trader/`)).text();
+  assert.match(ot, /Orbital Trader/);
+  assert.match(ot, /href="\.\/play\.html\?new"/);
+  assert.match(ot, /<canvas[^>]*id="sky"/);
+});
+
+test('Orbital Trader ships its own modules, and they are pure', async () => {
+  /* The game has no server: its rules and its sky are modules in public/,
+     imported by the browser and by the tests alike. A content module that
+     stopped answering, or answered as text/plain, is a page that draws
+     nothing and says nothing. */
+  for(const file of ['orbit.js', 'sim.js', 'content.js', 'render.js', 'data/world.js', 'data/economy.js', 'data/text.js']){
+    const res = await fetch(`${baseUrl}/orbital-trader/${file}`);
+    assert.equal(res.status, 200, `${file} returned ${res.status}`);
+    assert.match(res.headers.get('content-type'), /javascript/, `${file} content type`);
+    const text = await res.text();
+    assert.doesNotMatch(text, /from 'node:|require\(|process\.env|Buffer\./, `${file} reaches for Node`);
+  }
+  const play = await fetch(`${baseUrl}/orbital-trader/play.html`);
+  assert.equal(play.status, 200);
+  assert.match(play.headers.get('content-type'), /text\/html/);
 });
 
 test('each game keeps its own modules', async () => {
