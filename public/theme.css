@@ -1,0 +1,56 @@
+/* Good Vibe Games — the one look every page shares.
+ *
+ * Beige paper, soft ink, a rounded typeface, and the sun and the leaf kept
+ * for the things you can press. This is Good Vibes' own page theme, promoted
+ * to the whole site: three of the pages here were already set in exactly
+ * these values, and the other seven had each grown a dark theme of their own
+ * — a dark brown shelf, a dark green greenhouse with green type on it, a
+ * black space chart. The values are the same ones for the same reason
+ * pixel.js keeps one palette for the games: a colour can only be changed in
+ * one place, which is the only way a look stays one look once there are ten
+ * screens.
+ *
+ * Every page still keeps its own <style>, and most keep their own token names
+ * — a page that calls the ground `--ink` and one that calls the ink `--ink`
+ * cannot share a vocabulary without a rewrite nobody needs. Each one aliases
+ * its names onto these, so the numbers live here and the names stay local.
+ *
+ * Contrast is measured against --gv-paper: text 13.8:1, muted 5.6:1, leaf
+ * 5.0:1, sun 5.0:1, sky 5.9:1, bad 5.2:1 — every colour used as text clears
+ * the 4.5:1 body text needs. The two bright surfaces, gold and soft leaf, are
+ * for buttons with dark type on them and are never text themselves.
+ *
+ * Nothing is loaded from anywhere: this is a file in public/, and the type is
+ * a system stack — `ui-rounded` is SF Rounded on Apple, where most of the
+ * phones are, and the platform's own humanist face everywhere else.
+ */
+:root{
+  --gv-type: ui-rounded, "SF Pro Rounded", "Segoe UI Variable Text", "Segoe UI",
+             Ubuntu, Cantarell, system-ui, -apple-system, sans-serif;
+
+  --gv-paper:     #f4efe4;   /* the page */
+  --gv-paper-2:   #fdfaf3;   /* a panel on it */
+  --gv-sunk:      #ece2cd;   /* a well in it — a track, a chip, a tab at rest */
+  --gv-line:      #cfc2a8;
+  --gv-line-2:    #b9a98a;
+
+  --gv-text:      #2a2118;
+  --gv-muted:     #6b5c47;
+  --gv-faint:     #9a8a72;
+
+  --gv-leaf:      #2b7530;   /* green, as text and as an outline */
+  --gv-leaf-soft: #6cc24a;   /* green, as a surface with dark type on it */
+  --gv-sun:       #8f5c05;   /* gold, as text */
+  --gv-gold:      #ffd23f;   /* gold, as a surface with dark type on it */
+  --gv-gold-deep: #f59a2e;
+  --gv-sky:       #20629f;
+  --gv-bad:       #b5372a;
+
+  /* A panel floating over a picture: the greenhouse, the chart, the lot. */
+  --gv-glass:     rgba(253, 250, 243, 0.86);
+  --gv-glass-2:   rgba(253, 250, 243, 0.94);
+  --gv-shadow:    0 10px 30px rgba(74, 51, 32, 0.18);
+
+  /* The page's own light: warm from the top, like the games' low sun. */
+  --gv-ground:    radial-gradient(circle at 50% -10%, #fffdf6 0%, #efe7d7 68%);
+}

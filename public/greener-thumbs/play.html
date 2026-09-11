@@ -3,18 +3,23 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../theme.css">
 <title>Greener Thumbs — African Violet</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%231a1310'/%3E%3Ccircle cx='8' cy='9' r='3.4' fill='%236b4b9a'/%3E%3Ccircle cx='8' cy='9' r='1.1' fill='%23ffd23f'/%3E%3C/svg%3E">
 <style>
+  /* The site's look, from theme.css. The greenhouse itself is a lit scene and
+     was never dark; these are the chips and the inspector floating over it,
+     which were, and read as a night-vision overlay on a sunny afternoon. */
   :root{
-    --bg:#1a1310; --panel:#241b16; --line:#3a2b22;
-    --ink:#e8ded2; --dim:#a8998a; --gold:#ffd23f; --orange:#f59a2e; --leaf:#6f9c52;
+    --bg:var(--gv-paper); --panel:var(--gv-paper-2); --line:var(--gv-line);
+    --ink:var(--gv-text); --dim:var(--gv-muted); --gold:var(--gv-sun); --orange:var(--gv-gold-deep); --leaf:var(--gv-leaf);
   }
   *{box-sizing:border-box}
   html,body{height:100%;margin:0}
   body{
     background:var(--bg); color:var(--ink);
-    font:14px/1.5 ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;
+    font:14px/1.5 var(--gv-type);
+    -webkit-font-smoothing:antialiased;
     overflow:hidden;
   }
   #stage{position:fixed;inset:0}
@@ -38,11 +43,11 @@
   input[type=range]{flex:1;accent-color:var(--leaf);min-width:0}
   .btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
   button{
-    flex:1 1 auto; background:#2f241d; color:var(--ink); border:1px solid var(--line);
+    flex:1 1 auto; background:var(--gv-sunk); color:var(--ink); border:1px solid var(--line);
     border-radius:6px; padding:6px 9px; font-size:12px; cursor:pointer;
   }
-  button:hover{border-color:var(--orange);color:#fff}
-  button[aria-pressed=true]{background:var(--leaf);border-color:var(--leaf);color:#10240a}
+  button:hover{border-color:var(--orange);color:var(--ink)}
+  button[aria-pressed=true]{background:var(--gv-leaf-soft);border-color:var(--gv-leaf-soft);color:#10240a}
   #stats{
     margin-top:12px;padding-top:10px;border-top:1px solid var(--line);
     font-size:11.5px;color:var(--dim);font-variant-numeric:tabular-nums;
@@ -50,30 +55,30 @@
   #stats b{color:var(--ink);font-weight:600}
   #err{
     position:fixed;inset:auto 14px 14px 14px;max-width:620px;margin:0 auto;
-    background:#3a1a16;border:1px solid #7a3226;border-radius:8px;padding:10px 12px;
-    font-size:12.5px;color:#ffd9d2;display:none;white-space:pre-wrap;
+    background:#fbe9e5;border:1px solid var(--gv-bad);border-radius:8px;padding:10px 12px;
+    font-size:12.5px;color:var(--gv-bad);display:none;white-space:pre-wrap;
   }
   #load{
     position:fixed;inset:0;display:grid;place-content:center;text-align:center;
     color:var(--dim);font-size:13px;pointer-events:none;
   }
-  #back{ position:fixed; left:14px; top:14px; z-index:5; color:#9db09a;
-         font-size:.85rem; text-decoration:none; background:rgba(10,16,11,.62);
-         padding:.3rem .7rem; border-radius:999px; border:1px solid #2a3a2c;
+  #back{ position:fixed; left:14px; top:14px; z-index:5; color:var(--gv-muted);
+         font-size:.85rem; text-decoration:none; background:var(--gv-glass);
+         padding:.3rem .7rem; border-radius:999px; border:1px solid var(--gv-line);
          backdrop-filter:blur(6px); }
-  #back:hover{ color:#eef3e6; }
+  #back:hover{ color:var(--gv-text); }
 
   #hud{ position:fixed; left:14px; bottom:14px; z-index:5;
-        background:rgba(10,16,11,.68); border:1px solid #2a3a2c;
+        background:var(--gv-glass); border:1px solid var(--gv-line);
         border-radius:12px; padding:.7rem .95rem; backdrop-filter:blur(6px);
         max-width:min(88vw, 22rem); }
   #hud h2{ margin:0; font-size:1.05rem; }
-  #hud p{ margin:.15rem 0 0; color:#9db09a; font-size:.85rem; }
-  #hud .hint{ margin-top:.45rem; color:#6cc24a; font-size:.78rem; }
+  #hud p{ margin:.15rem 0 0; color:var(--gv-muted); font-size:.85rem; }
+  #hud .hint{ margin-top:.45rem; color:var(--gv-leaf); font-size:.78rem; }
 
   #devbadge{ font-size:.58rem; letter-spacing:.14em; text-transform:uppercase;
              vertical-align:middle; padding:.12rem .42rem; border-radius:999px;
-             border:1px solid #3f8f38; color:#6cc24a; }
+             border:1px solid var(--gv-leaf); color:var(--gv-leaf); }
 
   @media (max-width:640px){ #panel{width:auto;right:14px} }
 </style>

@@ -23,49 +23,59 @@
 
 import { absState, railState, unit, norm, add, sub, scale, perp, dist, propagate } from './orbit.js';
 
-/* The palette: a dark chart with warm light. The Lamp is orange, the peoples
- * each own a hue (Emberkin ember, otters river-green, cats bone, frogs cold
- * blue), and the Chorus is a violet that nothing living uses. */
+/* The palette: a star chart drawn on paper. The same paper as every page on
+ * the site (theme.css), with the orbits inked on it and the Lamp still the
+ * one warm thing. It was a black chart with pale lines for a while, and it
+ * was the one page whose whole screen was dark — the sky is most of it, so
+ * a paper frame around a black chart would have been a paper frame around
+ * dark mode.
+ *
+ * Every hue that used to be a light on black is the same hue as an ink on
+ * paper: the peoples keep their identities (Emberkin ember, otters
+ * river-green, cats — bone on black — are tan on paper, frogs cold blue) and
+ * the Chorus is still a violet that nothing living uses. The one rule is
+ * that anything drawn as a line or a label is dark enough to read on the
+ * paper; anything drawn as a glow or a fill is a tint of it. */
 export const PALETTE = {
-  space:      '#120e0c',
-  spaceEdge:  '#0a0806',
-  star:       '#ffd23f',
-  starCore:   '#fff1b8',
-  starGlow:   'rgba(245,154,46,0.22)',
-  orbit:      'rgba(245,234,214,0.14)',
-  orbitMoon:  'rgba(245,234,214,0.22)',
-  orbitFocus: 'rgba(245,234,214,0.30)',
-  soi:        'rgba(245,154,46,0.05)',
-  soiEdge:    'rgba(245,154,46,0.35)',
-  zone:       'rgba(108,194,74,0.55)',
-  zoneFill:   'rgba(108,194,74,0.12)',
-  zoneFast:   'rgba(245,154,46,0.8)',
-  belt:       'rgba(122,104,88,0.6)',
-  beltBand:   'rgba(122,104,88,0.08)',
+  space:      '#f4efe4',
+  spaceEdge:  '#e3d8c2',
+  star:       '#f59a2e',
+  starCore:   '#ffd23f',
+  starGlow:   'rgba(245,154,46,0.28)',
+  orbit:      'rgba(42,33,24,0.16)',
+  orbitMoon:  'rgba(42,33,24,0.26)',
+  orbitFocus: 'rgba(42,33,24,0.38)',
+  soi:        'rgba(200,110,20,0.06)',
+  soiEdge:    'rgba(200,110,20,0.45)',
+  zone:       'rgba(43,117,48,0.65)',
+  zoneFill:   'rgba(43,117,48,0.12)',
+  zoneFast:   'rgba(200,97,26,0.9)',
+  belt:       'rgba(122,104,88,0.55)',
+  beltBand:   'rgba(122,104,88,0.10)',
   debris:     'rgba(107,95,79,0.9)',
-  path:       ['#ffd23f', '#6cc24a', '#3fa9dd', '#cfa8ff', '#ffb26b', '#7ff0d3'],
-  pathDim:    'rgba(255,210,63,0.28)',
-  pathShort:  'rgba(111,97,85,0.7)',
-  ship:       '#f5ead6',
-  shipEdge:   '#120e0c',
-  node:       '#ffd23f',
-  nodeRing:   'rgba(255,210,63,0.45)',
-  prograde:   '#6cc24a',
-  retrograde: '#f59a2e',
-  radial:     '#3fa9dd',
-  marker:     '#f5ead6',
-  ghost:      'rgba(245,234,214,0.55)',
-  text:       '#f5ead6',
-  textDim:    'rgba(245,234,214,0.6)',
-  crash:      '#d9533c',
-  atmo:       'rgba(139,107,214,0.18)',
-  emberkin:   '#ff8c42',
-  otter:      '#6cc24a',
-  cat:        '#e9dcc0',
-  frog:       '#5fb9e6',
-  chorus:     '#b48cff',
-  mixed:      '#ffd23f',
-  none:       '#9a948a',
+  path:       ['#b8720c', '#2b7530', '#20629f', '#7a4fb5', '#c8611a', '#1f8f7a'],
+  pathDim:    'rgba(143,92,5,0.35)',
+  pathShort:  'rgba(111,97,85,0.6)',
+  ship:       '#2a2118',
+  shipEdge:   '#f4efe4',
+  node:       '#b8720c',
+  nodeRing:   'rgba(184,114,12,0.5)',
+  prograde:   '#2b7530',
+  retrograde: '#c8611a',
+  radial:     '#20629f',
+  marker:     '#2a2118',
+  ghost:      'rgba(42,33,24,0.5)',
+  text:       '#2a2118',
+  textDim:    'rgba(42,33,24,0.62)',
+  crash:      '#b5372a',
+  atmo:       'rgba(122,79,181,0.16)',
+  emberkin:   '#c8611a',
+  otter:      '#2b7530',
+  cat:        '#8a6a3a',
+  frog:       '#2d7fb3',
+  chorus:     '#7a4fb5',
+  mixed:      '#b8720c',
+  none:       '#8a7d6b',
 };
 
 export const speciesColour = s => PALETTE[s] ?? PALETTE.none;
@@ -210,7 +220,9 @@ function drawStars(chart, view){
   for(const s of chart.stars){
     const x = ((s.x - ox * 0.02 + 1) % 1) * W, y = ((s.y + oy * 0.02 + 1) % 1) * H;
     const a = 0.25 + 0.55 * s.m * (tw ? 0.75 + 0.25 * Math.sin(tw * (0.6 + s.m) + s.tw) : 1);
-    ctx.fillStyle = s.m > 0.94 ? `rgba(255,210,63,${a.toFixed(3)})` : `rgba(245,234,214,${a.toFixed(3)})`;
+    // Ink specks on paper rather than lights on black: the bright ones gold
+    // ink, the rest the page's own ink, at the same alphas as before.
+    ctx.fillStyle = s.m > 0.94 ? `rgba(143,92,5,${a.toFixed(3)})` : `rgba(42,33,24,${a.toFixed(3)})`;
     const r = s.m > 0.92 ? 1.6 : 1;
     ctx.fillRect(x, y, r, r);
   }
@@ -344,7 +356,7 @@ function drawBodies(chart, view, pos, t){
       if(len > 4){
         const d = [rel[0] / rn, -rel[1] / rn];
         const g = ctx.createLinearGradient(p[0], p[1], p[0] + d[0] * len, p[1] + d[1] * len);
-        g.addColorStop(0, 'rgba(191,233,255,0.7)'); g.addColorStop(1, 'rgba(191,233,255,0)');
+        g.addColorStop(0, 'rgba(32,98,159,0.55)'); g.addColorStop(1, 'rgba(32,98,159,0)');
         ctx.strokeStyle = g; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(p[0] + d[0] * len, p[1] + d[1] * len); ctx.stroke();
       }
@@ -368,7 +380,7 @@ function drawBodies(chart, view, pos, t){
     if(b.id === 'lantern'){
       // It blinks at irregular gaps nobody has explained. Under reduced motion it rests, lit, in a ring.
       const lit = chart.reducedMotion || lanternLit(view.now ?? 0);
-      fill = lit ? '#ffffff' : '#6f6155';
+      fill = lit ? '#2a2118' : '#b9a98a';
     }
     ctx.beginPath(); ctx.arc(p[0], p[1], rpx, 0, Math.PI * 2);
     ctx.fillStyle = fill; ctx.fill();

@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="../theme.css">
     <title>Sunward</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23f4efe4'/%3E%3Ccircle cx='8' cy='4' r='2.6' fill='%23ffd23f'/%3E%3Cpath d='M8 15V8' stroke='%23a97142' stroke-width='1.6'/%3E%3Cpath d='M8 9C8 6.5 6 5 3.6 5 3.6 7.5 5.6 9 8 9zM8 10c0-2.5 2-4 4.4-4 0 2.5-2 4-4.4 4z' fill='%233fa34d'/%3E%3C/svg%3E">
     <meta name="description" content="Tap a bare lot into a canopy. Light pays for growers, growers pay while you are away, and the day turns while you spend it." />
@@ -19,25 +20,20 @@
          is not an inverted copy of anything. */
       :root {
         color-scheme: light;
-        /* A rounded humanist sans, not the site's monospace. The other two
-           games' pages are set in monospace and it suits them — they are
-           lobbies and card tables, and the type reads as the instrument panel.
-           This is a garden you tap on a phone, and monospace read as a
-           terminal. `ui-rounded` is SF Rounded on Apple, where most of the
-           phones are; everywhere else the stack falls to the platform's own
-           humanist face. No font file is shipped, which is the site's rule:
-           nothing here is loaded from anywhere. */
-        --type: ui-rounded, "SF Pro Rounded", "Segoe UI Variable Text", "Segoe UI",
-                Ubuntu, Cantarell, system-ui, -apple-system, sans-serif;
-        --ink: #f4efe4;
-        --panel: #fdfaf3;
-        --sunk: #ece2cd;
-        --line: #cfc2a8;
-        --text: #2a2118;
-        --muted: #6b5c47;
-        --accent: #2b7530;
-        --sun: #8f5c05;
-        --bad: #b5372a;
+        /* The site's look, from theme.css. This page had these values first
+           — it was the one that asked for the rounded face and the paper, and
+           the rest of the site followed — so the names here are aliases onto
+           the shared ones, not a second copy of the numbers. */
+        --type: var(--gv-type);
+        --ink: var(--gv-paper);
+        --panel: var(--gv-paper-2);
+        --sunk: var(--gv-sunk);
+        --line: var(--gv-line);
+        --text: var(--gv-text);
+        --muted: var(--gv-muted);
+        --accent: var(--gv-leaf);
+        --sun: var(--gv-sun);
+        --bad: var(--gv-bad);
         --night: #3b2b5a;
       }
 
@@ -52,7 +48,7 @@
            whole 320 pixels at the width most phones actually are. */
         padding: 1rem clamp(0.4rem, 2.5vw, 1rem) 3rem;
         background: var(--ink);
-        background-image: radial-gradient(circle at 50% -10%, #fffdf6 0%, #efe7d7 68%);
+        background-image: var(--gv-ground);
         color: var(--text);
         font-family: var(--type);
         line-height: 1.55;

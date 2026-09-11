@@ -4,36 +4,39 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Good Vibe Games</title>
+<link rel="stylesheet" href="./theme.css">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%231a1310'/%3E%3Ccircle cx='8' cy='8' r='4' fill='%23ffd23f'/%3E%3Cpath d='M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.5 1.5M11.5 11.5L13 13M13 3l-1.5 1.5M4.5 11.5L3 13' stroke='%23f59a2e' stroke-width='1.4'/%3E%3C/svg%3E">
 <meta name="description" content="Co-op deck-builders and single-player games you play in a browser. No install, no account — share a room code, or just start.">
 <style>
-  /* The palette is the games' own: warm dark ground, sunlight, leaf green.
-     Nothing here is loaded from anywhere — no fonts, no images, no scripts but
-     the games' own art modules. The thumbnails are drawn, not photographed. */
+  /* The look is the site's, from theme.css: beige paper, soft ink, and the
+     sun and the leaf for anything you can press. This page's own names are
+     kept and aliased onto it — `--ink` was the dark ground for a long time and
+     is the paper now; the name outlived the colour. Nothing here is loaded
+     from anywhere but that one file — no fonts, no images, no scripts but the
+     games' own art modules. The thumbnails are drawn, not photographed. */
   :root{
-    --ink:      #1a1310;
-    --ink-soft: #241c17;
-    --edge:     #3a2418;
-    --paper:    #f5ead6;
-    --muted:    #b9a68c;
-    --sun:      #ffd23f;
-    --sun-deep: #f59a2e;
-    --leaf:     #6cc24a;
-    --leaf-deep:#3f8f38;
-    --sky:      #3fa9dd;
+    --ink:      var(--gv-paper);
+    --ink-soft: var(--gv-paper-2);
+    --edge:     var(--gv-line);
+    --paper:    var(--gv-text);
+    --muted:    var(--gv-muted);
+    --sun:      var(--gv-sun);
+    --sun-deep: var(--gv-gold-deep);
+    --leaf:     var(--gv-leaf);
+    --leaf-deep:var(--gv-leaf);
+    --sky:      var(--gv-sky);
   }
   *{ box-sizing: border-box; }
   html,body{ margin:0; padding:0; }
   body{
     background: var(--ink);
     color: var(--paper);
-    font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font: 16px/1.6 var(--gv-type);
+    -webkit-font-smoothing: antialiased;
     min-height: 100vh;
     display: flex; flex-direction: column;
     /* A low sun behind everything, so the page has the same light the games do. */
-    background-image:
-      radial-gradient(120% 80% at 50% 0%, #2b2119 0%, var(--ink) 62%),
-      linear-gradient(180deg, rgba(255,210,63,.06), transparent 40%);
+    background-image: var(--gv-ground);
   }
 
   header{ text-align:center; padding: clamp(2.5rem, 7vw, 5rem) 1.25rem 0; }
@@ -42,7 +45,7 @@
     font-size: clamp(2rem, 7vw, 3.5rem);
     letter-spacing: .02em;
     font-weight: 800;
-    background: linear-gradient(180deg, var(--sun) 0%, var(--sun-deep) 100%);
+    background: linear-gradient(180deg, #b8720c 0%, var(--gv-sun) 100%);
     -webkit-background-clip: text; background-clip: text;
     color: transparent;
   }
@@ -71,11 +74,11 @@
   }
   .game:hover, .game:focus-visible{
     transform: translateY(-4px);
-    border-color: var(--sun-deep);
-    box-shadow: 0 12px 30px -12px rgba(0,0,0,.8);
+    border-color: var(--gv-gold-deep);
+    box-shadow: var(--gv-shadow);
     outline: none;
   }
-  .game:focus-visible{ border-color: var(--sun); }
+  .game:focus-visible{ border-color: var(--gv-leaf); }
 
   /* The thumbnail is a 320x190 pixel canvas blown up by the browser. Nearest
      neighbour, because smoothing a pixel drawing is the one thing that makes it
@@ -97,7 +100,7 @@
 
   /* A game that is not playable yet says so on its own card. Better here than
      as a surprise on the other side of the click. */
-  .tags li.wip{ color: var(--muted); border-color: #4a4036; }
+  .tags li.wip{ color: var(--muted); border-color: var(--gv-line-2); }
 
   .about{ padding: 1.1rem 1.25rem 1.35rem; }
   .about h2{ margin:0 0 .35rem; font-size: 1.4rem; letter-spacing:.01em; }
@@ -108,12 +111,12 @@
     color: var(--leaf); border:1px solid var(--leaf-deep);
     border-radius:999px; padding:.15rem .6rem;
   }
-  .tags li.sun{ color: var(--sun); border-color: var(--sun-deep); }
-  .tags li.sky{ color: var(--sky); border-color: #20629f; }
+  .tags li.sun{ color: var(--sun); border-color: var(--gv-gold-deep); }
+  .tags li.sky{ color: var(--sky); border-color: var(--sky); }
 
   footer{
     text-align:center; padding: 0 1.25rem 2.5rem;
-    color:#6f6155; font-size:.85rem;
+    color: var(--gv-faint); font-size:.85rem;
   }
 
   @media (prefers-reduced-motion: reduce){

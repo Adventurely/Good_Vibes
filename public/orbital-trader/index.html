@@ -3,24 +3,26 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../theme.css">
 <title>Orbital Trader</title>
 <meta name="description" content="A cozy single-player orbital trading game. Plan burns, borrow speed from a grumpy gas giant, and carry goods between four peoples around a warm orange star.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230b0d17'/%3E%3Ccircle cx='8' cy='8' r='2.6' fill='%23f7a531'/%3E%3Cellipse cx='8' cy='8' rx='6.5' ry='4.2' fill='none' stroke='%23ffd23f' stroke-width='1' transform='rotate(-25 8 8)'/%3E%3Ccircle cx='13.2' cy='5.2' r='1.2' fill='%236cc24a'/%3E%3C/svg%3E">
 <style>
-  /* The same company as the other games, at night: the site's dark ground,
-     the Lamp's gold for anything you can press, and the chart itself as the
-     backdrop — the real renderer, drawing the real sky, from the same
-     modules the game plays on. A picture of the game would go stale the
-     first time somebody moved a moon. */
+  /* The site's look, from theme.css, with the chart itself as the backdrop —
+     the real renderer, drawing the real sky, from the same modules the game
+     plays on. A picture of the game would go stale the first time somebody
+     moved a moon. The chart is drawn on paper now rather than on black, the
+     way a star chart is, so the page and the sky are the same colour. */
   :root{
-    --space:#120e0c; --ink:#f5ead6; --muted:#b9a68c; --faint:#6f6155;
-    --gold:#ffd23f; --gold-deep:#f59a2e; --mint:#7ff0d3; --line:#3a2b22;
+    --space:var(--gv-paper); --ink:var(--gv-text); --muted:var(--gv-muted); --faint:var(--gv-faint);
+    --gold:var(--gv-gold); --gold-deep:var(--gv-gold-deep); --mint:#1f8f7a; --line:var(--gv-line);
   }
   *{ box-sizing:border-box; }
   html,body{ height:100%; }
   body{
     margin:0; background:var(--space); color:var(--ink);
-    font:16px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font:16px/1.55 var(--gv-type);
+    -webkit-font-smoothing:antialiased;
     overflow:hidden;
   }
   #sky{ position:fixed; inset:0; width:100%; height:100%; display:block; }
@@ -29,8 +31,8 @@
     /* Enough to read the words over, not so much that the sky behind them
        turns into a dark rectangle. */
     background:
-      linear-gradient(180deg, rgba(18,14,12,.62) 0%, rgba(18,14,12,.10) 34%, rgba(18,14,12,.10) 62%, rgba(18,14,12,.88) 100%),
-      radial-gradient(70% 46% at 50% 30%, rgba(18,14,12,.55) 0%, rgba(18,14,12,0) 100%);
+      linear-gradient(180deg, rgba(244,239,228,.72) 0%, rgba(244,239,228,.12) 34%, rgba(244,239,228,.12) 62%, rgba(244,239,228,.92) 100%),
+      radial-gradient(70% 46% at 50% 30%, rgba(244,239,228,.70) 0%, rgba(244,239,228,0) 100%);
   }
   main{
     position:fixed; inset:0; z-index:2;
@@ -41,9 +43,8 @@
   .eyebrow{ margin:0 0 .5rem; font-size:clamp(.7rem, 2vw, .82rem); letter-spacing:.34em; text-transform:uppercase; color:var(--gold-deep); }
   h1{
     margin:0; font-size:clamp(2.3rem, 8.5vw, 5.4rem); line-height:.95; letter-spacing:-.02em; font-weight:800;
-    background:linear-gradient(180deg, #fff3cf 0%, var(--gold) 70%, var(--gold-deep) 120%);
+    background:linear-gradient(180deg, #b8720c 0%, var(--gv-sun) 100%);
     -webkit-background-clip:text; background-clip:text; color:transparent;
-    text-shadow:0 2px 30px rgba(0,0,0,.6);
   }
   .tag{ margin:.9rem auto 0; max-width:36rem; color:var(--muted); font-size:clamp(.95rem, 2.6vw, 1.08rem); }
   .actions{ margin-top:clamp(1.4rem, 4vw, 2.2rem); display:flex; flex-wrap:wrap; gap:.8rem; justify-content:center; align-items:center; }
@@ -51,20 +52,20 @@
     display:inline-block; padding:.85rem 2.4rem; border:0; border-radius:999px;
     background:linear-gradient(180deg, var(--gold) 0%, var(--gold-deep) 100%); color:#1a1310;
     font:inherit; font-weight:800; font-size:1.02rem; letter-spacing:.04em; text-transform:uppercase; text-decoration:none;
-    cursor:pointer; box-shadow:0 10px 30px rgba(0,0,0,.5); transition:transform .12s ease, filter .12s ease;
+    cursor:pointer; box-shadow:var(--gv-shadow); transition:transform .12s ease, filter .12s ease;
   }
   .enter:hover, .enter:focus-visible{ transform:translateY(-2px); filter:brightness(1.06); }
   .enter:focus-visible{ outline:3px solid var(--mint); outline-offset:3px; }
-  .enter.quiet{ background:rgba(26,20,16,.88); color:var(--ink); border:1px solid var(--line); box-shadow:none; font-weight:600; }
+  .enter.quiet{ background:var(--gv-glass-2); color:var(--ink); border:1px solid var(--gv-line-2); box-shadow:none; font-weight:600; }
   .enter[hidden]{ display:none; }
   .saved{ margin:.6rem 0 0; color:var(--faint); font-size:.85rem; min-height:1.3em; }
   .peoples{
     margin:clamp(1.4rem, 4vw, 2.4rem) auto 0; padding:0; list-style:none;
     display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:.6rem; max-width:44rem; text-align:left;
   }
-  .peoples li{ background:rgba(20,16,13,.78); border:1px solid var(--line); border-radius:10px; padding:.55rem .7rem; font-size:.84rem; color:var(--muted); backdrop-filter:blur(6px); }
+  .peoples li{ background:var(--gv-glass); border:1px solid var(--line); border-radius:10px; padding:.55rem .7rem; font-size:.84rem; color:var(--muted); backdrop-filter:blur(6px); }
   .peoples b{ display:block; font-size:.92rem; margin-bottom:.1rem; }
-  .p-e b{ color:#ff8c42; } .p-o b{ color:#6cc24a; } .p-c b{ color:#e9dcc0; } .p-f b{ color:#5fb9e6; }
+  .p-e b{ color:#c8611a; } .p-o b{ color:var(--gv-leaf); } .p-c b{ color:#8a6a3a; } .p-f b{ color:#2d7fb3; }
   .back{ grid-row:3; align-self:end; color:var(--faint); font-size:.85rem; text-decoration:none; }
   .back:hover{ color:var(--ink); }
   .wip{ display:inline-block; margin-top:.9rem; padding:.18rem .6rem; border-radius:999px; border:1px solid var(--line); color:var(--muted); font-size:.72rem; letter-spacing:.12em; text-transform:uppercase; }
