@@ -230,9 +230,38 @@ test('the text has every line the game asks for', () => {
 
 /* ---------------------------------------------------------------- sim */
 
-test('a new game starts docked at Tessel with a full starter tank and a lesson', () => {
+/* The game opens in flight, not at a mooring: there is no landing in Orbital
+ * Trader and Tessel's harbour is a parking orbit you match. Tests about
+ * markets, contracts and the shipyard want to be tied up, so they start the
+ * same way a player does and then tie up. */
+function newDocked(seed, port = 'tessel'){
+  const s = S.newGame(seed);
+  if(port !== 'tessel'){ s.dockedAt = port; S.undock(s); }
+  s.justLeft = null;
+  const r = S.dock(s);
+  assert.ok(r.ok, `could not tie up at ${port}: ${r.reason}`);
+  /* The opening crate for Pip is two units of hold and a payday waiting to
+     happen. Tests about shelves, purses and holds want neither; the crate has
+     its own test where the game starts. */
+  s.passengers = [];
+  return s;
+}
+
+test('a new game starts in orbit above Tessel, full, with one crate for Pip', () => {
   const s = S.newGame(7);
-  assert.equal(s.dockedAt, 'tessel');
+  /* Nothing lands in this game, so there is nothing to cast off from. The
+     first frame is the ship already going round Tessel with a road ahead of
+     it and somewhere to be. */
+  assert.equal(s.dockedAt, null);
+  assert.equal(s.ship.body, 'tessel');
+  assert.equal(s.justLeft, 'tessel', "Tessel's own mouth is where we started");
+  const b = world.get('tessel');
+  assert.ok(Math.abs(O.norm(s.ship.r) - b.dockAlt) < 1e-12, 'in the parking orbit');
+  assert.ok(Math.abs(O.norm(s.ship.v) - Math.sqrt(b.mu / b.dockAlt)) < 1e-12, 'and going round it');
+  assert.equal(s.passengers.length, 1);
+  assert.equal(s.passengers[0].to, S.FIRST_DELIVERY.to);
+  assert.equal(s.target, S.FIRST_DELIVERY.to, 'the first delivery is already the target');
+  assert.ok(S.planImmediate(s), 'and there is a road drawn from the first frame');
   assert.ok(Math.abs(s.dv - s.tank) < 1e-12 && s.tank > 0);
   assert.ok(Math.abs(S.kms(s.tank) - S.tiers('tank')[0].value) < 1e-9, 'the starter tank is the one the shipyard lists');
   assert.equal(s.money, CONST.START_MONEY);
@@ -350,7 +379,7 @@ test('the whole first lesson can be flown: hop, brake at the kiss, and tie up at
 });
 
 test('markets: buying costs, selling elsewhere pays, and selling a lot walks the price down', () => {
-  const s = S.newGame(21);
+  const s = newDocked(21);
   const port = 'tessel';
   const good = PORTS[port].sells[0].good;
   const price = S.buyPrice(s, port, good);
@@ -389,7 +418,7 @@ test('perishables lose value with age, down to a floor', () => {
 });
 
 test('fuel: the tank is a hard ceiling and coin a hard floor', () => {
-  const s = S.newGame(1);
+  const s = newDocked(1);
   s.dv = 0;
   const r = S.refuel(s, 1000);
   assert.ok(r.ok && s.dv <= s.tank + 1e-12 && s.money >= 0);
@@ -399,7 +428,7 @@ test('fuel: the tank is a hard ceiling and coin a hard floor', () => {
 
 test('a tow moves the ship to the nearest port and costs money and days, never the save', () => {
   const s = S.newGame(9);
-  S.undock(s);
+  s.passengers = [];     // a tow that also delivers the opening crate pays, and this is about the bill
   s.dv = 0;
   const t0 = s.t, m0 = s.money;
   const q = S.towQuote(s);
@@ -483,7 +512,7 @@ test('aerobraking: Grumm\'s clouds are a crash without a shield and a brake with
 });
 
 test('contracts: taken here, paid there, less when late', () => {
-  const s = S.newGame(23);
+  const s = newDocked(23);
   const offers = S.refreshOffers(s, 'tessel');
   const c = offers.find(o => S.canTake(s, o).ok);
   assert.ok(c, 'an offer the starter ship can take');
@@ -669,7 +698,7 @@ test('what a mark costs is what the tank is charged, on any orbit', () => {
 test('a dry ship with an empty purse can still leave the dock', () => {
   /* Nothing may cost the save, and a ship with no fuel and no coin tied up at
      a dock would be exactly that. Ledger fronts it, at a price. */
-  const s = S.newGame(5);
+  const s = newDocked(5);
   s.dv = 0;
   s.money = 0;
   assert.ok(S.fuelCredit(s) > 0, 'no credit offered');
@@ -678,7 +707,7 @@ test('a dry ship with an empty purse can still leave the dock', () => {
   assert.ok(S.kms(s.dv) >= 2.5, `only got ${S.fmtKms(s.dv)}`);
   assert.ok(s.debt > 0 && s.money === 0);
   // And it is a floor, not a facility: a full purse borrows nothing.
-  const rich = S.newGame(5);
+  const rich = newDocked(5);
   rich.dv = 0;
   rich.money = 100000;
   const r2 = S.refuel(rich, 5);
@@ -758,10 +787,10 @@ test('a save is refused at the door rather than halfway through a frame', () => 
   // Fields a later version added are filled in quietly rather than refused.
   const old = JSON.parse(good);
   for(const k of ['markets', 'offers', 'log', 'rep', 'visited', 'flags', 'justLeft', 'shipName']) delete old[k];
-  old.warp = 99;
+  old.warp = 1e9;        // the clock is a rate now, not a rung, and the rate has a ceiling
   const back = S.restore(old);
   assert.ok(back.markets && back.offers && back.log && back.rep.otter === 0 && back.shipName);
-  assert.equal(back.warp, 0);
+  assert.equal(back.warp, CONST.MAX_WARP);
 });
 
 test('shelves refill at the rate the people behind them work', () => {
@@ -830,7 +859,7 @@ test('a contract whose day has gone leaves the board', () => {
 });
 
 test('quantities are whole crates, and at least one', () => {
-  const s = S.newGame(5);
+  const s = newDocked(5);
   const good = PORTS.tessel.sells[0].good;
   const money = s.money;
   for(const bad of [-5, 0, 1.5, NaN, '3']){

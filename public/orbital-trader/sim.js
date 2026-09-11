@@ -511,7 +511,7 @@ export function addNodeAhead(state){
   /* A floor of twenty-five real seconds at x1, which at this clock is most of
      the way round a small moon: enough to press the pad a few times before
      the mark arrives and fires whatever it has by then. */
-  const floor = CONST.BASE_RATE_DAYS_PER_SEC * 25;
+  const floor = Math.max(MIN_LEAD * 1.1, CONST.BASE_RATE_DAYS_PER_SEC * 25);
   return addNode(state, Math.max(state.t, last) + Math.max(floor, ahead));
 }
 export function planCost(state, horizon){
