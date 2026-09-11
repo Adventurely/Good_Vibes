@@ -589,6 +589,35 @@ function oneLap(seg){
   return { ...seg, points, times, lapped: true };
 }
 
+/* The intercept: how close the road comes to the world it has just entered,
+ * and when. Inside that world's reach the ship is on one conic about it, so
+ * the nearest point is simply that leg's periapsis — no search, no sampling,
+ * exact. It is the number a pilot is actually asking for while they push a
+ * burn around: not "does this reach Pip" but "how close, and how fast". */
+function interceptOf(segments, crossed){
+  if(crossed < 0) return null;
+  const leg = segments[crossed + 1];
+  if(!leg) return null;
+  const b = world.get(leg.body);
+  if(!b || !(b.mu > 0)) return null;
+  const dt = timeToAnomaly(b.mu, leg.r0, leg.v0, 0);
+  const within = dt != null && dt >= 0 && dt <= leg.t1 - leg.t0;
+  /* A road that leaves again before it gets to the low point never gets its
+     nearest pass; the nearest it manages is wherever the leg ends. */
+  const at = within ? propagate(b.mu, leg.r0, leg.v0, dt) : { r: leg.r1, v: leg.v1 };
+  return {
+    segIndex: crossed + 1,
+    body: leg.body,
+    t: leg.t0 + (within ? dt : leg.t1 - leg.t0),
+    r: at.r,
+    distance: norm(at.r),
+    altitude: Math.max(0, norm(at.r) - (b.radius ?? 0)),
+    speed: norm(at.v ?? leg.v1),
+    grazes: norm(at.r) <= (b.radius ?? 0),
+    inMouth: b.zoneRadius != null && norm(at.r) <= b.zoneRadius,
+  };
+}
+
 export function planImmediate(state, flown = true){
   if(state.dockedAt) return null;
   const bare = flown ? state : { ...state, nodes: [] };
@@ -604,9 +633,14 @@ export function planImmediate(state, flown = true){
   let horizon = Math.min(IMMEDIATE_CAP, lead + lapOf(el) * 1.02);
   let pred = plan(state, horizon);
   for(let pass = 0; pass < 3 && !settled(pred); pass++){
-    const fin = finalLeg(pred);
+      const fin = finalLeg(pred);
     if(!fin) break;
-    const want = Math.min(IMMEDIATE_CAP, (fin.t0 - state.t) + lapOf(fin.elements));
+    /* A leg that already ends at a boundary is as long as it is going to be;
+       asking for a lap of it (720 days, for anything unbound) sends the
+       horizon to the cap and costs two more solves per keystroke for a road
+       that was finished at the first. */
+    const done = fin.reason === 'exit' || fin.reason === 'enter' || fin.reason === 'crash';
+    const want = Math.min(IMMEDIATE_CAP, (fin.t0 - state.t) + (done ? fin.t1 - fin.t0 : lapOf(fin.elements)));
     if(Math.abs(want - horizon) <= Math.max(1e-6, horizon * 0.01)) break;
     horizon = want;
     pred = plan(state, horizon);
@@ -617,16 +651,22 @@ export function planImmediate(state, flown = true){
   const segments = segs.slice(0, keep).map(oneLap);
   const endT = segments.length ? segments[segments.length - 1].t1 : state.t;
   const events = pred.events.filter(e => e.t <= endT + 1e-9);
-  const crossing = crossed >= 0 && crossed < segments.length ? {
-    segIndex: crossed,
-    kind: segments[crossed].reason,
-    t: segments[crossed].t1,
-    from: segments[crossed].body,
-    to: events.find(e => e.kind === 'soi' && Math.abs(e.t - segments[crossed].t1) < 1e-6)?.to ?? null,
-  } : null;
+  /* Every door on the drawn road, not just the first. A burn that reaches a
+     moon and swings past it has two — the way in and the way out — and a
+     chart that marks only one of them is telling half the story. */
+  const crossings = [];
+  segments.forEach((sg, i) => {
+    if(sg.reason !== 'exit' && sg.reason !== 'enter') return;
+    crossings.push({
+      segIndex: i, kind: sg.reason, t: sg.t1, from: sg.body,
+      to: events.find(e => e.kind === 'soi' && Math.abs(e.t - sg.t1) < 1e-6)?.to ?? null,
+    });
+  });
   return {
     ...pred, segments, events, end: endT, horizon,
-    crossing,
+    crossings,
+    crossing: crossings[0] ?? null,
+    intercept: interceptOf(segments, crossed),
     /* From here on the road is drawn in the second colour: it is a different
        world's orbit, and it should not read as more of the same one. */
     afterFrom: crossed >= 0 ? crossed + 1 : segments.length,

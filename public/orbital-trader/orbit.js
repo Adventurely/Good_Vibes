@@ -120,7 +120,15 @@ export function elementsFromState(mu, r, v, floor = 0){
      there no ground it would come straight back up. Reading it as a parabola
      made its far point and its period Infinity for an orbit that has both. */
   const bound = Number.isFinite(a) && a > 0;
-  const rp = bound ? a * (1 - e) : p / 2;
+  /* Periapsis is p / (1 + e) on every conic there is. On a bound orbit that
+     is a(1 - e) exactly, which is how it is written here; on an open one it
+     is not p / 2 — that is the parabolic case only, and using it for a
+     hyperbola put the low point of every flyby several times too far out.
+     Which mattered twice: the chart labelled the closest approach with a
+     number that was not it, and `vmax` below is built on rp, so the boundary
+     search was handed a speed ceiling that was too low on exactly the legs
+     that move fastest. */
+  const rp = bound ? a * (1 - e) : p / (1 + e);
   const ra = bound ? a * (1 + e) : Infinity;
   const omega = Math.atan2(ey, ex);
   // True anomaly, signed by the sense of rotation so it increases with time.

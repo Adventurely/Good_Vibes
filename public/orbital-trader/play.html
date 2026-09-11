@@ -452,6 +452,12 @@ function replan(force = false){
      A near-circular heliocentric orbit has no meaningful pair — its two apses
      are a hair apart and the labels sit on top of each other — so it keeps
      neither. */
+  const ic = prediction.intercept;
+  interceptLabel = ic
+    ? (ic.grazes
+        ? `hits ${S.portName(ic.body)}`
+        : `${S.portName(ic.body)} ${fmtAu(ic.altitude)} · ${S.fmtKms(ic.speed)}${ic.inMouth ? ' · in the mouth' : ''}`)
+    : null;
   apses = [];
   prediction.segments.forEach((seg, i) => {
     const b = world.get(seg.body);
@@ -470,7 +476,7 @@ let firstStoryDone = false;
 let lockedTo = null;
 /* The one number the on-chart editor shows. Recomputed when the burn changes,
    not every frame: solving what a mark costs is not free. */
-let nodeLabel = null, nodeLabelKey = '';
+let nodeLabel = null, nodeLabelKey = '', interceptLabel = null;
 function refreshNodeLabel(){
   const n = state.nodes[selectedNode];
   if(!n || state.dockedAt){ nodeLabel = null; nodeLabelKey = ''; return; }
@@ -518,7 +524,7 @@ function frame(now){
     prediction, nodes: state.nodes, nodePositions, selectedNode, apses,
     editing: selectedNode >= 0 && !!state.nodes[selectedNode],
     shipLocalV: state.dockedAt ? null : state.ship.v,
-    nodeLabel,
+    nodeLabel, interceptLabel,
     belt, nearPort: docking?.port ?? null, docking,
   });
   renderHud(docking);
@@ -1227,24 +1233,30 @@ function plan(){
   return out;
 }
 
-/* What the drawn road runs into, which is at most one crossing by design. */
+/* What the drawn road runs into, in the order it runs into it: the doors it
+ * goes through and the nearest it passes whatever it meets on the way. */
 function aheadList(){
   if(!prediction) return '';
-  let out = '<h3>Ahead</h3>';
-  const evs = prediction.events.filter(e => e.kind !== 'burn' || e.node.aero);
   const skip = t => `<button class="btn sm" data-act="skipto|${t}">Skip to it</button>`;
-  if(!evs.length && !prediction.crashed) out += '<p class="lock">Nothing changes before this orbit comes round again.</p>';
-  for(const e of evs){
+  const lines = [];
+  for(const e of prediction.events){
     if(e.kind === 'soi'){
       const to = world.get(e.to), from = world.get(e.from);
-      out += `<p>${to.parent === from.id ? 'Into' : 'Out to'} ${esc(to.name)}'s reach in ${S.fmtDays(e.t - state.t)}. ${skip(e.t)}</p>`;
+      lines.push({ t: e.t, html: `<p>${to.parent === from.id ? 'Into' : 'Out to'} ${esc(to.name)}'s reach in ${S.fmtDays(e.t - state.t)}. ${skip(e.t)}</p>` });
     }else if(e.kind === 'burn' && e.node.aero){
-      out += `<p class="up">Skim ${esc(S.portName(e.node.body))}: shed ${S.fmtKms(e.magnitude)} in ${S.fmtDays(e.t - state.t)}. ${skip(e.t)}</p>`;
+      lines.push({ t: e.t, html: `<p class="up">Skim ${esc(S.portName(e.node.body))}: shed ${S.fmtKms(e.magnitude)} in ${S.fmtDays(e.t - state.t)}. ${skip(e.t)}</p>` });
     }else if(e.kind === 'crash'){
-      out += `<p class="down">This path strikes ${esc(S.portName(e.body))} in ${S.fmtDays(e.t - state.t)}.</p>`;
+      lines.push({ t: e.t, html: `<p class="down">This path strikes ${esc(S.portName(e.body))} in ${S.fmtDays(e.t - state.t)}.</p>` });
     }
   }
-  return out;
+  const ic = prediction.intercept;
+  if(ic) lines.push({ t: ic.t, html: ic.grazes
+    ? `<p class="down">This road hits ${esc(S.portName(ic.body))} in ${S.fmtDays(ic.t - state.t)}.</p>`
+    : `<p class="${ic.inMouth ? 'up' : ''}">Nearest pass with ${esc(S.portName(ic.body))}: ${fmtAu(ic.altitude)} at ${S.fmtKms(ic.speed)}, in ${S.fmtDays(ic.t - state.t)}.${ic.inMouth ? ' That is inside the harbour mouth.' : ''} ${skip(ic.t)}</p>` });
+  lines.sort((a, b) => a.t - b.t);
+  return '<h3>Ahead</h3>' + (lines.length
+    ? lines.map(l => l.html).join('')
+    : '<p class="lock">Nothing changes before this orbit comes round again.</p>');
 }
 
 function orbitTab(){

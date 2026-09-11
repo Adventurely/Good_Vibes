@@ -477,9 +477,29 @@ function drawPrediction(chart, view, pos){
      your presses are moving is the bright, continuous one. */
   const editing = !!view.editing;
   const afterBurnAt = si => pred.segments.slice(0, si).some(sg => sg.reason === 'burn');
+  /* Where each leg is pinned on the screen. The first is pinned to its world
+     where that world is now; every leg after it continues from where the last
+     one stopped:
+     
+         anchor(n) = anchor(n-1) + end(n-1) - start(n)
+     
+     which is the same point in space written in two frames, so the road joins
+     up exactly at every change of reach. Pinning a moon's leg to where the
+     moon is *now* instead — which is what this did — drew the swing past Pip
+     in one corner of the chart and the door into Pip's reach in another,
+     because the encounter happens where Pip will be, not where it is. */
+  const anchors = [];
+  for(let i = 0; i < pred.segments.length; i++){
+    const seg = pred.segments[i];
+    if(i === 0){ anchors.push(pos.get(seg.body)?.r ?? [0, 0]); continue; }
+    const prev = pred.segments[i - 1];
+    anchors.push(prev.body === seg.body
+      ? anchors[i - 1]
+      : sub(add(anchors[i - 1], prev.r1), seg.r0));
+  }
   for(let si = 0; si < pred.segments.length; si++){
     const seg = pred.segments[si];
-    const anchor = pos.get(seg.body)?.r;
+    const anchor = anchors[si];
     const pts = seg.points;
     if(!anchor || !pts.length) continue;
     if(si > 0 && pred.segments[si - 1].reason === 'burn'){
@@ -513,8 +533,9 @@ function drawPrediction(chart, view, pos){
       ctx.stroke();
     }
   }
-  drawApses(chart, view, pos, afterBurnAt);
-  drawCrossing(chart, view, pos, afterBurnAt);
+  drawApses(chart, view, anchors, afterBurnAt);
+  drawCrossings(chart, view, anchors, afterBurnAt);
+  drawIntercept(chart, view, anchors, afterBurnAt);
 }
 
 /* The marks on a road, each one a shape you can name without a legend:
@@ -524,15 +545,20 @@ function drawPrediction(chart, view, pos){
  *   crossing     a chevron in a ring — a door out of one world into another
  *   burn         a ring with the four directions round it (drawNodes)
  */
-function drawApses(chart, view, pos, afterBurnAt){
+function drawApses(chart, view, anchors, afterBurnAt){
   const { ctx } = chart;
   if(!view.apses) return;
   ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
   for(const a of view.apses){
     const seg = view.prediction.segments[a.segIndex];
-    if(!seg || !pos.has(seg.body)) continue;
+    const anchor = anchors[a.segIndex];
+    if(!seg || !anchor) continue;
+    /* The leg the intercept is on already has a labelled crosshair at its low
+       point; a second mark and a second number on the same pixel is a pile,
+       not a chart. */
+    if(a.segIndex === view.prediction.intercept?.segIndex) continue;
     const afterBurn = afterBurnAt(a.segIndex);
-    const p = chart.toScreen(add(pos.get(seg.body).r, a.r));
+    const p = chart.toScreen(add(anchor, a.r));
     if(p[0] < -60 || p[1] < -30 || p[0] > chart.width + 60 || p[1] > chart.height + 30) continue;
     const colour = afterBurn ? PALETTE.pathPlan : PALETTE.apsis;
     ctx.lineWidth = 2;
@@ -543,38 +569,64 @@ function drawApses(chart, view, pos, afterBurnAt){
   }
 }
 
-/* Where this road leaves one world's reach for another's: a chevron pointing
- * the way you are going, inside a ring. */
-function drawCrossing(chart, view, pos, afterBurnAt){
+/* Every door the road goes through: a chevron pointing the way you are going,
+ * inside a ring. A burn that reaches a moon and swings past it has two of
+ * them, and a chart that marks only the way in is telling half the story. */
+function drawCrossings(chart, view, anchors, afterBurnAt){
   const { ctx, world } = chart;
-  const c = view.prediction?.crossing;
-  if(!c) return;
-  const seg = view.prediction.segments[c.segIndex];
-  if(!seg || !pos.has(seg.body)) return;
-  const afterBurn = afterBurnAt(c.segIndex);
-  const colour = afterBurn ? PALETTE.pathPlan : PALETTE.crossing;
-  const anchor = pos.get(seg.body).r;
-  const p = chart.toScreen(add(anchor, seg.r1));
-  const n = seg.points.length;
-  const prev = n > 1 ? chart.toScreen(add(anchor, seg.points[n - 2])) : [p[0] - 1, p[1]];
-  const ang = Math.atan2(p[1] - prev[1], p[0] - prev[0]);
-  ctx.strokeStyle = colour; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.arc(p[0], p[1], 8, 0, Math.PI * 2); ctx.stroke();
-  ctx.save();
-  ctx.translate(p[0], p[1]); ctx.rotate(ang);
-  ctx.beginPath(); ctx.moveTo(-2.5, -4); ctx.lineTo(2.5, 0); ctx.lineTo(-2.5, 4); ctx.stroke();
-  ctx.restore();
-  const to = c.to ? world.get(c.to) : null;
-  if(!to) return;
+  const list = view.prediction?.crossings ?? (view.prediction?.crossing ? [view.prediction.crossing] : []);
   ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
-  ctx.fillStyle = PALETTE.text;
-  ctx.fillText(`${c.kind === 'exit' ? 'out to' : 'into'} ${labelFor(to)}`, p[0] + 12, p[1] + 4);
+  for(const c of list){
+    const seg = view.prediction.segments[c.segIndex];
+    const anchor = anchors[c.segIndex];
+    if(!seg || !anchor) continue;
+    const colour = afterBurnAt(c.segIndex) ? PALETTE.pathPlan : PALETTE.crossing;
+    const p = chart.toScreen(add(anchor, seg.r1));
+    const n = seg.points.length;
+    const prev = n > 1 ? chart.toScreen(add(anchor, seg.points[n - 2])) : [p[0] - 1, p[1]];
+    const ang = Math.atan2(p[1] - prev[1], p[0] - prev[0]);
+    ctx.strokeStyle = colour; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(p[0], p[1], 8, 0, Math.PI * 2); ctx.stroke();
+    ctx.save();
+    ctx.translate(p[0], p[1]); ctx.rotate(ang);
+    ctx.beginPath(); ctx.moveTo(-2.5, -4); ctx.lineTo(2.5, 0); ctx.lineTo(-2.5, 4); ctx.stroke();
+    ctx.restore();
+    const to = c.to ? world.get(c.to) : null;
+    if(!to) continue;
+    ctx.fillStyle = PALETTE.text;
+    ctx.fillText(`${c.kind === 'exit' ? 'out to' : 'into'} ${labelFor(to)}`, p[0] + 12, p[1] + 4);
+  }
 }
 
-function diamond(ctx, p, r){
+/* The intercept: the nearest the road comes to the world it has just entered.
+ * This is the question a pilot is actually asking while they push a burn
+ * around — not "does this reach Pip" but "how close, and how fast" — so it is
+ * marked wherever the chart is zoomed, even when the whole encounter is a few
+ * pixels wide, and it carries its own numbers. */
+function drawIntercept(chart, view, anchors, afterBurnAt){
+  const { ctx } = chart;
+  const ic = view.prediction?.intercept;
+  if(!ic) return;
+  const seg = view.prediction.segments[ic.segIndex];
+  const anchor = anchors[ic.segIndex];
+  if(!seg || !anchor) return;
+  const p = chart.toScreen(add(anchor, ic.r));
+  if(p[0] < -80 || p[1] < -40 || p[0] > chart.width + 80 || p[1] > chart.height + 40) return;
+  const colour = ic.grazes ? PALETTE.crash : afterBurnAt(ic.segIndex) ? PALETTE.pathPlan : PALETTE.apsis;
+  ctx.strokeStyle = colour; ctx.fillStyle = colour; ctx.lineWidth = 1.5;
+  // Crosshair on a ring, which is not a shape any other mark on this chart uses.
+  ctx.beginPath(); ctx.arc(p[0], p[1], 6, 0, Math.PI * 2); ctx.stroke();
   ctx.beginPath();
-  ctx.moveTo(p[0], p[1] - r); ctx.lineTo(p[0] + r, p[1]); ctx.lineTo(p[0], p[1] + r); ctx.lineTo(p[0] - r, p[1]);
-  ctx.closePath(); ctx.fill();
+  ctx.moveTo(p[0] - 10, p[1]); ctx.lineTo(p[0] - 3, p[1]);
+  ctx.moveTo(p[0] + 3, p[1]); ctx.lineTo(p[0] + 10, p[1]);
+  ctx.moveTo(p[0], p[1] - 10); ctx.lineTo(p[0], p[1] - 3);
+  ctx.moveTo(p[0], p[1] + 3); ctx.lineTo(p[0], p[1] + 10);
+  ctx.stroke();
+  if(view.interceptLabel){
+    ctx.font = '600 11px ui-sans-serif, system-ui, sans-serif';
+    ctx.fillStyle = ic.grazes ? PALETTE.crash : PALETTE.text;
+    ctx.fillText(view.interceptLabel, p[0] + 13, p[1] + 15);
+  }
 }
 
 function drawShip(chart, view){
@@ -592,7 +644,7 @@ function drawShip(chart, view){
   ctx.translate(p[0], p[1]);
   ctx.rotate(ang);
   ctx.beginPath();
-  ctx.moveTo(8, 0); ctx.lineTo(-6, 5); ctx.lineTo(-3, 0); ctx.lineTo(-6, -5); ctx.closePath();
+  ctx.moveTo(9, 0); ctx.lineTo(-6, 5.5); ctx.lineTo(-3, 0); ctx.lineTo(-6, -5.5); ctx.closePath();
   ctx.fillStyle = PALETTE.ship; ctx.fill();
   ctx.strokeStyle = PALETTE.shipEdge; ctx.lineWidth = 1; ctx.stroke();
   ctx.restore();
