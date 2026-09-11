@@ -103,7 +103,7 @@ export function railMaxSpeed(el, mu){
 /* Classical elements from a state vector, for the readouts and the bounds.
  * Works for any conic. `rp` is the periapsis distance; `ra` is Infinity on an
  * escape trajectory; `dir` is +1 anticlockwise, -1 clockwise. */
-export function elementsFromState(mu, r, v){
+export function elementsFromState(mu, r, v, floor = 0){
   const rn = norm(r), vn = norm(v);
   const h = cross(r, v);
   const energy = vn * vn / 2 - mu / rn;
@@ -114,17 +114,31 @@ export function elementsFromState(mu, r, v){
   const ey = ((vn * vn - mu / rn) * r[1] - rv * v[1]) / mu;
   const e = Math.hypot(ex, ey);
   const p = h * h / mu;
-  const rp = e === 1 || !Number.isFinite(a) ? p / 2 : a * (1 - e);
-  const ra = e < 1 ? a * (1 + e) : Infinity;
+  /* Whether an orbit comes back is decided by its energy, not by its
+     eccentricity. A ship dropped straight down has e exactly 1 and looks
+     parabolic by that test, but it is plainly bound: it will fall, and were
+     there no ground it would come straight back up. Reading it as a parabola
+     made its far point and its period Infinity for an orbit that has both. */
+  const bound = Number.isFinite(a) && a > 0;
+  const rp = bound ? a * (1 - e) : p / 2;
+  const ra = bound ? a * (1 + e) : Infinity;
   const omega = Math.atan2(ey, ex);
   // True anomaly, signed by the sense of rotation so it increases with time.
   let nu = Math.atan2(r[1], r[0]) - omega;
   if(h < 0) nu = -nu;
   nu = ((nu % TAU) + TAU) % TAU;
-  const T = e < 1 ? period(mu, a) : Infinity;
-  // Speed at periapsis is the fastest the ship goes on this conic.
-  const vmax = Math.sqrt(mu * (1 + e) / rp);
-  return { a, e, rp, ra, omega, nu, period: T, energy, h, dir: h >= 0 ? 1 : -1, vmax, p };
+  const T = bound ? period(mu, a) : Infinity;
+  /* The fastest the ship can be going anywhere on this conic, which is what
+     every step bound downstream is built on, so it must never come back
+     smaller than the truth. At periapsis on a normal conic; on a radial fall
+     periapsis is the middle of the world, where the speed is unbounded, so the
+     honest ceiling is the speed it would have at the ground — and a caller
+     that cares (the boundary search) hands in that floor. */
+  const rMin = Math.max(rp, floor);
+  const vmax = rMin > 0
+    ? Math.sqrt(Math.max(0, vn * vn + 2 * mu * (1 / rMin - 1 / rn)))
+    : Infinity;
+  return { a, e, rp, ra, omega, nu, period: T, energy, h, dir: h >= 0 ? 1 : -1, vmax, p, bound };
 }
 
 /* Time from now until the ship next reaches periapsis (or apoapsis), on an
@@ -275,6 +289,14 @@ export function lambert(mu, r1, r2, tof, ccw = true){
   const n1 = norm(r1), n2 = norm(r2);
   if(n1 === 0 || n2 === 0) return null;
   let cosdnu = Math.max(-1, Math.min(1, dot(r1, r2) / (n1 * n2)));
+  /* Half a turn exactly has no single answer — every plane through the two
+     points is a solution, and in two dimensions the arithmetic falls apart.
+     That is also, awkwardly, the cheapest transfer there is, so the answer is
+     not to refuse everything near it but to refuse only what genuinely will
+     not fly: the guard below is for the true singularity, and the solution is
+     checked against the propagator before it is handed back. */
+  const sinTurn = Math.abs(cross(r1, r2)) / (n1 * n2);
+  if(sinTurn < 1e-8 && cosdnu < 0) return null;
   // Short way or long way round, decided by which side of r1 the target lies
   // and which way the ship is going.
   const turn = cross(r1, r2);
@@ -314,10 +336,15 @@ export function lambert(mu, r1, r2, tof, ccw = true){
   const g = A * Math.sqrt(y / mu);
   const gdot = 1 - y / n2;
   if(!Number.isFinite(g) || g === 0) return null;
-  return {
-    v1: [(r2[0] - f * r1[0]) / g, (r2[1] - f * r1[1]) / g],
-    v2: [(gdot * r2[0] - r1[0]) / g, (gdot * r2[1] - r1[1]) / g],
-  };
+  const v1 = [(r2[0] - f * r1[0]) / g, (r2[1] - f * r1[1]) / g];
+  const v2 = [(gdot * r2[0] - r1[0]) / g, (gdot * r2[1] - r1[1]) / g];
+  if(!v1.every(Number.isFinite) || !v2.every(Number.isFinite)) return null;
+  /* Fly it before promising it. Near the half-turn the arithmetic still
+     produces a pair of velocities long after they have stopped meaning
+     anything, and a caller has no way to tell. One propagation settles it. */
+  const landed = propagate(mu, r1, v1, tof);
+  if(dist(landed.r, r2) > Math.max(n2, n1) * 1e-5) return null;
+  return { v1, v2 };
 }
 
 /* State on a circular orbit at `radius`, at polar angle `theta`, moving
@@ -461,8 +488,15 @@ function boundaries(world, body, r, v, t, opts){
  * the last two samples and bisected.
  */
 export function nextEvent(world, body, r0, v0, t0, span, opts){
-  const el = elementsFromState(body.mu, r0, v0);
-  const vship = Math.min(el.vmax, norm(v0) * 50 + 1e-9);   // vmax is exact; the min is paranoia against NaN
+  /* The fastest the ship can possibly be going during this step. It is the
+     only thing keeping the search honest: the bound below divides a clearance
+     by a closing speed, and if that speed can be exceeded the search can step
+     straight over a boundary. Measured from the lowest point the ship could
+     reach without hitting something — a radial fall has no periapsis, only a
+     surface. */
+  const floor = Math.max(body.radius ?? 0, (opts?.atmosphere && body.atmo) ? body.atmo : 0);
+  const el = elementsFromState(body.mu, r0, v0, floor);
+  const vship = Number.isFinite(el.vmax) ? el.vmax : Math.sqrt(Math.max(0, norm(v0) ** 2 + 2 * body.mu / Math.max(floor, 1e-9)));
   let t = 0;
   let r = r0, v = v0;
   let prev = boundaries(world, body, r, v, t0, opts);
@@ -506,6 +540,10 @@ export function nextEvent(world, body, r0, v0, t0, span, opts){
     }
     r = next.r; v = next.v; t = tn; prev = now;
   }
+  /* Out of steps rather than out of span. Saying "nothing happens here" would
+     be a lie, and the caller would coast serenely through whatever was coming;
+     saying where the search got to lets it pick up from there. */
+  if(t < span) return { kind: 'timeout', into: null, dt: t, r, v };
   return null;
 }
 
@@ -532,7 +570,11 @@ export function advance(world, ship, t, dt, nodes = [], opts = {}){
   const end = t + dt;
   const events = [];
   let ni = 0;
-  while(ni < nodes.length && nodes[ni].t < now - T_TOL) ni++;
+  /* Marks whose moment has already arrived are behind us. The test has to
+     include the moment itself: a step that stops exactly on a burn would
+     otherwise find the same mark waiting for it on the next call, fire it
+     again, and stop the clock dead on a burn it keeps paying for. */
+  while(ni < nodes.length && nodes[ni].t <= now + T_TOL) ni++;
   let guard = 0;
   while(end - now > 0 && guard++ < 64){
     let span = end - now;
@@ -542,6 +584,12 @@ export function advance(world, ship, t, dt, nodes = [], opts = {}){
       span = Math.max(0, nodeNext.t - now);
     }
     const ev = span > 0 ? nextEvent(world, body, r, v, now, span, opts) : null;
+    if(ev && ev.kind === 'timeout'){
+      // The search ran out of steps; take what it did cover and go round again.
+      r = ev.r; v = ev.v; now += ev.dt;
+      if(ev.dt <= 0) break;
+      continue;
+    }
     if(ev){
       now += ev.dt;
       if(ev.kind === 'surface'){
@@ -593,6 +641,10 @@ export function burnVector(r, v, node, dvAvailable){
   let dv = add(scale(pro, node.prograde || 0), scale(rad, node.radial || 0));
   let magnitude = norm(dv);
   let short = false;
+  // A skim through a world's clouds is not bought from the tank, so an empty
+  // tank must not scale it down — which it did, and the drawn path and the
+  // flown path then disagreed about where the ship came out.
+  if(node.free) return { dv, magnitude, short };
   if(dvAvailable != null && magnitude > dvAvailable + 1e-12){
     dv = scale(dv, magnitude > 0 ? dvAvailable / magnitude : 0);
     magnitude = dvAvailable;
@@ -669,6 +721,13 @@ export function predict(world, ship, t0, nodes = [], horizon = 720, opts = {}){
       break;
     }
     if(step.reason === 'horizon'){ break; }
+    if(step.reason === 'partial'){
+      // The search gave up part way; carry on from where it reached.
+      if(step.t <= t + 1e-12) break;
+      r = step.r; v = step.v; t = step.t;
+      segStart = { body: body.id, t, r, v };
+      continue;
+    }
     if(step.reason === 'burn'){
       const node = nodes[ni];
       const burn = burnVector(step.r, step.v, node, o.dvAvailable);
@@ -708,6 +767,10 @@ function advanceOne(world, body, r, v, t, end, nodes, ni, o){
     toNode = true;
   }
   const ev = span > 0 ? nextEvent(world, body, r, v, t, span, o) : null;
+  if(ev && ev.kind === 'timeout'){
+    // As far as the search got. The leg is cut here and the next one carries on.
+    return { t: t + ev.dt, r: ev.r, v: ev.v, reason: 'partial' };
+  }
   if(ev){
     return { t: t + ev.dt, r: ev.r, v: ev.v, reason: ev.kind === 'surface' ? 'crash' : ev.kind, into: ev.into };
   }
@@ -749,10 +812,19 @@ function finishSegment(world, start, body, t1, r1, v1, reason, opts){
 /* Closest approach between the predicted path and a body, absolute frame.
  * A coarse pass over the sample points finds the neighbourhood; a golden
  * section on the exact conic then pins it down. Returns null if the target
- * never comes within `within` au (default: anything). */
-export function closestApproach(world, prediction, targetId, within = Infinity){
+ * never comes within `within` au (default: anything).
+ *
+ * `arrive` changes the question from "how close does this road ever come?" to
+ * "where does it first come close enough?", which is the one a pilot is
+ * actually asking. A road that passes a moon at three thousand kilometres
+ * tomorrow and at two thousand next spring is a road that gets you there
+ * tomorrow, and reporting the spring pass because it is a hair nearer makes
+ * every plan look like it takes a season.
+ */
+export function closestApproach(world, prediction, targetId, within = Infinity, arrive = 0){
   const target = world.get(targetId);
   let best = null;
+  let done = false;
   for(const seg of prediction.segments){
     const segBody = world.get(seg.body);
     // Fast path: is the target this segment's own body? Distance is |r|.
@@ -766,7 +838,12 @@ export function closestApproach(world, prediction, targetId, within = Infinity){
       else if(child) d = dist(seg.points[i], railState(target, segBody.mu, t).r);
       else d = dist(add(absState(world, seg.body, t).r, seg.points[i]), absState(world, targetId, t).r);
       if(!best || d < best.d) best = { d, i, seg };
+      /* Close enough, and first: stop looking. The samples are in time order
+         within a segment and the segments are in time order, so the first one
+         under the bar is the earliest arrival. */
+      if(arrive > 0 && d <= arrive){ best = { d, i, seg }; done = true; break; }
     }
+    if(done) break;
   }
   if(!best || best.d > within) return null;
   const { seg } = best;

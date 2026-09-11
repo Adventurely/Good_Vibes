@@ -338,11 +338,19 @@ function save(){
   if(!state) return;
   try{ localStorage.setItem(SAVE_KEY, S.serialize(state)); }catch{ /* private window, full disk: play on */ }
 }
-if(params.has('new')){
-  state = S.newGame((Date.now() % 100000) | 1);
-  history.replaceState(null, '', location.pathname);
+/* A seed can be named in the address. It decides the ship's name and every
+   roll the game will ever make, so two people with the same seed see the same
+   offers — which is what makes a strange one reportable, and what lets the
+   tests fly the same lesson twice. */
+function freshSeed(){
+  const asked = Number(params.get('seed'));
+  return Number.isFinite(asked) && asked > 0 ? Math.floor(asked) : ((Date.now() % 100000) | 1);
+}
+if(params.has('new') || params.has('seed')){
+  state = S.newGame(freshSeed());
+  if(!params.has('seed')) history.replaceState(null, '', location.pathname);
 }else{
-  state = loadSave() || S.newGame((Date.now() % 100000) | 1);
+  state = loadSave() || S.newGame(freshSeed());
 }
 
 /* ------------------------------------------------------------- chart */
@@ -1158,7 +1166,7 @@ function storyTitle(name){ return { cometCaught: "Merrow's Comet", chimeArrival:
 function confirmNew(){
   openModal(`<h2>Start over?</h2><p>This save is replaced by a fresh ship at Tessel. There is one save slot.</p><div class="btns"><button class="btn" id="m-no">Keep playing</button><button class="btn danger" id="m-yes">New game</button></div>`, m => {
     m.querySelector('#m-no').addEventListener('click', closeModal);
-    m.querySelector('#m-yes').addEventListener('click', () => { closeModal(); state = S.newGame((Date.now() % 100000) | 1); save(); selectedNode = -1; lastDockedMode = null; replan(true); renderTabs(); chart.focus('ship'); chart.camera.zoom = 240 * 60; tutorialCheck(); });
+    m.querySelector('#m-yes').addEventListener('click', () => { closeModal(); state = S.newGame(freshSeed()); save(); selectedNode = -1; lastDockedMode = null; replan(true); renderTabs(); chart.focus('ship'); chart.camera.zoom = 240 * 60; tutorialCheck(); });
   });
 }
 
@@ -1184,6 +1192,15 @@ function tutorialCheck(){
   let step = state.flags.tutorial;
   const target = 'bramble';
   const reaches = prediction?.events.some(e => e.kind === 'soi' && e.to === target);
+  /* Tied up at the far end is the whole lesson, however you got there — by the
+     steps below, by dragging a handle, or by being towed. Checking it first
+     means the card cannot sit there telling you to do a thing you have done. */
+  if(state.dockedAt === target){
+    state.flags.tutorial = TUT.length;
+    $('tut').hidden = true;
+    if(!state.flags.tutorialDone){ state.flags.tutorialDone = true; toast('Lesson done. The rafts are yours to hop.', 'story'); }
+    return;
+  }
   if(step === 0 && !state.dockedAt) step = 1;
   if(step === 1 && state.nodes.length) step = 2;
   if(step === 2 && reaches) step = 3;
@@ -1193,7 +1210,7 @@ function tutorialCheck(){
   if(step === 3 && !reaches && state.ship.body !== target) step = 2;
   if(state.dockedAt && state.dockedAt !== target && step > 0 && step < 4) step = 0;
   state.flags.tutorial = step;
-  if(step >= TUT.length){ $('tut').hidden = true; toast('Lesson done. The rafts are yours to hop.', 'story'); return; }
+  if(step >= TUT.length){ $('tut').hidden = true; return; }
   const s = TUT[step];
   $('tut').hidden = false;
   $('tut-step').textContent = `Lesson · ${step + 1} of ${TUT.length}`;

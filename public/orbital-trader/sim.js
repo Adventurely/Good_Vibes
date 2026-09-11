@@ -299,7 +299,7 @@ export function effectiveNodes(state, horizon){
       const vFloor = Math.sqrt(Math.max(0, b.mu * (2 / el.rp - 1 / aTarget)));
       const shed = Math.max(0, Math.min(wanted, vp - vFloor));
       if(shed < vp * 1e-3) break;   // nothing left to give: stop inserting skims
-      list = [...list, { t: tAt, prograde: -shed, radial: 0, aero: true, body: b.id }].sort((a, b) => a.t - b.t);
+      list = [...list, { t: tAt, prograde: -shed, radial: 0, aero: true, free: true, body: b.id }].sort((a, b) => a.t - b.t);
       added = true;
       break;
     }
@@ -497,8 +497,11 @@ function seedFromLambert(state, targetId, node, scoreFn){
   // comet spends most of its life nowhere near its semi-major axis.
   const r2n = norm(sub(absState(world, target.id, state.t).r, frameNow.r));
   const hoh = period(frame.mu, (r1n + Math.max(r2n, target.a * (1 - (target.e ?? 0)))) / 2) / 2;
+  const hohFor = hoh;
   const offset = (target.zoneRadius ?? target.soi ?? 0) * 0.4;
   const sameFrame = frame.id === here.id;
+  // Cheapest first, with anything the tank cannot pay for at the back.
+  const rank = cost => (cost > state.dv ? 1e6 : 0) + cost;
   // Leaving a world takes about a quarter of an orbit to line up, so the
   // departure window is the local orbit itself rather than the transfer.
   const localSpan = localPeriod ?? Math.max(2, hoh);
@@ -545,8 +548,7 @@ function seedFromLambert(state, targetId, node, scoreFn){
           const dv = sub(sol.v1, v1);
           const cost = norm(dv);
           if(!Number.isFinite(cost) || cost === 0) continue;
-          const key = (cost > state.dv ? 1e6 : 0) + cost;
-          candidates.push({ key, dep, dv, r: local.r, v: local.v });
+          candidates.push({ key: rank(cost), arrives: dep + tof, dep, dv, r: local.r, v: local.v });
         }else{
           /* The ship is inside a smaller world's reach and the target is not,
              so this is a departure, not a transfer: solve the transfer as if it
@@ -567,14 +569,14 @@ function seedFromLambert(state, targetId, node, scoreFn){
           // A burn pointing the wrong way round the moon costs far more than
           // this estimate; only keep departures that are roughly aligned.
           if(align < 0.9) continue;
-          const key = (cost > state.dv ? 1e6 : 0) + cost + (1 - align) * norm(vinf) * 4;
-          candidates.push({ key, dep, dv: scale(unit(local.v), cost), r: local.r, v: local.v });
+          const key = rank(cost + (1 - align) * norm(vinf) * 4);
+          candidates.push({ key, arrives: dep + tof, dep, dv: scale(unit(local.v), cost), r: local.r, v: local.v });
         }
       }
     }
   }
   void ccw;
-  return pickSeed(state, node, candidates, scoreFn);
+  return pickSeed(state, node, candidates, scoreFn, hohFor);
 }
 
 /* Is `ancestorId` one of the worlds `id` goes round, at any depth? */
@@ -593,6 +595,7 @@ function seedDescent(state, target, here, node, scoreFn){
   const t0 = state.t;
   const moonNow = localState(world, here.id, t0);
   const r1 = norm(moonNow.r);
+  const ref = period(target.mu, (r1 + (target.dockAlt ?? target.radius)) / 2) / 2;
   const candidates = [];
   for(const frac of [0.5, 0.75, 1.0]){
     const rp = target.dockAlt + (target.zoneRadius - target.dockAlt) * frac;
@@ -610,20 +613,34 @@ function seedDescent(state, target, here, node, scoreFn){
       const need = Math.sqrt(Math.max(0, dot(vinf, vinf) - 2 * here.mu / here.soi) + 2 * here.mu / norm(local.r));
       const cost = need - norm(local.v);
       if(!(cost > 0) || !Number.isFinite(cost)) continue;
-      candidates.push({ key: cost + (1 - align) * norm(vinf) * 4, dep, dv: scale(unit(local.v), cost), r: local.r, v: local.v });
+      candidates.push({ key: cost + (1 - align) * norm(vinf) * 4, arrives: dep + ref, dep, dv: scale(unit(local.v), cost), r: local.r, v: local.v });
     }
   }
-  return pickSeed(state, node, candidates, scoreFn);
+  return pickSeed(state, node, candidates, scoreFn, ref);
 }
 
-/* Try the handful of cheapest guesses against the real predicted road and keep
- * whichever actually arrives nearest: cheapest on paper is not always best once
- * the other worlds have had their say. */
-function pickSeed(state, node, candidates, scoreFn){
+/* Try a handful of guesses against the real predicted road and keep whichever
+ * actually arrives best. Cheapest on paper is not always best once the other
+ * worlds have had their say — and a shortlist of nothing but the cheapest is
+ * a shortlist of nothing but the patient ones, since waiting three laps for a
+ * better alignment is exactly how you save fuel. So the list is the cheapest
+ * few overall *and* the cheapest few that arrive soon, which are rarely the
+ * same and are both worth a look. */
+function pickSeed(state, node, candidates, scoreFn, reference){
   if(!candidates.length) return false;
+  /* Waiting three laps for a better alignment is how you save fuel, and a
+     shortlist of nothing but the cheapest is a shortlist of nothing but the
+     patient. Half a game-year to cross between two moons is not what anybody
+     means by "aim for it", so anything that slow is off the menu, and the list
+     is then the cheapest few *and* the quickest few of what remains. */
   candidates.sort((a, b) => a.key - b.key);
-  let best = null;
-  for(const c of candidates.slice(0, 8)){
+  /* The cheapest few and the quickest few. They are rarely the same — waiting
+     three laps for a better alignment is how you save fuel — and both are
+     worth putting in front of the real predicted road. */
+  const byTime = [...candidates].sort((a, b) => (a.arrives ?? 0) - (b.arrives ?? 0));
+  const shortlist = [...new Set([...candidates.slice(0, 6), ...byTime.slice(0, 4)])];
+  const scored = [];
+  for(const c of shortlist){
     const parts = nodeFromVector(c.r, c.v, c.dv);
     if(!parts) continue;
     node.t = state.t + c.dep;
@@ -631,13 +648,18 @@ function pickSeed(state, node, candidates, scoreFn){
     node.radial = parts.radial;
     node.__r = c.r; node.__v = c.v;
     state.nodes.sort((a, d) => a.t - d.t);
-    const s = scoreFn();
-    if(!best || s < best.s) best = { s, t: node.t, prograde: node.prograde, radial: node.radial };
+    scored.push({ s: scoreFn(), t: node.t, prograde: node.prograde, radial: node.radial, arrives: c.arrives ?? Infinity, r: c.r, v: c.v });
   }
-  if(!best) return false;
-  node.t = best.t; node.prograde = best.prograde; node.radial = best.radial;
-  state.nodes.sort((a, d) => a.t - d.t);
-  return true;
+  if(!scored.length) return false;
+  scored.sort((a, b) => a.s - b.s);
+  const apply = c => {
+    node.t = c.t; node.prograde = c.prograde; node.radial = c.radial;
+    node.__r = c.r; node.__v = c.v;
+    state.nodes.sort((a, d) => a.t - d.t);
+  };
+  apply(scored[0]);
+  void reference;
+  return { starts: scored, apply };
 }
 
 /* Aim. A plan that reaches a world's reach is not the same as a plan that
@@ -686,27 +708,41 @@ export function trimToTarget(state, targetId, horizon){
     if(a.parent === b.id && b.mu > 0) return period(b.mu, (a.a + (b.dockAlt ?? b.radius)) / 2) / 2;
     return Math.max(2, slow);
   })();
+  /* How close counts as arrived. Normally the harbour mouth — but a ship
+     inside a moon's orbit is already within the planet's mouth by distance
+     alone, and calling that "arrived" would make standing still the best plan
+     there is. So it is never more than a good fraction of the gap the ship
+     starts with. */
+  const startGap = dist(shipAbsPos(state), absState(world, targetId, state.t).r);
+  const mouth0 = Math.max(floor, Math.min(mouthOf(targetId), Math.max(floor, startGap * 0.5)));
   const score = () => {
     const pred = plan(state, span);
-    const ca = closestApproach(world, pred, targetId);
+    const ca = closestApproach(world, pred, targetId, Infinity, mouth0);
     if(!ca) return Infinity;
-    /* Going through the target is worse than passing it, so the score bottoms
-       out at the surface; a pass tomorrow beats the same pass a year from now;
-       and a road that is flung about by three other worlds on the way is worse
-       than a quiet one, however pretty its arrival, because the tenth bounce
-       is where a plan stops being something you can rely on. */
-    const soon = ((ca.t - state.t) / Math.max(1, reference)) * floor * 0.8;
+    /* Arriving is not a matter of degree. Either the road comes inside the
+       harbour mouth or it does not, and no amount of being nearly there is
+       worth anything — so a plan that arrives always beats a plan that does
+       not, and only then do sooner, quieter and cheaper decide between them.
+       Scoring the two on one continuous scale kept producing the same absurd
+       answer from opposite directions: a pass six months out because it was a
+       thousand kilometres closer, or no plan at all because standing still is
+       the soonest way to be exactly where you already are.
+
+       The numbers below are in mouths and in reference crossings, so they mean
+       the same thing whether the target is a pebble with a ten-thousand
+       kilometre mouth or a world with a two-hundred-thousand kilometre one. */
+    const mouth = mouth0;
     const bounces = pred.events.filter(e => e.kind === 'soi' && e.t < ca.t && e.to !== targetId).length;
-    /* Flying into something before you get there is not arriving. What the
-       road does afterwards is the pilot's business: every arrival is an
-       unbraked one until the brake is written down. */
     const crash = pred.events.find(e => e.kind === 'crash');
-    const hit = crash && (crash.body === targetId || crash.t <= ca.t + 0.5) ? floor * 40 : 0;
-    /* And between two roads that both arrive, the cheaper one is the better
-       one. A tenth of a harbour mouth per km/s: enough to break a tie, not
-       enough to trade an arrival for a saving. */
-    const spend = (nodeCost(node.__r ?? [1, 0], node.__v ?? [0, 1], node) / auDay(1)) * floor * 0.1;
-    return Math.max(ca.distance, floor) + soon + bounces * floor * 0.25 + hit + spend;
+    if(crash && (crash.body === targetId || crash.t <= ca.t + 0.5)) return 1e9;
+    if(ca.distance > mouth) return 1000 + (ca.distance - mouth) / mouth + bounces * 0.15;
+    /* Time against fuel, which is the tension the whole game is built on. The
+       weights lean towards fuel on purpose: a helper should hand you the
+       thrifty road, because burning more is always available to a pilot who
+       wants to and unburning is not. */
+    const soon = (Math.max(0, ca.t - state.t) / Math.max(1e-9, reference)) * 0.25;
+    const spend = (nodeCost(node.__r ?? [1, 0], node.__v ?? [0, 1], node) / auDay(1)) * 0.1;
+    return soon + spend + bounces * 0.15;
   };
   // Which mark to work on: the last one before the encounter, or a new one.
   let ix = -1;
@@ -731,61 +767,101 @@ export function trimToTarget(state, targetId, horizon){
   const start = score();
   /* Seed from a direct solve where one exists, so the walk below starts beside
      the answer rather than hunting for it. */
-  const seeded = seedFromLambert(state, targetId, node, score);
-  let best = score();
-  if(seeded && !(best < start)){
+  const seed = seedFromLambert(state, targetId, node, score);
+  const seeded = !!seed;
+  if(seeded && !(score() < start)){
     // The guess was worse than what the player already had; keep theirs.
     node.prograde = before.prograde; node.radial = before.radial; node.t = before.t;
     state.nodes.sort((a, c) => a.t - c.t);
-    best = start;
   }
-  if(!Number.isFinite(best) && !added){
+  if(!Number.isFinite(score()) && !added){
     // The plan does not come near it at all; there is nothing to refine.
     return { ok: false, reason: 'This road does not go near it. Aim it roughly first.' };
   }
   /* If the solved guess already arrives inside the harbour mouth there is
      nothing worth a long walk: polish it finely and stop. A button that thinks
      for four seconds reads as a game that has died. */
-  const mouth = target.zoneRadius ?? target.soi ?? floor;
+  const mouthNow = target.zoneRadius ?? target.soi ?? floor;
   const arrived = () => {
-    const ca = closestApproach(world, plan(state, span), targetId);
-    return ca && ca.distance <= mouth;
+    const ca = closestApproach(world, plan(state, span), targetId, Infinity, mouth0);
+    return ca && ca.distance <= mouthNow;
   };
-  const close = seeded && arrived();
-  let step = auDay(close ? 0.004 : 0.05);        // 4 m/s when polishing, 50 to search
-  let tStep = close ? 0.02 : (Number.isFinite(el.period) ? el.period / 6 : 1);
-  const finest = auDay(0.0005);                  // half a metre per second
-  const tFinest = 0.002;                         // about three minutes
-  const budget = close ? 140 : 900;
-  let evaluations = 0;
-  while((step > finest || tStep > tFinest) && evaluations < budget){
-    let improved = false;
-    for(const axis of ['prograde', 'radial']){
-      if(step <= finest) continue;
-      for(const dir of [1, -1]){
-        const was = node[axis];
-        node[axis] = was + dir * step;
-        const s = score();
-        evaluations++;
-        if(s < best - 1e-12){ best = s; improved = true; }
-        else node[axis] = was;
+
+  /* One pass of the hill walk, from wherever the mark is now. Wrapped up so it
+     can be run again from a different guess: the first guess is sometimes one
+     that arrives beautifully six months from now, and the honest answer to
+     "aim for it" is rarely next spring. */
+  /* One budget for the whole aim, spent by whichever walks happen. Each step
+     is a full prediction, and a button that thinks for nine seconds is a
+     button that has hung. */
+  let budgetLeft = 450;
+  const walkFrom = (close, budget) => {
+    budget = Math.min(budget, budgetLeft);
+    let score0 = score();
+    let step = auDay(close ? 0.004 : 0.05);
+    let tStep = close ? 0.02 : (Number.isFinite(el.period) ? el.period / 6 : 1);
+    const finest = auDay(0.0005);
+    const tFinest = 0.002;
+    let evaluations = 0;
+    while((step > finest || tStep > tFinest) && evaluations < budget){
+      let improved = false;
+      for(const axis of ['prograde', 'radial']){
+        if(step <= finest) continue;
+        for(const dir of [1, -1]){
+          const was = node[axis];
+          node[axis] = was + dir * step;
+          const s = score();
+          evaluations++; budgetLeft--;
+          if(s < score0 - 1e-12){ score0 = s; improved = true; }
+          else node[axis] = was;
+        }
       }
-    }
-    if(tStep > tFinest){
-      for(const dir of [1, -1]){
-        const was = node.t;
-        const want = was + dir * tStep;
-        if(want < earliest || want > latest) continue;
-        node.t = want;
-        state.nodes.sort((a, c) => a.t - c.t);
-        const s = score();
-        evaluations++;
-        if(s < best - 1e-12){ best = s; improved = true; }
-        else { node.t = was; state.nodes.sort((a, c) => a.t - c.t); }
+      if(tStep > tFinest){
+        for(const dir of [1, -1]){
+          const was = node.t;
+          const want = was + dir * tStep;
+          if(want < earliest || want > latest) continue;
+          node.t = want;
+          state.nodes.sort((a, c) => a.t - c.t);
+          const s = score();
+          evaluations++; budgetLeft--;
+          if(s < score0 - 1e-12){ score0 = s; improved = true; }
+          else { node.t = was; state.nodes.sort((a, c) => a.t - c.t); }
+        }
       }
+      if(!improved){ step /= 2; tStep /= 2; }
     }
-    if(!improved){ step /= 2; tStep /= 2; }
+    return score0;
+  };
+
+  let best = walkFrom(seeded && arrived(), 340);
+
+  /* Six months to cross between two moons is not what anybody means by "aim
+     for it". When the first guess lands somewhere that slow, try the quickest
+     of the others and keep whichever reads better as an answer to the
+     question that was asked. */
+  const arrivalOf = () => {
+    const ca = closestApproach(world, plan(state, span), targetId, Infinity, mouth0);
+    return ca ? ca.t - state.t : Infinity;
+  };
+  const costNow = () => nodeCost(node.__r ?? [1, 0], node.__v ?? [0, 1], node);
+  if(seed && seed.starts && seed.starts.length > 1 && budgetLeft > 80 && arrivalOf() > reference * 8){
+    const keep = { t: node.t, prograde: node.prograde, radial: node.radial, score: best, when: arrivalOf(), cost: costNow() };
+    const quickest = [...seed.starts].sort((a, b) => a.arrives - b.arrives)[0];
+    seed.apply(quickest);
+    const other = walkFrom(false, budgetLeft);
+    const when = arrivalOf();
+    /* Worth it only if it really is much sooner and not much dearer. Half a
+       year saved is worth some fuel; nine kilometres a second to save a day is
+       not what anybody asked for. */
+    const worthIt = Number.isFinite(other) && when < keep.when * 0.5 && costNow() <= Math.max(keep.cost * 2, auDay(1.5));
+    if(!worthIt){
+      node.t = keep.t; node.prograde = keep.prograde; node.radial = keep.radial;
+      state.nodes.sort((a, c) => a.t - c.t);
+      best = keep.score;
+    }else best = other;
   }
+
   if(!Number.isFinite(best)){
     node.prograde = before.prograde; node.radial = before.radial; node.t = before.t;
     state.nodes.sort((a, c) => a.t - c.t);
@@ -794,7 +870,7 @@ export function trimToTarget(state, targetId, horizon){
   }
   // The score carries penalties; report the distance the player will actually see.
   const pred = plan(state, span);
-  const ca = closestApproach(world, pred, targetId);
+  const ca = closestApproach(world, pred, targetId, Infinity, mouth0);
   delete node.__r; delete node.__v;
   const mine = markStates(state, span).find(m => m.node === node);
   const cost = mine ? mine.cost : nodeMagnitude(node);
@@ -930,7 +1006,9 @@ export function brakeAtKiss(state){
   if(k && k.crashes) return raiseKiss(state);
   if(k && k.inMouth && !k.crashes && k.over > 0 && k.t > state.t + 0.02) return brakeAt(state, k.port, k.t);
   const st = dockingStatus(state);
-  if(st && st.inZone && !st.ok) return brakeAt(state, st.port, state.t + 0.05);
+  // Fourteen minutes' notice rather than an hour: a ship crossing a harbour
+  // mouth at speed does not have an hour.
+  if(st && st.inZone && !st.ok) return brakeAt(state, st.port, state.t + 0.01);
   return -1;
 }
 
@@ -944,9 +1022,14 @@ function brakeAt(state, portId, t){
   const rel = sub(s.v, port.v);
   const speed = norm(rel);
   const gap = dist(s.r, port.r);
+  /* Brake all the way to a parked orbit rather than to the harbour's speed
+     limit. The limit is what the port will accept, but a ship left at the
+     limit is still crossing the mouth and will be out the other side in an
+     hour; a ship at the speed of a circle stays where it is and can tie up at
+     its leisure. The difference is a few tens of metres a second. */
   const parked = b.mu > 0 ? Math.sqrt(b.mu / Math.max(gap, b.radius)) : 0;
-  const target = parked + b.dockSpeed * 0.7;
-  if(speed <= target) return -1;
+  const target = parked;
+  if(speed <= target + b.dockSpeed * 0.25) return -1;
   const dv = scale(unit(rel), -(speed - target));
   const parts = nodeFromVector(s.r, s.v, dv);
   if(!parts) return -1;
@@ -1643,7 +1726,9 @@ export function restore(json){
     if(!Number.isFinite(s[k])) bad(`${k} is ${s[k]}`);
   }
   if(s.dockedAt != null && !PORTS[s.dockedAt]) bad(`it is docked at "${s.dockedAt}", which is not a port`);
-  if(!Array.isArray(s.nodes) || s.nodes.some(n => !n || !Number.isFinite(n.t))) bad('its plan is not a list of marks');
+  if(!Array.isArray(s.nodes) || s.nodes.some(n => !n || !Number.isFinite(n.t)
+    || (n.prograde != null && !Number.isFinite(n.prograde))
+    || (n.radial != null && !Number.isFinite(n.radial)))) bad('its plan is not a list of marks');
   if(!Array.isArray(s.cargo) || s.cargo.some(c => !c || !goodById(c.good) || !Number.isFinite(c.qty))) bad('its hold holds something unknown');
   if(!Array.isArray(s.passengers)) bad('its passenger list is not a list');
   if(!s.tiers || ['tank', 'engine', 'hold'].some(k => !tiers(k)[s.tiers[k]])) bad('it is fitted with something this game does not have');
@@ -1661,11 +1746,25 @@ export function restore(json){
 }
 
 /* Everything a target readout wants: the approach, the slow-road comparison. */
+/* How close counts as having got there. A port says so itself — that is what
+ * its harbour mouth is. A world with no port on it, like Grumm, is reached by
+ * coming properly inside its reach rather than by grazing the edge of it: the
+ * whole sphere of influence is not an arrival, it is a doorway. */
+export function mouthOf(id){
+  const b = world.get(id);
+  if(!b) return 0;
+  if(b.zoneRadius) return b.zoneRadius;
+  if(b.soi) return b.soi * 0.1;
+  return Math.max(b.radius * 3, 1e-6);
+}
+
 export function approachTo(state, prediction, targetId){
   if(!targetId || !prediction) return null;
   const tb = world.get(targetId);
   const within = tb.soi ?? (tb.zoneRadius ? tb.zoneRadius * 40 : 0.5);
-  return closestApproach(world, prediction, targetId, Math.max(within, 0.05) * 3);
+  // The first pass that reaches the harbour mouth is the arrival; a nearer one
+  // three laps later is not what anybody means by "closest approach".
+  return closestApproach(world, prediction, targetId, Math.max(within, 0.05) * 3, mouthOf(targetId));
 }
 
 export { elementsFromState, propagate, absState, railState, predict, norm, sub, add, scale, unit, perp, dist, hohmann };

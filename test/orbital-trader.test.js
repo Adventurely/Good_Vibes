@@ -539,8 +539,11 @@ test('aiming reaches every port in the system from a Tessel orbit', () => {
     const r = S.trimToTarget(s, to, 12000);
     const tb = world.get(to);
     assert.ok(r.ok, `${to}: ${r.reason}`);
-    const mouth = tb.zoneRadius ?? tb.soi;
+    // What counts as arrived is the game's own idea of it: a port's harbour
+    // mouth, or properly inside the reach of a world that has no port on it.
+    const mouth = S.mouthOf(to);
     assert.ok(r.distance <= mouth, `${to}: near pass ${r.distance} outside ${mouth}`);
+    void tb;
     assert.ok(r.cost <= S.auDay(40) * 0.85, `${to}: ${S.fmtKms(r.cost)} is more than the deep tank affords`);
   }
   // A moon of another planet is two journeys, and the game says so rather than flailing.
