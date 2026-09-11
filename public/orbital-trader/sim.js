@@ -564,8 +564,14 @@ function finalLeg(pred){
 }
 const settled = pred => pred.segments.some(sg => sg.reason === 'crash' || sg.reason === 'partial');
 
-export function planImmediate(state){
+/* `flown` false draws the road the ship is on *now*, as if nothing were
+ * written down: that is what the chart shows when no burn is open, so the
+ * white line is always one honest lap of where you actually are. Open a burn
+ * and the plan comes back, in yellow. */
+export function planImmediate(state, flown = true){
   if(state.dockedAt) return null;
+  const bare = flown ? state : { ...state, nodes: [] };
+  if(!flown) return planImmediate(bare, true);
   const b = world.get(state.ship.body);
   const el = elementsFromState(b.mu, state.ship.r, state.ship.v);
   const lastNode = state.nodes.length ? state.nodes[state.nodes.length - 1].t : state.t;

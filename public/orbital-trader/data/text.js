@@ -491,22 +491,22 @@ export const NARRATIVE = {
   {
    "step": "mark",
    "title": "Tap your path",
-   "body": "You are already in orbit around Tessel, with a crate for Pip in the hold. Tap the bright line you are riding and choose 'Burn here'. That puts a mark on it: a burn written down for later. Nothing is spent yet, and you can move it or scrap it."
+   "body": "You are already in orbit around Tessel, with a crate for Pip in the hold. Tap the white line you are riding and choose 'Plan a burn'. That puts a mark on it: a burn that fires by itself when the clock reaches it. Nothing is spent yet, and you can change it or scrap it."
   },
   {
    "step": "push",
    "title": "Press the green arrow",
-   "body": "Prograde pushes you forward and lifts the far side of your orbit. Press it until the far side of your path reaches out to Pip's circle. Retrograde, the orange one, takes it back."
+   "body": "Forward pushes you along the way you are already going and lifts the far side of your orbit. Back takes it down again. Out and In swing it sideways. Watch the yellow dashed line move as you press."
   },
   {
-   "step": "aim",
-   "title": "Line it up with Pip",
-   "body": "Open Target, pick Pip, and press Aim for it. That tidies the last few metres per second so your path runs into Pip's reach instead of past it."
+   "step": "reach",
+   "title": "Push until the dashed line touches Pip",
+   "body": "The yellow dashed line is where the burn would put you. Keep pressing Forward, and nudge Out or In, until it runs into Pip's circle. Press Done when it does, and the dashed line puts itself away."
   },
   {
    "step": "skip",
    "title": "Let the clock run to it",
-   "body": "Tap your road where the burn sits, or press 'Skip to it' on the burn's card. The game tells you how long the wait is, runs the sky at whatever speed covers it in about ten seconds, and stops itself a moment before the burn so you can watch it go."
+   "body": "Tap your road ahead of the burn and choose 'Warp here'. The game tells you how long the wait is, runs the sky at whatever speed covers it in about ten seconds, and stops itself a moment before the burn so you can watch it fire."
   },
   {
    "step": "dock",

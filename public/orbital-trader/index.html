@@ -13,6 +13,22 @@
      plays on. A picture of the game would go stale the first time somebody
      moved a moon. The chart is drawn on paper now rather than on black, the
      way a star chart is, so the page and the sky are the same colour. */
+  /* Orbital Trader is played on the night side. The site's paper look is
+     right for a greenhouse and wrong for a star chart: a road drawn on
+     paper is a line among other lines, and a road drawn on black is the
+     only thing there. So this page keeps the site's names and its type and
+     re-points every colour at the dark. */
+  :root{
+    --gv-paper:#000000; --gv-paper-2:#0e1119; --gv-sunk:#171b26;
+    --gv-line:#2a3048; --gv-line-2:#3b4468;
+    --gv-text:#f5ead6; --gv-muted:#a99e8c; --gv-faint:#7b7261;
+    --gv-leaf:#6cc24a; --gv-leaf-soft:#6cc24a;
+    --gv-sun:#ffd23f; --gv-gold:#ffd23f; --gv-gold-deep:#f59a2e;
+    --gv-sky:#5aa6e8; --gv-bad:#ff5f5f;
+    --gv-glass:rgba(10,12,18,.86); --gv-glass-2:rgba(14,17,26,.94);
+    --gv-shadow:0 10px 30px rgba(0,0,0,.55);
+    --gv-ground:#000000;
+  }
   :root{
     --space:var(--gv-paper); --ink:var(--gv-text); --muted:var(--gv-muted); --faint:var(--gv-faint);
     --gold:var(--gv-gold); --gold-deep:var(--gv-gold-deep); --mint:#1f8f7a; --line:var(--gv-line);
@@ -31,8 +47,8 @@
     /* Enough to read the words over, not so much that the sky behind them
        turns into a dark rectangle. */
     background:
-      linear-gradient(180deg, rgba(244,239,228,.72) 0%, rgba(244,239,228,.12) 34%, rgba(244,239,228,.12) 62%, rgba(244,239,228,.92) 100%),
-      radial-gradient(70% 46% at 50% 30%, rgba(244,239,228,.70) 0%, rgba(244,239,228,0) 100%);
+      linear-gradient(180deg, rgba(0,0,0,.72) 0%, rgba(0,0,0,.15) 34%, rgba(0,0,0,.15) 62%, rgba(0,0,0,.92) 100%),
+      radial-gradient(70% 46% at 50% 30%, rgba(0,0,0,.55) 0%, rgba(0,0,0,0) 100%);
   }
   main{
     position:fixed; inset:0; z-index:2;

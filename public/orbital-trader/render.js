@@ -37,54 +37,56 @@ import { absState, railState, unit, norm, add, sub, scale, perp, dist, propagate
  * that anything drawn as a line or a label is dark enough to read on the
  * paper; anything drawn as a glow or a fill is a tint of it. */
 export const PALETTE = {
-  space:      '#f4efe4',
-  spaceEdge:  '#e3d8c2',
-  star:       '#f59a2e',
-  starCore:   '#ffd23f',
-  starGlow:   'rgba(245,154,46,0.28)',
-  orbit:      'rgba(42,33,24,0.16)',
-  orbitMoon:  'rgba(42,33,24,0.26)',
-  orbitFocus: 'rgba(42,33,24,0.38)',
-  soi:        'rgba(200,110,20,0.06)',
-  soiEdge:    'rgba(200,110,20,0.45)',
-  zone:       'rgba(43,117,48,0.65)',
-  zoneFill:   'rgba(43,117,48,0.12)',
-  zoneFast:   'rgba(200,97,26,0.9)',
-  belt:       'rgba(122,104,88,0.55)',
-  beltBand:   'rgba(122,104,88,0.10)',
+  space:      '#000000',
+  spaceEdge:  '#000000',
+  star:       '#ffd23f',
+  starCore:   '#fff1b8',
+  starGlow:   'rgba(245,154,46,0.22)',
+  orbit:      'rgba(245,234,214,0.13)',
+  orbitMoon:  'rgba(245,234,214,0.20)',
+  orbitFocus: 'rgba(245,234,214,0.30)',
+  soi:        'rgba(245,154,46,0.05)',
+  soiEdge:    'rgba(245,154,46,0.30)',
+  zone:       'rgba(108,194,74,0.55)',
+  zoneFill:   'rgba(108,194,74,0.12)',
+  zoneFast:   'rgba(245,154,46,0.8)',
+  belt:       'rgba(122,104,88,0.6)',
+  beltBand:   'rgba(122,104,88,0.08)',
   debris:     'rgba(107,95,79,0.9)',
-  path:       ['#b8720c', '#2b7530', '#20629f', '#7a4fb5', '#c8611a', '#1f8f7a'],
-  /* The road has exactly three voices: the orbit you are on, the orbit your
-     burns put you on, and the orbit waiting on the far side of the next
-     crossing. Three colours, never a rotating palette — the colour has to
-     mean the same thing every time you look at it. */
-  pathNow:    '#b8720c',
-  pathPlan:   '#2b7530',
-  pathNext:   '#7a4fb5',
-  pathDim:    'rgba(143,92,5,0.35)',
-  pathShort:  'rgba(111,97,85,0.6)',
-  apsis:      '#2a2118',
-  crossing:   '#7a4fb5',
-  ship:       '#2a2118',
-  shipEdge:   '#f4efe4',
-  node:       '#b8720c',
-  nodeRing:   'rgba(184,114,12,0.5)',
-  prograde:   '#2b7530',
-  retrograde: '#c8611a',
-  radial:     '#20629f',
-  marker:     '#2a2118',
-  ghost:      'rgba(42,33,24,0.5)',
-  text:       '#2a2118',
-  textDim:    'rgba(42,33,24,0.62)',
-  crash:      '#b5372a',
-  atmo:       'rgba(122,79,181,0.16)',
-  emberkin:   '#c8611a',
-  otter:      '#2b7530',
-  cat:        '#8a6a3a',
-  frog:       '#2d7fb3',
-  chorus:     '#7a4fb5',
-  mixed:      '#b8720c',
-  none:       '#8a7d6b',
+  /* The road is white. Everything else on this chart is dim, coloured or
+     small, so the one line you are riding is the only bright thing in the
+     sky — and when a burn is being edited, the road it would put you on is
+     the one other thing: yellow, and dashed, so you can see which is which
+     without reading a legend. */
+  path:       ['#ffffff', '#ffd23f', '#ffd23f', '#ffd23f', '#ffd23f', '#ffd23f'],
+  pathNow:    '#ffffff',
+  pathPlan:   '#ffd23f',
+  pathNext:   '#ffffff',
+  pathDim:    'rgba(255,255,255,0.30)',
+  pathShort:  'rgba(160,150,135,0.7)',
+  apsis:      '#ffffff',
+  crossing:   '#ffffff',
+  ship:       '#ffffff',
+  shipEdge:   '#000000',
+  shipHalo:   'rgba(255,255,255,0.22)',
+  node:       '#ffd23f',
+  nodeRing:   'rgba(255,210,63,0.7)',
+  prograde:   '#6cc24a',
+  retrograde: '#f59a2e',
+  radial:     '#5aa6e8',
+  marker:     '#ffffff',
+  ghost:      'rgba(245,234,214,0.55)',
+  text:       '#f5ead6',
+  textDim:    'rgba(245,234,214,0.6)',
+  crash:      '#ff5f5f',
+  atmo:       'rgba(139,107,214,0.18)',
+  emberkin:   '#ff8c42',
+  otter:      '#6cc24a',
+  cat:        '#e9dcc0',
+  frog:       '#5fb9e6',
+  chorus:     '#b48cff',
+  mixed:      '#ffd23f',
+  none:       '#9a948a',
 };
 
 export const speciesColour = s => PALETTE[s] ?? PALETTE.none;
@@ -106,11 +108,12 @@ export function createChart(canvas, world, opts = {}){
   const chart = {
     canvas, ctx, world,
     width: 0, height: 0, dpr: 1,
-    /* `follow` is not a preference. The chart is always centred on the body
-       whose reach the ship is in — the smallest one holding it — and it
-       changes when that changes. Panning is not offered: a view that can be
-       lost is a view somebody has to get back. */
-    camera: { cx: 0, cy: 0, zoom: 240, follow: null },
+    /* The chart is centred on the ship. That is where you are, and a player
+       who has to hunt for their own dot has already lost the thread. Tapping
+       a body centres on that instead, until you tap back to the ship or the
+       ship changes which world it is going round. Panning is not offered: a
+       view that can be lost is a view somebody has to get back. */
+    camera: { cx: 0, cy: 0, zoom: 240, follow: 'ship' },
     /* Screen-pixel shift of the follow centre: negative x when a panel covers
        the right of the chart, negative y when a sheet covers the bottom. */
     offset: [0, 0],
@@ -203,12 +206,6 @@ function draw(chart, view){
   const pos = new Map();
   for(const b of world.bodies) pos.set(b.id, absState(world, b.id, t));
 
-  /* The lock. The centre of the chart is the body the ship is going round —
-     the smallest reach containing it — unless a page has asked for something
-     else on purpose (the title screen turns about the Lamp). */
-  if(view.lockTo && pos.has(view.lockTo)){
-    camera.follow = view.lockTo;
-  }
   if(camera.follow === 'ship' && view.shipAbs){
     camera.cx = view.shipAbs.r[0]; camera.cy = view.shipAbs.r[1];
   }else if(camera.follow && pos.has(camera.follow)){
@@ -410,20 +407,21 @@ function drawBodies(chart, view, pos, t){
       ctx.strokeStyle = colour; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(p[0], p[1], rpx + 3, 0, Math.PI * 2); ctx.stroke();
     }
-    if(view.target === b.id){
+    // The body the chart is centred on wears a ring, so "what am I looking
+    // at" is answered by the picture rather than by a panel.
+    if(camera.follow === b.id){
       ctx.strokeStyle = PALETTE.marker; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(p[0], p[1], rpx + 7, 0, Math.PI * 2); ctx.stroke();
-      crosshair(ctx, p, rpx + 7);
     }
     chart.hits.bodies.push({ id: b.id, x: p[0], y: p[1], r: Math.max(rpx, 10), drawn: rpx });
 
     // Labels: planets always; moons when their orbit is drawn; zones when
     // they are more than a dot. Never over another label.
-    const wantLabel = b.kind === 'star' || b.kind === 'planet' || view.target === b.id || camera.follow === b.id
+    const wantLabel = b.kind === 'star' || b.kind === 'planet' || camera.follow === b.id
       || (b.parent && b.a * zoom > 28);
     if(!wantLabel) continue;
     const text = labelFor(b);
-    ctx.font = (view.target === b.id ? '600 ' : '') + '12px ui-sans-serif, system-ui, sans-serif';
+    ctx.font = (camera.follow === b.id ? '600 ' : '') + '12px ui-sans-serif, system-ui, sans-serif';
     const w = ctx.measureText(text).width + 8;
     const cand = [
       [p[0] + rpx + 6, p[1] - 6], [p[0] + rpx + 6, p[1] + 14], [p[0] - w - rpx - 2, p[1] - 6], [p[0] - w / 2 + 4, p[1] - rpx - 8],
@@ -436,7 +434,7 @@ function drawBodies(chart, view, pos, t){
       if(!placed.some(o => o.x < box.x + box.w && o.x + o.w > box.x && o.y < box.y + box.h && o.y + o.h > box.y)){ spot = c; placed.push(box); break; }
     }
     if(!spot) continue;
-    ctx.fillStyle = view.target === b.id ? PALETTE.text : PALETTE.textDim;
+    ctx.fillStyle = camera.follow === b.id ? PALETTE.text : PALETTE.textDim;
     ctx.fillText(text, spot[0], spot[1]);
   }
   void t;
@@ -467,29 +465,31 @@ function crosshair(ctx, p, r){
  * plan reads as "this, then that"; a leg after a burn the tank cannot pay for
  * is drawn grey. */
 function drawPrediction(chart, view, pos){
-  const { ctx, world, camera } = chart;
+  const { ctx } = chart;
   const pred = view.prediction;
-  const afterFrom = pred.afterFrom ?? pred.segments.length;
   const burns = pred.events.filter(e => e.kind === 'burn');
   let burnIx = 0;
   let short = false;
+  /* Two lines, and the eye should never have to work out which is which.
+     White and solid is the road you are on. Yellow and dashed is the road the
+     burn you are editing would put you on — and it is drawn only while you
+     are editing it, so a chart with nothing open has exactly one line on it. */
+  const editing = !!view.editing;
+  const afterBurnAt = si => pred.segments.slice(0, si).some(sg => sg.reason === 'burn');
   for(let si = 0; si < pred.segments.length; si++){
     const seg = pred.segments[si];
-    const anchor = pos.get(seg.body).r;
+    const anchor = pos.get(seg.body)?.r;
     const pts = seg.points;
-    if(!pts.length) continue;
+    if(!anchor || !pts.length) continue;
     if(si > 0 && pred.segments[si - 1].reason === 'burn'){
       const b = burns[burnIx++];
       if(b && b.short) short = true;
     }
-    /* Three voices. Before the first burn is the orbit you are already on;
-       after it is the orbit you have written down; past the crossing is a
-       different world's orbit entirely. */
-    const past = si >= afterFrom;
-    const planned = !past && si > 0;
-    ctx.strokeStyle = short ? PALETTE.pathShort : past ? PALETTE.pathNext : planned ? PALETTE.pathPlan : PALETTE.pathNow;
-    ctx.lineWidth = short ? 1 : past ? 1.5 : 2;
-    ctx.setLineDash(past ? [7, 5] : []);
+    const afterBurn = afterBurnAt(si);
+    if(afterBurn && !editing) continue;          // put away until a burn is open
+    ctx.strokeStyle = short ? PALETTE.pathShort : afterBurn ? PALETTE.pathPlan : PALETTE.pathNow;
+    ctx.lineWidth = afterBurn ? 1.75 : 2;
+    ctx.setLineDash(afterBurn ? [7, 5] : []);
     ctx.beginPath();
     const screenPts = [];
     for(let i = 0; i < pts.length; i++){
@@ -503,81 +503,71 @@ function drawPrediction(chart, view, pos){
 
     if(seg.reason === 'crash'){
       const endS = chart.toScreen(add(anchor, seg.r1));
-      ctx.strokeStyle = PALETTE.crash; ctx.lineWidth = 2;
+      ctx.strokeStyle = PALETTE.crash; ctx.lineWidth = 2.5;
       ctx.beginPath();
-      ctx.moveTo(endS[0] - 5, endS[1] - 5); ctx.lineTo(endS[0] + 5, endS[1] + 5);
-      ctx.moveTo(endS[0] + 5, endS[1] - 5); ctx.lineTo(endS[0] - 5, endS[1] + 5);
+      ctx.moveTo(endS[0] - 6, endS[1] - 6); ctx.lineTo(endS[0] + 6, endS[1] + 6);
+      ctx.moveTo(endS[0] + 6, endS[1] - 6); ctx.lineTo(endS[0] - 6, endS[1] + 6);
       ctx.stroke();
     }
   }
-
-  drawApses(chart, view, pos);
-  drawCrossing(chart, view, pos);
-
-  // Closest approach to the target: the ship's point on its leg, the target's
-  // ghost where it will be, both in that leg's frame.
-  const ca = view.approach;
-  if(ca && ca.segBody && pos.has(ca.segBody)){
-    const anchor = pos.get(ca.segBody).r;
-    const shipS = chart.toScreen(add(anchor, ca.shipLocal));
-    const tgS = chart.toScreen(add(anchor, ca.targetLocal));
-    ctx.strokeStyle = PALETTE.ghost; ctx.lineWidth = 1; ctx.setLineDash([2, 3]);
-    ctx.beginPath(); ctx.moveTo(shipS[0], shipS[1]); ctx.lineTo(tgS[0], tgS[1]); ctx.stroke();
-    ctx.setLineDash([]);
-    const tb = world.get(view.target);
-    const rpx = Math.max(3, (tb?.radius ?? 0) * camera.zoom);
-    ctx.beginPath(); ctx.arc(tgS[0], tgS[1], rpx + 2, 0, Math.PI * 2); ctx.stroke();
-    ctx.fillStyle = PALETTE.marker; diamond(ctx, shipS, 3.5);
-    if(ca.label){
-      ctx.fillStyle = PALETTE.text; ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
-      ctx.fillText(ca.label, tgS[0] + rpx + 6, tgS[1] - 6);
-    }
-  }
+  drawApses(chart, view, pos, afterBurnAt);
+  drawCrossing(chart, view, pos, afterBurnAt);
 }
 
-/* The two marks that describe an orbit at a glance: the low point and the
- * high point. A filled dot sits at the low one, a hollow ring at the high
- * one, and both carry their height so the numbers a pilot steers by are on
- * the chart rather than in a panel. */
-function drawApses(chart, view, pos){
-  const { ctx, camera } = chart;
+/* The marks on a road, each one a shape you can name without a legend:
+ *
+ *   low point    a filled disc      — the bottom of the orbit
+ *   high point   a hollow ring      — the top of it
+ *   crossing     a chevron in a ring — a door out of one world into another
+ *   burn         a ring with the four directions round it (drawNodes)
+ */
+function drawApses(chart, view, pos, afterBurnAt){
+  const { ctx } = chart;
   if(!view.apses) return;
   ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
   for(const a of view.apses){
     const seg = view.prediction.segments[a.segIndex];
     if(!seg || !pos.has(seg.body)) continue;
+    const afterBurn = afterBurnAt(a.segIndex);
+    if(afterBurn && !view.editing) continue;     // a mark on a road that is not drawn
     const p = chart.toScreen(add(pos.get(seg.body).r, a.r));
     if(p[0] < -60 || p[1] < -30 || p[0] > chart.width + 60 || p[1] > chart.height + 30) continue;
-    const dim = a.segIndex >= (view.prediction.afterFrom ?? 1e9);
-    ctx.strokeStyle = ctx.fillStyle = dim ? PALETTE.pathNext : PALETTE.apsis;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(p[0], p[1], 4, 0, Math.PI * 2);
+    const colour = afterBurn ? PALETTE.pathPlan : PALETTE.apsis;
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = ctx.fillStyle = colour;
+    ctx.beginPath(); ctx.arc(p[0], p[1], 4.5, 0, Math.PI * 2);
     if(a.kind === 'periapsis') ctx.fill(); else ctx.stroke();
-    if(a.label){
-      ctx.fillStyle = dim ? PALETTE.pathNext : PALETTE.text;
-      ctx.fillText(a.label, p[0] + 8, p[1] + 4);
-    }
+    if(a.label) ctx.fillText(a.label, p[0] + 9, p[1] + 4);
   }
 }
 
-/* Where this road leaves one world's reach for another's: the single event
- * the chart promises to show, so it gets a mark you cannot miss. */
-function drawCrossing(chart, view, pos){
+/* Where this road leaves one world's reach for another's: a chevron pointing
+ * the way you are going, inside a ring. */
+function drawCrossing(chart, view, pos, afterBurnAt){
   const { ctx, world } = chart;
   const c = view.prediction?.crossing;
   if(!c) return;
   const seg = view.prediction.segments[c.segIndex];
   if(!seg || !pos.has(seg.body)) return;
-  const p = chart.toScreen(add(pos.get(seg.body).r, seg.r1));
-  ctx.strokeStyle = PALETTE.crossing; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.arc(p[0], p[1], 7, 0, Math.PI * 2); ctx.stroke();
-  ctx.fillStyle = PALETTE.crossing;
-  diamond(ctx, p, 3.5);
+  const afterBurn = afterBurnAt(c.segIndex);
+  if(afterBurn && !view.editing) return;
+  const colour = afterBurn ? PALETTE.pathPlan : PALETTE.crossing;
+  const anchor = pos.get(seg.body).r;
+  const p = chart.toScreen(add(anchor, seg.r1));
+  const n = seg.points.length;
+  const prev = n > 1 ? chart.toScreen(add(anchor, seg.points[n - 2])) : [p[0] - 1, p[1]];
+  const ang = Math.atan2(p[1] - prev[1], p[0] - prev[0]);
+  ctx.strokeStyle = colour; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(p[0], p[1], 8, 0, Math.PI * 2); ctx.stroke();
+  ctx.save();
+  ctx.translate(p[0], p[1]); ctx.rotate(ang);
+  ctx.beginPath(); ctx.moveTo(-2.5, -4); ctx.lineTo(2.5, 0); ctx.lineTo(-2.5, 4); ctx.stroke();
+  ctx.restore();
   const to = c.to ? world.get(c.to) : null;
   if(!to) return;
   ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
   ctx.fillStyle = PALETTE.text;
-  ctx.fillText(`${c.kind === 'exit' ? 'out to' : 'into'} ${labelFor(to)}`, p[0] + 11, p[1] + 4);
+  ctx.fillText(`${c.kind === 'exit' ? 'out to' : 'into'} ${labelFor(to)}`, p[0] + 12, p[1] + 4);
 }
 
 function diamond(ctx, p, r){
@@ -600,6 +590,10 @@ function drawShip(chart, view){
   ctx.fillStyle = PALETTE.ship; ctx.fill();
   ctx.strokeStyle = PALETTE.shipEdge; ctx.lineWidth = 1; ctx.stroke();
   ctx.restore();
+  /* A faint halo, so the ship is findable at a glance against a field of
+     stars that are the same colour and nearly the same size. */
+  ctx.strokeStyle = PALETTE.shipHalo; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(p[0], p[1], 15, 0, Math.PI * 2); ctx.stroke();
   if(view.docked){
     ctx.strokeStyle = PALETTE.zone; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(p[0], p[1], 12, 0, Math.PI * 2); ctx.stroke();

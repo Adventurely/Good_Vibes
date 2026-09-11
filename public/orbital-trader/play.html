@@ -16,11 +16,27 @@
      `--gold-ink`, the darker tone that reads on paper; the bright one
      measured 1.7:1 and was a highlighter, not a word. The mint, the rose and
      the sky are likewise the ink versions of the lights they were. */
+  /* Orbital Trader is played on the night side. The site's paper look is
+     right for a greenhouse and wrong for a star chart: a road drawn on
+     paper is a line among other lines, and a road drawn on black is the
+     only thing there. So this page keeps the site's names and its type and
+     re-points every colour at the dark. */
+  :root{
+    --gv-paper:#000000; --gv-paper-2:#0e1119; --gv-sunk:#171b26;
+    --gv-line:#2a3048; --gv-line-2:#3b4468;
+    --gv-text:#f5ead6; --gv-muted:#a99e8c; --gv-faint:#7b7261;
+    --gv-leaf:#6cc24a; --gv-leaf-soft:#6cc24a;
+    --gv-sun:#ffd23f; --gv-gold:#ffd23f; --gv-gold-deep:#f59a2e;
+    --gv-sky:#5aa6e8; --gv-bad:#ff5f5f;
+    --gv-glass:rgba(10,12,18,.86); --gv-glass-2:rgba(14,17,26,.94);
+    --gv-shadow:0 10px 30px rgba(0,0,0,.55);
+    --gv-ground:#000000;
+  }
   :root{
     --space:var(--gv-paper); --glass:var(--gv-glass); --glass-2:var(--gv-glass-2);
     --line:var(--gv-line); --line-2:var(--gv-line-2);
     --ink:var(--gv-text); --dim:var(--gv-muted); --faint:var(--gv-faint);
-    --gold:var(--gv-gold); --gold-2:var(--gv-gold-deep); --gold-ink:var(--gv-sun);
+    --gold:var(--gv-gold); --gold-2:var(--gv-gold-deep); --gold-ink:var(--gv-gold);
     --mint:#1f8f7a; --rose:#b5372a; --sky:var(--gv-sky); --leaf:var(--gv-leaf);
     --bad:var(--gv-bad);
     --emberkin:#c8611a; --otter:var(--gv-leaf); --cat:#8a6a3a; --frog:#2d7fb3; --chorus:#7a4fb5;
@@ -45,7 +61,7 @@
     position:fixed; top:0; left:0; right:0; z-index:5;
     display:flex; flex-wrap:wrap; gap:.35rem .9rem; align-items:center;
     padding:.45rem .8rem; padding-top:max(.45rem, env(safe-area-inset-top));
-    background:linear-gradient(180deg, rgba(244,239,228,.94), rgba(244,239,228,.6) 80%, transparent);
+    background:linear-gradient(180deg, rgba(0,0,0,.92), rgba(0,0,0,.6) 80%, transparent);
     pointer-events:none; font-variant-numeric:tabular-nums;
   }
   #hud > *{ pointer-events:auto; }
@@ -198,6 +214,16 @@
   dialog p.say{ color:var(--ink); font-style:italic; border-left:2px solid var(--gold-2); padding-left:.7rem; }
   dialog .btns{ margin-top:1rem; justify-content:flex-end; }
 
+  /* The burn editor sits over the chart, left of the panel, so the road it
+     is changing stays in view while it is open. */
+  #burncard{
+    position:fixed; left:.8rem; bottom:calc(.8rem + env(safe-area-inset-bottom)); z-index:8;
+    width:min(92vw, 320px); background:var(--glass-2); border:1px solid var(--gold-2);
+    border-radius:14px; padding:.6rem .7rem; box-shadow:var(--gv-shadow); backdrop-filter:blur(10px);
+  }
+  #burncard .burnhead{ display:flex; align-items:baseline; gap:.5rem; margin-bottom:.4rem; }
+  #burncard .burnhead small{ color:var(--dim); font-size:.76rem; flex:1 1 auto; }
+  #burncard .btns{ margin-top:.5rem; }
   #dockcard{
     position:fixed; left:50%; bottom:calc(64px + env(safe-area-inset-bottom)); transform:translateX(-50%); z-index:7;
     width:min(92vw, 440px); background:var(--glass-2); border:1px solid var(--line-2); border-radius:12px;
@@ -210,6 +236,10 @@
   #dockcard[hidden]{ display:none; }
   /* The lesson steps aside when there is a dock to take. */
   #dockcard:not([hidden]) ~ #tut{ bottom:calc(150px + env(safe-area-inset-bottom)); }
+  /* The burn editor owns the bottom-left while it is open; the lesson and the
+     dock card step up over it rather than under it. */
+  body.editing #tut, body.editing #dockcard{ bottom:calc(340px + env(safe-area-inset-bottom)); }
+  @media (max-width: 760px){ body.editing #tut{ display:none; } }
 
   /* Centred on the chart rather than on the window, so that with the panel
      open they do not slide under it. */
@@ -265,6 +295,7 @@
 
     /* Bottom cards, stacked: the docking card closest to the thumb. */
     #dockcard{ left:.5rem; right:.5rem; transform:none; width:auto; bottom:calc(.6rem + env(safe-area-inset-bottom)); }
+    #burncard{ left:.5rem; right:.5rem; width:auto; bottom:calc(.6rem + env(safe-area-inset-bottom)); }
     #tut{ left:.5rem; right:.5rem; transform:none; width:auto; bottom:calc(.6rem + env(safe-area-inset-bottom)); }
     #dockcard:not([hidden]) ~ #tut{ bottom:calc(7.4rem + env(safe-area-inset-bottom)); }
     #tut p{ font-size:.84rem; }
@@ -292,6 +323,8 @@
   <div class="stat" id="where"><small>Where</small><b id="h-where">—</b><span id="dockhint"></span></div>
 </header>
 <a id="back" href="./">&larr; title</a>
+
+<div id="burncard" hidden></div>
 
 <div id="view">
   <button id="w-pause" aria-pressed="false" title="Hold the clock (space)">&#10074;&#10074;</button>
@@ -327,7 +360,7 @@
 <dialog id="modal"></dialog>
 
 <script type="module">
-import { createChart, PALETTE, locateOnPrediction, approachForChart, fmtAu, bodyColour } from './render.js';
+import { createChart, PALETTE, locateOnPrediction, fmtAu, bodyColour } from './render.js';
 import * as S from './sim.js';
 import { CONST, PORTS, GOODS, UPGRADES, TEXT, SPECIES, GLOSSARY, BELT_ROCKS, ARC_DEBRIS } from './content.js';
 import { segmentApses, norm, sub, add, unit, dist, absState, elementsFromState } from './orbit.js';
@@ -387,7 +420,7 @@ addEventListener('resize', refreshInsets);
 const belt = { inner: CONST.BELT.inner, outer: CONST.BELT.outer, rocks: BELT_ROCKS, debris: ARC_DEBRIS };
 addEventListener('resize', () => chart.resize());
 
-let prediction = null, nodePositions = [], approach = null, apses = [], predictedAt = -1, predictedReal = -1e9;
+let prediction = null, nodePositions = [], apses = [], predictedAt = -1, predictedReal = -1e9;
 let selectedNode = -1;
 let panelOpen = innerWidth > 760;
 let tab = null;
@@ -403,18 +436,11 @@ function horizonFor(){
   else h = Math.max(h, 120);
   if(state.nodes.length) h = Math.max(h, state.nodes[state.nodes.length - 1].t - state.t + Math.max(90, Number.isFinite(el.period) ? el.period : 0));
   if(b.id === 'lamp') h = Math.max(h, 900);
-  if(state.target){
-    const tb = world.get(state.target);
-    if(tb.parent === 'lamp' && b.id === 'lamp'){
-      const hh = S.slowRoad(state, state.target);
-      if(hh) h = Math.max(h, hh.time * 1.4);
-    }
-  }
   return Math.min(h, 5000);
 }
 
 function replan(force = false){
-  if(state.dockedAt){ prediction = null; nodePositions = []; approach = null; apses = []; return; }
+  if(state.dockedAt){ prediction = null; nodePositions = []; apses = []; return; }
   /* Re-solving the whole road is the most expensive thing this page does, so
      it happens on a real-time budget rather than a game-time one: at most a few
      times a second, whatever the warp. Measuring it in game days got it wrong
@@ -426,8 +452,12 @@ function replan(force = false){
   if(!force && predictedAt >= 0 && nowReal - predictedReal < 280) return;
   predictedReal = nowReal;
   predictedAt = state.t;
-  prediction = S.planImmediate(state);
-  if(!prediction){ nodePositions = []; approach = null; apses = []; return; }
+  /* Editing a burn is what puts the planned road on the chart. With nothing
+     open, the road drawn is the one the ship is actually on — a whole lap of
+     it, not the stub that ends where a burn happens to sit. */
+  const editing = selectedNode >= 0 && !!state.nodes[selectedNode];
+  prediction = S.planImmediate(state, editing);
+  if(!prediction){ nodePositions = []; apses = []; return; }
   nodePositions = state.nodes.map(n => locateOnPrediction(world, prediction, n.t));
   /* The low point and the high point of every closed leg on the drawn road.
      A near-circular heliocentric orbit has no meaningful pair — its two apses
@@ -441,9 +471,6 @@ function replan(force = false){
       apses.push({ segIndex: i, ...a, label: `${a.kind === 'periapsis' ? 'Pe' : 'Ap'} ${fmtAu(Math.max(0, a.distance - (b.radius ?? 0)))}` });
     }
   });
-  const ca = S.approachTo(state, prediction, state.target);
-  approach = ca ? { ...approachForChart(world, prediction, ca, state.target), label: `${fmtAu(ca.distance)} · ${S.fmtKms(ca.relSpeed)} · in ${S.fmtDays(ca.t - state.t)}` } : null;
-  if(approach) approach.ca = ca;
   reframeIfNeeded();
 }
 
@@ -468,8 +495,12 @@ function frame(now){
   /* Crossing into a moon's reach changes what the chart is about by four
      orders of magnitude. The lock follows it; so must the zoom, or the new
      orbit is a dot or a wall. */
+  /* Crossing into a moon's reach changes what the chart is about by four
+     orders of magnitude: come back to the ship and re-frame, or the player is
+     left looking at a world they have just left. */
   if(state.ship.body !== lockedTo){
     lockedTo = state.ship.body;
+    chart.camera.follow = 'ship';
     replan(true);
     frameShipOrbit();
   }
@@ -483,12 +514,13 @@ function frame(now){
   const shipAbs = state.dockedAt ? { r: absState(world, state.dockedAt, state.t).r, v: absState(world, state.dockedAt, state.t).v } : { r: S.shipAbsPos(state), v: S.shipAbsVel(state) };
   chart.draw({
     t: state.t, now, shipAbs, shipBody: state.ship.body, docked: !!state.dockedAt,
-    prediction, nodes: state.nodes, nodePositions, selectedNode, target: state.target, approach, apses,
-    lockTo: state.dockedAt ? (world.get(state.dockedAt).mu > 0 ? state.dockedAt : world.get(state.dockedAt).parent) : state.ship.body,
+    prediction, nodes: state.nodes, nodePositions, selectedNode, apses,
+    editing: selectedNode >= 0 && !!state.nodes[selectedNode],
     belt, nearPort: docking?.port ?? null, docking,
   });
   renderHud(docking);
   renderDockCard(docking);
+  renderBurnCard();
   requestAnimationFrame(frame);
 }
 
@@ -640,12 +672,10 @@ function askAtPath(t){
   const plan = S.skipPlan(state, t);
   const place = whereAt(t);
   openModal(`<h2>${S.fmtDays(Math.max(0, t - state.t))} along your road</h2>
-    <p>${place ? `You will be in ${esc(place.name)}'s reach.` : ''} From here you can write a burn down for that moment, or let the clock run to it.</p>
-    ${plan ? `<p class="lock">Running there takes ${saySeconds(plan.seconds)}.${plan.capped ? ' That is as fast as the clock goes.' : ''}</p>` : ''}
+    <p>${place ? `You will be in ${esc(place.name)}'s reach.` : ''}${plan ? ` Running the clock there takes ${saySeconds(plan.seconds)}.` : ''}</p>
     <div class="btns">
-      <button class="btn primary" id="m-burn" ${room ? '' : 'disabled title="Six is plenty for one road."'}>Burn here</button>
-      <button class="btn" id="m-skip" ${plan ? '' : 'disabled'}>Skip to here</button>
-      <button class="btn" id="m-none">Neither</button>
+      <button class="btn" id="m-skip" ${plan ? '' : 'disabled'}>Warp here</button>
+      <button class="btn primary" id="m-burn" ${room ? '' : 'disabled title="Six is plenty for one road."'}>Plan a burn</button>
     </div>`, m => {
     m.querySelector('#m-burn').addEventListener('click', () => {
       closeModal();
@@ -654,13 +684,12 @@ function askAtPath(t){
       selectedNode = ix; holdForPlanning(ix); replan(true); setTab('plan'); tutorialCheck(); save();
     });
     m.querySelector('#m-skip').addEventListener('click', () => { closeModal(); skipTo(t); });
-    m.querySelector('#m-none').addEventListener('click', closeModal);
   });
 }
 
 /* ------------------------------------------------------------- view */
 
-$('v-fit').addEventListener('click', () => frameShipOrbit(true));
+$('v-fit').addEventListener('click', backToShip);
 $('v-in').addEventListener('click', () => chart.zoomBy(1.6));
 $('v-out').addEventListener('click', () => chart.zoomBy(1 / 1.6));
 $('v-panel').addEventListener('click', () => togglePanel());
@@ -760,7 +789,7 @@ function endPointer(e){
     const onBody = d.hit?.kind === 'body';
     const insideDrawn = onBody && d.hit.d <= (d.hit.drawn ?? 0) + 2;
     if(p && !insideDrawn && p.t > state.t + S.MIN_LEAD){ askAtPath(p.t); return; }
-    if(onBody){ setTarget(d.hit.id); return; }
+    if(onBody){ lookAt(d.hit.id); return; }
     selectedNode = -1; if(tab === 'plan') renderTab();
   }
   if(d.kind === 'node'){ tutorialCheck(); save(); }
@@ -768,7 +797,7 @@ function endPointer(e){
 canvas.addEventListener('pointerup', endPointer);
 canvas.addEventListener('pointercancel', endPointer);
 canvas.addEventListener('wheel', e => { e.preventDefault(); chart.zoomBy(Math.pow(1.0015, -e.deltaY), [e.clientX, e.clientY]); }, { passive: false });
-canvas.addEventListener('dblclick', e => { const hit = chart.hitTest(e.clientX, e.clientY); if(hit?.kind === 'body') setTarget(hit.id); });
+canvas.addEventListener('dblclick', e => { const hit = chart.hitTest(e.clientX, e.clientY); if(hit?.kind === 'body') lookAt(hit.id); });
 
 /* A shortcut must never fire while somebody is typing into a control, and must
    never steal a browser's own combination. */
@@ -788,7 +817,7 @@ addEventListener('keydown', e => {
     case ' ': e.preventDefault(); $('w-pause').click(); break;
     case '+': case '=': chart.zoomBy(1.4); break;
     case '-': case '_': chart.zoomBy(1 / 1.4); break;
-    case 'f': frameShipOrbit(true); break;
+    case 'f': backToShip(); break;
     case 'p': togglePanel(); break;
     case 'Escape': if(selectedNode >= 0){ selectedNode = -1; renderTab(); } else togglePanel(false); break;
     case 'Delete': case 'Backspace': if(state.nodes[selectedNode]){ S.removeNode(state, selectedNode); selectedNode = -1; replan(true); renderTab(); } break;
@@ -833,17 +862,21 @@ function primaryBody(){
    you that you have. */
 function roadSpan(){
   const primary = primaryBody();
+  /* Measured from the ship, because that is where the chart is centred: a
+     circular orbit seen from a point on it reaches twice its radius across,
+     and framing it by the radius puts half the road off the screen. */
+  const here = state.ship.body === primary ? state.ship.r : [0, 0];
   let span = 0;
   if(prediction){
     for(const seg of prediction.segments){
       if(seg.body !== primary) continue;
-      for(const pt of seg.points) span = Math.max(span, Math.hypot(pt[0], pt[1]));
+      for(const pt of seg.points) span = Math.max(span, Math.hypot(pt[0] - here[0], pt[1] - here[1]));
     }
   }
   if(span > 0) return span;
   const b = world.get(primary);
   const el = elementsFromState(b.mu, state.ship.r, state.ship.v);
-  return Number.isFinite(el.ra) ? el.ra : Math.max(norm(state.ship.r), b.soi ?? 0.01);
+  return Number.isFinite(el.ra) ? el.ra * 2 : Math.max(norm(state.ship.r), b.soi ?? 0.01);
 }
 /* How much of the half-screen the road should fill when the chart frames it,
    and how far it is allowed to drift from that before the chart frames it
@@ -854,6 +887,7 @@ function usableHalf(){
   const w = chart.width - (panelOpen && innerWidth > 760 ? $('panel').getBoundingClientRect().width : 0);
   return Math.min(w, chart.height);
 }
+function backToShip(){ chart.camera.follow = 'ship'; frameShipOrbit(); }
 function frameShipOrbit(){
   const span = roadSpan();
   const half = usableHalf();
@@ -872,17 +906,17 @@ function reframeIfNeeded(){
   if(px > half * FRAME_SPILL || px < half * FRAME_SHRINK) frameShipOrbit();
 }
 
-function setTarget(id){
-  state.target = state.target === id ? null : id;
-  replan(true);
-  if(!state.dockedAt && tab !== 'plan') setTab('target'); else if(tab === 'target' || tab === 'plan') renderTab();
-  syncView();
+/* Tap a body and the chart centres on it; tap the ship, or press f, to come
+   back. Nothing is selected and nothing is aimed at — looking is looking. */
+function lookAt(id){
+  chart.focus(id);
+  toast(`Looking at ${esc(world.get(id).name)}. Press f for your ship.`);
 }
 
 /* ------------------------------------------------------------- panel */
 
 const TABS_DOCKED = [['market', 'Market'], ['passengers', 'Passengers'], ['shipyard', 'Shipyard'], ['talk', 'Talk'], ['log', 'Log']];
-const TABS_FLIGHT = [['plan', 'Plan'], ['target', 'Target'], ['ship', 'Ship'], ['log', 'Log']];
+const TABS_FLIGHT = [['orbit', 'Orbit'], ['plan', 'Burns'], ['ship', 'Ship'], ['log', 'Log']];
 let lastDockedMode = null;
 function renderTabs(){
   const mode = state.dockedAt ? 'docked' : 'flight';
@@ -915,7 +949,7 @@ function renderTab(){
      was and put it back. */
   const active = document.activeElement;
   const was = body.contains(active) ? (active.dataset?.act ?? active.id ?? null) : null;
-  const fn = { market, passengers, shipyard, talk, plan, target: targetTab, ship: shipTab, log: logTab }[tab];
+  const fn = { market, passengers, shipyard, talk, plan, orbit: orbitTab, ship: shipTab, log: logTab }[tab];
   body.innerHTML = fn ? fn() : '';
   wire(body);
   if(was){
@@ -1162,74 +1196,82 @@ function padButton(i, k){
   return `<button class="pv ${k}" data-act="push|${i}|${k}" title="${a.label} — ${a.hint}" aria-label="${a.label}, ${a.hint}">${arrow(k)}<span>${a.label}</span></button>`;
 }
 
-function burnPad(i, n, cost){
+/* The burn editor floats over the chart, because the chart is the thing it
+   changes: while it is open the road past the burn is drawn in yellow and
+   dashed, and every press moves that yellow line where you can see it. Close
+   it and the yellow goes away again. */
+/* Rebuilt only when something in it changed. Re-writing the card's markup
+   every frame emptied it out from under the finger on its way down, so no
+   button in it could ever be pressed. */
+let burnCardKey = '';
+function renderBurnCard(){
+  const card = $('burncard');
+  const i = selectedNode;
+  const n = state.nodes[i];
+  if(!n || state.dockedAt){
+    if(burnCardKey !== ''){ burnCardKey = ''; card.hidden = true; card.innerHTML = ''; document.body.classList.remove('editing'); }
+    return;
+  }
+  const when = $('burn-when');
+  const key = `${i}|${n.prograde}|${n.radial}|${n.t}|${state.nodes.length}`;
+  if(key === burnCardKey){
+    if(when) when.textContent = `fires in ${S.fmtDays(n.t - state.t)}`;
+    return;
+  }
+  burnCardKey = key;
+  card.hidden = false;
+  document.body.classList.add('editing');
   const step = stepFor(i);
+  const marks = S.markStates(state, horizonFor());
   const fwd = S.kms(n.prograde) * 1000, side = S.kms(n.radial) * 1000;
   const say = v => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v) >= 1000 ? (Math.abs(v) / 1000).toFixed(2) + ' km/s' : Math.round(Math.abs(v)) + ' m/s'}`;
-  return `<div class="pad">
+  card.innerHTML = `<div class="burnhead"><b>Burn ${i + 1}</b><small id="burn-when">fires in ${S.fmtDays(n.t - state.t)}</small>
+      <button class="btn sm" data-act="closenode" title="Done">Done</button></div>
     <div class="padgrid">
       <div class="padcell up">${padButton(i, 'out')}</div>
       <div class="padcell left">${padButton(i, 'retro')}</div>
-      <div class="padcell mid"><b>${S.fmtKms(cost ?? 0)}</b><small>${step} m/s a press</small></div>
+      <div class="padcell mid"><b>${S.fmtKms(marks[i]?.cost ?? 0)}</b><small>${step} m/s a press</small></div>
       <div class="padcell right">${padButton(i, 'pro')}</div>
       <div class="padcell down">${padButton(i, 'in')}</div>
     </div>
     <dl class="padout">
       <dt>Forward / back</dt><dd>${say(fwd)}</dd>
       <dt>Out / in</dt><dd>${say(side)}</dd>
-      <dt>When</dt><dd>${S.fmtDays(n.t - state.t)}</dd>
     </dl>
     <div class="btns">
       <button class="btn sm" data-act="shift|${i}|-0.0416667">&minus;1 h</button>
       <button class="btn sm" data-act="shift|${i}|0.0416667">+1 h</button>
       <button class="btn sm" data-act="zeronode|${i}">Start over</button>
-    </div>
-    <p class="lock">Arrow keys do the same four things. Drag the mark along the path to move it in time.</p>`;
+      <button class="btn sm danger" data-act="delnode|${i}">Scrap it</button>
+    </div>`;
+  wire(card);
 }
+/* The Plan tab reads; it does not edit. A burn is set on the chart, where
+ * the road it changes is in front of you — a panel of numbers beside a
+ * picture of the thing the numbers are about is a worse place to work than
+ * the picture. So this lists what is written down and what is coming. */
 function plan(){
-  let out = '<h2>Plan</h2>';
-  /* What each mark will really cost, measured where it fires: the two numbers
-     on a card are along axes that lean together, so their triangle is not the
-     burn. */
+  let out = '<h2>Planned burns</h2>';
   const marks = state.nodes.length ? S.markStates(state, horizonFor()) : [];
-  const cost = marks.reduce((s, m) => s + m.cost, 0);
+  const cost = marks.reduce((a, m) => a + m.cost, 0);
   const short = cost > state.dv + 1e-9;
-  out += `<p>This plan costs <b class="${short ? 'down' : ''}">${S.fmtKms(cost)}</b> of your ${S.fmtKms(state.dv)}.${short ? ' <span class="down">The tank will not cover it.</span>' : ''}</p>`;
-  if(state.target){
-    const hh = S.slowRoad(state, state.target);
-    if(hh) out += `<p class="lock">The slow road to ${esc(S.portName(state.target))} would be about ${S.fmtKms(hh.total)} and ${S.fmtDays(hh.time)}.</p>`;
+  if(!state.nodes.length){
+    out += '<p class="say">Nothing written down. Tap your road on the chart and choose <b>Plan a burn</b>.</p>';
+  }else{
+    out += `<p>These cost <b class="${short ? 'down' : ''}">${S.fmtKms(cost)}</b> of your ${S.fmtKms(state.dv)}.${short ? ' <span class="down">The tank will not cover it.</span>' : ''}</p>`;
+    state.nodes.forEach((n, i) => {
+      const where = nodePositions[i];
+      const frame = where ? world.get(where.body).name : '?';
+      const fwd = Math.round(S.kms(n.prograde) * 1000), side = Math.round(S.kms(n.radial) * 1000);
+      out += `<div class="node ${i === selectedNode ? 'sel' : ''}" data-act="selnode|${i}">
+        <b>Burn ${i + 1}</b>
+        <small>in ${S.fmtDays(n.t - state.t)} · ${esc(frame)}'s reach · ${S.fmtKms(marks[i]?.cost ?? 0)}</small>
+        <small>${fwd >= 0 ? 'forward' : 'back'} ${Math.abs(fwd)} m/s · ${side >= 0 ? 'out' : 'in'} ${Math.abs(side)} m/s</small>
+      </div>`;
+    });
+    out += '<p class="lock">A burn fires by itself the moment the clock reaches it. Tap one here, or its ring on the chart, to open it and change it.</p>';
   }
-  const room = state.nodes.length < S.MAX_NODES;
-  out += `<div class="btns"><button class="btn ${state.nodes.length ? '' : 'primary'}" id="addmark" data-act="addmark" ${room ? '' : 'disabled title="Six is plenty for one road."'}>Write down a burn</button></div>`;
-  if(!state.nodes.length) out += '<p class="say">Tap your road and choose <b>Burn here</b>, or use the button. Nothing is spent until the clock reaches it — and the same tap will run the clock there instead, if that is what you wanted.</p>';
-  state.nodes.forEach((n, i) => {
-    const sel = i === selectedNode;
-    const where = nodePositions[i];
-    const frame = where ? world.get(where.body).name : '?';
-    out += `<div class="node ${sel ? 'sel' : ''}" data-act="selnode|${i}"><div class="row" style="border:0;padding:0"><div class="name"><b>Burn ${i + 1}</b><small>in ${S.fmtDays(n.t - state.t)} · ${esc(frame)}'s reach · ${S.fmtKms(marks[i]?.cost ?? 0)}</small></div><div class="btns"><button class="btn sm" data-act="warpnode|${i}">Skip to it</button><button class="btn sm danger" data-act="delnode|${i}">×</button></div></div>`;
-    if(sel) out += burnPad(i, n, marks[i]?.cost ?? 0);
-  });
-  if(prediction){
-    out += '<h3>Ahead</h3>';
-    /* The drawn road stops at the first change of reach, so this list is
-       short by construction: the burns you wrote down, the one crossing, and
-       whatever the road runs into. Each line offers the clock. */
-    const evs = prediction.events.filter(e => e.kind !== 'burn' || e.node.aero);
-    const skip = t => `<button class="btn sm" data-act="skipto|${t}">Skip to it</button>`;
-    if(!evs.length && !prediction.crashed) out += '<p class="lock">Nothing changes before this orbit comes round again.</p>';
-    for(const e of evs){
-      if(e.kind === 'soi'){
-        const to = world.get(e.to), from = world.get(e.from);
-        const into = to.parent === from.id;
-        out += `<p>${into ? 'Into' : 'Out to'} ${esc(to.name)}'s reach in ${S.fmtDays(e.t - state.t)}. ${skip(e.t)}</p>`;
-      }else if(e.kind === 'burn' && e.node.aero){
-        out += `<p class="up">Skim ${esc(S.portName(e.node.body))}: shed ${S.fmtKms(e.magnitude)} in ${S.fmtDays(e.t - state.t)}. ${skip(e.t)}</p>`;
-      }else if(e.kind === 'crash'){
-        out += `<p class="down">This path strikes ${esc(S.portName(e.body))} in ${S.fmtDays(e.t - state.t)}.</p>`;
-      }
-    }
-    if(prediction.crossing) out += `<p class="lock">Nothing past that is drawn. One crossing at a time is enough road to read, and a burn before it would change everything after it anyway.</p>`;
-  }
+  out += aheadList();
   if(state.dv <= 1e-9){
     const q = S.towQuote(state);
     out += `<h3>Dry tank</h3><p>${esc(TEXT.captainLines.onStranded[2] ?? '')}</p><p>A tow to ${esc(S.portName(q.port))}: ${S.fmtMoney(q.cost)}, ${S.fmtDays(q.days)}.</p><button class="btn wide" data-act="tow">Call for a tow</button>`;
@@ -1239,47 +1281,48 @@ function plan(){
   return out;
 }
 
-function targetTab(){
-  let out = '<h2>Target</h2>';
-  const groups = new Map();
-  for(const b of world.bodies){
-    if(b.kind === 'star') continue;
-    if(b.id === 'merrow' && !state.keys.sensors) continue;
-    const g = b.parent === 'lamp' ? b.id : b.parent;
-    if(!groups.has(g)) groups.set(g, []);
-    groups.get(g).push(b);
-  }
-  out += `<select data-sel="target"><option value="">— none —</option>`;
-  for(const [g, list] of groups){
-    const gname = world.get(g).name;
-    out += `<optgroup label="${esc(gname)}">` + list.map(b => `<option value="${b.id}" ${state.target === b.id ? 'selected' : ''}>${esc(b.name)}${b.port ? '' : ' (no port)'}</option>`).join('') + '</optgroup>';
-  }
-  out += '</select>';
-  if(state.target){
-    const tb = world.get(state.target);
-    const tp = PORTS[state.target];
-    out += `<h3>${esc(tb.name)}</h3>`;
-    if(TEXT.ports[state.target]?.blurb) out += `<p>${esc(TEXT.ports[state.target].blurb)}</p>`;
-    if(tp) out += `<p class="lock">${sp(tp.species)} · ${esc(tb.climate)} · ${tp.fuelPricePerKms != null ? 'sells fuel' : 'no fuel'}${tp.shipyard ? ' · shipyard' : ''}</p>`;
-    if(approach?.ca){
-      const ca = approach.ca;
-      const within = tb.soi != null ? ca.distance < tb.soi : ca.distance < (tb.zoneRadius ?? 0) * 3;
-      out += `<dl class="kv"><dt>Closest approach</dt><dd>${fmtAu(ca.distance)}</dd><dt>Relative speed</dt><dd>${S.fmtKms(ca.relSpeed)}</dd><dt>In</dt><dd>${S.fmtDays(ca.t - state.t)}</dd></dl>`;
-      const mouth = tb.zoneRadius ?? 0;
-      if(mouth && ca.distance <= mouth) out += `<p class="up">That pass comes inside ${esc(tb.name)}'s harbour mouth.</p>`;
-      else if(within) out += `<p class="up">That is inside ${esc(tb.name)}'s ${tb.soi != null ? 'reach' : 'zone'}, but wide of the mouth by ${fmtAu(Math.max(0, ca.distance - mouth))}.</p>`;
-      else out += `<p class="lock">Not yet inside ${esc(tb.name)}'s ${tb.soi != null ? 'reach' : 'zone'}${tb.soi != null ? ` (${fmtAu(tb.soi)})` : ''}.</p>`;
-      out += `<div class="btns"><button class="btn sm primary" data-act="aim">Aim for it</button><button class="btn sm" data-act="warpca">Skip to the pass</button></div>`;
-      out += `<p class="lock">Aiming nudges your last burn until the pass is as close as it will go. It spends nothing until the clock reaches the mark.</p>`;
-    }else{
-      out += `<p class="lock">This path does not come near ${esc(tb.name)} within the plan.</p><div class="btns"><button class="btn sm primary" data-act="aim">Aim for it</button></div>`;
+/* What the drawn road runs into, which is at most one crossing by design. */
+function aheadList(){
+  if(!prediction) return '';
+  let out = '<h3>Ahead</h3>';
+  const evs = prediction.events.filter(e => e.kind !== 'burn' || e.node.aero);
+  const skip = t => `<button class="btn sm" data-act="skipto|${t}">Skip to it</button>`;
+  if(!evs.length && !prediction.crashed) out += '<p class="lock">Nothing changes before this orbit comes round again.</p>';
+  for(const e of evs){
+    if(e.kind === 'soi'){
+      const to = world.get(e.to), from = world.get(e.from);
+      out += `<p>${to.parent === from.id ? 'Into' : 'Out to'} ${esc(to.name)}'s reach in ${S.fmtDays(e.t - state.t)}. ${skip(e.t)}</p>`;
+    }else if(e.kind === 'burn' && e.node.aero){
+      out += `<p class="up">Skim ${esc(S.portName(e.node.body))}: shed ${S.fmtKms(e.magnitude)} in ${S.fmtDays(e.t - state.t)}. ${skip(e.t)}</p>`;
+    }else if(e.kind === 'crash'){
+      out += `<p class="down">This path strikes ${esc(S.portName(e.body))} in ${S.fmtDays(e.t - state.t)}.</p>`;
     }
-    const hh = S.slowRoad(state, state.target);
-    if(hh) out += `<p class="lock">Slow road: about ${S.fmtKms(hh.total)}, ${S.fmtDays(hh.time)}.</p>`;
-    const win = S.nextWindow(state, state.target);
-    if(win && win.days > 0.5) out += `<p class="lock">Next festival to ${esc(S.portName(win.target))}: in ${S.fmtDays(win.days)}, and one comes round every ${S.fmtDays(win.synodic)}.</p><div class="btns"><button class="btn sm" data-act="warpwin|${win.t.toFixed(3)}">Skip to the festival</button></div>`;
-    if(tb.port && tb.zoneRadius) out += `<p class="lock">Docking zone ${fmtAu(tb.zoneRadius)}, under ${S.fmtKms(tb.dockSpeed)} relative.</p>`;
   }
+  return out;
+}
+
+function orbitTab(){
+  const b = world.get(state.ship.body);
+  const el = elementsFromState(b.mu, state.ship.r, state.ship.v);
+  const alt = d => fmtAu(Math.max(0, d - (b.radius ?? 0)));
+  const shape = !Number.isFinite(el.period) ? 'an escape' :
+    el.e < 0.02 ? 'a circle' : el.e < 0.3 ? 'a gentle ellipse' :
+    el.e < 0.7 ? 'a long ellipse' : 'a very long ellipse';
+  let out = `<h2>Your orbit</h2>`;
+  out += `<p>You are going round <b>${esc(b.name)}</b> on ${shape}.</p>`;
+  out += `<dl class="kv"><dt>Low point</dt><dd>${alt(el.rp)}</dd>`;
+  out += Number.isFinite(el.ra) ? `<dt>High point</dt><dd>${alt(el.ra)}</dd>` : `<dt>High point</dt><dd>none — you are leaving</dd>`;
+  out += `<dt>Height now</dt><dd>${alt(norm(state.ship.r))}</dd>`;
+  out += `<dt>Speed</dt><dd>${S.fmtKms(norm(state.ship.v))}</dd>`;
+  if(Number.isFinite(el.period)) out += `<dt>A lap takes</dt><dd>${S.fmtDays(el.period)}</dd>`;
+  out += `</dl>`;
+  if(el.rp <= (b.radius ?? 0)) out += `<p class="down">The low point of this orbit is inside ${esc(b.name)}. Burn forward before it arrives.</p>`;
+  else if(b.atmo && el.rp < b.atmo) out += `<p class="up">The low point dips into ${esc(b.name)}'s air. With a heat shield that is free braking; without one it is a bad day.</p>`;
+  out += aheadList();
+  out += `<h3>What is out here</h3>`;
+  const kin = world.children(b.id).filter(c => c.port || c.kind === 'moon');
+  if(kin.length) out += `<p class="lock">${kin.map(c => esc(c.name)).join(' · ')} go round ${esc(b.name)} too. Tap one on the chart to look at it.</p>`;
+  else out += `<p class="lock">Nothing else goes round ${esc(b.name)}.</p>`;
   return out;
 }
 
@@ -1322,46 +1365,26 @@ const actions = {
   undock(){
     const r = S.undock(state);
     if(!r.ok) return;
-    selectedNode = -1; replan(true); renderTabs(); frameShipOrbit(true); tutorialCheck(); save();
+    selectedNode = -1; replan(true); renderTabs(); backToShip(); tutorialCheck(); save();
   },
   dock(){ doDock(); },
-  target(id){ state.target = id; replan(true); renderTab(); syncView(); },
   addmark(){
     const ix = S.addNodeAhead(state);
     if(ix < 0){ toast('No room for another burn on this road.', 'bad'); return; }
     selectedNode = ix; holdForPlanning(ix); replan(true); renderTab(); tutorialCheck();
   },
-  selnode(i){ selectedNode = Number(i); renderTab(); },
-  delnode(i, el){ S.removeNode(state, Number(i)); selectedNode = -1; replan(true); renderTab(); },
+  closenode(){ selectedNode = -1; replan(true); renderTab(); save(); },
+  selnode(i){ selectedNode = selectedNode === Number(i) ? -1 : Number(i); replan(true); renderTab(); },
+  delnode(i){ S.removeNode(state, Number(i)); selectedNode = -1; replan(true); renderTab(); save(); },
   warpnode(i){ const n = state.nodes[Number(i)]; if(n) askSkip(n.t - 0.05, `Burn ${Number(i) + 1}`); },
   skipto(t){ askSkip(Number(t)); },
   push(i, k){ pushAxis(Number(i), k); },
   zeronode(i){ const n = state.nodes[Number(i)]; if(!n) return; n.prograde = 0; n.radial = 0; replan(true); renderTab(); save(); },
   shift(i, d){ const n = state.nodes[Number(i)]; n.t = Math.max(state.t + 1e-3, n.t + Number(d)); state.nodes.sort((a, b) => a.t - b.t); selectedNode = state.nodes.indexOf(n); replan(true); renderTab(); },
-  warpca(){ if(approach?.ca) askSkip(approach.ca.t, `The near pass with ${S.portName(state.target)}`); },
-  warpwin(t){ askSkip(Number(t), 'The next window'); },
-  aim(el){
-    if(!state.target){ toast('Pick something to aim at first.', 'bad'); return; }
-    // Solving a transfer takes the best part of a second, and a button that
-    // freezes the page without a word reads as a button that killed the game.
-    if(el && el.tagName === 'BUTTON'){ el.textContent = 'Aiming…'; el.disabled = true; }
-    requestAnimationFrame(() => requestAnimationFrame(() => aimNow()));
-  },
   tow(){ showTow('dry'); },
   newgame(){ confirmNew(); },
 };
 
-function aimNow(){
-    const tb = world.get(state.target);
-    const r = S.trimToTarget(state, state.target, horizonFor());
-    if(!r.ok){ toast(r.reason, 'bad'); renderTab(); return; }
-    selectedNode = r.index;
-    if(state.nodes[r.index]) holdForPlanning(r.index);
-    replan(true); renderTab();
-    const mouth = tb.zoneRadius ?? 0;
-    const good = mouth && r.distance <= mouth;
-    toast(`${r.added ? 'Wrote down a burn and aimed' : 'Aimed'} at ${S.portName(state.target)}: ${fmtAu(r.distance)} at the near pass, ${S.fmtKms(r.cost)} on the mark.${good ? ' That is inside the mouth.' : ''}`, good ? 'story' : '');
-}
 for(const el of document.querySelectorAll('.node[data-act]')) void el;
 // Node cards select on click, but their buttons should not also select.
 document.addEventListener('click', e => {
@@ -1446,7 +1469,7 @@ function storyTitle(name){ return { cometCaught: "Merrow's Comet", chimeArrival:
 function confirmNew(){
   openModal(`<h2>Start over?</h2><p>This save is replaced by a fresh ship at Tessel. There is one save slot.</p><div class="btns"><button class="btn" id="m-no">Keep playing</button><button class="btn danger" id="m-yes">New game</button></div>`, m => {
     m.querySelector('#m-no').addEventListener('click', closeModal);
-    m.querySelector('#m-yes').addEventListener('click', () => { closeModal(); state = S.newGame(freshSeed()); save(); selectedNode = -1; lastDockedMode = null; replan(true); renderTabs(); frameShipOrbit(true); tutorialCheck(); });
+    m.querySelector('#m-yes').addEventListener('click', () => { closeModal(); state = S.newGame(freshSeed()); save(); selectedNode = -1; lastDockedMode = null; replan(true); renderTabs(); backToShip(); tutorialCheck(); });
   });
 }
 
@@ -1514,7 +1537,7 @@ $('grab').addEventListener('keydown', e => { if(e.key === 'Enter' || e.key === '
 renderTabs();
 togglePanel(panelOpen);
 replan(true);
-frameShipOrbit(true);
+backToShip();
 syncView();
 setRate(state.warp ?? 1);
 tutorialCheck();
