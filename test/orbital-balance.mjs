@@ -14,6 +14,11 @@
  *   node test/orbital-balance.mjs            # a few hundred days
  *   node test/orbital-balance.mjs 3600       # ten Tessel years
  *   node test/orbital-balance.mjs 3600 7     # ... with a different seed
+ *
+ * What it is not: a player. Its autopilot writes one mark, aims it, and flies;
+ * it does not re-plan a spoiled approach, wait for a festival, or notice that
+ * the comet is coming. Read its numbers as the floor a careless pilot would
+ * find, not the ceiling a good one would.
  */
 
 import * as S from '../public/orbital-trader/sim.js';
@@ -49,8 +54,10 @@ function slowRoad(state, from, to){
   const r1 = Math.hypot(...absState(world, from, state.t).r);
   const r2 = Math.hypot(...absState(world, to, state.t).r);
   const h = S.hohmann(CONST.MU_LAMP, Math.max(r1, 1e-6), Math.max(r2, 1e-6));
-  // Climbing out of one world and stopping at the other, roughly.
-  return { dv: S.kms(h.total) * 1.4 + 3, days: h.time + 4 };
+  /* Climbing out of one world and stopping at the other, roughly — the same
+     order as the table tools/orbital-trader/check-tuning.mjs prints, which is
+     what a player would be reading off the Target tab. */
+  return { dv: S.kms(h.total) * 1.15 + 1.5, days: h.time + 4 };
 }
 
 /* The best single cargo a player could buy here and sell there, at today's
@@ -75,8 +82,15 @@ function bestRun(state, from){
          cannot reach is not a destination. */
       const road = slowRoad(state, from, to);
       if(road.dv > S.kms(state.dv) * 0.7) continue;
-      const perDay = gain / road.days;
-      if(!best || perDay > best.perDay) best = { to, good: g.id, qty, gain, perDay, days: road.days, dv: road.dv, buy, sell };
+      /* What it will be worth when it gets there, not what it is worth on the
+         dock: a crate of Bramble fruit sold at the far end of a sixty-day
+         crossing is a crate of compost, and the freshness bar says so before
+         you buy it. */
+      const keeps = S.freshness(g, road.days);
+      const landed = (sell * keeps - buy) * qty;
+      if(landed <= 0) continue;
+      const perDay = landed / road.days;
+      if(!best || perDay > best.perDay) best = { to, good: g.id, qty, gain: landed, perDay, days: road.days, dv: road.dv, buy, sell };
     }
   }
   return best;
@@ -142,9 +156,11 @@ while(state.t < DAYS && laps < 400){
   const before = state.money;
   S.buy(state, run.good, run.qty);
   const t0 = state.t;
-  const ok = fly(state, run.to, Math.max(60, run.days * 3));
+  const ok = fly(state, run.to, Math.max(90, run.days * 4));
   if(!ok){
-    // Sell wherever we ended up and try again; that is what a player does.
+    // Adrift, or docked somewhere else: call a tow and sell wherever it lands,
+    // which is what a player does when a plan has plainly gone wrong.
+    if(!state.dockedAt) S.callTow(state, 'dry');
     if(state.dockedAt) S.sell(state, run.good, run.qty);
     log.push({ t: state.t, days: state.t - t0, from, to: run.to, good: run.good, qty: run.qty,
       profit: state.money - before, perDay: (state.money - before) / Math.max(1, state.t - t0),

@@ -290,7 +290,7 @@
 <aside id="panel" aria-label="Ship and port">
   <div id="grab" aria-hidden="true"></div>
   <div id="tabs" role="tablist"></div>
-  <div id="tabbody" role="tabpanel"></div>
+  <div id="tabbody" role="tabpanel" tabindex="0"></div>
 </aside>
 
 <div id="toasts" aria-live="polite" aria-atomic="false"></div>
@@ -677,8 +677,14 @@ canvas.addEventListener('pointercancel', endPointer);
 canvas.addEventListener('wheel', e => { e.preventDefault(); chart.zoomBy(Math.pow(1.0015, -e.deltaY), [e.clientX, e.clientY]); }, { passive: false });
 canvas.addEventListener('dblclick', e => { const hit = chart.hitTest(e.clientX, e.clientY); if(hit?.kind === 'body'){ chart.focus(hit.id); syncView(); } });
 
+/* A shortcut must never fire while somebody is typing into a control, and must
+   never steal a browser's own combination. */
+function typing(e){
+  const t = e.target;
+  return !!t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+}
 addEventListener('keydown', e => {
-  if(e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+  if(typing(e) || e.ctrlKey || e.metaKey || e.altKey) return;
   if($('modal').open) return;
   const fine = e.shiftKey ? S.auDay(0.001) : S.auDay(0.01);
   switch(e.key){
@@ -1018,7 +1024,7 @@ function shipTab(){
 }
 
 function logTab(){
-  return `<h2>Log</h2><ul id="log">` + [...state.log].reverse().map(l => `<li class="${l.kind === 'story' ? 'story' : ''}"><b>${S.calendar(l.t).year}.${S.calendar(l.t).day}</b>${esc(l.text)}</li>`).join('') + '</ul>';
+  return `<h2>Log</h2><ul id="log" aria-live="polite" aria-relevant="additions">` + [...state.log].reverse().map(l => `<li class="${l.kind === 'story' ? 'story' : ''}"><b>${S.calendar(l.t).year}.${S.calendar(l.t).day}</b>${esc(l.text)}</li>`).join('') + '</ul>';
 }
 
 /* ------------------------------------------------------------- actions */
@@ -1091,7 +1097,12 @@ function doDock(){
 // The dock button lives in the HUD hint: clicking the hint docks when it says so.
 $('dockhint').addEventListener('click', () => { const d = S.dockingStatus(state); if(d?.ok) doDock(); });
 $('dockhint').style.cursor = 'pointer';
-addEventListener('keydown', e => { if(e.key === 'd' && !$('modal').open){ const d = S.dockingStatus(state); if(d?.ok) doDock(); } });
+addEventListener('keydown', e => {
+  if(e.key !== 'd' || e.ctrlKey || e.metaKey || e.altKey) return;
+  if($('modal').open || typing(e)) return;
+  const d = S.dockingStatus(state);
+  if(d?.ok) doDock();
+});
 
 /* ------------------------------------------------------------- modals */
 
@@ -1101,6 +1112,10 @@ function openModal(html, wireFn){
   wire(modal);
   if(wireFn) wireFn(modal);
   if(!modal.open) modal.showModal();
+  // showModal traps focus by itself; this only decides where it lands, which
+  // should be the thing you are most likely to want.
+  const first = modal.querySelector('.btn.primary') ?? modal.querySelector('button');
+  if(first) first.focus();
 }
 function closeModal(){ if(modal.open) modal.close(); modal.innerHTML = ''; }
 modal.addEventListener('cancel', e => { if(state.pending) e.preventDefault(); });
