@@ -568,6 +568,27 @@ const settled = pred => pred.segments.some(sg => sg.reason === 'crash' || sg.rea
  * written down: that is what the chart shows when no burn is open, so the
  * white line is always one honest lap of where you actually are. Open a burn
  * and the plan comes back, in yellow. */
+/* No leg is ever drawn for more than one lap of its own conic. Choosing the
+ * horizon usually arranges that by itself, but not always — a burn that
+ * shrinks the orbit, or a road the boundary search had to give up part way
+ * along, can leave a leg running for several turns of the same ellipse, and
+ * the chart then shows a scribble where it should show a road. This is the
+ * guarantee rather than the estimate: keep the samples up to one period and
+ * drop the rest. */
+function oneLap(seg){
+  const p = seg.elements?.period;
+  const dur = seg.t1 - seg.t0;
+  if(!Number.isFinite(p) || p <= 0 || dur <= p * 1.001) return seg;
+  const n = seg.points.length - 1;
+  const keep = Math.max(2, Math.ceil(n * (p / dur)) + 1);
+  if(keep >= seg.points.length) return seg;
+  const points = seg.points.slice(0, keep);
+  const times = seg.times.slice(0, keep);
+  /* The leg still *ends* where it ended — a burn fires at t1 whatever the
+     chart drew — so only the drawing is trimmed, and `lapped` says so. */
+  return { ...seg, points, times, lapped: true };
+}
+
 export function planImmediate(state, flown = true){
   if(state.dockedAt) return null;
   const bare = flown ? state : { ...state, nodes: [] };
@@ -593,7 +614,7 @@ export function planImmediate(state, flown = true){
   const segs = pred.segments;
   const crossed = segs.findIndex(sg => sg.reason === 'exit' || sg.reason === 'enter');
   const keep = crossed >= 0 ? Math.min(crossed + 2, segs.length) : segs.length;
-  const segments = segs.slice(0, keep);
+  const segments = segs.slice(0, keep).map(oneLap);
   const endT = segments.length ? segments[segments.length - 1].t1 : state.t;
   const events = pred.events.filter(e => e.t <= endT + 1e-9);
   const crossing = crossed >= 0 && crossed < segments.length ? {

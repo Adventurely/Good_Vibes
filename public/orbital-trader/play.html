@@ -204,26 +204,22 @@
   .toast.bad{ border-color:var(--bad); }
   @keyframes toast{ from{ opacity:0; transform:translateY(-6px);} }
 
+  /* A popup over a chart should not put the chart away. These sit on the sky
+     at three-quarters opacity with a blur behind them, so the road you tapped
+     is still visible under the question you are being asked. */
   dialog{
-    background:var(--glass-2); color:var(--ink); border:1px solid var(--line-2); border-radius:14px;
-    padding:1.1rem 1.25rem; width:min(92vw, 460px); backdrop-filter:blur(12px);
+    background:rgba(12,15,22,.72); color:var(--ink); border:1px solid var(--line-2); border-radius:14px;
+    padding:1.1rem 1.25rem; width:min(92vw, 420px); backdrop-filter:blur(14px) saturate(1.1);
+    box-shadow:0 18px 50px -18px #000;
   }
-  dialog::backdrop{ background:rgba(74,51,32,.35); }
+  dialog::backdrop{ background:rgba(0,0,0,.28); backdrop-filter:blur(1px); }
+  .btn.ghost{ background:transparent; border-color:transparent; color:var(--dim); }
+  .btn.ghost:hover{ color:var(--ink); border-color:var(--line-2); }
   dialog h2{ margin:0 0 .5rem; font-size:1.15rem; }
   dialog p{ color:var(--dim); margin:.4rem 0; }
   dialog p.say{ color:var(--ink); font-style:italic; border-left:2px solid var(--gold-2); padding-left:.7rem; }
   dialog .btns{ margin-top:1rem; justify-content:flex-end; }
 
-  /* The burn editor sits over the chart, left of the panel, so the road it
-     is changing stays in view while it is open. */
-  #burncard{
-    position:fixed; left:.8rem; bottom:calc(.8rem + env(safe-area-inset-bottom)); z-index:8;
-    width:min(92vw, 320px); background:var(--glass-2); border:1px solid var(--gold-2);
-    border-radius:14px; padding:.6rem .7rem; box-shadow:var(--gv-shadow); backdrop-filter:blur(10px);
-  }
-  #burncard .burnhead{ display:flex; align-items:baseline; gap:.5rem; margin-bottom:.4rem; }
-  #burncard .burnhead small{ color:var(--dim); font-size:.76rem; flex:1 1 auto; }
-  #burncard .btns{ margin-top:.5rem; }
   #dockcard{
     position:fixed; left:50%; bottom:calc(64px + env(safe-area-inset-bottom)); transform:translateX(-50%); z-index:7;
     width:min(92vw, 440px); background:var(--glass-2); border:1px solid var(--line-2); border-radius:12px;
@@ -236,10 +232,6 @@
   #dockcard[hidden]{ display:none; }
   /* The lesson steps aside when there is a dock to take. */
   #dockcard:not([hidden]) ~ #tut{ bottom:calc(150px + env(safe-area-inset-bottom)); }
-  /* The burn editor owns the bottom-left while it is open; the lesson and the
-     dock card step up over it rather than under it. */
-  body.editing #tut, body.editing #dockcard{ bottom:calc(340px + env(safe-area-inset-bottom)); }
-  @media (max-width: 760px){ body.editing #tut{ display:none; } }
 
   /* Centred on the chart rather than on the window, so that with the panel
      open they do not slide under it. */
@@ -295,7 +287,6 @@
 
     /* Bottom cards, stacked: the docking card closest to the thumb. */
     #dockcard{ left:.5rem; right:.5rem; transform:none; width:auto; bottom:calc(.6rem + env(safe-area-inset-bottom)); }
-    #burncard{ left:.5rem; right:.5rem; width:auto; bottom:calc(.6rem + env(safe-area-inset-bottom)); }
     #tut{ left:.5rem; right:.5rem; transform:none; width:auto; bottom:calc(.6rem + env(safe-area-inset-bottom)); }
     #dockcard:not([hidden]) ~ #tut{ bottom:calc(7.4rem + env(safe-area-inset-bottom)); }
     #tut p{ font-size:.84rem; }
@@ -323,8 +314,6 @@
   <div class="stat" id="where"><small>Where</small><b id="h-where">—</b><span id="dockhint"></span></div>
 </header>
 <a id="back" href="./">&larr; title</a>
-
-<div id="burncard" hidden></div>
 
 <div id="view">
   <button id="w-pause" aria-pressed="false" title="Hold the clock (space)">&#10074;&#10074;</button>
@@ -471,7 +460,6 @@ function replan(force = false){
       apses.push({ segIndex: i, ...a, label: `${a.kind === 'periapsis' ? 'Pe' : 'Ap'} ${fmtAu(Math.max(0, a.distance - (b.radius ?? 0)))}` });
     }
   });
-  reframeIfNeeded();
 }
 
 /* ------------------------------------------------------------- loop */
@@ -480,6 +468,18 @@ let last = performance.now();
 let saveTimer = 0;
 let firstStoryDone = false;
 let lockedTo = null;
+/* The one number the on-chart editor shows. Recomputed when the burn changes,
+   not every frame: solving what a mark costs is not free. */
+let nodeLabel = null, nodeLabelKey = '';
+function refreshNodeLabel(){
+  const n = state.nodes[selectedNode];
+  if(!n || state.dockedAt){ nodeLabel = null; nodeLabelKey = ''; return; }
+  const key = `${selectedNode}|${n.prograde}|${n.radial}|${n.t}`;
+  if(key === nodeLabelKey) return;
+  nodeLabelKey = key;
+  const m = S.markStates(state, horizonFor())[selectedNode];
+  nodeLabel = `${S.fmtKms(m?.cost ?? 0)} · in ${S.fmtDays(n.t - state.t)}`;
+}
 function frame(now){
   const real = Math.min(0.1, (now - last) / 1000);
   last = now;
@@ -506,6 +506,7 @@ function frame(now){
   }
   saveTimer += real;
   if(saveTimer > 30){ saveTimer = 0; save(); }
+  refreshNodeLabel();
   const docking = state.dockedAt ? null : S.dockingStatus(state);
   if(docking && docking.inZone && state.warp > 1 && !state.flags.zoneWarpDropped){ stopSkip(); state.flags.zoneWarpDropped = true; }
   if(!docking) state.flags.zoneWarpDropped = false;
@@ -516,11 +517,12 @@ function frame(now){
     t: state.t, now, shipAbs, shipBody: state.ship.body, docked: !!state.dockedAt,
     prediction, nodes: state.nodes, nodePositions, selectedNode, apses,
     editing: selectedNode >= 0 && !!state.nodes[selectedNode],
+    shipLocalV: state.dockedAt ? null : state.ship.v,
+    nodeLabel,
     belt, nearPort: docking?.port ?? null, docking,
   });
   renderHud(docking);
   renderDockCard(docking);
-  renderBurnCard();
   requestAnimationFrame(frame);
 }
 
@@ -658,7 +660,7 @@ function askSkip(t, what){
   openModal(`<h2>Skip ahead?</h2>
     <p>${esc(what ?? 'That point on your road')} is <b>${S.fmtDays(plan.days)}</b> from now${place ? `, in ${esc(place.name)}'s reach` : ''}.</p>
     <p class="lock">The clock will run itself there and stop: ${saySeconds(plan.seconds)} of waiting.${plan.capped ? ' That is as fast as the clock goes.' : ''}</p>
-    <div class="btns"><button class="btn" id="m-stay">Stay here</button><button class="btn primary" id="m-go">Go</button></div>`, m => {
+    <div class="btns"><button class="btn primary" id="m-go">Go</button><button class="btn ghost" id="m-stay">Close</button></div>`, m => {
     m.querySelector('#m-go').addEventListener('click', () => { closeModal(); skipTo(t); });
     m.querySelector('#m-stay').addEventListener('click', closeModal);
   });
@@ -676,7 +678,9 @@ function askAtPath(t){
     <div class="btns">
       <button class="btn" id="m-skip" ${plan ? '' : 'disabled'}>Warp here</button>
       <button class="btn primary" id="m-burn" ${room ? '' : 'disabled title="Six is plenty for one road."'}>Plan a burn</button>
+      <button class="btn ghost" id="m-close">Close</button>
     </div>`, m => {
+    m.querySelector('#m-close').addEventListener('click', closeModal);
     m.querySelector('#m-burn').addEventListener('click', () => {
       closeModal();
       const ix = S.addNode(state, t);
@@ -731,9 +735,20 @@ canvas.addEventListener('pointerdown', e => {
     drag = null; return;
   }
   const hit = chart.hitTest(e.clientX, e.clientY);
+  if(hit?.kind === 'handle'){
+    if(hit.axis === 'delete'){
+      S.removeNode(state, hit.index); selectedNode = -1; replan(true); renderTab(); save();
+      drag = null; return;
+    }
+    drag = { kind: 'arrow' };
+    pushAxis(hit.index, hit.axis);
+    startRepeat(hit.index, hit.axis);
+    return;
+  }
   if(hit?.kind === 'node'){
-    selectedNode = hit.index; drag = { kind: 'node', index: hit.index, x: e.clientX, y: e.clientY, moved: false };
-    if(tab === 'plan') renderTab(); else if(!state.dockedAt){ setTab('plan'); }
+    selectedNode = selectedNode === hit.index ? -1 : hit.index;
+    drag = { kind: 'node', index: hit.index, x: e.clientX, y: e.clientY, moved: false };
+    replan(true); if(tab === 'plan') renderTab();
     return;
   }
   /* Not a pan: the chart is locked to the world you are going round, so a
@@ -892,18 +907,6 @@ function frameShipOrbit(){
   const span = roadSpan();
   const half = usableHalf();
   if(span > 0 && half > 0) chart.camera.zoom = Math.max(8, Math.min(2e7, half * FRAME_FILL / span));
-}
-/* Re-frame when the road no longer sits comfortably on the screen: it has
-   grown past the edge, or shrunk to a knot in the middle. Asking the question
-   in pixels rather than in au is what makes it work at both ends — a lap of
-   Pip and a lap of the Lamp are four orders of magnitude apart and neither is
-   special. */
-function reframeIfNeeded(){
-  const span = roadSpan();
-  const half = usableHalf();
-  if(!(span > 0) || !(half > 0)) return;
-  const px = span * chart.camera.zoom;
-  if(px > half * FRAME_SPILL || px < half * FRAME_SHRINK) frameShipOrbit();
 }
 
 /* Tap a body and the chart centres on it; tap the ship, or press f, to come
@@ -1130,25 +1133,22 @@ function pushAxis(i, k, scale = 1){
   save();
 }
 
-/* Hold a button down and it repeats, slowly at first so a single tap is never
+/* Hold an arrow down and it repeats, slowly at first so a single tap is never
    two, then faster, because pushing a big orbit around takes more than four
-   presses and nobody should have to click forty times. */
+   presses and nobody should have to tap forty times. */
 let repeat = null;
 function stopRepeat(){ if(repeat){ clearTimeout(repeat.timer); repeat = null; } }
-document.addEventListener('pointerdown', e => {
-  const btn = e.target.closest('button.pv[data-act]');
-  if(!btn) return;
-  const [, i, k] = btn.dataset.act.split('|');
+function startRepeat(i, axis){
   stopRepeat();
   let n = 0;
   const tick = () => {
     n++;
-    pushAxis(Number(i), k, n > 12 ? 4 : n > 5 ? 2 : 1);
+    pushAxis(i, axis, n > 12 ? 4 : n > 5 ? 2 : 1);
     repeat.timer = setTimeout(tick, n < 3 ? 260 : 90);
   };
   repeat = { timer: setTimeout(tick, 340) };
-});
-for(const ev of ['pointerup', 'pointercancel', 'pointerleave', 'blur']) document.addEventListener(ev, stopRepeat, true);
+}
+for(const ev of ['pointerup', 'pointercancel', 'blur']) document.addEventListener(ev, stopRepeat, true);
 
 
 /* Four buttons and two axes, and that is the whole of flying this ship.
@@ -1183,69 +1183,6 @@ function stepFor(i){
   return Math.max(1, Math.min(500, nice));
 }
 
-const ARROW = {
-  pro:   'M4 12 L16 12 M11 7 L16 12 L11 17',
-  retro: 'M20 12 L8 12 M13 7 L8 12 L13 17',
-  out:   'M12 20 L12 8 M7 13 L12 8 L17 13',
-  in:    'M12 4 L12 16 M7 11 L12 16 L17 11',
-};
-const arrow = k => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${ARROW[k]}"/></svg>`;
-
-function padButton(i, k){
-  const a = AXES[k];
-  return `<button class="pv ${k}" data-act="push|${i}|${k}" title="${a.label} — ${a.hint}" aria-label="${a.label}, ${a.hint}">${arrow(k)}<span>${a.label}</span></button>`;
-}
-
-/* The burn editor floats over the chart, because the chart is the thing it
-   changes: while it is open the road past the burn is drawn in yellow and
-   dashed, and every press moves that yellow line where you can see it. Close
-   it and the yellow goes away again. */
-/* Rebuilt only when something in it changed. Re-writing the card's markup
-   every frame emptied it out from under the finger on its way down, so no
-   button in it could ever be pressed. */
-let burnCardKey = '';
-function renderBurnCard(){
-  const card = $('burncard');
-  const i = selectedNode;
-  const n = state.nodes[i];
-  if(!n || state.dockedAt){
-    if(burnCardKey !== ''){ burnCardKey = ''; card.hidden = true; card.innerHTML = ''; document.body.classList.remove('editing'); }
-    return;
-  }
-  const when = $('burn-when');
-  const key = `${i}|${n.prograde}|${n.radial}|${n.t}|${state.nodes.length}`;
-  if(key === burnCardKey){
-    if(when) when.textContent = `fires in ${S.fmtDays(n.t - state.t)}`;
-    return;
-  }
-  burnCardKey = key;
-  card.hidden = false;
-  document.body.classList.add('editing');
-  const step = stepFor(i);
-  const marks = S.markStates(state, horizonFor());
-  const fwd = S.kms(n.prograde) * 1000, side = S.kms(n.radial) * 1000;
-  const say = v => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v) >= 1000 ? (Math.abs(v) / 1000).toFixed(2) + ' km/s' : Math.round(Math.abs(v)) + ' m/s'}`;
-  card.innerHTML = `<div class="burnhead"><b>Burn ${i + 1}</b><small id="burn-when">fires in ${S.fmtDays(n.t - state.t)}</small>
-      <button class="btn sm" data-act="closenode" title="Done">Done</button></div>
-    <div class="padgrid">
-      <div class="padcell up">${padButton(i, 'out')}</div>
-      <div class="padcell left">${padButton(i, 'retro')}</div>
-      <div class="padcell mid"><b>${S.fmtKms(marks[i]?.cost ?? 0)}</b><small>${step} m/s a press</small></div>
-      <div class="padcell right">${padButton(i, 'pro')}</div>
-      <div class="padcell down">${padButton(i, 'in')}</div>
-    </div>
-    <dl class="padout">
-      <dt>Forward / back</dt><dd>${say(fwd)}</dd>
-      <dt>Out / in</dt><dd>${say(side)}</dd>
-    </dl>
-    <div class="btns">
-      <button class="btn sm" data-act="shift|${i}|-0.0416667">&minus;1 h</button>
-      <button class="btn sm" data-act="shift|${i}|0.0416667">+1 h</button>
-      <button class="btn sm" data-act="zeronode|${i}">Start over</button>
-      <button class="btn sm danger" data-act="delnode|${i}">Scrap it</button>
-    </div>`;
-  wire(card);
-}
 /* The Plan tab reads; it does not edit. A burn is set on the chart, where
  * the road it changes is in front of you — a panel of numbers beside a
  * picture of the thing the numbers are about is a worse place to work than
@@ -1269,7 +1206,7 @@ function plan(){
         <small>${fwd >= 0 ? 'forward' : 'back'} ${Math.abs(fwd)} m/s · ${side >= 0 ? 'out' : 'in'} ${Math.abs(side)} m/s</small>
       </div>`;
     });
-    out += '<p class="lock">A burn fires by itself the moment the clock reaches it. Tap one here, or its ring on the chart, to open it and change it.</p>';
+    out += '<p class="lock">A burn fires by itself the moment the clock reaches it. Tap one here, or its ring on the chart, to open it: four arrows and a cross appear round the ring, and tapping the ring again puts them away.</p>';
   }
   out += aheadList();
   if(state.dv <= 1e-9){

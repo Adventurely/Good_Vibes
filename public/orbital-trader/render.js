@@ -118,7 +118,7 @@ export function createChart(canvas, world, opts = {}){
        the right of the chart, negative y when a sheet covers the bottom. */
     offset: [0, 0],
     /* Last frame's screen-space records, for hit testing. */
-    hits: { bodies: [], nodes: [], pathSegs: [] },
+    hits: { bodies: [], nodes: [], handles: [], pathSegs: [] },
     reducedMotion: !!opts.reducedMotion,
     /* The scale bar is a navigation tool. On a thumbnail or behind a title it
        is a stray measurement in the corner of a picture. */
@@ -200,7 +200,7 @@ function draw(chart, view){
   const { ctx, world, camera } = chart;
   const W = chart.width, H = chart.height;
   const t = view.t;
-  chart.hits = { bodies: [], nodes: [], pathSegs: [] };
+  chart.hits = { bodies: [], nodes: [], handles: [], pathSegs: [] };
 
   // Positions of every body now, once per frame.
   const pos = new Map();
@@ -580,7 +580,12 @@ function drawShip(chart, view){
   const { ctx } = chart;
   if(!view.shipAbs) return;
   const p = chart.toScreen(view.shipAbs.r);
-  const dir = unit(view.shipAbs.v);
+  /* The nose points along the road that is drawn, which is the ship's motion
+     in the frame of the world it is going round — not its absolute velocity.
+     In a parking orbit those differ by ninety degrees or more, because most
+     of the absolute speed is the planet's own trip round the Lamp, and an
+     arrow pointing across its own orbit reads as a bug. */
+  const dir = unit(view.shipLocalV ?? view.shipAbs.v);
   const ang = Math.atan2(-dir[1], dir[0]);
   ctx.save();
   ctx.translate(p[0], p[1]);
@@ -600,14 +605,14 @@ function drawShip(chart, view){
   }
 }
 
-/* Maneuver nodes: a ring on the path at the moment the burn fires, with the
- * four directions the pad pushes drawn around it. The arrows are a legend,
- * not a control — the burn itself is set with four buttons, and a chart you
- * have to drag a handle on with any accuracy is a chart that has already
- * asked too much. An arrow grows with the burn written down along it, so the
- * pad and the chart are saying the same thing.
+/* Maneuver nodes. A ring on the road at the moment the burn fires; when it is
+ * open, four arrows around it and a cross beside it. That is the whole
+ * editor — no panel, no card over the sky, nothing to cover a phone. The
+ * arrows are buttons: one tap is one press, and holding one repeats. They are
+ * drawn in pixels, so they are the same size to hit at any zoom, and their
+ * hit radius is bigger than the glyph.
  */
-const HANDLE_OFFSET = 26;
+const HANDLE_OFFSET = 34;
 function drawNodes(chart, view, pos){
   const { ctx } = chart;
   const nodes = view.nodes;
@@ -617,36 +622,52 @@ function drawNodes(chart, view, pos){
     if(!where || !pos.has(where.body)) continue;
     const anchor = pos.get(where.body).r;
     const p = chart.toScreen(add(anchor, where.r));
-    const vdir = unit(where.v);
-    const pro = [vdir[0], -vdir[1]];           // screen y is down
-    const rad = unit(where.r); const radS = [rad[0], -rad[1]];
     const selected = view.selectedNode === i;
-    ctx.strokeStyle = PALETTE.nodeRing; ctx.lineWidth = selected ? 2 : 1.25;
-    ctx.beginPath(); ctx.arc(p[0], p[1], selected ? 11 : 8, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = PALETTE.node; ctx.lineWidth = selected ? 2.5 : 1.5;
+    ctx.beginPath(); ctx.arc(p[0], p[1], selected ? 12 : 8, 0, Math.PI * 2); ctx.stroke();
     ctx.fillStyle = PALETTE.node;
-    ctx.beginPath(); ctx.arc(p[0], p[1], 3.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(p[0], p[1], 3, 0, Math.PI * 2); ctx.fill();
     chart.hits.nodes.push({ index: i, x: p[0], y: p[1], r: 18 });
     if(!selected) continue;
-    /* How far each arrow reaches: a stub when nothing is written down that
-       way, growing to the full length as the burn on that axis gets big. */
-    const reach = amount => HANDLE_OFFSET * (0.45 + 0.55 * Math.min(1, Math.abs(amount) / (0.28 * Math.max(1e-9, norm(where.v)))));
+
+    const vdir = unit(where.v);
+    const pro = [vdir[0], -vdir[1]];            // screen y is down
+    const rad = unit(where.r); const radS = [rad[0], -rad[1]];
     const arrows = [
-      [pro, PALETTE.prograde, n.prograde > 0 ? n.prograde : 0],
-      [[-pro[0], -pro[1]], PALETTE.retrograde, n.prograde < 0 ? n.prograde : 0],
-      [radS, PALETTE.radial, n.radial > 0 ? n.radial : 0],
-      [[-radS[0], -radS[1]], PALETTE.radial, n.radial < 0 ? n.radial : 0],
+      ['pro',   pro,                   PALETTE.prograde,   n.prograde],
+      ['retro', [-pro[0], -pro[1]],    PALETTE.retrograde, -n.prograde],
+      ['out',   radS,                  PALETTE.radial,     n.radial],
+      ['in',    [-radS[0], -radS[1]],  PALETTE.radial,     -n.radial],
     ];
-    for(const [d, colour, amount] of arrows){
-      const len = reach(amount);
-      const h = [p[0] + d[0] * len, p[1] + d[1] * len];
-      ctx.globalAlpha = amount ? 1 : 0.4;
-      ctx.strokeStyle = colour; ctx.lineWidth = amount ? 2 : 1;
-      ctx.beginPath(); ctx.moveTo(p[0] + d[0] * 13, p[1] + d[1] * 13); ctx.lineTo(h[0], h[1]); ctx.stroke();
+    for(const [axis, d, colour, amount] of arrows){
+      const h = [p[0] + d[0] * HANDLE_OFFSET, p[1] + d[1] * HANDLE_OFFSET];
+      const lit = amount > 1e-12;
+      ctx.strokeStyle = colour; ctx.lineWidth = lit ? 2 : 1.25;
+      ctx.globalAlpha = lit ? 1 : 0.55;
+      ctx.beginPath(); ctx.moveTo(p[0] + d[0] * 16, p[1] + d[1] * 16); ctx.lineTo(h[0], h[1]); ctx.stroke();
       ctx.fillStyle = colour;
       ctx.save(); ctx.translate(h[0], h[1]); ctx.rotate(Math.atan2(d[1], d[0]));
-      ctx.beginPath(); ctx.moveTo(5, 0); ctx.lineTo(-3.5, 4); ctx.lineTo(-3.5, -4); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(7, 0); ctx.lineTo(-4, 5.5); ctx.lineTo(-4, -5.5); ctx.closePath(); ctx.fill();
       ctx.restore();
       ctx.globalAlpha = 1;
+      chart.hits.handles.push({ index: i, axis, x: h[0], y: h[1], r: 22 });
+    }
+
+    // Scrap it: a cross beside the ring.
+    const x = [p[0] + 28, p[1] - 28];
+    ctx.strokeStyle = PALETTE.crash; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(x[0], x[1], 9, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x[0] - 3.5, x[1] - 3.5); ctx.lineTo(x[0] + 3.5, x[1] + 3.5);
+    ctx.moveTo(x[0] + 3.5, x[1] - 3.5); ctx.lineTo(x[0] - 3.5, x[1] + 3.5);
+    ctx.stroke();
+    chart.hits.handles.push({ index: i, axis: 'delete', x: x[0], y: x[1], r: 18 });
+
+    // What it costs, in a word, where the eye already is.
+    if(view.nodeLabel){
+      ctx.font = '600 12px ui-sans-serif, system-ui, sans-serif';
+      ctx.fillStyle = PALETTE.node;
+      ctx.fillText(view.nodeLabel, p[0] + 16, p[1] + 26);
     }
   }
 }
@@ -683,6 +704,7 @@ function hitTest(chart, x, y){
   /* Spread first, name after. A handle record carries its own axis, and
      spreading it over `kind` was how every handle came back as something else
      and dragging one panned the chart. */
+  for(const k of h.handles){ if(Math.hypot(k.x - x, k.y - y) <= k.r) return { ...k, kind: 'handle' }; }
   for(const n of h.nodes){ if(Math.hypot(n.x - x, n.y - y) <= n.r) return { ...n, kind: 'node' }; }
   // Bodies: nearest within its drawn size, so a moon beats the planet it is in
   // front of. The generous margin is for fingers.

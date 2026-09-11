@@ -496,12 +496,12 @@ export const NARRATIVE = {
   {
    "step": "push",
    "title": "Press the green arrow",
-   "body": "Forward pushes you along the way you are already going and lifts the far side of your orbit. Back takes it down again. Out and In swing it sideways. Watch the yellow dashed line move as you press."
+   "body": "Four arrows sit round the burn's ring on the chart. The green one forward pushes you along the way you are already going and lifts the far side of your orbit; the orange one behind takes it down again. The two blue ones swing it sideways. Tap them, or hold one down, and watch the yellow dashed line move."
   },
   {
    "step": "reach",
    "title": "Push until the dashed line touches Pip",
-   "body": "The yellow dashed line is where the burn would put you. Keep pressing Forward, and nudge Out or In, until it runs into Pip's circle. Press Done when it does, and the dashed line puts itself away."
+   "body": "The yellow dashed line is where the burn would put you. Keep pressing Forward, and nudge Out or In, until it runs into Pip's circle. Tap the burn's ring again when it does, and the dashed line puts itself away."
   },
   {
    "step": "skip",
