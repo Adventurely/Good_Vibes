@@ -5,11 +5,11 @@ export const TUNING = {
   "MU_LAMP": 0.00030461741978670857,
   "YEAR_DAYS": 360,
   "KMS_PER_AU_DAY": 1706,
-  "BASE_RATE_DAYS_PER_SEC": 0.0014875,
+  "BASE_RATE_DAYS_PER_SEC": 0.0000990491876,
   "SKIP_SECONDS": 10,
-  "MAX_WARP": 100000,
+  "MAX_WARP": 1500000,
   "DV_DISPLAY_NOTE": "1 au/day shows as 1706 km/s, so Tessel's circular speed reads 29.8 km/s like Earth's.",
-  "RATE_NOTE": "At x1 a lap of the parking orbit at Tessel (0.0007 au, 0.8925 d) takes 600 real seconds: ten minutes, the slowest clock the game ever runs. Nothing in the sky is quicker than that.",
+  "RATE_NOTE": "At x1 a lap of the orbit a new game starts in — Tessel's low orbit, startAlt 0.000115 au, 0.05943 d — takes 600 real seconds: ten minutes, the slowest clock the game ever runs. Nothing in the sky is quicker than that; a lap of the parking orbit the harbour sits in (0.0007 au, 0.8925 d) is two and a half hours.",
   "SKIP_NOTE": "There is no ladder of warp speeds. A player points at a place on their road and the clock runs at whatever rate covers it in SKIP_SECONDS, capped at MAX_WARP (about 149 days a second); anything longer than the cap allows simply takes proportionally more than ten seconds, and the confirmation says so."
  },
  "bodies": [
@@ -108,12 +108,13 @@ export const TUNING = {
    "soi": 0.03,
    "radius": 0.00004,
    "dockAlt": 0.0007,
+   "startAlt": 0.000115,
    "zoneRadius": 0.0014,
    "dockSpeed": 0.000293,
    "port": true,
    "species": "otter",
    "climate": "temperate",
-   "notes": "The starting port. 8.4 km/s at the docking altitude; 3.5 km/s to leave its reach."
+   "notes": "The starting port. 8.4 km/s at the docking altitude; 3.5 km/s to leave its reach. startAlt is the low orbit a new game opens in and nothing else: 0.000115 au, which is 0.000075 au of altitude over a world 0.00008 au across, so the high point of the opening orbit sits under one planet-diameter. It is the only orbit in the sky the clock is tuned to — a lap of it is ten real minutes at x1."
   },
   {
    "id": "pip",

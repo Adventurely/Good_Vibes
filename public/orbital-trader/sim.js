@@ -98,8 +98,9 @@ export function newGame(seed = 1){
      Orbital Trader — every harbour is a parking orbit — so the honest first
      frame is the ship already going round Tessel with a road drawn ahead of
      it. Nothing to cast off from, nothing to press before the chart means
-     something. */
-  placeParked(state, start);
+     something. And it opens *low*: close enough in that the world fills the
+     chart and a lap is ten real minutes, not a fortnight of nothing. */
+  placeStart(state, start);
   state.dockedAt = null;
   state.justLeft = start;          // Tessel's own mouth is where we started
   state.justLeftAt = state.t;
@@ -289,15 +290,14 @@ export function dock(state){
 /* Free flight at a port: the parking orbit a ship sits in when it is not tied
  * up. A prograde circle at the docking altitude, placed so that the ship's
  * velocity points the way the port itself is moving, which means the first
- * burn a beginner makes is already in the right direction. This is also where
- * a new game begins. */
-function placeParked(state, portId){
+ * burn a beginner makes is already in the right direction. */
+function placeParked(state, portId, radius){
   const b = world.get(portId);
   if(b.mu > 0){
     const pv = absState(world, portId, state.t).v;
     const dir = norm(pv) > 0 ? unit(pv) : [0, 1];
     const theta = Math.atan2(dir[1], dir[0]) - Math.PI / 2;
-    const s = circularState(b.mu, b.dockAlt, theta);
+    const s = circularState(b.mu, radius ?? b.dockAlt, theta);
     state.ship = { body: portId, r: s.r, v: s.v };
   }else{
     const parent = world.get(b.parent);
@@ -306,6 +306,25 @@ function placeParked(state, portId){
     const off = scale(unit(local.r), b.zoneRadius * 0.6);
     state.ship = { body: b.parent, r: add(local.r, off), v: [...local.v] };
   }
+}
+
+/* Where a new game begins: a low circular orbit, the same prograde circle as
+ * a parking orbit but drawn at `startAlt` instead of the docking altitude.
+ *
+ * Low means what a pilot means by it — the high point of the orbit sits less
+ * than one planet-diameter above the ground — and at Tessel that is 0.000115
+ * au, about three planet-radii out from the middle of the world. The point is
+ * what the first frame looks like: a world that fills the chart and visibly
+ * turns under you, rather than a blue dot a hundred thousand kilometres off.
+ * The clock is tuned to this orbit and no other — one lap, ten real minutes.
+ *
+ * Only the opening uses it. The harbour is still at `dockAlt`, so tying up
+ * and casting off put the ship back on the orbit the whole delta-v table is
+ * measured from, and nothing downstream of the first burn moves.
+ */
+function placeStart(state, portId){
+  const b = world.get(portId);
+  placeParked(state, portId, b.startAlt ?? b.dockAlt);
 }
 
 export function undock(state){
@@ -341,11 +360,11 @@ export function daysToPeriapsis(bodyId, t){
 /* --------------------------------------------------------------- flight */
 
 /* Time has no ladder. There is the clock — ×1, ten minutes to a lap of the
- * parking orbit — and there is skipping: you point at somewhere on your road,
- * the game says how long it takes and how long you will be sitting there, and
- * if you say yes it runs the clock at exactly the rate that covers it in ten
- * seconds. A rung of warp is a thing to choose; a place on your road is a
- * thing you already wanted. */
+ * low orbit a new game opens in — and there is skipping: you point at
+ * somewhere on your road, the game says how long it takes and how long you
+ * will be sitting there, and if you say yes it runs the clock at exactly the
+ * rate that covers it in ten seconds. A rung of warp is a thing to choose; a
+ * place on your road is a thing you already wanted. */
 export const MAX_WARP = CONST.MAX_WARP;
 export const SKIP_SECONDS = CONST.SKIP_SECONDS;
 export function warpRate(state){ return Math.max(1, Math.min(MAX_WARP, state.warp ?? 1)); }
@@ -520,12 +539,18 @@ function flag(state, name, events){
 
 /* ------------------------------------------------------------ planning */
 
-/* How long a harbour stays quiet after you cast off from it: a couple of
- * minutes of real time at x1, and a fifth of a lap of Tessel's parking orbit. */
-export const QUIET_DAYS = 0.2;
+/* Two constants that are really real seconds wearing game days, so both are
+ * written that way: the clock is what sets them, and when the clock changes
+ * they have to change with it or they stop meaning anything.
+ *
+ * QUIET_DAYS is how long a harbour stays quiet after you cast off from it —
+ * two minutes of real time at x1, long enough to be somewhere else. MIN_LEAD
+ * is how far ahead of now a mark may be written: a minute, which is a tenth
+ * of a lap of the orbit the game opens in and leaves room to plan inside it. */
+export const QUIET_DAYS = CONST.BASE_RATE_DAYS_PER_SEC * 120;
 
 export const MAX_NODES = 6;
-export const MIN_LEAD = 0.1;
+export const MIN_LEAD = CONST.BASE_RATE_DAYS_PER_SEC * 60;
 export function addNode(state, t){
   if(state.dockedAt || t < state.t + MIN_LEAD || state.nodes.length >= MAX_NODES) return -1;
   state.nodes.push({ t, prograde: 0, radial: 0 });
@@ -560,9 +585,8 @@ export function addNodeAhead(state){
   const el = elementsFromState(b.mu, state.ship.r, state.ship.v);
   const ahead = Number.isFinite(el.period) ? el.period / 8 : 1;
   const last = state.nodes.length ? state.nodes[state.nodes.length - 1].t : state.t;
-  /* A floor of twenty-five real seconds at x1, which at this clock is most of
-     the way round a small moon: enough to press the pad a few times before
-     the mark arrives and fires whatever it has by then. */
+  /* A floor of twenty-five real seconds at x1: enough to press the pad a few
+     times before the mark arrives and fires whatever it has by then. */
   const floor = Math.max(MIN_LEAD * 1.1, CONST.BASE_RATE_DAYS_PER_SEC * 25);
   return addNode(state, Math.max(state.t, last) + Math.max(floor, ahead));
 }

@@ -1732,7 +1732,7 @@ timestep anywhere, and nothing tunnels through a small moon at high warp.
 | Time | days (Tessel's year is 360 of them) |
 | Speed, Δv | au/day inside; 1 au/day shows as 1706 km/s, so Tessel's orbit reads 29.8 km/s |
 | Fuel | *is* the Δv budget. A burn subtracts its own size. No mass, no rocket equation |
-| Clock | ×1 is 0.0014875 days a second: ten real minutes to a lap of Tessel's parking orbit |
+| Clock | ×1 is 0.0000990491876 days a second: ten real minutes to a lap of the low orbit a new game opens in over Tessel |
 
 ### Aiming
 

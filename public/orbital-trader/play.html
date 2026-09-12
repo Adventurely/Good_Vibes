@@ -726,9 +726,10 @@ function renderDockCard(docking){
 /* ------------------------------------------------------------- time */
 
 /* There is no ladder of speeds to climb, and nothing to hold down. The clock
-   runs at ×1 — ten real minutes to a lap of the parking orbit — until you
-   point at somewhere on your road and say go. Then it runs at whatever rate
-   covers that stretch in about ten seconds and stops itself on arrival.
+   runs at ×1 — ten real minutes to a lap of the low orbit a new game opens
+   in, and longer for everything else in the sky — until you point at
+   somewhere on your road and say go. Then it runs at whatever rate covers
+   that stretch in about ten seconds and stops itself on arrival.
    Anything that matters on the way (a burn, a change of reach, a harbour
    mouth) cancels the skip, because the whole point of skipping is to be
    awake for the parts that are not a coast. */
@@ -966,7 +967,8 @@ addEventListener('keydown', e => {
    moment that is nearly here stops the clock, so the pad can be pressed
    before it arrives; anything further off leaves the clock alone. The
    threshold is in real seconds, not game days — at the top warp a fortnight
-   goes by while you look at it, and at ×1 a day is a quarter of an hour. */
+   goes by while you look at it, and at ×1 a day is the better part of three
+   hours. */
 const PLAN_HOLD_SECONDS = 25;
 function realSecondsTo(t){
   return (t - state.t) / Math.max(1e-12, CONST.BASE_RATE_DAYS_PER_SEC * S.warpRate(state));

@@ -97,6 +97,24 @@ for(const b of T.bodies){
   }
 }
 
+/* --- the orbit a new game opens in, and the clock that is tuned to it.
+   Low means what a pilot means by it: the high point of the orbit sits less
+   than one planet-diameter above the ground. The clock then has one job — a
+   lap of that orbit is ten real minutes at x1 — and the skip cap has to move
+   with it, or pointing at the Lantern stops being ten seconds. */
+const START_LAP_SECONDS = 600;
+for(const b of T.bodies){
+  if(b.startAlt == null) continue;
+  const alt = b.startAlt - b.radius;
+  check(`C12 ${b.id} opens in a low orbit`, alt > 0 && alt < 2 * b.radius, `apoapsis altitude ${alt.toFixed(6)} au < diameter ${(2 * b.radius).toFixed(6)} au`);
+  check(`C12 ${b.id}'s start orbit clears the harbour it is under`, b.startAlt < b.dockAlt, `${b.startAlt} < ${b.dockAlt}`);
+  const lap = period(b.mu, b.startAlt);
+  const seconds = lap / T.constants.BASE_RATE_DAYS_PER_SEC;
+  check(`C12 a lap of ${b.id}'s start orbit is ten real minutes at x1`, Math.abs(seconds - START_LAP_SECONDS) < 0.5, `${seconds.toFixed(2)} s (${lap.toFixed(5)} d)`);
+}
+const capRate = T.constants.MAX_WARP * T.constants.BASE_RATE_DAYS_PER_SEC;
+check('C12 the skip cap is still about 149 days a second', capRate > 120 && capRate < 180, `${capRate.toFixed(1)} d/s`);
+
 // --- the tutorial moons
 const t = by.tessel;
 const hop = hohmann(t.mu, by.bramble.a, by.ledger.a);

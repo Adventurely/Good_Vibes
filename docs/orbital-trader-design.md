@@ -60,7 +60,7 @@ Burns are **instantaneous impulses**. What you plan is exactly what you get, whi
 
 This is a scope decision as much as a fictional one. Landing would need a second control scheme, a second set of physics, and a second art problem, and it would buy nothing the orbital game does not already have. The fiction absorbs it easily: Tessel is an ocean of floating harbour cities that meet ships in orbit, the cats cannot survive a heavy world at all, and the frogs' balloon villages have no ground under them either.
 
-The player therefore **starts in orbit**, not moored. A new game opens with the ship already going round Tessel in its parking orbit, with a road drawn ahead of it and a crate in the hold. There is nothing to cast off from and nothing to press before the chart means something.
+The player therefore **starts in orbit**, not moored. A new game opens with the ship already going round Tessel — *low* round it, high point under one planet-diameter of altitude, so the ocean fills the chart and visibly turns underneath — with a road drawn ahead of it and a crate in the hold. There is nothing to cast off from and nothing to press before the chart means something. The harbour itself is higher up, at the docking altitude every other orbit in the game is measured from; tying up and casting off again is what puts a ship there.
 
 ### 2.3.1 Forgiveness Systems
 
@@ -74,7 +74,7 @@ The skill curve is built into the physics rather than layered on top.
 
 | Stage | Technique | In-world name | Payoff |
 |---|---|---|---|
-| Opening | Tessel's parking orbit out to Pip, its nearest moon | The first delivery | One tap, one push, one crossing: the whole game in five minutes |
+| Opening | Tessel's low opening orbit out to Pip, its nearest moon | The first delivery | One tap, one push, one crossing: the whole game in five minutes |
 | Beginner | Moon-to-moon hops around Tessel | "Hopping the rafts" | Learning SOI transitions in a safe space |
 | Beginner | Hohmann transfers | "The slow road" | Cheap, reliable, slow |
 | Intermediate | Faster direct transfers | "Running hot" | Speed at a fuel cost |
@@ -93,7 +93,7 @@ Fuel is the only resource for movement and is displayed to the player as a delta
 
 The game clock runs continuously, and every body moves along its orbit as time passes. Time is the second currency alongside fuel. Time pressure comes from perishable cargo, passenger deadlines, and scheduled orbital events such as Wanderwell's periapsis market and Merrow's Comet's passes.
 
-**The clock is slow on purpose.** At ×1, one lap of the parking orbit at Tessel takes **ten real minutes**. That is the slowest thing in the sky, and everything else is slower still, so at ×1 almost nothing appears to move. That is the intended reading: an orbit is a place you are, not an animation you watch. Watching the sky turn is what skipping is for.
+**The clock is slow on purpose.** At ×1, one lap of the low orbit a new game opens in over Tessel takes **ten real minutes**. That is the fastest thing in the sky — the orbit closest in to the heaviest world a player ever sits over — and everything else is slower still, so at ×1 almost nothing else appears to move. That is the intended reading: an orbit is a place you are, not an animation you watch. Watching the sky turn is what skipping is for.
 
 **There is no ladder of warp speeds.** A strip of ×1 / ×10 / ×100 buttons asks the player to answer a question they do not have — *how fast should time go?* — when the question they actually have is *when do I want to be there?* So time is skipped by pointing at a place:
 
@@ -299,6 +299,6 @@ A fully hand-drawn navigation chart was considered and ruled out as unrealistic 
 
 ### 6.7 Open Technical Questions
 
-**Decided since the first draft**, and recorded above rather than here: burns are instantaneous impulses (2.2); the control is four buttons on two axes, reached by tapping the road (2.2); there is no landing and the game starts in orbit (2.3); the clock runs at ten real minutes to a lap of the parking orbit, with no warp ladder and skipping by pointing at a place (2.6); the chart is locked to the body the ship orbits and draws only the immediate orbit plus the next crossing (2.6.1); the opening mission is a single delivery to Pip.
+**Decided since the first draft**, and recorded above rather than here: burns are instantaneous impulses (2.2); the control is four buttons on two axes, reached by tapping the road (2.2); there is no landing and the game starts in orbit (2.3); the clock runs at ten real minutes to a lap of the low orbit the game opens in, with no warp ladder and skipping by pointing at a place (2.6); the chart is locked to the body the ship orbits and draws only the immediate orbit plus the next crossing (2.6.1); the opening mission is a single delivery to Pip.
 
 **Still open.** Distance compression beyond the inner system needs prototyping. Docking-zone size and speed thresholds need tuning for the right level of forgiveness. The representation of belts, debris fields, and the comet (Section 5) needs a final decision. Whether landing is ever added — and if so, whether it is a third control scheme or a cutscene over an orbital rendezvous — is deferred, not refused.

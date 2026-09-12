@@ -249,6 +249,17 @@ function parkAt(s, id){
   }
 }
 
+/* The parking orbit: where a ship is whenever it is loose at a port and not
+ * opening a new game. A new game now starts *below* it — see the low-orbit
+ * test — so a test about the orbit undocking leaves you in, or about the
+ * first lesson flown from Tessel's harbour, has to tie up and cast off
+ * rather than take the opening frame for it. */
+function undockedAt(seed, port = 'tessel'){
+  const s = newDocked(seed, port);
+  S.undock(s);
+  return s;
+}
+
 function newDocked(seed, port = 'tessel'){
   const s = S.newGame(seed);
   if(port !== 'tessel'){ s.dockedAt = port; S.undock(s); }
@@ -271,8 +282,8 @@ test('a new game starts in orbit above Tessel, full, with one crate for Pip', ()
   assert.equal(s.ship.body, 'tessel');
   assert.equal(s.justLeft, 'tessel', "Tessel's own mouth is where we started");
   const b = world.get('tessel');
-  assert.ok(Math.abs(O.norm(s.ship.r) - b.dockAlt) < 1e-12, 'in the parking orbit');
-  assert.ok(Math.abs(O.norm(s.ship.v) - Math.sqrt(b.mu / b.dockAlt)) < 1e-12, 'and going round it');
+  assert.ok(Math.abs(O.norm(s.ship.r) - b.startAlt) < 1e-12, 'in the low orbit the game opens in');
+  assert.ok(Math.abs(O.norm(s.ship.v) - Math.sqrt(b.mu / b.startAlt)) < 1e-12, 'and going round it');
   assert.equal(s.passengers.length, 1);
   assert.equal(s.passengers[0].to, S.FIRST_DELIVERY.to);
   assert.equal(s.target, S.FIRST_DELIVERY.to, 'the first delivery is already the target');
@@ -287,9 +298,38 @@ test('a new game starts in orbit above Tessel, full, with one crate for Pip', ()
   assert.deepEqual(back, JSON.parse(JSON.stringify(s)));
 });
 
+test('the game opens in a low orbit, and the clock is tuned so a lap of it is ten real minutes', () => {
+  const s = S.newGame(5);
+  const b = world.get('tessel');
+  const el = O.elementsFromState(b.mu, s.ship.r, s.ship.v);
+  assert.ok(el.e < 1e-9 && el.dir > 0, 'a prograde circle, so the first burn points the right way');
+
+  /* Low means what a pilot means by it and not what a chart does: the high
+     point of the orbit is an altitude over the ground, and it sits under one
+     planet-diameter of it. At Tessel that is 0.000075 au over a world 0.00008
+     au across — close enough in that the ocean fills the chart. */
+  const apoapsisAltitude = el.ra - b.radius;
+  assert.ok(apoapsisAltitude > 0, 'and above the ocean, not through it');
+  assert.ok(apoapsisAltitude < 2 * b.radius, `apoapsis altitude ${apoapsisAltitude} is not below the diameter ${2 * b.radius}`);
+  assert.ok(el.ra < world.get('tessel').zoneRadius, 'inside the harbour mouth, so Tessel can still be tied up at');
+  assert.ok(el.ra < b.dockAlt, 'and below the harbour, which is where undocking puts you');
+
+  /* The clock has exactly one job: a lap of this orbit, at ×1, is ten real
+     minutes. Everything else in the sky is slower, so this is the fastest the
+     game ever looks. */
+  const lapSeconds = el.period / S.dtForFrame(s, 1);
+  assert.ok(Math.abs(lapSeconds - 600) < 0.5, `a lap takes ${lapSeconds.toFixed(2)} real seconds, not 600`);
+
+  // And flying it for those ten minutes really does come back round.
+  const r0 = [...s.ship.r];
+  for(let i = 0; i < 600; i++) S.tick(s, S.dtForFrame(s, 1));
+  assert.ok(O.dist(s.ship.r, r0) < el.ra * 1e-6, 'ten real minutes of ×1 is one lap, back where it started');
+});
+
 test('undocking puts the ship in a circular prograde orbit at the docking altitude', () => {
-  const s = S.newGame(3);
-  S.undock(s);
+  /* Casting off is not the same frame as a new game: the opening orbit is low
+     and the harbour's is not, so this ties up first and then lets go. */
+  const s = undockedAt(3);
   assert.equal(s.dockedAt, null);
   const b = world.get('tessel');
   const el = O.elementsFromState(b.mu, s.ship.r, s.ship.v);
@@ -338,8 +378,7 @@ function hopPlan(s, target, maxKms = 4, wantDockable = false){
 }
 
 test('the first lesson is flyable: one prograde burn from Tessel reaches Bramble inside the starter tank', () => {
-  const s = S.newGame(11);
-  S.undock(s);
+  const s = undockedAt(11);
   const plan = hopPlan(s, 'bramble');
   assert.ok(plan, 'no single prograde burn reaches Bramble');
   // The tuning's own figure for this hop is about 2 km/s out of a 14 km/s tank.
@@ -362,8 +401,7 @@ test('the whole first lesson can be flown: hop, brake at the kiss, and tie up at
   /* This is the tutorial, played by the rules the page plays by: one prograde
      burn to reach the moon, the game's own brake-at-the-kiss mark, and then
      Dock. If this test fails the game cannot be finished by a beginner. */
-  const s = S.newGame(5);
-  S.undock(s);
+  const s = undockedAt(5);
   const plan = hopPlan(s, 'bramble', 4, true);
   assert.ok(plan, 'no hop reaches Bramble inside its harbour mouth');
   s.nodes = plan.nodes;
