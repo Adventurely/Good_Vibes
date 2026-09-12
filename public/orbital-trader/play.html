@@ -81,7 +81,6 @@
   /* The ×1 clock has no controls but one: a hold. Time is skipped by pointing
      at where on your road you want to be, not by climbing a ladder of speeds,
      so there is no strip of numbers along the bottom of the sky any more. */
-  #w-pause.skipping{ color:var(--mint); border-color:var(--mint); }
   .btn:focus-visible, .tab:focus-visible{ outline:2px solid var(--gold); outline-offset:2px; }
 
   /* ---- Chart controls: bottom right ---------------------------------- */
@@ -215,6 +214,10 @@
     background:rgba(12,15,22,.72); color:var(--ink); border:1px solid var(--line-2); border-radius:14px;
     padding:1.1rem 1.25rem; width:min(92vw, 420px); backdrop-filter:blur(14px) saturate(1.1);
     box-shadow:0 18px 50px -18px #000;
+    /* Down at the bottom, near the thumb and clear of the sky you just
+       tapped: a question about a point on the chart should not sit on top of
+       the point. */
+    margin:auto auto max(1rem, env(safe-area-inset-bottom));
   }
   dialog::backdrop{ background:rgba(0,0,0,.28); backdrop-filter:blur(1px); }
   .btn.ghost{ background:transparent; border-color:transparent; color:var(--dim); }
@@ -344,6 +347,10 @@
     background:rgba(12,15,22,.72); color:var(--ink); border:1px solid var(--line-2); border-radius:14px;
     padding:1.1rem 1.25rem; width:min(92vw, 420px); backdrop-filter:blur(14px) saturate(1.1);
     box-shadow:0 18px 50px -18px #000;
+    /* Down at the bottom, near the thumb and clear of the sky you just
+       tapped: a question about a point on the chart should not sit on top of
+       the point. */
+    margin:auto auto max(1rem, env(safe-area-inset-bottom));
   }
   dialog::backdrop{ background:rgba(0,0,0,.28); backdrop-filter:blur(1px); }
   .btn.ghost{ background:transparent; border-color:transparent; color:var(--dim); }
@@ -437,7 +444,6 @@
 <canvas id="chart" aria-label="The navigation chart: the Lamp, its worlds, and your ship's predicted path." role="img"></canvas>
 
 <header id="hud" aria-live="off">
-  <div class="stat"><small>Date</small><b id="h-date">—</b></div>
   <div class="stat" id="h-dv-wrap"><small>Fuel</small><b id="h-dv">—</b><div id="dvbar"><i id="h-dvfill"></i></div></div>
   <div class="stat"><small>Coin</small><b id="h-money">—</b></div>
   <div class="stat"><small>Hold</small><b id="h-hold">—</b></div>
@@ -448,10 +454,7 @@
 
 <div id="view">
   <button id="dock-go" hidden title="Dock (d)" aria-label="Dock here"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="3.4"/><path d="M12 10.4 V20"/><path d="M8 13.5 H16"/><path d="M5 15.5 a7 7 0 0 0 14 0"/></svg></button>
-  <button id="w-pause" aria-pressed="false" title="Hold the clock (space)">&#10074;&#10074;</button>
   <button id="v-fit" title="Back to your ship, and frame it (f)">&#9678;</button>
-  <button id="v-in" title="Zoom in (+)">+</button>
-  <button id="v-out" title="Zoom out (-)">&minus;</button>
   <button id="v-panel" title="Show or hide the panel (p)" aria-pressed="true">&#9776;</button>
 </div>
 
@@ -692,7 +695,6 @@ function handleEvents(events){
 /* ------------------------------------------------------------- HUD */
 
 function renderHud(docking){
-  $('h-date').textContent = S.calendar(state.t).text;
   $('h-dv').textContent = `${S.fmtKms(state.dv)} / ${S.fmtKms(state.tank)}`;
   const fill = $('h-dvfill');
   const frac = state.tank > 0 ? state.dv / state.tank : 0;
@@ -745,11 +747,17 @@ function renderDockCard(docking){
 let warpTarget = null;
 function setRate(mult){
   state.warp = Math.max(1, Math.min(CONST.MAX_WARP, mult));
-  $('w-pause').setAttribute('aria-pressed', String(state.paused));
-  $('w-pause').classList.toggle('skipping', warpTarget != null && !state.paused);
 }
 function stopSkip(){ warpTarget = null; setRate(1); }
-$('w-pause').addEventListener('click', () => { state.paused = !state.paused; if(state.paused) warpTarget = null; setRate(state.paused ? 1 : state.warp); });
+/* There is no pause button any more: the menu is the pause. Opening it is
+   already what a player does when they want to stop and read something, and
+   the Clock stat in the bar says which it is. Space still works. */
+function setPaused(on){
+  if(state.paused === !!on) return;
+  state.paused = !!on;
+  if(state.paused) warpTarget = null;
+  setRate(state.paused ? 1 : state.warp);
+}
 
 /* Run to a moment and stop just short of it. The rate is chosen once, from
    the whole distance, so the ten seconds it promised are the ten seconds it
@@ -796,7 +804,6 @@ function askAtPath(t){
   const plan = S.skipPlan(state, t);
   const place = whereAt(t);
   openModal(`<h2>${S.fmtDays(Math.max(0, t - state.t))} along your path</h2>
-    <p>${place ? `You will be in ${esc(place.name)}'s gravity.` : ''}${plan ? ` Running the clock there takes ${saySeconds(plan.seconds)}.` : ''}</p>
     <div class="btns">
       <button class="btn" id="m-skip" ${plan ? '' : 'disabled'}>Warp here</button>
       <button class="btn primary" id="m-burn" ${room ? '' : 'disabled title="Six is plenty for one path."'}>Plan a burn</button>
@@ -821,13 +828,14 @@ function askAtPath(t){
 /* ------------------------------------------------------------- view */
 
 $('v-fit').addEventListener('click', () => backToShip(true));
-$('v-in').addEventListener('click', () => chart.zoomBy(1.6));
-$('v-out').addEventListener('click', () => chart.zoomBy(1 / 1.6));
 $('v-panel').addEventListener('click', () => togglePanel());
 /* The view is locked; there is nothing to keep in sync but the panel. */
 function syncView(){}
-function togglePanel(open = !panelOpen){
+/* `quiet` is for the times the layout moves the panel on its own — the first
+   paint and a resize. Only a person opening it stops the clock. */
+function togglePanel(open = !panelOpen, quiet = false){
   panelOpen = open;
+  if(!quiet) setPaused(open);
   $('panel').classList.toggle('closed', !panelOpen);
   $('v-panel').setAttribute('aria-pressed', String(panelOpen));
   // On a phone the sheet covers the bottom of the chart, so the cards that
@@ -846,7 +854,7 @@ function applyOffset(){
 }
 // A window that changes width changes which layout it is in, so the classes
 // that depend on the width have to be worked out again.
-addEventListener('resize', () => togglePanel(panelOpen));
+addEventListener('resize', () => togglePanel(panelOpen, true));
 
 /* ------------------------------------------------------------- input */
 
@@ -989,7 +997,7 @@ addEventListener('keydown', e => {
   if($('modal').open) return;
   const fine = e.shiftKey ? 0.2 : 1;   // a fraction of one press of the pad
   switch(e.key){
-    case ' ': e.preventDefault(); $('w-pause').click(); break;
+    case ' ': e.preventDefault(); setPaused(!state.paused); break;
     case '+': case '=': chart.zoomBy(1.4); break;
     case '-': case '_': chart.zoomBy(1 / 1.4); break;
     case 'f': backToShip(); break;
@@ -1682,7 +1690,7 @@ $('grab').setAttribute('aria-label', 'Close the panel');
 $('grab').addEventListener('keydown', e => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); togglePanel(false); } });
 
 renderTabs();
-togglePanel(panelOpen);
+togglePanel(panelOpen, true);
 replan(true);
 backToShip(true);
 syncView();

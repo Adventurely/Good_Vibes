@@ -457,7 +457,18 @@ function drawBodies(chart, view, pos, t){
       const lit = chart.reducedMotion || lanternLit(view.now ?? 0);
       alpha = lit ? 1 : 0.35;
     }
-    const drew = rpx >= 3.5 && drawSprite(ctx, b.id, p[0], p[1], rpx * 2.4, alpha);
+    /* The picture is the planet, so it is drawn at the planet's real size and
+       clipped to it. It used to be painted at 1.2 times the radius with
+       nothing holding it in, which made every world a fifth too big and put
+       a low orbit visibly inside the ground it was clearing. The clip also
+       keeps rings and sparks off the sky around the body. */
+    let drew = false;
+    if(rpx >= 3.5){
+      ctx.save();
+      ctx.beginPath(); ctx.arc(p[0], p[1], rpx, 0, Math.PI * 2); ctx.clip();
+      drew = drawSprite(ctx, b.id, p[0], p[1], rpx * 2, alpha);
+      ctx.restore();
+    }
     if(!drew){
       ctx.globalAlpha = alpha;
       ctx.beginPath(); ctx.arc(p[0], p[1], rpx, 0, Math.PI * 2);
@@ -769,8 +780,9 @@ function drawNodes(chart, view, pos){
       chart.hits.handles.push({ index: i, axis, x: h[0], y: h[1], r: 22 });
     }
 
-    // Scrap it: a cross beside the ring.
-    const x = [p[0] + 28, p[1] - 28];
+    /* Scrap it: a cross beside the ring, set far enough out that a thumb
+       going for the ring cannot catch it. */
+    const x = [p[0] + 40, p[1] - 40];
     ctx.strokeStyle = PALETTE.crash; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(x[0], x[1], 9, 0, Math.PI * 2); ctx.stroke();
     ctx.beginPath();
