@@ -3,94 +3,49 @@
 export const NARRATIVE = {
  "glossary": [
   {
-   "term": "kissing distance",
-   "plain": "periapsis",
-   "tip": "The closest your path comes to whatever you are going round. Everything cheap happens here."
+   "term": "low point / high point",
+   "plain": "periapsis / apoapsis",
+   "tip": "The nearest and furthest your path comes to whatever you are going round. Everything cheap happens at the low point; a small burn at the high point moves the low point a long way."
   },
   {
-   "term": "the long look",
-   "plain": "apoapsis",
-   "tip": "The far end of your path, where you are slowest and a small burn moves the other end a long way."
-  },
-  {
-   "term": "a festival",
-   "plain": "transfer window",
-   "tip": "The days when two worlds line up for the cheapest crossing. Everyone throws a party; the honest ones admit it is about the fuel."
-  },
-  {
-   "term": "the slow road",
-   "plain": "Hohmann transfer",
-   "tip": "One burn out, one burn in, and a long wait between them. The cheapest way anywhere, and the reason cargo is patient."
-  },
-  {
-   "term": "borrowing from Grumm",
-   "plain": "gravity assist",
-   "tip": "Fall past a heavy world and leave faster than you arrived. Grumm never notices; the Emberkin insist it sulks."
-  },
-  {
-   "term": "a world's reach",
-   "plain": "sphere of influence",
-   "tip": "How far a world's pull decides your path. Cross the line and everything is measured from somewhere new."
-  },
-  {
-   "term": "what you have left",
+   "term": "fuel",
    "plain": "delta-v",
-   "tip": "Not fuel in a tank so much as speed you are still allowed to change. Spend it on the right day and it goes a long way."
+   "tip": "Measured in km/s, because that is what it buys: how much you are still allowed to change your speed by. A burn subtracts its own size. There is no engine to throttle."
   },
   {
-   "term": "forward",
-   "plain": "prograde",
-   "tip": "The way you are already going. Burning forward raises the far end of your path."
+   "term": "forward, back, out, in",
+   "plain": "prograde, retrograde, radial",
+   "tip": "The four ways to push. Forward and back are along the way you are already going, and move the far end of your path. Out and in shove it sideways, turning the path without much changing its size."
   },
   {
-   "term": "back",
-   "plain": "retrograde",
-   "tip": "Against your own motion. Burning back lowers the far end, and is how you stop."
+   "term": "a transfer",
+   "plain": "Hohmann transfer",
+   "tip": "One burn to leave, one burn to arrive, and a long coast between them. The cheapest way anywhere, and the reason cargo is patient."
   },
   {
-   "term": "out and in",
-   "plain": "radial",
-   "tip": "Sideways, away from or towards what you are orbiting. It turns your path without much changing its size."
+   "term": "a launch window",
+   "plain": "transfer window",
+   "tip": "The days when two worlds line up for the cheapest crossing. Miss one and you wait for the next, which is why everybody throws a party for them."
   },
   {
-   "term": "matching",
-   "plain": "rendezvous",
-   "tip": "Arriving where something is, at the speed it is going. Cats are born knowing how; everyone else practises."
+   "term": "a slingshot",
+   "plain": "gravity assist",
+   "tip": "Fall past a heavy world and leave faster than you arrived, for nothing. Grumm never notices; the Emberkin insist it sulks."
   },
   {
-   "term": "skimming",
+   "term": "air braking",
    "plain": "aerobraking",
    "tip": "Grazing a world's air to shed speed for free. Wonderful with a heat shield. Brief without one."
   },
   {
-   "term": "winding the clock",
-   "plain": "time warp",
-   "tip": "Running the sky faster while you coast. It slows down again the moment anything happens."
+   "term": "a world's gravity",
+   "plain": "sphere of influence",
+   "tip": "How far out a world's pull is the one that decides your path. Cross the line and everything you see is measured from somewhere new."
   },
   {
-   "term": "the harbour mouth",
+   "term": "docking range",
    "plain": "docking zone",
-   "tip": "Close enough and slow enough, and a port will take your lines. Generous, on purpose."
-  },
-  {
-   "term": "getting out",
-   "plain": "escape",
-   "tip": "Going fast enough that a world stops holding you at all."
-  },
-  {
-   "term": "getting caught",
-   "plain": "capture",
-   "tip": "Burning back hard enough that a world starts holding you. The expensive half of every journey."
-  },
-  {
-   "term": "the near pass",
-   "plain": "closest approach",
-   "tip": "The best your current path will do against something you are chasing. Improve it before you spend anything."
-  },
-  {
-   "term": "a mark",
-   "plain": "maneuver node",
-   "tip": "A burn written down for later. Costs nothing until the clock reaches it."
+   "tip": "Get into a steady orbit whose high point is inside this and a port will take your lines. Generous, on purpose."
   }
  ],
  "ports": {
@@ -113,7 +68,7 @@ export const NARRATIVE = {
    ]
   },
   "wanderwell": {
-   "blurb": "A summer colony on an orbit that cannot make up its mind, swinging from scorched to frozen and back over three years. At kissing distance the Emberkin arrive in their thousands and the market fills a valley. On the way out they leave, all at once, and the otters of Tagalong turn the lights down.",
+   "blurb": "A summer colony on an orbit that cannot make up its mind, swinging from scorched to frozen and back over three years. At its low point the Emberkin arrive in their thousands and the market fills a valley. On the way out they leave, all at once, and the otters of Tagalong turn the lights down.",
    "arrival": [
     "The valley is one enormous awning, and under it everything in the inner system is for sale.",
     "Somebody hands you a drink before you have said who you are.",
@@ -143,7 +98,7 @@ export const NARRATIVE = {
     "It is not much of a market, and they are not pretending otherwise."
    ],
    "rumours": [
-    "Wanderwell's kiss is what they count the days to, and they will tell you exactly how many.",
+    "Wanderwell's low point is what they count the days to, and they will tell you exactly how many.",
     "A cat captain wintered here once and left a gift nobody has worked out the meaning of.",
     "They hear things from every ship that passes and remember every one."
    ]
@@ -162,7 +117,7 @@ export const NARRATIVE = {
    ],
    "rumours": [
     "Bramble and Ledger are not speaking again. Or still. It is hard to tell from here.",
-    "Somebody's cousin took the slow road to Grumm and came back saying the frogs gave her things for nothing.",
+    "Somebody's cousin took the slow transfer to Grumm and came back saying the frogs gave her things for nothing.",
     "The shipwrights at Pip will fit anything to anything, and will have opinions about your paint."
    ]
   },
@@ -271,7 +226,7 @@ export const NARRATIVE = {
    "rumours": [
     "They sing about Chime. Nobody is sure the song is theirs.",
     "Mossback's heartbeat can be heard through a hull if you get close and stay quiet.",
-    "Skimming Grumm's clouds is free braking, they say, with the right shield. Without one it is free anyway, once."
+    "Air braking in Grumm's clouds is free, they say, with the right shield. Without one it is free anyway, once."
    ]
   },
   "widdershins": {
@@ -469,13 +424,13 @@ export const NARRATIVE = {
   ],
   "towAtmosphere": "The clouds took the hull without a shield on it. The frogs fished you out and hummed the whole time they were doing it.",
   "ledgerDebt": "Ledger covers what you could not, at interest, with a copy of the paperwork for your records.",
-  "wanderwellOpening": "Wanderwell is coming to kissing distance. The valley market opens, and half the inner system is already on its way.",
+  "wanderwellOpening": "Wanderwell is coming to its low point. The valley market opens, and half the inner system is already on its way.",
   "wanderwellClosing": "Wanderwell is heading out. The stalls are down, the awning is rolled, and the otters of Tagalong are turning the lights off behind everyone.",
   "cometSighted": "Your sensors find Merrow's Comet out in the dark, falling inward on its nineteen-year swing.",
   "cometCaught": "You match speeds with a comet, and somebody opens a door in the ice. Four peoples are arguing about a price inside, and all four stop to see who managed it.",
   "firstSoiChange": "You cross a line that is not drawn on anything, and the numbers all change frame. That was a world letting go of you and another one taking hold.",
-  "firstTransfer": "You are out of every world's reach now, on the Lamp's own books. The slow road starts here and ends wherever you aimed it.",
-  "firstAssist": "You fell past Grumm and came out faster than you went in, with the tank untouched. The frogs call that borrowing. Grumm has not noticed.",
+  "firstTransfer": "You are out of every world's gravity now, on the Lamp's own books. The transfer starts here and ends wherever you aimed it.",
+  "firstAssist": "You fell past Grumm and came out faster than you went in, with the tank untouched. The frogs call that a slingshot. Grumm has not noticed.",
   "firstAerobrake": "The shield takes the heat, the clouds take the speed, and you come out the other side slower for free.",
   "mossbackHeartbeat": "You put a hand flat on the hull and wait. After a long while, something the size of a moon beats once, and the sound goes through the deck and through you.",
   "hushRelic": "The ringing stops at the line, and inside there is an observatory nobody has dusted in an age, still tracking the far edge of the system. You take a small tuned thing from a shelf that was never a shelf. The silence lets you.",
@@ -496,38 +451,27 @@ export const NARRATIVE = {
   {
    "step": "push",
    "title": "Four arrows. Green first",
-   "body": "See the arrows round the mark? Green pushes you the way you're already going and throws the far side of your orbit outward. Orange pulls it back. The two blue ones shove it sideways. Press green a few times and watch the yellow line swing out — that's where the burn leaves you."
+   "body": "See the arrows round the burn? Green pushes you the way you're already going and throws the high point of your orbit outward. Orange pulls it back. The two blue ones shove it sideways. Press green a few times and watch the yellow line swing out — that's where the burn leaves you."
   },
   {
    "step": "reach",
    "title": "Get the yellow out to Pip",
-   "body": "Keep pressing until the yellow line reaches Pip's circle. If it's running wide, tap blue. When it's touching, tap the mark's ring to fold the arrows away. The burn stays written down."
+   "body": "Keep pressing until the yellow line reaches Pip's circle. If it's running wide, tap blue. When it's touching, tap the burn's ring to fold the arrows away. The burn stays written down."
   },
   {
    "step": "skip",
    "title": "Don't sit there watching it",
-   "body": "It's a day and a half of nothing. Tap your road somewhere ahead of the mark and choose 'Warp here' — the clock runs itself there in about ten seconds and stops a moment before the burn. You don't press anything. It goes on its own."
+   "body": "It's a day and a half of nothing. Tap your path somewhere ahead of the burn and choose 'Warp here' — the clock runs itself there in about ten seconds and stops a moment before the burn. You don't press anything. It goes on its own."
   },
   {
    "step": "dock",
    "title": "Low and slow, and Nellie does the rest",
-   "body": "Once you're in Pip's reach the chart swings round to it. What you want is a tidy little circle close in: burn backward at the low point and drop into one. The moment you've got it an anchor appears with the buttons. Press that. And give her my love."
+   "body": "Once you're in Pip's gravity the chart swings round to it. What you want is a tidy little circle close in: burn backward at the low point and drop into one. The moment you've got it an anchor appears with the buttons. Press that. And give her my love."
   }
  ],
  "contractsIntro": "Cargo pays the fuel. People are why anyone flies at all: they want somewhere by some day, and they remember whether you managed it.",
  "shipNames": [
-  "Slow Road",
-  "Kissing Distance",
-  "Second Cousin",
-  "Hedge Money",
-  "Borrowed Speed",
-  "Wet Paint",
-  "The Long Look",
-  "Ninth Cousin Twice",
-  "Festival Weather",
-  "Cold Hold",
-  "Ledger's Regret",
-  "Two Burns Out"
+  "Skipper"
  ],
  "captainLines": {
   "onBurn": [
@@ -549,12 +493,12 @@ export const NARRATIVE = {
   ]
  },
  "logTemplates": {
-  "docked": "Tied up at {port}.",
-  "undocked": "Cast off from {port}.",
+  "docked": "Docked at {port}.",
+  "undocked": "Undocked from {port}.",
   "burn": "Burn: {dv}. Tank {left}.",
-  "soiEnter": "Into {body}'s reach.",
-  "soiExit": "Out of {body}'s reach, into {parent}'s.",
-  "aerobrake": "Skimmed {body}: {dv} shed to the clouds.",
+  "soiEnter": "Into {body}'s gravity.",
+  "soiExit": "Out of {body}'s gravity, into {parent}'s.",
+  "aerobrake": "Air braked at {body}: {dv} shed to the clouds.",
   "sold": "Sold {qty} × {good} at {port} for {price}.",
   "bought": "Bought {qty} × {good} at {port} for {price}.",
   "contractTaken": "Took on {title}, for {to}, {pay}.",

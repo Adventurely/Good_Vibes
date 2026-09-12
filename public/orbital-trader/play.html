@@ -438,7 +438,7 @@
 
 <header id="hud" aria-live="off">
   <div class="stat"><small>Date</small><b id="h-date">—</b></div>
-  <div class="stat" id="h-dv-wrap"><small>Delta-v</small><b id="h-dv">—</b><div id="dvbar"><i id="h-dvfill"></i></div></div>
+  <div class="stat" id="h-dv-wrap"><small>Fuel</small><b id="h-dv">—</b><div id="dvbar"><i id="h-dvfill"></i></div></div>
   <div class="stat"><small>Coin</small><b id="h-money">—</b></div>
   <div class="stat"><small>Hold</small><b id="h-hold">—</b></div>
   <div class="stat"><small>Clock</small><b id="h-warp">—</b></div>
@@ -447,7 +447,7 @@
 <a id="back" href="./">&larr; title</a>
 
 <div id="view">
-  <button id="dock-go" hidden title="Tie up (d)" aria-label="Tie up here"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="3.4"/><path d="M12 10.4 V20"/><path d="M8 13.5 H16"/><path d="M5 15.5 a7 7 0 0 0 14 0"/></svg></button>
+  <button id="dock-go" hidden title="Dock (d)" aria-label="Dock here"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="3.4"/><path d="M12 10.4 V20"/><path d="M8 13.5 H16"/><path d="M5 15.5 a7 7 0 0 0 14 0"/></svg></button>
   <button id="w-pause" aria-pressed="false" title="Hold the clock (space)">&#10074;&#10074;</button>
   <button id="v-fit" title="Back to your ship, and frame it (f)">&#9678;</button>
   <button id="v-in" title="Zoom in (+)">+</button>
@@ -583,21 +583,21 @@ function replan(force = false){
   interceptLabel = ic
     ? (ic.grazes
         ? `hits ${S.portName(ic.body)}`
-        : `${S.portName(ic.body)} ${fmtAu(ic.altitude)} · ${S.fmtKms(ic.speed)}${ic.inMouth ? ' · in the mouth' : ''}`)
+        : `${S.portName(ic.body)} ${fmtAu(ic.altitude)} · ${S.fmtKms(ic.speed)}${ic.inMouth ? ' · in docking range' : ''}`)
     : null;
   /* The window in the corner already says whose encounter it is, so its line
      is the numbers only. */
   insetLabel = ic
     ? (ic.grazes
-        ? 'this road hits it'
-        : `${fmtAu(ic.altitude)} · ${S.fmtKms(ic.speed)}${ic.inMouth ? ' · in the mouth' : ''}`)
+        ? 'this path hits it'
+        : `${fmtAu(ic.altitude)} · ${S.fmtKms(ic.speed)}${ic.inMouth ? ' · in docking range' : ''}`)
     : null;
   apses = [];
   prediction.segments.forEach((seg, i) => {
     const b = world.get(seg.body);
     if(b.id === 'lamp' && seg.elements.e < 0.05) return;
     for(const a of segmentApses(seg, b.mu)){
-      apses.push({ segIndex: i, ...a, label: `${a.kind === 'periapsis' ? 'Pe' : 'Ap'} ${fmtAu(Math.max(0, a.distance - (b.radius ?? 0)))}` });
+      apses.push({ segIndex: i, ...a, label: `${a.kind === 'periapsis' ? 'Low' : 'High'} ${fmtAu(Math.max(0, a.distance - (b.radius ?? 0)))}` });
     }
   });
 }
@@ -679,13 +679,13 @@ function handleEvents(events){
     /* A change of reach re-frames the chart, re-draws the road and changes
        every number on the Plan card. The panel has to be told, or it sits
        there naming the world you just left. */
-    if(e.kind === 'soi'){ const to = world.get(e.to); toast(`Now in ${to.name}'s reach.`); renderTab(); tutorialCheck(); }
+    if(e.kind === 'soi'){ const to = world.get(e.to); toast(`Now in ${to.name}'s gravity.`); renderTab(); tutorialCheck(); }
     if(e.kind === 'story') toast(e.text, 'story', 9000);
     if(e.kind === 'toll'){ stopSkip(); showToll(e.pending); }
     if(e.kind === 'crash'){ stopSkip(); showCrash(e.body); }
     if(e.kind === 'dry'){ stopSkip(); toast(TEXT.captainLines.onStranded[1] ?? 'The tank is dry.', 'bad', 8000); if(tab === 'plan') renderTab(); }
     if(e.kind === 'late') toast(`${e.contract.title}: you are late.`, 'bad');
-    if(e.kind === 'missed'){ toast(e.count > 1 ? `${e.count} marks went by unspent.` : 'That mark went by unspent.', 'bad'); if(tab === 'plan') renderTab(); }
+    if(e.kind === 'missed'){ toast(e.count > 1 ? `${e.count} burns went by unspent.` : 'That burn went by unspent.', 'bad'); if(tab === 'plan') renderTab(); }
   }
 }
 
@@ -707,7 +707,7 @@ function renderHud(docking){
     : warpTarget != null ? `skipping · ${Math.max(1, Math.round((warpTarget - state.t) / (CONST.BASE_RATE_DAYS_PER_SEC * S.warpRate(state))))}s`
     : 'running';
   const b = world.get(state.ship.body);
-  $('h-where').textContent = state.dockedAt ? `Docked at ${S.portName(state.dockedAt)}` : `In ${b.name}'s reach`;
+  $('h-where').textContent = state.dockedAt ? `Docked at ${S.portName(state.dockedAt)}` : `In ${b.name}'s gravity`;
   const hint = $('dockhint');
   if(!docking){ hint.textContent = ''; return; }
   const pb = world.get(docking.port);
@@ -716,7 +716,7 @@ function renderHud(docking){
   if(docking.kind === 'orbit'){
     hint.textContent = !docking.bound ? ` · ${pb.name}: not in orbit`
       : !docking.clear ? ` · ${pb.name}: that orbit goes through it`
-      : ` · ${pb.name}: bring the far side inside ${fmtAu(docking.mouth)}`;
+      : ` · ${pb.name}: bring the high point inside ${fmtAu(docking.mouth)}`;
   }else{
     hint.textContent = docking.inZone
       ? ` · ${pb.name}: ${S.fmtKms(docking.over)} too fast`
@@ -780,7 +780,7 @@ function askSkip(t, what){
   if(!plan){ toast('That is not ahead of you.', 'bad'); return; }
   const place = whereAt(t);
   openModal(`<h2>Skip ahead?</h2>
-    <p>${esc(what ?? 'That point on your road')} is <b>${S.fmtDays(plan.days)}</b> from now${place ? `, in ${esc(place.name)}'s reach` : ''}.</p>
+    <p>${esc(what ?? 'That point on your path')} is <b>${S.fmtDays(plan.days)}</b> from now${place ? `, in ${esc(place.name)}'s reach` : ''}.</p>
     <p class="lock">The clock will run itself there and stop: ${saySeconds(plan.seconds)} of waiting.${plan.capped ? ' That is as fast as the clock goes.' : ''}</p>
     <div class="btns"><button class="btn primary" id="m-go">Go</button><button class="btn ghost" id="m-stay">Close</button></div>`, m => {
     m.querySelector('#m-go').addEventListener('click', () => { closeModal(); skipTo(t); });
@@ -795,18 +795,18 @@ function askAtPath(t){
   const room = state.nodes.length < S.MAX_NODES;
   const plan = S.skipPlan(state, t);
   const place = whereAt(t);
-  openModal(`<h2>${S.fmtDays(Math.max(0, t - state.t))} along your road</h2>
-    <p>${place ? `You will be in ${esc(place.name)}'s reach.` : ''}${plan ? ` Running the clock there takes ${saySeconds(plan.seconds)}.` : ''}</p>
+  openModal(`<h2>${S.fmtDays(Math.max(0, t - state.t))} along your path</h2>
+    <p>${place ? `You will be in ${esc(place.name)}'s gravity.` : ''}${plan ? ` Running the clock there takes ${saySeconds(plan.seconds)}.` : ''}</p>
     <div class="btns">
       <button class="btn" id="m-skip" ${plan ? '' : 'disabled'}>Warp here</button>
-      <button class="btn primary" id="m-burn" ${room ? '' : 'disabled title="Six is plenty for one road."'}>Plan a burn</button>
+      <button class="btn primary" id="m-burn" ${room ? '' : 'disabled title="Six is plenty for one path."'}>Plan a burn</button>
       <button class="btn ghost" id="m-close">Close</button>
     </div>`, m => {
     m.querySelector('#m-close').addEventListener('click', closeModal);
     m.querySelector('#m-burn').addEventListener('click', () => {
       closeModal();
       const ix = S.addNode(state, t);
-      if(ix < 0){ toast('No room for another burn on this road.', 'bad'); return; }
+      if(ix < 0){ toast('No room for another burn on this path.', 'bad'); return; }
       /* The chart is the editor, so writing a burn down leaves the panel
          exactly as it was: shoving the side menu open over the sky is the
          opposite of what somebody who just tapped the sky wanted. */
@@ -1265,7 +1265,7 @@ function shipyard(){
   }
   out += '<h3>Wait here</h3><div class="btns"><button class="btn" data-act="wait|1">1 day</button><button class="btn" data-act="wait|10">10 days</button><button class="btn" data-act="wait|30">30 days</button>';
   const ww = S.daysToPeriapsis('wanderwell', state.t);
-  out += `<button class="btn" data-act="wait|${ww.toFixed(2)}">Wanderwell's kissing distance (${S.fmtDays(ww)})</button>`;
+  out += `<button class="btn" data-act="wait|${ww.toFixed(2)}">Wanderwell's low point (${S.fmtDays(ww)})</button>`;
   if(state.keys.sensors){ const mc = S.daysToPeriapsis('merrow', state.t); out += `<button class="btn" data-act="wait|${mc.toFixed(2)}">Merrow's pass (${S.fmtDays(mc)})</button>`; }
   out += '</div>';
   out += `<button class="btn primary wide" data-act="undock">Undock</button>`;
@@ -1348,8 +1348,8 @@ for(const ev of ['pointerup', 'pointercancel', 'blur']) document.addEventListene
  * a second. Hold a button and it repeats, and then it hurries.
  */
 const AXES = {
-  pro:  { axis: 'prograde', sign:  1, key: 'pro',  label: 'Forward', hint: 'lifts the far side' },
-  retro:{ axis: 'prograde', sign: -1, key: 'retro',label: 'Back',    hint: 'drops the far side' },
+  pro:  { axis: 'prograde', sign:  1, key: 'pro',  label: 'Forward', hint: 'lifts the high point' },
+  retro:{ axis: 'prograde', sign: -1, key: 'retro',label: 'Back',    hint: 'drops the high point' },
   out:  { axis: 'radial',   sign:  1, key: 'out',  label: 'Out',     hint: 'swings it outward' },
   in:   { axis: 'radial',   sign: -1, key: 'in',   label: 'In',      hint: 'swings it inward' },
 };
@@ -1412,7 +1412,7 @@ function aheadList(){
       const to = world.get(e.to), from = world.get(e.from);
       lines.push({ t: e.t, html: `<p>${to.parent === from.id ? 'Into' : 'Out to'} ${esc(to.name)}'s reach in ${S.fmtDays(e.t - state.t)}. ${skip(e.t)}</p>` });
     }else if(e.kind === 'burn' && e.node.aero){
-      lines.push({ t: e.t, html: `<p class="up">Skim ${esc(S.portName(e.node.body))}: shed ${S.fmtKms(e.magnitude)} in ${S.fmtDays(e.t - state.t)}. ${skip(e.t)}</p>` });
+      lines.push({ t: e.t, html: `<p class="up">Air brake at ${esc(S.portName(e.node.body))}: shed ${S.fmtKms(e.magnitude)} in ${S.fmtDays(e.t - state.t)}. ${skip(e.t)}</p>` });
     }else if(e.kind === 'crash'){
       lines.push({ t: e.t, html: `<p class="down">This path strikes ${esc(S.portName(e.body))} in ${S.fmtDays(e.t - state.t)}.</p>` });
     }
@@ -1420,7 +1420,7 @@ function aheadList(){
   const ic = prediction.intercept;
   if(ic) lines.push({ t: ic.t, html: ic.grazes
     ? `<p class="down">This road hits ${esc(S.portName(ic.body))} in ${S.fmtDays(ic.t - state.t)}.</p>`
-    : `<p class="${ic.inMouth ? 'up' : ''}">Nearest pass with ${esc(S.portName(ic.body))}: ${fmtAu(ic.altitude)} at ${S.fmtKms(ic.speed)}, in ${S.fmtDays(ic.t - state.t)}.${ic.inMouth ? ' That is inside the harbour mouth.' : ''} ${skip(ic.t)}</p>` });
+    : `<p class="${ic.inMouth ? 'up' : ''}">Closest approach to ${esc(S.portName(ic.body))}: ${fmtAu(ic.altitude)} at ${S.fmtKms(ic.speed)}, in ${S.fmtDays(ic.t - state.t)}.${ic.inMouth ? ' That is inside docking range.' : ''} ${skip(ic.t)}</p>` });
   lines.sort((a, b) => a.t - b.t);
   return '<h3>Ahead</h3>' + (lines.length
     ? lines.map(l => l.html).join('')
@@ -1455,13 +1455,18 @@ function orbitTab(){
 function shipTab(){
   const b = world.get(state.ship.body);
   const el = elementsFromState(b.mu, state.ship.r, state.ship.v);
+  /* Heights above the ground, the same as the Orbit tab. They used to be
+     distances from the middle of the world here and altitudes there, under
+     two different names, so nobody noticed they disagreed; one name for one
+     number means they have to. */
+  const alt = d => fmtAu(Math.max(0, d - (b.radius ?? 0)));
   let out = `<h2>${esc(state.shipName)}</h2>`;
-  out += `<dl class="kv"><dt>Reach</dt><dd>${esc(b.name)}</dd><dt>Distance</dt><dd>${fmtAu(norm(state.ship.r))}</dd><dt>Speed</dt><dd>${S.fmtKms(norm(state.ship.v))}</dd>`;
-  out += `<dt>Kissing distance</dt><dd>${fmtAu(el.rp)}</dd><dt>Farthest</dt><dd>${Number.isFinite(el.ra) ? fmtAu(el.ra) : 'escaping'}</dd>`;
-  if(Number.isFinite(el.period)) out += `<dt>Period</dt><dd>${S.fmtDays(el.period)}</dd>`;
-  out += `<dt>Shape</dt><dd>e = ${el.e.toFixed(3)}</dd></dl>`;
+  out += `<dl class="kv"><dt>Orbiting</dt><dd>${esc(b.name)}</dd><dt>Height now</dt><dd>${alt(norm(state.ship.r))}</dd><dt>Speed</dt><dd>${S.fmtKms(norm(state.ship.v))}</dd>`;
+  out += `<dt>Low point</dt><dd>${alt(el.rp)}</dd><dt>High point</dt><dd>${Number.isFinite(el.ra) ? alt(el.ra) : 'none — you are leaving'}</dd>`;
+  if(Number.isFinite(el.period)) out += `<dt>A lap takes</dt><dd>${S.fmtDays(el.period)}</dd>`;
+  out += `<dt>Shape</dt><dd>${el.e < 0.005 ? 'a circle' : el.e < 1 ? `an oval (${el.e.toFixed(2)} out of round)` : 'not a loop at all'}</dd></dl>`;
   if(b.atmo){
-    out += el.rp < b.atmo ? (state.keys.heatShield ? `<p class="up">Skimming ${esc(b.name)}'s clouds: the shield will brake you.</p>` : `<p class="down">That kissing distance is inside ${esc(b.name)}'s clouds, and you have no heat shield.</p>`) : '';
+    out += el.rp < b.atmo ? (state.keys.heatShield ? `<p class="up">Air braking in ${esc(b.name)}'s clouds: the shield will slow you.</p>` : `<p class="down">Your low point is inside ${esc(b.name)}'s clouds, and you have no heat shield.</p>`) : '';
   }
   out += '<h3>Hold</h3>';
   if(!state.cargo.length && !state.passengers.length) out += '<p class="empty">Empty.</p>';
@@ -1496,7 +1501,7 @@ const actions = {
   dock(){ doDock(); },
   addmark(){
     const ix = S.addNodeAhead(state);
-    if(ix < 0){ toast('No room for another burn on this road.', 'bad'); return; }
+    if(ix < 0){ toast('No room for another burn on this path.', 'bad'); return; }
     selectedNode = ix; holdForPlanning(ix); replan(true); renderTab(); tutorialCheck();
   },
   closenode(){ selectedNode = -1; replan(true); renderTab(); save(); },
@@ -1520,7 +1525,7 @@ document.addEventListener('click', e => {
 
 function doDock(){
   const r = S.dock(state);
-  if(!r.ok){ toast(r.reason === 'too fast' ? 'Too fast to dock. Kill some speed first.' : 'No port in reach.', 'bad'); return; }
+  if(!r.ok){ toast(r.reason === 'too fast' ? 'Too fast to dock. Kill some speed first.' : 'No port nearby.', 'bad'); return; }
   stopSkip();
   selectedNode = -1; replan(true); renderTabs(); setTab('market');
   const txt = TEXT.ports[r.port];

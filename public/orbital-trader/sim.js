@@ -462,7 +462,7 @@ export function tick(state, dtDays){
   for(const e of res.events){
     if(e.kind === 'burn'){
       if(e.node.aero){
-        logLine(state, 'burn', TEXT.logTemplates.aerobrake ?? 'Skimmed {body}: {dv} shed to the clouds.', { body: portName(e.node.body), dv: fmtKms(e.magnitude) });
+        logLine(state, 'burn', TEXT.logTemplates.aerobrake ?? 'Air braked at {body}: {dv} shed to the clouds.', { body: portName(e.node.body), dv: fmtKms(e.magnitude) });
         flag(state, 'firstAerobrake', events);
       }else{
         state.dv = Math.max(0, state.dv - e.magnitude);

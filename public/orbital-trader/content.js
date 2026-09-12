@@ -233,6 +233,6 @@ export const CONTRACT_TEMPLATES = ECONOMY.contracts.templates.map(t => {
 export const GLOSSARY = NARRATIVE.glossary ?? [];
 export const TEXT = NARRATIVE;
 TEXT.logTemplates ??= {};
-TEXT.logTemplates.aerobrake ??= 'Skimmed {body}: {dv} shed to the clouds.';
+TEXT.logTemplates.aerobrake ??= 'Air braked at {body}: {dv} shed to the clouds.';
 TEXT.events ??= {};
 TEXT.events.tollWaved ??= '{captain} looks over an empty hold, laughs, and waves you through.';

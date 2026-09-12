@@ -208,7 +208,12 @@ test('contract templates point at real places', () => {
 });
 
 test('the text has every line the game asks for', () => {
-  assert.ok(GLOSSARY.length >= 14);
+  /* The glossary shrank from 18 to 9 when the terms stopped needing a
+     translation: "low point" and "docking range" explain themselves, so what
+     is left is the handful that genuinely has something to say. Every entry
+     still carries the technical word a KSP player would know it by. */
+  assert.ok(GLOSSARY.length >= 8);
+  for(const g of GLOSSARY) assert.ok(g.term && g.plain && g.tip, `glossary entry ${g.term}`);
   for(const id of Object.keys(PORTS)){
     const p = TEXT.ports[id];
     assert.ok(p && p.blurb && p.arrival?.length >= 3 && p.trade?.length >= 3 && p.rumours?.length >= 3, `text for ${id}`);
@@ -226,7 +231,9 @@ test('the text has every line the game asks for', () => {
   for(const k of ['docked', 'undocked', 'burn', 'soiEnter', 'soiExit', 'sold', 'bought', 'contractTaken', 'contractDone', 'contractLate', 'towed', 'tolled', 'refuelled', 'upgraded']){
     assert.match(TEXT.logTemplates[k], /\{\w+\}/, `log template ${k} has a placeholder`);
   }
-  assert.ok(TEXT.shipNames.length >= 12 && TEXT.captainLines.onStranded.length >= 3);
+  // One ship, one name: she is the Skipper.
+  assert.deepEqual(TEXT.shipNames, ['Skipper']);
+  assert.ok(TEXT.captainLines.onStranded.length >= 3);
 });
 
 /* ------------------------------------------------------------- chart */

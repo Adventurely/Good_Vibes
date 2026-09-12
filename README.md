@@ -1707,6 +1707,34 @@ the game says how far off it is and how long you will wait, and then runs at wha
 it in about ten seconds and stops itself. A burn, a change of reach or a
 harbour mouth cancels the skip.
 
+### What the player is told it is called
+
+The code and this document keep the names they have always had — `kiss()`,
+`zoneRadius`, a world's *reach*, the *road*, a *mark*. None of that is what a
+player sees any more. The interface was rewritten in plain words, on the rule
+that a term a new player has to look up has failed, and the glossary shrank
+from eighteen entries to nine because most of them stopped needing to exist.
+
+| In the code, and above | On screen |
+|---|---|
+| `kiss`, kissing distance, periapsis | low point |
+| apoapsis, the far side, the long look | high point |
+| `soi`, a world's reach | X's gravity |
+| `zoneRadius`, the harbour mouth | docking range |
+| a mark, `nodes` | a burn |
+| the road, the prediction | your path |
+| tie up / cast off | dock / undock |
+| delta-v, what you have left | fuel (still in km/s) |
+| the slow road, Hohmann | a transfer |
+| a festival | a launch window |
+| borrowing from Grumm | a slingshot |
+| skimming | air braking |
+| the near pass | closest approach |
+
+The ship is the *Skipper*, and only the Skipper — the twelve seeded names are
+gone. Port flavour prose still says "tie up" here and there, because that is
+an otter talking about a rope and not the interface naming a verb.
+
 ### Tying up
 
 Docking is an orbit, not a box. A harbour takes you when you are in a **stable
