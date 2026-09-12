@@ -443,28 +443,48 @@
  "tutorial": [
   {
    "step": "mark",
-   "title": "That crate's for your Aunt Nellie",
-   "body": "Morning. You're in orbit over Tessel and there's a crate in your hold with Nellie's name on it — she runs the dry docks out on Pip. Tap the white line you're riding and pick 'Plan a burn'. That only writes it down. You haven't spent a drop yet."
+   "title": "Write a burn down",
+   "body": "Morning. Uncle Theo here. Nellie wants a pebble off Pip and I have left it late. Tap the white line you are riding and pick 'Plan a burn'. That only writes it down — you have not spent a drop yet."
   },
   {
    "step": "push",
-   "title": "Four arrows. Green first",
-   "body": "See the arrows round the burn? Green pushes you the way you're already going and throws the high point of your orbit outward. Orange pulls it back. The two blue ones shove it sideways. Press green a few times and watch the yellow line swing out — that's where the burn leaves you."
+   "title": "Push it out to Pip's height",
+   "body": "Four arrows appear round the mark. Green throws the far side of your orbit outward; orange pulls it back. Press green until the high point on the yellow line sits at Pip's own height. Close is close enough — within a tenth of it."
   },
   {
-   "step": "reach",
-   "title": "Get the yellow out to Pip",
-   "body": "Keep pressing until the yellow line reaches Pip's circle. If it's running wide, tap blue. When it's touching, tap the burn's ring to fold the arrows away. The burn stays written down."
+   "step": "aim",
+   "title": "Now put Pip in the way",
+   "body": "Right height, wrong moment. Drag the mark round your orbit until the yellow line runs into Pip's circle. When the chart says it has found Pip, you have it."
   },
   {
    "step": "skip",
-   "title": "Don't sit there watching it",
-   "body": "It's a day and a half of nothing. Tap your path somewhere ahead of the burn and choose 'Warp here' — the clock runs itself there in about ten seconds and stops a moment before the burn. You don't press anything. It goes on its own."
+   "title": "Do not sit there watching",
+   "body": "Tap your path somewhere past the mark and choose 'Warp here'. The clock runs itself along and the burn fires on its own. Keep going until you are inside Pip's gravity."
   },
   {
-   "step": "dock",
-   "title": "Low and slow, and Nellie does the rest",
-   "body": "Once you're in Pip's gravity the chart swings round to it. What you want is a tidy little circle close in: burn backward at the low point and drop into one. The moment you've got it an anchor appears with the buttons. Press that. And give her my love."
+   "step": "brake",
+   "title": "Fall in, then stop falling",
+   "body": "You are falling past Pip, not round it. Write a mark near the low point and press orange — burning back sheds the speed that would carry you out the other side. Keep pressing until the path closes into a loop."
+  },
+  {
+   "step": "lower",
+   "title": "Bring the loop inside docking range",
+   "body": "A loop is not a harbour. The high point has to sit inside Pip's docking range before they will take your lines. Burn back a little more at the low point until it does, then press the anchor."
+  },
+  {
+   "step": "buy",
+   "title": "One pebble, and mind the price",
+   "body": "The Market has the beach pebbles on it, the cheapest thing on the shelf. Theo has left you just about enough for one. Buy it."
+  },
+  {
+   "step": "leave",
+   "title": "Climb back out",
+   "body": "Cast off and burn forward — green — until the path opens and lets go of Pip. You are back on Tessel's books the moment it does."
+  },
+  {
+   "step": "home",
+   "title": "And bring it home",
+   "body": "Tessel is where Nellie is. Bring your high point inside Tessel's docking range the same way you did at Pip, tie up, and the pebble is hers."
   }
  ],
  "contractsIntro": "Cargo pays the fuel. People are why anyone flies at all: they want somewhere by some day, and they remember whether you managed it.",
@@ -505,6 +525,31 @@
   "towed": "Towed to {port}: {cost}, {days}.",
   "tolled": "Paid the Scatter toll to {captain}.",
   "refuelled": "Took on {amount} at {port} for {price}.",
-  "upgraded": "Fitted {name} at {port}."
- }
+  "upgraded": "Fitted {name} at {port}.",
+  "questTaken": "Took on {title}.",
+  "questDone": "Finished {title}. Paid {pay}."
+ },
+ "quests": [
+  {
+   "id": "pebble",
+   "title": "A pebble for Aunt Nellie",
+   "giver": "Uncle Theo",
+   "target": "pip",
+   "gives": "pebble",
+   "pay": 420,
+   "rep": "otter",
+   "blurb": "Nellie's birthday is coming and Theo has left it late, as Theo does. There is a beach on Pip — the only one — and the pebbles off it are worth going for. He has put what he has in your purse. It is enough for one.",
+   "steps": [
+    {
+     "id": "buy",
+     "text": "Buy a moon pebble at Pip"
+    },
+    {
+     "id": "home",
+     "text": "Bring it home to Tessel"
+    }
+   ],
+   "done": "Nellie turns the pebble over twice, says nothing, and puts it in her pocket. Theo settles up, and looks like a man who has got away with something."
+  }
+ ]
 }

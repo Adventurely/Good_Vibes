@@ -89,6 +89,7 @@ export function newGame(seed = 1){
     markets: {},
     rep: { emberkin: 0, otter: 0, cat: 0, frog: 0 },
     nodes: [],
+    quests: [],
     target: null,
     log: [],
     flags: { tutorial: 0 },
@@ -111,22 +112,16 @@ export function newGame(seed = 1){
   state.justLeft = start;          // Tessel's own mouth is where we started
   state.justLeftAt = state.t;
   refreshOffers(state, start, true);
-  const first = TEXT.opening ?? {};
-  state.passengers.push({
-    id: 'opening-pip',
-    kind: 'cargo', species: 'otter',
-    from: start, to: FIRST_DELIVERY.to,
-    pay: FIRST_DELIVERY.pay,
-    deadline: state.t + FIRST_DELIVERY.days,
-    units: FIRST_DELIVERY.units, needs: [], tightness: 'easy',
-    title: first.title ?? 'A crate for Pip',
-    line: first.line ?? '',
-    offeredAt: state.t, takenAt: state.t, opening: true,
-  });
-  state.target = FIRST_DELIVERY.to;
-  logLine(state, 'contractTaken', TEXT.logTemplates.contractTaken, {
-    title: state.passengers[0].title, to: portName(FIRST_DELIVERY.to), pay: fmtMoney(FIRST_DELIVERY.pay),
-  });
+  /* The opening is an errand rather than a contract: Uncle Theo wants a pebble
+     off Pip for Aunt Nellie, and the purse holds just about enough to buy one.
+     It is also the tutorial's spine — every step of the lesson is a step of
+     this quest — so the game opens with a reason rather than a cargo. */
+  state.quests = QUESTS.map(q => ({ id: q.id, step: 0, done: false }));
+  const opening = QUESTS[0];
+  if(opening){
+    state.target = opening.target ?? FIRST_DELIVERY.to;
+    logLine(state, 'questTaken', TEXT.logTemplates.questTaken ?? 'Took on {title}.', { title: opening.title });
+  }
   return state;
 }
 
@@ -293,6 +288,7 @@ export function dock(state){
   const delivered = deliverHere(state, port);
   refreshOffers(state, port);
   const events = [{ kind: 'docked', port, delivered }];
+  questCheck(state, events);
   milestonesOnDock(state, port, events);
   return { ok: true, port, delivered, events };
 }
@@ -450,6 +446,7 @@ export function tick(state, dtDays){
   if(state.dockedAt){
     state.t += dtDays;
     ageContracts(state, events);
+    questCheck(state, events);
     return events;
   }
   /* Far enough ahead to see the coming skim. Normally a step only needs to
@@ -545,6 +542,74 @@ function flag(state, name, events){
   state.flags[name] = true;
   const text = TEXT.events[name];
   if(text){ logLine(state, 'story', text); events.push({ kind: 'story', name, text }); }
+}
+
+/* ---------------------------------------------------------------- quests */
+
+/* An errand somebody gave you, with a list of steps and the one you are on.
+ * The words live in narrative.json like every other line the game says; what
+ * lives here is the only part that cannot be written down as text — how the
+ * game knows a step is finished. Keyed by quest id and step id, so the table
+ * and the tests are read side by side.
+ *
+ * A contract is a cargo with a deadline and a payment; a quest is a reason.
+ * The opening errand is a quest because "fetch your aunt a pebble" is a thing
+ * a person does for a person, and because it can teach the whole game on the
+ * way: it is the tutorial's spine. */
+const QUEST_TESTS = {
+  pebble: {
+    buy: state => carrying(state, 'pebble') > 0,
+    home: state => state.dockedAt === 'tessel' && carrying(state, 'pebble') > 0,
+  },
+};
+
+export const QUESTS = TEXT.quests ?? [];
+export const questById = id => QUESTS.find(q => q.id === id);
+export function carrying(state, goodId){
+  return state.cargo.reduce((n, c) => n + (c.good === goodId ? c.qty : 0), 0);
+}
+/* Take one unit out of the hold, oldest crate first. */
+function handOver(state, goodId){
+  for(const c of state.cargo){
+    if(c.good !== goodId || c.qty <= 0) continue;
+    c.qty -= 1;
+    state.cargo = state.cargo.filter(x => x.qty > 0);
+    return true;
+  }
+  return false;
+}
+
+/* Walk every live quest forward as far as it will go. Steps only ever move
+ * forward: a quest that asks you to buy a thing and bring it home does not
+ * un-buy itself when you put the thing down, or the card would flicker every
+ * time a hold was rearranged. */
+export function questCheck(state, events = []){
+  for(const live of state.quests ?? []){
+    if(live.done) continue;
+    const q = questById(live.id);
+    if(!q) continue;
+    const tests = QUEST_TESTS[q.id] ?? {};
+    let moved = false;
+    while(live.step < q.steps.length){
+      const step = q.steps[live.step];
+      const test = tests[step.id];
+      if(!test || !test(state)) break;
+      live.step++;
+      moved = true;
+    }
+    if(live.step >= q.steps.length && !live.done){
+      live.done = true;
+      if(q.gives) handOver(state, q.gives);
+      if(q.pay) state.money += q.pay;
+      if(q.rep && q.rep in state.rep) state.rep[q.rep] += 1;
+      logLine(state, 'questDone', TEXT.logTemplates.questDone ?? 'Finished {title}. Paid {pay}.',
+        { title: q.title, pay: fmtMoney(q.pay ?? 0) });
+      events.push({ kind: 'questDone', quest: q });
+    }else if(moved){
+      events.push({ kind: 'questStep', quest: q, step: live.step });
+    }
+  }
+  return events;
 }
 
 /* ------------------------------------------------------------ planning */
@@ -1644,7 +1709,8 @@ export function buy(state, goodId, qty){
   state.stats.bought += qty;
   if(PORTS[port].species === 'frog') state.rep.frog += 0.05 * qty;   // frogs give; taking is how you let them
   logLine(state, 'bought', TEXT.logTemplates.bought, { qty, good: goodById(goodId).name, price: fmtMoney(total), port: portName(port) });
-  return { ok: true, total };
+  const events = questCheck(state, []);
+  return { ok: true, total, events };
 }
 
 /* Sell from the oldest stack first: the crate going off is the one to move. */
@@ -2135,6 +2201,7 @@ export function restore(json){
   s.rep = { emberkin: 0, otter: 0, cat: 0, frog: 0, ...(s.rep ?? {}) };
   s.pending ??= null; s.flags ??= {}; s.stats ??= {}; s.visited ??= [s.dockedAt].filter(Boolean);
   s.toll ??= { lastT: -1e9, inBelt: false };
+  s.quests ??= QUESTS.map(q => ({ id: q.id, step: 0, done: false }));
   s.debt ??= 0; s.target ??= null; s.justLeft ??= null; s.justLeftAt ??= -1e9;
   s.warp = Number.isFinite(s.warp) ? Math.max(1, Math.min(CONST.MAX_WARP, s.warp)) : 1;
   s.rng = Number.isFinite(s.rng) ? s.rng : 1;

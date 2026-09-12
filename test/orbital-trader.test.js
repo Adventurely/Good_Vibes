@@ -227,7 +227,15 @@ test('the text has every line the game asks for', () => {
   }
   assert.ok(TEXT.events.tollOffer.length >= 3 && TEXT.events.tollOffer.every(v => v.captain && v.line));
   assert.ok(/\?\s*$/.test(TEXT.events.lanternArrival.trim()), 'the Lantern ends on a question, as the design leaves it');
-  assert.equal(TEXT.tutorial.length, 5);
+  /* The lesson is nine steps now and each one is a step of the opening quest,
+     so the two lists have to stay the same shape as each other. */
+  assert.equal(TEXT.tutorial.length, 9);
+  for(const t of TEXT.tutorial) assert.ok(t.step && t.title && t.body, `tutorial step ${t.step}`);
+  assert.ok(TEXT.quests?.length >= 1, 'there is an opening quest');
+  for(const q of TEXT.quests){
+    assert.ok(q.id && q.title && q.giver && q.blurb && q.done, `quest ${q.id} has its words`);
+    assert.ok(q.steps?.length >= 1 && q.steps.every(st => st.id && st.text), `quest ${q.id} has steps`);
+  }
   for(const k of ['docked', 'undocked', 'burn', 'soiEnter', 'soiExit', 'sold', 'bought', 'contractTaken', 'contractDone', 'contractLate', 'towed', 'tolled', 'refuelled', 'upgraded']){
     assert.match(TEXT.logTemplates[k], /\{\w+\}/, `log template ${k} has a placeholder`);
   }
@@ -360,7 +368,7 @@ function newDocked(seed, port = 'tessel'){
   return s;
 }
 
-test('a new game starts in orbit above Tessel, full, with one crate for Pip', () => {
+test('a new game starts in orbit above Tessel, full, with an errand from Uncle Theo', () => {
   const s = S.newGame(7);
   /* Nothing lands in this game, so there is nothing to cast off from. The
      first frame is the ship already going round Tessel with a road ahead of
@@ -371,9 +379,13 @@ test('a new game starts in orbit above Tessel, full, with one crate for Pip', ()
   const b = world.get('tessel');
   assert.ok(Math.abs(O.norm(s.ship.r) - b.startAlt) < 1e-12, 'in the low orbit the game opens in');
   assert.ok(Math.abs(O.norm(s.ship.v) - Math.sqrt(b.mu / b.startAlt)) < 1e-12, 'and going round it');
-  assert.equal(s.passengers.length, 1);
-  assert.equal(s.passengers[0].to, S.FIRST_DELIVERY.to);
-  assert.equal(s.target, S.FIRST_DELIVERY.to, 'the first delivery is already the target');
+  /* The opening is an errand, not a cargo: no crate in the hold, one quest on
+     the list, and Pip already the target. */
+  assert.equal(s.passengers.length, 0);
+  assert.equal(s.cargo.length, 0);
+  assert.equal(s.quests.length, 1);
+  assert.deepEqual(s.quests[0], { id: 'pebble', step: 0, done: false });
+  assert.equal(s.target, 'pip', 'the errand is already the target');
   assert.ok(S.planImmediate(s), 'and there is a road drawn from the first frame');
   assert.ok(Math.abs(s.dv - s.tank) < 1e-12 && s.tank > 0);
   assert.ok(Math.abs(S.kms(s.tank) - S.tiers('tank')[0].value) < 1e-9, 'the starter tank is the one the shipyard lists');
@@ -518,13 +530,50 @@ test('the whole first lesson can be flown: hop, brake at the kiss, and tie up at
   assert.ok(s.dv > 0, 'with fuel to spare');
 });
 
+test("the opening errand: Theo's purse buys exactly one pebble, and Nellie pays for it", () => {
+  const s = S.newGame(5);
+  const price = S.buyPrice(s, 'pip', 'pebble');
+
+  /* The pebble is the cheapest thing on Pip's shelf, and the purse covers one
+     of them and no more. Both halves matter: the first is why a new player
+     cannot pick the wrong row, the second is why they cannot buy three and
+     wander off. */
+  const shelf = PORTS.pip.sells.map(r => S.buyPrice(s, 'pip', r.good));
+  assert.equal(price, Math.min(...shelf), 'the pebble is the cheapest row at Pip');
+  assert.ok(price <= s.money, `a pebble costs ${price} and the purse holds ${s.money}`);
+  assert.ok(price * 2 > s.money, 'and there is not enough for two');
+
+  // Prices drift, so the purse has to cover the dearest a pebble ever gets.
+  let dearest = 0;
+  for(let seed = 1; seed <= 40; seed++){
+    const g = S.newGame(seed);
+    for(let d = 0; d <= 120; d += 3){ g.t = d; dearest = Math.max(dearest, S.buyPrice(g, 'pip', 'pebble')); }
+  }
+  assert.ok(dearest <= S.newGame(1).money, `a pebble reaches ${dearest} and the purse is ${S.newGame(1).money}`);
+
+  // Buy it at Pip, carry it home, and the errand closes itself.
+  s.dockedAt = 'pip'; s.justLeft = null;
+  assert.ok(S.buy(s, 'pebble', 1).ok);
+  assert.equal(s.quests[0].step, 1, 'buying it is the first step');
+  assert.equal(s.quests[0].done, false, 'but the errand is to bring it home');
+  s.dockedAt = 'tessel';
+  S.tick(s, 0.01);
+  assert.equal(s.quests[0].done, true, 'home with it finishes the errand');
+  assert.equal(S.carrying(s, 'pebble'), 0, 'and the pebble is Nellie\'s');
+  assert.ok(s.money > 400 && s.rep.otter >= 1, 'Theo settles up and the otters remember');
+});
+
 test('markets: buying costs, selling elsewhere pays, and selling a lot walks the price down', () => {
   const s = newDocked(21);
+  /* The game now opens with twelve cowries, which is exactly one moon pebble
+     and the whole point of the opening. A test about a market needs a purse. */
+  s.money = 2000;
   const port = 'tessel';
   const good = PORTS[port].sells[0].good;
   const price = S.buyPrice(s, port, good);
+  const purse = s.money;
   const r = S.buy(s, good, 2);
-  assert.ok(r.ok && s.money === CONST.START_MONEY - price * 2);
+  assert.ok(r.ok && s.money === purse - price * 2);
   assert.equal(S.usedUnits(s), 2 * S.goodById(good).units);
   // Somebody who wants it pays more than the disinterested rate.
   const wanter = Object.entries(PORTS).find(([id, p]) => id !== port && p.buys.some(b => b.good === good));

@@ -160,6 +160,20 @@
   .kv dt{ color:var(--dim); } .kv dd{ margin:0; text-align:right; }
   .lock{ color:var(--faint); font-size:.78rem; }
   .node{ border:1px solid var(--line); border-radius:10px; padding:.5rem .6rem; margin:.4rem 0; }
+  /* A quest reads as a list with a place in it, so the step you are on is the
+     only one that is fully lit: the ones behind are ticked and dimmed, the
+     ones ahead are waiting. */
+  .quest{ border-top:1px solid var(--line); padding-top:.6rem; margin-top:.6rem; }
+  .quest:first-of-type{ border-top:0; padding-top:0; margin-top:0; }
+  .quest h3{ margin:0 0 .1rem; }
+  .quest.done h3{ color:var(--dim); }
+  ol.steps{ list-style:none; margin:.5rem 0 .3rem; padding:0; display:flex; flex-direction:column; gap:.3rem; }
+  ol.steps li{ color:var(--dim); font-size:.88rem; padding-left:1.4rem; position:relative; }
+  ol.steps li::before{ content:'○'; position:absolute; left:0; color:var(--line-2); }
+  ol.steps li.ok{ color:var(--faint); }
+  ol.steps li.ok::before{ content:'✓'; color:var(--leaf-soft, var(--mint)); }
+  ol.steps li.now{ color:var(--ink); font-weight:600; }
+  ol.steps li.now::before{ content:'▸'; color:var(--gold-2); }
   .node.sel{ border-color:var(--gold-2); }
   .node .val{ font-variant-numeric:tabular-nums; text-align:right; min-width:72px; }
   .step{ display:flex; gap:2px; }
@@ -293,6 +307,20 @@
   .kv dt{ color:var(--dim); } .kv dd{ margin:0; text-align:right; }
   .lock{ color:var(--faint); font-size:.78rem; }
   .node{ border:1px solid var(--line); border-radius:10px; padding:.5rem .6rem; margin:.4rem 0; }
+  /* A quest reads as a list with a place in it, so the step you are on is the
+     only one that is fully lit: the ones behind are ticked and dimmed, the
+     ones ahead are waiting. */
+  .quest{ border-top:1px solid var(--line); padding-top:.6rem; margin-top:.6rem; }
+  .quest:first-of-type{ border-top:0; padding-top:0; margin-top:0; }
+  .quest h3{ margin:0 0 .1rem; }
+  .quest.done h3{ color:var(--dim); }
+  ol.steps{ list-style:none; margin:.5rem 0 .3rem; padding:0; display:flex; flex-direction:column; gap:.3rem; }
+  ol.steps li{ color:var(--dim); font-size:.88rem; padding-left:1.4rem; position:relative; }
+  ol.steps li::before{ content:'○'; position:absolute; left:0; color:var(--line-2); }
+  ol.steps li.ok{ color:var(--faint); }
+  ol.steps li.ok::before{ content:'✓'; color:var(--leaf-soft, var(--mint)); }
+  ol.steps li.now{ color:var(--ink); font-weight:600; }
+  ol.steps li.now::before{ content:'▸'; color:var(--gold-2); }
   .node.sel{ border-color:var(--gold-2); }
   .node .val{ font-variant-numeric:tabular-nums; text-align:right; min-width:72px; }
   .step{ display:flex; gap:2px; }
@@ -1144,8 +1172,8 @@ function lookAt(id){
 
 /* ------------------------------------------------------------- panel */
 
-const TABS_DOCKED = [['market', 'Market'], ['passengers', 'Passengers'], ['shipyard', 'Shipyard'], ['talk', 'Talk'], ['log', 'Log']];
-const TABS_FLIGHT = [['orbit', 'Orbit'], ['plan', 'Burns'], ['ship', 'Ship'], ['log', 'Log']];
+const TABS_DOCKED = [['market', 'Market'], ['passengers', 'Passengers'], ['shipyard', 'Shipyard'], ['quests', 'Quests'], ['talk', 'Talk'], ['log', 'Log']];
+const TABS_FLIGHT = [['orbit', 'Orbit'], ['plan', 'Burns'], ['quests', 'Quests'], ['ship', 'Ship'], ['log', 'Log']];
 let lastDockedMode = null;
 function renderTabs(){
   const mode = state.dockedAt ? 'docked' : 'flight';
@@ -1178,7 +1206,7 @@ function renderTab(){
      was and put it back. */
   const active = document.activeElement;
   const was = body.contains(active) ? (active.dataset?.act ?? active.id ?? null) : null;
-  const fn = { market, passengers, shipyard, talk, plan, orbit: orbitTab, ship: shipTab, log: logTab }[tab];
+  const fn = { market, passengers, shipyard, talk, plan, quests: questsTab, orbit: orbitTab, ship: shipTab, log: logTab }[tab];
   body.innerHTML = fn ? fn() : '';
   wire(body);
   if(was){
@@ -1523,6 +1551,31 @@ function shipTab(){
   return out;
 }
 
+/* What somebody has asked you to do, and how far along it is. A quest is not
+   a contract: there is no clock on it and no cargo hold full of somebody
+   else's crates — it is a reason to go somewhere, with the steps written out
+   so the chart is never the only thing telling you what to do next. */
+function questsTab(){
+  let out = '<h2>Quests</h2>';
+  const live = (state.quests ?? []).map(l => ({ l, q: S.questById(l.id) })).filter(x => x.q);
+  if(!live.length) return out + '<p class="say">Nobody has asked you for anything yet.</p>';
+  for(const { l, q } of live){
+    out += `<div class="quest${l.done ? ' done' : ''}">`;
+    out += `<h3>${esc(q.title)}</h3>`;
+    out += `<p class="lock">${esc(q.giver)}${l.done ? ' · done' : ''}</p>`;
+    out += `<p class="say">${esc(l.done && q.done ? q.done : q.blurb)}</p>`;
+    out += '<ol class="steps">';
+    q.steps.forEach((st, i) => {
+      const state_ = l.done || i < l.step ? 'ok' : i === l.step ? 'now' : '';
+      out += `<li class="${state_}">${esc(st.text)}</li>`;
+    });
+    out += '</ol>';
+    if(!l.done && q.pay) out += `<p class="lock">Pays ${S.fmtMoney(q.pay)} when it is finished.</p>`;
+    out += '</div>';
+  }
+  return out;
+}
+
 function logTab(){
   return `<h2>Log</h2><ul id="log" aria-live="polite" aria-relevant="additions">` + [...state.log].reverse().map(l => `<li class="${l.kind === 'story' ? 'story' : ''}"><b>${S.calendar(l.t).year}.${S.calendar(l.t).day}</b>${esc(l.text)}</li>`).join('') + '</ul>';
 }
@@ -1666,34 +1719,70 @@ function toast(text, kind = '', ms = 4200){
    the state rather than the clicks, so doing a step your own way still
    counts, and it steps out of the way the moment you are tied up. */
 const TUT = TEXT.tutorial;
-const FIRST_TARGET = S.FIRST_DELIVERY.to;
-function tutorialCheck(){
-  if(state.flags.tutorial >= TUT.length || state.flags.tutorialSkipped){ $('tut').hidden = true; return; }
-  let step = state.flags.tutorial;
+const FIRST_TARGET = S.QUESTS[0]?.target ?? 'pip';
+
+/* One test per step of the lesson, in order, each asking the game the same
+   question the card asks the player.
+
+   Every test has to be true of *every* state past its own step, not only of
+   the moment it is passed — a pilot standing in Pip's gravity has no burn
+   written down, and a lesson that reads its tests one at a time would send
+   them back to step one to write one. So each test carries the proof that
+   comes after it: reaching the moon proves the aiming, and the pebble in the
+   hold proves everything up to buying it. The card is then simply the first
+   step whose test is false, which also means undoing something walks it back
+   on its own. */
+function tutorialTests(){
   const target = FIRST_TARGET;
-  const marked = state.nodes.length > 0;
-  const pushed = state.nodes.some(n => Math.abs(n.prograde) > 1e-9 || Math.abs(n.radial) > 1e-9);
-  const reaches = prediction?.events.some(e => e.kind === 'soi' && e.to === target);
-  /* Tied up at the far end is the whole lesson, however you got there — by the
-     steps below, or by being towed. Checking it first means the card cannot
-     sit there telling you to do a thing you have done. */
-  if(state.dockedAt === target){
-    state.flags.tutorial = TUT.length;
+  const moon = world.get(target);
+  const here = world.get(state.ship.body);
+  const el = state.dockedAt ? null : elementsFromState(here.mu, state.ship.r, state.ship.v);
+  const segs = prediction?.segments ?? [];
+  const afterBurn = segs.find((sg, i) => i > 0 && segs[i - 1].reason === 'burn');
+  const raAfter = afterBurn?.elements?.ra;
+  const docking = state.dockedAt ? null : S.dockingStatus(state);
+
+  // Having been there is a fact about the trip, not about right now.
+  if(state.ship.body === target) state.flags.reachedTarget = true;
+  const reached = !!state.flags.reachedTarget;
+  const bought = (state.quests ?? []).some(q => q.id === 'pebble' && (q.step >= 1 || q.done));
+  const atTarget = state.ship.body === target;
+  const aimed = segs.some(sg => sg.body === target) || prediction?.intercept?.body === target;
+  const highEnough = Number.isFinite(raAfter) && Math.abs(raAfter - moon.a) <= moon.a * 0.1;
+  const dockableAt = id => state.dockedAt === id || (docking?.port === id && docking.ok);
+
+  return [
+    () => state.nodes.length > 0 || aimed || reached || bought,         // write a mark down
+    () => highEnough || aimed || reached || bought,                     // push it out to the moon's height
+    () => aimed || reached || bought,                                   // slide it until the road finds the moon
+    () => reached || bought,                                            // warp into its gravity
+    () => bought || (atTarget && el && Number.isFinite(el.period)),      // brake until the path closes
+    () => bought || dockableAt(target),                                 // bring the high point inside docking range
+    () => bought,                                                       // buy the pebble
+    () => bought && !atTarget,                                          // climb back out
+    () => dockableAt('tessel'),                                         // and get home
+  ];
+}
+
+function tutorialCheck(){
+  if(state.flags.tutorialSkipped){ $('tut').hidden = true; return; }
+  const tests = tutorialTests();
+  let step = 0;
+  while(step < tests.length && tests[step]()) step++;
+  state.flags.tutorial = step;
+
+  const finished = (state.quests ?? []).some(q => q.id === 'pebble' && q.done);
+  if(finished || step >= TUT.length){
     $('tut').hidden = true;
-    if(!state.flags.tutorialDone){ state.flags.tutorialDone = true; toast("Nellie has her crate. Theo says you'll do.", 'story'); }
+    if(finished && !state.flags.tutorialDone){
+      state.flags.tutorialDone = true;
+      toast(S.questById('pebble')?.done ?? 'Nellie has her pebble.', 'story', 9000);
+    }
     return;
   }
-  if(step === 0 && marked) step = 1;
-  if(step === 1 && pushed) step = 2;
-  if(step === 2 && reaches) step = 3;
-  if(step === 3 && state.ship.body === target) step = 4;
-  if(step >= 1 && !marked && !reaches && state.ship.body !== target && !state.dockedAt) step = 0;
-  if(step === 3 && !reaches && state.ship.body !== target) step = 2;
-  state.flags.tutorial = step;
-  if(step >= TUT.length){ $('tut').hidden = true; return; }
   const s = TUT[step];
   $('tut').hidden = false;
-  $('tut-step').textContent = `Uncle Theo · ${step + 1} of ${TUT.length}`;
+  $('tut-step').textContent = `${S.QUESTS[0]?.giver ?? 'Uncle Theo'} · ${step + 1} of ${TUT.length}`;
   $('tut-title').textContent = s.title;
   $('tut-body').textContent = s.body;
   $('tut').classList.toggle('min', !!state.flags.tutorialFolded);
