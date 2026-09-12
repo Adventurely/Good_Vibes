@@ -198,68 +198,207 @@ One goal should always be in sight at each timescale.
 
 ## 4. Setting
 
+> **Status.** This section is the current setting. Sections 1–3 and 5–6 still
+> name bodies from the earlier map (Pip, Bramble, Ledger, Grumm, Wanderwell,
+> Chime, Hush, Merrow's Comet, the Scatter, the Far Lantern, the Chorus) and
+> have not been brought across yet, and neither has the game itself. Nothing
+> below is implemented.
+
 ### 4.1 Tone
 
 Warm, whimsical, and curious, with a quiet undercurrent of mystery. The system is lived-in and a little silly on the surface, with an ancient, unanswered question at its edge.
 
-Whimsy comes through the fiction rather than through cartoonishness. Orbital concepts get in-world names (transfer windows are festivals, periapsis is "kissing distance"), planets have personalities, and each culture grows out of the physical facts of its home.
+Whimsy comes through the fiction rather than through cartoonishness. Orbital concepts get plain in-world names, planets have personalities, and each culture grows out of the physical facts of its home.
 
 ### 4.2 The Peoples
 
-Four living species are arranged along the system's temperature gradient, so each one's biology explains where it lives. They pair off as opposites: Emberkin and frogs split on heat, speed, and economy, while otters and cats split on gravity and on crowds versus tight crews.
+Four living species, one extinct. Each has one thing it is better at than anybody else, and that strength is what a player goes to them for.
 
-| | Emberkin | Otters | Cats | Frogs |
-|---|---|---|---|---|
-| **Animal** | Salamanders | Otters | Cats | Frogs |
-| **Climate** | Hot | Temperate, adaptable | Any, but weightless | Deep cold |
-| **Gravity** | Normal | Wide tolerance | Microgravity only | Normal |
-| **Lifespan** | Short (~15 years) | Moderate | Moderate | Centuries |
-| **Pace** | Frantic | Social | Daring | Slow |
-| **Economy** | Volatile, fashion-driven | Haggling as ritual | Tolls by oath and custom | Gift economy, no property |
-| **Records** | Written, meticulous | Gossip and family lore | Stories of captains | Songs |
+**🦦 Otters — Tassel**
 
-**Emberkin (salamanders): hot and fast.** Cold-blooded and heat-hungry, the Emberkin grow sluggish beyond Tessel's orbit without heated suits, so they rarely travel far. They live about fifteen years but count age in Cinder's weeks-long years, so a "300-year-old" elder is middle-aged. Everything feels urgent. Fashions change within weeks, making Emberkin demand the most volatile market in the game and the one that pays most for speed. Because their lives are short, they write everything down. They keep the system's best records and have its worst patience. They are the finest engine smiths anywhere.
+- Playful, friendly, chatty, persistent
+- Social, relationship-oriented merchants
+- Reputation and connections over wealth
+- Curious, nosy, terrible secret-keepers
+- **Strength: Connections**
 
-**Otters: adaptable and social.** Amphibious and tolerant of a wide range of temperatures and gravity, otters are comfortable almost everywhere, which made them the glue of the system. They live in large family "rafts" and hate being alone, so a solo otter pilot is considered odd. Haggling is a social ritual, and refusing to haggle is rude. The otters of Bramble (farmers) and Ledger (bankers) are two rival rafts locked in a long-running feud.
+**🦎 Emberkin — Inner Worlds**
 
-**Cats: weightless and daring.** Born in microgravity, cats are lanky with light bones. Heavy worlds are painful and eventually crippling for them, so they can't land on major worlds and must meet ships in space. Their piracy is partly necessity. They have an instinctive feel for intercepts. A crew is bound by oath to its captain, and status comes from the stories told about you. Tolls follow strict rules: never take everything, and never harm anyone who yields. A captain who robbed you might later send a lavish gift if you impressed them.
+- Reptilian, proud, competitive, materialistic
+- Highly factional: houses, guilds, corporations, military orders
+- Status-conscious and contract-oriented
+- Industrial, wealthy, politically divided
+- **Strength: Wealth**
 
-**Frogs: cold and slow.** Frog biology runs on ammonia, and they survive only in deep cold, so the inner system is lethal to them. They live for centuries on a slow metabolism, and a single conversation might last your entire visit. They have no private property and no scarcity mindset, which is where their famous kindness comes from. They don't haggle. They give freely and remember who gives back, across generations. Their songs serve as their records and preserve things everyone else has forgotten.
+**🐈 Cats — Asteroid Belt**
 
-### 4.3 The Chorus (Extinct)
+- Solitary, clever, pragmatic, suspicious
+- Salvagers, mechanics, scavengers
+- Personal freedom over institutions
+- Extensive Arc salvage culture
+- **Strength: Stuff**
 
-The Chorus built the Arc, Hush's observatory, and the Far Lantern. Their ruins have no doors, stairs, or seats, only smooth tubes, so nobody knows what their bodies were like. Everything they built is *tuned*. Chime rings because of something they did, and Hush is silent because they built a dampener there.
+**🐸 Frogs — Gas Giant & Moons**
 
-One working idea is that the Chorus perceived orbits the way others hear music, which is why surviving Chorus routes are uncannily efficient. Frog songs may preserve fragments of the Chorus language without the frogs realizing it. Chorus relics are natural gate-key upgrades.
+- Peaceful, spiritual, patient, long-lived
+- Philosophical, historical, community-oriented
+- Floating cities and ancient traditions
+- Slow-moving but deeply knowledgeable
+- **Strength: Knowledge**
 
-### 4.4 The Lamp System
+**The Builders — Extinct**
 
-Distances are in AU for reference and will be scaled for gameplay.
+- Unknown species, unknown name
+- Creators of the Arc and the outer-system station
+- Incomprehensible technology
+- Mysterious disappearance
+- **Strength: Technology**
 
-| Body | Orbit | Inhabitants | Description |
-|---|---|---|---|
-| **The Lamp** | — | — | A warm orange star at the system's center. |
-| **Cinder** | 0.3 AU, circular | Emberkin homeworld | Tidally locked, with cities in the twilight band between a molten dayside and a frozen nightside. Its year lasts only weeks, so New Year parties never stop. Home of the engine smiths. |
-| **Wanderwell** | 0.5–3.5 AU, highly eccentric | Emberkin summer colony | Swings from scorching summer to deep winter past the belt. The Emberkin flock here at periapsis for a huge market and flee as it heads outward, turning the market into a migration players learn to anticipate. |
-| ↳ **Tagalong** | Tight orbit around Wanderwell | Small otter raft | A pebble of a moon whose otters tend the empty colony through winter. The only off-season trade at Wanderwell, with thin stock. |
-| **Tessel** | 1.0 AU, circular | Otter rafts | An ocean world of floating harbor cities and the system's gossip hub. The starting port. |
-| ↳ **Pip** | Low orbit around Tessel | Otter shipwrights | A tiny moon of dry docks and cranes. The otters here handle upgrades and have strong opinions about your paint job. |
-| ↳ **Bramble** | Mid orbit around Tessel | Otter farming raft | Hedgerow-covered and feeding half the inner system. Distrusts anyone who handles money for a living. |
-| ↳ **Ledger** | Far orbit around Tessel | Otter banking raft | Vaults and counting houses that finance most trade ventures. Looks down on the "dirt-grubbers" next door. The Bramble–Ledger hop is the natural first transfer lesson. |
-| **The Arc** | 2.2 AU, co-orbital debris | Cat salvagers | The last intact segment of a shattered Chorus ring, trailed by wreckage along its orbit. Perfect microgravity for cats, and a source of relic upgrades. |
-| **The Scatter** | 2.6–3.2 AU, belt | Cat homeland | An asteroid belt every outward route must cross, which is exactly why the cats collect tolls here. Their haven, Claw Rock, has a surprisingly good tavern. |
-| **Grumm** | 5 AU, circular | Frog balloon villages | A grumpy violet gas giant with the deepest gravity well in the system and the premier slingshot. Frogs live in balloon villages in its cold upper clouds. A heat shield allows aerobraking. |
-| ↳ **Mossback** | Close orbit around Grumm | None (it's alive) | A moon-sized creature asleep for millennia, its shell covered in moss forests. Pilgrims come to hear its heartbeat. |
-| ↳ **Lillimoor** | Mid orbit around Grumm | Frog homeworld | Ammonia seas and lily-pad villages. The frogs pay handsomely for inner-world luxuries, in their own way. |
-| ↳ **Widdershins** | Far orbit around Grumm, **retrograde** | Cat exiles | A captured moon orbiting backwards. The costly retrograde approach keeps visitors away, which is exactly the point. Its goods are rare. |
-| **Chime** | 9 AU, circular | Chorus ruins | A cold world where glass snows from the sky and the whole planet rings faintly. The frogs sing about it. Almost nobody has been. |
-| ↳ **Hush** | Low orbit around Chime | Chorus ruins | A dark moon where Chime's ringing falls completely silent. Holds an empty Chorus observatory pointed at the Far Lantern. |
-| **Merrow's Comet** | 0.4–14 AU, extremely eccentric | All four species | A traveling bazaar and the only place all four peoples live together. Passes through the inner system rarely. Intercepting it is a signature skill check. |
-| **The Far Lantern** | 18 AU, slow circular | ??? | Something at the system's edge blinks at irregular intervals. Linked to the Chorus. The long-term goal. |
+### 4.3 Major Bodies
 
-### 4.5 Geography as Design
+| Body | Type | Character |
+|---|---|---|
+| **The Lamp** | Star | Warm, orange, dangerous |
+| **Cinder** | Emberkin planet | Industrial, volcanic, crowded |
+| **Scorch** | Cinder moon | Barren, mining, frontier |
+| **Veyra** | Emberkin planet | Wealthy, luxurious, factional |
+| **Tassel** | Ocean planet | Friendly, bustling, aquatic |
+| **Slate** | Tassel moon | Rocky, industrial, tutorial |
+| **Moss** | Tassel moon | Green, lush, agricultural |
+| **The Belt** | Asteroid belt | Chaotic, improvised, lawless |
+| **Nail** | Cat settlement | Friendly, scrappy, communal |
+| **Whisker** | Cat settlement | Shady, illicit, dangerous |
+| **The Arc** | Ancient station | Enormous, abandoned, mysterious |
+| **The Giant** | Gas giant | Vast, stormy, inhabited |
+| **Brine** | Frog moon | Ammonia seas, chemical-rich |
+| **Glass** | Frog moon | Icy, scientific, subterranean |
+| **Croak** | Frog moon | Retrograde, isolated, spiritual |
+| **Haven** | Frog moon | Beautiful, peaceful, populous |
+| **The Maw** | Ancient station | Remote, impossible, endgame |
 
-The layout does design work on its own. **The Scatter is a chokepoint** between the inner and outer systems, which is why the cats control it and why stealth is valuable. **Grumm is a gateway:** its gravity assists are the efficient road to Chime and beyond. **Eccentric orbits are calendars:** Wanderwell's periapsis and Merrow's Comet's passes are events players plan around. **Tessel's moons are a tutorial:** the opening delivery goes to Pip, the lowest and cheapest of the three, and Bramble and Ledger are two more short, safe hops after it — all of them teaching SOI transitions before the player ever leaves home.
+### 4.4 The Worlds
+
+#### Tassel
+
+**Slate — Tutorial Moon.** Rocky, barren, industrial.
+
+- Otter mining colonies
+- Shipyards
+- Basic trading
+- First navigation lessons
+- Easy orbital transfers
+- Tutorial starting area
+
+**Moss.** Green, lush, oceanic.
+
+- Agriculture
+- Medicine
+- Exotic plants
+- Otter settlements
+- Social quests
+- Crew introductions
+
+#### Emberkin
+
+**Cinder.** Industrial, volcanic, crowded.
+
+- Metals
+- Fuel
+- Machinery
+- Factories
+- Factional politics
+- Industrial contracts
+
+**Scorch.** Barren, mineral-rich, frontier.
+
+- Mining
+- Cheap materials
+- Dangerous jobs
+- Stranded ships
+- Rougher Emberkin
+
+**Veyra.** Wealthy, luxurious, competitive.
+
+- Luxury goods
+- High-value trading
+- Corporate factions
+- Auctions
+- Status-driven customers
+
+#### Asteroid Belt
+
+**Nail.** Friendly, scrappy.
+
+- Repairs
+- Salvage
+- Cheap parts
+- Cat mechanics
+- Informal trade
+
+**Whisker.** Shady, lawless.
+
+- Smuggling
+- Black market
+- Stolen goods
+- Illegal Arc technology
+- Mercenaries
+
+**The Arc.** Ancient, enormous, incomprehensible.
+
+- Salvage
+- Ancient technology
+- Exploration
+- Major mystery
+- Gradually unlocked areas
+
+#### Frog System
+
+**The Giant.** Vast, stormy, atmospheric.
+
+- Floating cities
+- Frog civilization
+- Medicine
+- Spiritual centers
+
+**Brine.** Ammonia seas, alien, chemical-rich.
+
+- Pharmaceuticals
+- Chemicals
+- Floating settlements
+- Strange biology
+
+**Glass.** Icy, beautiful, subterranean.
+
+- Research
+- Subsurface ocean
+- Ancient history
+- Builder studies
+
+**Croak.** Retrograde, isolated, austere.
+
+- Difficult orbital transfer
+- Frog ascetics
+- Spiritual quests
+- Lore-heavy
+- Minimal commerce
+
+**Haven.** Peaceful, beautiful, populous.
+
+- Frog capital
+- Pilgrimages
+- Festivals
+- Philosophy
+- Major trade hub
+
+#### The Outer Mystery
+
+**The Maw.** Remote, ancient, impossible.
+
+- Miniature black hole
+- Builder station
+- Unexplained orbit
+- Late-game destination
+- Final mystery
 
 ---
 
