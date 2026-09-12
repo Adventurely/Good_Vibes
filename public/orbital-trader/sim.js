@@ -68,7 +68,13 @@ export const FIRST_DELIVERY = { to: 'pip', pay: 420, days: 14, units: 2 };
 export function newGame(seed = 1){
   const start = CONST.START_PORT;
   const state = {
-    version: 1,
+    /* 2: the sky was rebuilt. Tessel went from nineteen Earths to a Kerbin,
+       every body to a tenth of its size, and every reach to something a mass
+       earns — so a version 1 save's ship position is a place that no longer
+       means what it meant. Those saves are refused rather than repaired: the
+       page catches it and opens a new game, which is the honest outcome when
+       the world under a ship has changed shape. */
+    version: 2,
     seed, rng: (seed * 2654435761) >>> 0 || 1,
     t: 0, warp: 1, paused: false,
     shipName: TEXT.shipNames[Math.abs(seed) % TEXT.shipNames.length],
@@ -2102,7 +2108,7 @@ export function restore(json){
   const s = typeof json === 'string' ? JSON.parse(json) : json;
   const bad = why => { throw new Error(`Not a save this game understands: ${why}.`); };
   if(!s || typeof s !== 'object') bad('it is not an object');
-  if(s.version !== 1) bad(`it is version ${s.version}`);
+  if(s.version !== 2) bad(`it is version ${s.version}, and this sky is version 2`);
   if(!s.ship || typeof s.ship !== 'object') bad('it has no ship');
   if(!world.get(s.ship.body)) bad(`its ship is at "${s.ship.body}", which is nowhere`);
   for(const k of ['r', 'v']){

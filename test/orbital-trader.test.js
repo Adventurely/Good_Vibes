@@ -949,7 +949,11 @@ test('a save is refused at the door rather than halfway through a frame', () => 
     'a hold of something unknown': s => { s.cargo = [{ good: 'moonbeams', qty: 2 }]; },
     'a plan of nonsense': s => { s.nodes = [{ prograde: 1 }]; },
     'a tank that does not exist': s => { s.tiers.tank = 9; },
-    'the wrong version': s => { s.version = 2; },
+    /* Version 1 is the sky before the rescale — Tessel at nineteen Earths,
+       reaches written by hand. A ship's position in that world is not a place
+       in this one, so those saves are refused rather than repaired. */
+    'a version this sky is not': s => { s.version = 1; },
+    'a version from the future': s => { s.version = 3; },
   };
   for(const [what, wreck] of Object.entries(broken)){
     const s = JSON.parse(good);
