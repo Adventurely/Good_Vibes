@@ -1685,14 +1685,25 @@ past that first crossing is chased. `planImmediate` picks the horizon that ends
 the last drawn leg exactly one lap in, then cuts.
 
 **The view is locked to the world you are going round** — the smallest reach
-holding the ship — and swings when that changes. There is no panning. The zoom
-follows the drawn road and re-frames when it grows off the screen or shrinks to
-a knot.
+holding the ship — and swings when that changes. The zoom follows the drawn
+road and re-frames when it grows off the screen or shrinks to a knot.
 
-**The clock has no ladder.** ×1 is ten real minutes to a lap of the parking
-orbit at Tessel, which is slow enough that nothing appears to move, and that is
-the point. Time is skipped by tapping somewhere on your road: the game says how
-far off it is and how long you will wait, and then runs at whatever rate covers
+**Panning is an offset from the lock, not a place in the sky.** Drag the chart
+(one finger, two fingers, or the arrow keys with no burn selected) and what
+that drag is worth is stored as `pan`: how far you have wandered from the last
+thing you focused. The anchor is read fresh every frame, so nothing slides out
+from under you — look a little ahead of your ship and it stays a little ahead
+of your ship as the ship goes round; drag over a moon and your view travels
+with the moon. Zooming about a pointer writes into the same offset, which is
+why it now survives the next frame. Focusing anything (tapping a body, `f`, the
+◎ button) puts the offset back to nothing, and ◎ lights up while you are off
+the lock: a view that can be lost is a view somebody has to get back, and this
+is how it is got back.
+
+**The clock has no ladder.** ×1 is ten real minutes to a lap of the low orbit
+a new game opens in over Tessel, which is slow enough that nothing appears to
+move, and that is the point. Time is skipped by tapping somewhere on your road:
+the game says how far off it is and how long you will wait, and then runs at whatever rate covers
 it in about ten seconds and stops itself. A burn, a change of reach or a
 harbour mouth cancels the skip.
 

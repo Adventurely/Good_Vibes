@@ -112,9 +112,21 @@ export function createChart(canvas, world, opts = {}){
     /* The chart is centred on the ship. That is where you are, and a player
        who has to hunt for their own dot has already lost the thread. Tapping
        a body centres on that instead, until you tap back to the ship or the
-       ship changes which world it is going round. Panning is not offered: a
-       view that can be lost is a view somebody has to get back. */
-    camera: { cx: 0, cy: 0, zoom: 240, follow: 'ship' },
+       ship changes which world it is going round.
+
+       Panning is offered on top of that lock rather than instead of it. The
+       view a player drags to is kept as `pan`: an offset in au **from the
+       thing they last focused**, not a position in the sky. So the sky does
+       not slide out from under a pan — look a little ahead of your ship and
+       it stays a little ahead of your ship as the ship goes round, and the
+       same drag over a moon keeps its place as the moon travels. Centring is
+       then always one press away (`focus` puts pan back to nothing), which is
+       the answer to the old objection that a view you can lose is a view
+       somebody has to get back.
+
+       `cx`/`cy` are the sum — anchor plus pan — written down once a frame so
+       every projection in this file can stay the one subtraction it was. */
+    camera: { cx: 0, cy: 0, zoom: 240, follow: 'ship', pan: [0, 0], anchor: [0, 0] },
     /* Screen-pixel shift of the follow centre: negative x when a panel covers
        the right of the chart, negative y when a sheet covers the bottom. */
     offset: [0, 0],
@@ -151,6 +163,33 @@ export function createChart(canvas, world, opts = {}){
     (chart.height / 2 + chart.offset[1] - s[1]) / chart.camera.zoom + chart.camera.cy,
   ];
 
+  /* Centre = the thing being followed, plus however far the player has
+     dragged away from it. Everything that moves the view moves `pan` and then
+     calls this, so the next frame agrees with the frame that is on screen. */
+  chart.settle = () => {
+    const cam = chart.camera;
+    cam.cx = cam.anchor[0] + cam.pan[0];
+    cam.cy = cam.anchor[1] + cam.pan[1];
+  };
+
+  /* Drag the sky by a screen distance. The point under the finger stays under
+     the finger, which is the only thing a pan has to get right. */
+  chart.panBy = (dxPx, dyPx) => {
+    const cam = chart.camera;
+    cam.pan[0] -= dxPx / cam.zoom;
+    cam.pan[1] += dyPx / cam.zoom;
+    chart.settle();
+  };
+  /* Back to the middle of whatever is being followed, keeping the scale. */
+  chart.centre = () => { chart.camera.pan = [0, 0]; chart.settle(); };
+  /* Whether the view is off its lock, and by how much of the shorter side of
+     the canvas: what a "you have wandered" cue in the page is drawn from. */
+  chart.panned = () => {
+    const cam = chart.camera;
+    const px = Math.hypot(cam.pan[0], cam.pan[1]) * cam.zoom;
+    return px / Math.max(1, Math.min(chart.width, chart.height));
+  };
+
   /* Zoom about a screen point, so what is under the pointer stays there. */
   chart.zoomBy = (factor, at) => {
     const cam = chart.camera;
@@ -158,12 +197,19 @@ export function createChart(canvas, world, opts = {}){
     const before = chart.toWorld(at ?? centre);
     cam.zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, cam.zoom * factor));
     const after = chart.toWorld(at ?? centre);
-    cam.cx += before[0] - after[0];
-    cam.cy += before[1] - after[1];
+    /* Into the pan, not into the centre: the centre is recomputed from the
+       lock every frame, so a correction written there is gone by the next
+       one and the sky jumps back under the pointer. */
+    cam.pan[0] += before[0] - after[0];
+    cam.pan[1] += before[1] - after[1];
+    chart.settle();
   };
-  /* Lock onto a body and pick a zoom that frames its reach. */
+  /* Lock onto a body and pick a zoom that frames its reach. Focusing is also
+     what un-pans: the thing you just asked to look at belongs in the middle,
+     and every later drag is measured from it. */
   chart.focus = (what, view, frame = true) => {
     chart.camera.follow = what;
+    chart.centre();
     if(!frame) return;
     const b = world.get(what);
     if(!b) return;
@@ -207,11 +253,15 @@ function draw(chart, view){
   const pos = new Map();
   for(const b of world.bodies) pos.set(b.id, absState(world, b.id, t));
 
-  if(camera.follow === 'ship' && view.shipAbs){
-    camera.cx = view.shipAbs.r[0]; camera.cy = view.shipAbs.r[1];
-  }else if(camera.follow && pos.has(camera.follow)){
-    const p = pos.get(camera.follow).r; camera.cx = p[0]; camera.cy = p[1];
-  }
+  /* The lock, and then the pan on top of it. Nothing that is followed holds
+     still — the ship is going round something and every world is on a rail —
+     so the anchor is read fresh each frame and the player's drag rides along
+     on it. With nothing followed (the title screen) the anchor is the Lamp at
+     the origin, and the pan is the whole of the framing. */
+  if(camera.follow === 'ship' && view.shipAbs) camera.anchor = [...view.shipAbs.r];
+  else if(camera.follow && pos.has(camera.follow)) camera.anchor = [...pos.get(camera.follow).r];
+  else camera.anchor = [0, 0];
+  chart.settle();
 
   // Ground.
   const g = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.7);

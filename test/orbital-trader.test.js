@@ -6,6 +6,7 @@ import {
   CONST, BODIES, GOODS, PORTS, UPGRADES, FORMULAS, CONTRACT_TEMPLATES, TEXT, GLOSSARY, SPECIES, BELT_ROCKS,
 } from '../public/orbital-trader/content.js';
 import * as S from '../public/orbital-trader/sim.js';
+import { createChart } from '../public/orbital-trader/render.js';
 
 /* Orbital Trader has no server: everything it knows is in public/ and is
  * imported here as the browser imports it. These tests are the gate that a
@@ -226,6 +227,85 @@ test('the text has every line the game asks for', () => {
     assert.match(TEXT.logTemplates[k], /\{\w+\}/, `log template ${k} has a placeholder`);
   }
   assert.ok(TEXT.shipNames.length >= 12 && TEXT.captainLines.onStranded.length >= 3);
+});
+
+/* ------------------------------------------------------------- chart */
+
+/* The chart is a canvas, but its camera is arithmetic, and the arithmetic is
+ * the part a player can get lost in. Enough of a canvas to make one. */
+function stubChart(w = 800, h = 600){
+  const prev = globalThis.window;
+  globalThis.window = { devicePixelRatio: 1 };
+  const canvas = {
+    width: 0, height: 0,
+    getContext: () => ({ setTransform(){} }),
+    getBoundingClientRect: () => ({ width: w, height: h, left: 0, top: 0 }),
+  };
+  const chart = createChart(canvas, world);
+  chart.restore = () => { if(prev === undefined) delete globalThis.window; else globalThis.window = prev; };
+  return chart;
+}
+/* One frame's worth of the thing draw() does: read where the followed body is
+ * now, and lay the player's pan on top of it. */
+function settleOn(chart, id, t){
+  chart.camera.anchor = [...O.absState(world, id, t).r];
+  chart.settle();
+}
+
+test('a pan is stored against the thing last focused, so the sky does not slide out from under it', () => {
+  const chart = stubChart();
+  try{
+    chart.focus('tessel', null, false);
+    assert.deepEqual(chart.camera.pan, [0, 0], 'focusing centres');
+
+    settleOn(chart, 'tessel', 0);
+    const centre = [chart.width / 2, chart.height / 2];
+    const at0 = chart.toScreen(O.absState(world, 'tessel', 0).r);
+    assert.ok(Math.abs(at0[0] - centre[0]) < 1e-6 && Math.abs(at0[1] - centre[1]) < 1e-6, 'and puts it in the middle');
+
+    // Drag the sky a hundred pixels right and forty down.
+    chart.panBy(100, 40);
+    const panned = chart.toScreen(O.absState(world, 'tessel', 0).r);
+    assert.ok(Math.abs(panned[0] - (centre[0] + 100)) < 1e-6, 'the world under the finger came with it');
+    assert.ok(Math.abs(panned[1] - (centre[1] + 40)) < 1e-6);
+
+    /* Ninety days on, Tessel is a quarter of a year round the Lamp — a long
+       way from where the drag happened. The pan is an offset from Tessel, not
+       a place in the sky, so the view is still looking at the same corner of
+       it. This is the whole promise. */
+    settleOn(chart, 'tessel', 90);
+    const later = chart.toScreen(O.absState(world, 'tessel', 90).r);
+    assert.ok(Math.abs(later[0] - (centre[0] + 100)) < 1e-9, 'still a hundred pixels off Tessel');
+    assert.ok(Math.abs(later[1] - (centre[1] + 40)) < 1e-9, 'and forty down');
+    assert.ok(chart.panned() > 0, 'and the chart knows it is off its lock');
+
+    // Looking somewhere else re-centres, and the next pan is measured from there.
+    chart.focus('pip', null, false);
+    assert.deepEqual(chart.camera.pan, [0, 0]);
+    assert.equal(chart.panned(), 0);
+    settleOn(chart, 'pip', 90);
+    const onPip = chart.toScreen(O.absState(world, 'pip', 90).r);
+    assert.ok(Math.abs(onPip[0] - centre[0]) < 1e-6 && Math.abs(onPip[1] - centre[1]) < 1e-6);
+  }finally{ chart.restore(); }
+});
+
+test('zooming about a point keeps that point under the pointer, and keeps it there next frame', () => {
+  const chart = stubChart();
+  try{
+    chart.focus('tessel', null, false);
+    settleOn(chart, 'tessel', 0);
+    const at = [chart.width * 0.75, chart.height * 0.3];
+    const under = chart.toWorld(at);
+    chart.zoomBy(2.5, at);
+    const after = chart.toScreen(under);
+    assert.ok(Math.hypot(after[0] - at[0], after[1] - at[1]) < 1e-6, 'the point under the pointer stayed there');
+    /* And it has to survive the redraw: a correction written into the centre
+       is overwritten by the lock every frame, which is what made zooming to a
+       point snap back before there was a pan to put it in. */
+    settleOn(chart, 'tessel', 0);
+    const redrawn = chart.toScreen(under);
+    assert.ok(Math.hypot(redrawn[0] - at[0], redrawn[1] - at[1]) < 1e-6, 'and stayed there on the next frame');
+  }finally{ chart.restore(); }
 });
 
 /* ---------------------------------------------------------------- sim */

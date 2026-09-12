@@ -168,8 +168,13 @@ function fit(){
   chart.camera.follow = null;
   chart.camera.zoom = Math.min(chart.width, chart.height) / 7.0;
   const want = [chart.width * 0.26, chart.height * 0.78];
-  chart.camera.cx = (chart.width / 2 - want[0]) / chart.camera.zoom;
-  chart.camera.cy = (want[1] - chart.height / 2) / chart.camera.zoom;
+  /* Nothing is followed here, so the chart's anchor is the Lamp at the origin
+     and the whole of this framing is a pan away from it. */
+  chart.camera.pan = [
+    (chart.width / 2 - want[0]) / chart.camera.zoom,
+    (want[1] - chart.height / 2) / chart.camera.zoom,
+  ];
+  chart.settle();
 }
 fit();
 addEventListener('resize', fit);

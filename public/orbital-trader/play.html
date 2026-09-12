@@ -99,6 +99,10 @@
   }
   #view button:hover{ color:var(--ink); border-color:var(--line-2); }
   #view button[aria-pressed="true"]{ color:var(--gold-ink); border-color:var(--gold-2); }
+  /* Dragged off the thing the chart is locked to. The button that brings you
+     back is the one that lights up, so "where am I" and "get me back" are the
+     same place on the screen. */
+  #v-fit.off{ color:var(--gold-ink); border-color:var(--gold-2); }
 
   /* ---- The panel: right column on wide screens, a sheet on narrow ---- */
   #panel{
@@ -445,7 +449,7 @@
 <div id="view">
   <button id="dock-go" hidden title="Tie up (d)" aria-label="Tie up here"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="3.4"/><path d="M12 10.4 V20"/><path d="M8 13.5 H16"/><path d="M5 15.5 a7 7 0 0 0 14 0"/></svg></button>
   <button id="w-pause" aria-pressed="false" title="Hold the clock (space)">&#10074;&#10074;</button>
-  <button id="v-fit" title="Frame the world you are orbiting (f)">&#9678;</button>
+  <button id="v-fit" title="Back to your ship, and frame it (f)">&#9678;</button>
   <button id="v-in" title="Zoom in (+)">+</button>
   <button id="v-out" title="Zoom out (-)">&minus;</button>
   <button id="v-panel" title="Show or hide the panel (p)" aria-pressed="true">&#9776;</button>
@@ -636,7 +640,10 @@ function frame(now){
      left looking at a world they have just left. */
   if(state.ship.body !== lockedTo){
     lockedTo = state.ship.body;
-    chart.camera.follow = 'ship';
+    /* Through focus, not by setting the lock: a pan is an offset from the
+       thing you were looking at, and four orders of magnitude ago is not a
+       place to keep looking from. */
+    chart.focus('ship', null, false);
     replan(true);
     frameShipOrbit();
   }
@@ -660,6 +667,7 @@ function frame(now){
   });
   renderHud(docking);
   renderDockCard(docking);
+  refreshRecentre();
   requestAnimationFrame(frame);
 }
 
@@ -842,6 +850,26 @@ addEventListener('resize', () => togglePanel(panelOpen));
 
 /* ------------------------------------------------------------- input */
 
+/* How far a finger may slide on the way to a tap before the gesture is a drag
+   instead. Below it, a slightly wobbly press on a road is still a press on
+   that road; above it, the sky follows the finger. */
+const TAP_SLOP = 6;
+
+/* The chart can now be dragged away from what it is locked to, so it has to
+   say when it has been. The cue is on the button that undoes it, and it lights
+   only once the view is properly off — a few pixels of drift while placing a
+   burn is not being lost. */
+let recentreShown = false;
+function refreshRecentre(){
+  const off = chart.panned() > 0.03;
+  if(off === recentreShown) return;
+  recentreShown = off;
+  $('v-fit').classList.toggle('off', off);
+  $('v-fit').title = off
+    ? 'Back to your ship, and frame it (f) — the chart has been dragged off its lock'
+    : 'Back to your ship, and frame it (f)';
+}
+
 let drag = null;
 let pinch = null;
 const pointers = new Map();
@@ -850,7 +878,8 @@ canvas.addEventListener('pointerdown', e => {
   pointers.set(e.pointerId, [e.clientX, e.clientY]);
   if(pointers.size === 2){
     const [a, b] = [...pointers.values()];
-    pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]) };
+    pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), m: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] };
+    canvas.classList.remove('grab');
     drag = null; return;
   }
   const hit = chart.hitTest(e.clientX, e.clientY);
@@ -871,25 +900,33 @@ canvas.addEventListener('pointerdown', e => {
     replan(true); if(tab === 'plan') renderTab();
     return;
   }
-  /* Not a pan: the chart is locked to the world you are going round, so a
-     drag on empty sky has nowhere to go. It is kept as a gesture only so that
-     a finger that slides a little on the way to a tap is not read as a tap
-     somewhere else. */
-  drag = { kind: 'tap', x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: false, hit };
+  /* Empty sky is a pan. It stays a tap until the finger has actually gone
+     somewhere — a few pixels of slide on the way to tapping a road is not a
+     drag — and from then on it drags the sky, measured from whatever the
+     chart is locked to rather than from the stars. */
+  drag = { kind: 'pan', x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: false, hit };
 });
 canvas.addEventListener('pointermove', e => {
   if(pointers.has(e.pointerId)) pointers.set(e.pointerId, [e.clientX, e.clientY]);
   if(pinch && pointers.size === 2){
     const [a, b] = [...pointers.values()];
     const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
-    if(d > 0 && pinch.d > 0) chart.zoomBy(d / pinch.d, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]);
-    pinch.d = d; return;
+    const m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    // Two fingers do both at once: the gap is the scale, the middle is the pan.
+    if(d > 0 && pinch.d > 0) chart.zoomBy(d / pinch.d, m);
+    chart.panBy(m[0] - pinch.m[0], m[1] - pinch.m[1]);
+    pinch.d = d; pinch.m = m; return;
   }
   if(!drag) return;
   const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
-  if(drag.kind === 'tap'){
-    if(Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > 6) drag.moved = true;
-    drag.x = e.clientX; drag.y = e.clientY; return;
+  if(drag.kind === 'pan'){
+    if(!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > TAP_SLOP){
+      drag.moved = true;
+      canvas.classList.add('grab');
+    }
+    if(drag.moved) chart.panBy(dx, dy);
+    drag.x = e.clientX; drag.y = e.clientY;
+    return;
   }
   if(drag.kind === 'node'){
     if(Math.hypot(dx, dy) > 4) drag.moved = true;
@@ -914,7 +951,7 @@ function endPointer(e){
   canvas.classList.remove('grab');
   if(!drag) return;
   const d = drag; drag = null;
-  if(d.kind === 'tap' && !d.moved){
+  if(d.kind === 'pan' && !d.moved){
     /* A tap: the path takes a burn, a body becomes the target, empty sky
        deselects. The path wins ties, because a body's hit disc is a generous
        forty pixels across for fingers and at the zoom you cast off at, the
@@ -944,6 +981,9 @@ function typing(e){
      pause meant no button in the game could be pressed without a mouse. */
   return typeof t.closest === 'function' && !!t.closest('button, a[href], [role="button"], [tabindex]');
 }
+/* One arrow press, in screen pixels: a seventh of the short side of the chart,
+   or a fortieth with shift held, so the same key is both a stride and a nudge. */
+function panStep(e){ return Math.min(chart.width, chart.height) * (e.shiftKey ? 0.025 : 0.15); }
 addEventListener('keydown', e => {
   if(typing(e) || e.ctrlKey || e.metaKey || e.altKey) return;
   if($('modal').open) return;
@@ -956,10 +996,13 @@ addEventListener('keydown', e => {
     case 'p': togglePanel(); break;
     case 'Escape': if(selectedNode >= 0){ selectedNode = -1; renderTab(); } else togglePanel(false); break;
     case 'Delete': case 'Backspace': if(state.nodes[selectedNode]){ S.removeNode(state, selectedNode); selectedNode = -1; replan(true); renderTab(); } break;
-    case 'ArrowRight': if(state.nodes[selectedNode]){ e.preventDefault(); pushAxis(selectedNode, 'pro', fine); } break;
-    case 'ArrowLeft': if(state.nodes[selectedNode]){ e.preventDefault(); pushAxis(selectedNode, 'retro', fine); } break;
-    case 'ArrowUp': if(state.nodes[selectedNode]){ e.preventDefault(); pushAxis(selectedNode, 'out', fine); } break;
-    case 'ArrowDown': if(state.nodes[selectedNode]){ e.preventDefault(); pushAxis(selectedNode, 'in', fine); } break;
+    /* The arrows push the selected burn; with nothing selected they are the
+       keyboard's pan, so the chart can be walked around without a pointer.
+       Shift makes both of them fine. */
+    case 'ArrowRight': e.preventDefault(); if(state.nodes[selectedNode]) pushAxis(selectedNode, 'pro', fine); else chart.panBy(-panStep(e), 0); break;
+    case 'ArrowLeft': e.preventDefault(); if(state.nodes[selectedNode]) pushAxis(selectedNode, 'retro', fine); else chart.panBy(panStep(e), 0); break;
+    case 'ArrowUp': e.preventDefault(); if(state.nodes[selectedNode]) pushAxis(selectedNode, 'out', fine); else chart.panBy(0, panStep(e)); break;
+    case 'ArrowDown': e.preventDefault(); if(state.nodes[selectedNode]) pushAxis(selectedNode, 'in', fine); else chart.panBy(0, -panStep(e)); break;
   }
 });
 
@@ -1035,7 +1078,9 @@ function lookAtEncounter(){
   toast(`Looking at ${esc(S.portName(ic.body))}. Press f for your ship.`);
 }
 
-function backToShip(fit = false){ chart.camera.follow = 'ship'; if(fit) frameShipOrbit(); }
+/* Come home. Both halves matter: the lock goes back to the ship *and* the
+   pan goes back to nothing, so one press undoes any amount of wandering. */
+function backToShip(fit = false){ chart.focus('ship', null, false); if(fit) frameShipOrbit(); }
 function frameShipOrbit(){
   const span = roadSpan();
   const half = usableHalf();
@@ -1046,7 +1091,9 @@ function frameShipOrbit(){
    back. Nothing is selected and nothing is aimed at — looking is looking, and
    it never changes the zoom: moving the centre and changing the scale at the
    same time is how you lose track of where you were. The fit button is there
-   for when you do want the scale chosen for you. */
+   for when you do want the scale chosen for you. Looking somewhere also ends
+   any drag away from the last thing looked at: the new centre is the new
+   thing, and the next pan is measured from it. */
 function lookAt(id){
   chart.focus(id, null, false);
   toast(`Looking at ${esc(world.get(id).name)}. Press f for your ship.`);

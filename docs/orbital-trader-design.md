@@ -109,7 +109,9 @@ A cap on the rate means the longest hauls take proportionally more than ten seco
 
 Two rules keep the chart readable, and both of them are about refusing to show things.
 
-**The view is locked to the world you are going round.** The chart is always centred on the smallest sphere of influence containing the ship, and it changes when that changes — crossing into a moon's reach swings the chart to that moon and re-frames it. There is no panning and no free look. A view that can be lost is a view somebody has to get back, and a player who is lost on the chart is lost in the game. The zoom follows the drawn road: it re-frames when the road grows past the edge of the screen or shrinks to a knot in the middle, and leaves the player's own zooming alone in between.
+**The view is locked to the world you are going round.** The chart is always centred on the smallest sphere of influence containing the ship, and it changes when that changes — crossing into a moon's reach swings the chart to that moon and re-frames it. The zoom follows the drawn road: it re-frames when the road grows past the edge of the screen or shrinks to a knot in the middle, and leaves the player's own zooming alone in between.
+
+**Panning rides the lock instead of replacing it.** The chart can be dragged — one finger, two fingers, or the arrow keys when no burn is selected — but what is stored is not a position in the sky. It is an offset from the thing last focused, and the thing last focused is looked up again every frame, so a pan keeps its meaning as the world it is measured from moves: look a little ahead of your ship and it stays a little ahead of your ship; drag over a moon and the view travels with the moon. The original objection stands and is answered rather than ignored — a view that can be lost is a view somebody has to get back — so focusing anything at all (tapping a body, pressing `f`, the ◎ button) sets the offset back to nothing, and ◎ lights while the view is off its lock.
 
 **The road shows the orbit you are on and the one thing that happens next.** Never more. It is always exactly one of three pictures:
 
