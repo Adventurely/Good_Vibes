@@ -669,6 +669,11 @@ const settled = pred => pred.segments.some(sg => sg.reason === 'crash' || sg.rea
  * guarantee rather than the estimate: keep the samples up to one period and
  * drop the rest. */
 function oneLap(seg){
+  /* finishSegment already draws at most one lap, at full resolution. This is
+     left as the belt to that pair of braces: it only ever has work to do for
+     a segment built some other way. Trimming an already-lapped leg again
+     would cut it to a fraction of a turn. */
+  if(seg.lapped) return seg;
   const p = seg.elements?.period;
   const dur = seg.t1 - seg.t0;
   if(!Number.isFinite(p) || p <= 0 || dur <= p * 1.001) return seg;

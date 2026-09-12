@@ -792,26 +792,52 @@ function finishSegment(world, start, body, t1, r1, v1, reason, opts){
   const el = elementsFromState(mu, start.r, start.v);
   const dur = t1 - start.t;
   const cap = opts.maxPoints ?? 360;
+  /* Draw at most one lap. A bound leg that runs for fifty turns of its own
+     orbit is still one ellipse on the chart, and spending a fixed budget of
+     points across the whole duration spends them on laps that lie on top of
+     one another: fifty turns inside a moon's reach left seven points a lap,
+     which is how a tidy little orbit came out as a scribble. Sampling one lap
+     at full resolution draws the same picture properly, and the closer in the
+     orbit is — a retrograde burn round a small moon — the more it matters,
+     because the shorter the period the more laps the leg holds.
+     The leg still *ends* where it ends: only the drawing is one lap, and
+     `lapped` says so. */
+  const lapped = Number.isFinite(el.period) && el.period > 0 && dur > el.period * 1.001;
+  const span = lapped ? el.period : dur;
   let n;
   if(Number.isFinite(el.period)){
-    n = Math.round(Math.min(cap, Math.max(24, 240 * dur / el.period)));
+    n = Math.round(Math.min(cap, Math.max(24, 240 * span / el.period)));
   }else{
-    n = Math.round(Math.min(cap, Math.max(24, dur / (opts.hyperbolicStep ?? 0.25))));
+    n = Math.round(Math.min(cap, Math.max(24, span / (opts.hyperbolicStep ?? 0.25))));
   }
   const points = new Array(n + 1);
   const times = new Array(n + 1);
-  // Sample by eccentric anomaly when the leg is a bound orbit so that the fast
-  // part near periapsis gets as many points as the slow part near apoapsis.
   for(let i = 0; i <= n; i++){
     const f = i / n;
-    const dt = dur * f;
-    const s = i === n ? { r: r1 } : propagate(mu, start.r, start.v, dt);
+    const dt = span * f;
+    const s = (!lapped && i === n) ? { r: r1 } : propagate(mu, start.r, start.v, dt);
     points[i] = s.r;
     times[i] = start.t + dt;
   }
+  /* A second, coarser set over the *whole* leg, for the searches rather than
+     the drawing. closestApproach hunts for the nearest pass to a world, and a
+     leg that laps fifty times may only line up with a moon on the fortieth —
+     so it needs the whole duration, at exactly the budget it always had,
+     while the chart needs one turn drawn properly. One buffer could not be
+     both, which is what made drawing it well break aiming at it. */
+  let scan = points, scanTimes = times;
+  if(lapped){
+    const m = Math.round(Math.min(cap, Math.max(24, 240 * dur / el.period)));
+    scan = new Array(m + 1); scanTimes = new Array(m + 1);
+    for(let i = 0; i <= m; i++){
+      const dt = dur * (i / m);
+      scan[i] = (i === m ? { r: r1 } : propagate(mu, start.r, start.v, dt)).r;
+      scanTimes[i] = start.t + dt;
+    }
+  }
   return {
     body: body.id, t0: start.t, t1, r0: start.r, v0: start.v, r1, v1,
-    elements: el, points, times, reason,
+    elements: el, points, times, scan, scanTimes, reason, lapped,
   };
 }
 
@@ -839,17 +865,23 @@ export function closestApproach(world, prediction, targetId, within = Infinity, 
     const own = seg.body === targetId;
     // Or a direct child of it? Then work in the segment's frame directly.
     const child = target.parent === seg.body;
-    for(let i = 0; i < seg.points.length; i++){
-      const t = seg.times[i];
+    // The full-duration samples, not the one lap the chart draws.
+    const pts = seg.scan ?? seg.points, ts = seg.scanTimes ?? seg.times;
+    for(let i = 0; i < pts.length; i++){
+      const t = ts[i];
       let d;
-      if(own) d = norm(seg.points[i]);
-      else if(child) d = dist(seg.points[i], railState(target, segBody.mu, t).r);
-      else d = dist(add(absState(world, seg.body, t).r, seg.points[i]), absState(world, targetId, t).r);
-      if(!best || d < best.d) best = { d, i, seg };
+      if(own) d = norm(pts[i]);
+      else if(child) d = dist(pts[i], railState(target, segBody.mu, t).r);
+      else d = dist(add(absState(world, seg.body, t).r, pts[i]), absState(world, targetId, t).r);
+      /* Carry the bracket, not the index: the samples searched and the
+         samples drawn are different arrays now, and an index into one is
+         meaningless in the other. */
+      const mark = () => ({ d, seg, lo: ts[Math.max(0, i - 1)], hi: ts[Math.min(ts.length - 1, i + 1)] });
+      if(!best || d < best.d) best = mark();
       /* Close enough, and first: stop looking. The samples are in time order
          within a segment and the segments are in time order, so the first one
          under the bar is the earliest arrival. */
-      if(arrive > 0 && d <= arrive){ best = { d, i, seg }; done = true; break; }
+      if(arrive > 0 && d <= arrive){ best = mark(); done = true; break; }
     }
     if(done) break;
   }
@@ -863,7 +895,7 @@ export function closestApproach(world, prediction, targetId, within = Infinity, 
     const tg = absState(world, targetId, t);
     return { d: dist(shipR, tg.r), rel: norm(sub(shipV, tg.v)), shipR, tgR: tg.r };
   };
-  let lo = seg.times[Math.max(0, best.i - 1)], hi = seg.times[Math.min(seg.times.length - 1, best.i + 1)];
+  let lo = best.lo, hi = best.hi;
   const phi = (Math.sqrt(5) - 1) / 2;
   let a = hi - phi * (hi - lo), b = lo + phi * (hi - lo);
   let fa = f(a).d, fb = f(b).d;

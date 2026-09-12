@@ -657,8 +657,11 @@ function frame(now){
   if(saveTimer > 30){ saveTimer = 0; save(); }
   refreshNodeLabel();
   const docking = state.dockedAt ? null : S.dockingStatus(state);
-  /* A harbour in sight ends a skip once, so you are awake for the arrival. */
-  if(docking && (docking.ok || docking.inZone) && state.warp > 1 && !state.flags.zoneWarpDropped){ stopSkip(); state.flags.zoneWarpDropped = true; }
+  /* A harbour in sight ends a skip once, so you are awake for the arrival —
+     but only a harbour somewhere other than where the skip set off from. A
+     change of reach already ends a skip on its own, so what this is really
+     for is the things with no reach to cross: the Arc, Claw Rock, the comet. */
+  if(docking && docking.port !== skipHome && (docking.ok || docking.inZone) && state.warp > 1 && !state.flags.zoneWarpDropped){ stopSkip(); state.flags.zoneWarpDropped = true; }
   if(!docking) state.flags.zoneWarpDropped = false;
   if(state.dockedAt) warpTarget = null;
   if(warpTarget != null && state.t >= warpTarget) stopSkip();
@@ -679,9 +682,15 @@ function frame(now){
 
 function handleEvents(events){
   for(const e of events){
-    if(e.kind === 'soi' || e.kind === 'burn') stopSkip();
+    /* A skip runs through the burns it was told about. Pointing at somewhere
+       past a mark is a player saying "and that one too" — stopping dead at
+       every mark on the way meant a road with three burns on it took four
+       skips to fly, and the burns fire by themselves anyway. What still ends
+       a skip is anything the plan did not promise: a change of reach, a burn
+       the tank could not pay for, a toll, a crash, a dry tank. */
+    if(e.kind === 'soi') stopSkip();
     if(e.kind === 'burn') { save(); toast(`Burned ${S.fmtKms(e.magnitude)}.`); if(tab === 'plan') renderTab(); }
-    if(e.kind === 'short') toast(`The tank ran short: ${S.fmtKms(e.got)} of ${S.fmtKms(e.wanted)}.`, 'bad');
+    if(e.kind === 'short'){ stopSkip(); toast(`The tank ran short: ${S.fmtKms(e.got)} of ${S.fmtKms(e.wanted)}.`, 'bad'); }
     /* A change of reach re-frames the chart, re-draws the road and changes
        every number on the Plan card. The panel has to be told, or it sits
        there naming the world you just left. */
@@ -754,10 +763,12 @@ function renderDockCard(docking){
    awake for the parts that are not a coast. */
 
 let warpTarget = null;
+/* The world a skip began around. Its own harbour is not an arrival. */
+let skipHome = null;
 function setRate(mult){
   state.warp = Math.max(1, Math.min(CONST.MAX_WARP, mult));
 }
-function stopSkip(){ warpTarget = null; setRate(1); }
+function stopSkip(){ warpTarget = null; skipHome = null; setRate(1); }
 /* There is no pause button any more: the menu is the pause. Opening it is
    already what a player does when they want to stop and read something, and
    the Clock stat in the bar says which it is. Space still works. */
@@ -776,6 +787,14 @@ function skipTo(t){
   if(!plan) return false;
   warpTarget = plan.t - Math.min(0.02, plan.days * 0.02);
   state.paused = false;
+  /* Remember where this skip started. The harbour rule below wakes you when
+     a harbour comes into sight, which is worth waking for when it belongs to
+     somewhere you have arrived — and never when it is the harbour you are
+     leaving. The game opens parked in Tessel's docking range, and the quiet
+     window after casting off ends a moment into the first skip, so Tessel's
+     own harbour "came into sight" and cancelled it: the first skip of every
+     game died on its second frame, which is what made warping look broken. */
+  skipHome = state.ship.body;
   setRate(plan.rate);
   return true;
 }
