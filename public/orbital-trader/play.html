@@ -974,6 +974,13 @@ canvas.addEventListener('pointermove', e => {
       const later = state.nodes.find((o, i) => i !== drag.index && o.t > n.t);
       const earlier = [...state.nodes].reverse().find((o, i) => state.nodes.indexOf(o) !== drag.index && o.t < n.t);
       let t = p.t;
+      /* The chart draws one lap of a leg however many it holds, so the times
+         under the pointer only ever span that lap. Dragging a mark that sits
+         three laps along would otherwise snap it back to the first one, where
+         it fires at once and vanishes — so put it back on the lap it was on.
+         Sliding it right round the ellipse still moves it a lap at a time. */
+      const P = p.seg?.elements?.period;
+      if(p.seg?.lapped && Number.isFinite(P) && P > 0) t += Math.round((n.t - t) / P) * P;
       if(later) t = Math.min(t, later.t - 1e-3);
       if(earlier) t = Math.max(t, earlier.t + 1e-3);
       n.t = Math.max(state.t + 1e-3, t);

@@ -988,9 +988,17 @@ function nearestPathPoint(chart, x, y, prediction, tNow){
       u = Math.max(0, Math.min(1, u));
       const px = a[0] + u * abx, py = a[1] + u * aby;
       const d = Math.hypot(px - x, py - y);
-      if(!best || d < best.d){
-        const t = seg.times[i - 1] + u * (seg.times[i] - seg.times[i - 1]);
-        best = { d, t, seg, x: px, y: py };
+      const t = seg.times[i - 1] + u * (seg.times[i] - seg.times[i - 1]);
+      /* Two roads can lie a few pixels apart on the same screen — the one you
+         are flying and the one a burn would put you on, drawn round the same
+         little moon and separated by the width of the burn. A tap that could
+         mean either means the nearer one *in time*: "that point ahead of me"
+         is the road under the ship, and picking the other one warped a player
+         four laps into their own future for a tap they read as one. A tap
+         plainly on the other road still reaches it. */
+      const TIE = 6;
+      if(!best || d < best.d - TIE || (d < best.d + TIE && t < best.t)){
+        best = { d: Math.min(d, best?.d ?? d), t, seg, x: px, y: py };
       }
     }
   }
