@@ -13,7 +13,7 @@ export const ECONOMY = {
    "lifetimeDays": null,
    "needsRefrigeration": false,
    "producedAt": [
-    "pip"
+    "slate"
    ],
    "demandBy": {
     "emberkin": 0.8,
@@ -21,7 +21,7 @@ export const ECONOMY = {
     "cat": 0.9,
     "frog": 1
    },
-   "blurb": "A smooth grey pebble off Pip's one beach, polished by a moon with no weather. Otters give them to each other and mean it."
+   "blurb": "A smooth grey pebble off Slate's one beach, polished by a moon with no weather. Otters give them to each other and mean it."
   },
   {
    "id": "grain",
@@ -32,7 +32,7 @@ export const ECONOMY = {
    "lifetimeDays": null,
    "needsRefrigeration": false,
    "producedAt": [
-    "bramble"
+    "moss"
    ],
    "demandBy": {
     "otter": 1,
@@ -40,7 +40,7 @@ export const ECONOMY = {
     "cat": 1.3,
     "frog": 0.7
    },
-   "blurb": "Sacks of Bramble barley, still smelling of hedgerow. Cats will pay for anything that did not come out of a tube."
+   "blurb": "Sacks of Moss barley, still smelling of hedgerow. Cats will pay for anything that did not come out of a tube."
   },
   {
    "id": "paper",
@@ -51,7 +51,7 @@ export const ECONOMY = {
    "lifetimeDays": null,
    "needsRefrigeration": false,
    "producedAt": [
-    "ledger"
+    "moss"
    ],
    "demandBy": {
     "otter": 1,
@@ -59,7 +59,7 @@ export const ECONOMY = {
     "cat": 0.6,
     "frog": 0.4
    },
-   "blurb": "Ledger-pressed paper and squid ink. The Emberkin write everything down and are always out of both."
+   "blurb": "Moss-pressed paper and squid ink. The Emberkin write everything down and are always out of both."
   },
   {
    "id": "parts",
@@ -70,7 +70,7 @@ export const ECONOMY = {
    "lifetimeDays": null,
    "needsRefrigeration": false,
    "producedAt": [
-    "pip"
+    "slate"
    ],
    "demandBy": {
     "otter": 0.9,
@@ -78,7 +78,7 @@ export const ECONOMY = {
     "cat": 1.5,
     "frog": 0.8
    },
-   "blurb": "Crates of Pip-made valves, seals and struts. Far from any dry dock, cats keep ships flying with these and oaths."
+   "blurb": "Crates of Slate-made valves, seals and struts. Far from any dry dock, cats keep ships flying with these and oaths."
   },
   {
    "id": "rope",
@@ -89,7 +89,7 @@ export const ECONOMY = {
    "lifetimeDays": null,
    "needsRefrigeration": false,
    "producedAt": [
-    "tessel"
+    "tassel"
    ],
    "demandBy": {
     "otter": 0.8,
@@ -97,18 +97,18 @@ export const ECONOMY = {
     "cat": 1.3,
     "frog": 1
    },
-   "blurb": "Tessel harbor cordage. Every port in the system tethers something with it."
+   "blurb": "Tassel harbour cordage. Every port in the system tethers something with it."
   },
   {
    "id": "ore",
-   "name": "Scatter ore",
+   "name": "Belt ore",
    "category": "bulk",
    "basePrice": 14,
    "units": 2,
    "lifetimeDays": null,
    "needsRefrigeration": false,
    "producedAt": [
-    "clawrock",
+    "nail",
     "arc"
    ],
    "demandBy": {
@@ -128,9 +128,8 @@ export const ECONOMY = {
    "lifetimeDays": null,
    "needsRefrigeration": false,
    "producedAt": [
-    "widdershins",
-    "merrow",
-    "tagalong"
+    "croak",
+    "glass"
    ],
    "demandBy": {
     "emberkin": 1.7,
@@ -150,7 +149,7 @@ export const ECONOMY = {
    "needsRefrigeration": false,
    "producedAt": [
     "cinder",
-    "wanderwell"
+    "scorch"
    ],
    "demandBy": {
     "otter": 1.2,
@@ -158,7 +157,7 @@ export const ECONOMY = {
     "cat": 1,
     "frog": 1.3
    },
-   "blurb": "Yellow sulfur salts raked from Cinder's dayside. Fertilizer for Bramble, heater chemistry for the frogs."
+   "blurb": "Yellow sulfur salts raked from Cinder's dayside. Fertilizer for Moss, heater chemistry for the frogs."
   },
   {
    "id": "produce",
@@ -169,7 +168,7 @@ export const ECONOMY = {
    "lifetimeDays": 40,
    "needsRefrigeration": false,
    "producedAt": [
-    "bramble"
+    "moss"
    ],
    "demandBy": {
     "otter": 0.9,
@@ -188,7 +187,7 @@ export const ECONOMY = {
    "lifetimeDays": 20,
    "needsRefrigeration": false,
    "producedAt": [
-    "tessel"
+    "tassel"
    ],
    "demandBy": {
     "otter": 0.8,
@@ -200,13 +199,14 @@ export const ECONOMY = {
   },
   {
    "id": "fashions",
-   "name": "Cinder fashions",
+   "name": "Ember fashions",
    "category": "perishable",
    "basePrice": 45,
    "units": 1,
    "lifetimeDays": 90,
    "needsRefrigeration": false,
    "producedAt": [
+    "veyra",
     "cinder"
    ],
    "demandBy": {
@@ -215,7 +215,7 @@ export const ECONOMY = {
     "cat": 1,
     "frog": 0.3
    },
-   "blurb": "This week's Emberkin look, folded in heat-paper. Worth a fortune fresh and an embarrassment in three months."
+   "blurb": "This week's Veyra look, folded in heat-paper. Worth a fortune fresh and an embarrassment in three months."
   },
   {
    "id": "tideglass",
@@ -226,7 +226,7 @@ export const ECONOMY = {
    "lifetimeDays": null,
    "needsRefrigeration": false,
    "producedAt": [
-    "tessel"
+    "tassel"
    ],
    "demandBy": {
     "emberkin": 1.5,
@@ -246,7 +246,7 @@ export const ECONOMY = {
    "needsRefrigeration": false,
    "producedAt": [
     "cinder",
-    "wanderwell"
+    "veyra"
    ],
    "demandBy": {
     "otter": 1.3,
@@ -265,8 +265,8 @@ export const ECONOMY = {
    "lifetimeDays": null,
    "needsRefrigeration": false,
    "producedAt": [
-    "lillimoor",
-    "chime"
+    "haven",
+    "brine"
    ],
    "demandBy": {
     "otter": 1.5,
@@ -274,18 +274,18 @@ export const ECONOMY = {
     "cat": 1.2,
     "frog": 0.3
    },
-   "blurb": "Resonant shells that hold a frog song for centuries. Tessel plays them at parties; Cinder scholars transcribe them."
+   "blurb": "Resonant shells that hold a frog song for centuries. Tassel plays them at parties; Cinder scholars transcribe them."
   },
   {
    "id": "shadowsilk",
-   "name": "Widdershins shadow-silk",
+   "name": "Whisker shadow-silk",
    "category": "luxury",
    "basePrice": 160,
    "units": 1,
    "lifetimeDays": null,
    "needsRefrigeration": false,
    "producedAt": [
-    "widdershins"
+    "whisker"
    ],
    "demandBy": {
     "otter": 1.5,
@@ -293,18 +293,18 @@ export const ECONOMY = {
     "frog": 1.2,
     "cat": 0.7
    },
-   "blurb": "Spun by the exiles from something they will not name. Drinks light. Rare because the approach is backwards."
+   "blurb": "Spun on Whisker from something nobody there will name. Drinks light, and arrives without paperwork."
   },
   {
    "id": "cometdust",
-   "name": "Merrow tail-dust",
+   "name": "Maw dust",
    "category": "luxury",
    "basePrice": 200,
    "units": 1,
    "lifetimeDays": null,
    "needsRefrigeration": false,
    "producedAt": [
-    "merrow"
+    "maw"
    ],
    "demandBy": {
     "emberkin": 1.6,
@@ -312,18 +312,18 @@ export const ECONOMY = {
     "cat": 1.3,
     "frog": 1.3
    },
-   "blurb": "Glittering dust swept from the comet's tail by the bazaar folk. Fireworks on Cinder, wedding confetti on Tessel."
+   "blurb": "Glittering grit swept off the ring the Maw wears. Fireworks on Cinder, wedding confetti on Tassel, and dear because of where it comes from."
   },
   {
    "id": "lilywine",
-   "name": "Lillimoor ice-wine",
+   "name": "Haven ice-wine",
    "category": "cold",
    "basePrice": 90,
    "units": 1,
    "lifetimeDays": null,
    "needsRefrigeration": true,
    "producedAt": [
-    "lillimoor"
+    "haven"
    ],
    "demandBy": {
     "otter": 1.6,
@@ -342,8 +342,8 @@ export const ECONOMY = {
    "lifetimeDays": null,
    "needsRefrigeration": true,
    "producedAt": [
-    "lillimoor",
-    "chime"
+    "brine",
+    "glass"
    ],
    "demandBy": {
     "otter": 1.6,
@@ -355,7 +355,7 @@ export const ECONOMY = {
   },
   {
    "id": "chorustube",
-   "name": "Chorus tube-segment",
+   "name": "Builder tube-segment",
    "category": "relic",
    "basePrice": 600,
    "units": 3,
@@ -370,7 +370,7 @@ export const ECONOMY = {
     "frog": 1.3,
     "cat": 1
    },
-   "blurb": "A length of seamless Chorus tube cut from the Arc. Hums when you tap it. Nobody knows what it was for."
+   "blurb": "A length of seamless Builder tube cut from the Arc. Hums when you tap it. Nobody knows what it was for."
   },
   {
    "id": "ringglass",
@@ -381,7 +381,7 @@ export const ECONOMY = {
    "lifetimeDays": null,
    "needsRefrigeration": false,
    "producedAt": [
-    "chime"
+    "glass"
    ],
    "demandBy": {
     "emberkin": 1.5,
@@ -389,7 +389,7 @@ export const ECONOMY = {
     "otter": 1.3,
     "cat": 1
    },
-   "blurb": "Glass snow from Chime, still faintly ringing the note the Chorus tuned the planet to."
+   "blurb": "Glass snow off the shell of Glass, still faintly ringing the note the Builders left in it."
   },
   {
    "id": "hushshard",
@@ -400,7 +400,7 @@ export const ECONOMY = {
    "lifetimeDays": null,
    "needsRefrigeration": false,
    "producedAt": [
-    "hush"
+    "croak"
    ],
    "demandBy": {
     "emberkin": 1.6,
@@ -408,7 +408,7 @@ export const ECONOMY = {
     "frog": 1.4,
     "cat": 1.1
    },
-   "blurb": "A splinter of the Hush dampener. Sound dies within a hand of it. The engine smiths want it very badly."
+   "blurb": "A splinter of Builder dampener, kept by the Croak ascetics. Sound dies within a hand of it. The engine smiths want it very badly."
   },
   {
    "id": "pax_otter",
@@ -419,12 +419,9 @@ export const ECONOMY = {
    "lifetimeDays": null,
    "needsRefrigeration": false,
    "producedAt": [
-    "tessel",
-    "pip",
-    "bramble",
-    "ledger",
-    "tagalong",
-    "merrow"
+    "tassel",
+    "slate",
+    "moss"
    ],
    "demandBy": {
     "otter": 1,
@@ -444,8 +441,8 @@ export const ECONOMY = {
    "needsRefrigeration": false,
    "producedAt": [
     "cinder",
-    "wanderwell",
-    "merrow"
+    "scorch",
+    "veyra"
    ],
    "demandBy": {
     "otter": 1.1,
@@ -465,10 +462,8 @@ export const ECONOMY = {
    "needsRefrigeration": false,
    "producedAt": [
     "arc",
-    "clawrock",
-    "widdershins",
-    "hush",
-    "merrow"
+    "nail",
+    "whisker"
    ],
    "demandBy": {
     "otter": 1,
@@ -487,9 +482,11 @@ export const ECONOMY = {
    "lifetimeDays": null,
    "needsRefrigeration": true,
    "producedAt": [
-    "lillimoor",
-    "chime",
-    "merrow"
+    "grumm",
+    "brine",
+    "glass",
+    "croak",
+    "haven"
    ],
    "demandBy": {
     "otter": 1.1,
@@ -497,7 +494,7 @@ export const ECONOMY = {
     "cat": 1,
     "frog": 1
    },
-   "blurb": "Bound for Mossback to hear the heartbeat. They need the hold kept cold and will hum the entire way."
+   "blurb": "Bound for Haven to walk in the festival. They need the hold kept cold and will hum the entire way."
   }
  ],
  "ports": {
@@ -607,145 +604,34 @@ export const ECONOMY = {
     }
    ]
   },
-  "wanderwell": {
-   "name": "Wanderwell",
+  "scorch": {
+   "name": "Scorch",
    "species": "emberkin",
    "climate": "hot",
-   "orbitAu": 0.5,
+   "orbitAu": 0.3,
+   "parent": "cinder",
+   "marketSize": 0.6,
+   "fuelPricePerKms": 12,
+   "shipyard": false,
+   "upgrades": [],
+   "sells": [],
+   "buys": []
+  },
+  "veyra": {
+   "name": "Veyra",
+   "species": "emberkin",
+   "climate": "hot",
+   "orbitAu": 0.6,
    "parent": null,
-   "openWhen": {
-    "rAuBelow": 1.2
-   },
-   "marketSize": 1.5,
-   "fuelPricePerKms": 14,
+   "marketSize": 1.6,
+   "fuelPricePerKms": 11,
    "shipyard": false,
    "upgrades": [],
-   "sells": [
-    {
-     "good": "emberwork",
-     "stock": 12,
-     "regenPerDay": 0.6,
-     "priceMul": 0.9
-    },
-    {
-     "good": "sulfur",
-     "stock": 120,
-     "regenPerDay": 6,
-     "priceMul": 0.75
-    }
-   ],
-   "buys": [
-    {
-     "good": "grain",
-     "priceMul": 1.3
-    },
-    {
-     "good": "produce",
-     "priceMul": 1.4
-    },
-    {
-     "good": "oysters",
-     "priceMul": 1.4
-    },
-    {
-     "good": "ice",
-     "priceMul": 1.5
-    },
-    {
-     "good": "paper",
-     "priceMul": 1.2
-    },
-    {
-     "good": "rope",
-     "priceMul": 1.2
-    },
-    {
-     "good": "fashions",
-     "priceMul": 1
-    },
-    {
-     "good": "tideglass",
-     "priceMul": 1.3
-    },
-    {
-     "good": "lilywine",
-     "priceMul": 1.3
-    },
-    {
-     "good": "cultures",
-     "priceMul": 1
-    },
-    {
-     "good": "frogsong",
-     "priceMul": 1.2
-    },
-    {
-     "good": "shadowsilk",
-     "priceMul": 1.3
-    },
-    {
-     "good": "cometdust",
-     "priceMul": 1.3
-    }
-   ]
+   "sells": [],
+   "buys": []
   },
-  "tagalong": {
-   "name": "Tagalong",
-   "species": "otter",
-   "climate": "varies",
-   "orbitAu": 2,
-   "parent": "wanderwell",
-   "marketSize": 0.3,
-   "fuelPricePerKms": 16,
-   "shipyard": false,
-   "upgrades": [],
-   "sells": [
-    {
-     "good": "ice",
-     "stock": 20,
-     "regenPerDay": 0.5,
-     "priceMul": 0.9
-    },
-    {
-     "good": "emberwork",
-     "stock": 4,
-     "regenPerDay": 0.05,
-     "priceMul": 1
-    }
-   ],
-   "buys": [
-    {
-     "good": "grain",
-     "priceMul": 1.3
-    },
-    {
-     "good": "produce",
-     "priceMul": 1.2
-    },
-    {
-     "good": "oysters",
-     "priceMul": 1.2
-    },
-    {
-     "good": "paper",
-     "priceMul": 1.1
-    },
-    {
-     "good": "rope",
-     "priceMul": 1.1
-    },
-    {
-     "good": "fashions",
-     "priceMul": 1.1
-    },
-    {
-     "good": "parts",
-     "priceMul": 1.2
-    }
-   ]
-  },
-  "tessel": {
-   "name": "Tessel",
+  "tassel": {
+   "name": "Tassel",
    "species": "otter",
    "climate": "temperate",
    "orbitAu": 1,
@@ -841,12 +727,12 @@ export const ECONOMY = {
     }
    ]
   },
-  "pip": {
-   "name": "Pip",
+  "slate": {
+   "name": "Slate",
    "species": "otter",
    "climate": "temperate",
    "orbitAu": 1,
-   "parent": "tessel",
+   "parent": "tassel",
    "marketSize": 0.8,
    "fuelPricePerKms": 9,
    "shipyard": true,
@@ -917,12 +803,12 @@ export const ECONOMY = {
     }
    ]
   },
-  "bramble": {
-   "name": "Bramble",
+  "moss": {
+   "name": "Moss",
    "species": "otter",
    "climate": "temperate",
    "orbitAu": 1,
-   "parent": "tessel",
+   "parent": "tassel",
    "marketSize": 1,
    "fuelPricePerKms": 12,
    "shipyard": false,
@@ -976,88 +862,39 @@ export const ECONOMY = {
     }
    ]
   },
-  "ledger": {
-   "name": "Ledger",
-   "species": "otter",
-   "climate": "temperate",
-   "orbitAu": 1,
-   "parent": "tessel",
-   "marketSize": 1,
-   "fuelPricePerKms": 13,
+  "nail": {
+   "name": "Nail",
+   "species": "cat",
+   "climate": "micro",
+   "orbitAu": 2.15,
+   "parent": null,
+   "marketSize": 0.8,
+   "fuelPricePerKms": 20,
    "shipyard": false,
    "upgrades": [],
-   "sells": [
-    {
-     "good": "paper",
-     "stock": 100,
-     "regenPerDay": 6,
-     "priceMul": 0.85
-    }
+   "sells": [],
+   "buys": []
+  },
+  "whisker": {
+   "name": "Whisker",
+   "species": "cat",
+   "climate": "micro",
+   "orbitAu": 2.38,
+   "parent": null,
+   "marketSize": 0.7,
+   "fuelPricePerKms": 26,
+   "shipyard": true,
+   "upgrades": [
+    "stealth"
    ],
-   "buys": [
-    {
-     "good": "grain",
-     "priceMul": 1.5
-    },
-    {
-     "good": "produce",
-     "priceMul": 1.4
-    },
-    {
-     "good": "oysters",
-     "priceMul": 1.3
-    },
-    {
-     "good": "tideglass",
-     "priceMul": 1
-    },
-    {
-     "good": "emberwork",
-     "priceMul": 1.3
-    },
-    {
-     "good": "frogsong",
-     "priceMul": 1.3
-    },
-    {
-     "good": "shadowsilk",
-     "priceMul": 1.4
-    },
-    {
-     "good": "cometdust",
-     "priceMul": 1.4
-    },
-    {
-     "good": "lilywine",
-     "priceMul": 1.2
-    },
-    {
-     "good": "fashions",
-     "priceMul": 1.2
-    },
-    {
-     "good": "parts",
-     "priceMul": 1
-    },
-    {
-     "good": "chorustube",
-     "priceMul": 1.4
-    },
-    {
-     "good": "ringglass",
-     "priceMul": 1.4
-    },
-    {
-     "good": "hushshard",
-     "priceMul": 1.4
-    }
-   ]
+   "sells": [],
+   "buys": []
   },
   "arc": {
    "name": "The Arc",
    "species": "cat",
-   "climate": "chill",
-   "orbitAu": 2.2,
+   "climate": "micro",
+   "orbitAu": 2.7,
    "parent": null,
    "marketSize": 0.6,
    "fuelPricePerKms": null,
@@ -1130,171 +967,74 @@ export const ECONOMY = {
     }
    ]
   },
-  "clawrock": {
-   "name": "Claw Rock",
-   "species": "cat",
-   "climate": "chill",
-   "orbitAu": 2.9,
+  "grumm": {
+   "name": "Grumm",
+   "species": "frog",
+   "climate": "cold",
+   "orbitAu": 5,
    "parent": null,
-   "marketSize": 0.8,
-   "fuelPricePerKms": 22,
+   "marketSize": 1,
+   "fuelPricePerKms": 24,
    "shipyard": false,
    "upgrades": [],
-   "sells": [
-    {
-     "good": "ore",
-     "stock": 120,
-     "regenPerDay": 5,
-     "priceMul": 0.75
-    }
-   ],
-   "buys": [
-    {
-     "good": "grain",
-     "priceMul": 1.3
-    },
-    {
-     "good": "produce",
-     "priceMul": 1.4
-    },
-    {
-     "good": "oysters",
-     "priceMul": 1.4
-    },
-    {
-     "good": "rope",
-     "priceMul": 1.2
-    },
-    {
-     "good": "parts",
-     "priceMul": 1.3
-    },
-    {
-     "good": "sulfur",
-     "priceMul": 1
-    },
-    {
-     "good": "ice",
-     "priceMul": 1.1
-    },
-    {
-     "good": "fashions",
-     "priceMul": 1.1
-    },
-    {
-     "good": "tideglass",
-     "priceMul": 1
-    },
-    {
-     "good": "emberwork",
-     "priceMul": 1.2
-    },
-    {
-     "good": "lilywine",
-     "priceMul": 1.3
-    },
-    {
-     "good": "cultures",
-     "priceMul": 1.2
-    },
-    {
-     "good": "cometdust",
-     "priceMul": 1.1
-    },
-    {
-     "good": "frogsong",
-     "priceMul": 1.1
-    },
-    {
-     "good": "paper",
-     "priceMul": 1
-    }
-   ]
+   "sells": [],
+   "buys": []
   },
-  "lillimoor": {
-   "name": "Lillimoor",
+  "brine": {
+   "name": "Brine",
    "species": "frog",
    "climate": "cold",
    "orbitAu": 5,
    "parent": "grumm",
-   "marketSize": 1.2,
-   "fuelPricePerKms": 24,
+   "marketSize": 0.8,
+   "fuelPricePerKms": 26,
    "shipyard": false,
    "upgrades": [],
-   "sells": [
-    {
-     "good": "lilywine",
-     "stock": 40,
-     "regenPerDay": 1.5,
-     "priceMul": 0.8
-    },
-    {
-     "good": "cultures",
-     "stock": 40,
-     "regenPerDay": 2,
-     "priceMul": 0.8
-    },
-    {
-     "good": "frogsong",
-     "stock": 12,
-     "regenPerDay": 0.3,
-     "priceMul": 0.7
-    }
+   "sells": [],
+   "buys": []
+  },
+  "glass": {
+   "name": "Glass",
+   "species": "frog",
+   "climate": "cold",
+   "orbitAu": 5,
+   "parent": "grumm",
+   "marketSize": 0.7,
+   "fuelPricePerKms": 26,
+   "shipyard": false,
+   "upgrades": [],
+   "sells": [],
+   "buys": []
+  },
+  "croak": {
+   "name": "Croak",
+   "species": "frog",
+   "climate": "cold",
+   "orbitAu": 5,
+   "parent": "grumm",
+   "marketSize": 0.3,
+   "fuelPricePerKms": 34,
+   "shipyard": false,
+   "upgrades": [],
+   "sells": [],
+   "buys": [],
+   "retrograde": true
+  },
+  "haven": {
+   "name": "Haven",
+   "species": "frog",
+   "climate": "cold",
+   "orbitAu": 5,
+   "parent": "grumm",
+   "marketSize": 1.4,
+   "fuelPricePerKms": 22,
+   "shipyard": true,
+   "upgrades": [
+    "tank_1",
+    "tank_2"
    ],
-   "buys": [
-    {
-     "good": "tideglass",
-     "priceMul": 1.25
-    },
-    {
-     "good": "emberwork",
-     "priceMul": 1.2
-    },
-    {
-     "good": "cometdust",
-     "priceMul": 1.2
-    },
-    {
-     "good": "grain",
-     "priceMul": 1
-    },
-    {
-     "good": "rope",
-     "priceMul": 1.1
-    },
-    {
-     "good": "sulfur",
-     "priceMul": 1.2
-    },
-    {
-     "good": "paper",
-     "priceMul": 1
-    },
-    {
-     "good": "parts",
-     "priceMul": 1
-    },
-    {
-     "good": "shadowsilk",
-     "priceMul": 1
-    },
-    {
-     "good": "ore",
-     "priceMul": 0.9
-    },
-    {
-     "good": "chorustube",
-     "priceMul": 1.25
-    },
-    {
-     "good": "ringglass",
-     "priceMul": 1.25
-    },
-    {
-     "good": "hushshard",
-     "priceMul": 1.25
-    }
-   ],
+   "sells": [],
+   "buys": [],
    "gifts": {
     "perVisitValue": 40,
     "perRepPoint": 12,
@@ -1305,376 +1045,10 @@ export const ECONOMY = {
     ]
    }
   },
-  "widdershins": {
-   "name": "Widdershins",
-   "species": "cat",
-   "climate": "cold",
-   "orbitAu": 5,
-   "parent": "grumm",
-   "retrograde": true,
-   "marketSize": 0.5,
-   "fuelPricePerKms": 34,
-   "shipyard": false,
-   "upgrades": [],
-   "sells": [
-    {
-     "good": "shadowsilk",
-     "stock": 15,
-     "regenPerDay": 0.4,
-     "priceMul": 0.85
-    },
-    {
-     "good": "ice",
-     "stock": 100,
-     "regenPerDay": 4,
-     "priceMul": 0.6
-    }
-   ],
-   "buys": [
-    {
-     "good": "grain",
-     "priceMul": 1.4
-    },
-    {
-     "good": "produce",
-     "priceMul": 1.5
-    },
-    {
-     "good": "oysters",
-     "priceMul": 1.5
-    },
-    {
-     "good": "rope",
-     "priceMul": 1.3
-    },
-    {
-     "good": "parts",
-     "priceMul": 1.4
-    },
-    {
-     "good": "fashions",
-     "priceMul": 1.2
-    },
-    {
-     "good": "emberwork",
-     "priceMul": 1.3
-    },
-    {
-     "good": "lilywine",
-     "priceMul": 1.4
-    },
-    {
-     "good": "cultures",
-     "priceMul": 1.3
-    },
-    {
-     "good": "tideglass",
-     "priceMul": 1.2
-    },
-    {
-     "good": "cometdust",
-     "priceMul": 1.2
-    },
-    {
-     "good": "sulfur",
-     "priceMul": 1.2
-    },
-    {
-     "good": "paper",
-     "priceMul": 1.1
-    },
-    {
-     "good": "frogsong",
-     "priceMul": 1.2
-    }
-   ]
-  },
-  "mossback": {
-   "name": "Mossback",
+  "maw": {
+   "name": "The Maw",
    "species": "none",
    "climate": "cold",
-   "orbitAu": 5,
-   "parent": "grumm",
-   "marketSize": 0,
-   "fuelPricePerKms": null,
-   "shipyard": false,
-   "upgrades": [],
-   "sells": [],
-   "buys": [],
-   "passengerDestination": true
-  },
-  "chime": {
-   "name": "Chime",
-   "species": "frog",
-   "climate": "cold",
-   "orbitAu": 9,
-   "parent": null,
-   "marketSize": 0.4,
-   "fuelPricePerKms": 36,
-   "shipyard": false,
-   "upgrades": [],
-   "sells": [
-    {
-     "good": "ringglass",
-     "stock": 5,
-     "regenPerDay": 0.04,
-     "priceMul": 1
-    },
-    {
-     "good": "frogsong",
-     "stock": 6,
-     "regenPerDay": 0.15,
-     "priceMul": 0.75
-    },
-    {
-     "good": "cultures",
-     "stock": 15,
-     "regenPerDay": 0.5,
-     "priceMul": 0.9
-    }
-   ],
-   "buys": [
-    {
-     "good": "tideglass",
-     "priceMul": 1.4
-    },
-    {
-     "good": "emberwork",
-     "priceMul": 1.4
-    },
-    {
-     "good": "cometdust",
-     "priceMul": 1.3
-    },
-    {
-     "good": "grain",
-     "priceMul": 1.2
-    },
-    {
-     "good": "rope",
-     "priceMul": 1.3
-    },
-    {
-     "good": "sulfur",
-     "priceMul": 1.4
-    },
-    {
-     "good": "parts",
-     "priceMul": 1.2
-    },
-    {
-     "good": "paper",
-     "priceMul": 1.1
-    }
-   ],
-   "gifts": {
-    "perVisitValue": 60,
-    "perRepPoint": 15,
-    "goods": [
-     "cultures",
-     "frogsong"
-    ]
-   }
-  },
-  "hush": {
-   "name": "Hush",
-   "species": "cat",
-   "climate": "cold",
-   "orbitAu": 9,
-   "parent": "chime",
-   "marketSize": 0.3,
-   "fuelPricePerKms": null,
-   "shipyard": false,
-   "upgrades": [
-    "stealth"
-   ],
-   "sells": [
-    {
-     "good": "hushshard",
-     "stock": 3,
-     "regenPerDay": 0.02,
-     "priceMul": 1
-    }
-   ],
-   "buys": [
-    {
-     "good": "grain",
-     "priceMul": 1.5
-    },
-    {
-     "good": "produce",
-     "priceMul": 1.5
-    },
-    {
-     "good": "oysters",
-     "priceMul": 1.5
-    },
-    {
-     "good": "rope",
-     "priceMul": 1.3
-    },
-    {
-     "good": "parts",
-     "priceMul": 1.4
-    },
-    {
-     "good": "lilywine",
-     "priceMul": 1.4
-    },
-    {
-     "good": "cultures",
-     "priceMul": 1.4
-    },
-    {
-     "good": "fashions",
-     "priceMul": 1.2
-    },
-    {
-     "good": "emberwork",
-     "priceMul": 1.2
-    },
-    {
-     "good": "tideglass",
-     "priceMul": 1.2
-    },
-    {
-     "good": "cometdust",
-     "priceMul": 1.2
-    },
-    {
-     "good": "paper",
-     "priceMul": 1.2
-    },
-    {
-     "good": "sulfur",
-     "priceMul": 1.2
-    },
-    {
-     "good": "ice",
-     "priceMul": 1.2
-    }
-   ]
-  },
-  "merrow": {
-   "name": "Merrow's Comet",
-   "species": "all",
-   "climate": "varies",
-   "orbitAu": 1.5,
-   "parent": null,
-   "marketSize": 1.5,
-   "fuelPricePerKms": 11,
-   "shipyard": false,
-   "upgrades": [
-    "tank_1",
-    "tank_2"
-   ],
-   "sells": [
-    {
-     "good": "cometdust",
-     "stock": 10,
-     "regenPerDay": 0.3,
-     "priceMul": 1
-    },
-    {
-     "good": "ice",
-     "stock": 60,
-     "regenPerDay": 2,
-     "priceMul": 0.8
-    },
-    {
-     "good": "fashions",
-     "stock": 10,
-     "regenPerDay": 0.4,
-     "priceMul": 1.1
-    },
-    {
-     "good": "emberwork",
-     "stock": 6,
-     "regenPerDay": 0.2,
-     "priceMul": 1.1
-    },
-    {
-     "good": "lilywine",
-     "stock": 8,
-     "regenPerDay": 0.3,
-     "priceMul": 1.1
-    },
-    {
-     "good": "tideglass",
-     "stock": 8,
-     "regenPerDay": 0.3,
-     "priceMul": 1.1
-    },
-    {
-     "good": "shadowsilk",
-     "stock": 4,
-     "regenPerDay": 0.1,
-     "priceMul": 1.1
-    },
-    {
-     "good": "frogsong",
-     "stock": 4,
-     "regenPerDay": 0.1,
-     "priceMul": 1.1
-    },
-    {
-     "good": "parts",
-     "stock": 20,
-     "regenPerDay": 1,
-     "priceMul": 1.1
-    }
-   ],
-   "buys": [
-    {
-     "good": "grain",
-     "priceMul": 0.8
-    },
-    {
-     "good": "produce",
-     "priceMul": 0.8
-    },
-    {
-     "good": "oysters",
-     "priceMul": 0.8
-    },
-    {
-     "good": "ore",
-     "priceMul": 0.8
-    },
-    {
-     "good": "sulfur",
-     "priceMul": 0.8
-    },
-    {
-     "good": "rope",
-     "priceMul": 0.8
-    },
-    {
-     "good": "paper",
-     "priceMul": 0.8
-    },
-    {
-     "good": "cultures",
-     "priceMul": 0.8
-    },
-    {
-     "good": "chorustube",
-     "priceMul": 1.2
-    },
-    {
-     "good": "ringglass",
-     "priceMul": 1.2
-    },
-    {
-     "good": "hushshard",
-     "priceMul": 1.2
-    }
-   ]
-  },
-  "lantern": {
-   "name": "The Far Lantern",
-   "species": "unknown",
-   "climate": "dark",
    "orbitAu": 18,
    "parent": null,
    "marketSize": 0,
@@ -1693,11 +1067,11 @@ export const ECONOMY = {
    "tier": 0,
    "price": 1200,
    "soldAt": [
-    "pip"
+    "slate"
    ],
    "starter": true,
    "effect": "Starter Δv budget (size from tuning).",
-   "unlocks": "Tessel's moons and the slow road to Cinder or Wanderwell with a refuel."
+   "unlocks": "Tassel's moons and the slow road out to the Belt with a refuel."
   },
   {
    "id": "tank_1",
@@ -1706,11 +1080,11 @@ export const ECONOMY = {
    "tier": 1,
    "price": 3600,
    "soldAt": [
-    "pip",
-    "merrow"
+    "slate",
+    "haven"
    ],
    "effect": "Larger Δv budget (size from tuning).",
-   "unlocks": "Comfortable Hohmann to the Arc and the Scatter; Grumm with careful routing."
+   "unlocks": "A comfortable transfer to the Belt and the Arc; Grumm with careful routing."
   },
   {
    "id": "tank_2",
@@ -1719,20 +1093,20 @@ export const ECONOMY = {
    "tier": 2,
    "price": 11500,
    "soldAt": [
-    "pip",
-    "merrow"
+    "slate",
+    "haven"
    ],
    "effect": "Largest Δv budget (size from tuning).",
-   "unlocks": "Direct Grumm runs, Chime, and running hot with perishables."
+   "unlocks": "Direct Grumm runs, the Maw, and running hot with perishables."
   },
   {
    "id": "engine_0",
-   "name": "Pip putter",
+   "name": "Slate putter",
    "kind": "engine",
    "tier": 0,
    "price": 900,
    "soldAt": [
-    "pip"
+    "slate"
    ],
    "starter": true,
    "effect": "Starter fuel efficiency: km/s bought per cowrie at the pump (factor from tuning).",
@@ -1752,7 +1126,7 @@ export const ECONOMY = {
   },
   {
    "id": "engine_2",
-   "name": "Smith's masterwork",
+   "name": "Smiths' masterwork",
    "kind": "engine",
    "tier": 2,
    "price": 9000,
@@ -1769,7 +1143,7 @@ export const ECONOMY = {
    "tier": 0,
    "price": 800,
    "soldAt": [
-    "pip"
+    "slate"
    ],
    "starter": true,
    "effect": "Starter cargo capacity (units from tuning; the sim assumes 24).",
@@ -1782,7 +1156,7 @@ export const ECONOMY = {
    "tier": 1,
    "price": 2800,
    "soldAt": [
-    "pip",
+    "slate",
     "cinder"
    ],
    "effect": "Larger cargo capacity (units from tuning).",
@@ -1795,7 +1169,7 @@ export const ECONOMY = {
    "tier": 2,
    "price": 8500,
    "soldAt": [
-    "pip"
+    "slate"
    ],
    "effect": "Largest cargo capacity (units from tuning).",
    "unlocks": "Relic hauls and full frog gift-exchanges in one trip."
@@ -1810,7 +1184,7 @@ export const ECONOMY = {
     "cinder"
    ],
    "effect": "Survive atmosphere skims; enables aerobraking at Grumm.",
-   "unlocks": "Free braking at Grumm (\"Skimming\"); the fast cheap road to Lillimoor."
+   "unlocks": "Free braking at Grumm (\"Skimming\"); the fast cheap road to Haven."
   },
   {
    "id": "refrigeration",
@@ -1819,7 +1193,7 @@ export const ECONOMY = {
    "tier": 0,
    "price": 2400,
    "soldAt": [
-    "pip"
+    "slate"
    ],
    "effect": "Hold can carry goods and passengers flagged needsRefrigeration.",
    "unlocks": "Ice-wine, cold cultures and frog pilgrims."
@@ -1833,24 +1207,25 @@ export const ECONOMY = {
    "soldAt": [
     "arc"
    ],
-   "effect": "Shows Merrow's Comet and Arc salvage sites on the chart with intercept predictions.",
-   "unlocks": "Comet-intercept contracts, the bazaar, salvage contracts."
+   "effect": "Shows Arc salvage sites and Belt traffic on the chart with intercept predictions.",
+   "unlocks": "Salvage contracts, quiet Belt work, and the long look outward."
   },
   {
    "id": "stealth",
-   "name": "Hush dampener",
+   "name": "Whisker dampener",
    "kind": "key",
    "tier": 0,
-   "price": null,
-   "soldAt": null,
-   "foundAt": "hush",
-   "effect": "Cat toll intercepts in the Scatter no longer trigger unless you dock at Claw Rock.",
-   "unlocks": "Toll-free Scatter crossings."
+   "price": 5200,
+   "soldAt": [
+    "whisker"
+   ],
+   "effect": "Cat toll intercepts in the Belt no longer trigger unless you dock at Nail.",
+   "unlocks": "Toll-free Belt crossings."
   }
  ],
  "formulas": {
   "price": {
-   "description": "You pay base*sells.priceMul*(1-repDiscount)*haggle. A port pays base*demandBy[species]*buys.priceMul*alignment*saturation*perishable*haggle*(1+volatility wobble). Merrow (\"all\") uses the mean of the four species demands."
+   "description": "You pay base*sells.priceMul*(1-repDiscount)*haggle. A port pays base*demandBy[species]*buys.priceMul*alignment*saturation*perishable*haggle*(1+volatility wobble). A port with no people of its own uses the mean of the four species demands."
   },
   "alignment": {
    "description": "For a good at buyer port B, d = current distance to the good's nearest producer port A. With dmin/dmax the geometric min/max separation of the two orbits (capped at maxSeparationAu), x = clamp((d-dmin)/(dmax-dmin),0,1); mul = clamp(1 + k*(x-0.5), minMul, maxMul). Same-parent pairs (dmax-dmin < 0.05 au) get mul 1. Close worlds flood the market, far worlds go hungry.",
@@ -1875,13 +1250,13 @@ export const ECONOMY = {
    "maxPoints": 10
   },
   "toll": {
-   "description": "A Scatter toll intercept takes min(cap, fraction*cargoValue) in goods, chosen by the cats; nothing if cargoValue < minCargoValue (they never take everything, never touch passengers, and never harm a ship that yields). Stealth suppresses intercepts.",
+   "description": "A Belt toll intercept takes min(cap, fraction*cargoValue) in goods, chosen by the cats; nothing if cargoValue < minCargoValue (they never take everything, never touch passengers, and never harm a ship that yields). Stealth suppresses intercepts.",
    "fraction": 0.15,
    "cap": 600,
    "minCargoValue": 200
   },
   "tow": {
-   "description": "A stranded or crashed ship is towed to the nearest port: cost = base + perAu*distanceAu, time = max(3, daysPerAu*distanceAu) days. If you cannot pay, Ledger fronts it and the debt is deducted from sales.",
+   "description": "A stranded or crashed ship is towed to the nearest port: cost = base + perAu*distanceAu, time = max(3, daysPerAu*distanceAu) days. If you cannot pay, the Tassel harbour bank fronts it and the debt is deducted from sales.",
    "base": 60,
    "perAu": 40,
    "daysPerAu": 45
@@ -1925,7 +1300,7 @@ export const ECONOMY = {
   "speciesRules": {
    "otter": "Haggle spread on every price; refusing to haggle is rude (small rep loss).",
    "emberkin": "Volatile prices; perishable fashions; contracts pay the most for speed (speciesMul 1.3, earlyBonus counts double).",
-   "cat": "Tolls in the Scatter under strict custom (never everything, never passengers). Impress a captain and a gift may follow.",
+   "cat": "Tolls in the Belt under strict custom (never everything, never passengers). Impress a captain and a gift may follow.",
    "frog": "No haggling. \"Prices\" are exchange rates: you are paid in trade credit at the stall plus goodwill (reputation), and every visit ends with a gift."
   }
  },
@@ -1937,9 +1312,9 @@ export const ECONOMY = {
      "cinder"
     ],
     "toPorts": [
-     "tessel",
-     "wanderwell",
-     "ledger"
+     "tassel",
+     "veyra",
+     "slate"
     ],
     "needs": [],
     "payMul": 1.3,
@@ -1949,27 +1324,27 @@ export const ECONOMY = {
     "species": "emberkin",
     "fromPorts": [
      "cinder",
-     "wanderwell"
+     "veyra"
     ],
     "toPorts": [
-     "tessel",
-     "pip"
+     "tassel",
+     "slate"
     ],
     "needs": [],
     "payMul": 1.2,
-    "text": "An Emberkin apprentice with a letter of introduction to the Pip shipwrights and no patience whatsoever."
+    "text": "An Emberkin apprentice with a letter of introduction to the Slate shipwrights and no patience whatsoever."
    },
    {
     "species": "emberkin",
     "fromPorts": [
-     "cinder"
+     "veyra"
     ],
     "toPorts": [
-     "mossback"
+     "glass"
     ],
     "needs": [],
     "payMul": 1.8,
-    "text": "An elderly scholar (she is four) wants to hear Mossback's heartbeat before she dies of old age."
+    "text": "An elderly scholar (she is four) wants to see the Builder halls under Glass before she dies of old age."
    },
    {
     "species": "otter",
@@ -1982,48 +1357,49 @@ export const ECONOMY = {
    {
     "species": "otter",
     "fromPorts": [
-     "tessel"
+     "tassel"
     ],
     "toPorts": [
-     "tagalong"
+     "scorch"
     ],
     "needs": [],
     "payMul": 1.1,
-    "text": "Relief caretakers for Tagalong, plus three months of gossip in written form."
+    "text": "Relief caretakers for the Scorch camps, plus three months of gossip in written form."
    },
    {
     "species": "otter",
     "fromPorts": [
-     "ledger"
+     "tassel"
     ],
     "toPorts": [
-     "merrow"
+     "nail"
     ],
     "needs": [
      "sensors"
     ],
     "payMul": 1.5,
-    "text": "A Ledger banker with a sealed case wants to be at the comet bazaar before it leaves. Do not ask."
+    "text": "An otter banker with a sealed case wants to be at Nail before the salvage auction closes. Do not ask."
    },
    {
     "species": "otter",
     "fromPorts": [
-     "bramble"
+     "moss"
     ],
-    "toClimate": "chill",
     "needs": [],
     "payMul": 1.1,
-    "text": "A load of Bramble fruit for the Claw Rock tavern. It pays by the crate that arrives edible."
+    "text": "A load of Moss fruit for the Nail tavern. It pays by the crate that arrives edible.",
+    "toPorts": [
+     "nail"
+    ]
    },
    {
     "species": "cat",
     "fromPorts": [
      "arc",
-     "widdershins",
-     "hush"
+     "whisker"
     ],
     "toPorts": [
-     "clawrock"
+     "nail"
     ],
     "needs": [],
     "payMul": 1.1,
@@ -2036,7 +1412,7 @@ export const ECONOMY = {
     ],
     "toPorts": [
      "cinder",
-     "pip"
+     "slate"
     ],
     "needs": [
      "sensors"
@@ -2047,69 +1423,69 @@ export const ECONOMY = {
    {
     "species": "cat",
     "fromPorts": [
-     "clawrock"
+     "nail"
     ],
     "toPorts": [
-     "widdershins"
+     "whisker"
     ],
     "needs": [],
     "payMul": 1.3,
-    "text": "A parcel for the exiles. The retrograde approach is your problem."
+    "text": "A parcel for the quiet end of the Belt. Do not look inside and do not be late."
    },
    {
     "species": "frog",
     "fromPorts": [
-     "lillimoor",
-     "chime",
-     "merrow"
+     "haven",
+     "brine",
+     "glass"
     ],
     "toPorts": [
-     "mossback"
+     "croak"
     ],
     "needs": [
      "refrigeration"
     ],
     "payMul": 1.2,
-    "text": "Pilgrims for Mossback. Keep the hold cold and do not hurry them."
+    "text": "Pilgrims for Croak. Keep the hold cold and do not hurry them."
    },
    {
     "species": "frog",
     "fromPorts": [
-     "lillimoor"
+     "haven"
     ],
     "toPorts": [
-     "chime"
+     "glass"
     ],
     "needs": [
      "refrigeration"
     ],
     "payMul": 1.6,
-    "text": "A song-keeper who has waited ninety years for a ride to Chime and can wait a little longer, in the cold."
+    "text": "A song-keeper who has waited ninety years for a ride to Glass and can wait a little longer, in the cold."
    },
    {
     "species": "frog",
     "fromPorts": [
-     "lillimoor"
+     "haven"
     ],
     "toPorts": [
-     "pip",
-     "tessel"
+     "slate",
+     "tassel"
     ],
     "needs": [
      "refrigeration"
     ],
     "payMul": 1.3,
-    "text": "A crate of cold cultures for the Tessel healers, given freely; the healers will pay you."
+    "text": "A crate of cold cultures for the Tassel healers, given freely; the healers will pay you."
    },
    {
     "species": "any",
     "fromPorts": [
-     "merrow"
+     "nail"
     ],
     "toClimate": "temperate",
     "needs": [],
     "payMul": 1.2,
-    "text": "A bazaar family heading home. They know a route you do not."
+    "text": "A belt family heading in-system. They know a route you do not."
    }
   ]
  }

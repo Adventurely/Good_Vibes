@@ -99,7 +99,7 @@ export function bodyColour(body){
   return speciesColour(body.species ?? 'none');
 }
 
-/* A lap of Tessel is 0.0007 au across and a lap of Pip is 0.00003; the chart
+/* A lap of Tassel is 0.0007 au across and a lap of Slate is 0.00003; the chart
    has to frame both, so the ceiling is set by the smallest moon rather than
    by the biggest orbit. */
 const MIN_ZOOM = 8, MAX_ZOOM = 2e7;
@@ -417,19 +417,6 @@ function drawBodies(chart, view, pos, t){
       glow.addColorStop(0, PALETTE.starGlow); glow.addColorStop(1, 'rgba(245,154,46,0)');
       ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(p[0], p[1], rpx * 5, 0, Math.PI * 2); ctx.fill();
     }
-    // Merrow's tail: away from the Lamp, longer the closer it comes.
-    if(b.id === 'merrow' && b.parent){
-      const rel = pos.get(b.id).r;
-      const rn = Math.hypot(rel[0], rel[1]) || 1;
-      const len = Math.min(120, Math.max(0, 26 / rn));
-      if(len > 4){
-        const d = [rel[0] / rn, -rel[1] / rn];
-        const g = ctx.createLinearGradient(p[0], p[1], p[0] + d[0] * len, p[1] + d[1] * len);
-        g.addColorStop(0, 'rgba(32,98,159,0.55)'); g.addColorStop(1, 'rgba(32,98,159,0)');
-        ctx.strokeStyle = g; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(p[0] + d[0] * len, p[1] + d[1] * len); ctx.stroke();
-      }
-    }
     // Grumm's atmosphere band, when it is big enough to mean something.
     if(b.atmo && b.atmo * zoom > 8){
       ctx.beginPath(); ctx.arc(p[0], p[1], b.atmo * zoom, 0, Math.PI * 2);
@@ -452,9 +439,9 @@ function drawBodies(chart, view, pos, t){
        sprite is too small to say anything — under about seven pixels across a
        sixteen-pixel picture is mush, and a clean dot reads better. */
     let alpha = 1;
-    if(b.id === 'lantern'){
-      // It blinks at irregular gaps nobody has explained. Under reduced motion it rests, lit.
-      const lit = chart.reducedMotion || lanternLit(view.now ?? 0);
+    if(b.id === 'maw'){
+      // The ring flickers at gaps nobody has explained. Under reduced motion it rests, lit.
+      const lit = chart.reducedMotion || mawLit(view.now ?? 0);
       alpha = lit ? 1 : 0.35;
     }
     /* The picture is the planet, so it is drawn at the planet's real size and
@@ -481,7 +468,7 @@ function drawBodies(chart, view, pos, t){
       ctx.globalAlpha = 1;
     }
     if((b.kind === 'zone' || b.mu === 0) && !drew){
-      // Gravity-less things are hollow: the comet, the Lantern, Claw Rock.
+      // Gravity-less things are hollow: the belt havens and the Maw.
       ctx.strokeStyle = colour; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(p[0], p[1], rpx + 3, 0, Math.PI * 2); ctx.stroke();
     }
@@ -519,7 +506,7 @@ function drawBodies(chart, view, pos, t){
 }
 
 /* Lit for 0.4 s at seeded gaps of three to eleven seconds. */
-function lanternLit(nowMs){
+function mawLit(nowMs){
   let t = 0, i = 0;
   const s = nowMs / 1000;
   while(t < s && i < 100000){
@@ -563,9 +550,9 @@ function drawPrediction(chart, view, pos){
      
      which is the same point in space written in two frames, so the road joins
      up exactly at every change of reach. Pinning a moon's leg to where the
-     moon is *now* instead — which is what this did — drew the swing past Pip
-     in one corner of the chart and the door into Pip's reach in another,
-     because the encounter happens where Pip will be, not where it is. */
+     moon is *now* instead — which is what this did — drew the swing past Slate
+     in one corner of the chart and the door into Slate's reach in another,
+     because the encounter happens where Slate will be, not where it is. */
   const anchors = [];
   for(let i = 0; i < pred.segments.length; i++){
     const seg = pred.segments[i];
@@ -678,7 +665,7 @@ function drawCrossings(chart, view, anchors, afterBurnAt){
 
 /* The intercept: the nearest the road comes to the world it has just entered.
  * This is the question a pilot is actually asking while they push a burn
- * around — not "does this reach Pip" but "how close, and how fast" — so it is
+ * around — not "does this reach Slate" but "how close, and how fast" — so it is
  * marked wherever the chart is zoomed, even when the whole encounter is a few
  * pixels wide, and it carries its own numbers. */
 function drawIntercept(chart, view, anchors, afterBurnAt){

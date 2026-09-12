@@ -1,7 +1,7 @@
 /* Orbital Trader: the worlds, as pixels.
  *
  * Every body on the chart used to be a coloured dot, which is honest and
- * completely forgettable: Bramble and Ledger are a green circle and a gold
+ * completely forgettable: Moss and Slate are a green circle and a grey
  * one, and nobody ever learned which was which. These give each of them a
  * face — sixteen pixels across, drawn once into an offscreen canvas and
  * blitted with smoothing off, so it stays crunchy at any zoom.
@@ -14,11 +14,11 @@
  * than drawn because sixteen hand-placed spheres would drift apart in their
  * lighting and their palettes, and because a recipe is four lines a designer
  * can read and change. The randomness is seeded from the body's own id, so
- * Bramble's hedgerows are in the same places today as yesterday.
+ * Moss's hedgerows are in the same places today as yesterday.
  *
  * **Shapes** are hand-drawn grids, one character per pixel, for the things
- * that are not spheres: the Arc's broken ring, Claw Rock, the comet, the
- * Lantern, and the ship. A silhouette is the whole character of those, and a
+ * that are not spheres: the Arc's broken ring, the two belt havens, the
+ * Maw, and the ship. A silhouette is the whole character of those, and a
  * silhouette is exactly what a generator is worst at.
  *
  * Nothing here touches the DOM until the first sprite is asked for, so the
@@ -85,17 +85,22 @@ export const WORLDS = {
     { t: 'lights', colour: '#ffe9a8', amount: 0.5 },
   ]},
 
-  wanderwell: { base: '#f2a65a', features: [
-    { t: 'bands', colour: '#c8611a', n: 4, strength: 0.5 },
-    { t: 'cap', colour: '#e6eef7', size: 0.26, top: true },   // winter, coming or going
-    { t: 'patches', colour: '#b8722c', amount: 0.4, scale: 3 },
+  /* Cinder's mining moon: bare rock, and the head of every shaft lit. */
+  scorch: { base: '#b58a5a', features: [
+    { t: 'craters', n: 4 },
+    { t: 'patches', colour: '#8a6338', amount: 0.3, scale: 3 },
+    { t: 'lights', colour: '#ffb26b', amount: 0.35 },
   ]},
 
-  tagalong: { base: '#cbb8a0', features: [
-    { t: 'craters', n: 5 },
+  /* Veyra: banded, bright, and lit all the way round, because somebody is
+     always awake and spending. */
+  veyra: { base: '#f2a65a', features: [
+    { t: 'bands', colour: '#c8611a', n: 4, strength: 0.45 },
+    { t: 'patches', colour: '#b8722c', amount: 0.35, scale: 3 },
+    { t: 'lights', colour: '#fff0c0', amount: 0.6 },
   ]},
 
-  tessel: { base: '#3fa9dd', features: [
+  tassel: { base: '#3fa9dd', features: [
     { t: 'patches', colour: '#2b7530', amount: 0.46, scale: 3 },
     { t: 'patches', colour: '#6cc24a', amount: 0.2, scale: 4 },
     { t: 'cap', colour: '#eaf6ff', size: 0.16, top: true },
@@ -103,27 +108,17 @@ export const WORLDS = {
     { t: 'clouds', colour: '#f4fbff', amount: 0.2 },
   ]},
 
-  pip: { base: '#cfc2a8', features: [
+  slate: { base: '#cfc2a8', features: [
     { t: 'craters', n: 3 },
     /* Dry docks and cranes: the lamps are on all night, every night. */
     { t: 'lights', colour: '#ffb26b', amount: 0.55 },
     { t: 'pixels', colour: '#f59a2e', at: [[10, 4], [11, 4], [11, 5], [4, 10], [5, 11]] },
   ]},
 
-  bramble: { base: '#6cc24a', features: [
+  moss: { base: '#6cc24a', features: [
     { t: 'patches', colour: '#2b7530', amount: 0.55, scale: 2.4 },   // hedgerows
     { t: 'patches', colour: '#9ad86a', amount: 0.22, scale: 4 },
     { t: 'clouds', colour: '#eafbe0', amount: 0.1 },
-  ]},
-
-  ledger: { base: '#d8b45a', features: [
-    { t: 'patches', colour: '#a8842e', amount: 0.35, scale: 3 },
-    /* A vault door, which is the only architecture the bankers care about:
-       two rings, four spokes and a handle in the middle. */
-    { t: 'ring', colour: '#6b4f16', r: 0.66 },
-    { t: 'ring', colour: '#f3dc9a', r: 0.4 },
-    { t: 'pixels', colour: '#6b4f16', at: [[8, 5], [8, 10], [5, 8], [10, 8]] },
-    { t: 'pixels', colour: '#fff3c4', at: [[7, 7], [8, 7], [7, 8], [8, 8]] },
   ]},
 
   grumm: { base: '#8b6bd6', features: [
@@ -132,39 +127,34 @@ export const WORLDS = {
     { t: 'storm', colour: '#f2a65a', x: 0.34, y: 0.58, r: 0.2 },
   ]},
 
-  mossback: { base: '#5e8f4a', features: [
-    { t: 'patches', colour: '#3c6b33', amount: 0.5, scale: 2.6 },
-    { t: 'patches', colour: '#86b463', amount: 0.22, scale: 4 },
-    /* It is asleep, not dead. One shut eye, and the ridges of a shell. */
-    { t: 'pixels', colour: '#c8d8a0', at: [[5, 6], [6, 5], [7, 5], [8, 5], [9, 6]] },
-    { t: 'pixels', colour: '#20301a', at: [[5, 7], [6, 7], [7, 7], [8, 7], [9, 7]] },
+  /* An ammonia sea the colour of weak tea, with apothecary rafts on it. */
+  brine: { base: '#a8c48c', features: [
+    { t: 'patches', colour: '#6f8f5a', amount: 0.5, scale: 2.8 },
+    { t: 'pixels', colour: '#e6f3c8', at: [[6, 5], [10, 6], [5, 10], [9, 11]] },
+    { t: 'clouds', colour: '#eef7dd', amount: 0.16 },
   ]},
 
-  lillimoor: { base: '#7fd0c8', features: [
-    { t: 'patches', colour: '#3f9a95', amount: 0.42, scale: 3 },
-    /* Lily pads, which are villages. */
-    { t: 'pixels', colour: '#b8f0d8', at: [[5, 6], [9, 5], [7, 10], [11, 9], [4, 9]] },
-    { t: 'clouds', colour: '#dffaf6', amount: 0.14 },
-  ]},
-
-  widdershins: { base: '#9a8fa6', features: [
-    { t: 'craters', n: 4 },
-    /* Captured, and going the wrong way round. The rim light is on the side
-       the light is not, which is the only way a still picture can say so. */
-    { t: 'rim', colour: '#cfc2e8', side: -1 },
-  ]},
-
-  chime: { base: '#cfe8ff', features: [
+  /* Ice over an ocean, lit from underneath where the station has cut in. */
+  glass: { base: '#cfe8ff', features: [
     { t: 'patches', colour: '#9ec6ea', amount: 0.35, scale: 3.4 },
     { t: 'cap', colour: '#ffffff', size: 0.22, top: true },
     { t: 'cap', colour: '#ffffff', size: 0.2, top: false },
-    { t: 'sparkle', colour: '#ffffff', n: 6 },     // glass, falling
+    { t: 'sparkle', colour: '#ffffff', n: 6 },
   ]},
 
-  hush: { base: '#6b6b7e', features: [
-    { t: 'patches', colour: '#3a3a4a', amount: 0.6, scale: 3 },
-    { t: 'craters', n: 2 },
-    { t: 'pixels', colour: '#b48cff', at: [[9, 6]] },   // the observatory, still pointed
+  croak: { base: '#9a8fa6', features: [
+    { t: 'craters', n: 4 },
+    /* Going the wrong way round. The rim light is on the side the light is
+       not, which is the only way a still picture can say so. */
+    { t: 'rim', colour: '#cfc2e8', side: -1 },
+  ]},
+
+  /* The frog capital: lily terraces all the way up, and every one of them lit. */
+  haven: { base: '#7fd0c8', features: [
+    { t: 'patches', colour: '#3f9a95', amount: 0.42, scale: 3 },
+    { t: 'pixels', colour: '#b8f0d8', at: [[5, 6], [9, 5], [7, 10], [11, 9], [4, 9]] },
+    { t: 'lights', colour: '#ffe9a8', amount: 0.4 },
+    { t: 'clouds', colour: '#dffaf6', amount: 0.14 },
   ]},
 };
 
@@ -173,7 +163,7 @@ export const WORLDS = {
 /* One character per pixel. A space is nothing. The legend is per sprite so
  * each one can use single letters for whatever it needs. */
 export const SHAPES = {
-  /* The last intact segment of a Chorus ring, seen edge on: a curved bar of
+  /* The last intact segment of a Builder ring, seen edge on: a curved bar of
      worked metal with the break showing at both ends. */
   arc: { legend: { '.': null, o: '#d9c9a3', O: '#f2e7c8', s: '#8a7a58', d: '#6b5f4f' },
     rows: [
@@ -195,9 +185,9 @@ export const SHAPES = {
       '................',
     ]},
 
-  /* Claw Rock: a jagged haven with a tavern light in it, and two points at
+  /* Nail: a jagged belt haven with a tavern light in it, and two points at
      the top that the cats insist are a coincidence. */
-  clawrock: { legend: { '.': null, r: '#b58a5a', R: '#d8ae7c', d: '#6f5133', l: '#ffd23f' },
+  nail: { legend: { '.': null, r: '#b58a5a', R: '#d8ae7c', d: '#6f5133', l: '#ffd23f' },
     rows: [
       '................',
       '...R........R...',
@@ -217,45 +207,46 @@ export const SHAPES = {
       '................',
     ]},
 
-  /* Merrow's Comet: a dirty snowball with a bazaar bolted to it. The tail is
-     drawn by the chart, not here. */
-  merrow: { legend: { '.': null, i: '#bfe9ff', I: '#ffffff', d: '#7a9fb5', g: '#ffd23f' },
+  /* Whisker: a rounder, darker rock at the thin end of the Belt, with one
+     light showing and no name painted anywhere on it. */
+  whisker: { legend: { '.': null, R: '#6b6478', d: '#2a2632', l: '#b48cff' },
     rows: [
       '................',
       '................',
-      '......dii.......',
-      '....diIIIid.....',
-      '...dIIIiIIid....',
-      '...iIIgIIIIi....',
-      '..diIIIIIIiid...',
-      '..iIIIIIgIIii...',
-      '..iIIgIIIIIid...',
-      '...iIIIIIIid....',
-      '...diIIIIid.....',
-      '....ddiiid......',
-      '......dd........',
-      '................',
+      '.....ddRRdd.....',
+      '...ddRRRRRRdd...',
+      '..dRRRRRRRRRRd..',
+      '.dRRRRRRRRRRRRd.',
+      '.dRRRRRRRRRRRRd.',
+      'dRRRRRlRRRRRRRRd',
+      'dRRRRRRRRRRRRRRd',
+      '.dRRRRRRRRRRRRd.',
+      '.ddRRRRRRRRRRdd.',
+      '..dddRRRRRRddd..',
+      '....dddRRddd....',
+      '......dddd......',
       '................',
       '................',
     ]},
 
-  /* The Far Lantern. Nobody knows what it is; it is drawn as what it does. */
-  lantern: { legend: { '.': null, w: '#ffffff', y: '#ffd23f', f: 'rgba(255,210,63,0.45)' },
+  /* The Maw. A hole with a ring of light falling into it; the Builder station
+     that watches it is too small to draw at this size. */
+  maw: { legend: { '.': null, k: '#0b0b12', w: '#ffffff', y: '#ffd23f', f: 'rgba(255,210,63,0.45)' },
     rows: [
       '................',
-      '.......f........',
-      '.......w........',
-      '.....f.w.f......',
-      '......yyy.......',
-      '.....ywwwy......',
-      '..fw.ywwwy.wf...',
-      '.....ywwwy......',
-      '......yyy.......',
-      '.....f.w.f......',
-      '.......w........',
-      '.......f........',
       '................',
-      '................',
+      '.....ffffff.....',
+      '...ffywwwwyff...',
+      '..fywwkkkkwwyf..',
+      '..ywkkkkkkkkwy..',
+      '.fwkkkkkkkkkkwf.',
+      '.ywkkkkkkkkkkwy.',
+      '.ywkkkkkkkkkkwy.',
+      '.fwkkkkkkkkkkwf.',
+      '..ywkkkkkkkkwy..',
+      '..fywwkkkkwwyf..',
+      '...ffywwwwyff...',
+      '.....ffffff.....',
       '................',
       '................',
     ]},

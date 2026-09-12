@@ -1,7 +1,7 @@
 /* Orbital Trader: the rules.
  *
  * Pure functions over one plain state object: what a tick does, what docking
- * means, what a crate of Bramble apples is worth on Lillimoor today. The page
+ * means, what a crate of Moss apples is worth on Haven today. The page
  * calls these and draws the result; the tests call these and check the
  * result; neither is allowed to decide anything on its own.
  *
@@ -63,18 +63,18 @@ export function tiers(kind){ return UPGRADES.filter(u => u.kind === kind).sort((
  * the whole of the opening brief. A player who has never flown anything has
  * somewhere to be before they have learned what a market is, and the road
  * there is the shortest one in the game. */
-export const FIRST_DELIVERY = { to: 'pip', pay: 420, days: 14, units: 2 };
+export const FIRST_DELIVERY = { to: 'slate', pay: 420, days: 14, units: 2 };
 
 export function newGame(seed = 1){
   const start = CONST.START_PORT;
   const state = {
-    /* 2: the sky was rebuilt. Tessel went from nineteen Earths to a Kerbin,
-       every body to a tenth of its size, and every reach to something a mass
-       earns — so a version 1 save's ship position is a place that no longer
-       means what it meant. Those saves are refused rather than repaired: the
-       page catches it and opens a new game, which is the honest outcome when
-       the world under a ship has changed shape. */
-    version: 2,
+    /* 3: the setting was rewritten. Ten bodies left the sky, six arrived,
+       and four were renamed — so a version 2 save names places that are not
+       there any more, and a version 1 save's ship position means nothing at
+       all. Those saves are refused rather than repaired: the page catches it
+       and opens a new game, which is the honest outcome when the world under
+       a ship has changed shape. */
+    version: 3,
     seed, rng: (seed * 2654435761) >>> 0 || 1,
     t: 0, warp: 1, paused: false,
     shipName: TEXT.shipNames[Math.abs(seed) % TEXT.shipNames.length],
@@ -103,17 +103,17 @@ export function newGame(seed = 1){
   state.dv = state.tank;
   /* The game opens in flight, not at a mooring. There is no landing in
      Orbital Trader — every harbour is a parking orbit — so the honest first
-     frame is the ship already going round Tessel with a road drawn ahead of
+     frame is the ship already going round Tassel with a road drawn ahead of
      it. Nothing to cast off from, nothing to press before the chart means
      something. And it opens *low*: close enough in that the world fills the
      chart and a lap is ten real minutes, not a fortnight of nothing. */
   placeStart(state, start);
   state.dockedAt = null;
-  state.justLeft = start;          // Tessel's own mouth is where we started
+  state.justLeft = start;          // Tassel's own mouth is where we started
   state.justLeftAt = state.t;
   refreshOffers(state, start, true);
   /* The opening is an errand rather than a contract: Uncle Theo wants a pebble
-     off Pip for Aunt Nellie, and the purse holds just about enough to buy one.
+     off Slate for Aunt Nellie, and the purse holds just about enough to buy one.
      It is also the tutorial's spine — every step of the lesson is a step of
      this quest — so the game opens with a reason rather than a cargo. */
   state.quests = QUESTS.map(q => ({ id: q.id, step: 0, done: false }));
@@ -145,7 +145,7 @@ export function fill(template, vars){
   return String(template).replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? `{${k}}`);
 }
 
-/* Game time as the world tells it: Tessel years and days. */
+/* Game time as the world tells it: Tassel years and days. */
 export function calendar(t){
   const y = Math.floor(t / CONST.YEAR_DAYS) + 1;
   const d = Math.floor(t - (y - 1) * CONST.YEAR_DAYS) + 1;
@@ -174,8 +174,9 @@ export function fmtMoney(m){
 
 /* -------------------------------------------------------------- ports */
 
-/* Wanderwell's colony is a market only near periapsis; the rest of the time
- * it is an empty town the otters of Tagalong keep the lights on in. */
+/* A port may keep hours: `openWithin` shuts its market whenever the body it
+ * is on is further from the Lamp than that. Nothing in the sky uses it today,
+ * and the rule stays because a seasonal market is a thing a port may want. */
 export function portOpen(portId, t){
   const p = PORTS[portId];
   if(!p) return false;
@@ -318,7 +319,7 @@ function placeParked(state, portId, radius){
  * a parking orbit but drawn at `startAlt` instead of the docking altitude.
  *
  * Low means what a pilot means by it — the high point of the orbit sits less
- * than one planet-diameter above the ground — and at Tessel that is 0.000115
+ * than one planet-diameter above the ground — and at Tassel that is 0.000115
  * au, about three planet-radii out from the middle of the world. The point is
  * what the first frame looks like: a world that fills the chart and visibly
  * turns under you, rather than a blue dot a hundred thousand kilometres off.
@@ -354,8 +355,8 @@ export function wait(state, days){
   ageContracts(state);
 }
 
-/* Days until a body next reaches periapsis (Wanderwell's kissing distance,
- * the comet's pass). The rails make this exact. */
+/* Days until a body next reaches periapsis: the closest a body on an ellipse
+ * comes to the thing it goes round. The rails make this exact. */
 export function daysToPeriapsis(bodyId, t){
   const b = world.get(bodyId);
   const n = Math.sqrt(world.get(b.parent).mu / (b.a ** 3));
@@ -559,7 +560,7 @@ function flag(state, name, events){
 const QUEST_TESTS = {
   pebble: {
     buy: state => carrying(state, 'pebble') > 0,
-    home: state => state.dockedAt === 'tessel' && carrying(state, 'pebble') > 0,
+    home: state => state.dockedAt === 'tassel' && carrying(state, 'pebble') > 0,
   },
 };
 
@@ -776,7 +777,7 @@ function fullLap(seg, mu){
  * and when. Inside that world's reach the ship is on one conic about it, so
  * the nearest point is simply that leg's periapsis — no search, no sampling,
  * exact. It is the number a pilot is actually asking for while they push a
- * burn around: not "does this reach Pip" but "how close, and how fast". */
+ * burn around: not "does this reach Slate" but "how close, and how fast". */
 function interceptOf(segments, crossed){
   if(crossed < 0) return null;
   /* Only an *entry* has an intercept. Climbing out of a world's reach leaves
@@ -1127,7 +1128,7 @@ export function trimToTarget(state, targetId, horizon){
   const el = elementsFromState(here.mu, state.ship.r, state.ship.v);
   const laps = Number.isFinite(el.period) ? el.period * 8 : 400;
   /* Far enough ahead to contain the crossing itself: a slow road to the Far
-     Lantern takes fourteen years, and a search that cannot see the arrival
+     Maw takes fourteen years, and a search that cannot see the arrival
      scores every guess the same. */
   const anchor = helioOf(state.ship.body) ?? world.root;
   const r1 = norm(shipAbsPos(state));
@@ -1562,7 +1563,7 @@ const q0For = portId => FORMULAS.saturation.q0 * (PORTS[portId].marketSize ?? 1)
 /* How much of a stall's stock is still missing. Selling into a market and
  * buying out of one are not the same thing and must not decay the same way:
  * a market's appetite fades on its own clock, but a shelf refills at the rate
- * the people behind it can make more. Bramble grows grain by the sackful every
+ * the people behind it can make more. Moss grows grain by the sackful every
  * day; the Arc cuts a relic out of a ruin twice a year. A single half-life for
  * both made a rare thing as easy to strip-mine as a common one. */
 function shortfall(state, portId, goodId){
@@ -1761,7 +1762,7 @@ export function fuelPrice(state, portId = state.dockedAt){
 }
 /* A ship with no fuel and no coin, tied up at a dock, is a ship that can never
  * leave — and the design document is clear that nothing may cost the save. So
- * Ledger will front enough to get going again, at a price, exactly as they do
+ * the harbour bank will front enough to get going again, at a price, as they do
  * for a tow. It is a floor, not a facility: it only opens when the tank is
  * nearly dry and the purse cannot cover it, and only up to what it takes to
  * reach the next port. */
@@ -1791,7 +1792,7 @@ export function refuel(state, kmsWanted){
   if(state.money < 0){ state.debt += -state.money; state.money = 0; }
   state.dv = Math.min(state.tank, state.dv + auDay(amount));
   logLine(state, 'refuelled', TEXT.logTemplates.refuelled, { amount: `${amount.toFixed(1)} km/s`, price: fmtMoney(cost), port: portName(state.dockedAt) });
-  if(borrowed > 0) logLine(state, 'story', TEXT.events.ledgerDebt);
+  if(borrowed > 0) logLine(state, 'story', TEXT.events.bankDebt);
   return { ok: true, amount, cost, borrowed };
 }
 
@@ -2079,8 +2080,8 @@ export function nearestPort(state){
       if(!portOpen(id, state.t)) continue;
       if(id === state.dockedAt) continue;
       /* And a tow that leaves a dry ship at a dock with no fuel pump has not
-         rescued anybody: Mossback, Hush, the Arc and the Lantern sell nothing
-         to burn, so a ship towed to one of them could never leave again. The
+         rescued anybody: the Arc and the Maw sell nothing to burn, so a ship
+         towed to one of them could never leave again. The
          design is explicit that nothing costs the save. */
       if(requireFuel && PORTS[id].fuelPricePerKms == null) continue;
       const d = dist(here, absState(world, id, state.t).r);
@@ -2101,7 +2102,7 @@ export function towQuote(state){
 
 /* A tow, or the aftermath of a crash: the ship arrives at the nearest port,
  * later and poorer, with its cargo and its story. Coin can go negative; that
- * is a debt to Ledger, who are delighted. */
+ * is a debt to the harbour bank, who are delighted. */
 export function callTow(state, reason = 'dry'){
   const q = towQuote(state);
   const mul = reason === 'crash' ? FORMULAS.tow.crashMul : 1;
@@ -2118,7 +2119,7 @@ export function callTow(state, reason = 'dry'){
   const story = reason === 'atmosphere' ? TEXT.events.towAtmosphere : pool[Math.floor(rnd(state) * pool.length)];
   if(!state.visited.includes(q.port)) state.visited.push(q.port);
   logLine(state, 'towed', TEXT.logTemplates.towed, { port: portName(q.port), cost: fmtMoney(cost), days: fmtDays(q.days) });
-  if(state.debt > 0) logLine(state, 'story', TEXT.events.ledgerDebt);
+  if(state.debt > 0) logLine(state, 'story', TEXT.events.bankDebt);
   refreshOffers(state, q.port, true);
   const delivered = deliverHere(state, q.port);
   ageContracts(state);
@@ -2129,7 +2130,7 @@ export function callTow(state, reason = 'dry'){
   return { ...q, cost, story, delivered, events };
 }
 
-/* Paying Ledger back happens whenever there is coin: quietly, first. */
+/* Paying the bank back happens whenever there is coin: quietly, first. */
 export function settleDebt(state){
   if(state.debt <= 0 || state.money <= 0) return 0;
   const pay = Math.min(state.debt, state.money);
@@ -2146,17 +2147,7 @@ function milestonesOnDock(state, port, events){
     const text = TEXT.events[name];
     if(text){ logLine(state, 'story', text); events.push({ kind: 'story', name, text }); }
   };
-  if(port === 'merrow') say('cometCaught');
-  if(port === 'chime') say('chimeArrival');
-  if(port === 'mossback') say('mossbackHeartbeat');
-  if(port === 'hush'){
-    say('hushRelic');
-    if(!state.keys.stealth){
-      const relic = UPGRADES.find(u => u.key === 'stealth');
-      if(relic){ grantUpgrade(state, relic); logLine(state, 'upgraded', TEXT.logTemplates.upgraded, { name: relic.name, port: portName(port) }); events.push({ kind: 'upgrade', id: relic.id }); }
-    }
-  }
-  if(port === 'lantern') say('lanternArrival');
+  if(port === 'maw') say('mawArrival');
   if(state.flags.catGiftDue && PORTS[port].species !== 'cat'){
     state.flags.catGiftDue = false;
     const gift = Math.round(200 + 400 * rnd(state));
@@ -2179,7 +2170,7 @@ export function restore(json){
   const s = typeof json === 'string' ? JSON.parse(json) : json;
   const bad = why => { throw new Error(`Not a save this game understands: ${why}.`); };
   if(!s || typeof s !== 'object') bad('it is not an object');
-  if(s.version !== 2) bad(`it is version ${s.version}, and this sky is version 2`);
+  if(s.version !== 3) bad(`it is version ${s.version}, and this sky is version 3`);
   if(!s.ship || typeof s.ship !== 'object') bad('it has no ship');
   if(!world.get(s.ship.body)) bad(`its ship is at "${s.ship.body}", which is nowhere`);
   for(const k of ['r', 'v']){

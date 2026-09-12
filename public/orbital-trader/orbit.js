@@ -5,8 +5,8 @@
  * numbers so that the same code runs in the browser, in the tests, and in
  * any tool that wants to ask "where will the ship be?".
  *
- * Units, everywhere: distance in au (Tessel's orbital radius), time in days
- * (Tessel's year is 360 of them), so mu is in au^3/day^2 and speed in au/day.
+ * Units, everywhere: distance in au (Tassel's orbital radius), time in days
+ * (Tassel's year is 360 of them), so mu is in au^3/day^2 and speed in au/day.
  * Vectors are two-element arrays. Angles are radians, anticlockwise.
  *
  * The model is the one the design document fixes: bodies on rails (a Kepler
@@ -48,7 +48,7 @@ export const perp = a => [-a[1], a[0]];
 
 /* Solve Kepler's equation M = E - e sin E for the eccentric anomaly.
  * Newton from a starting guess that is good on both ends of the eccentricity
- * range; Merrow's Comet at e = 0.94 is the case that punishes a lazy start. */
+ * range; a long cometary ellipse at e = 0.94 is the case that punishes a lazy start. */
 export function solveKepler(M, e){
   M = ((M % TAU) + TAU) % TAU;
   let E = e < 0.8 ? M : Math.PI;
@@ -71,7 +71,7 @@ export const period = (mu, a) => TAU / meanMotion(mu, a);
  * `el` is { a, e, omega, M0, retrograde }. A retrograde orbit is the prograde
  * one reflected across the x axis: same shape, opposite sense, and it needs no
  * special handling anywhere downstream, which is the design document's promise
- * about Widdershins kept in one line.
+ * about a retrograde moon kept in one line.
  */
 export function railState(el, mu, t){
   const { a, e = 0, omega = 0, M0 = 0, retrograde = false } = el;
@@ -385,7 +385,7 @@ export function hohmann(mu, r1, r2){
  * A body: { id, parent, a, e, omega, M0, retrograde, mu, soi, radius, ... }.
  * The star has parent null and soi null (it holds everything). A body with
  * mu 0 and soi null is a rendezvous zone: it moves on rails but has no
- * gravity, which is how the comet and the Far Lantern are represented.
+ * gravity, which is how the belt havens and the Maw are represented.
  */
 export function makeWorld(bodies){
   const byId = new Map();

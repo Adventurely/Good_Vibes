@@ -27,7 +27,7 @@ export const CONST = {
   BASE_RATE_DAYS_PER_SEC: C.BASE_RATE_DAYS_PER_SEC,
   SKIP_SECONDS: C.SKIP_SECONDS,
   MAX_WARP: C.MAX_WARP,
-  START_PORT: 'tessel',
+  START_PORT: 'tassel',
   START_MONEY: ECONOMY.startingMoney,
   CURRENCY: ECONOMY.currencyName,
   BELT: { inner: TUNING.belt.inner, outer: TUNING.belt.outer },
@@ -40,23 +40,23 @@ export const SPECIES = {
   otter:    { name: 'Otters',   plural: 'The otters',   adjective: 'otter',    colour: '#6cc24a', animal: 'otters' },
   cat:      { name: 'Cats',     plural: 'The cats',     adjective: 'cat',      colour: '#e9dcc0', animal: 'cats' },
   frog:     { name: 'Frogs',    plural: 'The frogs',    adjective: 'frog',     colour: '#5fb9e6', animal: 'frogs' },
-  chorus:   { name: 'The Chorus', plural: 'The Chorus', adjective: 'Chorus',   colour: '#b48cff', animal: 'nobody knows' },
+  builders: { name: 'The Builders', plural: 'The Builders', adjective: 'Builder', colour: '#b48cff', animal: 'nobody knows' },
   mixed:    { name: 'All four peoples', plural: 'Everyone', adjective: 'bazaar', colour: '#ffd23f', animal: 'everyone' },
   none:     { name: 'Nobody', plural: 'Nobody', adjective: '', colour: '#9a948a', animal: 'nobody at all' },
 };
 
-/* The four peoples who trade, remember and hold grudges. The Chorus are gone
- * and nobody lives at the Lantern, so neither keeps a reputation. */
+/* The four peoples who trade, remember and hold grudges. The Builders are gone
+ * and nobody lives at the Maw, so neither keeps a reputation. */
 export const PEOPLES = ['emberkin', 'otter', 'cat', 'frog'];
 
 /* Colours for the chart, by body. Peoples' worlds take their people's hue;
  * the rest are what they are: a violet giant, a glass-snow world, a lamp. */
 const BODY_COLOURS = {
-  lamp: '#ffd23f', cinder: '#e8683c', wanderwell: '#f2a65a', tagalong: '#cbb8a0',
-  tessel: '#3fa9dd', pip: '#cfc2a8', bramble: '#6cc24a', ledger: '#d8b45a',
-  arc: '#d9c9a3', clawrock: '#b58a5a', grumm: '#8b6bd6', mossback: '#5e8f4a',
-  lillimoor: '#7fd0c8', widdershins: '#9a8fa6', chime: '#cfe8ff', hush: '#8b8b9e',
-  merrow: '#bfe9ff', lantern: '#ffffff',
+  lamp: '#ffd23f', cinder: '#e8683c', scorch: '#b58a5a', veyra: '#f2a65a',
+  tassel: '#3fa9dd', slate: '#cfc2a8', moss: '#6cc24a',
+  nail: '#e9dcc0', whisker: '#8b8b9e', arc: '#d9c9a3',
+  grumm: '#8b6bd6', brine: '#a8c48c', glass: '#cfe8ff', croak: '#9a8fa6',
+  haven: '#7fd0c8', maw: '#ffffff',
 };
 
 /* --------------------------------------------------------------- bodies */
@@ -80,7 +80,7 @@ const normaliseSpecies = s => {
  * ratio is a ratio of mu and the G cancels.
  *
  * A thing with no mass, or nothing to go round, has no reach: the star, and
- * the drifting zones — Claw Rock, the comet, the Lantern — which are places
+ * the drifting zones — the belt havens and the Maw — which are places
  * you match speeds with rather than fall towards. */
 export function soiRadius(mu, a, parentMu){
   if(!(mu > 0) || !(a > 0) || !(parentMu > 0)) return null;
@@ -100,7 +100,7 @@ export const BODIES = TUNING.bodies.map(b => ({
 const bodyIndex = new Map(BODIES.map(b => [b.id, b]));
 export const bodyById = id => bodyIndex.get(id);
 
-/* The Scatter's rocks and the Arc's debris: decorative, deterministic, and on
+/* The Belt's rocks and the Arc's debris: decorative, deterministic, and on
  * their own circular rails so they turn with the sky. Generated once here
  * rather than stored, because ten thousand numbers in a JSON file would be
  * ten thousand numbers nobody could review. */
@@ -152,13 +152,12 @@ const goodIds = new Set(GOODS.map(g => g.id));
 
 /* ---------------------------------------------------------------- ports */
 
-const NO_OFFERS = new Set(['mossback', 'lantern', 'hush', 'chime']);
+const NO_OFFERS = new Set(['maw']);
 export const PORTS = Object.fromEntries(Object.entries(ECONOMY.ports).map(([id, p]) => {
   const body = bodyIndex.get(id);
   return [id, {
-    /* The sky is the authority on who lives where: the price list calls Chime
-       and Hush frog and cat ports, and the design document is clear that the
-       Chorus are gone and nobody has taken their place. */
+    /* The sky is the authority on who lives where: where the price list and
+       the body table disagree about a port's people, the body table wins. */
     species: normaliseSpecies(body?.species ?? p.species),
     climate: body?.climate ?? p.climate,
     marketSize: p.marketSize ?? 1,
@@ -170,7 +169,7 @@ export const PORTS = Object.fromEntries(Object.entries(ECONOMY.ports).map(([id, 
     gifts: p.gifts ?? null,
     openWithin: p.openWhen?.rAuBelow ?? null,
     passengers: !NO_OFFERS.has(id),
-    towAllowed: id !== 'wanderwell' && id !== 'lantern',
+    towAllowed: id !== 'maw',
   }];
 }));
 
@@ -220,8 +219,6 @@ const DELIVERY = /crate|load|lot|parcel|case|cultures|fashions/i;
 export const CONTRACT_TEMPLATES = ECONOMY.contracts.templates.map(t => {
   const out = { ...t, kind: DELIVERY.test(t.text) && !/apprentice|scholar|pilgrim|song-keeper|crew|cousins|family|caretakers|banker/i.test(t.text) ? 'delivery' : 'passenger' };
   out.units = out.kind === 'delivery' ? 4 : 1;
-  // The table names a climate the sky does not have; it means the tavern.
-  if(out.toClimate === 'chill'){ delete out.toClimate; out.toPorts = ['clawrock']; }
   if(typeof out.toClimate === 'string') out.toClimate = [out.toClimate];
   if(typeof out.fromClimate === 'string') out.fromClimate = [out.fromClimate];
   if(out.species === 'any') out.species = 'otter';

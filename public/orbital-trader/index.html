@@ -150,7 +150,7 @@ document.getElementById('new').addEventListener('click', e => {
 });
 
 /* The sky: the real chart, at a slow warp, looking at the inner system so
-   the moons of Tessel and Wanderwell's long ellipse both read. */
+   the moons of Tassel and the Belt havens both read. */
 const world = makeWorld(BODIES);
 const canvas = document.getElementById('sky');
 const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -162,7 +162,7 @@ const chart = createChart(canvas, world, {
 const belt = { inner: CONST.BELT.inner, outer: CONST.BELT.outer, rocks: BELT_ROCKS, debris: ARC_DEBRIS };
 /* Put the Lamp low and left, so the orbits sweep up behind the title instead
    of sitting under the button, and frame about seven au: Cinder through the
-   Scatter, with Wanderwell's long ellipse crossing all of it. */
+   Belt, with the Arc riding just beyond it. */
 function fit(){
   chart.resize();
   chart.camera.follow = null;
@@ -178,7 +178,7 @@ function fit(){
 }
 fit();
 addEventListener('resize', fit);
-// Start the clock somewhere in the save, or at a day that puts Wanderwell in the sky.
+// Start the clock somewhere in the save, or at a day that spreads the sky out.
 let t = save?.t ?? 140;
 let last = performance.now();
 function frame(now){

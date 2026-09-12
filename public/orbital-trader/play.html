@@ -818,8 +818,8 @@ function skipTo(t){
   /* Remember where this skip started. The harbour rule below wakes you when
      a harbour comes into sight, which is worth waking for when it belongs to
      somewhere you have arrived — and never when it is the harbour you are
-     leaving. The game opens parked in Tessel's docking range, and the quiet
-     window after casting off ends a moment into the first skip, so Tessel's
+     leaving. The game opens parked in Tassel's docking range, and the quiet
+     window after casting off ends a moment into the first skip, so Tassel's
      own harbour "came into sight" and cancelled it: the first skip of every
      game died on its second frame, which is what made warping look broken. */
   skipHome = state.ship.body;
@@ -1026,7 +1026,7 @@ function endPointer(e){
     /* A tap: the path takes a burn, a body becomes the target, empty sky
        deselects. The path wins ties, because a body's hit disc is a generous
        forty pixels across for fingers and at the zoom you cast off at, the
-       whole parking orbit fits inside Tessel's — which made lesson two
+       whole parking orbit fits inside Tassel's — which made lesson two
        impossible to follow by tapping the road it names. */
     const p = prediction && !state.dockedAt ? chart.nearestPathPoint(e.clientX, e.clientY, prediction, state.t) : null;
     const onBody = d.hit?.kind === 'body';
@@ -1238,12 +1238,12 @@ function market(){
   const p = PORTS[port];
   if(!S.portOpen(port, state.t)){
     const days = S.daysToPeriapsis(port, state.t);
-    return `<h2>${esc(S.portName(port))}</h2><p class="say">${esc(TEXT.events.wanderwellClosing)}</p><p>The colony stands empty. Back at its low point in ${S.fmtDays(days)}. Tagalong keeps a thin market in the meantime.</p>`;
+    return `<h2>${esc(S.portName(port))}</h2><p>The market here keeps hours, and it is shut. It opens again in ${S.fmtDays(days)}.</p>`;
   }
   const lines = TEXT.ports[port]?.trade ?? [];
   const say = lines.length ? `<p class="say">${esc(lines[Math.floor(S.hash(port, Math.floor(state.t / 3)) * lines.length)])}</p>` : '';
   let out = `<h2>${esc(S.portName(port))} <small class="lock">${sp(p.species)}</small></h2>${say}`;
-  const nobody = p.species === 'chorus' || p.species === 'none';
+  const nobody = p.species === 'builders' || p.species === 'none';
   out += nobody ? '<h3>To be taken</h3>' : '<h3>For sale</h3>';
   const sells = p.sells.map(s => s.good);
   if(!sells.length) out += nobody ? '<p class="empty">Nothing here but the quiet.</p>' : '<p class="empty">Nothing for sale here.</p>';
@@ -1335,9 +1335,6 @@ function shipyard(){
     }
   }
   out += '<h3>Wait here</h3><div class="btns"><button class="btn" data-act="wait|1">1 day</button><button class="btn" data-act="wait|10">10 days</button><button class="btn" data-act="wait|30">30 days</button>';
-  const ww = S.daysToPeriapsis('wanderwell', state.t);
-  out += `<button class="btn" data-act="wait|${ww.toFixed(2)}">Wanderwell's low point (${S.fmtDays(ww)})</button>`;
-  if(state.keys.sensors){ const mc = S.daysToPeriapsis('merrow', state.t); out += `<button class="btn" data-act="wait|${mc.toFixed(2)}">Merrow's pass (${S.fmtDays(mc)})</button>`; }
   out += '</div>';
   out += `<button class="btn primary wide" data-act="undock">Undock</button>`;
   /* Being stuck at a dock is still being stuck: a ship with a dry tank at a
@@ -1362,11 +1359,15 @@ function talk(){
   if(TEXT.species[p.species]?.greeting) out += `<p>${esc(TEXT.species[p.species].greeting)}</p>`;
   if(txt.rumours) out += `<h3>Heard at the dock</h3>` + txt.rumours.map((r, i) => `<p>${i === k % txt.rumours.length ? '<b>' : ''}${esc(r)}${i === k % txt.rumours.length ? '</b>' : ''}</p>`).join('');
   out += '<h3>How they know you</h3><dl class="kv">' + Object.entries(state.rep).map(([s, v]) => `<dt>${sp(s)}</dt><dd>${repWord(v)}</dd>`).join('') + '</dl>';
+  /* Where the rest of the sky is from here, in the plainest terms a dock has:
+     how far away it is today, and which way from the Lamp that is. */
   out += '<h3>The sky</h3>';
-  const ww = S.daysToPeriapsis('wanderwell', state.t);
-  const wr = norm(absState(world, 'wanderwell', state.t).r);
-  out += `<p>Wanderwell is ${wr.toFixed(2)} au out, ${S.portOpen('wanderwell', state.t) ? 'and the summer market is open' : `and reaches its low point in ${S.fmtDays(ww)}`}.</p>`;
-  if(state.keys.sensors) out += `<p>Merrow's Comet passes the Lamp in ${S.fmtDays(S.daysToPeriapsis('merrow', state.t))}.</p>`;
+  const from = absState(world, port, state.t).r;
+  for(const id of ['cinder', 'veyra', 'nail', 'arc', 'grumm', 'maw']){
+    if(id === port) continue;
+    const there = absState(world, id, state.t).r;
+    out += `<p>${esc(S.portName(id))} is ${fmtAu(dist(from, there))} away, ${norm(there).toFixed(2)} au from the Lamp.</p>`;
+  }
   out += `<h3>Glossary</h3>` + GLOSSARY.slice(0, 16).map(g => `<p><b>${esc(g.term)}</b> <span class="lock">(${esc(g.plain)})</span> — ${esc(g.tip)}</p>`).join('');
   return out;
 }
@@ -1677,7 +1678,7 @@ function showCrash(bodyId){
 }
 function showTow(reason){
   const q = S.towQuote(state);
-  openModal(`<h2>Call for a tow</h2><p>The nearest help is at ${esc(S.portName(q.port))}, ${fmtAu(q.distance)} away. They ask ${S.fmtMoney(q.cost)} and it will take ${S.fmtDays(q.days)}. ${state.money < q.cost ? 'What you cannot pay, Ledger will lend.' : ''}</p>
+  openModal(`<h2>Call for a tow</h2><p>The nearest help is at ${esc(S.portName(q.port))}, ${fmtAu(q.distance)} away. They ask ${S.fmtMoney(q.cost)} and it will take ${S.fmtDays(q.days)}. ${state.money < q.cost ? 'What you cannot pay, the harbour bank will lend.' : ''}</p>
     <div class="btns"><button class="btn" id="m-no">Not yet</button><button class="btn primary" id="m-tow">Call</button></div>`, m => {
     m.querySelector('#m-no').addEventListener('click', closeModal);
     m.querySelector('#m-tow').addEventListener('click', () => { const r = S.callTow(state, reason); closeModal(); afterTow(r); });
@@ -1685,16 +1686,16 @@ function showTow(reason){
 }
 function afterTow(r){
   selectedNode = -1; replan(true); renderTabs(); setTab('shipyard'); stopSkip();
-  openModal(`<h2>Towed to ${esc(S.portName(r.port))}</h2><p class="say">${esc(r.story)}</p><p>${S.fmtDays(r.days)} later and ${S.fmtMoney(r.cost)} poorer, you are docked. ${state.debt > 0 ? esc(TEXT.events.ledgerDebt) : ''}</p><div class="btns"><button class="btn primary" id="m-ok">Carry on</button></div>`, m => m.querySelector('#m-ok').addEventListener('click', closeModal));
+  openModal(`<h2>Towed to ${esc(S.portName(r.port))}</h2><p class="say">${esc(r.story)}</p><p>${S.fmtDays(r.days)} later and ${S.fmtMoney(r.cost)} poorer, you are docked. ${state.debt > 0 ? esc(TEXT.events.bankDebt) : ''}</p><div class="btns"><button class="btn primary" id="m-ok">Carry on</button></div>`, m => m.querySelector('#m-ok').addEventListener('click', closeModal));
   save();
 }
 function showStory(name, text){
   const paras = String(text).split(/\n+/).map(p => `<p class="say">${esc(p)}</p>`).join('');
   openModal(`<h2>${esc(storyTitle(name))}</h2>${paras}<div class="btns"><button class="btn primary" id="m-ok">Close</button></div>`, m => m.querySelector('#m-ok').addEventListener('click', closeModal));
 }
-function storyTitle(name){ return { cometCaught: "Merrow's Comet", chimeArrival: 'Chime', mossbackHeartbeat: 'Mossback', hushRelic: 'Hush', lanternArrival: 'The Far Lantern', tollGiftLater: 'A parcel from the Scatter' }[name] ?? 'A note in the log'; }
+function storyTitle(name){ return { mawArrival: 'The Maw', tollGiftLater: 'A parcel from the Belt' }[name] ?? 'A note in the log'; }
 function confirmNew(){
-  openModal(`<h2>Start over?</h2><p>This save is replaced by a fresh ship at Tessel. There is one save slot.</p><div class="btns"><button class="btn" id="m-no">Keep playing</button><button class="btn danger" id="m-yes">New game</button></div>`, m => {
+  openModal(`<h2>Start over?</h2><p>This save is replaced by a fresh ship at Tassel. There is one save slot.</p><div class="btns"><button class="btn" id="m-no">Keep playing</button><button class="btn danger" id="m-yes">New game</button></div>`, m => {
     m.querySelector('#m-no').addEventListener('click', closeModal);
     m.querySelector('#m-yes').addEventListener('click', () => { closeModal(); state = S.newGame(freshSeed()); save(); selectedNode = -1; lastDockedMode = null; replan(true); renderTabs(); backToShip(true); tutorialCheck(); });
   });
@@ -1713,19 +1714,19 @@ function toast(text, kind = '', ms = 4200){
 
 /* ------------------------------------------------------------- tutorial */
 
-/* The lesson is the first delivery: the orbit you open in, out to Pip, the
+/* The lesson is the first delivery: the orbit you open in, out to Slate, the
    nearest moon. There is no casting off to do — the game starts in flight —
    so step one is the first thing a player actually has to decide. It watches
    the state rather than the clicks, so doing a step your own way still
    counts, and it steps out of the way the moment you are tied up. */
 const TUT = TEXT.tutorial;
-const FIRST_TARGET = S.QUESTS[0]?.target ?? 'pip';
+const FIRST_TARGET = S.QUESTS[0]?.target ?? CONST.START_PORT;
 
 /* One test per step of the lesson, in order, each asking the game the same
    question the card asks the player.
 
    Every test has to be true of *every* state past its own step, not only of
-   the moment it is passed — a pilot standing in Pip's gravity has no burn
+   the moment it is passed — a pilot standing in Slate's gravity has no burn
    written down, and a lesson that reads its tests one at a time would send
    them back to step one to write one. So each test carries the proof that
    comes after it: reaching the moon proves the aiming, and the pebble in the
@@ -1760,7 +1761,7 @@ function tutorialTests(){
     () => bought || dockableAt(target),                                 // bring the high point inside docking range
     () => bought,                                                       // buy the pebble
     () => bought && !atTarget,                                          // climb back out
-    () => dockableAt('tessel'),                                         // and get home
+    () => dockableAt(CONST.START_PORT),                                 // and get home
   ];
 }
 

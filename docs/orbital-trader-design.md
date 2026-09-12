@@ -34,9 +34,9 @@ The game is top-down 2D with the Lamp fixed at the origin. All planets and moons
 
 The ship uses **patched conics**. At any moment it feels the gravity of exactly one body: the smallest sphere of influence (SOI) that contains it. When the ship crosses an SOI boundary, its position and velocity are converted into the new body's reference frame (by adding or subtracting that body's velocity), and the new body becomes its sole gravitational influence.
 
-Each body has a **fixed, hand-tuned SOI radius** rather than one calculated from mass and distance. This keeps the math simple, lets designers tune approaches for fun, and avoids edge cases such as a moon drifting outside an eccentric planet's shrinking SOI (relevant for Tagalong around Wanderwell).
+No body carries a hand-written SOI radius. A reach is `a · (mu/mu_parent)^(2/5)` — the standard patched-conic radius — computed from the body's own mass and orbit, so mass is the only knob and no table can quietly disagree with the physics. The invariant checker then proves what a hand-tuned table used to promise: that no moon ever leaves its parent's reach and that sibling moons keep their distance.
 
-Because the ship follows a single conic inside each SOI, trajectories can be solved analytically. That makes path prediction exact and cheap, and it keeps time warp stable at any speed. Retrograde orbits (Widdershins) require no special handling.
+Because the ship follows a single conic inside each SOI, trajectories can be solved analytically. That makes path prediction exact and cheap, and it keeps time warp stable at any speed. Retrograde orbits (Croak) require no special handling.
 
 ### 2.2 Maneuver Planning
 
@@ -58,9 +58,9 @@ Burns are **instantaneous impulses**. What you plan is exactly what you get, whi
 
 **Nothing lands.** Every harbour in the system is an orbit, and docking means matching one: you arrive by getting close enough and slow enough inside a port's **harbour mouth**, and the port's own lighters carry goods the rest of the way down. A world's surface is scenery and a crash hazard, never a destination.
 
-This is a scope decision as much as a fictional one. Landing would need a second control scheme, a second set of physics, and a second art problem, and it would buy nothing the orbital game does not already have. The fiction absorbs it easily: Tessel is an ocean of floating harbour cities that meet ships in orbit, the cats cannot survive a heavy world at all, and the frogs' balloon villages have no ground under them either.
+This is a scope decision as much as a fictional one. Landing would need a second control scheme, a second set of physics, and a second art problem, and it would buy nothing the orbital game does not already have. The fiction absorbs it easily: Tassel is an ocean of floating harbour cities that meet ships in orbit, the cats cannot survive a heavy world at all, and the frogs' balloon villages have no ground under them either.
 
-The player therefore **starts in orbit**, not moored. A new game opens with the ship already going round Tessel — *low* round it, high point under one planet-diameter of altitude, so the ocean fills the chart and visibly turns underneath — with a road drawn ahead of it and a crate in the hold. There is nothing to cast off from and nothing to press before the chart means something. The harbour itself is higher up, at the docking altitude every other orbit in the game is measured from; tying up and casting off again is what puts a ship there.
+The player therefore **starts in orbit**, not moored. A new game opens with the ship already going round Tassel — *low* round it, high point under one planet-diameter of altitude, so the ocean fills the chart and visibly turns underneath — with a road drawn ahead of it and a crate in the hold. There is nothing to cast off from and nothing to press before the chart means something. The harbour itself is higher up, at the docking altitude every other orbit in the game is measured from; tying up and casting off again is what puts a ship there.
 
 ### 2.3.1 Forgiveness Systems
 
@@ -74,14 +74,14 @@ The skill curve is built into the physics rather than layered on top.
 
 | Stage | Technique | In-world name | Payoff |
 |---|---|---|---|
-| Opening | Tessel's low opening orbit out to Pip, its nearest moon | The first delivery | One tap, one push, one crossing: the whole game in five minutes |
-| Beginner | Moon-to-moon hops around Tessel | "Hopping the rafts" | Learning SOI transitions in a safe space |
+| Opening | Tassel's low opening orbit out to Slate, its nearest moon | The first errand | One tap, one push, one crossing: the whole game in five minutes |
+| Beginner | Moon-to-moon hops around Tassel | "Hopping the moons" | Learning SOI transitions in a safe space |
 | Beginner | Hohmann transfers | "The slow road" | Cheap, reliable, slow |
 | Intermediate | Faster direct transfers | "Running hot" | Speed at a fuel cost |
-| Intermediate | Rendezvous and intercepts | "Matching" | Access to moving targets (other ships, Wanderwell) |
+| Intermediate | Rendezvous and intercepts | "Matching" | Access to moving targets (the belt havens, other ships) |
 | Advanced | Gravity assists at Grumm | "Borrowing from Grumm" | Fast *and* cheap routes to the outer system |
 | Advanced | Aerobraking (requires heat shield) | "Skimming" | Free braking at atmospheric worlds |
-| Expert | Comet intercepts, Chorus routes | "Catching Merrow" | Rare goods, secrets, bragging rights |
+| Expert | The long haul to the Maw | "The deep dark" | Rare goods, secrets, bragging rights |
 
 ### 2.5 Fuel and Delta-V
 
@@ -91,9 +91,9 @@ Fuel is the only resource for movement and is displayed to the player as a delta
 
 ### 2.6 Time
 
-The game clock runs continuously, and every body moves along its orbit as time passes. Time is the second currency alongside fuel. Time pressure comes from perishable cargo, passenger deadlines, and scheduled orbital events such as Wanderwell's periapsis market and Merrow's Comet's passes.
+The game clock runs continuously, and every body moves along its orbit as time passes. Time is the second currency alongside fuel. Time pressure comes from perishable cargo, passenger deadlines, and scheduled orbital events. (A port can keep seasonal hours; nothing in the sky uses that yet.)
 
-**The sky is built at KSP's scale.** Every body is a tenth of the size a real one would be and many times denser, which is the trick that makes a world a place rather than a backdrop: Tessel is 498 km across, has 9.25 m/s² at the ground, air to 70 km, and a reach of 116,500 km — a Kerbin. A new game opens at 75 km, five above the air, on an orbit that takes thirty minutes of game time. Local flying is correspondingly cheap: the first lesson is a quarter of a km/s. Interplanetary flying is *not*, because a small world gives almost no gravity assist on departure or arrival, and that trade is deliberate.
+**The sky is built at KSP's scale.** Every body is a tenth of the size a real one would be and many times denser, which is the trick that makes a world a place rather than a backdrop: Tassel is 498 km across, has 9.25 m/s² at the ground, air to 70 km, and a reach of 116,500 km — a Kerbin. A new game opens at 75 km, five above the air, on an orbit that takes thirty minutes of game time. Local flying is correspondingly cheap: the first lesson is a quarter of a km/s. Interplanetary flying is *not*, because a small world gives almost no gravity assist on departure or arrival, and that trade is deliberate.
 
 **The clock is slow on purpose.** At ×1, one lap of that opening orbit takes **ten real minutes**. That is the fastest thing in the sky and everything else is slower still, so at ×1 almost nothing else appears to move. That is the intended reading: an orbit is a place you are, not an animation you watch. Watching the sky turn is what skipping is for.
 
@@ -138,7 +138,7 @@ Trade is built around one central tension: **time versus fuel.**
 | Passengers | Travelers of all four species | Pay for speed or comfort, often with special requests. |
 | Climate-sensitive | Frog goods, frog passengers | Require refrigeration (a gate-key upgrade). |
 | Luxuries | Inner-world crafts, frog songs | High value, driven by species demand. |
-| Relics | Chorus artifacts | Rare, often tied to story and upgrades. |
+| Relics | Builder artifacts | Rare, often tied to story and upgrades. |
 
 Markets respond to the sky. **Alignment-driven prices:** when two worlds swing close, trade between them floods and prices drop, while worlds far from their partners grow hungry for goods. **Market saturation:** selling the same good repeatedly in one market lowers its price, which discourages grinding a single loop. **Species demand:** each people wants what only others produce, so trade becomes a way of connecting cultures.
 
@@ -155,9 +155,9 @@ Upgrades fall into two categories.
 | Upgrade | Unlocks | Likely source |
 |---|---|---|
 | Heat shield | Aerobraking at Grumm | Emberkin engine smiths, Cinder |
-| Refrigeration | Frog passengers, cold-chain cargo | Otter shipwrights, Pip |
-| Stealth system | Slipping past cat tolls in the Scatter | Chorus relic, Hush's dampener |
-| Long-range sensors | Comet tracking, Arc salvage sites | Cat salvagers, the Arc |
+| Refrigeration | Frog passengers, cold-chain cargo | Otter shipwrights, Slate |
+| Stealth system | Slipping past cat tolls in the Belt | A Builder dampener, fitted on Whisker |
+| Long-range sensors | Arc salvage sites, quiet Belt work | Cat salvagers, the Arc |
 
 The guiding principle is that upgrades should **expand options, not erase challenge.**
 
@@ -175,7 +175,7 @@ The design leans on Self-Determination Theory, which holds that people stay enga
 
 **Relatedness** comes from the four peoples. Players travel to see who's there, and species remember how you've treated them.
 
-**Curiosity** drives exploration. Near worlds hint at far ones (frog songs about Chime, corvid-era rumors about the Far Lantern), creating information gaps players want to close.
+**Curiosity** drives exploration. Near worlds hint at far ones (the scholars on Glass, rumours about the Maw), creating information gaps players want to close.
 
 ### 3.2 Guardrails
 
@@ -189,20 +189,19 @@ One goal should always be in sight at each timescale.
 
 | Layer | Examples |
 |---|---|
-| Opening | One crate, already in the hold, for Pip |
+| Opening | One pebble, bought on Slate, for your aunt |
 | Short-term | This delivery, this passenger, this transfer window |
 | Medium-term | A new upgrade, a relationship with a people, reaching a new region |
-| Long-term | The Chorus mystery and the Far Lantern |
+| Long-term | The Builders' mystery and the Maw |
 
 ---
 
 ## 4. Setting
 
-> **Status.** This section is the current setting. The game still flies the
-> earlier map, and so do sections 1–3 and 5–6 of this document. Nothing below
-> is implemented. §4.5 records which of the built bodies carry across, so the
-> implementation pass is a rename where it can be and a decision where it is
-> not.
+> **Status.** This section is the current setting, and the game now flies it.
+> §4.5 records what happened to the map that was there before. What is *not*
+> done is balance: the new ports carry no market rows yet, and the Δv ladder
+> out to Grumm and the Maw has not been re-tuned around the new spacing.
 
 ### 4.1 Tone
 
@@ -400,42 +399,50 @@ Four living species, one extinct. Each has one thing it is better at than anybod
 - Late-game destination
 - Final mystery
 
-### 4.5 What Carries Across
+### 4.5 What Carried Across
 
-Most of the built system survives the new setting under a different name, so
-the implementation is mostly a rename. This table is the part that is settled.
+The sky is sixteen bodies and one belt region. Four of the built worlds only
+changed their names, one moved, ten were dropped, and six were built new.
 
-| Built now | Becomes | Note |
+| Built before | Now | Note |
 |---|---|---|
 | The Lamp | **The Lamp** | unchanged |
 | Cinder | **Cinder** | unchanged; the Emberkin homeworld |
 | Tessel | **Tassel** | spelling only |
 | Pip | **Slate** | still the tutorial moon |
 | Bramble | **Moss** | |
-| Grumm | **Grumm** | keeps its name; it is "the Giant" only in description |
-| The Arc | **The Arc** | keeps its name, **moves outward to beyond the Belt** |
-| The Far Lantern | **The Maw** | |
+| Grumm | **Grumm** | keeps its name, and is now a port: the balloon docks |
+| The Arc | **The Arc** | keeps its name; moved out from 2.2 au to 2.7, beyond the Belt |
+| The Far Lantern | **The Maw** | the same place in the sky, a different thing to find |
 
-**Still to decide.** Ten built bodies have no new name yet — Wanderwell,
-Tagalong, Ledger, Claw Rock, Mossback, Lillimoor, Widdershins, Chime, Hush and
-Merrow's Comet — plus the Scatter, which is a belt region rather than a body
-and becomes the Belt. Against them stand seven new names with no built
-counterpart: Scorch, Veyra, Nail, Whisker, Brine, Glass and Haven.
+**Built new.** Scorch (Cinder's mining moon), Veyra (the wealthy Emberkin world
+at 0.6 au), Nail and Whisker (the two cat havens, at 2.15 and 2.38 au inside
+the Belt), and Brine, Glass, Croak and Haven (the four frog moons of Grumm).
+Croak runs retrograde, which is Widdershins' one idea kept.
 
-Some pair off on sight — Widdershins and **Croak** are both retrograde moons
-kept remote by the cost of reaching them — and some cannot, because the two
-maps are not the same shape. The new one has two cat settlements where the old
-has a single haven, two Emberkin worlds past Cinder where the old has a
-wandering colony and its pebble, and four frog moons where the old has three
-and a sleeping one. Four built bodies have nowhere obvious to go at all:
-Ledger (Tassel's third moon, where the new map has two), Chime and Hush (the
-old endgame, now the Maw's job), and Merrow's Comet. Nothing above is assumed.
+**Dropped.** Wanderwell, Tagalong, Ledger, Claw Rock, Mossback, Lillimoor,
+Widdershins, Chime, Hush and Merrow's Comet, with everything written for them:
+the periapsis festival, the comet bazaar, the banking raft, and the old endgame
+at Chime and Hush. The Maw does the endgame's job now. The Scatter, which was a
+belt region rather than a body, is the Belt, and it moved inward from 2.6–3.2
+au to 2.0–2.5 so the Arc could ride just outside it.
+
+**What moved with them.** The dampener used to be lying about at Hush and is
+now fitted, for money and no questions, on Whisker. The tow debt used to be
+owed to Ledger and is now owed to the harbour bank on Tassel. Goods whose
+producer was dropped were re-sourced rather than deleted, so the price list is
+the length it always was.
+
+**Saves.** A version 2 save names places that are not in the sky any more, so
+the save format is at version 3 and anything older is refused at the door.
 
 ---
 
 ## 5. Technical Notes
 
-Fixed SOI radii should be tuned so that no moon ever leaves its parent's SOI, and so that gravity-assist approaches at Grumm feel generous. The Arc and the Scatter need a decision on representation: the Scatter is likely decorative, with Claw Rock and a handful of named rocks as dockable bodies, while the Arc segment needs its own small SOI. Merrow's Comet has negligible gravity, so it may use a rendezvous zone instead of a true SOI.
+**Decided since the first draft.** Reaches are computed from mass rather than written down (2.1), and the invariant checker proves the promises a hand-tuned table used to make. The Belt is decorative — a field of drawn rocks — and the two cat havens inside it are massless rendezvous zones with a harbour mouth rather than bodies with a well, as are the Arc and the Maw: a pilot arrives at those by matching speeds, not by falling in.
+
+**Still to tune.** Gravity-assist approaches at Grumm, and the Δv ladder between the tanks now that the map has been respaced.
 
 ---
 
@@ -455,7 +462,7 @@ Open questions include how crew are recruited, how many the ship can carry, whet
 
 Coasting stretches are natural pacing gaps and the likely home for events. The guiding principle is that events should ask for **orbital decisions** where possible, not just text choices.
 
-Candidates from brainstorming include distress beacons (requiring a rendezvous), rival traders racing to the same market, stowaways in the hold, solar flares threatening sensitive cargo, hitchhikers on passing asteroids, cat toll intercepts in the Scatter (escapable through maneuvering), and letters or radio chatter that advance character stories mid-flight.
+Candidates from brainstorming include distress beacons (requiring a rendezvous), rival traders racing to the same market, stowaways in the hold, solar flares threatening sensitive cargo, hitchhikers on passing asteroids, cat toll intercepts in the Belt (escapable through maneuvering), and letters or radio chatter that advance character stories mid-flight.
 
 Open questions include event frequency, trigger conditions (location, cargo, reputation, time), and how events tie into species relationships.
 
@@ -465,7 +472,7 @@ Options for channeling competitive drives without combat include a named rival t
 
 ### 6.5 Ending and Long-Term Goal — TBD
 
-The Chorus mystery and the Far Lantern are the long-term hook, with breadcrumbs at the Arc, Chime, and Hush. Undecided: what the Far Lantern actually is, what the Chorus were and why they vanished, whether reaching the Lantern ends the game or opens a post-game, and how the frogs' songs and Chorus routes pay off.
+The Builders and the Maw are the long-term hook, with breadcrumbs at the Arc, on Whisker, and in the research station under the ice on Glass. Undecided: what the Builder station at the Maw is for, what the Builders were and why they vanished, whether reaching the Maw ends the game or opens a post-game, and how the frogs' songs pay off.
 
 ### 6.6 Art Direction — TBD
 
@@ -473,6 +480,6 @@ A fully hand-drawn navigation chart was considered and ruled out as unrealistic 
 
 ### 6.7 Open Technical Questions
 
-**Decided since the first draft**, and recorded above rather than here: burns are instantaneous impulses (2.2); the control is four buttons on two axes, reached by tapping the road (2.2); there is no landing and the game starts in orbit (2.3); the clock runs at ten real minutes to a lap of the low orbit the game opens in, with no warp ladder and skipping by pointing at a place (2.6); the chart is locked to the body the ship orbits and draws only the immediate orbit plus the next crossing (2.6.1); the opening mission is a single delivery to Pip.
+**Decided since the first draft**, and recorded above rather than here: burns are instantaneous impulses (2.2); the control is four buttons on two axes, reached by tapping the road (2.2); there is no landing and the game starts in orbit (2.3); the clock runs at ten real minutes to a lap of the low orbit the game opens in, with no warp ladder and skipping by pointing at a place (2.6); the chart is locked to the body the ship orbits and draws only the immediate orbit plus the next crossing (2.6.1); the opening mission is a single errand to Slate.
 
-**Still open.** Distance compression beyond the inner system needs prototyping. Docking-zone size and speed thresholds need tuning for the right level of forgiveness. The representation of belts, debris fields, and the comet (Section 5) needs a final decision. Whether landing is ever added — and if so, whether it is a third control scheme or a cutscene over an orbital rendezvous — is deferred, not refused.
+**Still open.** Distance compression beyond the inner system needs prototyping. Docking-zone size and speed thresholds need tuning for the right level of forgiveness. The representation of belts and debris fields (Section 5) is settled; what a player can *do* in the Belt beyond docking at the two havens is not. Whether landing is ever added — and if so, whether it is a third control scheme or a cutscene over an orbital rendezvous — is deferred, not refused.
