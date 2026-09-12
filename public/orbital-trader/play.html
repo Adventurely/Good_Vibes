@@ -780,7 +780,7 @@ function askSkip(t, what){
   if(!plan){ toast('That is not ahead of you.', 'bad'); return; }
   const place = whereAt(t);
   openModal(`<h2>Skip ahead?</h2>
-    <p>${esc(what ?? 'That point on your path')} is <b>${S.fmtDays(plan.days)}</b> from now${place ? `, in ${esc(place.name)}'s reach` : ''}.</p>
+    <p>${esc(what ?? 'That point on your path')} is <b>${S.fmtDays(plan.days)}</b> from now${place ? `, in ${esc(place.name)}'s gravity` : ''}.</p>
     <p class="lock">The clock will run itself there and stop: ${saySeconds(plan.seconds)} of waiting.${plan.capped ? ' That is as fast as the clock goes.' : ''}</p>
     <div class="btns"><button class="btn primary" id="m-go">Go</button><button class="btn ghost" id="m-stay">Close</button></div>`, m => {
     m.querySelector('#m-go').addEventListener('click', () => { closeModal(); skipTo(t); });
@@ -1167,7 +1167,7 @@ function market(){
   const p = PORTS[port];
   if(!S.portOpen(port, state.t)){
     const days = S.daysToPeriapsis(port, state.t);
-    return `<h2>${esc(S.portName(port))}</h2><p class="say">${esc(TEXT.events.wanderwellClosing)}</p><p>The colony stands empty. Kissing distance again in ${S.fmtDays(days)}. Tagalong keeps a thin market in the meantime.</p>`;
+    return `<h2>${esc(S.portName(port))}</h2><p class="say">${esc(TEXT.events.wanderwellClosing)}</p><p>The colony stands empty. Back at its low point in ${S.fmtDays(days)}. Tagalong keeps a thin market in the meantime.</p>`;
   }
   const lines = TEXT.ports[port]?.trade ?? [];
   const say = lines.length ? `<p class="say">${esc(lines[Math.floor(S.hash(port, Math.floor(state.t / 3)) * lines.length)])}</p>` : '';
@@ -1294,7 +1294,7 @@ function talk(){
   out += '<h3>The sky</h3>';
   const ww = S.daysToPeriapsis('wanderwell', state.t);
   const wr = norm(absState(world, 'wanderwell', state.t).r);
-  out += `<p>Wanderwell is ${wr.toFixed(2)} au out, ${S.portOpen('wanderwell', state.t) ? 'and the summer market is open' : `and reaches kissing distance in ${S.fmtDays(ww)}`}.</p>`;
+  out += `<p>Wanderwell is ${wr.toFixed(2)} au out, ${S.portOpen('wanderwell', state.t) ? 'and the summer market is open' : `and reaches its low point in ${S.fmtDays(ww)}`}.</p>`;
   if(state.keys.sensors) out += `<p>Merrow's Comet passes the Lamp in ${S.fmtDays(S.daysToPeriapsis('merrow', state.t))}.</p>`;
   out += `<h3>Glossary</h3>` + GLOSSARY.slice(0, 16).map(g => `<p><b>${esc(g.term)}</b> <span class="lock">(${esc(g.plain)})</span> — ${esc(g.tip)}</p>`).join('');
   return out;
@@ -1376,7 +1376,7 @@ function plan(){
   const cost = marks.reduce((a, m) => a + m.cost, 0);
   const short = cost > state.dv + 1e-9;
   if(!state.nodes.length){
-    out += '<p class="say">Nothing written down. Tap your road on the chart and choose <b>Plan a burn</b>.</p>';
+    out += '<p class="say">Nothing written down. Tap your path on the chart and choose <b>Plan a burn</b>.</p>';
   }else{
     out += `<p>These cost <b class="${short ? 'down' : ''}">${S.fmtKms(cost)}</b> of your ${S.fmtKms(state.dv)}.${short ? ' <span class="down">The tank will not cover it.</span>' : ''}</p>`;
     state.nodes.forEach((n, i) => {
@@ -1385,7 +1385,7 @@ function plan(){
       const fwd = Math.round(S.kms(n.prograde) * 1000), side = Math.round(S.kms(n.radial) * 1000);
       out += `<div class="node ${i === selectedNode ? 'sel' : ''}" data-act="selnode|${i}">
         <b>Burn ${i + 1}</b>
-        <small>in ${S.fmtDays(n.t - state.t)} · ${esc(frame)}'s reach · ${S.fmtKms(marks[i]?.cost ?? 0)}</small>
+        <small>in ${S.fmtDays(n.t - state.t)} · ${esc(frame)}'s gravity · ${S.fmtKms(marks[i]?.cost ?? 0)}</small>
         <small>${fwd >= 0 ? 'forward' : 'back'} ${Math.abs(fwd)} m/s · ${side >= 0 ? 'out' : 'in'} ${Math.abs(side)} m/s</small>
       </div>`;
     });
@@ -1410,7 +1410,7 @@ function aheadList(){
   for(const e of prediction.events){
     if(e.kind === 'soi'){
       const to = world.get(e.to), from = world.get(e.from);
-      lines.push({ t: e.t, html: `<p>${to.parent === from.id ? 'Into' : 'Out to'} ${esc(to.name)}'s reach in ${S.fmtDays(e.t - state.t)}. ${skip(e.t)}</p>` });
+      lines.push({ t: e.t, html: `<p>${to.parent === from.id ? 'Into' : 'Out to'} ${esc(to.name)}'s gravity in ${S.fmtDays(e.t - state.t)}. ${skip(e.t)}</p>` });
     }else if(e.kind === 'burn' && e.node.aero){
       lines.push({ t: e.t, html: `<p class="up">Air brake at ${esc(S.portName(e.node.body))}: shed ${S.fmtKms(e.magnitude)} in ${S.fmtDays(e.t - state.t)}. ${skip(e.t)}</p>` });
     }else if(e.kind === 'crash'){
@@ -1419,7 +1419,7 @@ function aheadList(){
   }
   const ic = prediction.intercept;
   if(ic) lines.push({ t: ic.t, html: ic.grazes
-    ? `<p class="down">This road hits ${esc(S.portName(ic.body))} in ${S.fmtDays(ic.t - state.t)}.</p>`
+    ? `<p class="down">This path hits ${esc(S.portName(ic.body))} in ${S.fmtDays(ic.t - state.t)}.</p>`
     : `<p class="${ic.inMouth ? 'up' : ''}">Closest approach to ${esc(S.portName(ic.body))}: ${fmtAu(ic.altitude)} at ${S.fmtKms(ic.speed)}, in ${S.fmtDays(ic.t - state.t)}.${ic.inMouth ? ' That is inside docking range.' : ''} ${skip(ic.t)}</p>` });
   lines.sort((a, b) => a.t - b.t);
   return '<h3>Ahead</h3>' + (lines.length
