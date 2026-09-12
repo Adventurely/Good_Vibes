@@ -66,6 +66,9 @@
   }
   #hud > *{ pointer-events:auto; }
   .stat{ display:flex; flex-direction:column; line-height:1.15; min-width:0; }
+  /* display:flex outranks the [hidden] default, so say it here or a hidden
+     stat keeps its space and its em dash. */
+  .stat[hidden]{ display:none; }
   .stat small{ font-size:.66rem; letter-spacing:.12em; text-transform:uppercase; color:var(--faint); }
   .stat b{ font-weight:600; font-size:.92rem; white-space:nowrap; }
   .stat.warn b{ color:var(--rose); }
@@ -447,7 +450,7 @@
   <div class="stat" id="h-dv-wrap"><small>Fuel</small><b id="h-dv">—</b><div id="dvbar"><i id="h-dvfill"></i></div></div>
   <div class="stat"><small>Coin</small><b id="h-money">—</b></div>
   <div class="stat"><small>Hold</small><b id="h-hold">—</b></div>
-  <div class="stat"><small>Clock</small><b id="h-warp">—</b></div>
+  <div class="stat" id="clock-stat" hidden><small>Clock</small><b id="h-warp">—</b></div>
   <div class="stat" id="where"><small>Where</small><b id="h-where">—</b><span id="dockhint"></span></div>
 </header>
 <a id="back" href="./">&larr; title</a>
@@ -705,9 +708,15 @@ function renderHud(docking){
   $('h-hold').textContent = `${S.usedUnits(state)} / ${S.holdUnits(state)}`;
   /* The clock says what it is doing, not what rung it is on: held, running,
      or running itself somewhere with the seconds left to sit through. */
-  $('h-warp').textContent = state.paused ? 'held'
+  /* The clock only speaks up when it is doing something worth saying. A
+     running clock is the ordinary state of the game and "running" was a word
+     that never changed anything; held and skipping are the two a pilot has to
+     know about, so the stat appears for those and is not there otherwise. */
+  const clockWord = state.paused ? 'held'
     : warpTarget != null ? `skipping · ${Math.max(1, Math.round((warpTarget - state.t) / (CONST.BASE_RATE_DAYS_PER_SEC * S.warpRate(state))))}s`
-    : 'running';
+    : null;
+  $('clock-stat').hidden = clockWord == null;
+  if(clockWord != null) $('h-warp').textContent = clockWord;
   const b = world.get(state.ship.body);
   $('h-where').textContent = state.dockedAt ? `Docked at ${S.portName(state.dockedAt)}` : `In ${b.name}'s gravity`;
   const hint = $('dockhint');

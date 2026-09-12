@@ -466,7 +466,11 @@ function drawBodies(chart, view, pos, t){
     if(rpx >= 3.5){
       ctx.save();
       ctx.beginPath(); ctx.arc(p[0], p[1], rpx, 0, Math.PI * 2); ctx.clip();
-      drew = drawSprite(ctx, b.id, p[0], p[1], rpx * 2, alpha);
+      /* An eighth over the mask, which is one pixel of a sixteen-pixel
+         sprite: the art's rim is jagged at that scale and a disc drawn exactly
+         to the clip leaves slivers of sky showing round the edge. The clip is
+         still the radius, so the silhouette is still the surface. */
+      drew = drawSprite(ctx, b.id, p[0], p[1], rpx * 2.25, alpha);
       ctx.restore();
     }
     if(!drew){
