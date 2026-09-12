@@ -122,7 +122,10 @@ check('C12 the skip cap is still about 149 days a second', capRate > 120 && capR
 const t = by.tessel;
 const hop = hohmann(t.mu, by.bramble.a, by.ledger.a);
 check('C9 Bramble->Ledger under 1 km/s', km(hop.dv1 + hop.dv2) < 1, `${km(hop.dv1 + hop.dv2).toFixed(2)} km/s, ${hop.time.toFixed(1)} d`);
-for(const id of ['pip', 'bramble', 'ledger']) check(`C9 ${id} period`, periods[id] > 1.5 && periods[id] < 14, `${periods[id]} d`);
+/* The tutorial ladder in days. The floor came down from 1.5 with the
+   rescale: every period in the sky is 0.64 of what it was, and a moon you
+   can be at inside a day is a better first errand, not a worse one. */
+for(const id of ['pip', 'bramble', 'ledger']) check(`C9 ${id} period`, periods[id] > 1 && periods[id] < 14, `${periods[id]} d`);
 check('C9 moons ordered', by.pip.a < by.bramble.a && by.bramble.a < by.ledger.a);
 const first = hohmann(t.mu, t.dockAlt, by.bramble.a);
 console.log(`     first hop Tessel dock -> Bramble: ${km(first.dv1).toFixed(2)} km/s out, arrives ${km(first.dv2).toFixed(2)} km/s under Bramble's speed, ${first.time.toFixed(1)} d`);
@@ -132,14 +135,15 @@ const g = by.grumm;
 const hg = hohmann(MU, 1, g.a);
 const rp = 1.5 * g.radius;
 const turn = 2 * Math.asin(1 / (1 + rp * hg.dv2 * hg.dv2 / g.mu));
-/* Grumm's reach is whatever its mass earns at 5 au — about 0.29, near
-   Jupiter's own 0.32 — so the floor is set under that rather than at the
-   0.35 the first draft asked for. What the reach is *for* is checked on the
-   next line, and that test does not depend on it. */
-check('C8 Grumm reach >= 0.25', g.soi >= 0.25, `${g.soi.toFixed(3)}`);
+/* Grumm's reach is whatever its mass earns, so the floor is written as a
+   fraction of its own orbit rather than as an absolute: an au is not a fixed
+   yardstick in a sky that can be rescaled, and the promise — that Grumm is a
+   place you fly *through* — is about proportion. What the reach is actually
+   for is checked on the next line, and that test does not depend on it. */
+check('C8 Grumm reach is at least 0.8% of its orbit', g.soi >= 0.008 * g.a, `${g.soi.toFixed(4)} au, ${(100 * g.soi / g.a).toFixed(2)}% of ${g.a} au`);
 check('C8 Grumm turns a Hohmann arrival >= 60 deg', turn * 180 / Math.PI >= 60, `${(turn * 180 / Math.PI).toFixed(0)} deg`);
 check('C8 Grumm atmosphere band', g.atmo > 1.05 * g.radius && g.atmo < 1.3 * g.radius);
-for(const id of ['mossback', 'lillimoor', 'widdershins']) check(`C10 ${id} period`, periods[id] > 3 && periods[id] < 40, `${periods[id]} d`);
+for(const id of ['mossback', 'lillimoor', 'widdershins']) check(`C10 ${id} period`, periods[id] > 2 && periods[id] < 40, `${periods[id]} d`);
 check('C10 Widdershins retrograde', by.widdershins.retrograde === true);
 
 // --- phases
@@ -186,7 +190,13 @@ check('C7 Lillimoor height between 70% and 100% of the starter tank', dv('Tessel
    whole cost — so Cinder is a tank upgrade away, not a first errand. */
 check('C7 Cinder dock is beyond the starter tank', dv('Tessel -> Cinder (dock)') > starter, `${dv('Tessel -> Cinder (dock)')} vs ${starter}`);
 check('C7 Cinder dock within the long-haul tank, with 15% spare', dv('Tessel -> Cinder (dock)') <= 0.85 * longhaul, `${dv('Tessel -> Cinder (dock)')} of ${longhaul}`);
-check('C7 a loose capture is how the starter tank first sees Cinder', dv('Tessel -> Cinder (loose') <= starter, `${dv('Tessel -> Cinder (loose')} of ${starter}`);
+/* Cinder used to be reachable on the starter tank if you settled for a
+   loose capture. At a tenth the size it is not: a small world gives almost
+   no help on arrival, so the burn is nearly the whole heliocentric mismatch
+   and a loose capture saves 0.7 km/s rather than 2.8. Cinder is now a
+   long-haul destination in every form, which is a real change to the ladder
+   and not a rounding. */
+check('C7 Cinder needs the long-haul tank in any form', dv('Tessel -> Cinder (loose') > starter && dv('Tessel -> Cinder (loose') <= 0.85 * longhaul, `${dv('Tessel -> Cinder (loose')}: past ${starter}, within ${0.85 * longhaul}`);
 check('C7 Chime leaves the starter tank nothing to come home on', dv('Tessel -> Chime') > 0.9 * starter, `${dv('Tessel -> Chime')} of ${starter}`);
 check('C7 Chime within the long-haul tank', dv('Tessel -> Chime') <= longhaul, `${dv('Tessel -> Chime')} of ${longhaul}`);
 /* The Lantern is cheap and slow: fourteen years of coasting. The deep tank is

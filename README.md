@@ -1743,7 +1743,8 @@ timestep anywhere, and nothing tunnels through a small moon at high warp.
 | Time | days (Tessel's year is 360 of them) |
 | Speed, Δv | au/day inside; 1 au/day shows as 1706 km/s, so Tessel's orbit reads 29.8 km/s |
 | Fuel | *is* the Δv budget. A burn subtracts its own size. No mass, no rocket equation |
-| Clock | ×1 is 0.0000990491876 days a second: ten real minutes to a lap of the low orbit a new game opens in over Tessel |
+| Clock | ×1 is 0.0000347222222 days a second: ten real minutes to a lap of the 75 km orbit a new game opens in over Tessel, which takes 30 minutes of game time |
+| Scale | KSP's, not ours: every body is a tenth of real size and many times denser. Tessel is 498 km across with 9.25 m/s² at the ground, air to 70 km, and a reach of 116,500 km |
 
 ### Aiming
 

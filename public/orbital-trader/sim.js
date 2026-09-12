@@ -152,7 +152,11 @@ export function calendar(t){
 }
 export function fmtDays(d){
   if(!Number.isFinite(d)) return '—';
-  if(d < 1) return `${Math.max(1, Math.round(d * 24))} h`;
+  /* Minutes, now that there are things worth counting in them: at a tenth the
+     size a low orbit is half an hour, and "1 h" is not what a pilot flying it
+     wants to be told. */
+  if(d < 1 / 16) return `${Math.max(1, Math.round(d * 1440))} min`;
+  if(d < 1) return `${(d * 24).toFixed(d < 1 / 4 ? 1 : 0)} h`;
   if(d < 60) return `${d.toFixed(d < 10 ? 1 : 0)} d`;
   if(d < CONST.YEAR_DAYS * 2) return `${Math.round(d)} d`;
   return `${(d / CONST.YEAR_DAYS).toFixed(1)} y`;
@@ -1269,14 +1273,20 @@ export function kiss(state){
   if(Math.abs(el.h) < 1e-14 || el.rp <= b.radius * 0.02){
     const speed = norm(state.ship.v);
     const parked = Math.sqrt(b.mu / Math.max(norm(state.ship.r), b.radius));
-    return { port: b.id, t: state.t + 0.01, distance: 0, speed, over: Math.max(0, speed - (b.dockSpeed + parked)), inMouth: true, crashes: true };
+    return { port: b.id, t: state.t + 0.01, distance: 0, speed, over: Math.max(0, speed - (b.dockSpeed + parked)), ra: Infinity, fits: false, inMouth: true, crashes: true };
   }
   const tp = timeToAnomaly(b.mu, state.ship.r, state.ship.v, 0);
   if(tp == null) return null;
   const at = propagate(b.mu, state.ship.r, state.ship.v, tp);
   const speed = norm(at.v);
   const parked = Math.sqrt(b.mu / Math.max(el.rp, b.radius));
-  return { port: b.id, t: state.t + tp, distance: el.rp, speed, over: Math.max(0, speed - (b.dockSpeed + parked)), inMouth: el.rp <= b.zoneRadius, crashes: el.rp <= b.radius };
+  /* `over` is a speed and the harbour is not: tying up asks for the far side
+     of the orbit to be inside the mouth. On a small moon those two part
+     company — dockSpeed is half a km/s and a moon's whole circular speed is a
+     fifth of that, so a ship can be "slow enough" on an ellipse five times
+     too wide. `fits` is the question the harbour actually asks. */
+  const fits = Number.isFinite(el.ra) && el.ra <= (b.zoneRadius ?? Infinity);
+  return { port: b.id, t: state.t + tp, distance: el.rp, speed, over: Math.max(0, speed - (b.dockSpeed + parked)), ra: el.ra, fits, inMouth: el.rp <= b.zoneRadius, crashes: el.rp <= b.radius };
 }
 
 /* Lift the kiss out of the ground. An approach whose periapsis is inside the
@@ -1362,7 +1372,7 @@ export function brakeAtKiss(state){
   const k = kiss(state);
   // A path through the world is not a path to it: lift it first.
   if(k && k.crashes) return raiseKiss(state);
-  if(k && k.inMouth && !k.crashes && k.over > 0 && k.t > state.t + MIN_LEAD) return brakeAt(state, k.port, k.t);
+  if(k && k.inMouth && !k.crashes && (k.over > 0 || !k.fits) && k.t > state.t + MIN_LEAD) return brakeAt(state, k.port, k.t);
   const st = dockingStatus(state);
   /* As soon as a mark may be written at all: a ship crossing a harbour mouth
      at speed has no more notice than that to give. The floor is MIN_LEAD and
@@ -1389,7 +1399,13 @@ function brakeAt(state, portId, t){
      its leisure. The difference is a few tens of metres a second. */
   const parked = b.mu > 0 ? Math.sqrt(b.mu / Math.max(gap, b.radius)) : 0;
   const target = parked;
-  if(speed <= target + b.dockSpeed * 0.25) return -1;
+  /* Near enough to a circle already, and the harbour agrees: nothing to do.
+     The second half matters — a ship inside the speed tolerance can still be
+     on an ellipse whose far side is outside the mouth, and declining there is
+     how the tutorial used to run out of things to offer. */
+  const wide = b.mu > 0
+    && !(elementsFromState(b.mu, sub(s.r, port.r), rel).ra <= (b.zoneRadius ?? Infinity));
+  if(speed <= target + b.dockSpeed * 0.25 && !wide) return -1;
   const dv = scale(unit(rel), -(speed - target));
   const parts = nodeFromVector(s.r, s.v, dv);
   if(!parts) return -1;
