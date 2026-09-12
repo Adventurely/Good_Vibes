@@ -1362,11 +1362,13 @@ export function brakeAtKiss(state){
   const k = kiss(state);
   // A path through the world is not a path to it: lift it first.
   if(k && k.crashes) return raiseKiss(state);
-  if(k && k.inMouth && !k.crashes && k.over > 0 && k.t > state.t + 0.02) return brakeAt(state, k.port, k.t);
+  if(k && k.inMouth && !k.crashes && k.over > 0 && k.t > state.t + MIN_LEAD) return brakeAt(state, k.port, k.t);
   const st = dockingStatus(state);
-  // Fourteen minutes' notice rather than an hour: a ship crossing a harbour
-  // mouth at speed does not have an hour.
-  if(st && st.inZone && !st.ok) return brakeAt(state, st.port, state.t + 0.01);
+  /* As soon as a mark may be written at all: a ship crossing a harbour mouth
+     at speed has no more notice than that to give. The floor is MIN_LEAD and
+     not a number of its own, because a mark nearer than MIN_LEAD is refused
+     by addNode — which is how this quietly offered nothing at all. */
+  if(st && st.inZone && !st.ok) return brakeAt(state, st.port, state.t + MIN_LEAD * 1.05);
   return -1;
 }
 

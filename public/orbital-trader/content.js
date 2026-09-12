@@ -67,12 +67,33 @@ const normaliseSpecies = s => {
   return s;
 };
 
+/* How far a world's gravity is the one that matters: the sphere of influence,
+ * which is not a design number but a consequence of how heavy the thing is.
+ *
+ *     r_soi = a · (m / M)^(2/5)
+ *
+ * — the standard patched-conic radius, with `a` the body's own orbit about
+ * its parent and m/M the mass ratio between them. It is computed here rather
+ * than written into the tables so that mass is the only knob: make a world
+ * heavier and its reach grows on its own, and no table can quietly disagree
+ * with the physics it is supposed to describe. Masses are `mu` (GM), so the
+ * ratio is a ratio of mu and the G cancels.
+ *
+ * A thing with no mass, or nothing to go round, has no reach: the star, and
+ * the drifting zones — Claw Rock, the comet, the Lantern — which are places
+ * you match speeds with rather than fall towards. */
+export function soiRadius(mu, a, parentMu){
+  if(!(mu > 0) || !(a > 0) || !(parentMu > 0)) return null;
+  return a * Math.pow(mu / parentMu, 2 / 5);
+}
+
+const rawMu = Object.fromEntries(TUNING.bodies.map(b => [b.id, b.mu ?? 0]));
 export const BODIES = TUNING.bodies.map(b => ({
   ...b,
   species: normaliseSpecies(b.species),
   e: b.e ?? 0, omega: b.omega ?? 0, M0: b.M0 ?? 0, retrograde: !!b.retrograde,
   mu: b.mu ?? 0,
-  soi: b.soi ?? null,
+  soi: soiRadius(b.mu ?? 0, b.a ?? 0, rawMu[b.parent] ?? 0),
   colour: BODY_COLOURS[b.id] ?? null,
 }));
 

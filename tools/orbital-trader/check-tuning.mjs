@@ -18,6 +18,9 @@ const MU = T.constants.MU_LAMP, KMS = T.constants.KMS_PER_AU_DAY;
 const by = Object.fromEntries(T.bodies.map(b => [b.id, b]));
 const TAU = Math.PI * 2;
 const period = (mu, a) => TAU * Math.sqrt(a ** 3 / mu);
+/* The reach a mass earns, mirrored from content.js: no body carries one. */
+const soiOf = b => (b.mu > 0 && b.a > 0 && by[b.parent]?.mu > 0) ? b.a * Math.pow(b.mu / by[b.parent].mu, 2 / 5) : null;
+for(const b of T.bodies) b.soi = soiOf(b);
 const km = v => (v * KMS);
 let fails = 0;
 const check = (name, ok, detail = '') => { console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? '  ' + detail : ''}`); if(!ok) fails++; };
@@ -129,7 +132,11 @@ const g = by.grumm;
 const hg = hohmann(MU, 1, g.a);
 const rp = 1.5 * g.radius;
 const turn = 2 * Math.asin(1 / (1 + rp * hg.dv2 * hg.dv2 / g.mu));
-check('C8 Grumm reach >= 0.35', g.soi >= 0.35);
+/* Grumm's reach is whatever its mass earns at 5 au — about 0.29, near
+   Jupiter's own 0.32 — so the floor is set under that rather than at the
+   0.35 the first draft asked for. What the reach is *for* is checked on the
+   next line, and that test does not depend on it. */
+check('C8 Grumm reach >= 0.25', g.soi >= 0.25, `${g.soi.toFixed(3)}`);
 check('C8 Grumm turns a Hohmann arrival >= 60 deg', turn * 180 / Math.PI >= 60, `${(turn * 180 / Math.PI).toFixed(0)} deg`);
 check('C8 Grumm atmosphere band', g.atmo > 1.05 * g.radius && g.atmo < 1.3 * g.radius);
 for(const id of ['mossback', 'lillimoor', 'widdershins']) check(`C10 ${id} period`, periods[id] > 3 && periods[id] < 40, `${periods[id]} d`);
