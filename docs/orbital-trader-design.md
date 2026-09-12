@@ -198,11 +198,11 @@ One goal should always be in sight at each timescale.
 
 ## 4. Setting
 
-> **Status.** This section is the current setting. Sections 1–3 and 5–6 still
-> name bodies from the earlier map (Pip, Bramble, Ledger, Grumm, Wanderwell,
-> Chime, Hush, Merrow's Comet, the Scatter, the Far Lantern, the Chorus) and
-> have not been brought across yet, and neither has the game itself. Nothing
-> below is implemented.
+> **Status.** This section is the current setting. The game still flies the
+> earlier map, and so do sections 1–3 and 5–6 of this document. Nothing below
+> is implemented. §4.5 records which of the built bodies carry across, so the
+> implementation pass is a rename where it can be and a decision where it is
+> not.
 
 ### 4.1 Tone
 
@@ -269,7 +269,7 @@ Four living species, one extinct. Each has one thing it is better at than anybod
 | **Nail** | Cat settlement | Friendly, scrappy, communal |
 | **Whisker** | Cat settlement | Shady, illicit, dangerous |
 | **The Arc** | Ancient station | Enormous, abandoned, mysterious |
-| **The Giant** | Gas giant | Vast, stormy, inhabited |
+| **Grumm** | Gas giant | Vast, stormy, inhabited |
 | **Brine** | Frog moon | Ammonia seas, chemical-rich |
 | **Glass** | Frog moon | Icy, scientific, subterranean |
 | **Croak** | Frog moon | Retrograde, isolated, spiritual |
@@ -353,7 +353,7 @@ Four living species, one extinct. Each has one thing it is better at than anybod
 
 #### Frog System
 
-**The Giant.** Vast, stormy, atmospheric.
+**Grumm.** Vast, stormy, atmospheric.
 
 - Floating cities
 - Frog civilization
@@ -399,6 +399,37 @@ Four living species, one extinct. Each has one thing it is better at than anybod
 - Unexplained orbit
 - Late-game destination
 - Final mystery
+
+### 4.5 What Carries Across
+
+Most of the built system survives the new setting under a different name, so
+the implementation is mostly a rename. This table is the part that is settled.
+
+| Built now | Becomes | Note |
+|---|---|---|
+| The Lamp | **The Lamp** | unchanged |
+| Cinder | **Cinder** | unchanged; the Emberkin homeworld |
+| Tessel | **Tassel** | spelling only |
+| Pip | **Slate** | still the tutorial moon |
+| Bramble | **Moss** | |
+| Grumm | **Grumm** | keeps its name; it is "the Giant" only in description |
+| The Arc | **The Arc** | keeps its name, **moves outward to beyond the Belt** |
+| The Far Lantern | **The Maw** | |
+
+**Still to decide.** Ten built bodies have no new name yet — Wanderwell,
+Tagalong, Ledger, Claw Rock, Mossback, Lillimoor, Widdershins, Chime, Hush and
+Merrow's Comet — plus the Scatter, which is a belt region rather than a body
+and becomes the Belt. Against them stand seven new names with no built
+counterpart: Scorch, Veyra, Nail, Whisker, Brine, Glass and Haven.
+
+Some pair off on sight — Widdershins and **Croak** are both retrograde moons
+kept remote by the cost of reaching them — and some cannot, because the two
+maps are not the same shape. The new one has two cat settlements where the old
+has a single haven, two Emberkin worlds past Cinder where the old has a
+wandering colony and its pebble, and four frog moons where the old has three
+and a sleeping one. Four built bodies have nowhere obvious to go at all:
+Ledger (Tassel's third moon, where the new map has two), Chime and Hush (the
+old endgame, now the Maw's job), and Merrow's Comet. Nothing above is assumed.
 
 ---
 
