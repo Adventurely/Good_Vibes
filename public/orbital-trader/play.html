@@ -126,7 +126,7 @@
   #tabbody h3{ margin:1rem 0 .35rem; font-size:.72rem; letter-spacing:.14em; text-transform:uppercase; color:var(--faint); }
   #tabbody p{ margin:.3rem 0; color:var(--dim); }
   #tabbody p.say{ color:var(--ink); font-style:italic; border-left:2px solid var(--line-2); padding-left:.6rem; }
-  .sp-emberkin{ color:var(--emberkin); } .sp-otter{ color:var(--otter); } .sp-cat{ color:var(--cat); } .sp-frog{ color:var(--frog); } .sp-chorus{ color:var(--chorus); } .sp-mixed{ color:var(--gold-ink); }
+  .sp-emberkin{ color:var(--emberkin); } .sp-otter{ color:var(--otter); } .sp-cat{ color:var(--cat); } .sp-frog{ color:var(--frog); } .sp-builders{ color:var(--chorus); } .sp-mixed{ color:var(--gold-ink); }
   #grab{ display:none; }
 
   /* Two lines, always: name and price on the first, the description and the
@@ -273,7 +273,7 @@
   #tabbody h3{ margin:1rem 0 .35rem; font-size:.72rem; letter-spacing:.14em; text-transform:uppercase; color:var(--faint); }
   #tabbody p{ margin:.3rem 0; color:var(--dim); }
   #tabbody p.say{ color:var(--ink); font-style:italic; border-left:2px solid var(--line-2); padding-left:.6rem; }
-  .sp-emberkin{ color:var(--emberkin); } .sp-otter{ color:var(--otter); } .sp-cat{ color:var(--cat); } .sp-frog{ color:var(--frog); } .sp-chorus{ color:var(--chorus); } .sp-mixed{ color:var(--gold-ink); }
+  .sp-emberkin{ color:var(--emberkin); } .sp-otter{ color:var(--otter); } .sp-cat{ color:var(--cat); } .sp-frog{ color:var(--frog); } .sp-builders{ color:var(--chorus); } .sp-mixed{ color:var(--gold-ink); }
   #grab{ display:none; }
 
   /* Two lines, always: name and price on the first, the description and the
@@ -1633,14 +1633,21 @@ function doDock(){
   tutorialCheck();
   save();
 }
-// The dock button lives in the HUD hint: clicking the hint docks when it says so.
-$('dockhint').addEventListener('click', () => { const d = S.dockingStatus(state); if(d?.ok) doDock(); });
+/* Three ways in, and all three have to work. The anchor in the chart controls
+   is the one the lesson names and the only one a player will find on a phone;
+   it appeared beside the other view buttons without ever being wired to
+   anything, so it lit up the moment a harbour would take you and then did
+   nothing when you pressed it. The HUD hint docks too, because it is the thing
+   that says the harbour will take your lines, and `d` because a keyboard is a
+   keyboard. */
+const dockIfWeCan = () => { const d = S.dockingStatus(state); if(d?.ok) doDock(); };
+$('dock-go').addEventListener('click', dockIfWeCan);
+$('dockhint').addEventListener('click', dockIfWeCan);
 $('dockhint').style.cursor = 'pointer';
 addEventListener('keydown', e => {
   if(e.key !== 'd' || e.ctrlKey || e.metaKey || e.altKey) return;
   if($('modal').open || typing(e)) return;
-  const d = S.dockingStatus(state);
-  if(d?.ok) doDock();
+  dockIfWeCan();
 });
 
 /* ------------------------------------------------------------- modals */

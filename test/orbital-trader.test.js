@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
 
 import * as O from '../public/orbital-trader/orbit.js';
 import {
@@ -256,6 +257,27 @@ test('the text has every line the game asks for', () => {
   // One ship, one name: she is the Skipper.
   assert.deepEqual(TEXT.shipNames, ['Skipper']);
   assert.ok(TEXT.captainLines.onStranded.length >= 3);
+});
+
+/* --------------------------------------------------------------- page */
+
+/* The page is not importable under Node — it is a document with a module in
+ * it — so what can be checked here is the wiring, as text. That is enough to
+ * catch the failure this test was written for: the anchor in the chart
+ * controls was styled, given a tooltip, and shown the moment a harbour would
+ * take your lines, and nothing anywhere listened for a click on it. The
+ * button lit up and did nothing, and only the `d` key and the HUD hint
+ * actually docked. */
+test('every button the page draws for itself has something listening to it', () => {
+  const html = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  const ids = [...html.matchAll(/<button id="([a-z0-9-]+)"/g)].map(m => m[1]);
+  assert.ok(ids.length >= 4, 'no buttons found: the page has changed shape');
+  for(const id of ids){
+    const wired = new RegExp(`\\$\\('${id}'\\)\\.addEventListener\\('click'`).test(html);
+    assert.ok(wired, `#${id} is drawn but nothing listens for a click on it`);
+  }
+  // And the anchor in particular, which is the only way to dock on a phone.
+  assert.match(html, /\$\('dock-go'\)\.addEventListener\('click'/, 'the dock button is not wired');
 });
 
 /* ------------------------------------------------------------- chart */
