@@ -550,13 +550,6 @@ let tab = null;
 /* How far ahead the *solver* is allowed to look. The drawn road is a
    different question entirely: see S.planImmediate, which shows the orbit you
    are on and the one thing that happens next, and nothing after that. */
-/* How far ahead a tap on the road is allowed to mean: one turn of the orbit
-   the ship is actually on, or anywhere at all when the path does not close. */
-function tapHorizon(){
-  const b = world.get(state.ship.body);
-  const el = elementsFromState(b.mu, state.ship.r, state.ship.v);
-  return Number.isFinite(el.period) && el.period > 0 ? state.t + el.period : Infinity;
-}
 function horizonFor(){
   const b = world.get(state.ship.body);
   const el = elementsFromState(b.mu, state.ship.r, state.ship.v);
@@ -974,7 +967,7 @@ canvas.addEventListener('pointermove', e => {
   if(drag.kind === 'node'){
     if(Math.hypot(dx, dy) > 4) drag.moved = true;
     if(!drag.moved || !prediction) return;
-    const p = chart.nearestPathPoint(e.clientX, e.clientY, prediction, state.t, tapHorizon());
+    const p = chart.nearestPathPoint(e.clientX, e.clientY, prediction, state.t);
     if(p){
       const n = state.nodes[drag.index];
       // Only slide within the leg the node is on, so it cannot jump past a later node.
@@ -1007,7 +1000,7 @@ function endPointer(e){
        forty pixels across for fingers and at the zoom you cast off at, the
        whole parking orbit fits inside Tessel's — which made lesson two
        impossible to follow by tapping the road it names. */
-    const p = prediction && !state.dockedAt ? chart.nearestPathPoint(e.clientX, e.clientY, prediction, state.t, tapHorizon()) : null;
+    const p = prediction && !state.dockedAt ? chart.nearestPathPoint(e.clientX, e.clientY, prediction, state.t) : null;
     const onBody = d.hit?.kind === 'body';
     const insideDrawn = onBody && d.hit.d <= (d.hit.drawn ?? 0) + 2;
     if(p && !insideDrawn && p.t > state.t + S.MIN_LEAD){ askAtPath(p.t); return; }

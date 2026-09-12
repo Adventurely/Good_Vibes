@@ -224,7 +224,7 @@ export function createChart(canvas, world, opts = {}){
 
   chart.draw = view => draw(chart, view);
   chart.hitTest = (x, y) => hitTest(chart, x, y);
-  chart.nearestPathPoint = (x, y, prediction, t, tMax) => nearestPathPoint(chart, x, y, prediction, t, tMax);
+  chart.nearestPathPoint = (x, y, prediction, t) => nearestPathPoint(chart, x, y, prediction, t);
   chart.resize();
   return chart;
 }
@@ -977,16 +977,13 @@ function hitTest(chart, x, y){
  * for, so a click on the path can become a node at that moment. Linear
  * interpolation along the polyline is fine: the node then snaps to the
  * exact conic when the plan is rebuilt. */
-/* `tMax` is how far ahead a tap may mean: one turn of the orbit the ship is
- * on. With a burn written down there are two roads round the same world — the
- * one being flown and the one the burn leads to — drawn a few pixels apart,
- * and the second one's times are whole laps in the future. Without a ceiling,
- * tapping what read as "just ahead of me" planned a burn, or warped, four laps
- * out. Anything past one orbit is reached from the Ahead list instead. */
-function nearestPathPoint(chart, x, y, prediction, tNow, tMax = Infinity){
+/* Every point the chart draws is a point you can tap: there are no dead
+ * stretches of road. How far a tap can take you is settled by what is drawn,
+ * and each drawn section of a closed orbit is one cycle — so a tap is never
+ * more than a cycle along the section it lands on. */
+function nearestPathPoint(chart, x, y, prediction, tNow){
   let best = null;
   for(const { seg, screenPts } of chart.hits.pathSegs){
-    if(seg.times[0] > tMax) continue;
     for(let i = 1; i < screenPts.length; i++){
       const a = screenPts[i - 1], b = screenPts[i];
       const abx = b[0] - a[0], aby = b[1] - a[1];
@@ -996,7 +993,6 @@ function nearestPathPoint(chart, x, y, prediction, tNow, tMax = Infinity){
       const px = a[0] + u * abx, py = a[1] + u * aby;
       const d = Math.hypot(px - x, py - y);
       const t = seg.times[i - 1] + u * (seg.times[i] - seg.times[i - 1]);
-      if(t > tMax) continue;
       /* Two roads can lie a few pixels apart on the same screen — the one you
          are flying and the one a burn would put you on, drawn round the same
          little moon and separated by the width of the burn. A tap that could
