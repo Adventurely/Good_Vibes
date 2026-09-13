@@ -630,6 +630,36 @@ test('a save full of rubbish loads as a playable game', () => {
   }
 });
 
+test('a save from the twelve-grower build keeps what it earned', () => {
+  /* The tables were cut — three growers, twenty-four upgrades — and every save
+     that predates the cut names things that are gone. What is gone must load
+     as nothing, and what is not gone must not be lost on the way. Two medals
+     keep old ids on purpose: 'first-light', from when the resource was called
+     light, and 'thirty-upgrades', from when there were forty-two upgrades to
+     buy thirty of. A medal is a record, and a record you lose to a rename is
+     not a record. */
+  const old = {
+    version: 2, light: 5e6, elapsed: 900,
+    owned: { moss: 30, fern: 20, mirror: 4, reef: 2, mycelium: 7 },
+    bought: { 'warm-hands': true, 'sun-gloves': true, 'atoll': true, 'damp-corners': true },
+    medals: { 'first-light': true, 'thirty-upgrades': true, 'fifty-mirror': true, 'ten-growers': true },
+    seeds: 3, prestiges: 1,
+    life: { taps: 5000, earned: 4e9, studied: 31 },
+  };
+  const state = fromSave(old);
+  assert.equal(state.owned.moss, 30);
+  assert.equal(state.owned.mirror, undefined, 'a grower that no longer exists must not come back');
+  assert.deepEqual(Object.keys(state.bought).sort(), ['damp-corners', 'warm-hands'],
+    'upgrades that no longer exist are dropped, the rest kept');
+  assert.ok(state.medals['thirty-upgrades'], 'Studious was earned and must survive the cut');
+  assert.ok(state.medals['first-light'], 'First tap was earned and must survive the rename');
+  assert.ok(state.medals['ten-growers']);
+  assert.equal(state.medals['fifty-mirror'], undefined, 'a medal for a grower that is gone is gone');
+  assert.equal(state.seeds, 3);
+  assert.ok(Number.isFinite(totalRate(state)));
+  assert.ok(ACHIEVEMENT_BY_ID['thirty-upgrades'], 'the Studious id must stay what old saves call it');
+});
+
 test('an upgrade deleted from the table does not break a save that names it', () => {
   const state = newGame();
   state.bought['gone-tomorrow'] = true;    // as if this file had dropped a row

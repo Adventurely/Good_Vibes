@@ -208,8 +208,8 @@ try {
     if(planted > 0 || state.life.earned > 0){
       document.getElementById('enter').textContent = 'Back to the lot';
       document.getElementById('saved').textContent =
-        `${planted} growers planted, ${formatEnergy(state.life.earned)} energy earned all told`
-        + `${state.seeds ? `, ${state.seeds} seeds held` : ''}.`;
+        `${planted} grower${planted === 1 ? '' : 's'} planted, ${formatEnergy(state.life.earned)} energy earned all told`
+        + `${state.seeds ? `, ${state.seeds} seed${state.seeds === 1 ? '' : 's'} held` : ''}.`;
     }
   }
 } catch { /* private window, or a save this build cannot read. Say nothing. */ }

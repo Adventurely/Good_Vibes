@@ -397,7 +397,6 @@ export const NARRATIVE = {
    "You are fished out, dusted off, and handed a bill written in a very steady hand."
   ],
   "towAtmosphere": "The clouds took the hull without a shield on it. The frogs fished you out and hummed the whole time they were doing it.",
-  "firstSoiChange": "You cross a line that is not drawn on anything, and the numbers all change frame. That was a world letting go of you and another one taking hold.",
   "firstTransfer": "You are out of every world's gravity now, on the Lamp's own books. The transfer starts here and ends wherever you aimed it.",
   "firstAssist": "You fell past Grumm and came out faster than you went in, with the tank untouched. The frogs call that a slingshot. Grumm has not noticed.",
   "firstAerobrake": "The shield takes the heat, the clouds take the speed, and you come out the other side slower for free.",

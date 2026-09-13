@@ -3,7 +3,7 @@
  * The numbers in `public/sunward/content.js` cannot be read off the table. A
  * tier's cost and its output are two dials, what a player actually owns at hour
  * four is the two of them fought out against a 15% price rise per purchase and
- * forty-two upgrades, and the failures that matter — a tier nobody reaches, an
+ * eighteen upgrades, and the failures that matter — a tier nobody reaches, an
  * upgrade that unlocks after everyone has stopped playing — are invisible on
  * screen for days. So they are measured.
  *
