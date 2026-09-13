@@ -58,13 +58,25 @@ Burns are **instantaneous impulses**. What you plan is exactly what you get, whi
 
 **Nothing lands.** Every harbour in the system is an orbit, and docking means matching one: you arrive by getting close enough and slow enough inside a port's **harbour mouth**, and the port's own lighters carry goods the rest of the way down. A world's surface is scenery and a crash hazard, never a destination.
 
+**How wide a harbour mouth is, is not a design number.** Like a world's reach, it comes out of the world:
+
+> `r_dock = 10 × radius + (atmosphere height)`
+
+Ten times the ground, plus however much air stands over it. A big world earns a big harbour and a pebble earns a small one, so widening a world widens its approach and no table can quietly disagree with the sky it is describing. Grumm's approach is enormous because Grumm is enormous and carries sixty thousand kilometres of cloud on top of that, not because somebody typed a number.
+
+Two consequences are worth stating plainly, because the formula means different things at different sizes. On a planet the mouth is a small target — Veyra's is 2% of its sphere of influence, so arriving in Veyra's gravity and tying up at Veyra are two separate pieces of flying. On a small moon it is most of the well — Glass's mouth is 90% of Glass's reach, Brine's 79%, Slate's 64% — so crossing into a little moon's gravity is very nearly arriving. That is the shape ten radii has: it scales with the ground, and a moon's reach does not.
+
+On the chart the mouth is a dashed ring with **a small anchor hung at the top of it**, green where they will take your lines and amber where they will not yet. The anchor is there because a dashed circle round a world is the same shape as three other things the chart draws — a sphere of influence, an atmosphere, a hollow rock — and this is the only one you can tie up inside.
+
+The **drifting havens keep their authored mouths.** Nail, Whisker and the Maw have no surface to be ten times of and no air over it; their radius is a dot on a chart rather than a ground. A pilot arrives at those by matching speeds, and the size of that rendezvous is a design choice with nothing physical to derive it from.
+
 This is a scope decision as much as a fictional one. Landing would need a second control scheme, a second set of physics, and a second art problem, and it would buy nothing the orbital game does not already have. The fiction absorbs it easily: Tassel is an ocean of floating harbour cities that meet ships in orbit, the cats cannot survive a heavy world at all, and the frogs' balloon villages have no ground under them either.
 
 The player therefore **starts in orbit**, not moored. A new game opens with the ship already going round Tassel — *low* round it, high point under one planet-diameter of altitude, so the ocean fills the chart and visibly turns underneath — with a road drawn ahead of it and a crate in the hold. There is nothing to cast off from and nothing to press before the chart means something. The harbour itself is higher up, at the docking altitude every other orbit in the game is measured from; tying up and casting off again is what puts a ship there.
 
 ### 2.3.1 Forgiveness Systems
 
-Arrival uses a generous **docking zone** around each port. Entering it below a relative-speed threshold counts as arrival. If the player comes in too fast, they can simply plan a correction burn and try again. Mid-course corrections are cheap and encouraged. Planning previews show everything the player needs, so failure comes from choices, not surprises.
+Arrival uses a **docking zone** around each port, sized by the rule in 2.3. Entering it below a relative-speed threshold counts as arrival. If the player comes in too fast, they can simply plan a correction burn and try again. Mid-course corrections are cheap and encouraged. Planning previews show everything the player needs, so failure comes from choices, not surprises.
 
 Running out of fuel is not a game over, and there are two ways out of it, which cost different things.
 
@@ -662,7 +674,7 @@ parts to Slate, fire crystals to Veyra (who love them), reactor coils to Nail
 
 ## 6. Technical Notes
 
-**Decided since the first draft.** Reaches are computed from mass rather than written down (2.1), and the invariant checker proves the promises a hand-tuned table used to make. The Belt is decorative — a field of drawn rocks — and the two cat havens inside it are massless rendezvous zones with a harbour mouth rather than bodies with a well, as are the Arc and the Maw: a pilot arrives at those by matching speeds, not by falling in.
+**Decided since the first draft.** Reaches are computed from mass and harbour mouths from size rather than written down (2.1, 2.3), and the invariant checker proves the promises a hand-tuned table used to make. The Belt is decorative — a field of drawn rocks — and the two cat havens inside it are massless rendezvous zones with a harbour mouth rather than bodies with a well, as are the Arc and the Maw: a pilot arrives at those by matching speeds, not by falling in.
 
 **Still to tune.** Gravity-assist approaches at Grumm, and the Δv ladder between the tanks now that the map has been respaced.
 

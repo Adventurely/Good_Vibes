@@ -20,7 +20,10 @@ const TAU = Math.PI * 2;
 const period = (mu, a) => TAU * Math.sqrt(a ** 3 / mu);
 /* The reach a mass earns, mirrored from content.js: no body carries one. */
 const soiOf = b => (b.mu > 0 && b.a > 0 && by[b.parent]?.mu > 0) ? b.a * Math.pow(b.mu / by[b.parent].mu, 2 / 5) : null;
-for(const b of T.bodies) b.soi = soiOf(b);
+/* And the mouth a size earns, mirrored the same way: ten radii plus the air
+   over the ground. A drifting haven has neither, and keeps its authored one. */
+const mouthOf = b => b.mu > 0 && b.radius > 0 ? 10 * b.radius + Math.max(0, (b.atmo ?? b.radius) - b.radius) : b.zoneRadius;
+for(const b of T.bodies){ b.soi = soiOf(b); b.zoneRadius = mouthOf(b); }
 const km = v => (v * KMS);
 let fails = 0;
 const check = (name, ok, detail = '') => { console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? '  ' + detail : ''}`); if(!ok) fails++; };
@@ -83,7 +86,17 @@ check('C4 the inner worlds never nest', by.cinder.soi + by.veyra.soi < 0.2 && by
 for(const b of T.bodies){
   if(!b.port) continue;
   if(b.mu > 0){
-    check(`C5 ${b.id} radius < dockAlt < zone <= soi/3`, b.radius < b.dockAlt && b.dockAlt < b.zoneRadius && b.zoneRadius <= b.soi / 3 + 1e-12, `${b.radius} < ${b.dockAlt} < ${b.zoneRadius} <= ${(b.soi / 3).toFixed(5)}`);
+    /* The ordering that has to hold: the ground, then the parking orbit, then
+       the harbour mouth, and all of it inside the world's own reach. The cap
+       used to be a third of the reach, back when the mouth was a number
+       somebody chose. Ten radii is a bigger bite out of a small moon than out
+       of a planet — Glass's mouth is most of Glass's gravity — so the cap is
+       now the physical one: the harbour has to be inside the reach, with
+       enough left over that crossing the line and tying up are still two
+       things. The fraction is printed because it is the number that decides
+       how much of an arrival is left. */
+    const frac = b.zoneRadius / b.soi;
+    check(`C5 ${b.id} ground < parking < mouth < reach`, b.radius < b.dockAlt && b.dockAlt < b.zoneRadius && frac <= 0.92, `mouth is ${(frac * 100).toFixed(0)}% of the reach`);
     const vc = Math.sqrt(b.mu / b.dockAlt);
     check(`C6 ${b.id} parked speed`, km(vc) < 20, `${km(vc).toFixed(2)} km/s`);
     const esc = Math.sqrt(b.mu * (2 / b.dockAlt - 1 / ((b.dockAlt + b.soi) / 2))) - vc;

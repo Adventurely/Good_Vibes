@@ -8,7 +8,7 @@ import {
   CONST, BODIES, GOODS, PORTS, UPGRADES, FORMULAS, TEXT, GLOSSARY, SPECIES, BELT_ROCKS,
 } from '../public/orbital-trader/content.js';
 import * as S from '../public/orbital-trader/sim.js';
-import { createChart, railCrossings } from '../public/orbital-trader/render.js';
+import { createChart, railCrossings, PALETTE } from '../public/orbital-trader/render.js';
 import { DURATION, BREACH, BEATS, beatAt, ascent, skyAt, ROCKET } from '../public/orbital-trader/intro.js';
 
 /* Orbital Trader has no server: everything it knows is in public/ and is
@@ -123,12 +123,28 @@ test('every body has what the kernel and the chart read', () => {
     if(b.mu > 0) assert.ok(b.soi > 0, `${w}: a gravitating body has an SOI`); else assert.equal(b.soi, null, `${w}: a zone has no SOI`);
     if(b.port){
       assert.ok(b.zoneRadius > 0 && b.dockSpeed > 0, `${w}: docking zone`);
-      if(b.mu > 0) assert.ok(b.radius < b.dockAlt && b.dockAlt < b.zoneRadius && b.zoneRadius <= b.soi / 3 + 1e-12, `${w}: radius < dockAlt < zone <= soi/3`);
+      /* Ground, then parking orbit, then harbour mouth, and all of it inside
+         the world's own reach. The mouth is ten radii plus whatever air is
+         over them, which is a far bigger bite out of a small moon than out of
+         a planet — Glass's harbour is most of Glass's gravity — so the ceiling
+         is the physical one rather than a fraction somebody chose. */
+      if(b.mu > 0) assert.ok(b.radius < b.dockAlt && b.dockAlt < b.zoneRadius && b.zoneRadius <= b.soi * 0.92, `${w}: ground < parking < mouth < reach`);
     }
     if(b.retrograde) assert.equal(b.id, 'croak', 'only Croak runs backwards');
   }
   for(const id of ['lamp', 'cinder', 'scorch', 'veyra', 'tassel', 'slate', 'moss', 'nail', 'whisker', 'arc', 'grumm', 'brine', 'glass', 'croak', 'haven', 'maw']){
     assert.ok(ids.has(id), `the design document's ${id} is in the sky`);
+  }
+  /* The mouth is not authored: it is ten times the ground plus the air over
+     it, so that making a world bigger widens its harbour and no table can
+     quietly disagree. The drifting havens have no ground and keep theirs. */
+  for(const b of BODIES){
+    if(!(b.mu > 0) || !(b.radius > 0)) continue;
+    const want = 10 * b.radius + Math.max(0, (b.atmo ?? b.radius) - b.radius);
+    assert.ok(Math.abs(b.zoneRadius - want) < 1e-15, `${b.id}: mouth is ${b.zoneRadius}, ten radii plus air is ${want}`);
+  }
+  for(const id of ['nail', 'whisker', 'maw']){
+    assert.ok(world.get(id).zoneRadius >= 1e-3, `${id} is a rendezvous, not a world; its mouth stays the one it was given`);
   }
   assert.equal(BODIES.length, 16, 'the sky is the sixteen bodies the setting names');
   assert.ok(world.get('croak').retrograde, 'Croak is retrograde');
@@ -679,12 +695,12 @@ test('the opening film plays for a new ship and gets out of the way of every oth
 
 /* The chart is a canvas, but its camera is arithmetic, and the arithmetic is
  * the part a player can get lost in. Enough of a canvas to make one. */
-function stubChart(w = 800, h = 600){
+function stubChart(w = 800, h = 600, ops = null){
   const prev = globalThis.window;
   globalThis.window = { devicePixelRatio: 1 };
   const canvas = {
     width: 0, height: 0,
-    getContext: () => paperlessCtx(),
+    getContext: () => paperlessCtx(ops),
     getBoundingClientRect: () => ({ width: w, height: h, left: 0, top: 0 }),
   };
   const chart = createChart(canvas, world);
@@ -696,16 +712,17 @@ function stubChart(w = 800, h = 600){
  * only knows once it has drawn them — where a rail ended up on the screen,
  * for one. Assignments (fillStyle, font) are kept so nothing throws on
  * reading them back; every method is a no-op. */
-function paperlessCtx(){
+function paperlessCtx(ops){
   const gradient = { addColorStop(){} };
   return new Proxy({}, {
     get(t, k){
       if(k in t) return t[k];
       if(k === 'createRadialGradient' || k === 'createLinearGradient') return () => gradient;
       if(k === 'measureText') return () => ({ width: 40 });
-      return () => {};
+      // Every other method is a no-op that writes down that it was asked.
+      return (...args) => { ops?.push([k, ...args]); };
     },
-    set(t, k, v){ t[k] = v; return true; },
+    set(t, k, v){ t[k] = v; ops?.push([k, v]); return true; },
   });
 }
 /* One frame's worth of the thing draw() does: read where the followed body is
@@ -755,6 +772,54 @@ test('a rail crossing sits on the rail, and the world is marked where it will re
   }
   // Soonest first, so the one that survives the cap is the one about to happen.
   for(let i = 1; i < list.length; i++) assert.ok(list[i].t >= list[i - 1].t, 'crossings come in time order');
+});
+
+test('the harbour mouth wears an anchor, and only when it is the harbour you are at', () => {
+  /* A dashed circle round a world is the same shape as three other things on
+     this chart — a sphere of influence, an atmosphere, a hollow rock. The
+     anchor is what says this one is the ring you can tie up inside. Checked
+     by watching what the frame actually asks the canvas to draw: the flukes
+     are the one curve on the whole chart, so a quadratic tells us the glyph
+     went down. */
+  const flukes = ops => ops.some(o => o[0] === 'quadraticCurveTo');
+  const frame = (ops, near) => {
+    const chart = stubChart(800, 600, ops);
+    try{
+      const g = S.newGame(5);
+      g.dockedAt = null; g.justLeft = null;
+      chart.camera.follow = 'tassel';
+      chart.camera.anchor = [...O.absState(world, 'tassel', 0).r];
+      chart.settle();
+      chart.frameBody('tassel');
+      chart.draw({
+        t: 0, now: 0, shipAbs: { r: S.shipAbsPos(g), v: S.shipAbsVel(g) }, shipBody: 'tassel',
+        prediction: null, nodes: [], nodePositions: [], apses: [], railCrossings: [],
+        nearPort: near, docking: near ? { port: near, ok: true } : null,
+      });
+    } finally { chart.restore(); }
+  };
+  const near = []; frame(near, 'tassel');
+  const away = []; frame(away, null);
+  assert.ok(flukes(near), 'no anchor on the harbour you are approaching');
+  assert.ok(!flukes(away), 'an anchor was drawn with no harbour in reach');
+
+  /* And it carries the ring's own meaning rather than a colour of its own:
+     green where they will take your lines, amber where they will not yet. */
+  const strokes = ops => ops.filter(o => o[0] === 'strokeStyle').map(o => o[1]);
+  assert.ok(strokes(near).includes(PALETTE.zone), 'the mouth is not drawn in the harbour green');
+  const waiting = [];
+  const chart = stubChart(800, 600, waiting);
+  try{
+    const g = S.newGame(5); g.dockedAt = null; g.justLeft = null;
+    chart.camera.follow = 'tassel';
+    chart.camera.anchor = [...O.absState(world, 'tassel', 0).r];
+    chart.settle(); chart.frameBody('tassel');
+    chart.draw({ t: 0, now: 0, shipAbs: { r: S.shipAbsPos(g), v: S.shipAbsVel(g) }, shipBody: 'tassel',
+      prediction: null, nodes: [], nodePositions: [], apses: [], railCrossings: [],
+      nearPort: 'tassel', docking: { port: 'tassel', ok: false } });
+  } finally { chart.restore(); }
+  assert.ok(strokes(waiting).includes(PALETTE.zoneWait), 'a mouth you cannot use yet is not drawn in the waiting colour');
+  assert.ok(flukes(waiting), 'and it still wears its anchor');
 });
 
 test('only the first crossing is marked, however many the road makes', () => {

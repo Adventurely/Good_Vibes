@@ -48,7 +48,13 @@ export const PALETTE = {
   orbitFocus: 'rgba(245,234,214,0.30)',
   soi:        'rgba(245,154,46,0.05)',
   soiEdge:    'rgba(245,154,46,0.30)',
-  zone:       'rgba(108,194,74,0.55)',
+  /* The harbour mouth. It was dim enough to lose against a bright road drawn
+     across it, which is the one moment it matters — so it is the strongest
+     green on the chart, and the ring you cannot yet tie up inside is a clear
+     amber rather than the near-invisible wash the sphere-of-influence rings
+     use. */
+  zone:       'rgba(124,214,88,0.85)',
+  zoneWait:   'rgba(245,154,46,0.55)',
   zoneFill:   'rgba(108,194,74,0.12)',
   zoneFast:   'rgba(245,154,46,0.8)',
   belt:       'rgba(122,104,88,0.6)',
@@ -458,9 +464,15 @@ function drawBodies(chart, view, pos, t){
          green wash that size swallows the road drawn across it. */
       const zr = Math.max(14, b.zoneRadius * zoom);
       const d = view.docking;
+      ctx.strokeStyle = d?.ok ? PALETTE.zone : PALETTE.zoneWait;
       ctx.beginPath(); ctx.arc(p[0], p[1], zr, 0, Math.PI * 2);
-      ctx.strokeStyle = d?.ok ? PALETTE.zone : PALETTE.soiEdge;
-      ctx.lineWidth = d?.ok ? 1.5 : 1; ctx.setLineDash([2, 3]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.lineWidth = d?.ok ? 2 : 1.5; ctx.setLineDash([5, 4]); ctx.stroke(); ctx.setLineDash([]);
+      /* And an anchor hung on it at the top, so the ring says what it is. A
+         dashed circle round a planet is the same shape as half a dozen other
+         things on this chart — a sphere of influence, an atmosphere, a
+         hollow world — and this is the only one you can tie up inside. Drawn
+         in pixels, so it is the same size to read at any zoom. */
+      anchorGlyph(ctx, p[0], p[1] - zr, 12);
     }
 
     /* The body itself. Each one has a sprite; the dot is what is left when a
@@ -534,6 +546,27 @@ function drawBodies(chart, view, pos, t){
 }
 
 /* Lit for 0.4 s at seeded gaps of three to eleven seconds. */
+/* A small anchor, drawn on a ten-unit grid and scaled to `s` pixels tall:
+ * ring, shank, stock across it, and the flukes curving up at the foot. It is
+ * stroked in whatever colour is already set, so it carries the ring's own
+ * meaning — green where you may tie up, amber where you may not yet. */
+function anchorGlyph(ctx, x, y, s){
+  const u = s / 10;
+  const was = ctx.lineWidth;
+  ctx.lineWidth = Math.max(1.2, s / 9);
+  ctx.lineJoin = ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.arc(x, y - 3.4 * u, 1.25 * u, 0, Math.PI * 2);        // the ring
+  ctx.moveTo(x, y - 2.1 * u); ctx.lineTo(x, y + 3.8 * u);   // the shank
+  ctx.moveTo(x - 2.5 * u, y - 1.2 * u);
+  ctx.lineTo(x + 2.5 * u, y - 1.2 * u);                     // the stock
+  ctx.moveTo(x - 3.3 * u, y + 1.3 * u);                     // the flukes
+  ctx.quadraticCurveTo(x, y + 5.6 * u, x + 3.3 * u, y + 1.3 * u);
+  ctx.stroke();
+  ctx.lineWidth = was;
+  ctx.lineJoin = ctx.lineCap = 'butt';
+}
+
 function mawLit(nowMs){
   let t = 0, i = 0;
   const s = nowMs / 1000;

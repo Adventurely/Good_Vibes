@@ -87,6 +87,27 @@ export function soiRadius(mu, a, parentMu){
   return a * Math.pow(mu / parentMu, 2 / 5);
 }
 
+/* How wide a harbour mouth is: ten times the world's own radius, and then
+ * however much air stands above that surface.
+ *
+ *     r_dock = 10 · radius + (atmo − radius)
+ *
+ * Derived here for the same reason the sphere of influence is: size is the
+ * knob, and a table of hand-written mouths can quietly disagree with the
+ * worlds it is describing. A big world earns a big harbour, a pebble earns a
+ * small one, and a world with weather earns the room its weather takes up —
+ * Grumm's approach is wide because Grumm is wide and has sixty thousand
+ * kilometres of cloud on top of that, not because somebody typed a number.
+ *
+ * The drifting havens keep theirs. Nail, Whisker and the Maw have no surface
+ * to be ten times of and no air over it — their radius is a dot on a chart,
+ * not a ground — so "ten times the radius" has nothing to act on and the
+ * authored mouth stands. */
+export function dockRange(radius, atmo){
+  if(!(radius > 0)) return null;
+  return 10 * radius + Math.max(0, (atmo ?? radius) - radius);
+}
+
 const rawMu = Object.fromEntries(TUNING.bodies.map(b => [b.id, b.mu ?? 0]));
 export const BODIES = TUNING.bodies.map(b => ({
   ...b,
@@ -94,6 +115,8 @@ export const BODIES = TUNING.bodies.map(b => ({
   e: b.e ?? 0, omega: b.omega ?? 0, M0: b.M0 ?? 0, retrograde: !!b.retrograde,
   mu: b.mu ?? 0,
   soi: soiRadius(b.mu ?? 0, b.a ?? 0, rawMu[b.parent] ?? 0),
+  // A world's mouth comes from its size; a drifting haven keeps the one it was given.
+  zoneRadius: (b.mu ?? 0) > 0 ? dockRange(b.radius ?? 0, b.atmo) : b.zoneRadius,
   colour: BODY_COLOURS[b.id] ?? null,
 }));
 
