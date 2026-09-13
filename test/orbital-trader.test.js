@@ -8,7 +8,7 @@ import {
   CONST, BODIES, GOODS, PORTS, UPGRADES, FORMULAS, TEXT, GLOSSARY, SPECIES, BELT_ROCKS,
 } from '../public/orbital-trader/content.js';
 import * as S from '../public/orbital-trader/sim.js';
-import { createChart } from '../public/orbital-trader/render.js';
+import { createChart, railCrossings } from '../public/orbital-trader/render.js';
 import { DURATION, BREACH, BEATS, beatAt, ascent, skyAt, ROCKET } from '../public/orbital-trader/intro.js';
 
 /* Orbital Trader has no server: everything it knows is in public/ and is
@@ -579,12 +579,29 @@ function stubChart(w = 800, h = 600){
   globalThis.window = { devicePixelRatio: 1 };
   const canvas = {
     width: 0, height: 0,
-    getContext: () => ({ setTransform(){} }),
+    getContext: () => paperlessCtx(),
     getBoundingClientRect: () => ({ width: w, height: h, left: 0, top: 0 }),
   };
   const chart = createChart(canvas, world);
   chart.restore = () => { if(prev === undefined) delete globalThis.window; else globalThis.window = prev; };
   return chart;
+}
+/* A canvas context that accepts everything and keeps nothing. Enough to run a
+ * whole frame under Node, which is the only way to test the things the chart
+ * only knows once it has drawn them — where a rail ended up on the screen,
+ * for one. Assignments (fillStyle, font) are kept so nothing throws on
+ * reading them back; every method is a no-op. */
+function paperlessCtx(){
+  const gradient = { addColorStop(){} };
+  return new Proxy({}, {
+    get(t, k){
+      if(k in t) return t[k];
+      if(k === 'createRadialGradient' || k === 'createLinearGradient') return () => gradient;
+      if(k === 'measureText') return () => ({ width: 40 });
+      return () => {};
+    },
+    set(t, k, v){ t[k] = v; return true; },
+  });
 }
 /* One frame's worth of the thing draw() does: read where the followed body is
  * now, and lay the player's pan on top of it. */
@@ -592,6 +609,130 @@ function settleOn(chart, id, t){
   chart.camera.anchor = [...O.absState(world, id, t).r];
   chart.settle();
 }
+
+/* ------------------------------------------------- crossing a world's rail */
+
+/* A ship falling from Tassel's orbit down towards Veyra's, which is the shape
+ * every interplanetary trip in this game has. */
+function transferShip(from = 'tassel', toRadius = 0.6){
+  const g = S.newGame(5);
+  g.dockedAt = null; g.justLeft = null; g.t = 0;
+  const start = O.absState(world, from, 0);
+  const mu = world.get('lamp').mu;
+  const r1 = O.norm(start.r);
+  const vc = Math.sqrt(mu / r1);
+  g.ship = { body: 'lamp', r: [...start.r], v: O.scale(O.unit(start.v), vc * Math.sqrt(2 * toRadius / (r1 + toRadius))) };
+  return g;
+}
+
+test('a rail crossing sits on the rail, and the world is marked where it will really be', () => {
+  const g = transferShip();
+  const pred = S.planImmediate(g);
+  const list = railCrossings(world, pred, g.t, { minLead: S.MIN_LEAD });
+  assert.ok(list.length >= 2, `a fall from 1 au to 0.6 au crosses something; found ${list.length}`);
+  assert.ok(list.some(c => c.body === 'veyra'), 'including the rail it was aimed at');
+
+  for(const c of list){
+    const b = world.get(c.body);
+    /* On the rail: the ship's distance from the Lamp equals the rail's own
+       distance at that same bearing. This is the whole claim the mark makes,
+       and it is the one a sampled polyline would get wrong. */
+    const th = Math.atan2(c.r[1], c.r[0]);
+    const e = b.e ?? 0, om = b.omega ?? 0;
+    const railR = e ? b.a * (1 - e * e) / (1 + e * Math.cos((b.retrograde ? -th : th) - om)) : b.a;
+    assert.ok(Math.abs(O.norm(c.r) - railR) < 1e-9, `${b.name}: the mark is ${O.norm(c.r) - railR} au off its own rail`);
+    /* And the world's mark is not a guess: it is where that world actually
+       is at that moment, which is the half of the pair that makes it a
+       reading about timing rather than about geometry. */
+    assert.ok(O.dist(c.ghost, O.absState(world, c.body, c.t).r) < 1e-12, `${b.name}: the ghost is not where the world is`);
+    assert.ok(c.t > g.t, 'and it is ahead, not behind');
+  }
+  // Soonest first, so a chart with room for a few shows the ones about to happen.
+  for(let i = 1; i < list.length; i++) assert.ok(list[i].t >= list[i - 1].t, 'crossings come in time order');
+});
+
+test('the rail a ship is standing on is not a crossing', () => {
+  /* A ship that has just left Tassel is sitting exactly on Tassel's rail, so
+     the arithmetic finds a crossing at this instant: true, useless, and drawn
+     on top of the ship. The lead is what keeps it off the chart. */
+  const g = transferShip();
+  const pred = S.planImmediate(g);
+  const raw = railCrossings(world, pred, g.t);
+  assert.ok(raw.some(c => c.body === 'tassel' && c.t < g.t + S.MIN_LEAD), 'the doorstep is there to be dropped');
+  const led = railCrossings(world, pred, g.t, { minLead: S.MIN_LEAD });
+  assert.ok(led.every(c => c.t >= g.t + S.MIN_LEAD), 'and the lead drops it');
+});
+
+test('an orbit that crosses nothing is marked with nothing', () => {
+  // A parking orbit round Tassel is nowhere near either moon's rail.
+  const g = S.newGame(5);
+  g.dockedAt = null; g.justLeft = null;
+  assert.deepEqual(railCrossings(world, S.planImmediate(g), g.t, { minLead: S.MIN_LEAD }), []);
+});
+
+test('tapping a world\'s rail asks the clock for the moment that world is there', () => {
+  const chart = stubChart(900, 700);
+  try{
+    const g = transferShip();
+    const pred = S.planImmediate(g);
+    chart.camera.follow = 'lamp';
+    chart.camera.zoom = 300;          // the whole inner system on one screen
+    chart.draw({ t: g.t, now: 0, shipAbs: { r: g.ship.r, v: g.ship.v }, shipBody: 'lamp', prediction: pred, nodes: [], nodePositions: [], apses: [], railCrossings: [] });
+    assert.ok(chart.hits.rails.some(r => r.id === 'veyra'), 'the frame drew Veyra’s rail and wrote it down');
+
+    /* Pick a point Veyra will be at in eighty days, tap exactly there, and the
+       answer should be eighty days. That is the whole promise of the gesture:
+       the time that comes back is the time that world is under your finger. */
+    const when = g.t + 80;
+    const p = chart.toScreen(O.absState(world, 'veyra', when).r);
+    const hit = chart.nearestRailPoint(p[0], p[1], g.t);
+    assert.ok(hit, 'a tap on the rail finds it');
+    assert.equal(hit.id, 'veyra');
+    assert.ok(Math.abs(hit.t - when) < 1, `asked for day ${when}, got ${hit.t}`);
+    // Where the world is at the answer is where the finger went, near enough to draw.
+    const back = chart.toScreen(O.absState(world, 'veyra', hit.t).r);
+    assert.ok(Math.hypot(back[0] - p[0], back[1] - p[1]) < 3, 'and it comes back to the same pixel');
+
+    // Empty sky is still empty sky.
+    assert.equal(chart.nearestRailPoint(5, 5, g.t), null);
+  } finally { chart.restore(); }
+});
+
+test('a rail nobody drew is a rail nobody can tap', () => {
+  /* Zoomed into a moon system, the outer rails are off the chart entirely.
+     Tapping where one would have been must not warp a player two years on. */
+  const chart = stubChart(900, 700);
+  try{
+    const g = S.newGame(5);
+    g.dockedAt = null; g.justLeft = null;
+    chart.focus('slate');
+    chart.camera.anchor = [...O.absState(world, 'slate', 0).r];
+    chart.settle();
+    chart.draw({ t: 0, now: 0, shipAbs: { r: S.shipAbsPos(g), v: S.shipAbsVel(g) }, shipBody: 'tassel', prediction: null, nodes: [], nodePositions: [], apses: [], railCrossings: [] });
+    assert.ok(!chart.hits.rails.some(r => r.id === 'grumm'), 'Grumm’s rail is not on this screen');
+    for(let x = 0; x < 900; x += 37){
+      for(let y = 0; y < 700; y += 41){
+        const hit = chart.nearestRailPoint(x, y, 0);
+        assert.ok(!hit || chart.hits.rails.some(r => r.id === hit.id), `a tap at ${x},${y} reached ${hit?.id}, which is not drawn`);
+      }
+    }
+  } finally { chart.restore(); }
+});
+
+test('the page wires the rail gesture and the marks to the chart', () => {
+  /* Both halves of this live in play.html, which Node cannot run. The wiring
+     is what breaks silently: a solver nobody calls draws nothing, and a
+     gesture nobody listens for is a dead patch of sky. */
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.match(PLAY, /chart\.nearestRailPoint\(/, 'nothing listens for a tap on a rail');
+  assert.match(PLAY, /askSkip\(rail\.t/, 'and a tap on one does not reach the clock');
+  /* A skip started at a dock sets the rate and never stops, because the loop
+     drops its target the moment it sees a docked ship. The road is already
+     untappable while tied up; a rail has to be too. */
+  assert.match(PLAY, /state\.dockedAt \? null : chart\.nearestRailPoint\(/, 'a rail can be tapped while docked, which runs the clock away');
+  assert.match(PLAY, /railCrossings\(world, prediction, state\.t/, 'the crossings are never worked out');
+  assert.match(PLAY, /railCrossings: crossedRails/, 'and never reach the chart');
+});
 
 test('a pan is stored against the thing last focused, so the sky does not slide out from under it', () => {
   const chart = stubChart();

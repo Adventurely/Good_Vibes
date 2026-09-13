@@ -587,7 +587,7 @@
 </div>
 
 <script type="module">
-import { createChart, PALETTE, locateOnPrediction, fmtAu, bodyColour } from './render.js';
+import { createChart, PALETTE, locateOnPrediction, railCrossings, fmtAu, bodyColour } from './render.js';
 import { portraitURL } from './sprites.js';
 import * as S from './sim.js';
 import { CONST, PORTS, GOODS, UPGRADES, TEXT, SPECIES, GLOSSARY, BELT_ROCKS, ARC_DEBRIS } from './content.js';
@@ -654,7 +654,7 @@ addEventListener('resize', refreshInsets);
 const belt = { inner: CONST.BELT.inner, outer: CONST.BELT.outer, rocks: BELT_ROCKS, debris: ARC_DEBRIS };
 addEventListener('resize', () => chart.resize());
 
-let prediction = null, nodePositions = [], apses = [], predictedAt = -1, predictedReal = -1e9;
+let prediction = null, nodePositions = [], apses = [], crossedRails = [], predictedAt = -1, predictedReal = -1e9;
 let selectedNode = -1;
 let panelOpen = innerWidth > 760;
 let tab = null;
@@ -674,7 +674,7 @@ function horizonFor(){
 }
 
 function replan(force = false){
-  if(state.dockedAt){ prediction = null; nodePositions = []; apses = []; return; }
+  if(state.dockedAt){ prediction = null; nodePositions = []; apses = []; crossedRails = []; return; }
   /* Re-solving the whole road is the most expensive thing this page does, so
      it happens on a real-time budget rather than a game-time one: at most a few
      times a second, whatever the warp. Measuring it in game days got it wrong
@@ -691,7 +691,7 @@ function replan(force = false){
      nothing written down at all there is one road, a whole lap of the orbit
      the ship is actually on. */
   prediction = S.planImmediate(state);
-  if(!prediction){ nodePositions = []; apses = []; return; }
+  if(!prediction){ nodePositions = []; apses = []; crossedRails = []; return; }
   nodePositions = state.nodes.map(n => locateOnPrediction(world, prediction, n.t));
   /* The low point and the high point of every closed leg on the drawn road.
      A near-circular heliocentric orbit has no meaningful pair — its two apses
@@ -710,6 +710,10 @@ function replan(force = false){
         ? 'this path hits it'
         : `${fmtAu(ic.altitude)} · ${S.fmtKms(ic.speed)}${ic.inMouth ? ' · in docking range' : ''}`)
     : null;
+  /* Every rail the road cuts across, and where that world will be when it
+     does. Worked out here rather than every frame: it is a bisection per
+     crossing, and it only changes when the road does. */
+  crossedRails = railCrossings(world, prediction, state.t, { minLead: S.MIN_LEAD });
   apses = [];
   prediction.segments.forEach((seg, i) => {
     const b = world.get(seg.body);
@@ -780,7 +784,7 @@ function frame(now){
   const shipAbs = state.dockedAt ? { r: absState(world, state.dockedAt, state.t).r, v: absState(world, state.dockedAt, state.t).v } : { r: S.shipAbsPos(state), v: S.shipAbsVel(state) };
   chart.draw({
     t: state.t, now, shipAbs, shipBody: state.ship.body, docked: !!state.dockedAt,
-    prediction, nodes: state.nodes, nodePositions, selectedNode, apses,
+    prediction, nodes: state.nodes, nodePositions, selectedNode, apses, railCrossings: crossedRails,
     editing: selectedNode >= 0 && !!state.nodes[selectedNode],
     shipLocalV: state.dockedAt ? null : state.ship.v,
     nodeLabel, interceptLabel, insetLabel,
@@ -943,9 +947,14 @@ function askSkip(t, what){
   const plan = S.skipPlan(state, t);
   if(!plan){ toast('That is not ahead of you.', 'bad'); return; }
   const place = whereAt(t);
+  /* Two sentences, not one: what you asked about, and then where *you* will
+     be when it happens. They used to be one clause, which read correctly for
+     a point on your own road and wrongly for anything else — "Veyra reaching
+     that point is 240 days from now, in Tassel's gravity" says the wrong
+     thing about Veyra. */
   openModal(`<h2>Skip ahead?</h2>
-    <p>${esc(what ?? 'That point on your path')} is <b>${S.fmtDays(plan.days)}</b> from now${place ? `, in ${esc(place.name)}'s gravity` : ''}.</p>
-    <p class="lock">The clock will run itself there and stop: ${saySeconds(plan.seconds)} of waiting.${plan.capped ? ' That is as fast as the clock goes.' : ''}</p>
+    <p>${esc(what ?? 'That point on your path')} is <b>${S.fmtDays(plan.days)}</b> from now.</p>
+    <p class="lock">${place ? `You will be in ${esc(place.name)}'s gravity. ` : ''}The clock will run itself there and stop: ${saySeconds(plan.seconds)} of waiting.${plan.capped ? ' That is as fast as the clock goes.' : ''}</p>
     <div class="btns"><button class="btn primary" id="m-go">Go</button><button class="btn ghost" id="m-stay">Close</button></div>`, m => {
     m.querySelector('#m-go').addEventListener('click', () => { closeModal(); skipTo(t); });
     m.querySelector('#m-stay').addEventListener('click', closeModal);
@@ -1139,6 +1148,18 @@ function endPointer(e){
     const insideDrawn = onBody && d.hit.d <= (d.hit.drawn ?? 0) + 2;
     if(p && !insideDrawn && p.t > state.t + S.MIN_LEAD){ askAtPath(p.t); return; }
     if(onBody){ lookAt(d.hit.id); return; }
+    /* Last, after the road and after the worlds: a tap on the ring a world
+       travels on asks the clock to wait until that world gets there. It is
+       the other half of a transfer — the road says where you will be, and
+       until now nothing on the chart would tell you when anybody else would
+       be anywhere. A rail runs through its own world, so the world has to
+       win that tie or a planet could not be tapped at all. */
+    /* Not while tied up. A skip started at a dock sets the rate and then
+       never stops — the loop drops `warpTarget` the moment it sees a docked
+       ship — so the clock would run away at a hundred days a second on a
+       promise of ten seconds. The same reason the road is not tappable here. */
+    const rail = state.dockedAt ? null : chart.nearestRailPoint(e.clientX, e.clientY, state.t);
+    if(rail){ askSkip(rail.t, `${S.portName(rail.id)} reaching that point`); return; }
     selectedNode = -1; if(tab === 'plan') renderTab();
   }
   if(d.kind === 'node'){ tutorialCheck(); save(); }

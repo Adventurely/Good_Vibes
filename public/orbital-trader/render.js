@@ -21,7 +21,7 @@
  *    SOI rings, docking zones) are in au and grow with the zoom.
  */
 
-import { absState, railState, unit, norm, add, sub, scale, perp, dist, propagate } from './orbit.js';
+import { absState, railState, meanMotion, unit, norm, add, sub, scale, perp, dist, propagate } from './orbit.js';
 import { drawSprite } from './sprites.js';
 
 /* The palette: a star chart drawn on paper. The same paper as every page on
@@ -72,6 +72,14 @@ export const PALETTE = {
   shipHalo:   'rgba(255,255,255,0.22)',
   node:       '#ffd23f',
   nodeRing:   'rgba(255,210,63,0.7)',
+  /* Where the road cuts across a world's rail, and where that world will be
+     when it does. Orange, because every other mark on this chart is already
+     spoken for: white is the road you are on, yellow is the road a burn
+     would put you on, and a coloured dot is a world. A pair of orange
+     diamonds is neither, which is the point — they are a question about
+     timing, and the gap between them is the answer. */
+  railCross:  '#f59a2e',
+  railTie:    'rgba(245,154,46,0.38)',
   prograde:   '#6cc24a',
   retrograde: '#f59a2e',
   radial:     '#5aa6e8',
@@ -131,7 +139,7 @@ export function createChart(canvas, world, opts = {}){
        the right of the chart, negative y when a sheet covers the bottom. */
     offset: [0, 0],
     /* Last frame's screen-space records, for hit testing. */
-    hits: { bodies: [], nodes: [], handles: [], pathSegs: [], inset: null },
+    hits: { bodies: [], nodes: [], handles: [], pathSegs: [], rails: [], inset: null },
     reducedMotion: !!opts.reducedMotion,
     /* The scale bar is a navigation tool. On a thumbnail or behind a title it
        is a stray measurement in the corner of a picture. */
@@ -225,6 +233,7 @@ export function createChart(canvas, world, opts = {}){
   chart.draw = view => draw(chart, view);
   chart.hitTest = (x, y) => hitTest(chart, x, y);
   chart.nearestPathPoint = (x, y, prediction, t) => nearestPathPoint(chart, x, y, prediction, t);
+  chart.nearestRailPoint = (x, y, t) => nearestRailPoint(chart, x, y, t);
   chart.resize();
   return chart;
 }
@@ -251,7 +260,7 @@ function draw(chart, view){
   const { ctx, world, camera } = chart;
   const W = chart.width, H = chart.height;
   const t = view.t;
-  chart.hits = { bodies: [], nodes: [], handles: [], pathSegs: [], inset: chart.hits?.inset ?? null };
+  chart.hits = { bodies: [], nodes: [], handles: [], pathSegs: [], rails: [], inset: chart.hits?.inset ?? null };
 
   // Positions of every body now, once per frame.
   const pos = new Map();
@@ -383,6 +392,12 @@ function drawOrbits(chart, pos, t){
     if(b.kind === 'zone' || b.mu === 0) ctx.setLineDash([3, 5]); else ctx.setLineDash([]);
     ellipsePath(ctx, chart, parent, b);
     ctx.stroke();
+    /* A rail that is on the screen is a rail you can tap, so every one that
+       gets drawn writes down what it would take to find a point on it again:
+       where its focus is this frame, and whose gravity it is going round.
+       A rail nobody drew is not tappable, which is what keeps a tap from
+       landing on a hairline nobody can see. */
+    chart.hits.rails.push({ id: b.id, el: b, mu: world.get(b.parent).mu, centre: parent });
   }
   ctx.setLineDash([]);
 }
@@ -614,6 +629,7 @@ function drawPrediction(chart, view, pos){
   }
   drawApses(chart, view, anchors, afterBurnAt);
   drawCrossings(chart, view, anchors, afterBurnAt);
+  drawRailCrossings(chart, view, anchors);
   drawIntercept(chart, view, anchors, afterBurnAt);
 }
 
@@ -674,6 +690,73 @@ function drawCrossings(chart, view, anchors, afterBurnAt){
     if(!to) continue;
     ctx.fillStyle = PALETTE.text;
     ctx.fillText(`${c.kind === 'exit' ? 'out to' : 'into'} ${labelFor(to)}`, p[0] + 12, p[1] + 4);
+  }
+}
+
+/* Cutting across a world's rail: two orange diamonds and a dashed tie.
+ *
+ * One sits where the road crosses the ring the world travels on; the other
+ * sits where that world will actually be at that moment. That pair is the
+ * whole of interplanetary timing. Crossing Veyra's rail means nothing on its
+ * own — the chart has always drawn the crossing, because the rail and the
+ * road are both on it — but crossing it with Veyra a quarter of a lap away
+ * means you left too early, and the length of the tie says by how much.
+ *
+ * Both marks are drawn in the frame of the leg the crossing is on, not the
+ * frame the rail is drawn in. Those are the same thing for the first leg,
+ * which is nearly always where this happens; where they differ (a leg that
+ * has come back out of a moon's reach is pinned to where that leg started,
+ * not to the Lamp) keeping the pair together is what matters, because the
+ * gap between them is the reading.
+ */
+function diamond(ctx, p, r){
+  ctx.beginPath();
+  ctx.moveTo(p[0], p[1] - r); ctx.lineTo(p[0] + r, p[1]);
+  ctx.lineTo(p[0], p[1] + r); ctx.lineTo(p[0] - r, p[1]);
+  ctx.closePath();
+}
+function drawRailCrossings(chart, view, anchors){
+  const { ctx, world } = chart;
+  const list = view.railCrossings ?? [];
+  if(!list.length) return;
+  /* Only for rails that are on the screen. A crossing of a ring nobody can
+     see is two orange diamonds floating in the dark with nothing to be
+     against. */
+  const drawn = new Set(chart.hits.rails.map(r => r.id));
+  /* One name per world, on the crossing you reach first. A road that cuts a
+     rail going in and again coming out earns two pairs of diamonds — both are
+     real and both are worth drawing — but not two labels saying the same word
+     a few pixels apart. */
+  const named = new Set();
+  ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
+  for(const c of list){
+    if(!drawn.has(c.body)) continue;
+    const anchor = anchors[c.segIndex];
+    if(!anchor) continue;
+    const p = chart.toScreen(add(anchor, c.r));
+    const q = chart.toScreen(add(anchor, c.ghost));
+    const out = s => s[0] < -80 || s[1] < -40 || s[0] > chart.width + 80 || s[1] > chart.height + 40;
+    if(out(p) && out(q)) continue;
+    const apart = Math.hypot(q[0] - p[0], q[1] - p[1]);
+    if(apart > 12){
+      ctx.strokeStyle = PALETTE.railTie; ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    ctx.strokeStyle = PALETTE.railCross; ctx.lineWidth = 1.5;
+    diamond(ctx, p, 5); ctx.stroke();
+    diamond(ctx, q, 5); ctx.stroke();
+    /* Whose rail it is, on the world's own mark. Left off when the two are
+       nearly on top of each other: that is an arrival, the encounter window
+       is already saying so in words, and a third label on the same pixels is
+       a pile rather than a chart. */
+    const b = world.get(c.body);
+    if(b && apart > 18 && !out(q) && !named.has(c.body)){
+      named.add(c.body);
+      ctx.fillStyle = PALETTE.textDim;
+      ctx.fillText(labelFor(b), q[0] + 9, q[1] + 4);
+    }
   }
 }
 
@@ -1009,6 +1092,108 @@ function nearestPathPoint(chart, x, y, prediction, tNow){
   }
   if(!best || best.d > 18 || best.t <= (tNow ?? -Infinity)) return null;
   return best;
+}
+
+/* Nearest point on a world's rail to a screen point, and the moment that
+ * world is next there. Everything else on this chart answers "where will I
+ * be"; this is the other half of a transfer — "when is *it* there" — and the
+ * answer is a time you can hand straight to the clock.
+ *
+ * Walked as a polyline in time rather than solved in closed form. Sampling by
+ * time is what makes the answer a time at all: no inverting Kepler, and the
+ * samples agree with where the body is actually drawn because they come from
+ * the same function that draws it. One lap from now, so the time that comes
+ * back is always the next time round and never one already gone. */
+const RAIL_SAMPLES = 180;
+function nearestRailPoint(chart, x, y, tNow){
+  let best = null;
+  for(const rail of chart.hits.rails){
+    const n = meanMotion(rail.mu, rail.el.a);
+    if(!Number.isFinite(n) || n <= 0) continue;
+    const period = 2 * Math.PI / n;
+    let prev = null, prevT = 0;
+    for(let i = 0; i <= RAIL_SAMPLES; i++){
+      const t = tNow + (i / RAIL_SAMPLES) * period;
+      const here = chart.toScreen(add(rail.centre, railState(rail.el, rail.mu, t).r));
+      if(prev){
+        const abx = here[0] - prev[0], aby = here[1] - prev[1];
+        const len2 = abx * abx + aby * aby || 1e-9;
+        const u = Math.max(0, Math.min(1, ((x - prev[0]) * abx + (y - prev[1]) * aby) / len2));
+        const px = prev[0] + u * abx, py = prev[1] + u * aby;
+        const d = Math.hypot(px - x, py - y);
+        if(!best || d < best.d) best = { kind: 'rail', id: rail.id, d, t: prevT + u * (t - prevT), x: px, y: py };
+      }
+      prev = here; prevT = t;
+    }
+  }
+  /* Tighter than the road's eighteen. The road is the thing a player is
+     aiming at and there is one of it; rails are scenery and there are
+     fifteen, so a rail has to be tapped rather than merely tapped near. */
+  if(!best || best.d > 12) return null;
+  return best;
+}
+
+/* Where the drawn road cuts across the rail of a world going round the same
+ * thing, and where that world will be when it does.
+ *
+ * The road is a conic in the parent's frame and a rail is an ellipse in the
+ * same frame, so a crossing is where the ship's distance from the focus meets
+ * the rail's distance at that same bearing. Walk the leg's own sample points
+ * watching that difference change sign, then bisect on the real conic — the
+ * samples say which pair of moments to look between, and the bisection says
+ * exactly when. */
+function railRadiusAt(el, th){
+  const { a, e = 0, omega = 0, retrograde } = el;
+  if(!e) return a;
+  /* A retrograde rail is the same ellipse mirrored in y, so its radius at a
+     bearing is the unmirrored radius at the opposite bearing. */
+  return a * (1 - e * e) / (1 + e * Math.cos((retrograde ? -th : th) - omega));
+}
+export function railCrossings(world, prediction, tNow, opts = {}){
+  /* `minLead` is what keeps the ship's own doorstep off the chart. A ship
+     that has just left Tassel is sitting exactly on Tassel's rail, so the
+     first sample is a crossing at t = now — true, useless, and drawn right
+     on top of the ship. */
+  const { limit = 8, minLead = 0 } = opts;
+  const out = [];
+  if(!prediction?.segments) return out;
+  for(let si = 0; si < prediction.segments.length; si++){
+    const seg = prediction.segments[si];
+    const parent = world.get(seg.body);
+    const pts = seg.points, times = seg.times;
+    if(!parent || !pts || pts.length < 2 || !times) continue;
+    const mu = parent.mu;
+    for(const b of world.bodies){
+      if(b.parent !== seg.body || !(b.a > 0)) continue;
+      const gap = r => norm(r) - railRadiusAt(b, Math.atan2(r[1], r[0]));
+      let prevGap = gap(pts[0]);
+      for(let i = 1; i < pts.length; i++){
+        const g = gap(pts[i]);
+        const crossed = (prevGap < 0) !== (g < 0);
+        prevGap = g;
+        if(!crossed) continue;
+        const at = t => gap(propagate(mu, seg.r0, seg.v0, t - seg.t0).r);
+        let lo = times[i - 1], hi = times[i];
+        const loInside = at(lo) < 0;
+        for(let k = 0; k < 40; k++){
+          const mid = (lo + hi) / 2;
+          if((at(mid) < 0) === loInside) lo = mid; else hi = mid;
+        }
+        const t = (lo + hi) / 2;
+        if(t <= tNow + minLead) continue;
+        out.push({
+          segIndex: si, body: b.id, t,
+          r: propagate(mu, seg.r0, seg.v0, t - seg.t0).r,
+          ghost: railState(b, mu, t).r,
+        });
+        // A guard against a pathological road, not the limit the caller asked for.
+        if(out.length >= 64) break;
+      }
+    }
+  }
+  /* Soonest first, so that when there are more crossings than the chart has
+     room for, the ones that survive are the ones you are about to fly. */
+  return out.sort((a, b) => a.t - b.t).slice(0, limit);
 }
 
 /* Where a node sits on the plan: the ship's state at the node's time in the

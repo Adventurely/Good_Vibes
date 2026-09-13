@@ -127,6 +127,28 @@ The road has three voices and they always mean the same thing: the orbit you are
 
 A road that predicts nine encounters is a road nobody can read, and every prediction past the first is a guess that a single burn will erase anyway. One crossing at a time is enough.
 
+**Where the road cuts a world's rail, the chart says where that world will be.**
+Two orange diamonds joined by a faint dashed tie: one on the road at the
+crossing, one on the rail at the place that world has reached by then. This is
+the reading interplanetary flight actually turns on. Crossing Veyra's orbit
+means nothing on its own — the road and the rail are both drawn, so the
+crossing has always been visible — but crossing it with Veyra a quarter of a
+lap away means you left too early, and the tie is how much too early. Only
+rails that are on the screen are marked, only the soonest handful, and only one
+name per world however many times the road cuts its ring.
+
+**Tapping a world's rail asks the clock to wait until that world gets there.**
+The other half of the same question. Everything else on the chart answers
+"where will I be"; until this, nothing answered "when is anybody else
+anywhere". A tap on the ring a world travels on offers the same skip-ahead
+card a tap on your own road does, with the time counted to the moment that
+world reaches the point under your finger — so the usual way to plan a
+transfer is to tap a rail, read the wait, and burn from there. The road wins a
+tie over a rail and a world wins over both, because a rail runs straight
+through its own world and a planet has to stay tappable. Tied up at a dock,
+neither the road nor a rail takes a tap: a skip started at a port sets the
+rate and never stops.
+
 ### 2.7 Trading
 
 Trade is built around one central tension: **time versus fuel.**
