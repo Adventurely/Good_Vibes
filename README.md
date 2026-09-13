@@ -368,7 +368,7 @@ public/index.html   the shelf: every game, thumbnails painted by their own
                     renderers rather than screenshotted
 public/solarium/    Save Solarium, client and content
 public/sunward/content.js  Sunward as data — the nine growers and their curve,
-                    the eighteen upgrades, the medals, the day, the record, and
+                    the twenty upgrades, the medals, the day, the record, and
                     the pure functions over all of it. No DOM, no clock, no save
 public/sunward/art.js  the lot: sky, ground, nine prop sprites, and a tree
                     that is grown by a recursion rather than drawn as a sprite
@@ -1541,8 +1541,9 @@ node test/sunward-balance.mjs 345600 8      # four days, at eight
 ```
 
 It runs as part of `npm test`, the way `test/balance.mjs` does for Good Vibes,
-and it carries four coarse guardrails: something is making energy after a
-minute, three kinds are planted within the hour, the first seed is inside an
+and it carries five coarse guardrails: something is making energy after a
+minute, the hand has made at least two fifths of the energy at the quarter
+hour, three kinds are planted within the hour, the first seed is inside an
 evening, and all but one of the nine kinds are on the lot within a day. The
 shape of the curve
 is pinned in `test/sunward.test.js`; this measures what a player actually ends
@@ -1555,7 +1556,7 @@ second at all — see below. And the lot's sprites appeared at 1, 10, 25 and 60
 owned, which drew four things for a garden of ninety-one — the picture was a
 third of the way through the game while the shop was most of the way.
 
-**Nine growers and eighteen upgrades**, down from twelve and forty-two. Three of
+**Nine growers and twenty upgrades**, down from twelve and forty-two. Three of
 the twelve were the same idea as a tier already on the list — a second fungus, a
 coral reef nobody could explain, an orbital mirror that was a second sun — and
 most of the forty-two were the same upgrade sold twice: six doublings of the
@@ -1564,6 +1565,30 @@ swing, two rows per grower. A row that is "the row above, again, bigger" is not
 a choice, it is a longer list. What is left is one line of each kind, every
 grower improved exactly once, and a test that fails the moment two rows do the
 same thing to the same target.
+
+**The hand has to keep up, and for a week it did not.** The question was how
+long the first replant takes, and the harness answered it for eight ways of
+playing: between an hour and nine minutes (eight taps a second, never
+stopping) and an hour and forty-nine (thirty taps and a closed lid). Tapping
+was worth forty minutes over an hour and three quarters, because a tap was
+worth two energy from the first minute to the forty-fifth, by which time the
+lot made a hundred and fifty a second — the hand was two percent of income
+from the half hour on, and the second and third doublings of it were priced
+to land at forty minutes and five hours, where a doubling of two is nothing
+anybody notices. Three things changed. The hand's rows now land in the first
+quarter hour — Steady hands at 900 rather than 30,000, Gleaning at 600 for two
+percent of the rate rather than 25,000 for one. And two rows came back, as
+new kinds rather than more steps: *Momentum*, a quarter more per tap a second
+the hand is going, capped at eight so an autoclicker is worth exactly what a
+flurry is; and *Windfall*, every tenth tap of the run paying ten, counted off
+the run rather than rolled so the same tap is the tenth in the browser and in
+the test. Over a hundred taps Windfall is worth a doubling, but it is not
+shaped like one — it gives the hand a beat. The harness now reads: at four
+taps a second and not stopping, the first replant at forty-nine minutes; at
+eight, twenty-five; tapping for the first quarter hour and leaving, an hour
+and twenty-four, with the hand making two thirds of the energy while it is
+at the desk. The idle path is untouched, which is the point: the lever that
+moved was the one the player is holding.
 
 **The lot is the page.** The frame around it is one thin row — the name, a
 way back, a way to start over — the four numbers that never go away, and the

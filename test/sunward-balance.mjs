@@ -3,7 +3,7 @@
  * The numbers in `public/sunward/content.js` cannot be read off the table. A
  * tier's cost and its output are two dials, what a player actually owns at hour
  * four is the two of them fought out against a 15% price rise per purchase and
- * eighteen upgrades, and the failures that matter — a tier nobody reaches, an
+ * twenty upgrades, and the failures that matter — a tier nobody reaches, an
  * upgrade that unlocks after everyone has stopped playing — are invisible on
  * screen for days. So they are measured.
  *
@@ -44,7 +44,7 @@ const TAP_UNTIL = 900;                          // then they leave it running
  * floor for how well somebody plays a clicker; it is a different game.
  */
 function step(state, dt){
-  tick(state, dt);
+  const grown = tick(state, dt);
 
   for(const up of offered(state)) if(!studyRefusal(state, up.id)) study(state, up.id);
 
@@ -55,11 +55,12 @@ function step(state, dt){
     if(!best || payback < best.payback) best = { id: g.id, payback, cost };
   }
   if(best && state.light >= best.cost) plant(state, best.id, 1);
+  return grown;
 }
 
 /* ------------------------------------------------------------------ report --- */
 
-const MARKS = [60, 600, 1800, 3600, 4 * 3600, 12 * 3600, 24 * 3600, 48 * 3600, 96 * 3600]
+const MARKS = [60, 600, 900, 1800, 3600, 4 * 3600, 12 * 3600, 24 * 3600, 48 * 3600, 96 * 3600]
   .filter(at => at <= HORIZON);
 
 const state = newGame();
@@ -68,9 +69,11 @@ const rows = [];
 let firstSeed = null;
 const reached = {};
 
+let byHand = 0, byLot = 0;
 for(let at = 0; at <= HORIZON; at += DT){
-  step(state, DT);
-  if(at < TAP_UNTIL) for(let i = 0; i < TAPS * DT; i++) tap(state);
+  byLot += step(state, DT);
+  // The rate is passed in, as the page passes it: Momentum reads it.
+  if(at < TAP_UNTIL) for(let i = 0; i < TAPS * DT; i++) byHand += tap(state, TAPS);
   if(firstSeed === null && pendingSeeds(state) >= 1) firstSeed = at;
   for(const id of GROWER_IDS) if(reached[id] === undefined && state.owned[id] > 0) reached[id] = at;
 
@@ -84,19 +87,21 @@ for(let at = 0; at <= HORIZON; at += DT){
       seeds: pendingSeeds(state),
       kinds: GROWER_IDS.filter(id => state.owned[id] > 0).length,
       owned: { ...state.owned },
+      hand: byHand / Math.max(1, byHand + byLot),
     });
   }
 }
 
 console.log(`Sunward balance — ${formatTime(HORIZON)} at ${TAPS} taps a second`
   + ` for the first ${formatTime(TAP_UNTIL)}, ${(HORIZON / DAY_LENGTH).toFixed(0)} in-game days\n`);
-console.log('   time |     rate |  lifetime | ups | seeds | kinds | what is on the lot');
+console.log('   time |     rate |  lifetime | ups | seeds | kinds | by hand | what is on the lot');
 for(const row of rows){
   const lot = GROWER_IDS.filter(id => row.owned[id] > 0).map(id => `${id}:${row.owned[id]}`).join(' ');
   console.log(
     `${formatTime(row.at).padStart(7)} | ${(formatLight(row.rate) + '/s').padStart(8)}`
     + ` | ${formatLight(row.lifetime).padStart(9)} | ${String(row.upgrades).padStart(3)}`
-    + ` | ${String(row.seeds).padStart(5)} | ${String(row.kinds).padStart(5)} | ${lot}`,
+    + ` | ${String(row.seeds).padStart(5)} | ${String(row.kinds).padStart(5)}`
+    + ` | ${(Math.round(row.hand * 100) + '%').padStart(7)} | ${lot}`,
   );
 }
 
@@ -114,6 +119,12 @@ const first = rows.find(row => row.at === 60);
 if(first){
   assert.ok(first.rate > 0.2,
     `a minute in, the lot makes ${formatLight(first.rate)}/s — the opening is too slow to feel like anything`);
+}
+const quarter = rows.find(row => row.at === 900);
+if(quarter && TAPS >= 4 && TAP_UNTIL >= 900){
+  assert.ok(quarter.hand >= 0.4,
+    `a quarter hour in, the hand has made ${Math.round(quarter.hand * 100)}% of the energy — tapping`
+    + ' is not worth doing, and a clicker in which clicking does not matter is a screensaver');
 }
 const hour = rows.find(row => row.at === 3600);
 if(hour){
