@@ -407,6 +407,111 @@ test('three jobs pay in a person, and finishing one fills that berth', () => {
   }
 });
 
+/* ------------------------------------------------------- the distress call */
+
+/* Adrift with a dead tank, somewhere out past Tassel. */
+function adrift(opts = {}){
+  const g = S.newGame(5);
+  g.dockedAt = null; g.justLeft = null; g.justLeftAt = -1e9;
+  g.ship = { body: 'lamp', r: opts.r ?? [1.4, 0.2], v: [0, 0.01] };
+  g.dv = 0;
+  g.t = opts.t ?? 50;
+  g.money = opts.money ?? 1000;
+  g.lastPort = opts.lastPort ?? 'veyra';
+  return g;
+}
+
+test('a distress call goes to the last dock and costs half of everything', () => {
+  // Adrift out past the Belt, with the last mooring two au sunward of that.
+  const g = adrift({ r: [-2, 1.2] });
+  assert.ok(S.canCallDistress(g));
+  const q = S.distressQuote(g);
+  /* The point of the feature: the port that answers is the one you last tied
+     up at, which is not the one a tug would come from. */
+  assert.equal(q.port, 'veyra');
+  assert.notEqual(q.port, S.nearestPort(g).id, 'the test is worthless if the last dock is also the nearest');
+  assert.equal(q.cost, 500);
+
+  const before = g.money;
+  const r = S.callDistress(g);
+  assert.equal(r.port, 'veyra');
+  assert.equal(g.dockedAt, 'veyra', 'and the ship is tied up there');
+  assert.equal(g.money, before / 2, 'half the purse, and no more');
+  assert.equal(g.debt, 0, 'a share is never a debt');
+  assert.deepEqual(g.nodes, [], 'the plan went with the tank');
+  assert.equal(g.stats.rescues, 1);
+  assert.ok(g.visited.includes('veyra'));
+  // The ship is really at that dock, not merely labelled with it.
+  assert.ok(O.dist(S.shipAbsPos(g), O.absState(world, "veyra", g.t).r) < world.get("veyra").soi);
+});
+
+test('half of nothing is nothing, so running dry never costs a save', () => {
+  /* The design guarantee. A tow has a price and a purse can be empty — that
+     is what the harbour bank is for — but a share can always be paid. */
+  const g = adrift({ money: 0, lastPort: 'slate' });
+  const r = S.callDistress(g);
+  assert.ok(r, 'a broke pilot is still fetched');
+  assert.equal(r.cost, 0);
+  assert.equal(g.money, 0);
+  assert.equal(g.debt, 0);
+  assert.equal(g.dockedAt, 'slate');
+  // And one coin buys a rescue and keeps the coin.
+  const h = adrift({ money: 1, lastPort: 'slate' });
+  assert.equal(S.distressQuote(h).cost, 0);
+});
+
+test('a rescue never puts a dry ship somewhere it could not leave', () => {
+  /* The Arc and the Maw sell nothing to burn. Being set down at one with an
+     empty tank is not a rescue, it is a slower version of the same problem. */
+  for(const id of Object.keys(PORTS)){
+    if(PORTS[id].fuelPricePerKms != null) continue;
+    const g = adrift({ lastPort: id, r: [2.2, 0.3] });
+    const q = S.distressQuote(g);
+    assert.notEqual(q.port, id, `a call from a dry ship was answered by ${id}, which sells no fuel`);
+    assert.equal(q.home, false, 'and it says so rather than pretending');
+    assert.ok(PORTS[q.port].fuelPricePerKms != null, `${q.port} sells no fuel either`);
+  }
+});
+
+test('help answers a tank that is empty, and only that', () => {
+  // A metre per second left is still a ship that can change its mind.
+  const low = adrift(); low.dv = 1e-6;
+  assert.equal(S.canCallDistress(low), false);
+  assert.equal(S.callDistress(low), null, 'and calling anyway does nothing');
+  // Tied up is not adrift.
+  const moored = S.newGame(5); moored.dv = 0; moored.dockedAt = 'tassel';
+  assert.equal(S.canCallDistress(moored), false);
+  assert.equal(S.callDistress(moored), null);
+});
+
+test('a ship remembers the last dock it was tied up at', () => {
+  const g = S.newGame(5);
+  assert.equal(g.lastPort, CONST.START_PORT, 'a new ship counts where it was let go from');
+  /* Undocking must not forget it — that is the whole point of the record, and
+     a ship is never docked at the moment it needs rescuing. */
+  const near = S.newGame(5);
+  near.dockedAt = null; near.justLeft = null;
+  const veyra = world.get('veyra');
+  const st = O.circularState(veyra.mu, veyra.dockAlt, 0);
+  near.ship = { body: 'veyra', r: st.r, v: st.v };
+  assert.ok(S.dock(near).ok, 'docked at Veyra');
+  assert.equal(near.lastPort, 'veyra');
+  S.undock(near);
+  assert.equal(near.lastPort, 'veyra', 'casting off does not erase where you cast off from');
+
+  // A save from before anybody could call for help still knows who to call.
+  const old = JSON.parse(S.serialize(near));
+  delete old.lastPort;
+  assert.ok(PORTS[S.restore(old).lastPort], 'a save with no record of it gets a workable one');
+});
+
+test('the page offers the distress call when the tank is dead', () => {
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.match(PLAY, /data-act="distress"/, 'there is no button to press');
+  assert.match(PLAY, /distress\(\)\s*\{\s*showDistress\(\)/, 'and nothing listening for it');
+  assert.match(PLAY, /S\.callDistress\(state\)/, 'the button never reaches the game');
+});
+
 test('the crew menu has a captain to show and three berths to leave empty', () => {
   const c = TEXT.crew;
   assert.ok(c?.captain?.role && c.captain.name && c.captain.line, 'the captain has no card');

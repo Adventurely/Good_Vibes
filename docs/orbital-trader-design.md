@@ -66,7 +66,15 @@ The player therefore **starts in orbit**, not moored. A new game opens with the 
 
 Arrival uses a generous **docking zone** around each port. Entering it below a relative-speed threshold counts as arrival. If the player comes in too fast, they can simply plan a correction burn and try again. Mid-course corrections are cheap and encouraged. Planning previews show everything the player needs, so failure comes from choices, not surprises.
 
-Running out of fuel is not a game over. A stranded ship can call for a tow at a cost in money and time, and a stranding is a natural hook for an event.
+Running out of fuel is not a game over, and there are two ways out of it, which cost different things.
+
+A **tow** can be called at any time, stranded or not. A tug comes from the nearest port that sells fuel, charges a fixed sum by distance, and takes months. If the purse cannot cover it the Tassel harbour bank fronts the rest and takes the difference out of later sales — so a tow always works, but it can leave a ship in debt.
+
+A **distress call** opens only when the tank is completely empty and the ship is adrift. It goes to the last dock the ship tied up at, they come and get you, and they take **half of everything you have**. No days, no debt, and the hold comes with you. The price is a share rather than a sum on purpose: half of nothing is nothing, so the one player a tow cannot rescue — dry tank, empty purse, nobody to lend to them — is rescued for free. That is the floor under the guarantee that nothing costs a save.
+
+The two are a real choice rather than a better and a worse. A tow is usually far cheaper in coin and costs a season; a distress call is instant and expensive, and gets more expensive the better the run has been going. And the destination differs: a tug takes you to whatever is nearest, which may be nowhere you were going, while a distress call takes you back to the port you set out from. If that port sells nothing to burn — the Arc and the Maw do not — the call is answered by the nearest port that does, and the card says so rather than delivering a dry ship somewhere it could never leave.
+
+A stranding remains a natural hook for an event.
 
 ### 2.4 Skill Curve
 

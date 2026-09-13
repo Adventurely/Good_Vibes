@@ -406,6 +406,11 @@
    "A salvage crew arrives before the tug does, looks disappointed, and helps anyway.",
    "You are fished out, dusted off, and handed a bill written in a very steady hand."
   ],
+  "distress": [
+   "They come out for you without being asked twice, which is its own kind of comment. Nobody mentions the fee; the fee mentions itself.",
+   "The harbour master remembers your ship, remembers what you paid last time, and works out what half of everything is before the ship is even alongside.",
+   "A long quiet ride home behind somebody else's engine, with your own tank ticking as it cools and nothing to do but think about it."
+  ],
   "towAtmosphere": "The clouds took the hull without a shield on it. The frogs fished you out and hummed the whole time they were doing it.",
   "firstTransfer": "You are out of every world's gravity now, on the Lamp's own books. The transfer starts here and ends wherever you aimed it.",
   "firstAssist": "You fell past Grumm and came out faster than you went in, with the tank untouched. The frogs call that a slingshot. Grumm has not noticed.",
@@ -509,7 +514,7 @@
   "onStranded": [
    "The tank is dry. Nothing is on fire; we simply cannot change our mind about anything now.",
    "Out of what you had left. The path we are on is the path we get, unless somebody comes out.",
-   "Dry. A tow costs money and days. It has happened to better pilots, most of whom deny it."
+   "Dry. A distress call costs half of everything and no time at all; a tow costs less and takes months. It has happened to better pilots, most of whom deny it."
   ]
  },
  "logTemplates": {
@@ -522,6 +527,7 @@
   "sold": "Sold {qty} × {good} at {port} for {price}.",
   "bought": "Bought {qty} × {good} at {port} for {price}.",
   "towed": "Towed to {port}: {cost}, {days}.",
+  "rescued": "Distress call answered by {port}. Half the purse: {cost}.",
   "tolled": "Paid the Belt toll to {captain}.",
   "refuelled": "Took on {amount} at {port} for {price}.",
   "upgraded": "Fitted {name} at {port}.",

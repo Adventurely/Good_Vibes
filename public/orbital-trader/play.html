@@ -831,7 +831,7 @@ function handleEvents(events){
     if(e.kind === 'story') toast(e.text, 'story', 9000);
     if(e.kind === 'toll'){ stopSkip(); showToll(e.pending); }
     if(e.kind === 'crash'){ stopSkip(); showCrash(e.body); }
-    if(e.kind === 'dry'){ stopSkip(); toast(TEXT.captainLines.onStranded[1] ?? 'The tank is dry.', 'bad', 8000); if(tab === 'plan') renderTab(); }
+    if(e.kind === 'dry'){ stopSkip(); toast(`${TEXT.captainLines.onStranded[1] ?? 'The tank is dry.'} Burns has the distress call.`, 'bad', 9000); if(tab === 'plan') renderTab(); }
     if(e.kind === 'missed'){ toast(e.count > 1 ? `${e.count} burns went by unspent.` : 'That burn went by unspent.', 'bad'); if(tab === 'plan') renderTab(); }
   }
 }
@@ -1634,8 +1634,18 @@ function plan(){
   }
   out += aheadList();
   if(state.dv <= 1e-9){
+    /* A dead tank is the one hole a tow cannot always dig you out of, because
+       a tow has a price and a purse can be empty. The distress call is the
+       floor under that: half of whatever you have, and the dock you last tied
+       up at comes and gets you. */
+    const d = S.distressQuote(state);
+    out += `<h3>Dry tank</h3><p>${esc(TEXT.captainLines.onStranded[2] ?? '')}</p>`;
+    if(d){
+      out += `<p>${d.home ? `A call to ${esc(S.portName(d.port))}, where you last tied up` : `Nobody is left at your last mooring who could fetch you; ${esc(S.portName(d.port))} would come instead`}. They ask half of everything: ${S.fmtMoney(d.cost)}.</p>`
+        + `<button class="btn wide danger" data-act="distress">Send a distress call</button>`;
+    }
     const q = S.towQuote(state);
-    out += `<h3>Dry tank</h3><p>${esc(TEXT.captainLines.onStranded[2] ?? '')}</p><p>A tow to ${esc(S.portName(q.port))}: ${S.fmtMoney(q.cost)}, ${S.fmtDays(q.days)}.</p><button class="btn wide" data-act="tow">Call for a tow</button>`;
+    out += `<p class="lock" style="margin-top:.8rem">Or a tow to ${esc(S.portName(q.port))}: ${S.fmtMoney(q.cost)}, ${S.fmtDays(q.days)}. <button class="btn sm" data-act="tow">Call for a tow</button></p>`;
   }else{
     out += `<p class="lock" style="margin-top:1rem">Stuck anywhere? <button class="btn sm" data-act="tow">Call for a tow</button></p>`;
   }
@@ -1841,6 +1851,7 @@ const actions = {
   zeronode(i){ const n = state.nodes[Number(i)]; if(!n) return; n.prograde = 0; n.radial = 0; replan(true); renderTab(); save(); },
   shift(i, d){ const n = state.nodes[Number(i)]; n.t = Math.max(state.t + 1e-3, n.t + Number(d)); state.nodes.sort((a, b) => a.t - b.t); selectedNode = state.nodes.indexOf(n); replan(true); renderTab(); },
   tow(){ showTow('dry'); },
+  distress(){ showDistress(); },
   newgame(){ confirmNew(); },
 };
 
@@ -1925,6 +1936,34 @@ function showTow(reason){
 function afterTow(r){
   selectedNode = -1; replan(true); panelMenu = 'dock'; tab = 'shipyard'; renderTabs(); setTab('shipyard'); stopSkip();
   openModal(`<h2>Towed to ${esc(S.portName(r.port))}</h2><p class="say">${esc(r.story)}</p><p>${S.fmtDays(r.days)} later and ${S.fmtMoney(r.cost)} poorer, you are docked. ${state.debt > 0 ? esc(TEXT.events.bankDebt) : ''}</p><div class="btns"><button class="btn primary" id="m-ok">Carry on</button></div>`, m => m.querySelector('#m-ok').addEventListener('click', closeModal));
+  save();
+}
+/* The distress call. Two numbers and no arithmetic to do: where they will
+   put you down, and what half of everything comes to. */
+function showDistress(){
+  const d = S.distressQuote(state);
+  if(!d){ toast('There is nobody within reach to call.', 'bad'); return; }
+  openModal(`<h2>Send a distress call?</h2>
+    <p>${d.home
+      ? `${esc(S.portName(d.port))} knows your ship. They will come out and bring you in.`
+      : `There is no getting you back to ${esc(S.portName(state.lastPort))} — nothing to burn is sold there, and a dry ship put down there would stay. ${esc(S.portName(d.port))} answers instead.`}</p>
+    <p>They take half of everything you have: <b>${S.fmtMoney(d.cost)}</b>, leaving you ${S.fmtMoney(state.money - d.cost)}. Your hold comes with you.</p>
+    <div class="btns"><button class="btn" id="m-no">Not yet</button><button class="btn danger" id="m-yes">Send it</button></div>`, m => {
+    m.querySelector('#m-no').addEventListener('click', closeModal);
+    m.querySelector('#m-yes').addEventListener('click', () => {
+      const r = S.callDistress(state);
+      closeModal();
+      if(!r){ toast('The call would not go out.', 'bad'); return; }
+      afterDistress(r);
+    });
+  });
+}
+function afterDistress(r){
+  selectedNode = -1; replan(true); panelMenu = 'dock'; tab = 'shipyard'; renderTabs(); setTab('shipyard'); stopSkip();
+  /* Arriving is arriving: whatever the place has to say to a first visitor,
+     and whatever job ended here, says itself. */
+  handleEvents(r.events ?? []);
+  openModal(`<h2>Brought in to ${esc(S.portName(r.port))}</h2><p class="say">${esc(r.story)}</p><p>${S.fmtMoney(r.cost)} lighter, and tied up. The pumps are over there.</p><div class="btns"><button class="btn primary" id="m-ok">Carry on</button></div>`, m => m.querySelector('#m-ok').addEventListener('click', closeModal));
   save();
 }
 function showStory(name, text){
