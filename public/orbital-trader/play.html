@@ -944,20 +944,24 @@ function askSkip(t, what){
    burn down at that moment, or skip the clock to it. One gesture, two big
    buttons, and the time to that point on the card either way. */
 function askAtPath(t){
-  const room = state.nodes.length < S.MAX_NODES;
+  /* One mark at a time while the lesson is running. The button is simply not
+     available — no toast, no explanation: a beginner who has not been told
+     they may have six does not need telling they may not. */
+  const room = state.nodes.length < S.maxNodes(state);
+  const full = S.tutorialRunning(state) ? '' : ' title="Six is plenty for one path."';
   const plan = S.skipPlan(state, t);
   const place = whereAt(t);
   openModal(`<h2>${S.fmtDays(Math.max(0, t - state.t))} along your path</h2>
     <div class="btns">
       <button class="btn" id="m-skip" ${plan ? '' : 'disabled'}>Warp here</button>
-      <button class="btn primary" id="m-burn" ${room ? '' : 'disabled title="Six is plenty for one path."'}>Plan a burn</button>
+      <button class="btn primary" id="m-burn" ${room ? '' : 'disabled' + full}>Plan a burn</button>
       <button class="btn ghost" id="m-close">Close</button>
     </div>`, m => {
     m.querySelector('#m-close').addEventListener('click', closeModal);
     m.querySelector('#m-burn').addEventListener('click', () => {
       closeModal();
       const ix = S.addNode(state, t);
-      if(ix < 0){ toast('No room for another burn on this path.', 'bad'); return; }
+      if(ix < 0) return;   // the button is already disabled when there is no room
       /* The chart is the editor, so writing a burn down leaves the panel
          exactly as it was: shoving the side menu open over the sky is the
          opposite of what somebody who just tapped the sky wanted. */
@@ -1795,11 +1799,6 @@ const actions = {
     selectedNode = -1; replan(true); renderTabs(); backToShip(true); tutorialCheck(); save();
   },
   dock(){ doDock(); },
-  addmark(){
-    const ix = S.addNodeAhead(state);
-    if(ix < 0){ toast('No room for another burn on this path.', 'bad'); return; }
-    selectedNode = ix; holdForPlanning(ix); replan(true); renderTab(); tutorialCheck();
-  },
   closenode(){ selectedNode = -1; replan(true); renderTab(); save(); },
   selnode(i){ selectedNode = selectedNode === Number(i) ? -1 : Number(i); replan(true); renderTab(); },
   delnode(i){ S.removeNode(state, Number(i)); selectedNode = -1; replan(true); renderTab(); save(); },

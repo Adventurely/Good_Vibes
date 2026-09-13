@@ -756,9 +756,21 @@ export function questCheck(state, events = []){
 export const QUIET_DAYS = CONST.BASE_RATE_DAYS_PER_SEC * 120;
 
 export const MAX_NODES = 6;
+
+/* The lesson is running until it is finished or waved off. Both flags are set
+ * by the page, but the rule they gate is a rule about the plan, so it is
+ * answered here where everything that writes a mark can ask it. */
+export const tutorialRunning = state => !(state.flags?.tutorialDone || state.flags?.tutorialSkipped);
+/* How many marks a path may carry: six, and one while the lesson is running.
+ * The cards teach one burn at a time and each names the burn it means; a
+ * beginner with three marks on the road cannot tell which one is being talked
+ * about, and the fix for that is not a longer card. Every way of writing a
+ * mark goes through addNode, so this is the only place it has to be said. */
+export const maxNodes = state => (tutorialRunning(state) ? 1 : MAX_NODES);
+
 export const MIN_LEAD = CONST.BASE_RATE_DAYS_PER_SEC * 60;
 export function addNode(state, t){
-  if(state.dockedAt || t < state.t + MIN_LEAD || state.nodes.length >= MAX_NODES) return -1;
+  if(state.dockedAt || t < state.t + MIN_LEAD || state.nodes.length >= maxNodes(state)) return -1;
   state.nodes.push({ t, prograde: 0, radial: 0 });
   state.nodes.sort((a, b) => a.t - b.t);
   return state.nodes.findIndex(n => n.t === t);

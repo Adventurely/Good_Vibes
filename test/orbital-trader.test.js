@@ -415,6 +415,41 @@ test('a portrait is a square grid the palette can actually paint', () => {
  * take your lines, and nothing anywhere listened for a click on it. The
  * button lit up and did nothing, and only the `d` key and the HUD hint
  * actually docked. */
+test('the lesson allows one mark on the path at a time, and says nothing about it', () => {
+  const s = S.newGame(5);
+  S.undock(s);
+  const t = s.t + S.MIN_LEAD * 2;
+  assert.equal(S.tutorialRunning(s), true, 'a new game is mid-lesson');
+  assert.equal(S.maxNodes(s), 1);
+
+  assert.equal(S.addNode(s, t), 0, 'the first mark goes down');
+  assert.equal(S.addNode(s, t + 0.01), -1, 'and the second does not');
+  assert.equal(s.nodes.length, 1, 'nothing happened, which is the whole ask');
+
+  // Rubbing one out frees the berth, so the lesson is never stuck.
+  S.removeNode(s, 0);
+  assert.equal(S.addNode(s, t), 0, 'a mark can always be replaced');
+
+  // Waving the lesson off, or finishing it, gives all six back.
+  for(const flag of ['tutorialSkipped', 'tutorialDone']){
+    const g = S.newGame(5);
+    S.undock(g);
+    g.flags[flag] = true;
+    assert.equal(S.tutorialRunning(g), false, flag);
+    assert.equal(S.maxNodes(g), S.MAX_NODES);
+    for(let i = 0; i < 9; i++) S.addNode(g, g.t + S.MIN_LEAD * 2 + 0.01 * i);
+    assert.equal(g.nodes.length, S.MAX_NODES, `${flag}: the six-mark ceiling still holds`);
+  }
+
+  /* And the page offers no way to trip over it: the button is disabled rather
+     than clickable-and-refusing, and it carries no explanation while the
+     lesson is running. A beginner who has not been told they may have six
+     does not need telling they may not. */
+  const html = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.match(html, /const room = state\.nodes\.length < S\.maxNodes\(state\);/);
+  assert.doesNotMatch(html, /No room for another burn on this path/);
+});
+
 test('the lesson cannot finish itself in the orbit it started in', () => {
   /* A text check, because the lesson's tests live inside the page's module
      and there is no canvas or DOM here to run them against. It is worth the
