@@ -1888,7 +1888,7 @@ timestep anywhere, and nothing tunnels through a small moon at high warp.
 | Time | days (Tessel's year is 360 of them) |
 | Speed, Δv | au/day inside; 1 au/day shows as 1706 km/s, so Tessel's orbit reads 29.8 km/s |
 | Fuel | *is* the Δv budget. A burn subtracts its own size. No mass, no rocket equation |
-| Clock | ×1 is 0.0000347222222 days a second: ten real minutes to a lap of the 75 km orbit a new game opens in over Tessel, which takes 30 minutes of game time |
+| Clock | ×1 is 0.0000370182663 days a second: ten real minutes to a lap of the 100 km orbit a new game opens in over Tassel, which takes 32 minutes of game time. Ten minutes a lap is the rate's only job, so moving the opening orbit moves the rate |
 | Scale | KSP's, not ours: every body is a tenth of real size and many times denser. Tessel is 498 km across with 9.25 m/s² at the ground, air to 70 km, and a reach of 116,500 km |
 
 ### Aiming
@@ -1935,31 +1935,31 @@ node tools/orbital-trader/check-tuning.mjs        # check, and print the Δv tab
 node tools/orbital-trader/check-tuning.mjs --write  # and record it in tuning.json
 ```
 
-It asserts what the design document promises — Tessel's year is exactly 360
-days, no moon can leave its planet's reach, sibling moons never overlap, every
-harbour mouth fits inside a third of its world's reach, Grumm turns a Hohmann
-arrival through at least sixty degrees, Wanderwell reaches kissing distance
-about a year in — and it prints the Δv table the ladder is built on:
+It asserts what the design document promises — the calendar and the sky are
+the same thing, no moon can leave its planet's reach, sibling moons never
+overlap, every harbour mouth sits well inside its world's reach, every harbour
+sits inside its own mouth, Grumm turns a Hohmann arrival through at least
+sixty degrees, a lap of the opening orbit is ten real minutes at ×1 — and it
+prints the Δv table the ladder is built on:
 
 | Route | Δv | Time |
 | --- | --- | --- |
-| Bramble → Ledger, the second lesson | 0.9 km/s | 5 d |
-| Tessel dock → Bramble, the first | 2.2 km/s | 2 d |
-| Tessel → Wanderwell at its kiss | 6.6 km/s | 117 d |
-| Tessel → the Arc | 8.6 km/s | 364 d |
-| Tessel → Claw Rock | 10.0 km/s | 490 d |
-| Tessel → Grumm, loose capture | 7.6 km/s | 935 d |
-| Tessel → Lillimoor's height, circular | 10.7 km/s | 935 d |
-| Tessel → Cinder, docked | 15.9 km/s | 94 d |
-| Tessel → Chime, docked, no assist | 13.6 km/s | 2012 d |
-| Tessel → the Far Lantern | 12.6 km/s | 5271 d |
+| Slate → Moss, the moon hop | 0.15 km/s | 1.1 d |
+| Tassel dock → Slate, the first lesson | 0.18 km/s | 0.3 d |
+| Tassel → Cinder, loose capture | 4.8 km/s | 43 d |
+| Tassel → Cinder, docked | 6.5 km/s | 43 d |
+| Tassel → Nail, the Belt | 8.4 km/s | 119 d |
+| Tassel → the Arc | 10.2 km/s | 151 d |
+| Tassel → Grumm, loose capture | 12.1 km/s | 312 d |
+| Tassel → Haven's height, circular | 12.4 km/s | 312 d |
+| Tassel → the Maw | 15.1 km/s | 1757 d |
+| Tassel → Veyra, docked | 18.5 km/s | 31 d |
 
-The starter tank is 14 km/s, so that table *is* the map: the rafts, the
-festival at Wanderwell, the belt and Grumm are all open from the first hour,
-and Cinder and Chime wait for a bigger tank. **Falling inward is dearer than
-climbing out** — Cinder sits at 0.3 au and the arrival is most of the bill —
-which is real orbital mechanics and, happily, exactly what the Emberkin would
-tell you.
+The starter tank is 14 km/s, so that table *is* the map: the moons, Cinder,
+the Belt, the Arc and a loose capture at Grumm are all open from the first
+hour, and Veyra and the Maw wait for a bigger tank. **The errand comes before
+the expedition** — Cinder is the near Emberkin world and Veyra the far one, and
+the difference between them is most of a tank.
 
 ### Forgiveness, as built
 

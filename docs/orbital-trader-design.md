@@ -68,15 +68,15 @@ Burns are **instantaneous impulses**. What you plan is exactly what you get, whi
 
 **How wide a harbour mouth is, is not a design number.** Like a world's reach, it comes out of the world:
 
-> `r_dock = 10 × radius + (atmosphere height)`
+> `r_dock = (top of the air) + 5 × radius`
 
-Ten times the ground, plus however much air stands over it. A big world earns a big harbour and a pebble earns a small one, so widening a world widens its approach and no table can quietly disagree with the sky it is describing. Grumm's approach is enormous because Grumm is enormous and carries sixty thousand kilometres of cloud on top of that, not because somebody typed a number.
+Five of the world's own radii above its weather — above the ground, on a world with no air worth the name. A big world earns a big harbour and a pebble earns a small one, so widening a world widens its approach and no table can quietly disagree with the sky it is describing. Grumm's approach is enormous because Grumm is enormous and carries fourteen hundred kilometres of cloud on top of that, not because somebody typed a number.
 
-Two consequences are worth stating plainly, because the formula means different things at different sizes. On a planet the mouth is a small target — Grumm's is 2% of its sphere of influence and Cinder's 4%, so arriving in a planet's gravity and tying up at it are two separate pieces of flying. On a small moon it is most of the well — Glass's mouth is 90% of Glass's reach, Brine's 79%, Slate's 64% — so crossing into a little moon's gravity is very nearly arriving. That is the shape ten radii has: it scales with the ground, and a moon's reach does not.
+Two consequences are worth stating plainly, because the formula means different things at different sizes. On a planet the mouth is a small target — Grumm's is 1% of its sphere of influence and Cinder's 2%, so arriving in a planet's gravity and tying up at it are two separate pieces of flying. On a small moon it is a good part of the well — Glass's mouth is 54% of Glass's reach, Brine's 47%, Slate's 39% — so crossing into a little moon's gravity is most of the way to arriving. That is the shape five radii has: it scales with the ground, and a moon's reach does not.
 
 On the chart the mouth is a dashed ring with **a small anchor hung at the top of it**, green where they will take your lines and amber where they will not yet. The anchor is there because a dashed circle round a world is the same shape as three other things the chart draws — a sphere of influence, an atmosphere, a hollow rock — and this is the only one you can tie up inside.
 
-The **drifting havens keep their authored mouths.** Nail, Whisker and the Maw have no surface to be ten times of and no air over it; their radius is a dot on a chart rather than a ground. A pilot arrives at those by matching speeds, and the size of that rendezvous is a design choice with nothing physical to derive it from.
+The **drifting havens keep their authored mouths.** Nail, Whisker and the Maw have no surface to stand five radii off and no air over it; their radius is a dot on a chart rather than a ground. A pilot arrives at those by matching speeds, and the size of that rendezvous is a design choice with nothing physical to derive it from.
 
 This is a scope decision as much as a fictional one. Landing would need a second control scheme, a second set of physics, and a second art problem, and it would buy nothing the orbital game does not already have. The fiction absorbs it easily: Tassel is an ocean of floating harbour cities that meet ships in orbit, the cats cannot survive a heavy world at all, and the frogs' balloon villages have no ground under them either.
 
@@ -132,7 +132,7 @@ Moons kept their distance from their planets, Scorch included: it had to move in
 | **Veyra** | 0.1 au | 18.5 km/s | 31 d | 24 d | 20 d |
 | **Cinder** | 0.2 au | 6.5 km/s | 43 d | 104 d | 56 d |
 
-**The sky is built at KSP's scale.** Every body is a tenth of the size a real one would be and many times denser, which is the trick that makes a world a place rather than a backdrop: Tassel is 498 km across, has 9.25 m/s² at the ground, air to 70 km, and a reach of 116,500 km — a Kerbin. A new game opens at 75 km, five above the air, on an orbit that takes thirty minutes of game time. Local flying is correspondingly cheap: the first lesson is a quarter of a km/s. Interplanetary flying is *not*, because a small world gives almost no gravity assist on departure or arrival, and that trade is deliberate.
+**The sky is built at KSP's scale.** Every body is a tenth of the size a real one would be and many times denser, which is the trick that makes a world a place rather than a backdrop: Tassel is 498 km across, has 9.25 m/s² at the ground, air to 70 km, and a reach of 116,500 km — a Kerbin. A new game opens at 100 km, thirty above the air, on an orbit that takes thirty-two minutes of game time. Local flying is correspondingly cheap: the first lesson is a quarter of a km/s. Interplanetary flying is *not*, because a small world gives almost no gravity assist on departure or arrival, and that trade is deliberate.
 
 **The clock is slow on purpose.** At ×1, one lap of that opening orbit takes **ten real minutes**. That is the fastest thing in the sky and everything else is slower still, so at ×1 almost nothing else appears to move. That is the intended reading: an orbit is a place you are, not an animation you watch. Watching the sky turn is what skipping is for.
 

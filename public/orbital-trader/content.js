@@ -87,25 +87,25 @@ export function soiRadius(mu, a, parentMu){
   return a * Math.pow(mu / parentMu, 2 / 5);
 }
 
-/* How wide a harbour mouth is: ten times the world's own radius, and then
- * however much air stands above that surface.
+/* How wide a harbour mouth is: five of the world's own radii above the top of
+ * its air — or above the ground, on a world with no air to speak of.
  *
- *     r_dock = 10 · radius + (atmo − radius)
+ *     r_dock = atmo + 5 · radius
  *
  * Derived here for the same reason the sphere of influence is: size is the
  * knob, and a table of hand-written mouths can quietly disagree with the
  * worlds it is describing. A big world earns a big harbour, a pebble earns a
  * small one, and a world with weather earns the room its weather takes up —
- * Grumm's approach is wide because Grumm is wide and has sixty thousand
+ * Grumm's approach is wide because Grumm is wide and has fourteen hundred
  * kilometres of cloud on top of that, not because somebody typed a number.
  *
  * The drifting havens keep theirs. Nail, Whisker and the Maw have no surface
- * to be ten times of and no air over it — their radius is a dot on a chart,
- * not a ground — so "ten times the radius" has nothing to act on and the
- * authored mouth stands. */
+ * to be five times of and no air over it — their radius is a dot on a chart,
+ * not a ground — so the formula has nothing to act on and the authored mouth
+ * stands. */
 export function dockRange(radius, atmo){
   if(!(radius > 0)) return null;
-  return 10 * radius + Math.max(0, (atmo ?? radius) - radius);
+  return Math.max(radius, atmo ?? radius) + 5 * radius;
 }
 
 const rawMu = Object.fromEntries(TUNING.bodies.map(b => [b.id, b.mu ?? 0]));

@@ -135,13 +135,17 @@ test('every body has what the kernel and the chart read', () => {
   for(const id of ['lamp', 'cinder', 'scorch', 'veyra', 'tassel', 'slate', 'moss', 'nail', 'whisker', 'arc', 'grumm', 'brine', 'glass', 'croak', 'haven', 'maw']){
     assert.ok(ids.has(id), `the design document's ${id} is in the sky`);
   }
-  /* The mouth is not authored: it is ten times the ground plus the air over
-     it, so that making a world bigger widens its harbour and no table can
-     quietly disagree. The drifting havens have no ground and keep theirs. */
+  /* The mouth is not authored: it is five of the world's own radii above the
+     top of its air, so that making a world bigger widens its harbour and no
+     table can quietly disagree. The drifting havens have no ground and keep
+     theirs. */
   for(const b of BODIES){
     if(!(b.mu > 0) || !(b.radius > 0)) continue;
-    const want = 10 * b.radius + Math.max(0, (b.atmo ?? b.radius) - b.radius);
-    assert.ok(Math.abs(b.zoneRadius - want) < 1e-15, `${b.id}: mouth is ${b.zoneRadius}, ten radii plus air is ${want}`);
+    const want = Math.max(b.radius, b.atmo ?? b.radius) + 5 * b.radius;
+    assert.ok(Math.abs(b.zoneRadius - want) < 1e-15, `${b.id}: mouth is ${b.zoneRadius}, five radii over the air is ${want}`);
+    // And every harbour is inside the mouth it belongs to, or a ship undocks
+    // outside its own docking range.
+    if(b.dockAlt) assert.ok(b.dockAlt < b.zoneRadius, `${b.id}: the harbour at ${b.dockAlt} is outside its own mouth ${b.zoneRadius}`);
   }
   for(const id of ['nail', 'whisker', 'maw']){
     assert.ok(world.get(id).zoneRadius >= 1e-3, `${id} is a rendezvous, not a world; its mouth stays the one it was given`);

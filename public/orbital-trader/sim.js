@@ -1116,7 +1116,18 @@ function seedFromLambert(state, targetId, node, scoreFn){
   const r2n = norm(sub(absState(world, target.id, state.t).r, frameNow.r));
   const hoh = period(frame.mu, (r1n + Math.max(r2n, target.a * (1 - (target.e ?? 0)))) / 2) / 2;
   const hohFor = hoh;
-  const offset = (target.zoneRadius ?? target.soi ?? 0) * 0.4;
+  /* Where to aim, off to one side of the target so the road passes it rather
+     than hits it: halfway between the top of its air and its harbour mouth.
+     A flat fraction of the mouth was enough while a mouth was ten radii, and
+     stopped being enough when it became five above the air — on a small world
+     that put the aim point barely two radii over the ground, and a hyperbola
+     drawn that close bends into it. Every seeded road to Cinder came back a
+     crash, and the aim fell back on a walk that never crossed its orbit. A
+     drifting haven has no ground to stand off from, so a fraction of its own
+     mouth is all there is to use there. */
+  const ground = Math.max(target.radius ?? 0, target.atmo ?? 0);
+  const reach = target.zoneRadius ?? target.soi ?? 0;
+  const offset = ground > 0 && reach > ground ? (ground + reach) / 2 : reach * 0.4;
   const sameFrame = frame.id === here.id;
   // Cheapest first, with anything the tank cannot pay for at the back.
   const rank = cost => (cost > state.dv ? 1e6 : 0) + cost;

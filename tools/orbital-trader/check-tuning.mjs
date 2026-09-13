@@ -20,9 +20,9 @@ const TAU = Math.PI * 2;
 const period = (mu, a) => TAU * Math.sqrt(a ** 3 / mu);
 /* The reach a mass earns, mirrored from content.js: no body carries one. */
 const soiOf = b => (b.mu > 0 && b.a > 0 && by[b.parent]?.mu > 0) ? b.a * Math.pow(b.mu / by[b.parent].mu, 2 / 5) : null;
-/* And the mouth a size earns, mirrored the same way: ten radii plus the air
-   over the ground. A drifting haven has neither, and keeps its authored one. */
-const mouthOf = b => b.mu > 0 && b.radius > 0 ? 10 * b.radius + Math.max(0, (b.atmo ?? b.radius) - b.radius) : b.zoneRadius;
+/* And the mouth a size earns, mirrored the same way: five radii above the top
+   of the air. A drifting haven has neither, and keeps its authored one. */
+const mouthOf = b => b.mu > 0 && b.radius > 0 ? Math.max(b.radius, b.atmo ?? b.radius) + 5 * b.radius : b.zoneRadius;
 for(const b of T.bodies){ b.soi = soiOf(b); b.zoneRadius = mouthOf(b); }
 const km = v => (v * KMS);
 let fails = 0;
