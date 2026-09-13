@@ -133,10 +133,10 @@ Trade is built around one central tension: **time versus fuel.**
 
 | Cargo type | Examples | Behavior |
 |---|---|---|
-| Bulk | Iron ore, refined steel, cryo fuel | Cheap, durable, low margin. The slow road is fine. |
+| Bulk | Iron ore, refined steel, cryo fuel | Cheap, durable, low margin. Three units of hold a crate, so a hold runs out long before a shelf does. |
 | Craft | Engine parts, tide glass, prayer lanterns | The working middle of the price list. |
-| Perishables | Riverfish, medicinal herbs and gel | Value decays in transit. Rewards fast routes. |
-| Climate-sensitive | Riverfish, fire crystals, ancient cider, ice lenses, medicinal gel, smuggled medicine | Require temperature control (a gate-key upgrade). Not all of them are cold: fire crystals are a thing you keep *steady*. |
+| Fresh | Riverfish, medicinal herbs and gel | Organic, and priced as fashion is: they move with a market's mood. They no longer rot — see below. |
+| Climate-sensitive | Riverfish, fire crystals, ancient cider, ice lenses, medicinal gel, smuggled medicine | Require temperature control (a gate-key upgrade), and **pay ×1.5** for it. Not all of them are cold: fire crystals are a thing you keep *steady*. |
 | Luxuries | Ember silk, frog tea, frogwood instruments | High value, and the things a people loves. |
 | Contraband | Stolen arms, forged medals, cybernetics | Whisker's whole shelf. |
 | Relics | Arc fragments, reactor coils, storm crystals | Rare, often tied to story and upgrades. |
@@ -148,22 +148,58 @@ sells what its port produces and buys what the goods table says it wants; no
 port carries a hand-written price list. Loving a thing is wanting it: a people
 who love a good are on its buyer list whether or not the table says so twice.
 
-**Prices are a region rule and a love rule.** The sky is five regions — inner,
-home, belt, outer, deep — and a good is worth what it costs at the stall in its
-own region and **×1.6 anywhere else**. A port that loves it pays **×2.2** on top.
-So the trade is: buy at the source, carry it out of its region, and sell it to
-the people who care. Tide glass bought on Tassel for 60 sells on Brine, who love
-it and live four au away, for over 200.
+**What a port pays is a table with four corners.** Two questions — does this
+port want it, and is it out of the good's own region — and the answer is the
+multiple of base price they pay:
+
+| | same system | another region |
+|---|---|---|
+| **loves it** | ×2.5 | **×5.5** |
+| **wants it** | ×1.5 | ×2.5 |
+| neither | ×0.6 | ×0.6 |
+
+Space is hard and there are few merchants who cross between peoples, so
+**carrying a loved good to another people is the trade the game is about**, and
+the same run inside one system is worth a fraction of it. A good nobody named
+goes at a loss to whoever will take it, and a stall never buys back what it is
+selling two feet away — a producer pays the ×0.6, capped at three quarters of
+its own asking price, or the dock would be a money pump.
+
+It used to be a region multiplier times a love multiplier, which could not hit
+all four corners at once: making the in-system numbers right dragged the
+cross-region ones down with them. A table has no such trouble, and it can be
+told to a player in one sentence.
+
+**Temperature control pays ×1.5 on top**, so a loved cold good carried across
+regions runs about ×8 what it cost. That is the best cargo in the game and it
+sits behind an Engineer and a 2,800-cowrie box (§2.8), which is the point.
 
 **Shelves are what a merchant keeps, not what a factory makes.** Every good has
-a stock range, a stall's shelf is rolled inside it, and the shelf is rolled
-again when you come back from somewhere else. Waiting at a dock does nothing;
-trading elsewhere is the restock. A picked-over shelf also costs more, so buying
-a stall out is never free.
+a stock range, a stall's shelf is rolled inside it and scaled by the port's
+`marketSize` — Tassel is the capital and keeps twice the table, Croak is a
+hamlet and keeps a third — and the shelf is rolled again when you come back
+from somewhere else. Waiting at a dock does nothing; trading elsewhere is the
+restock. **The shelf is the only limit on how much you can move at once**, and
+it is limit enough: the price does not rise as you empty it.
 
-**Market saturation** still applies on the selling side: landing the same good
-in the same market repeatedly walks the price down, and the market forgets over
-about three weeks, which is what stops one loop being the whole game.
+**There is no supply and demand.** A stall's prices do not remember what you
+sold it last month and do not move as its shelf empties. Both rules existed to
+stop one loop being the whole game, and the stock limit does that better and
+without asking a player to model a market they cannot see. What is left that
+moves a price is species character, not economics: Emberkin markets wobble
+±15% on a slow wave per good, otter ports roll ±7% per good per day, frogs and
+cats do neither.
+
+**Nothing spoils.** Goods used to lose value in transit, down to a tenth. It
+made the six organic goods regional by force — Cinder is ninety-four days from
+Tassel and nothing with a shelf life survives the crossing — and it did it
+without warning anybody, because a freshness bar only appeared once the cargo
+was already aboard. Time and hold room are still what limit a run. A crate is
+no longer one of them.
+
+**Jobs are priced against this table**, not against a number somebody liked:
+fetching work pays more than selling the same goods on the open market at the
+same destination would, and a test holds that line as prices move (§5.1.1).
 
 Money is treated as a **key** (to upgrades, access, and relationships) rather than a scoreboard.
 
@@ -242,7 +278,7 @@ The design leans on Self-Determination Theory, which holds that people stay enga
 
 ### 3.2 Guardrails
 
-**Avoid the overjustification trap.** Strong external rewards can smother intrinsic fun. If profit becomes the goal, players will grind the optimal loop even while bored. Market saturation, shifting alignments, and money-as-key all counter this.
+**Avoid the overjustification trap.** Strong external rewards can smother intrinsic fun. If profit becomes the goal, players will grind the optimal loop even while bored. Market saturation was the first answer to that and has been withdrawn (§2.7): it asked a player to model something they could not see, and the stall's own stock does the same job in plain sight. Shifting alignments and money-as-key still counter it, and what actually stops one loop being the whole game is that the loop is small — a shelf holds what it holds.
 
 **Losses sting roughly twice as hard as equal gains.** Use them sparingly, and make them recoverable and story-generating.
 

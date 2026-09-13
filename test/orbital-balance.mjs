@@ -61,8 +61,9 @@ function slowRoad(state, from, to){
 }
 
 /* The best single cargo a player could buy here and sell there, at today's
- * prices, per unit of hold. Ignores freshness decay in transit, which makes it
- * a slightly optimistic reading — deliberately, since that is the bound. */
+ * prices, per unit of hold. Nothing spoils on the way any more, so what it is
+ * worth on arrival is what it is worth on the dock — give or take the day's
+ * haggle roll at an otter port. */
 function bestRun(state, from){
   const room = S.freeUnits(state);
   let best = null;
@@ -82,13 +83,7 @@ function bestRun(state, from){
          cannot reach is not a destination. */
       const road = slowRoad(state, from, to);
       if(road.dv > S.kms(state.dv) * 0.7) continue;
-      /* What it will be worth when it gets there, not what it is worth on the
-         dock: a crate of Bramble fruit sold at the far end of a sixty-day
-         crossing is a crate of compost, and the freshness bar says so before
-         you buy it. */
-      const keeps = S.freshness(g, road.days);
-      const landed = (sell * keeps - buy) * qty;
-      if(landed <= 0) continue;
+      const landed = gain;
       const perDay = landed / road.days;
       if(!best || perDay > best.perDay) best = { to, good: g.id, qty, gain: landed, perDay, days: road.days, dv: road.dv, buy, sell };
     }
@@ -124,6 +119,19 @@ function fly(state, to, budgetDays){
 }
 
 const state = S.newGame(SEED);
+/* A new ship is in orbit over Tassel, not tied up at it — the game has no
+   landing and never starts at a mooring. This probe is about the price list
+   rather than about flying, so it tows itself to the first dock rather than
+   opening with a rendezvous: undock() puts the ship back in the harbour it
+   just left, so one line here is the whole of it. Without it the loop below
+   read `state.dockedAt` as null on its first pass and stopped before it
+   started, which is why this file has been reporting nought runs.  */
+state.dockedAt = CONST.START_PORT;
+/* And with the opening errand behind it. A new purse is twelve cowries, which
+   is one moon pebble and nothing else — the tutorial is what turns that into a
+   working float, and a probe that starts before it has no trade to measure and
+   waits at the dock for two years. */
+state.money += S.questById('pebble')?.pay ?? 0;
 const log = [];
 let laps = 0, tows0 = 0;
 const firsts = {};

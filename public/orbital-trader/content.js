@@ -146,7 +146,6 @@ const UNITS = { light: 1, heavy: 3 };
 export const GOODS = ECONOMY.goods.map(g => ({
   ...g,
   units: UNITS[g.weight] ?? 1,
-  lifetimeDays: g.lifetimeDays ?? null,
   needsTempControl: !!g.needsTempControl,
   producedAt: g.producedAt ?? [],
   stock: g.stock ?? [1, 1],
@@ -233,15 +232,11 @@ export const UPGRADES = ECONOMY.upgrades.map(u => {
 
 const F = ECONOMY.formulas;
 export const FORMULAS = {
-  region: F.region,
-  loved: F.loved,
   stock: F.stock,
-  saturation: F.saturation,
-  perishable: F.perishable,
+  demand: F.demand,
   reputation: F.reputation,
   haggle: F.haggle ?? { spread: 0.07 },
   volatility: F.volatility ?? { bySpecies: {} },
-  market: { disinterestMul: 0.6, resaleCap: 0.75 },
   /* Aerobraking. The shed is a fraction of the speed at the bottom of the
      dive, scaled by how deep into the air the dive goes — and the fraction has
      to be small, because the design sells skimming as *free braking*, not as a

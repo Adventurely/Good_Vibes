@@ -81,11 +81,12 @@ export function newGame(seed = 1){
     tank: 0, dv: 0,
     money: CONST.START_MONEY, debt: 0,
     cargo: [],
-    /* markets holds, per port, what you have landed on it lately (`sold`),
-       what you have taken off its shelves this visit (`bought`), and which
-       visit that was (`visit`). marketEpoch turns over every time you tie up
-       somewhere other than where you last tied up, which is what makes a
-       stall find more stock while you were away. */
+    /* markets holds, per port, what you have taken off its shelves this visit
+       (`bought`) and which visit that was (`visit`). It used to also hold what
+       you had landed there lately, for a saturation rule that is gone.
+       marketEpoch turns over every time you tie up somewhere other than where
+       you last tied up, which is what makes a stall find more stock while you
+       were away. */
     markets: {},
     marketEpoch: 0,
     lastMarket: null,
@@ -1692,50 +1693,50 @@ export function supplierDistance(portId, goodId, t){
   return best;
 }
 
-/* Where a good is worth carrying, which is the whole of trade: a thing is
- * cheap where it is made and dear where it is not. The rule is regions rather
- * than distance, because a region is something a player can hold in their head
- * — inner, home, belt, outer — and "carry it out of the region it came from"
- * is an instruction, where "carry it 3.4 au" is a sum. */
-export function regionMul(portId, goodId){
-  const f = FORMULAS.region;
+/* What a port pays for a thing, as a multiple of its base price, and the whole
+ * of the selling side in one lookup.
+ *
+ * Two questions and nothing else. Does this port want it — loved, merely on the
+ * buyer list, or neither — and is it out of the good's own region? Space is
+ * hard and there are few merchants who cross between peoples, so carrying a
+ * loved good to another people is the trade the game is about (×5.5), and the
+ * same run inside one system is worth a fraction of it (×2.5). A good nobody
+ * named is sold at a loss to whoever will take it.
+ *
+ * It used to be a product of a region multiplier and a love multiplier, which
+ * could not hit all four corners at once: making the in-system numbers right
+ * dragged the cross-region ones down with them. A table has no such trouble,
+ * and a player can be told it in one sentence.
+ *
+ * The producer is the exception: a stall does not buy back what it is selling
+ * two feet away. Those are priced as unwanted and then capped (see sellPrice).
+ */
+export function demandMul(portId, goodId){
+  const f = FORMULAS.demand;
   const g = goodById(goodId);
-  if(!g.producedAt.length || g.producedAt.includes(portId)) return f.homeMul;
+  if(g.producedAt.includes(portId)) return f.unwanted;
   const here = REGION_OF[portId];
-  return g.producedAt.some(p => REGION_OF[p] === here) ? f.homeMul : f.awayMul;
+  const away = g.producedAt.length && !g.producedAt.some(p => REGION_OF[p] === here);
+  if(lovesGood(portId, goodId)) return away ? f.lovedAway : f.lovedSame;
+  if(PORTS[portId].buys.some(b => b.good === goodId)) return away ? f.likedAway : f.likedSame;
+  return f.unwanted;
 }
 
-/* And the big lever. A port that loves a thing — by its own name or its
- * people's — pays over the odds for it, and loving it in another region is
- * what a trade route is made of: three and a half times the stall price. */
-export function lovedMul(portId, goodId){
-  return lovesGood(portId, goodId) ? FORMULAS.loved.mul : 1;
+/* Said in words, for the row a player actually reads. */
+export function demandWords(portId, goodId){
+  const g = goodById(goodId);
+  if(g.producedAt.includes(portId)) return 'they make it here';
+  if(lovesGood(portId, goodId)) return 'they love it';
+  if(PORTS[portId].buys.some(b => b.good === goodId)) return 'they want it';
+  return 'nobody here wants it';
 }
-
-function decayed(entry, t){
-  if(!entry) return 0;
-  return entry.q * Math.pow(0.5, (t - entry.t) / FORMULAS.saturation.halfLifeDays);
-}
-const q0For = portId => FORMULAS.saturation.q0 * (PORTS[portId].marketSize ?? 1);
 
 /* How much of a stall's shelf you have already taken this visit. Shelves do
- * not regrow on a clock any more — waiting at a dock gets you nothing — so
- * this is simply a count, cleared when the shelves are rolled again. */
+ * not regrow on a clock — waiting at a dock gets you nothing — so this is
+ * simply a count, cleared when the shelves are rolled again. It no longer
+ * moves the price: the shelf is the limit, and that is limit enough. */
 function shortfall(state, portId, goodId){
   return state.markets[portId]?.bought?.[goodId] ?? 0;
-}
-export function saturationMul(state, portId, goodId){
-  const m = state.markets[portId];
-  const q = decayed(m?.sold?.[goodId], state.t);
-  const q0 = q0For(portId);
-  return q0 / (q0 + q);
-}
-/* A picked-over shelf costs more, so buying a stall out is never free. */
-function scarcityMul(state, portId, goodId){
-  const full = stockFull(state, portId, goodId);
-  if(full <= 0) return 1;
-  const gone = Math.min(full, shortfall(state, portId, goodId));
-  return 1 + FORMULAS.stock.scarcityK * (gone / full);
 }
 
 /* Emberkin fashion: a slow wave per good, so what Cinder wants this week is
@@ -1746,7 +1747,7 @@ function speciesMood(portId, goodId, t){
   const g = goodById(goodId);
   const vol = FORMULAS.volatility.bySpecies[sp] ?? 0;
   let m = 1;
-  if(vol && (g.category === 'luxury' || g.category === 'perishable' || sp === 'cat')){
+  if(vol && (g.category === 'luxury' || g.category === 'fresh' || sp === 'cat')){
     // Two slow waves per good, so the wobble does not repeat every three weeks.
     m *= 1 + vol * (0.6 * Math.sin(TAU * t / 23 + hash(goodId) * TAU) + 0.4 * Math.sin(TAU * t / 61 + hash(goodId, 'b') * TAU));
   }
@@ -1769,42 +1770,28 @@ export function buyPrice(state, portId, goodId){
   const row = p.sells.find(s => s.good === goodId);
   if(!row) return null;
   const g = goodById(goodId);
-  let price = g.basePrice * row.priceMul * speciesMood(portId, goodId, state.t) * scarcityMul(state, portId, goodId);
+  let price = g.basePrice * row.priceMul * speciesMood(portId, goodId, state.t);
   price *= 1 - repDiscount(state, p.species);
   return Math.max(1, Math.round(price));
 }
 
-/* What the port pays for one unit, fresh. Everyone buys everything at some
- * price; the ones who want it pay for it. */
-export function sellPrice(state, portId, goodId, boughtAt = null){
+/* What the port pays for one unit. Everyone buys everything at some price; the
+ * ones who want it pay for it, and the ones who need a hold that holds a
+ * temperature pay half as much again on top — that is what the Engineer and
+ * her 2,800-cowrie box are for. */
+export function sellPrice(state, portId, goodId){
   const p = PORTS[portId];
   const g = goodById(goodId);
-  const row = p.buys.find(s => s.good === goodId);
-  const mul = row ? row.priceMul : FORMULAS.market.disinterestMul;
-  let price = g.basePrice * mul * regionMul(portId, goodId) * lovedMul(portId, goodId)
-    * saturationMul(state, portId, goodId) * speciesMood(portId, goodId, state.t);
+  let price = g.basePrice * demandMul(portId, goodId) * speciesMood(portId, goodId, state.t);
+  if(g.needsTempControl) price *= FORMULAS.demand.tempControlMul;
   price *= 1 + repDiscount(state, p.species) * 0.5;
-  if(boughtAt != null) price *= freshness(g, state.t - boughtAt);
   /* A port that sells this itself will never pay more than it asks. Otherwise
      a stall with a low price and no entry on its buying list is a money pump
      you never have to leave the dock to work. */
-  if(row == null && p.sells.some(x => x.good === goodId)){
-    price = Math.min(price, buyPrice(state, portId, goodId) * FORMULAS.market.resaleCap);
+  if(p.sells.some(x => x.good === goodId)){
+    price = Math.min(price, buyPrice(state, portId, goodId) * FORMULAS.demand.resaleCap);
   }
   return Math.max(1, Math.round(price));
-}
-
-export function saturationWords(mul){
-  return mul >= 0.95 ? 'they want more' : mul >= 0.8 ? 'they have some' : mul >= 0.6 ? 'they have plenty' : 'they are sick of it';
-}
-export function freshnessWords(g, ageDays){
-  if(!g.lifetimeDays) return '';
-  const f = 1 - ageDays / g.lifetimeDays;
-  return f <= 0 ? 'spoiled' : f < 0.25 ? 'spoiling' : f < 0.5 ? 'turning' : f < 0.75 ? 'ripe' : 'fresh';
-}
-export function freshness(g, ageDays){
-  if(!g.lifetimeDays) return 1;
-  return Math.max(FORMULAS.perishable.floor, 1 - ageDays / g.lifetimeDays);
 }
 
 /* What this stall had on the shelf when you walked in. A merchant keeps what
@@ -1817,10 +1804,19 @@ export function freshness(g, ageDays){
  * more; stand at the dock and wait and it will not. */
 export function stockFull(state, portId, goodId){
   const g = goodById(goodId);
-  if(!PORTS[portId]?.sells.some(r => r.good === goodId)) return 0;
+  const p = PORTS[portId];
+  if(!p?.sells.some(r => r.good === goodId)) return 0;
   const [lo, hi] = g.stock ?? [1, 1];
   const visit = state.markets[portId]?.visit ?? 0;
-  return lo + Math.floor(hash(portId, goodId, visit) * (hi - lo + 1));
+  const rolled = lo + Math.floor(hash(portId, goodId, visit) * (hi - lo + 1));
+  /* Scaled by how big a market this is. Tassel is the capital and keeps twice
+     what the table says; Croak is a hamlet and keeps a third of it. marketSize
+     used to do this work on the selling side, as the size of a port's appetite
+     before it tired of a good — when that rule went, the field described
+     something nothing read. The shelf is the better home for it: it is what a
+     market *being big* actually means to a trader, and it is what decides
+     whether a bigger hold is worth buying. */
+  return Math.max(1, Math.round(rolled * (p.marketSize ?? 1)));
 }
 export function stockAvailable(state, portId, goodId){
   return Math.max(0, stockFull(state, portId, goodId) - shortfall(state, portId, goodId));
@@ -1837,16 +1833,8 @@ export function openMarket(state, portId){
 }
 
 function market(state, portId){
-  return state.markets[portId] ??= { sold: {}, bought: {} };
+  return state.markets[portId] ??= { bought: {} };
 }
-/* The appetite book: how much has been sold into this market lately, fading
- * exponentially, which is what makes a good pay less the more of it you land. */
-function bump(book, goodId, qty, t){
-  const e = book[goodId];
-  const q = e ? decayed(e, t) : 0;
-  book[goodId] = { q: q + qty, t };
-}
-
 export function canBuy(state, goodId, qty){
   const port = state.dockedAt;
   if(!port) return { ok: false, reason: 'Not docked.' };
@@ -1870,7 +1858,7 @@ export function buy(state, goodId, qty){
   state.money -= total;
   // What is missing off the shelf this visit, until the shelves are rolled again.
   market(state, port).bought[goodId] = shortfall(state, port, goodId) + qty;
-  // Stacks are split by purchase time, because freshness is per crate.
+  // Stacks are split by what was paid, so the hold remembers each buy.
   const stack = state.cargo.find(s => s.good === goodId && Math.abs(s.t - state.t) < 1e-9 && s.price === c.price);
   if(stack) stack.qty += qty; else state.cargo.push({ good: goodId, qty, t: state.t, price: c.price, from: port });
   state.stats.bought += qty;
@@ -1889,15 +1877,18 @@ export function sell(state, goodId, qty){
   const stacks = state.cargo.filter(s => s.good === goodId && !isConsigned(s)).sort((a, b) => a.t - b.t);
   const have = stacks.reduce((s, c) => s + c.qty, 0);
   if(have < qty) return { ok: false, reason: have ? 'The rest of those belong to somebody.' : 'Not that many aboard.' };
+  /* One price for the whole sale. It used to walk down as the crates came off
+     the ship, which is the last of the supply-and-demand rules and is gone with
+     the rest of them: what a stall pays is what a stall pays. The stacks are
+     still walked oldest first, because each one remembers what it cost and the
+     profit line is the difference. */
+  const unitPrice = sellPrice(state, port, goodId);
   let left = qty, total = 0, cost = 0;
   for(const s of stacks){
     if(left <= 0) break;
     const take = Math.min(left, s.qty);
-    const unitPrice = sellPrice(state, port, goodId, s.t);
     total += unitPrice * take; cost += s.price * take;
     s.qty -= take; left -= take;
-    // Saturation is applied as we go, so a big sale walks the price down.
-    bump(market(state, port).sold, goodId, take, state.t);
   }
   state.cargo = state.cargo.filter(s => s.qty > 0);
   state.money += total;
@@ -1915,7 +1906,7 @@ export function cargoValue(state, portId = null){
   // job with no way back.
   return state.cargo.filter(c => !isConsigned(c)).reduce((s, c) => {
     const g = goodById(c.good);
-    const unitPrice = portId ? sellPrice(state, portId, c.good, c.t) : g.basePrice * freshness(g, state.t - c.t);
+    const unitPrice = portId ? sellPrice(state, portId, c.good) : g.basePrice;
     return s + unitPrice * c.qty;
   }, 0);
 }
@@ -2267,4 +2258,4 @@ export function approachTo(state, prediction, targetId){
 }
 
 export { elementsFromState, propagate, absState, railState, predict, norm, sub, add, scale, unit, perp, dist, hohmann };
-export { wantsGood, lovesGood, REGION_OF };
+export { wantsGood, lovesGood, REGION_OF, FORMULAS };

@@ -1936,6 +1936,49 @@ climbing out** — Cinder sits at 0.3 au and the arrival is most of the bill —
 which is real orbital mechanics and, happily, exactly what the Emberkin would
 tell you.
 
+### What a stall pays
+
+Two questions, four answers, and that is the whole of the selling side.
+
+| | same system | another region |
+| --- | --- | --- |
+| **they love it** | ×2.5 | **×5.5** |
+| **they want it** | ×1.5 | ×2.5 |
+| neither | ×0.6 | ×0.6 |
+
+Multiples of the good's base price, which is roughly what it costs at the stall
+that makes it. Space is hard and few merchants cross between peoples, so
+carrying a loved good to another people is the trade; the same run inside one
+system is worth a fraction of it. A producer never buys back its own stock —
+it pays the ×0.6, capped at three quarters of its asking price, or the dock
+would be a money pump you never have to leave.
+
+**Temperature control pays ×1.5 on top of all of it**, so a loved cold good
+carried across regions runs about ×8 what it cost. That is the best cargo in
+the game, and it is behind the Engineer and a 2,800-cowrie box.
+
+**Nothing else moves a price.** A stall does not remember what you sold it last
+month, and it does not charge more as its shelf empties. Both of those were
+supply-and-demand rules that asked a player to model a market they could not
+see, and the shelf does the job in plain sight: you cannot take what is not
+there. What is left is species character — Emberkin prices wobble ±15% on a
+slow wave, otter ports roll ±7% a day, frogs and cats neither.
+
+**The shelf is the limit, and how big it is says how big the market is.** Every
+good has a stock range; a stall rolls inside it and multiplies by the port's
+market size, so Tassel the capital keeps twice what the table says and Croak
+the hamlet keeps a third. Rolled again when you come back from somewhere else —
+waiting at a dock does nothing, trading elsewhere is the restock. It is also
+what decides whether a bigger hold is worth buying: filling ninety units out of
+Slate is worth about four times filling twenty-four, and out of Croak it is
+worth nothing at all, because there is nothing there to buy.
+
+**Nothing spoils.** Goods used to lose value in transit, down to a tenth, which
+made the six organic ones regional by force — Cinder is ninety-four days out
+and nothing with a shelf life survives that — and did it without warning,
+because the freshness bar only appeared once the cargo was already aboard. Time
+and hold room still limit a run. A crate no longer does.
+
 ### The rack
 
 Two things you buy more of and four you buy once.

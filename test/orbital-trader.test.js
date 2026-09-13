@@ -199,7 +199,6 @@ test('every port is a body with a port, and every reference resolves', () => {
     const [lo, hi] = g.stock;
     assert.ok(Number.isInteger(lo) && Number.isInteger(hi) && lo >= 1 && hi >= lo, `${g.id}: stock range ${g.stock}`);
     assert.ok(['light', 'heavy'].includes(g.weight), `${g.id}: weight ${g.weight}`);
-    if(g.lifetimeDays != null) assert.ok(g.lifetimeDays > 0);
     // Somebody, somewhere, has to want it, or it is a crate that cannot be sold.
     assert.ok(Object.keys(PORTS).some(id => S.wantsGood(id, g.id)), `${g.id} has no buyer anywhere`);
   }
@@ -1116,7 +1115,7 @@ test("the opening errand: Theo's purse buys exactly one pebble, and Nellie pays 
   assert.ok(s.money > 400 && s.rep.otter >= 1, 'Theo settles up and the otters remember');
 });
 
-test('markets: buying costs, selling elsewhere pays, and selling a lot walks the price down', () => {
+test('markets: buying costs, selling elsewhere pays, and nothing else moves a price', () => {
   const s = newDocked(21);
   /* The game now opens with twelve cowries, which is exactly one moon pebble
      and the whole point of the opening. A test about a market needs a purse. */
@@ -1133,14 +1132,13 @@ test('markets: buying costs, selling elsewhere pays, and selling a lot walks the
   if(wanter){
     const [wid] = wanter;
     const p1 = S.sellPrice(s, wid, good);
-    s.markets[wid] = { sold: { [good]: { q: 200, t: s.t } }, bought: {} };
-    const p2 = S.sellPrice(s, wid, good);
-    assert.ok(p2 < p1 * 0.6, `saturation bites: ${p2} vs ${p1}`);
-    // And it forgets. Compared on the multiplier alone, because a price also
-    // moves with the sky and with whatever the Emberkin decided was fashionable.
-    assert.ok(S.saturationMul(s, wid, good) < 0.6);
-    s.t += FORMULAS.saturation.halfLifeDays * 6;
-    assert.ok(S.saturationMul(s, wid, good) > 0.9, 'and recovers');
+    assert.ok(p1 > S.sellPrice(s, 'maw', good), 'somebody who wants it pays over the odds');
+    /* What you have landed here before does not move the price any more, and
+       neither does how picked-over the shelf is. The stall's stock is the only
+       limit on how much you can move at once, and that is limit enough. */
+    s.markets[wid] = { sold: { [good]: { q: 500, t: s.t } }, bought: { [good]: 500 } };
+    assert.equal(S.sellPrice(s, wid, good), p1, 'selling a lot here changed what they pay');
+    assert.equal(S.buyPrice(s, port, good), price, 'emptying the shelf changed what it costs');
   }
   // Nobody makes money round-tripping in one port.
   for(const [id, p] of Object.entries(PORTS)){
@@ -1160,11 +1158,26 @@ test('a good is worth more out of its region, and much more where it is loved', 
   const loved = S.sellPrice(s, 'brine', 'tideglass');      // outer, and loves it
   assert.ok(away > home * 1.4, `carrying it out of its region is worth it: ${home} -> ${away}`);
   assert.ok(loved > away * 1.8, `and the ones who love it pay much more: ${away} -> ${loved}`);
-  assert.ok(loved > S.buyPrice(s, 'tassel', 'tideglass') * 2.5, 'a loved good abroad is a trade route');
+  assert.ok(loved > S.buyPrice(s, 'tassel', 'tideglass') * 4.5, 'a loved good abroad is the trade route');
+
+  /* The four corners of the table, which is the whole of the selling side.
+     Space is hard and few merchants cross between peoples, so the run that
+     matters is a loved good carried out of its own region. */
+  const F = FORMULAS.demand;
+  assert.ok(F.lovedAway >= 5 && F.lovedAway <= 6, 'a loved good abroad is five or six times the stall price');
+  assert.ok(F.likedAway > F.likedSame && F.lovedSame > F.likedSame);
+  assert.ok(F.lovedAway > F.lovedSame * 2, 'the same run inside one system is worth a fraction of it');
+  assert.ok(F.unwanted < 1, 'and a good nobody named goes at a loss');
+  assert.equal(S.demandMul('brine', 'tideglass'), F.lovedAway, 'Brine loves it and lives four au away');
+  assert.equal(S.demandMul('haven', 'tideglass'), F.likedAway, 'Haven merely wants it, and is also far');
+  assert.equal(S.demandMul('slate', 'pearls'), F.likedSame, 'Slate wants pearls off its own planet');
+  assert.equal(S.demandMul('slate', 'coral'), F.lovedSame, 'otters love coral, and Slate is an otter port in its own region');
+  assert.equal(S.demandMul('slate', 'tideglass'), F.unwanted, 'nobody on Slate asked for tide glass');
+  assert.equal(S.demandMul('tassel', 'tideglass'), F.unwanted, 'a stall does not buy back its own stock');
 
   // Region is a region, not a distance: a sibling port pays the home rate.
-  assert.equal(S.regionMul('slate', 'tideglass'), S.regionMul('moss', 'tideglass'));
-  assert.ok(S.regionMul('cinder', 'tideglass') > S.regionMul('slate', 'tideglass'));
+  assert.equal(S.demandMul('slate', 'pearls'), S.demandMul('moss', 'pearls'));
+  assert.ok(S.demandMul('cinder', 'pearls') > S.demandMul('slate', 'pearls'));
   // Loving something names a port or a whole people; both count.
   assert.ok(S.lovesGood('brine', 'tideglass'), 'Brine loves tide glass by name');
   assert.ok(S.lovesGood('tassel', 'frogtea') && S.lovesGood('moss', 'frogtea'), 'otters love frog tea as a people');
@@ -1205,10 +1218,10 @@ test('a stall keeps what it keeps, and finds more only while you are away', () =
   assert.ok(again >= lo && again <= hi, `the new shelf of ${again} is outside ${lo}-${hi}`);
   assert.equal(again, S.stockFull(s, 'slate', 'pebble'), 'and it is a whole shelf, not the picked-over one');
 
-  /* A thin shelf costs more than a full one, so buying a stall out is not
-     free. Pebbles, because they are light: a hold is twenty-four units and an
-     ore crate is three of them, so a heavy good runs out of ship long before
-     it runs out of shelf. */
+  /* The last crate on a shelf costs what the first one did. A picked-over
+     stall used to charge more, which was the buying half of a supply-and-demand
+     rule the stock limit already does better: you cannot take what is not
+     there, and that is the whole of the limit. */
   const t = S.newGame(9);
   t.dockedAt = null; t.justLeft = null; parkAt(t, 'slate'); S.dock(t);
   t.money = 100000;
@@ -1216,15 +1229,38 @@ test('a stall keeps what it keeps, and finds more only while you are away', () =
   const room = Math.min(S.stockAvailable(t, 'slate', 'pebble') - 1, S.freeUnits(t));
   assert.ok(room >= 4, `nothing to buy: ${room} crates of room`);
   assert.ok(S.buy(t, 'pebble', room).ok);
-  assert.ok(S.buyPrice(t, 'slate', 'pebble') > first, 'the last crates on the shelf cost no more than the first');
+  assert.equal(S.buyPrice(t, 'slate', 'pebble'), first, 'the last crates on the shelf cost more than the first');
 });
 
-test('perishables lose value with age, down to a floor', () => {
-  const g = GOODS.find(g => g.lifetimeDays);
-  assert.ok(g);
-  assert.equal(S.freshness(g, 0), 1);
-  assert.ok(S.freshness(g, g.lifetimeDays / 2) < 0.6);
-  assert.equal(S.freshness(g, g.lifetimeDays * 5), FORMULAS.perishable.floor);
+test('nothing spoils: a crate is worth what it is worth whenever it lands', () => {
+  /* Decay is gone. Time and hold room are still what limit a run — the clock
+     and the tank — but a cargo bought on Moss is the same cargo when it
+     reaches Cinder ninety-four days later, which is what the inner system
+     being ninety-four days away was quietly making impossible. */
+  const s = newDocked(5, 'moss');
+  s.money = 100000;
+  s.keys.tempControl = true;                     // riverfish is one of the six
+  assert.ok(S.buy(s, 'riverfish', 4).ok);
+  const now = S.cargoValue(s, 'tassel');
+  /* Age the crates rather than the clock: what is being pinned is that the
+     hold does not remember when something came aboard. Moving the clock would
+     also move the otter haggle roll, which is species character and stays. */
+  for(const c of s.cargo) c.t -= 2000;
+  assert.equal(S.cargoValue(s, 'tassel'), now, 'two thousand days cost the hold nothing');
+  assert.equal(S.sellPrice.length, 3, 'sellPrice takes a state, a port and a good — and no age');
+  for(const g of GOODS) assert.equal(g.lifetimeDays, undefined, `${g.id} still carries a shelf life`);
+});
+
+test('temperature control is what the good cargo is behind', () => {
+  const s = S.newGame(5);
+  const F = FORMULAS.demand;
+  assert.ok(F.tempControlMul > 1, 'the goods that need a held temperature pay more');
+  /* Ice lenses are made on Glass and loved on Veyra, two regions apart, and
+     they need the Engineer's box: the best kind of cargo in the game, which is
+     the point of a 2,800-cowrie upgrade behind a quest. */
+  const ratio = S.sellPrice(s, 'veyra', 'lenses') / S.buyPrice(s, 'glass', 'lenses');
+  assert.ok(ratio > F.lovedAway, `a loved cold good abroad beats a loved warm one: ${ratio}`);
+  assert.ok(S.goodById('lenses').needsTempControl);
 });
 
 test('fuel: the tank is a hard ceiling and coin a hard floor', () => {

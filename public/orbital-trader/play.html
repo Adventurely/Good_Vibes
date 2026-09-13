@@ -144,9 +144,6 @@
   .row .price small{ display:block; color:var(--dim); font-size:.74rem; }
   .row .btns{ grid-column:1 / -1; justify-content:flex-end; margin-top:.2rem; }
   .up{ color:var(--leaf); } .down{ color:var(--rose); } .flat{ color:var(--dim); }
-  .fresh{ display:inline-block; width:46px; height:4px; background:var(--gv-sunk); border-radius:2px; vertical-align:middle; overflow:hidden; }
-  .fresh i{ display:block; height:100%; background:var(--leaf); }
-  .fresh i.mid{ background:var(--gold); } .fresh i.low{ background:var(--rose); }
   .btns{ display:flex; gap:.3rem; flex-wrap:wrap; }
   .btn{
     min-height:32px; padding:.25rem .6rem; border-radius:8px; border:1px solid var(--line-2);
@@ -302,9 +299,6 @@
   .row .price small{ display:block; color:var(--dim); font-size:.74rem; }
   .row .btns{ grid-column:1 / -1; justify-content:flex-end; margin-top:.2rem; }
   .up{ color:var(--leaf); } .down{ color:var(--rose); } .flat{ color:var(--dim); }
-  .fresh{ display:inline-block; width:46px; height:4px; background:var(--gv-sunk); border-radius:2px; vertical-align:middle; overflow:hidden; }
-  .fresh i{ display:block; height:100%; background:var(--leaf); }
-  .fresh i.mid{ background:var(--gold); } .fresh i.low{ background:var(--rose); }
   .btns{ display:flex; gap:.3rem; flex-wrap:wrap; }
   .btn{
     min-height:32px; padding:.25rem .6rem; border-radius:8px; border:1px solid var(--line-2);
@@ -1377,11 +1371,16 @@ function wire(root){
 }
 
 const trend = (price, base) => price > base * 1.12 ? '<span class="up">▲</span>' : price < base * 0.88 ? '<span class="down">▼</span>' : '<span class="flat">•</span>';
-const plenty = (state, port, good) => { const m = S.saturationMul(state, port, good); return m >= 0.95 ? '' : ' · ' + S.saturationWords(m); };
-/* Whether this crate has left the region it was made in, which is most of what
-   it is worth. Said in words rather than as a multiplier, because "a long way
-   from home" is the thing a trader knows and 1.6 is not. */
-const away = (port, good) => S.regionMul(port, good) > 1 ? ' · <span class="up">a long way from home</span>' : '';
+/* What this stall pays, said the way a trader says it rather than as a number:
+   who wants it, and whether the crate has left the region it was made in,
+   which between them are the whole of what it is worth. "They love it, a long
+   way from home" is a thing somebody can act on; ×5.5 is a sum. */
+const demand = (port, good) => {
+  const words = S.demandWords(port, good);
+  const far = S.demandMul(port, good) >= S.FORMULAS.demand.likedAway;
+  const cls = far || words === 'they love it' ? 'up' : words === 'nobody here wants it' ? 'down' : '';
+  return ` · <span class="${cls}">${words}</span>${far ? ' · <span class="up">a long way from home</span>' : ''}`;
+};
 
 function market(){
   const port = state.dockedAt;
@@ -1423,18 +1422,15 @@ function market(){
      Ship tab lists it, which is where a pilot looks to see what is aboard. */
   for(const c of state.cargo){
     if(c.questId != null) continue;
-    const e = aboard.get(c.good) ?? { qty: 0, oldest: c.t, paid: 0 }; e.qty += c.qty; e.oldest = Math.min(e.oldest, c.t); e.paid += c.price * c.qty; aboard.set(c.good, e);
+    const e = aboard.get(c.good) ?? { qty: 0, paid: 0 }; e.qty += c.qty; e.paid += c.price * c.qty; aboard.set(c.good, e);
   }
   if(!aboard.size) out += '<p class="empty">The hold is empty.</p>';
   for(const [gid, e] of aboard){
     const g = S.goodById(gid);
-    const price = S.sellPrice(state, port, gid, e.oldest);
-    const loved = S.lovesGood(port, gid);
-    const wants = p.buys.some(b => b.good === gid);
-    const fr = S.freshness(g, state.t - e.oldest);
-    const fresh = g.lifetimeDays ? `<span class="fresh" title="freshness"><i class="${fr > 0.66 ? '' : fr > 0.33 ? 'mid' : 'low'}" style="width:${Math.round(fr * 100)}%"></i></span> ${esc(S.freshnessWords(g, state.t - e.oldest))}` : '';
+    const price = S.sellPrice(state, port, gid);
+    const cold = g.needsTempControl ? ' · <span class="up">temperature control pays</span>' : '';
     const avg = e.paid / e.qty;
-    out += `<div class="row"><div class="name"><b>${esc(g.name)}</b><small>${e.qty} aboard · paid ${S.fmtMoney(avg)} each ${fresh}${loved ? ' · <span class="up">they love this here</span>' : wants ? ' · <span class="up">wanted here</span>' : ''}${away(port, gid)}${plenty(state, port, gid)}</small></div>
+    out += `<div class="row"><div class="name"><b>${esc(g.name)}</b><small>${e.qty} aboard · paid ${S.fmtMoney(avg)} each${demand(port, gid)}${cold}</small></div>
       <div class="price">${S.fmtMoney(price)}<small>${price > avg ? '<span class="up">' : '<span class="down">'}${price >= avg ? '+' : ''}${S.fmtMoney(price - avg)}</span></small></div>
       <div class="btns"><button class="btn sm" data-act="sell|${gid}|1">−1</button><button class="btn sm" data-act="sell|${gid}|10" ${e.qty >= 10 ? '' : 'disabled'}>−10</button><button class="btn sm primary" data-act="sell|${gid}|${e.qty}">all</button></div></div>`;
   }
@@ -1699,7 +1695,7 @@ function shipTab(){
   for(const c of state.cargo){
     const g = S.goodById(c.good);
     const forWhom = c.questId != null ? ` · <span class="up">for ${esc(S.questById(c.questId)?.title ?? 'a job')}</span>` : '';
-    out += `<p>${c.qty} × ${esc(g.name)} <span class="lock">from ${esc(S.portName(c.from))}${g.lifetimeDays ? ` · ${Math.round(S.freshness(g, state.t - c.t) * 100)}% fresh` : ''}</span>${forWhom}</p>`;
+    out += `<p>${c.qty} × ${esc(g.name)} <span class="lock">from ${esc(S.portName(c.from))} · paid ${S.fmtMoney(c.price)} each</span>${forWhom}</p>`;
   }
 
   out += '<h3>Record</h3>';

@@ -14,7 +14,6 @@ export const ECONOMY = {
     3,
     12
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "tassel"
    ],
@@ -38,7 +37,6 @@ export const ECONOMY = {
     8,
     25
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "tassel"
    ],
@@ -61,7 +59,6 @@ export const ECONOMY = {
     8,
     20
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "tassel"
    ],
@@ -83,7 +80,6 @@ export const ECONOMY = {
     2,
     8
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "tassel"
    ],
@@ -106,7 +102,6 @@ export const ECONOMY = {
     10,
     40
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "slate"
    ],
@@ -128,7 +123,6 @@ export const ECONOMY = {
     40,
     100
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "slate",
     "scorch"
@@ -150,7 +144,6 @@ export const ECONOMY = {
     30,
     80
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "slate"
    ],
@@ -168,14 +161,13 @@ export const ECONOMY = {
   {
    "id": "herbs",
    "name": "Medicinal herbs",
-   "category": "perishable",
+   "category": "fresh",
    "basePrice": 40,
    "weight": "light",
    "stock": [
     10,
     30
    ],
-   "lifetimeDays": 45,
    "producedAt": [
     "moss"
    ],
@@ -199,7 +191,6 @@ export const ECONOMY = {
     5,
     15
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "moss"
    ],
@@ -223,7 +214,6 @@ export const ECONOMY = {
     8,
     20
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "moss"
    ],
@@ -237,14 +227,13 @@ export const ECONOMY = {
   {
    "id": "riverfish",
    "name": "Rare riverfish",
-   "category": "perishable",
+   "category": "fresh",
    "basePrice": 70,
    "weight": "light",
    "stock": [
     3,
     8
    ],
-   "lifetimeDays": 22,
    "producedAt": [
     "moss"
    ],
@@ -269,7 +258,6 @@ export const ECONOMY = {
     10,
     30
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "cinder"
    ],
@@ -291,7 +279,6 @@ export const ECONOMY = {
     5,
     15
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "cinder"
    ],
@@ -314,7 +301,6 @@ export const ECONOMY = {
     10,
     25
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "cinder"
    ],
@@ -336,7 +322,6 @@ export const ECONOMY = {
     30,
     80
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "cinder"
    ],
@@ -357,7 +342,6 @@ export const ECONOMY = {
     3,
     10
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "cinder"
    ],
@@ -381,7 +365,6 @@ export const ECONOMY = {
     5,
     15
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "scorch"
    ],
@@ -406,7 +389,6 @@ export const ECONOMY = {
     15,
     40
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "scorch"
    ],
@@ -429,7 +411,6 @@ export const ECONOMY = {
     3,
     10
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "scorch"
    ],
@@ -453,7 +434,6 @@ export const ECONOMY = {
     3,
     10
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "veyra"
    ],
@@ -477,7 +457,6 @@ export const ECONOMY = {
     2,
     6
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "veyra"
    ],
@@ -499,7 +478,6 @@ export const ECONOMY = {
     5,
     15
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "veyra"
    ],
@@ -522,7 +500,6 @@ export const ECONOMY = {
     5,
     15
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "veyra"
    ],
@@ -545,7 +522,6 @@ export const ECONOMY = {
     3,
     10
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "grumm"
    ],
@@ -569,7 +545,6 @@ export const ECONOMY = {
     10,
     25
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "grumm"
    ],
@@ -592,7 +567,6 @@ export const ECONOMY = {
     2,
     6
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "grumm"
    ],
@@ -611,14 +585,13 @@ export const ECONOMY = {
   {
    "id": "gel",
    "name": "Medicinal gel",
-   "category": "perishable",
+   "category": "fresh",
    "basePrice": 130,
    "weight": "light",
    "stock": [
     5,
     15
    ],
-   "lifetimeDays": 70,
    "producedAt": [
     "brine"
    ],
@@ -641,7 +614,6 @@ export const ECONOMY = {
     3,
     10
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "brine"
    ],
@@ -662,7 +634,6 @@ export const ECONOMY = {
     10,
     30
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "brine"
    ],
@@ -686,7 +657,6 @@ export const ECONOMY = {
     5,
     15
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "glass"
    ],
@@ -710,7 +680,6 @@ export const ECONOMY = {
     10,
     25
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "glass"
    ],
@@ -731,7 +700,6 @@ export const ECONOMY = {
     5,
     12
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "croak"
    ],
@@ -754,7 +722,6 @@ export const ECONOMY = {
     8,
     20
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "croak"
    ],
@@ -778,7 +745,6 @@ export const ECONOMY = {
     2,
     6
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "croak"
    ],
@@ -802,7 +768,6 @@ export const ECONOMY = {
     8,
     20
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "haven"
    ],
@@ -825,7 +790,6 @@ export const ECONOMY = {
     10,
     30
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "haven"
    ],
@@ -847,7 +811,6 @@ export const ECONOMY = {
     3,
     10
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "haven"
    ],
@@ -871,7 +834,6 @@ export const ECONOMY = {
     15,
     40
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "nail"
    ],
@@ -893,7 +855,6 @@ export const ECONOMY = {
     3,
     10
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "nail"
    ],
@@ -917,7 +878,6 @@ export const ECONOMY = {
     5,
     15
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "nail"
    ],
@@ -941,7 +901,6 @@ export const ECONOMY = {
     1,
     5
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "nail"
    ],
@@ -966,7 +925,6 @@ export const ECONOMY = {
     2,
     8
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "whisker"
    ],
@@ -989,7 +947,6 @@ export const ECONOMY = {
     5,
     20
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "whisker"
    ],
@@ -1011,7 +968,6 @@ export const ECONOMY = {
     5,
     15
    ],
-   "lifetimeDays": 60,
    "producedAt": [
     "whisker"
    ],
@@ -1036,7 +992,6 @@ export const ECONOMY = {
     2,
     8
    ],
-   "lifetimeDays": null,
    "producedAt": [
     "whisker"
    ],
@@ -1372,16 +1327,7 @@ export const ECONOMY = {
  ],
  "formulas": {
   "price": {
-   "description": "You pay base * sells.priceMul * scarcity * (1 - repDiscount) * mood. A port pays base * (it is on the good's buyer list ? 1 : disinterestMul) * region * loved * saturation * mood * freshness. Nothing on the buying side depends on which species you are selling to except through the buyer and loved lists, which name ports and peoples alike."
-  },
-  "saturation": {
-   "description": "Each port remembers what you have landed on it lately, decaying with half-life halfLifeDays. The k-th item you sell fetches q0eff/(q0eff+recentSold) of the price, q0eff = q0 * port.marketSize.",
-   "halfLifeDays": 20,
-   "q0": 48
-  },
-  "perishable": {
-   "description": "Perishable value multiplier = floor + (1-floor)*max(0, 1 - ageDays/lifetimeDays); linear decay to the floor, shown in the UI as \"loses X% per day\".",
-   "floor": 0.1
+   "description": "You pay base * sells.priceMul * mood * (1 - repDiscount). A port pays base * demand * (needsTempControl ? tempControlMul : 1) * mood * (1 + repDiscount/2). Nothing else moves a price: what you have sold here before does not, and how picked-over a shelf is does not. The stall's stock is the only limit on how much of a thing you can move at once, and that is limit enough."
   },
   "reputation": {
    "description": "Reputation is 0..10 points per species. Purchases and fuel at that species' ports are discounted by min(maxDiscount, discountPerPoint*points). Frog gifts scale with frog reputation; cat tolls fall by the same fraction.",
@@ -1406,7 +1352,7 @@ export const ECONOMY = {
    "spread": 0.07
   },
   "volatility": {
-   "description": "Daily random-walk wobble on what a port pays, amplitude by species. Emberkin markets are the most volatile.",
+   "description": "Daily random-walk wobble on what a port pays, amplitude by species. Emberkin markets are the most volatile. This is species character, not supply and demand: it does not remember anything you did.",
    "bySpecies": {
     "emberkin": 0.15,
     "cat": 0.05,
@@ -1415,23 +1361,23 @@ export const ECONOMY = {
    }
   },
   "speciesRules": {
-   "otter": "Haggle spread on every price; refusing to haggle is rude (small rep loss).",
-   "emberkin": "Volatile prices; perishable luxuries that turn over by the season.",
+   "otter": "Haggle spread: every price at an otter port is rolled within +-spread, per good, per day. The roll is the whole of it — there is no haggling exchange behind it.",
+   "emberkin": "Volatile prices: what Cinder wants this week is not what it wanted last week.",
    "cat": "Tolls in the Belt under strict custom (never everything, never a ship that yields). Impress a captain and a gift may follow.",
    "frog": "No haggling. \"Prices\" are exchange rates: you are paid in trade credit at the stall plus goodwill (reputation), and every visit ends with a gift."
   },
-  "region": {
-   "description": "Where a good is worth carrying. A port in the same region as the good's nearest producer pays homeMul; a port anywhere else pays awayMul. Regions are named in the ports table: inner, home, belt, outer, deep.",
-   "homeMul": 1,
-   "awayMul": 1.6
-  },
-  "loved": {
-   "description": "A port named in a good's lovedBy list — by its own id or by its people — pays this on top of everything else. This is the big lever: a loved good in another region is worth three and a half times what it costs at the stall it came from.",
-   "mul": 2.2
-  },
   "stock": {
-   "description": "A stall's shelves hold a number rolled out of the good's own stock range, and they are rolled again when you come back from somewhere else. Staying at one dock and waiting does not restock it; going and trading elsewhere does. What you bought this visit is what is missing, and a thin shelf costs more (scarcity).",
-   "scarcityK": 0.5
+   "description": "A stall's shelves hold a number rolled out of the good's own stock range, and they are rolled again when you come back from somewhere else. Staying at one dock and waiting does not restock it; going and trading elsewhere does. What you bought this visit is what is missing, and the price does not move as the shelf empties: the shelf itself is the limit."
+  },
+  "demand": {
+   "description": "What a port pays for a good, as a multiple of its base price. Two questions: does this port want it (loved, on its buyer list, or neither), and is it out of the good's own region. Space is hard and there are few interspecies merchants, so carrying a loved good to another people is the trade the game is about; the same run inside one system is worth a fraction of it. Regions are named in the ports table: inner, home, belt, outer, deep.",
+   "lovedAway": 5.5,
+   "lovedSame": 2.5,
+   "likedAway": 2.5,
+   "likedSame": 1.5,
+   "unwanted": 0.6,
+   "tempControlMul": 1.5,
+   "resaleCap": 0.75
   }
  },
  "regions": {
