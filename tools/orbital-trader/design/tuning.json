@@ -363,48 +363,41 @@
  "ship": {
   "tanks": [
    {
-    "id": "starter",
-    "name": "Starter tank",
+    "id": "stock",
+    "name": "Stock tank",
     "dv_kms": 14
    },
    {
     "id": "longhaul",
     "name": "Long-haul tank",
-    "dv_kms": 24
+    "dv_kms": 22
    },
    {
-    "id": "deep",
+    "id": "deepsky",
+    "name": "Deep-sky tank",
+    "dv_kms": 30
+   },
+   {
+    "id": "deepdark",
     "name": "Deep-dark tank",
     "dv_kms": 40
    }
   ],
-  "engines": [
-   {
-    "id": "stock",
-    "name": "Stock burner",
-    "fuelPriceMul": 1
-   },
-   {
-    "id": "fastburn",
-    "name": "Cinder fastburn",
-    "fuelPriceMul": 0.75
-   },
-   {
-    "id": "smiths",
-    "name": "Smiths' masterwork",
-    "fuelPriceMul": 0.55
-   }
-  ],
   "holds": [
    {
-    "id": "starter",
-    "name": "Starter hold",
+    "id": "stock",
+    "name": "Stock hold",
     "units": 24
    },
    {
-    "id": "wide",
-    "name": "Wide hold",
-    "units": 48
+    "id": "raft",
+    "name": "Raft hold",
+    "units": 40
+   },
+   {
+    "id": "barge",
+    "name": "Barge hold",
+    "units": 64
    },
    {
     "id": "barn",

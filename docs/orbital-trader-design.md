@@ -136,7 +136,7 @@ Trade is built around one central tension: **time versus fuel.**
 | Bulk | Iron ore, refined steel, cryo fuel | Cheap, durable, low margin. The slow road is fine. |
 | Craft | Engine parts, tide glass, prayer lanterns | The working middle of the price list. |
 | Perishables | Riverfish, medicinal herbs and gel | Value decays in transit. Rewards fast routes. |
-| Climate-sensitive | Riverfish, medicinal gel, smuggled medicine | Require refrigeration (a gate-key upgrade). |
+| Climate-sensitive | Riverfish, fire crystals, ancient cider, ice lenses, medicinal gel, smuggled medicine | Require temperature control (a gate-key upgrade). Not all of them are cold: fire crystals are a thing you keep *steady*. |
 | Luxuries | Ember silk, frog tea, frogwood instruments | High value, and the things a people loves. |
 | Contraband | Stolen arms, forged medals, cybernetics | Whisker's whole shelf. |
 | Relics | Arc fragments, reactor coils, storm crystals | Rare, often tied to story and upgrades. |
@@ -169,18 +169,58 @@ Money is treated as a **key** (to upgrades, access, and relationships) rather th
 
 ### 2.8 Upgrades
 
-Upgrades fall into two categories.
+**Built, and this is the whole rack.** Two categories, as before.
 
-**Soft gates** raise the ceiling of what's comfortably reachable. These include larger fuel tanks, more efficient engines, and larger cargo holds. Skilled play can bypass them.
+**Soft gates** raise the ceiling of what is comfortably reachable: the fuel
+tank and the cargo hold. Three buyable sizes each, over the stock fitting the
+ship arrives with — four rungs in all, and the stock one is on no rack
+anywhere, because you own it before you have been anywhere.
 
-**Gate keys** unlock new techniques, cargo, or places. Each one gives experimenters a new toy rather than removing challenge.
+| | Stock | 1st | 2nd | 3rd |
+|---|---|---|---|---|
+| Tank | 14 km/s | Long-haul, 22 | Deep-sky, 30 | Deep-dark, 40 |
+| Hold | 24 units | Raft, 40 | Barge, 64 | Barn, 90 |
 
-| Upgrade | Unlocks | Likely source |
-|---|---|---|
-| Heat shield | Aerobraking at Grumm | Emberkin engine smiths, Cinder |
-| Refrigeration | Cold-chain cargo | Otter shipwrights, Slate |
-| Stealth system | Slipping past cat tolls in the Belt | A Builder dampener, fitted on Whisker |
-| Long-range sensors | Arc salvage sites, quiet Belt work | Cat salvagers, the Arc |
+They are **basics: fitted anywhere with a fuel pump**, which is every port but
+the Arc and the Maw, where nobody sells anything at all. The first size up is
+coin and nothing else. **The second and third want the Engineer aboard** — the
+berth quest #6 fills — on the rule that a dock hand will bolt a bigger tank on
+for anybody, and will not cut into a hull for a captain with nobody aboard who
+could put it back together. That is the first thing crew have ever done
+mechanically (§7.2).
+
+The tank ladder is the map: 22 is what opens Cinder, whose arrival is most of
+its bill; 40 is what makes the Maw a journey you come back from. The checker
+asserts both, and that each rung is larger than the one below it.
+
+**Gate keys** unlock techniques, cargo or places. Each names the bench it comes
+off, because where you buy a thing is half of what it is.
+
+| Upgrade | Bought at | Wants | Does |
+|---|---|---|---|
+| Temperature control | Cinder | Engineer | Carries the six goods that will not keep at hold temperature |
+| Gravitational sensors | Nail | — | *Nothing yet.* Will show gravitational phenomena on the chart |
+| Heat shielding | Cinder | Engineer | *Nothing yet.* Will allow risky aerobraking |
+| Cryo hull cooling | Cinder | Engineer, heat shielding | *Nothing yet.* Will make that aerobraking safe |
+
+**Three of the four are sold and wired to nothing.** That is deliberate and it
+is said out loud: each row on the rack carries "not fitted to anything yet",
+because selling a captain a box that does nothing without saying so is a
+swindle, and because the alternative — holding the upgrade back until the
+mechanic lands — means the mechanic arrives with no place to be bought.
+
+Aerobraking is the one that used to work. A shielded ship could skim Grumm's
+air and be captured by it, free. That is switched off: risky and safe skims are
+two different manoeuvres, neither is built, and until they are, the clouds are
+lethal to everybody. The arithmetic survives in `effectiveNodes`, which takes a
+`skim` flag so a test can still reach it rather than leaving it to rot behind a
+flag no caller can set.
+
+**What went.** Engine tiers are gone — fuel cost the same everywhere the moment
+they were removed, which is one fewer axis and one fewer thing to price. The
+Whisker dampener is gone with them, so there is nothing to hide behind in the
+Belt: the only let-off on a cat toll is the cooldown, and a captain is never
+asked twice inside a month.
 
 The guiding principle is that upgrades should **expand options, not erase challenge.**
 
@@ -454,8 +494,9 @@ at Chime and Hush. The Maw does the endgame's job now. The Scatter, which was a
 belt region rather than a body, is the Belt, and it moved inward from 2.6–3.2
 au to 2.0–2.5 so the Arc could ride just outside it.
 
-**What moved with them.** The dampener used to be lying about at Hush and is
-now fitted, for money and no questions, on Whisker. The tow debt used to be
+**What moved with them.** The dampener used to be lying about at Hush, was
+fitted for money and no questions on Whisker, and is now off the rack
+altogether (§2.8). The tow debt used to be
 owed to Ledger and is now owed to the harbour bank on Tassel. Goods whose
 producer was dropped were re-sourced rather than deleted, so the price list is
 the length it always was.
@@ -614,7 +655,8 @@ settled, and the settlements are written into the quests.
   medicine, routed through Nail — the first quest that asks a player to do
   something the market would not. A delivery hands you the goods, so Nail
   never needed to stock them and Brine never needed to buy them. It is also
-  the one quest that needs a cold hold before anybody can hand it to you.
+  the one quest that needs temperature control before anybody can hand it to
+  you.
 
 Everything else lines up with the table as shipped: iron ore to Cinder, engine
 parts to Slate, fire crystals to Veyra (who love them), reactor coils to Nail
@@ -654,11 +696,15 @@ berth fills with a name, a species, a portrait and a line:
 | Appraiser | Wicket | Frogs | #19 Appraisal |
 
 `state.crew` carries a slot per berth, null until earned and then `{ role,
-from, joinedAt }` — who they are, which job brought them, and when. That is
-deliberately all of it: **a crew member does nothing yet.** No bonus, no
-discount, no change to flight. The berth is a record of a journey taken, and
-whatever crew eventually do can be added to the slot without touching how they
-arrive.
+from, joinedAt }` — who they are, which job brought them, and when.
+
+**The Engineer now does something**, and is the only one who does. The second
+and third size of tank and hold, and every gate key but the cat sensors, are
+refused to a ship with an empty engineer's berth (§2.8). No bonus, no discount,
+no change to flight — a gate, which is the cheapest kind of effect to add and
+the easiest to take back. The navigator and the appraiser still do nothing, and
+the shape of that first effect is the argument for what they might: something a
+yard or a market checks, rather than a number quietly folded into a burn.
 
 The captain is drawn as an otter. §7.1 still has that down as a proposal, but
 the shipped fiction already leans that way — the game opens among otters, and
@@ -668,9 +714,12 @@ five portraits — captain, the three crew, and the empty chair — are 24×24
 character grids in `sprites.js` sharing one ink legend, drawn to a cached data
 URL by `portraitURL(id)`.
 
-What is still open is everything the berths are for: whether crew have
-mechanical effects or are purely narrative, whether anybody can be recruited
-outside the quest line, and whether three is the number.
+What is still open is most of what the berths are for: whether the other two
+get effects of their own, whether anybody can be recruited outside the quest
+line, and whether three is the number. Note what the Engineer's gate does to
+the line's ordering — quest #6 now sits in front of the whole upper rack, and
+in front of fire crystals at #8, so the errand that was a story beat is load
+bearing.
 
 Crew reacting to the player's burns is a desired feature, working as characterization, soft tutorial, and feedback on skill. Early flavor notes per species: Emberkin crew cheer big burns and complain through long coasts. Otter crew are chatty, point out sights, and grow anxious when the radio goes quiet. Cat crew love tight slingshots, mock safe routes, and are secretly terrified of landing. Frog crew hum during coasts, dislike high-g burns, and never complain about the slow road.
 

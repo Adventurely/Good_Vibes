@@ -158,7 +158,7 @@ for(const group of [['slate', 'moss'], ['brine', 'glass', 'croak', 'haven'], ['n
 }
 
 // --- the delta-v table and the tank gating
-const starter = T.ship.tanks[0].dv_kms, longhaul = T.ship.tanks[1].dv_kms, deep = T.ship.tanks[T.ship.tanks.length - 1].dv_kms;
+const starter = T.ship.tanks[0].dv_kms, longhaul = T.ship.tanks[1].dv_kms, deepsky = T.ship.tanks[2].dv_kms, deep = T.ship.tanks[T.ship.tanks.length - 1].dv_kms;
 const table = [
   { route: 'Slate -> Moss (moon hop)', dv_kms: +km(hop.dv1 + hop.dv2).toFixed(2), days: +hop.time.toFixed(1) },
   { route: 'Tassel dock -> Slate (first lesson)', dv_kms: +km(first.dv1 + Math.max(0, first.dv2 - by.slate.dockSpeed)).toFixed(2), days: +first.time.toFixed(1) },
@@ -187,6 +187,12 @@ check('C7 Grumm is a loose capture on the starter tank', dv('Tassel -> Grumm (lo
 check('C7 Haven costs more than a loose capture at Grumm', dv('Tassel -> Haven') > dv('Tassel -> Grumm (loose'));
 check('C7 Cinder is dearer than Veyra', dv('Tassel -> Cinder (dock)') > dv('Tassel -> Veyra'), `${dv('Tassel -> Cinder (dock)')} vs ${dv('Tassel -> Veyra')}`);
 check('C7 Cinder is a long-haul destination', dv('Tassel -> Cinder (dock)') > starter && dv('Tassel -> Cinder (dock)') <= longhaul, `${dv('Tassel -> Cinder (dock)')}: past ${starter}, within ${longhaul}`);
+/* Four rungs now — the one the ship comes with and three that are bought —
+   so each has to be worth its price, and the middle one has to be worth more
+   than the arrival it barely paid for on the rung below. */
+check('C7 the tanks climb', T.ship.tanks.every((t, i) => !i || t.dv_kms > T.ship.tanks[i - 1].dv_kms), T.ship.tanks.map(t => t.dv_kms).join(' < '));
+check('C7 the holds climb', T.ship.holds.every((h, i) => !i || h.units > T.ship.holds[i - 1].units), T.ship.holds.map(h => h.units).join(' < '));
+check('C7 the deep-sky tank makes Cinder comfortable rather than exact', dv('Tassel -> Cinder (dock)') <= 0.8 * deepsky, `${dv('Tassel -> Cinder (dock)')} of ${deepsky}`);
 /* The Maw is cheap and slow: years of coasting. The deep tank is what makes it
    a journey you come back from. */
 check('C7 the deep tank reaches the Maw with 20% spare', dv('Tassel -> the Maw') <= 0.8 * deep, `${dv('Tassel -> the Maw')} of ${deep}`);

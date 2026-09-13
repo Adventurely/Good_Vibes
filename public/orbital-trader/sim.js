@@ -63,20 +63,21 @@ export function tiers(kind){ return UPGRADES.filter(u => u.kind === kind).sort((
 export function newGame(seed = 1){
   const start = CONST.START_PORT;
   const state = {
-    /* 5: the contract board is gone, and with it the passenger list a save
-       used to carry. Before that, 4 replaced every good in the sky and 3
-       replaced the sky itself. A save from any of them describes a game this
-       one is not playing, so they are refused rather than repaired: the page
-       catches it and opens a new game, which is the honest outcome when the
-       world under a ship has changed shape. */
-    version: 5,
+    /* 6: the rack was rebuilt — four sizes of tank and hold instead of three,
+       no engines to buy, and keys that are fitted rather than sold. Before
+       that, 5 took the contract board and the passenger list away, 4 replaced
+       every good in the sky and 3 replaced the sky itself. A save from any of
+       them describes a game this one is not playing, so they are refused
+       rather than repaired: the page catches it and opens a new game, which is
+       the honest outcome when the world under a ship has changed shape. */
+    version: 6,
     seed, rng: (seed * 2654435761) >>> 0 || 1,
     t: 0, warp: 1, paused: false,
     shipName: TEXT.shipNames[Math.abs(seed) % TEXT.shipNames.length],
     ship: { body: start, r: [0, 0], v: [0, 0] },
     dockedAt: start,
-    tiers: { tank: 0, engine: 0, hold: 0 },
-    keys: { heatShield: false, refrigeration: false, sensors: false, stealth: false },
+    tiers: { tank: 0, hold: 0 },
+    keys: { heatShield: false, tempControl: false, gravSensors: false, cryoCooling: false },
     tank: 0, dv: 0,
     money: CONST.START_MONEY, debt: 0,
     cargo: [],
@@ -130,7 +131,6 @@ export function newGame(seed = 1){
 }
 
 export function holdUnits(state){ return tiers('hold')[state.tiers.hold].value; }
-export function fuelPriceMul(state){ return tiers('engine')[state.tiers.engine].value; }
 export function usedUnits(state){
   return state.cargo.reduce((s, c) => s + c.qty * goodById(c.good).units, 0)
 
@@ -138,6 +138,8 @@ export function usedUnits(state){
 export function freeUnits(state){ return holdUnits(state) - usedUnits(state); }
 export const portName = id => world.get(id)?.name ?? id;
 export const portOf = id => PORTS[id];
+
+const aOrAn = w => `${/^[aeiou]/i.test(w) ? 'an' : 'a'} ${w.toLowerCase()}`;
 
 export function logLine(state, kind, template, vars = {}){
   const text = fill(template, vars);
@@ -393,14 +395,22 @@ export function skipPlan(state, t){
   return { t, days, rate, seconds: days / (rate * CONST.BASE_RATE_DAYS_PER_SEC), capped: ideal > MAX_WARP };
 }
 
+/* Whether a ship skims air rather than burning up in it. Nothing does, yet:
+ * heat shielding and cryo hull cooling are on the rack and wired to nothing,
+ * because the risky skim and the safe one are two different manoeuvres and
+ * neither is built (§2.8). The arithmetic below is what they will both be
+ * built out of, so it stays, and `skim` lets a test reach it directly rather
+ * than leaving it to rot behind a flag no caller can set. */
+export const skimsAir = () => false;
+
 /* The maneuvers the kernel should actually fly: the player's nodes plus any
- * aerobrake the heat shield will take at a periapsis inside an atmosphere.
+ * aerobrake a shielded ship will take at a periapsis inside an atmosphere.
  * Computed by predicting, finding such a periapsis, inserting a retrograde
  * pseudo-node there, and predicting again — so the drawn path and the flown
  * path both include the skim. */
-export function effectiveNodes(state, horizon){
+export function effectiveNodes(state, horizon, { skim = skimsAir(state) } = {}){
   const nodes = state.nodes.map(n => ({ ...n })).sort((a, b) => a.t - b.t);
-  if(!state.keys.heatShield) return nodes;
+  if(!skim) return nodes;
   let list = nodes;
   for(let pass = 0; pass < 3; pass++){
     const pred = predict(world, state.ship, state.t, list, horizon, { atmosphere: false, dvAvailable: state.dv });
@@ -456,11 +466,11 @@ export function tick(state, dtDays){
      written down before the dive begins, and the bottom of it can be months
      away — which is how a shielded ship sailed straight through Grumm's air
      without the shield ever being used. */
-  const inAir = world.get(state.ship.body).atmo && state.keys.heatShield;
+  const inAir = world.get(state.ship.body).atmo && skimsAir(state);
   const nodes = effectiveNodes(state, inAir ? Math.max(dtDays + 1, 150) : dtDays + 1);
   // Stop the step at the first change of reach or burn, so warp cannot skip
   // past an encounter the player was warping towards.
-  const opts = { atmosphere: !state.keys.heatShield, dvAvailable: state.dv, stopOnSoi: true, stopOnBurn: true };
+  const opts = { atmosphere: !skimsAir(state), dvAvailable: state.dv, stopOnSoi: true, stopOnBurn: true };
   const res = advance(world, state.ship, state.t, dtDays, nodes, opts);
   state.ship = res.ship;
   state.t = res.t;
@@ -677,11 +687,11 @@ export function canAcceptQuest(state, q){
   const load = questLoad(q);
   if(load > freeUnits(state)) return { ok: false, reason: 'No room in the hold for it.' };
   /* A consignment skips the market, so it also skips the market's one check:
-     nothing stops somebody handing you four cases of cold medicine and a warm
-     hold to put them in except this. */
-  if(q.type === 'delivery' && !state.keys.refrigeration
-     && (q.goods ?? []).some(g => goodById(g.good)?.needsRefrigeration)){
-    return { ok: false, reason: 'That wants a cold hold.' };
+     nothing stops somebody handing you four cases of cold medicine and a hold
+     that cannot hold a temperature except this. */
+  if(q.type === 'delivery' && !state.keys.tempControl
+     && (q.goods ?? []).some(g => goodById(g.good)?.needsTempControl)){
+    return { ok: false, reason: 'That wants temperature control.' };
   }
   return { ok: true, load };
 }
@@ -823,7 +833,7 @@ export function planCost(state, horizon){
 /* The plan as the solver reads it: as far ahead as it is asked for. */
 export function plan(state, horizon){
   const nodes = effectiveNodes(state, horizon);
-  return predict(world, state.ship, state.t, nodes, horizon, { atmosphere: !state.keys.heatShield, dvAvailable: state.dv });
+  return predict(world, state.ship, state.t, nodes, horizon, { atmosphere: !skimsAir(state), dvAvailable: state.dv });
 }
 
 /* ------------------------------------------------- the immediate orbit */
@@ -1845,7 +1855,7 @@ export function canBuy(state, goodId, qty){
   const g = goodById(goodId);
   const price = buyPrice(state, port, goodId);
   if(price == null) return { ok: false, reason: 'Not sold here.' };
-  if(g.needsRefrigeration && !state.keys.refrigeration) return { ok: false, reason: 'Needs refrigeration.' };
+  if(g.needsTempControl && !state.keys.tempControl) return { ok: false, reason: 'Needs temperature control.' };
   if(stockAvailable(state, port, goodId) < qty) return { ok: false, reason: 'Not enough in stock.' };
   if(freeUnits(state) < qty * g.units) return { ok: false, reason: 'No room in the hold.' };
   if(state.money < price * qty) return { ok: false, reason: 'Not enough coin.' };
@@ -1916,7 +1926,7 @@ export function fuelPrice(state, portId = state.dockedAt){
   const p = PORTS[portId];
   if(!p || p.fuelPricePerKms == null) return null;
   if(!portOpen(portId, state.t)) return null;   // the pumps went with the colony
-  return p.fuelPricePerKms * fuelPriceMul(state) * (1 - repDiscount(state, p.species) * 0.5);
+  return p.fuelPricePerKms * (1 - repDiscount(state, p.species) * 0.5);
 }
 /* A ship with no fuel and no coin, tied up at a dock, is a ship that can never
  * leave — and the design document is clear that nothing may cost the save. So
@@ -1971,6 +1981,18 @@ export function canBuyUpgrade(state, id){
   if(!portOpen(port, state.t)) return { ok: false, reason: 'The yard is shut for the season.' };
   if(ownsUpgrade(state, u)) return { ok: false, reason: 'Already fitted.' };
   if(u.kind !== 'key' && state.tiers[u.kind] !== u.tier - 1) return { ok: false, reason: 'Needs the tier below first.' };
+  /* Money is not the only thing a yard wants. The second and third tank and
+     hold are fitted rather than sold: a dock hand will bolt on the first size
+     up for anyone with the coin, and will not cut into a hull for a captain
+     with nobody aboard who could put it back together. The rest of the rack
+     is the same rule for the same reason. */
+  if(u.requiresCrew && !state.crew?.[u.requiresCrew]){
+    const role = (TEXT.crew?.roles ?? []).find(r => r.id === u.requiresCrew)?.name ?? u.requiresCrew;
+    return { ok: false, reason: `That is work for ${aOrAn(role)}, and the berth is empty.` };
+  }
+  if(u.requiresUpgrade && !ownsUpgrade(state, upgradeById(u.requiresUpgrade))){
+    return { ok: false, reason: `Needs ${upgradeById(u.requiresUpgrade).name.toLowerCase()} first.` };
+  }
   if(u.minRep && (state.rep[u.minRep.species] ?? 0) < u.minRep.value) return { ok: false, reason: `${SPECIES[u.minRep.species].plural} do not know you well enough yet.` };
   const price = Math.round(u.price * (1 - repDiscount(state, PORTS[port].species)));
   if(state.money < price) return { ok: false, reason: 'Not enough coin.', price };
@@ -1997,9 +2019,9 @@ export function grantUpgrade(state, u){
 
 /* --------------------------------------------------------------- tolls */
 
-/* The Scatter: crossing into the belt in the Lamp's frame, without a stealth
- * system, brings a cat captain alongside. Once per crossing, and never twice
- * inside a month: the oath is a toll, not a tax. */
+/* The Scatter: crossing into the belt in the Lamp's frame brings a cat
+ * captain alongside. Once per crossing, and never twice inside a month: the
+ * oath is a toll, not a tax. */
 function tollCheck(state, events){
   const inLamp = state.ship.body === 'lamp';
   const r = inLamp ? norm(state.ship.r) : norm(shipAbsPos(state));
@@ -2009,11 +2031,6 @@ function tollCheck(state, events){
   if(!inBelt || was || !inLamp) return;
   if(state.t - state.toll.lastT < FORMULAS.toll.cooldownDays) return;
   state.toll.lastT = state.t;
-  if(state.keys.stealth){
-    logLine(state, 'story', TEXT.events.tollStealth);
-    events.push({ kind: 'story', name: 'tollStealth', text: TEXT.events.tollStealth });
-    return;
-  }
   const f = FORMULAS.toll;
   const value = cargoValue(state);
   const variant = TEXT.events.tollOffer[Math.floor(rnd(state) * TEXT.events.tollOffer.length)];
@@ -2195,7 +2212,7 @@ export function restore(json){
   const s = typeof json === 'string' ? JSON.parse(json) : json;
   const bad = why => { throw new Error(`Not a save this game understands: ${why}.`); };
   if(!s || typeof s !== 'object') bad('it is not an object');
-  if(s.version !== 5) bad(`it is version ${s.version}, and this sky is version 5`);
+  if(s.version !== 6) bad(`it is version ${s.version}, and this sky is version 6`);
   if(!s.ship || typeof s.ship !== 'object') bad('it has no ship');
   if(!world.get(s.ship.body)) bad(`its ship is at "${s.ship.body}", which is nowhere`);
   for(const k of ['r', 'v']){
@@ -2210,7 +2227,7 @@ export function restore(json){
     || (n.prograde != null && !Number.isFinite(n.prograde))
     || (n.radial != null && !Number.isFinite(n.radial)))) bad('its plan is not a list of marks');
   if(!Array.isArray(s.cargo) || s.cargo.some(c => !c || !goodById(c.good) || !Number.isFinite(c.qty))) bad('its hold holds something unknown');
-  if(!s.tiers || ['tank', 'engine', 'hold'].some(k => !tiers(k)[s.tiers[k]])) bad('it is fitted with something this game does not have');
+  if(!s.tiers || ['tank', 'hold'].some(k => !tiers(k)[s.tiers[k]])) bad('it is fitted with something this game does not have');
   // Everything below is either filled in or safely absent.
   s.keys ??= {}; s.markets ??= {}; s.log ??= [];
   s.rep = { emberkin: 0, otter: 0, cat: 0, frog: 0, ...(s.rep ?? {}) };

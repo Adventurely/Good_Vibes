@@ -393,7 +393,6 @@
   ],
   "tollPaidCoin": "You hand over {amount}. {captain} counts it once, calls it fair, and tells you where the rocks are thin this year.",
   "tollPaidCargo": "They take {cargo} and leave the rest lashed down properly, which was not required of them. {captain} salutes on the way out.",
-  "tollStealth": "Something aboard swallows your wake, and the Belt lets you through without a hail. It feels like cheating, because it is.",
   "tollGiftLater": "A crate arrives at the dock with no sender and no note, worth {amount}. A cat captain, somewhere, is telling this story better than you could.",
   "tollWaved": "{captain} looks over an empty hold, laughs, and waves you through with something close to sympathy.",
   "towDry": [

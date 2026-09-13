@@ -69,7 +69,7 @@ function bestRun(state, from){
   for(const to of reachable(state, from)){
     for(const row of PORTS[from].sells){
       const g = S.goodById(row.good);
-      if(g.needsRefrigeration && !state.keys.refrigeration) continue;
+      if(g.needsTempControl && !state.keys.tempControl) continue;
       const buy = S.buyPrice(state, from, g.id);
       const sell = S.sellPrice(state, to, g.id);
       const stock = S.stockAvailable(state, from, g.id);
@@ -138,7 +138,7 @@ while(state.t < DAYS && laps < 400){
     S.refuel(state, Math.min(S.kms(state.tank - state.dv), Math.max(4, (state.money * 0.35) / fp)));
   }
   // Buy what a bigger ship would want, when it is affordable.
-  for(const kind of ['hold', 'tank', 'engine']){
+  for(const kind of ['hold', 'tank']){
     const next = S.tiers(kind)[state.tiers[kind] + 1];
     if(next && next.soldAt?.includes(from) && state.money > next.price * 1.8){
       S.buyUpgrade(state, next.id);
@@ -200,7 +200,7 @@ console.log(`  profit per day        median ${fmt(median)}, best ${fmt(top)}  ${
 console.log(`  fuel burned           ${S.fmtKms(state.stats.dvSpent)} over ${state.stats.burns} burns`);
 console.log(`  tows                  ${state.stats.tows}`);
 console.log(`  ports visited         ${state.visited.length} of ${Object.keys(PORTS).length}: ${state.visited.map(S.portName).join(', ')}`);
-console.log(`  fitted                ${['tank', 'engine', 'hold'].map(k => `${k} ${state.tiers[k]}`).join(', ')}; keys: ${Object.entries(state.keys).filter(([, v]) => v).map(([k]) => k).join(', ') || 'none'}`);
+console.log(`  fitted                ${['tank', 'hold'].map(k => `${k} ${state.tiers[k]}`).join(', ')}; keys: ${Object.entries(state.keys).filter(([, v]) => v).map(([k]) => k).join(', ') || 'none'}`);
 console.log('\n  first time...');
 for(const [what, at] of Object.entries(firsts)) console.log(`    ${what.padEnd(22)} ${S.calendar(at.t).text}`);
 const unseen = Object.keys(PORTS).filter(p => !state.visited.includes(p));

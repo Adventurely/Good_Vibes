@@ -15,7 +15,6 @@ export const ECONOMY = {
     12
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "tassel"
    ],
@@ -40,7 +39,6 @@ export const ECONOMY = {
     25
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "tassel"
    ],
@@ -64,7 +62,6 @@ export const ECONOMY = {
     20
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "tassel"
    ],
@@ -87,7 +84,6 @@ export const ECONOMY = {
     8
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "tassel"
    ],
@@ -111,7 +107,6 @@ export const ECONOMY = {
     40
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "slate"
    ],
@@ -134,7 +129,6 @@ export const ECONOMY = {
     100
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "slate",
     "scorch"
@@ -157,7 +151,6 @@ export const ECONOMY = {
     80
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "slate"
    ],
@@ -183,7 +176,6 @@ export const ECONOMY = {
     30
    ],
    "lifetimeDays": 45,
-   "needsRefrigeration": false,
    "producedAt": [
     "moss"
    ],
@@ -208,7 +200,6 @@ export const ECONOMY = {
     15
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "moss"
    ],
@@ -233,7 +224,6 @@ export const ECONOMY = {
     20
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "moss"
    ],
@@ -255,7 +245,6 @@ export const ECONOMY = {
     8
    ],
    "lifetimeDays": 22,
-   "needsRefrigeration": true,
    "producedAt": [
     "moss"
    ],
@@ -267,7 +256,8 @@ export const ECONOMY = {
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Silver, quick, and only in three rivers. Worth a fortune fresh and worth an apology otherwise."
+   "blurb": "Silver, quick, and only in three rivers. Worth a fortune fresh and worth an apology otherwise.",
+   "needsTempControl": true
   },
   {
    "id": "engineparts",
@@ -280,7 +270,6 @@ export const ECONOMY = {
     30
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "cinder"
    ],
@@ -303,7 +292,6 @@ export const ECONOMY = {
     15
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "cinder"
    ],
@@ -327,7 +315,6 @@ export const ECONOMY = {
     25
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "cinder"
    ],
@@ -350,7 +337,6 @@ export const ECONOMY = {
     80
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "cinder"
    ],
@@ -372,7 +358,6 @@ export const ECONOMY = {
     10
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "cinder"
    ],
@@ -397,7 +382,6 @@ export const ECONOMY = {
     15
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "scorch"
    ],
@@ -409,7 +393,8 @@ export const ECONOMY = {
    "lovedBy": [
     "veyra"
    ],
-   "blurb": "Grown in the vents and cut cold. They hold a light for a week after you take them out of the sun."
+   "blurb": "Grown in the vents and cut cold. They hold a light for a week after you take them out of the sun.",
+   "needsTempControl": true
   },
   {
    "id": "volcanicglass",
@@ -422,7 +407,6 @@ export const ECONOMY = {
     40
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "scorch"
    ],
@@ -446,7 +430,6 @@ export const ECONOMY = {
     10
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "scorch"
    ],
@@ -471,7 +454,6 @@ export const ECONOMY = {
     10
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "veyra"
    ],
@@ -496,7 +478,6 @@ export const ECONOMY = {
     6
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "veyra"
    ],
@@ -519,7 +500,6 @@ export const ECONOMY = {
     15
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "veyra"
    ],
@@ -543,7 +523,6 @@ export const ECONOMY = {
     15
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "veyra"
    ],
@@ -567,7 +546,6 @@ export const ECONOMY = {
     10
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "grumm"
    ],
@@ -592,7 +570,6 @@ export const ECONOMY = {
     25
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "grumm"
    ],
@@ -616,7 +593,6 @@ export const ECONOMY = {
     6
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "grumm"
    ],
@@ -629,7 +605,8 @@ export const ECONOMY = {
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Laid down in a balloon city before anyone alive was hatched. Otters weep at it; the frogs think that is the point."
+   "blurb": "Laid down in a balloon city before anyone alive was hatched. Otters weep at it; the frogs think that is the point.",
+   "needsTempControl": true
   },
   {
    "id": "gel",
@@ -642,7 +619,6 @@ export const ECONOMY = {
     15
    ],
    "lifetimeDays": 70,
-   "needsRefrigeration": true,
    "producedAt": [
     "brine"
    ],
@@ -652,7 +628,8 @@ export const ECONOMY = {
    "lovedBy": [
     "scorch"
    ],
-   "blurb": "Cold, clear, and it will close a wound that nothing else will. Scorch buys it by the crate and never haggles."
+   "blurb": "Cold, clear, and it will close a wound that nothing else will. Scorch buys it by the crate and never haggles.",
+   "needsTempControl": true
   },
   {
    "id": "amber",
@@ -665,7 +642,6 @@ export const ECONOMY = {
     10
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "brine"
    ],
@@ -687,7 +663,6 @@ export const ECONOMY = {
     30
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "brine"
    ],
@@ -712,7 +687,6 @@ export const ECONOMY = {
     15
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "glass"
    ],
@@ -723,7 +697,8 @@ export const ECONOMY = {
    "lovedBy": [
     "veyra"
    ],
-   "blurb": "Ground from shell ice that has never melted. You can read a ship's name off it from further than you would believe."
+   "blurb": "Ground from shell ice that has never melted. You can read a ship's name off it from further than you would believe.",
+   "needsTempControl": true
   },
   {
    "id": "cryofuel",
@@ -736,7 +711,6 @@ export const ECONOMY = {
     25
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "glass"
    ],
@@ -758,7 +732,6 @@ export const ECONOMY = {
     12
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "croak"
    ],
@@ -782,7 +755,6 @@ export const ECONOMY = {
     20
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "croak"
    ],
@@ -807,7 +779,6 @@ export const ECONOMY = {
     6
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "croak"
    ],
@@ -832,7 +803,6 @@ export const ECONOMY = {
     20
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "haven"
    ],
@@ -856,7 +826,6 @@ export const ECONOMY = {
     30
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "haven"
    ],
@@ -879,7 +848,6 @@ export const ECONOMY = {
     10
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "haven"
    ],
@@ -904,7 +872,6 @@ export const ECONOMY = {
     40
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "nail"
    ],
@@ -927,7 +894,6 @@ export const ECONOMY = {
     10
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "nail"
    ],
@@ -952,7 +918,6 @@ export const ECONOMY = {
     15
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "nail"
    ],
@@ -977,7 +942,6 @@ export const ECONOMY = {
     5
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "nail"
    ],
@@ -1003,7 +967,6 @@ export const ECONOMY = {
     8
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "whisker"
    ],
@@ -1027,7 +990,6 @@ export const ECONOMY = {
     20
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "whisker"
    ],
@@ -1050,7 +1012,6 @@ export const ECONOMY = {
     15
    ],
    "lifetimeDays": 60,
-   "needsRefrigeration": true,
    "producedAt": [
     "whisker"
    ],
@@ -1062,7 +1023,8 @@ export const ECONOMY = {
    "lovedBy": [
     "scorch"
    ],
-   "blurb": "The same gel Brine makes, in the wrong crates, at half the price and twice the risk. Scorch does not care."
+   "blurb": "The same gel Brine makes, in the wrong crates, at half the price and twice the risk. Scorch does not care.",
+   "needsTempControl": true
   },
   {
    "id": "cyberparts",
@@ -1075,7 +1037,6 @@ export const ECONOMY = {
     8
    ],
    "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "whisker"
    ],
@@ -1099,13 +1060,7 @@ export const ECONOMY = {
    "region": "inner",
    "marketSize": 1.5,
    "fuelPricePerKms": 6,
-   "shipyard": true,
-   "upgrades": [
-    "engine_1",
-    "engine_2",
-    "hold_1",
-    "heatshield"
-   ]
+   "shipyard": true
   },
   "scorch": {
    "name": "Scorch",
@@ -1116,8 +1071,7 @@ export const ECONOMY = {
    "region": "inner",
    "marketSize": 0.6,
    "fuelPricePerKms": 12,
-   "shipyard": false,
-   "upgrades": []
+   "shipyard": true
   },
   "veyra": {
    "name": "Veyra",
@@ -1128,8 +1082,7 @@ export const ECONOMY = {
    "region": "inner",
    "marketSize": 1.6,
    "fuelPricePerKms": 11,
-   "shipyard": false,
-   "upgrades": []
+   "shipyard": true
   },
   "tassel": {
    "name": "Tassel",
@@ -1140,8 +1093,7 @@ export const ECONOMY = {
    "region": "home",
    "marketSize": 2,
    "fuelPricePerKms": 10,
-   "shipyard": false,
-   "upgrades": []
+   "shipyard": true
   },
   "slate": {
    "name": "Slate",
@@ -1152,17 +1104,7 @@ export const ECONOMY = {
    "region": "home",
    "marketSize": 0.8,
    "fuelPricePerKms": 9,
-   "shipyard": true,
-   "upgrades": [
-    "tank_0",
-    "tank_1",
-    "tank_2",
-    "engine_0",
-    "hold_0",
-    "hold_1",
-    "hold_2",
-    "refrigeration"
-   ]
+   "shipyard": true
   },
   "moss": {
    "name": "Moss",
@@ -1173,8 +1115,7 @@ export const ECONOMY = {
    "region": "home",
    "marketSize": 1,
    "fuelPricePerKms": 12,
-   "shipyard": false,
-   "upgrades": []
+   "shipyard": true
   },
   "nail": {
    "name": "Nail",
@@ -1185,8 +1126,7 @@ export const ECONOMY = {
    "region": "belt",
    "marketSize": 0.8,
    "fuelPricePerKms": 20,
-   "shipyard": false,
-   "upgrades": []
+   "shipyard": true
   },
   "whisker": {
    "name": "Whisker",
@@ -1197,10 +1137,7 @@ export const ECONOMY = {
    "region": "belt",
    "marketSize": 0.7,
    "fuelPricePerKms": 26,
-   "shipyard": true,
-   "upgrades": [
-    "stealth"
-   ]
+   "shipyard": true
   },
   "arc": {
    "name": "The Arc",
@@ -1211,10 +1148,7 @@ export const ECONOMY = {
    "region": "belt",
    "marketSize": 0.6,
    "fuelPricePerKms": null,
-   "shipyard": false,
-   "upgrades": [
-    "sensors"
-   ]
+   "shipyard": false
   },
   "grumm": {
    "name": "Grumm",
@@ -1225,8 +1159,7 @@ export const ECONOMY = {
    "region": "outer",
    "marketSize": 1,
    "fuelPricePerKms": 24,
-   "shipyard": false,
-   "upgrades": []
+   "shipyard": true
   },
   "brine": {
    "name": "Brine",
@@ -1237,8 +1170,7 @@ export const ECONOMY = {
    "region": "outer",
    "marketSize": 0.8,
    "fuelPricePerKms": 26,
-   "shipyard": false,
-   "upgrades": []
+   "shipyard": true
   },
   "glass": {
    "name": "Glass",
@@ -1249,8 +1181,7 @@ export const ECONOMY = {
    "region": "outer",
    "marketSize": 0.7,
    "fuelPricePerKms": 26,
-   "shipyard": false,
-   "upgrades": []
+   "shipyard": true
   },
   "croak": {
    "name": "Croak",
@@ -1261,8 +1192,7 @@ export const ECONOMY = {
    "region": "outer",
    "marketSize": 0.3,
    "fuelPricePerKms": 34,
-   "shipyard": false,
-   "upgrades": [],
+   "shipyard": true,
    "retrograde": true
   },
   "haven": {
@@ -1275,10 +1205,6 @@ export const ECONOMY = {
    "marketSize": 1.4,
    "fuelPricePerKms": 22,
    "shipyard": true,
-   "upgrades": [
-    "tank_1",
-    "tank_2"
-   ],
    "gifts": {
     "perVisitValue": 40,
     "perRepPoint": 12,
@@ -1298,110 +1224,71 @@ export const ECONOMY = {
    "region": "deep",
    "marketSize": 0,
    "fuelPricePerKms": null,
-   "shipyard": false,
-   "upgrades": []
+   "shipyard": false
   }
  },
  "upgrades": [
   {
    "id": "tank_0",
-   "name": "Slack tank",
+   "name": "Stock tank",
    "kind": "tank",
    "tier": 0,
-   "price": 1200,
-   "soldAt": [
-    "slate"
-   ],
+   "price": null,
+   "soldAt": null,
    "starter": true,
-   "effect": "Starter Δv budget (size from tuning).",
-   "unlocks": "Tassel's moons and the slow road out to the Belt with a refuel."
+   "effect": "The tank the ship came with (size from tuning).",
+   "unlocks": "Tassel's moons, the Belt, and a loose capture at Grumm."
   },
   {
    "id": "tank_1",
    "name": "Long-haul tank",
    "kind": "tank",
    "tier": 1,
-   "price": 3600,
-   "soldAt": [
-    "slate",
-    "haven"
-   ],
+   "price": 3200,
+   "soldAt": "*",
    "effect": "Larger Δv budget (size from tuning).",
-   "unlocks": "A comfortable transfer to the Belt and the Arc; Grumm with careful routing."
+   "unlocks": "Cinder and the inward run, where the arrival is most of the bill."
   },
   {
    "id": "tank_2",
    "name": "Deep-sky tank",
    "kind": "tank",
    "tier": 2,
-   "price": 11500,
-   "soldAt": [
-    "slate",
-    "haven"
-   ],
+   "price": 8000,
+   "soldAt": "*",
+   "requiresCrew": "engineer",
+   "effect": "Larger Δv budget again (size from tuning).",
+   "unlocks": "Grumm and Haven without counting every metre; the Arc with room to come home."
+  },
+  {
+   "id": "tank_3",
+   "name": "Deep-dark tank",
+   "kind": "tank",
+   "tier": 3,
+   "price": 16000,
+   "soldAt": "*",
+   "requiresCrew": "engineer",
    "effect": "Largest Δv budget (size from tuning).",
-   "unlocks": "Direct Grumm runs, the Maw, and running hot with perishables."
-  },
-  {
-   "id": "engine_0",
-   "name": "Slate putter",
-   "kind": "engine",
-   "tier": 0,
-   "price": 900,
-   "soldAt": [
-    "slate"
-   ],
-   "starter": true,
-   "effect": "Starter fuel efficiency: km/s bought per cowrie at the pump (factor from tuning).",
-   "unlocks": "Nothing; it is what you came with."
-  },
-  {
-   "id": "engine_1",
-   "name": "Cinder fastburn",
-   "kind": "engine",
-   "tier": 1,
-   "price": 3000,
-   "soldAt": [
-    "cinder"
-   ],
-   "effect": "Better fuel efficiency: more km/s per cowrie when refuelling (factor from tuning).",
-   "unlocks": "Cheaper hot transfers; the Cinder run stops eating your margin."
-  },
-  {
-   "id": "engine_2",
-   "name": "Smiths' masterwork",
-   "kind": "engine",
-   "tier": 2,
-   "price": 9000,
-   "soldAt": [
-    "cinder"
-   ],
-   "effect": "Best fuel efficiency (factor from tuning).",
-   "unlocks": "Outer-system fuel prices stop mattering as much."
+   "unlocks": "The Maw, and running hot anywhere you like."
   },
   {
    "id": "hold_0",
-   "name": "Starter hold",
+   "name": "Stock hold",
    "kind": "hold",
    "tier": 0,
-   "price": 800,
-   "soldAt": [
-    "slate"
-   ],
+   "price": null,
+   "soldAt": null,
    "starter": true,
-   "effect": "Starter cargo capacity (units from tuning; the sim assumes 24).",
-   "unlocks": "Nothing; it is what you came with."
+   "effect": "The hold the ship came with (units from tuning; the sim assumes 24).",
+   "unlocks": "One consignment at a time, and not a large one."
   },
   {
    "id": "hold_1",
    "name": "Raft hold",
    "kind": "hold",
    "tier": 1,
-   "price": 2800,
-   "soldAt": [
-    "slate",
-    "cinder"
-   ],
+   "price": 2400,
+   "soldAt": "*",
    "effect": "Larger cargo capacity (units from tuning).",
    "unlocks": "Bulk runs that actually pay: ore and steel by the crate rather than the armful."
   },
@@ -1410,60 +1297,77 @@ export const ECONOMY = {
    "name": "Barge hold",
    "kind": "hold",
    "tier": 2,
-   "price": 8500,
-   "soldAt": [
-    "slate"
-   ],
+   "price": 6000,
+   "soldAt": "*",
+   "requiresCrew": "engineer",
+   "effect": "Larger cargo capacity again (units from tuning).",
+   "unlocks": "A delivery and a speculation in the same hold."
+  },
+  {
+   "id": "hold_3",
+   "name": "Barn hold",
+   "kind": "hold",
+   "tier": 3,
+   "price": 13000,
+   "soldAt": "*",
+   "requiresCrew": "engineer",
    "effect": "Largest cargo capacity (units from tuning).",
-   "unlocks": "Ore and masonry by the barge, and full frog gift-exchanges in one trip."
+   "unlocks": "Ore and masonry by the barge, and a full frog gift-exchange in one trip."
+  },
+  {
+   "id": "gravsensors",
+   "name": "Gravitational sensors",
+   "kind": "key",
+   "tier": 0,
+   "price": 3500,
+   "soldAt": [
+    "nail"
+   ],
+   "pending": true,
+   "effect": "See gravitational phenomena on the chart.",
+   "unlocks": "Nothing yet: the phenomena are not in the sky so far."
+  },
+  {
+   "id": "tempcontrol",
+   "name": "Temperature control",
+   "kind": "key",
+   "tier": 0,
+   "price": 2800,
+   "soldAt": [
+    "cinder"
+   ],
+   "requiresCrew": "engineer",
+   "effect": "The hold can carry goods that will not keep at hold temperature.",
+   "unlocks": "Rare riverfish, fire crystals, ancient cider, ice lenses, medicinal gel and smuggled medicine."
   },
   {
    "id": "heatshield",
-   "name": "Ember heat shield",
+   "name": "Heat shielding",
    "kind": "key",
    "tier": 0,
    "price": 4600,
    "soldAt": [
     "cinder"
    ],
-   "effect": "Survive atmosphere skims; enables aerobraking at Grumm.",
-   "unlocks": "Free braking at Grumm (\"Skimming\"); the fast cheap road to Haven."
+   "requiresCrew": "engineer",
+   "pending": true,
+   "effect": "Survive an atmosphere skim, at a risk.",
+   "unlocks": "Nothing yet: risky aerobraking is not built."
   },
   {
-   "id": "refrigeration",
-   "name": "Cold hold",
+   "id": "cryocooling",
+   "name": "Cryo hull cooling",
    "kind": "key",
    "tier": 0,
-   "price": 2400,
+   "price": 9500,
    "soldAt": [
-    "slate"
+    "cinder"
    ],
-   "effect": "Hold can carry goods flagged needsRefrigeration.",
-   "unlocks": "Riverfish, medicinal gel and frog pilgrims."
-  },
-  {
-   "id": "sensors",
-   "name": "Long-range sensors",
-   "kind": "key",
-   "tier": 0,
-   "price": 3500,
-   "soldAt": [
-    "arc"
-   ],
-   "effect": "Shows Arc salvage sites and Belt traffic on the chart with intercept predictions.",
-   "unlocks": "Salvage work, quiet Belt crossings, and the long look outward."
-  },
-  {
-   "id": "stealth",
-   "name": "Whisker dampener",
-   "kind": "key",
-   "tier": 0,
-   "price": 5200,
-   "soldAt": [
-    "whisker"
-   ],
-   "effect": "Cat toll intercepts in the Belt no longer trigger unless you dock at Nail.",
-   "unlocks": "Toll-free Belt crossings."
+   "requiresCrew": "engineer",
+   "requiresUpgrade": "heatshield",
+   "pending": true,
+   "effect": "Carries the heat of a skim away, so the skim is safe.",
+   "unlocks": "Nothing yet: safe aerobraking is not built."
   }
  ],
  "formulas": {
@@ -1486,7 +1390,7 @@ export const ECONOMY = {
    "maxPoints": 10
   },
   "toll": {
-   "description": "A Belt toll intercept takes min(cap, fraction*cargoValue) in goods, chosen by the cats; nothing if cargoValue < minCargoValue (they never take everything and never harm a ship that yields). Stealth suppresses intercepts.",
+   "description": "A Belt toll intercept takes min(cap, fraction*cargoValue) in goods, chosen by the cats; nothing if cargoValue < minCargoValue (they never take everything and never harm a ship that yields). There is nothing to hide behind: the only let-off is the cooldown, so a captain is never asked twice inside a month.",
    "fraction": 0.15,
    "cap": 600,
    "minCargoValue": 200

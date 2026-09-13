@@ -1936,6 +1936,41 @@ climbing out** — Cinder sits at 0.3 au and the arrival is most of the bill —
 which is real orbital mechanics and, happily, exactly what the Emberkin would
 tell you.
 
+### The rack
+
+Two things you buy more of and four you buy once.
+
+**Tank and hold** are basics, fitted at any port with a fuel pump — everywhere
+but the Arc and the Maw, which sell nothing at all. Three sizes each above the
+one the ship came with: 14 → 22 → 30 → 40 km/s, and 24 → 40 → 64 → 90 units.
+The stock fitting is on no rack anywhere, because you own it before you have
+been anywhere.
+
+**The first size up is money. The second and third want the Engineer**, the
+berth quest #6 fills. A dock hand will bolt a bigger tank on for anybody, and
+will not cut into a hull for a captain with nobody aboard who could put it back
+together. It is the first and so far only thing crew do mechanically.
+
+The four keys name the bench they come off:
+
+| Key | Bought at | Wants | Does |
+| --- | --- | --- | --- |
+| Temperature control | Cinder | Engineer | Carries the six goods that will not keep at hold temperature — riverfish, fire crystals, ancient cider, ice lenses, medicinal gel, smuggled medicine. Not all of them are cold: fire crystals are a thing you keep *steady* |
+| Gravitational sensors | Nail | — | *Nothing yet* |
+| Heat shielding | Cinder | Engineer | *Nothing yet* |
+| Cryo hull cooling | Cinder | Engineer, heat shielding | *Nothing yet* |
+
+**Three of them are sold and wired to nothing, and each says so on its own
+row** — "not fitted to anything yet". Selling somebody a box that does nothing
+without telling them is a swindle; holding the box back until the mechanic
+lands means the mechanic arrives with nowhere to be bought.
+
+Aerobraking is the one that used to work, and is switched off: a risky skim and
+a safe one are two different manoeuvres, neither is built, so Grumm's clouds
+are lethal to everybody. The arithmetic is still in `effectiveNodes`, which
+takes a `skim` flag so a test can reach it rather than leaving it to rot behind
+a flag no caller can set.
+
 ### Forgiveness, as built
 
 Nothing here can cost the save. A dry tank calls a tow, for money and days. So

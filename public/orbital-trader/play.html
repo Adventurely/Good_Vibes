@@ -1402,9 +1402,9 @@ function market(){
     const price = S.buyPrice(state, port, gid);
     const stock = S.stockAvailable(state, port, gid);
     const c1 = S.canBuy(state, gid, 1);
-    const lock = g.needsRefrigeration && !state.keys.refrigeration ? '<span class="lock">needs refrigeration</span>' : '';
+    const lock = g.needsTempControl && !state.keys.tempControl ? '<span class="lock">needs temperature control</span>' : '';
     /* How many you could actually take. It has to start from canBuy rather
-       than from the arithmetic: a cold-chain good with no cold hold priced out
+       than from the arithmetic: a good that needs a held temperature and no way to hold one priced out
        the +1 button and left +10 and "all" lit, which is a button that exists
        to tell you no. If one is impossible, ten is impossible. */
     const maxQ = c1.ok ? Math.min(stock, Math.floor(state.money / price), Math.floor(S.freeUnits(state) / g.units)) : 0;
@@ -1481,7 +1481,10 @@ function shipyardTab(){
   for(const u of ups){
     const c = S.canBuyUpgrade(state, u.id);
     const owned = S.ownsUpgrade(state, u);
-    out += `<div class="row"><div class="name"><b>${esc(u.name)}</b><small>${esc(u.effect)}${u.unlocks ? ' · ' + esc(u.unlocks) : ''}</small></div><div class="price">${owned ? '<span class="lock">fitted</span>' : S.fmtMoney(c.price ?? u.price)}</div>
+    /* Three of the keys are sold and wired to nothing yet. Saying so on the
+       row is the difference between a promise and a swindle. */
+    const soon = u.pending ? '<small class="lock">not fitted to anything yet</small>' : '';
+    out += `<div class="row"><div class="name"><b>${esc(u.name)}</b><small>${esc(u.effect)}${u.unlocks ? ' · ' + esc(u.unlocks) : ''}</small>${soon}</div><div class="price">${owned ? '<span class="lock">fitted</span>' : S.fmtMoney(c.price ?? u.price)}</div>
       <div class="btns">${owned ? '' : `<button class="btn sm primary" data-act="upgrade|${u.id}" ${c.ok ? '' : 'disabled title="' + esc(c.reason) + '"'}>Fit</button>`}</div></div>`;
     if(!owned && !c.ok && c.reason !== 'Not enough coin.') out += `<p class="lock">${esc(c.reason)}</p>`;
   }
@@ -1684,10 +1687,12 @@ function shipTab(){
 
   out += '<h3>Fitted</h3>';
   const t = state.tiers;
+  /* The fitted list reads the rack rather than naming the keys itself, so a
+     new one appears here the moment it exists in the tables. */
+  const fittedKeys = UPGRADES.filter(u => u.kind === 'key' && state.keys[u.key]);
   out += `<dl class="kv"><dt>Tank</dt><dd>${esc(S.tiers('tank')[t.tank].name)} · ${S.fmtKms(state.dv)} of ${S.fmtKms(state.tank)}</dd>
-    <dt>Engine</dt><dd>${esc(S.tiers('engine')[t.engine].name)}</dd>
     <dt>Hold</dt><dd>${esc(S.tiers('hold')[t.hold].name)} · ${S.usedUnits(state)} of ${S.holdUnits(state)} units</dd>
-    <dt>Keys</dt><dd>${['heatShield', 'refrigeration', 'sensors', 'stealth'].filter(k => state.keys[k]).map(k => esc(UPGRADES.find(u => u.key === k)?.name ?? k)).join(', ') || '<span class="lock">none yet</span>'}</dd></dl>`;
+    <dt>Systems</dt><dd>${fittedKeys.map(u => esc(u.name)).join(', ') || '<span class="lock">nothing yet</span>'}</dd></dl>`;
 
   out += '<h3>Hold</h3>';
   if(!state.cargo.length) out += '<p class="empty">Empty.</p>';

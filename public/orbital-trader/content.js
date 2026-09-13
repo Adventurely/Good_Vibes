@@ -147,7 +147,7 @@ export const GOODS = ECONOMY.goods.map(g => ({
   ...g,
   units: UNITS[g.weight] ?? 1,
   lifetimeDays: g.lifetimeDays ?? null,
-  needsRefrigeration: !!g.needsRefrigeration,
+  needsTempControl: !!g.needsTempControl,
   producedAt: g.producedAt ?? [],
   stock: g.stock ?? [1, 1],
   buyers: g.buyers ?? [],
@@ -196,7 +196,6 @@ export const PORTS = Object.fromEntries(Object.entries(ECONOMY.ports).map(([id, 
     marketSize: p.marketSize ?? 1,
     fuelPricePerKms: p.fuelPricePerKms ?? null,
     shipyard: !!p.shipyard,
-    upgrades: p.upgrades ?? [],
     region: p.region ?? null,
     /* The shelves are not written down per port any more: a stall sells what
        the place produces and buys what the goods table says it wants, so one
@@ -212,16 +211,21 @@ export const PORTS = Object.fromEntries(Object.entries(ECONOMY.ports).map(([id, 
 
 /* ------------------------------------------------------------- upgrades */
 
-const KEY_NAMES = { heatshield: 'heatShield', refrigeration: 'refrigeration', sensors: 'sensors', stealth: 'stealth' };
+const KEY_NAMES = {
+  heatshield: 'heatShield', tempcontrol: 'tempControl',
+  gravsensors: 'gravSensors', cryocooling: 'cryoCooling',
+};
+/* Tanks and holds are fitted anywhere there is a pump, so their shelf is
+   written as "*" rather than as thirteen port ids that would have to be kept
+   in step with the sky. Everything else names its port, because where you buy
+   it is half of what it is: gravitational sensors are a cat instrument, and
+   the rest come off an Emberkin bench. */
+const EVERY_YARD = Object.keys(PORTS).filter(id => PORTS[id].fuelPricePerKms != null);
 export const UPGRADES = ECONOMY.upgrades.map(u => {
-  const out = { ...u, soldAt: u.soldAt ?? null };
-  if(u.kind === 'tank') out.value = TUNING.ship.tanks[u.tier].dv_kms;
-  if(u.kind === 'engine') out.value = TUNING.ship.engines[u.tier].fuelPriceMul;
-  if(u.kind === 'hold') out.value = TUNING.ship.holds[u.tier].units;
+  const out = { ...u, soldAt: u.soldAt === '*' ? EVERY_YARD : (u.soldAt ?? null) };
+  if(u.kind === 'tank'){ out.value = TUNING.ship.tanks[u.tier].dv_kms; out.effect = `Holds ${out.value} km/s.`; }
+  if(u.kind === 'hold'){ out.value = TUNING.ship.holds[u.tier].units; out.effect = `${out.value} units of cargo.`; }
   if(u.kind === 'key') out.key = KEY_NAMES[u.id] ?? u.id;
-  if(u.kind === 'tank') out.effect = `Holds ${out.value} km/s.`;
-  if(u.kind === 'hold') out.effect = `${out.value} units of cargo.`;
-  if(u.kind === 'engine') out.effect = out.value < 1 ? `Fuel costs ${Math.round((1 - out.value) * 100)}% less to buy.` : 'The engine you came with.';
   return out;
 });
 

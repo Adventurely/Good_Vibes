@@ -205,23 +205,64 @@ test('every port is a body with a port, and every reference resolves', () => {
   }
 });
 
-test('upgrades come in complete ladders with a starter at the bottom', () => {
-  for(const kind of ['tank', 'engine', 'hold']){
+test('upgrades come in complete ladders with a stock fitting at the bottom', () => {
+  /* Three buyable sizes each, over the one the ship came with. The stock
+     fitting is tier 0 and is on no rack anywhere: you own it before you have
+     been anywhere, so there is nothing to sell you. */
+  for(const kind of ['tank', 'hold']){
     const ladder = S.tiers(kind);
-    assert.deepEqual(ladder.map(u => u.tier), [0, 1, 2], `${kind} ladder`);
+    assert.deepEqual(ladder.map(u => u.tier), [0, 1, 2, 3], `${kind} ladder`);
     for(const u of ladder){ assert.ok(Number.isFinite(u.value) && u.value > 0, `${u.id} has a value`); }
-    assert.ok(ladder[2].value !== ladder[0].value, `${kind}: the top tier differs from the starter`);
+    for(let i = 1; i < ladder.length; i++) assert.ok(ladder[i].value > ladder[i - 1].value, `${kind}: tier ${i} is bigger than the one below`);
+    assert.equal(ladder[0].soldAt, null, `${kind}: the stock fitting is not for sale`);
+    assert.ok(ladder[0].starter, `${kind}: the stock fitting says it is the starter`);
   }
-  for(const key of ['heatShield', 'refrigeration', 'sensors', 'stealth']) assert.ok(UPGRADES.some(u => u.key === key), `a ${key} upgrade exists`);
+  assert.equal(S.tiers('engine').length, 0, 'there is no engine to buy any more');
+  for(const key of ['heatShield', 'tempControl', 'gravSensors', 'cryoCooling']) assert.ok(UPGRADES.some(u => u.key === key), `a ${key} upgrade exists`);
   for(const u of UPGRADES){
     if(u.soldAt) for(const p of u.soldAt) assert.ok(PORTS[p], `${u.id} sold at unknown ${p}`);
-    if(u.price != null) assert.ok(u.price > 0);
+    if(u.tier > 0 || u.kind === 'key') assert.ok(u.price > 0, `${u.id} is bought, so it has a price`);
   }
-  /* The dampener used to be lying about at Hush, which is not in the sky any
-     more. Somebody on Whisker will now fit you one, for money and no talk. */
-  const stealth = UPGRADES.find(u => u.key === 'stealth');
-  assert.deepEqual(stealth.soldAt, ['whisker'], 'the dampener is fitted at Whisker');
-  assert.ok(stealth.price > 0, 'and it is bought, so it has a price');
+  /* Tanks and holds are basics: anywhere with a pump will fit one. The rest
+     name their bench, and the one that is not Emberkin work says so. */
+  const yards = Object.keys(PORTS).filter(p => PORTS[p].fuelPricePerKms != null).sort();
+  for(const id of ['tank_1', 'tank_2', 'tank_3', 'hold_1', 'hold_2', 'hold_3']){
+    assert.deepEqual([...UPGRADES.find(x => x.id === id).soldAt].sort(), yards, `${id} is on every rack`);
+  }
+  assert.deepEqual(UPGRADES.find(u => u.id === 'gravsensors').soldAt, ['nail'], 'the cats sell the sensors');
+  for(const id of ['tempcontrol', 'heatshield', 'cryocooling']){
+    assert.deepEqual(UPGRADES.find(u => u.id === id).soldAt, ['cinder'], `${id} comes off an Emberkin bench`);
+  }
+});
+
+test('the second and third size of anything is engineer\'s work', () => {
+  /* Coin buys the first step up. After that a yard wants somebody aboard who
+     can put the hull back together, and that is the berth quest #6 fills. */
+  const s = newDocked(3, 'slate');
+  s.money = 500000;
+  for(const id of ['tank_1', 'hold_1']) assert.ok(S.canBuyUpgrade(s, id).ok, `${id} needs no crew`);
+  S.buyUpgrade(s, 'tank_1'); S.buyUpgrade(s, 'hold_1');
+  for(const id of ['tank_2', 'hold_2']){
+    const no = S.canBuyUpgrade(s, id);
+    assert.equal(no.ok, false, `${id} is refused with an empty berth`);
+    assert.match(no.reason, /engineer/i);
+  }
+  s.crew.engineer = { role: 'engineer', from: 'enginetrouble', joinedAt: 0 };
+  for(const id of ['tank_2', 'hold_2']) assert.ok(S.canBuyUpgrade(s, id).ok, `${id} opens once the berth is filled`);
+  S.buyUpgrade(s, 'tank_2'); S.buyUpgrade(s, 'hold_2');
+  assert.ok(S.canBuyUpgrade(s, 'tank_3').ok && S.canBuyUpgrade(s, 'hold_3').ok, 'and the third size after it');
+  assert.ok(Math.abs(S.kms(s.tank) - S.tiers('tank')[2].value) < 1e-9, 'the tank that was fitted is the tank that is aboard');
+});
+
+test('cryo hull cooling goes on over heat shielding, not instead of it', () => {
+  const s = newDocked(3, 'cinder');
+  s.money = 500000;
+  s.crew.engineer = { role: 'engineer', from: 'enginetrouble', joinedAt: 0 };
+  const no = S.canBuyUpgrade(s, 'cryocooling');
+  assert.equal(no.ok, false);
+  assert.match(no.reason, /heat shielding/i);
+  assert.ok(S.buyUpgrade(s, 'heatshield').ok);
+  assert.ok(S.canBuyUpgrade(s, 'cryocooling').ok, 'and then it will go on');
 });
 
 test('the text has every line the game asks for', () => {
@@ -239,7 +280,7 @@ test('the text has every line the game asks for', () => {
     const sp = TEXT.species[s];
     assert.ok(sp && sp.onGift && sp.greeting, `species text for ${s}`);
   }
-  for(const k of ['tollOffer', 'tollPaidCoin', 'tollPaidCargo', 'tollStealth', 'tollGiftLater', 'towDry', 'towCrash', 'towAtmosphere', 'bankDebt', 'firstTransfer', 'firstAssist', 'firstAerobrake', 'mawArrival']){
+  for(const k of ['tollOffer', 'tollPaidCoin', 'tollPaidCargo', 'tollGiftLater', 'towDry', 'towCrash', 'towAtmosphere', 'bankDebt', 'firstTransfer', 'firstAssist', 'firstAerobrake', 'mawArrival']){
     assert.ok(TEXT.events[k], `event text ${k}`);
   }
   assert.ok(TEXT.events.tollOffer.length >= 3 && TEXT.events.tollOffer.every(v => v.captain && v.line));
@@ -382,7 +423,7 @@ test('three jobs pay in a person, and finishing one fills that berth', () => {
   // Flying one to the end puts somebody in the berth, and only that one.
   for(const q of paying){
     const s = S.newGame(11);
-    s.quests = []; s.money = 300000; s.keys.refrigeration = true;
+    s.quests = []; s.money = 300000; s.keys.tempControl = true;
     s.dockedAt = q.from; s.justLeft = null;
     assert.ok(S.acceptQuest(s, q.id).ok, q.id);
     const live = s.quests.find(l => l.id === q.id);
@@ -916,7 +957,7 @@ test('every quest in the catalogue can be flown from its giver to its end', () =
     const s = S.newGame(11);
     s.dockedAt = q.from; s.justLeft = null;
     s.money = 200000;
-    s.keys.refrigeration = true;
+    s.keys.tempControl = true;
     s.quests = [];                              // one job at a time, to keep the three free
     const got = S.acceptQuest(s, q.id);
     assert.ok(got.ok, `${q.id} could not be taken at ${q.from}: ${got.reason}`);
@@ -943,15 +984,15 @@ test('every quest in the catalogue can be flown from its giver to its end', () =
   }
 });
 
-test('a cold consignment needs a cold hold before anybody can hand it to you', () => {
-  /* A delivery skips the market, so it skips the market's refrigeration
-     check. Four cases of smuggled medicine and a warm hold is the case. */
+test('a cold consignment needs temperature control before anybody can hand it to you', () => {
+  /* A delivery skips the market, so it skips the market's temperature check.
+     Four cases of smuggled medicine and a plain hold is the case. */
   const s = newDocked(5, 'nail');
-  assert.equal(S.goodById('greymeds').needsRefrigeration, true);
+  assert.equal(S.goodById('greymeds').needsTempControl, true);
   const no = S.acceptQuest(s, 'medicinerun');
   assert.equal(no.ok, false);
-  assert.match(no.reason, /cold hold/);
-  s.keys.refrigeration = true;
+  assert.match(no.reason, /temperature control/);
+  s.keys.tempControl = true;
   assert.ok(S.acceptQuest(s, 'medicinerun').ok);
   assert.equal(S.usedUnits(s), 4);
 });
@@ -1206,7 +1247,7 @@ test('a tow moves the ship to the nearest port and costs money and days, never t
   assert.equal(s.stats.tows, 1);
 });
 
-test('crossing the Belt without stealth brings a toll that never takes everything', () => {
+test('crossing the Belt brings a toll that never takes everything', () => {
   const s = S.newGame(13);
   S.undock(s);
   // Put the ship on a heliocentric orbit that climbs into the belt, with a hold worth taking a share of.
@@ -1223,22 +1264,25 @@ test('crossing the Belt without stealth brings a toll that never takes everythin
   assert.ok(r.ok && s.cargo.reduce((a, c) => a + c.qty, 0) >= 6, 'they left most of the hold');
   assert.equal(s.pending, null);
   assert.ok(s.rep.cat > 0);
-  // With stealth, the same crossing is quiet.
-  const s2 = S.newGame(13); S.undock(s2); s2.keys.stealth = true;
-  const st2 = O.circularState(MU, CONST.BELT.inner - 0.1, 1.0);
-  s2.ship = { body: 'lamp', r: st2.r, v: O.scale(st2.v, 1.12) };
-  s2.cargo = [{ good: 'tideglass', qty: 10, t: s2.t, price: 80, from: 'tassel' }];
-  guard = 0; while(!s2.toll.inBelt && guard++ < 1200) S.tick(s2, 0.5);
-  assert.ok(s2.toll.inBelt, 'the quiet ship did cross the belt');
-  assert.equal(s2.pending, null, 'and was never hailed');
+  /* The dampener that used to buy a quiet crossing is off the rack, so the
+     only thing keeping a captain from being hailed is the cooldown. Out of the
+     belt and back into it the same week is the case: the oath is a toll, not a
+     tax, and it is not asked twice inside a month. */
+  assert.ok(s.t - s.toll.lastT < FORMULAS.toll.cooldownDays, 'the hail was just now');
+  s.toll.inBelt = false;
+  S.tick(s, 0.5);
+  assert.ok(s.toll.inBelt, 'the ship is in the belt again');
+  assert.equal(s.pending, null, 'and was let alone, because it was asked this week');
 });
 
-test('aerobraking: Grumm\'s clouds are a crash without a shield and a brake with one', () => {
+test("Grumm's clouds are a crash, shield or no shield: nothing skims yet", () => {
+  /* Heat shielding and cryo hull cooling are on the rack and wired to nothing
+     (§2.8): the risky skim and the safe one are two different manoeuvres and
+     neither is built. So the air is lethal to everybody, and buying the shield
+     does not change that — which is the behaviour this pins, so that whoever
+     builds the skim has to come back here and say so. */
   const g = world.get('grumm');
-  const dive = (shield) => {
-    const s = S.newGame(17);
-    S.undock(s);
-    s.keys.heatShield = shield;
+  const entry = () => {
     // A hyperbolic approach whose periapsis sits inside the atmosphere band.
     const rp = (g.atmo + g.radius) / 2;
     /* A fifth of the circular speed at the cloud tops, rather than a number in
@@ -1251,39 +1295,48 @@ test('aerobraking: Grumm\'s clouds are a crash without a shield and a brake with
     const pe = { r: [rp, 0], v: [0, vp] };
     let tBack = -0.5, st;
     for(let i = 0; i < 200; i++){ st = O.propagate(g.mu, pe.r, pe.v, tBack); if(O.norm(st.r) > g.soi * 0.9) break; tBack *= 1.3; }
-    s.ship = { body: 'grumm', r: st.r, v: st.v };
-    const start = { r: st.r, v: st.v };
-    const events = [];
-    let guard = 0;
-    let after = null;
-    while(guard++ < 3000 && !s.pending && s.ship.body === 'grumm'){
-      const got = S.tick(s, 0.2);
-      events.push(...got);
-      // The state just after the dive, before the ship goes wandering.
-      if(!after && s.flags.firstAerobrake) after = { r: s.ship.r, v: s.ship.v };
-      /* Once the skim is on the books and the ship is back out of the clouds,
-         this test has its answer. Flying on until the ship happens to blunder
-         into one of Grumm's moons is a different world's arithmetic, and in a
-         sky where it never does it is thousands of needless predictions — a
-         shielded ship in Grumm's air looks a hundred and fifty days ahead on
-         every step, and down there a lap is under a tenth of a day. */
-      if(after && O.norm(s.ship.r) > g.atmo) break;
-    }
-    return { s, events, start, after: after ?? { r: s.ship.r, v: s.ship.v } };
+    return st;
   };
-  const bare = dive(false);
-  assert.ok(bare.s.pending && bare.s.pending.kind === 'crash', 'no shield: the clouds take the ship');
-  const shielded = dive(true);
-  assert.equal(shielded.s.pending, null, 'with a shield the ship survives, pass after pass');
-  assert.ok(shielded.s.flags.firstAerobrake, 'the skim was noted');
-  assert.equal(shielded.s.dv, shielded.s.tank, 'and it cost no fuel at all');
-  /* What a skim is for: the ship arrived on an escape trajectory and Grumm's
-     air alone put it into orbit. Measured in Grumm's frame at the moment the
-     dive is done — where it wanders afterwards, past the frog moons, is the
-     pilot's business and another world's arithmetic. */
-  const before = O.elementsFromState(g.mu, shielded.start.r, shielded.start.v);
+  const dive = (shield) => {
+    const s = S.newGame(17);
+    S.undock(s);
+    s.keys.heatShield = shield;
+    const st = entry();
+    s.ship = { body: 'grumm', r: st.r, v: st.v };
+    let guard = 0;
+    while(guard++ < 3000 && !s.pending && s.ship.body === 'grumm') S.tick(s, 0.2);
+    return s;
+  };
+  for(const shield of [false, true]){
+    const s = dive(shield);
+    assert.ok(s.pending && s.pending.kind === 'crash', `shield ${shield}: the clouds take the ship`);
+    assert.ok(!s.flags.firstAerobrake, `shield ${shield}: and nothing was skimmed`);
+  }
+  assert.equal(S.skimsAir({ keys: { heatShield: true, cryoCooling: true } }), false, 'no fitting skims air yet');
+
+  /* The arithmetic a skim will be built out of is still here and still right,
+     so it is checked directly rather than left to rot behind a flag no caller
+     can set. Ask effectiveNodes for a skim and it inserts one retrograde mark
+     at the bottom of the dive, free of fuel, and the air alone turns an escape
+     trajectory into an orbit that never digs into the planet. */
+  const s = S.newGame(17);
+  S.undock(s);
+  const st = entry();
+  s.ship = { body: 'grumm', r: st.r, v: st.v };
+  const nodes = S.effectiveNodes(s, 400, { skim: true });
+  /* One per dive, and a long horizon sees more than one dive: what matters is
+     that every mark it writes is a free retrograde push at the bottom. */
+  assert.ok(nodes.length >= 1, 'a skim was written down');
+  for(const n of nodes) assert.ok(n.aero && n.free && n.prograde < 0, 'every skim is a free retrograde mark');
+  const before = O.elementsFromState(g.mu, st.r, st.v);
   assert.ok(before.e > 1, 'the setup was not an escape trajectory to begin with');
-  const after = O.elementsFromState(g.mu, shielded.after.r, shielded.after.v);
+  let ship = s.ship, t = s.t, guard = 0;
+  while(guard++ < 3000){
+    const res = O.advance(world, ship, t, 0.2, nodes, { atmosphere: false, dvAvailable: s.dv, stopOnBurn: true });
+    ship = res.ship; t = res.t;
+    if(t > nodes[0].t && O.norm(ship.r) > g.atmo) break;
+  }
+  const after = O.elementsFromState(g.mu, ship.r, ship.v);
   assert.ok(after.e < 1, `the clouds did not catch it: e ${after.e}`);
   assert.ok(after.rp > g.radius, 'and never dug it into the planet');
 });
@@ -1576,15 +1629,17 @@ test('a save is refused at the door rather than halfway through a frame', () => 
     'a tank that does not exist': s => { s.tiers.tank = 9; },
     /* Version 1 is the sky before the rescale, version 2 the map before the
        setting was rewritten, version 3 the price list before every good in it
-       was replaced, and version 4 the game that still had a contract board and
-       a passenger list. A ship's position, a port name, a hold full of crates
-       or a list of people waiting to be somewhere: none of it means anything
+       was replaced, version 4 the game that still had a contract board and a
+       passenger list, and version 5 the ship that was fitted with an engine
+       and a dampener. A ship's position, a port name, a hold full of crates or
+       a list of people waiting to be somewhere: none of it means anything
        here, so those saves are refused rather than repaired. */
     'a version this sky is not': s => { s.version = 1; },
     'the map before the setting changed': s => { s.version = 2; },
     'the price list before the goods changed': s => { s.version = 3; },
     'the contract board before it was taken away': s => { s.version = 4; },
-    'a version from the future': s => { s.version = 6; },
+    'the rack before it was rebuilt': s => { s.version = 5; },
+    'a version from the future': s => { s.version = 7; },
   };
   for(const [what, wreck] of Object.entries(broken)){
     const s = JSON.parse(good);
