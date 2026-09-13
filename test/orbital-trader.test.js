@@ -153,8 +153,11 @@ test('every body has what the kernel and the chart read', () => {
 test('the rails keep the promises the design makes', () => {
   const yr = O.period(MU, world.get('tassel').a);
   assert.ok(Math.abs(yr - CONST.YEAR_DAYS) < 1e-6, `Tassel's year is ${yr} days`);
+  /* Cinder's year is a fraction of Tassel's, which is what the fiction is
+     about — the New Year party that never quite stops — rather than any
+     particular number of days. The sky has been squeezed once already. */
   const cinderYear = O.period(MU, world.get('cinder').a);
-  assert.ok(cinderYear > 30 && cinderYear < 80, `Cinder's year is weeks (${cinderYear.toFixed(1)} d)`);
+  assert.ok(cinderYear < yr / 4, `Cinder's year is a fraction of Tassel's (${cinderYear.toFixed(1)} of ${yr.toFixed(0)} d)`);
   // The inner worlds are in the order the setting puts them, and the Maw is
   // the far edge of everything.
   assert.ok(world.get('cinder').a < world.get('veyra').a && world.get('veyra').a < world.get('tassel').a);
@@ -177,7 +180,11 @@ test('no moon ever leaves its parent, and sibling moons never overlap', () => {
 });
 
 test('the Belt is where the design says, and it has rocks in it', () => {
-  assert.ok(CONST.BELT.inner >= 1.8 && CONST.BELT.outer <= 3 && CONST.BELT.inner < CONST.BELT.outer);
+  /* Between Tassel and Grumm, wherever those two are: the Belt is a place in
+     the sky's order, not a number of au. */
+  assert.ok(CONST.BELT.inner < CONST.BELT.outer, 'the Belt has a width');
+  assert.ok(CONST.BELT.inner > world.get('tassel').a && CONST.BELT.outer < world.get('grumm').a,
+    `the Belt (${CONST.BELT.inner}-${CONST.BELT.outer}) is not between Tassel and Grumm`);
   assert.ok(BELT_ROCKS.length > 200);
   for(const k of BELT_ROCKS.slice(0, 50)) assert.ok(k.r >= CONST.BELT.inner && k.r <= CONST.BELT.outer);
   for(const id of ['nail', 'whisker']){
@@ -736,7 +743,7 @@ function settleOn(chart, id, t){
 
 /* A ship falling from Tassel's orbit down towards Veyra's, which is the shape
  * every interplanetary trip in this game has. */
-function transferShip(from = 'tassel', toRadius = 0.6){
+function transferShip(from = 'tassel', toRadius = world.get('veyra').a){
   const g = S.newGame(5);
   g.dockedAt = null; g.justLeft = null; g.t = 0;
   const start = O.absState(world, from, 0);
@@ -752,7 +759,7 @@ test('a rail crossing sits on the rail, and the world is marked where it will re
   const pred = S.planImmediate(g);
   // Asking for the lot, to check the arithmetic on every one of them.
   const list = railCrossings(world, pred, g.t, { minLead: S.MIN_LEAD, limit: 8 });
-  assert.ok(list.length >= 2, `a fall from 1 au to 0.6 au crosses something; found ${list.length}`);
+  assert.ok(list.length >= 2, `a fall from Tassel's orbit to Veyra's crosses something; found ${list.length}`);
   assert.ok(list.some(c => c.body === 'veyra'), 'including the rail it was aimed at');
 
   for(const c of list){
@@ -1032,7 +1039,7 @@ test('only the first crossing is marked, however many the road makes', () => {
 
   /* A long ellipse right out past the Belt, which is the case that made this
      necessary: five rails, twice each. */
-  const wide = transferShip('tassel', 3.4);
+  const wide = transferShip('tassel', world.get('grumm').a * 0.68);
   wide.ship.v = O.scale(O.unit(wide.ship.v), O.norm(wide.ship.v) * 1.28);
   const far = railCrossings(world, S.planImmediate(wide), wide.t, { minLead: S.MIN_LEAD, limit: 64 });
   assert.ok(far.length >= 4, `the busy case needs to be busy; found ${far.length}`);
@@ -1085,12 +1092,15 @@ test('tapping a world\'s rail asks the clock for the moment that world is there'
     /* Pick a point Veyra will be at in eighty days, tap exactly there, and the
        answer should be eighty days. That is the whole promise of the gesture:
        the time that comes back is the time that world is under your finger. */
-    const when = g.t + 80;
+    /* A fifth of the way round Veyra's own year. Asking in days would be
+       asking for a moment more than a lap away in a squeezed sky, and a lap
+       is all a rail tap can offer. */
+    const when = g.t + O.period(MU, world.get('veyra').a) / 5;
     const p = chart.toScreen(O.absState(world, 'veyra', when).r);
     const hit = chart.nearestRailPoint(p[0], p[1], g.t);
     assert.ok(hit, 'a tap on the rail finds it');
     assert.equal(hit.id, 'veyra');
-    assert.ok(Math.abs(hit.t - when) < 1, `asked for day ${when}, got ${hit.t}`);
+    assert.ok(Math.abs(hit.t - when) < 1, `asked for day ${when.toFixed(2)}, got ${hit.t.toFixed(2)}`);
     // Where the world is at the answer is where the finger went, near enough to draw.
     const back = chart.toScreen(O.absState(world, 'veyra', hit.t).r);
     assert.ok(Math.hypot(back[0] - p[0], back[1] - p[1]) < 3, 'and it comes back to the same pixel');
@@ -1792,8 +1802,18 @@ test('aerobraking: Grumm\'s clouds are a crash without a shield and a brake with
     const vp = Math.sqrt(vinf * vinf + 2 * g.mu / rp);
     // Start at periapsis and run time backwards to the SOI edge to get an entry state.
     const pe = { r: [rp, 0], v: [0, vp] };
-    let tBack = -0.5, st;
-    for(let i = 0; i < 200; i++){ st = O.propagate(g.mu, pe.r, pe.v, tBack); if(O.norm(st.r) > g.soi * 0.9) break; tBack *= 1.3; }
+    /* Walk back to the edge of the reach and then close in on it. Growing the
+       step alone overshot once the sky was squeezed and Grumm's reach halved:
+       the ship began outside the SOI, left it on the first tick, and never
+       reached the clouds this test is about. */
+    let tBack = -0.01, st = O.propagate(g.mu, pe.r, pe.v, tBack);
+    for(let i = 0; i < 400 && O.norm(st.r) <= g.soi * 0.85; i++){ tBack *= 1.3; st = O.propagate(g.mu, pe.r, pe.v, tBack); }
+    let lo = tBack / 1.3, hi = tBack;
+    for(let i = 0; i < 60; i++){
+      const mid = (lo + hi) / 2;
+      if(O.norm(O.propagate(g.mu, pe.r, pe.v, mid).r) > g.soi * 0.85) hi = mid; else lo = mid;
+    }
+    st = O.propagate(g.mu, pe.r, pe.v, hi);
     s.ship = { body: 'grumm', r: st.r, v: st.v };
     const start = { r: st.r, v: st.v };
     const events = [];

@@ -121,6 +121,10 @@ Fuel is the only resource for movement and is displayed to the player as a delta
 
 The game clock runs continuously, and every body moves along its orbit as time passes. Time is the second currency alongside fuel. Time pressure comes from perishable cargo and from quests with a deadline on them. (A port can keep seasonal hours; nothing in the sky uses that yet.)
 
+**The sky was squeezed by three.** Every orbit about the Lamp is a third of the size it was, and the Lamp is a third of the mass. Those two together are the whole trick: `v = √(μ/r)` with both halves moved the same way leaves every speed — and so **every delta-v in the game unchanged**. What changes is time. A lap, a transfer and a launch window all take a third as long, so Tassel's year is **120 days**, a crossing to Veyra is **43 days** instead of 129, and a missed window at Veyra costs **104 days** instead of 313. The sky was hard to hit because a player got one attempt a session; now they get three, at the same price in fuel.
+
+Moons kept their distance from their planets. Scorch is the one exception — Cinder's reach shrank with its orbit, until it no longer held a moon at 0.00045 au — so Scorch moved in to 0.00026 and took the mass its own harbour needs.
+
 **The sky is built at KSP's scale.** Every body is a tenth of the size a real one would be and many times denser, which is the trick that makes a world a place rather than a backdrop: Tassel is 498 km across, has 9.25 m/s² at the ground, air to 70 km, and a reach of 116,500 km — a Kerbin. A new game opens at 75 km, five above the air, on an orbit that takes thirty minutes of game time. Local flying is correspondingly cheap: the first lesson is a quarter of a km/s. Interplanetary flying is *not*, because a small world gives almost no gravity assist on departure or arrival, and that trade is deliberate.
 
 **The clock is slow on purpose.** At ×1, one lap of that opening orbit takes **ten real minutes**. That is the fastest thing in the sky and everything else is slower still, so at ×1 almost nothing else appears to move. That is the intended reading: an orbit is a place you are, not an animation you watch. Watching the sky turn is what skipping is for.
@@ -213,7 +217,7 @@ home, belt, outer, deep — and a good is worth what it costs at the stall in it
 own region and **×1.6 anywhere else**. A port that loves it pays **×2.2** on top.
 So the trade is: buy at the source, carry it out of its region, and sell it to
 the people who care. Tide glass bought on Tassel for 60 sells on Brine, who love
-it and live four au away, for over 200.
+it and live most of the system away, for over 200.
 
 **Shelves are what a merchant keeps, not what a factory makes.** Every good has
 a stock range, a stall's shelf is rolled inside it, and the shelf is rolled
@@ -513,6 +517,8 @@ the periapsis festival, the comet bazaar, the banking raft, and the old endgame
 at Chime and Hush. The Maw does the endgame's job now. The Scatter, which was a
 belt region rather than a body, is the Belt, and it moved inward from 2.6–3.2
 au to 2.0–2.5 so the Arc could ride just outside it.
+
+*(Every distance in this section is from before the sky was squeezed by three — see 2.6. Divide by three for where things actually are.)*
 
 **What moved with them.** The dampener used to be lying about at Hush and is
 now fitted, for money and no questions, on Whisker. The tow debt used to be

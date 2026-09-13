@@ -62,8 +62,13 @@ function route(name, toRadius, arrive){
 // --- periods and the calendar
 const periods = {};
 for(const b of T.bodies){ if(b.parent) periods[b.id] = +period(by[b.parent].mu, b.a).toFixed(2); }
-check('C1 Tassel year is 360 days', Math.abs(periods.tassel - 360) < 0.01, `${periods.tassel}`);
-check('C1 Cinder year is weeks', periods.cinder > 40 && periods.cinder < 70, `${periods.cinder} d`);
+/* The calendar and the sky have to be the same thing. YEAR_DAYS is what the
+   log and every date in the game count in, and Tassel's lap is what a year
+   *is*, so the check is that they agree rather than that either is some
+   particular number — the sky has been squeezed once and would otherwise
+   have left the calendar behind it. */
+check('C1 the calendar is Tassel\'s year', Math.abs(periods.tassel - T.constants.YEAR_DAYS) < 0.01, `${periods.tassel} d vs YEAR_DAYS ${T.constants.YEAR_DAYS}`);
+check('C1 a Cinder year is under a month', periods.cinder > 12 && periods.cinder < 30, `${periods.cinder} d`);
 check('C1 Veyra sits between Cinder and Tassel', by.cinder.a < by.veyra.a && by.veyra.a < by.tassel.a, `${by.cinder.a} < ${by.veyra.a} < ${by.tassel.a} au`);
 check('C1 both cat havens ride inside the Belt', by.nail.a > T.belt.inner && by.nail.a < T.belt.outer && by.whisker.a > T.belt.inner && by.whisker.a < T.belt.outer, `${by.nail.a} and ${by.whisker.a} in ${T.belt.inner}-${T.belt.outer} au`);
 check('C1 the Arc rides just beyond the Belt', by.arc.a > T.belt.outer && by.arc.a < T.belt.outer + 0.5, `${by.arc.a} au, belt ends at ${T.belt.outer}`);
@@ -203,7 +208,10 @@ check('C7 Cinder is a long-haul destination', dv('Tassel -> Cinder (dock)') > st
 /* The Maw is cheap and slow: years of coasting. The deep tank is what makes it
    a journey you come back from. */
 check('C7 the deep tank reaches the Maw with 20% spare', dv('Tassel -> the Maw') <= 0.8 * deep, `${dv('Tassel -> the Maw')} of ${deep}`);
-check('C7 the Maw is the long way round, not the dear one', table.find(r => r.route.startsWith('Tassel -> the Maw')).days > 3000);
+check('C7 the Maw is the long way round, not the dear one',
+  table.find(r => r.route.startsWith('Tassel -> the Maw')).days > 1200
+  && table.every(r => r.route.startsWith('Tassel -> the Maw') || r.days < table.find(x => x.route.startsWith('Tassel -> the Maw')).days),
+  `${table.find(r => r.route.startsWith('Tassel -> the Maw')).days} d, the longest road there is`);
 
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASS');
 if(process.argv.includes('--write')){

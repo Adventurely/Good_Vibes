@@ -48,7 +48,7 @@
  ],
  "ports": {
   "cinder": {
-   "blurb": "A world tide-locked to the Lamp, with a molten face, a frozen back, and every Emberkin city crowded into the twilight between. The year lasts fifty-nine days, so the New Year party has never entirely stopped. The best engines anywhere are built here by people who will not live to see them wear out.",
+   "blurb": "A world tide-locked to the Lamp, with a molten face, a frozen back, and every Emberkin city crowded into the twilight between. The year lasts twenty days, so the New Year party has never entirely stopped. The best engines anywhere are built here by people who will not live to see them wear out.",
    "arrival": [
     "The dock crew has your lines tied before you have finished thinking about it.",
     "Somebody is already asking what you brought, what it cost, and whether you will take a letter back.",
@@ -358,10 +358,10 @@
     "id": "navigator",
     "name": "Navigator",
     "species": "cat",
-    "does": "Reads a rock at four au and tells you which way it is going.",
+    "does": "Reads a rock an au off and tells you which way it is going.",
     "person": {
      "name": "Celia",
-     "line": "Can read a rock at four au and tell you which way it is going. Says almost nothing and is always already looking at the thing you are about to point at."
+     "line": "Can read a rock an au off and tell you which way it is going. Says almost nothing and is always already looking at the thing you are about to point at."
     }
    },
    {
