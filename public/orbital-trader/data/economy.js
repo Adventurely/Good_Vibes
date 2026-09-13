@@ -1403,7 +1403,7 @@ export const ECONOMY = {
     "cinder"
    ],
    "effect": "Larger cargo capacity (units from tuning).",
-   "unlocks": "Bulk runs that actually pay; two passenger cabins plus cargo."
+   "unlocks": "Bulk runs that actually pay: ore and steel by the crate rather than the armful."
   },
   {
    "id": "hold_2",
@@ -1438,7 +1438,7 @@ export const ECONOMY = {
    "soldAt": [
     "slate"
    ],
-   "effect": "Hold can carry goods and passengers flagged needsRefrigeration.",
+   "effect": "Hold can carry goods flagged needsRefrigeration.",
    "unlocks": "Riverfish, medicinal gel and frog pilgrims."
   },
   {
@@ -1451,7 +1451,7 @@ export const ECONOMY = {
     "arc"
    ],
    "effect": "Shows Arc salvage sites and Belt traffic on the chart with intercept predictions.",
-   "unlocks": "Salvage contracts, quiet Belt work, and the long look outward."
+   "unlocks": "Salvage work, quiet Belt crossings, and the long look outward."
   },
   {
    "id": "stealth",
@@ -1486,7 +1486,7 @@ export const ECONOMY = {
    "maxPoints": 10
   },
   "toll": {
-   "description": "A Belt toll intercept takes min(cap, fraction*cargoValue) in goods, chosen by the cats; nothing if cargoValue < minCargoValue (they never take everything, never touch passengers, and never harm a ship that yields). Stealth suppresses intercepts.",
+   "description": "A Belt toll intercept takes min(cap, fraction*cargoValue) in goods, chosen by the cats; nothing if cargoValue < minCargoValue (they never take everything and never harm a ship that yields). Stealth suppresses intercepts.",
    "fraction": 0.15,
    "cap": 600,
    "minCargoValue": 200
@@ -1496,29 +1496,6 @@ export const ECONOMY = {
    "base": 60,
    "perAu": 40,
    "daysPerAu": 45
-  },
-  "contract": {
-   "description": "Pay = basePerAu*max(minAu, separationAu)*deadlineDays[tightness]*speciesMul[species]*template.payMul per passenger or cargo lot, plus the boarding fee; deadline = tightnessOverHohmann[tightness]*HohmannDays; earlyBonus fraction extra if delivered within half the deadline.",
-   "basePerAu": 60,
-   "minAu": 0.3,
-   "deadlineDays": {
-    "relaxed": 1,
-    "brisk": 1.5,
-    "urgent": 2.4
-   },
-   "tightnessOverHohmann": {
-    "relaxed": 2,
-    "brisk": 1.2,
-    "urgent": 0.8
-   },
-   "speciesMul": {
-    "emberkin": 1.3,
-    "otter": 1,
-    "cat": 1.1,
-    "frog": 0.9,
-    "any": 1
-   },
-   "earlyBonus": 0.25
   },
   "haggle": {
    "description": "Otter ports: each visit rolls a uniform spread of +-spread on every price, then a haggle mini-exchange lets you keep the good end of the roll. Frogs never haggle (spread 0). Cats and Emberkin do not haggle either.",
@@ -1535,8 +1512,8 @@ export const ECONOMY = {
   },
   "speciesRules": {
    "otter": "Haggle spread on every price; refusing to haggle is rude (small rep loss).",
-   "emberkin": "Volatile prices; perishable fashions; contracts pay the most for speed (speciesMul 1.3, earlyBonus counts double).",
-   "cat": "Tolls in the Belt under strict custom (never everything, never passengers). Impress a captain and a gift may follow.",
+   "emberkin": "Volatile prices; perishable luxuries that turn over by the season.",
+   "cat": "Tolls in the Belt under strict custom (never everything, never a ship that yields). Impress a captain and a gift may follow.",
    "frog": "No haggling. \"Prices\" are exchange rates: you are paid in trade credit at the stall plus goodwill (reputation), and every visit ends with a gift."
   },
   "region": {
@@ -1552,191 +1529,6 @@ export const ECONOMY = {
    "description": "A stall's shelves hold a number rolled out of the good's own stock range, and they are rolled again when you come back from somewhere else. Staying at one dock and waiting does not restock it; going and trading elsewhere does. What you bought this visit is what is missing, and a thin shelf costs more (scarcity).",
    "scarcityK": 0.5
   }
- },
- "contracts": {
-  "templates": [
-   {
-    "species": "emberkin",
-    "fromPorts": [
-     "cinder"
-    ],
-    "toPorts": [
-     "tassel",
-     "veyra",
-     "slate"
-    ],
-    "needs": [],
-    "payMul": 1.3,
-    "text": "A crate of this season's fashions. Next season starts in a month. Fly."
-   },
-   {
-    "species": "emberkin",
-    "fromPorts": [
-     "cinder",
-     "veyra"
-    ],
-    "toPorts": [
-     "tassel",
-     "slate"
-    ],
-    "needs": [],
-    "payMul": 1.2,
-    "text": "An Emberkin apprentice with a letter of introduction to the Slate shipwrights and no patience whatsoever."
-   },
-   {
-    "species": "emberkin",
-    "fromPorts": [
-     "veyra"
-    ],
-    "toPorts": [
-     "glass"
-    ],
-    "needs": [],
-    "payMul": 1.8,
-    "text": "An elderly scholar (she is four) wants to see the Builder halls under Glass before she dies of old age."
-   },
-   {
-    "species": "otter",
-    "fromClimate": "temperate",
-    "toClimate": "temperate",
-    "needs": [],
-    "payMul": 0.8,
-    "text": "Cousins, a wedding, and a cake that must not be tilted."
-   },
-   {
-    "species": "otter",
-    "fromPorts": [
-     "tassel"
-    ],
-    "toPorts": [
-     "scorch"
-    ],
-    "needs": [],
-    "payMul": 1.1,
-    "text": "Relief caretakers for the Scorch camps, plus three months of gossip in written form."
-   },
-   {
-    "species": "otter",
-    "fromPorts": [
-     "tassel"
-    ],
-    "toPorts": [
-     "nail"
-    ],
-    "needs": [
-     "sensors"
-    ],
-    "payMul": 1.5,
-    "text": "An otter banker with a sealed case wants to be at Nail before the salvage auction closes. Do not ask."
-   },
-   {
-    "species": "otter",
-    "fromPorts": [
-     "moss"
-    ],
-    "needs": [],
-    "payMul": 1.1,
-    "text": "A load of Moss fruit for the Nail tavern. It pays by the crate that arrives edible.",
-    "toPorts": [
-     "nail"
-    ]
-   },
-   {
-    "species": "cat",
-    "fromPorts": [
-     "arc",
-     "whisker"
-    ],
-    "toPorts": [
-     "nail"
-    ],
-    "needs": [],
-    "payMul": 1.1,
-    "text": "A crew on leave, bound for the tavern. They will critique every burn."
-   },
-   {
-    "species": "cat",
-    "fromPorts": [
-     "arc"
-    ],
-    "toPorts": [
-     "cinder",
-     "slate"
-    ],
-    "needs": [
-     "sensors"
-    ],
-    "payMul": 1.4,
-    "text": "A salvage lot from a marked Arc site, to be delivered to a buyer who will pretend not to know what it is."
-   },
-   {
-    "species": "cat",
-    "fromPorts": [
-     "nail"
-    ],
-    "toPorts": [
-     "whisker"
-    ],
-    "needs": [],
-    "payMul": 1.3,
-    "text": "A parcel for the quiet end of the Belt. Do not look inside and do not be late."
-   },
-   {
-    "species": "frog",
-    "fromPorts": [
-     "haven",
-     "brine",
-     "glass"
-    ],
-    "toPorts": [
-     "croak"
-    ],
-    "needs": [
-     "refrigeration"
-    ],
-    "payMul": 1.2,
-    "text": "Pilgrims for Croak. Keep the hold cold and do not hurry them."
-   },
-   {
-    "species": "frog",
-    "fromPorts": [
-     "haven"
-    ],
-    "toPorts": [
-     "glass"
-    ],
-    "needs": [
-     "refrigeration"
-    ],
-    "payMul": 1.6,
-    "text": "A song-keeper who has waited ninety years for a ride to Glass and can wait a little longer, in the cold."
-   },
-   {
-    "species": "frog",
-    "fromPorts": [
-     "haven"
-    ],
-    "toPorts": [
-     "slate",
-     "tassel"
-    ],
-    "needs": [
-     "refrigeration"
-    ],
-    "payMul": 1.3,
-    "text": "A crate of cold cultures for the Tassel healers, given freely; the healers will pay you."
-   },
-   {
-    "species": "any",
-    "fromPorts": [
-     "nail"
-    ],
-    "toClimate": "temperate",
-    "needs": [],
-    "payMul": 1.2,
-    "text": "A belt family heading in-system. They know a route you do not."
-   }
-  ]
  },
  "regions": {
   "inner": "The Emberkin worlds: Cinder, Scorch and Veyra.",

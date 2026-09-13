@@ -19,7 +19,7 @@ import {
   closestApproach, nodeMagnitude, nodeCost, nodeFromVector, cross, dot, localState, TAU,
 } from './orbit.js';
 import {
-  CONST, BODIES, GOODS, PORTS, UPGRADES, FORMULAS, CONTRACT_TEMPLATES, TEXT, SPECIES,
+  CONST, BODIES, GOODS, PORTS, UPGRADES, FORMULAS, TEXT, SPECIES,
   REGION_OF, wantsGood, lovesGood,
 } from './content.js';
 
@@ -69,13 +69,13 @@ export const FIRST_DELIVERY = { to: 'slate', pay: 420, days: 14, units: 2 };
 export function newGame(seed = 1){
   const start = CONST.START_PORT;
   const state = {
-    /* 4: every good in the sky was replaced, and shelves stopped regrowing on
-       a clock. A version 3 save's hold is full of goods that do not exist and
-       its market book is in the old shape; a version 2 save names places that
-       are not there any more. Those saves are refused rather than repaired:
-       the page catches it and opens a new game, which is the honest outcome
-       when the world under a ship has changed shape. */
-    version: 4,
+    /* 5: the contract board is gone, and with it the passenger list a save
+       used to carry. Before that, 4 replaced every good in the sky and 3
+       replaced the sky itself. A save from any of them describes a game this
+       one is not playing, so they are refused rather than repaired: the page
+       catches it and opens a new game, which is the honest outcome when the
+       world under a ship has changed shape. */
+    version: 5,
     seed, rng: (seed * 2654435761) >>> 0 || 1,
     t: 0, warp: 1, paused: false,
     shipName: TEXT.shipNames[Math.abs(seed) % TEXT.shipNames.length],
@@ -85,8 +85,7 @@ export function newGame(seed = 1){
     keys: { heatShield: false, refrigeration: false, sensors: false, stealth: false },
     tank: 0, dv: 0,
     money: CONST.START_MONEY, debt: 0,
-    cargo: [], passengers: [],
-    offers: {},
+    cargo: [],
     /* markets holds, per port, what you have landed on it lately (`sold`),
        what you have taken off its shelves this visit (`bought`), and which
        visit that was (`visit`). marketEpoch turns over every time you tie up
@@ -104,7 +103,7 @@ export function newGame(seed = 1){
     toll: { lastT: -1e9, inBelt: false },
     pending: null,
     justLeft: null, justLeftAt: -1e9,
-    stats: { burns: 0, dvSpent: 0, docks: 0, sold: 0, bought: 0, deliveries: 0, tows: 0, tolls: 0, farthest: 0 },
+    stats: { burns: 0, dvSpent: 0, docks: 0, sold: 0, bought: 0, tows: 0, tolls: 0, farthest: 0 },
     visited: [start],
   };
   state.tank = auDay(tiers('tank')[0].value);
@@ -119,9 +118,8 @@ export function newGame(seed = 1){
   state.dockedAt = null;
   state.justLeft = start;          // Tassel's own mouth is where we started
   state.justLeftAt = state.t;
-  refreshOffers(state, start, true);
-  /* The opening is an errand rather than a contract: Uncle Theo wants a pebble
-     off Slate for Aunt Nellie, and the purse holds just about enough to buy one.
+  /* The opening is an errand: Uncle Theo wants a pebble off Slate for Aunt
+     Nellie, and the purse holds just about enough to buy one.
      It is also the tutorial's spine — every step of the lesson is a step of
      this quest — so the game opens with a reason rather than a cargo. */
   state.quests = QUESTS.map(q => ({ id: q.id, step: 0, done: false }));
@@ -137,7 +135,7 @@ export function holdUnits(state){ return tiers('hold')[state.tiers.hold].value; 
 export function fuelPriceMul(state){ return tiers('engine')[state.tiers.engine].value; }
 export function usedUnits(state){
   return state.cargo.reduce((s, c) => s + c.qty * goodById(c.good).units, 0)
-    + state.passengers.reduce((s, p) => s + (p.units ?? 1), 0);
+
 }
 export function freeUnits(state){ return holdUnits(state) - usedUnits(state); }
 export const portName = id => world.get(id)?.name ?? id;
@@ -295,12 +293,10 @@ export function dock(state){
   const dAbs = norm(absState(world, port, state.t).r);
   state.stats.farthest = Math.max(state.stats.farthest, dAbs);
   logLine(state, 'docked', TEXT.logTemplates.docked, { port: portName(port) });
-  const delivered = deliverHere(state, port);
-  refreshOffers(state, port);
-  const events = [{ kind: 'docked', port, delivered }];
+  const events = [{ kind: 'docked', port }];
   questCheck(state, events);
   milestonesOnDock(state, port, events);
-  return { ok: true, port, delivered, events };
+  return { ok: true, port, events };
 }
 
 /* Free flight at a port: the parking orbit a ship sits in when it is not tied
@@ -357,11 +353,10 @@ export function undock(state){
   return { ok: true };
 }
 
-/* Wait at a port. Time passes for everyone: markets drift, contracts age. */
+/* Wait at a port. Time passes for everyone: the sky turns, markets drift. */
 export function wait(state, days){
   if(!state.dockedAt || days <= 0) return;
   state.t += days;
-  ageContracts(state);
 }
 
 /* Days until a body next reaches periapsis: the closest a body on an ellipse
@@ -455,7 +450,6 @@ export function tick(state, dtDays){
   if(dtDays <= 0 || state.pending) return events;
   if(state.dockedAt){
     state.t += dtDays;
-    ageContracts(state, events);
     questCheck(state, events);
     return events;
   }
@@ -530,7 +524,6 @@ export function tick(state, dtDays){
     }
   }
   tollCheck(state, events);
-  ageContracts(state, events);
   if(state.dv <= 1e-9 && !state.flags.dryWarned){
     state.flags.dryWarned = true;
     events.push({ kind: 'dry' });
@@ -562,10 +555,10 @@ function flag(state, name, events){
  * game knows a step is finished. Keyed by quest id and step id, so the table
  * and the tests are read side by side.
  *
- * A contract is a cargo with a deadline and a payment; a quest is a reason.
- * The opening errand is a quest because "fetch your aunt a pebble" is a thing
- * a person does for a person, and because it can teach the whole game on the
- * way: it is the tutorial's spine. */
+ * A quest is a reason to fly somewhere. The opening errand is one because
+ * "fetch your aunt a pebble" is a thing a person does for a person, and
+ * because it can teach the whole game on the way: it is the tutorial's
+ * spine. */
 const QUEST_TESTS = {
   pebble: {
     buy: state => carrying(state, 'pebble') > 0,
@@ -1853,136 +1846,6 @@ export function grantUpgrade(state, u){
   }
 }
 
-/* ----------------------------------------------------------- contracts */
-
-const climateOf = id => world.get(id).climate;
-const isMicro = id => climateOf(id) === 'micro';
-
-function destinationsFor(template, from){
-  return portIds.filter(id => {
-    if(id === from) return false;
-    const b = world.get(id);
-    if(!b.port) return false;
-    if(!PORTS[id].passengers && template.kind === 'passenger') return false;
-    if(template.toClimate && !template.toClimate.includes(climateOf(id))) return false;
-    if(template.toPorts && !template.toPorts.includes(id)) return false;
-    if(template.species === 'cat' && !isMicro(id)) return false;
-    if(template.species === 'frog' && !['cold'].includes(climateOf(id))) return false;
-    if(template.species === 'emberkin' && !['hot', 'temperate'].includes(climateOf(id))) return false;
-    return true;
-  });
-}
-
-function routeDays(from, to, t){
-  // The slow road between the two orbital radii, or a moon hop if siblings.
-  const a = world.get(from), b = world.get(to);
-  if(a.parent === b.parent && a.parent !== 'lamp'){
-    const mu = world.get(a.parent).mu;
-    return hohmann(mu, a.a, b.a).time + 1;
-  }
-  const r1 = norm(absState(world, from, t).r), r2 = norm(absState(world, to, t).r);
-  return hohmann(CONST.MU_LAMP, r1, r2).time;
-}
-
-export function refreshOffers(state, portId, force = false) {
-  const existing = state.offers[portId];
-  if(existing && !force && state.t - existing.t < FORMULAS.contract.refreshDays){
-    /* Whatever is left of the board, minus anything whose day has been and
-       gone. A deadline in the past is not an offer, it is a trap. */
-    const live = existing.contracts.filter(c => c.deadline > state.t + 0.5);
-    if(live.length !== existing.contracts.length) existing.contracts = live;
-    return live;
-  }
-  const p = PORTS[portId];
-  const f = FORMULAS.contract;
-  const contracts = [];
-  const templates = CONTRACT_TEMPLATES.filter(tp =>
-    (!tp.fromPorts || tp.fromPorts.includes(portId)) &&
-    (!tp.fromClimate || tp.fromClimate.includes(climateOf(portId))) &&
-    (tp.species !== 'cat' || isMicro(portId)) &&
-    (tp.species !== 'frog' || climateOf(portId) === 'cold') &&
-    (tp.species !== 'emberkin' || ['hot', 'temperate'].includes(climateOf(portId))));
-  const want = p.passengers && portOpen(portId, state.t) ? 3 + Math.floor(rnd(state) * 3) : 0;
-  let guard = 0;
-  while(contracts.length < want && guard++ < 40 && templates.length){
-    const tp = templates[Math.floor(rnd(state) * templates.length)];
-    const dests = destinationsFor(tp, portId);
-    if(!dests.length) continue;
-    const to = dests[Math.floor(rnd(state) * dests.length)];
-    if(contracts.some(c => c.to === to && c.species === tp.species)) continue;
-    const d = dist(absState(world, portId, state.t).r, absState(world, to, state.t).r);
-    const slow = routeDays(portId, to, state.t);
-    const kinds = Object.keys(f.deadlineDays);
-    const tightness = kinds[Math.floor(rnd(state) * kinds.length)];
-    const deadline = state.t + slow * f.tightnessOverHohmann[tightness] + 3;
-    const pay = Math.round(f.basePerAu * Math.max(f.minAu, d) * f.deadlineDays[tightness] * (f.speciesMul[tp.species] ?? 1) * tp.payMul);
-    const lines = TEXT.species[tp.species]?.passengerRequests ?? ['A quiet trip, please.'];
-    contracts.push({
-      id: `${portId}-${to}-${Math.floor(rnd(state) * 1e9).toString(36)}`,
-      kind: tp.kind, species: tp.species, from: portId, to, pay, deadline,
-      units: tp.units ?? 1, needs: tp.needs ?? [], tightness,
-      title: fill(tp.text, { to: portName(to), from: portName(portId) }),
-      line: lines[Math.floor(rnd(state) * lines.length)],
-      offeredAt: state.t,
-    });
-  }
-  state.offers[portId] = { t: state.t, contracts };
-  return contracts;
-}
-
-export function canTake(state, contract){
-  if(!state.dockedAt || contract.from !== state.dockedAt) return { ok: false, reason: 'Not here.' };
-  if(contract.deadline <= state.t) return { ok: false, reason: 'That day has gone.' };
-  if(state.passengers.some(p => p.id === contract.id)) return { ok: false, reason: 'Already aboard.' };
-  if(contract.needs.includes('refrigeration') && !state.keys.refrigeration) return { ok: false, reason: 'Needs refrigeration.' };
-  if(freeUnits(state) < contract.units) return { ok: false, reason: 'No room aboard.' };
-  return { ok: true };
-}
-export function takeContract(state, id){
-  const offers = state.offers[state.dockedAt]?.contracts ?? [];
-  const c = offers.find(o => o.id === id);
-  if(!c) return { ok: false, reason: 'Gone.' };
-  const ok = canTake(state, c);
-  if(!ok.ok) return ok;
-  state.passengers.push({ ...c, takenAt: state.t });
-  state.offers[state.dockedAt].contracts = offers.filter(o => o.id !== id);
-  logLine(state, 'contractTaken', TEXT.logTemplates.contractTaken, { title: c.title, to: portName(c.to), pay: fmtMoney(c.pay) });
-  if(!state.flags.contractsIntro){ state.flags.contractsIntro = true; }
-  return { ok: true };
-}
-
-function deliverHere(state, portId){
-  const done = [];
-  const f = FORMULAS.contract;
-  for(const c of [...state.passengers]){
-    if(c.to !== portId) continue;
-    const late = state.t > c.deadline;
-    const span = c.deadline - c.takenAt;
-    const early = !late && (state.t - c.takenAt) < span * f.earlyFraction;
-    let pay = c.pay;
-    if(late) pay = Math.round(pay * f.latePayMul);
-    else if(early) pay = Math.round(pay * (1 + f.earlyBonus));
-    state.money += pay;
-    state.passengers = state.passengers.filter(p => p.id !== c.id);
-    state.stats.deliveries++;
-    const sp = c.species;
-    if(sp in state.rep) state.rep[sp] += late ? -0.5 : 1;
-    const say = late ? TEXT.species[sp].onLateArrival : (early ? TEXT.species[sp].onFastArrival : TEXT.species[sp].onGift);
-    logLine(state, late ? 'contractLate' : 'contractDone', late ? TEXT.logTemplates.contractLate : TEXT.logTemplates.contractDone, { title: c.title, pay: fmtMoney(pay), port: portName(portId) });
-    done.push({ contract: c, pay, late, early, say });
-  }
-  return done;
-}
-
-function ageContracts(state, events = []){
-  for(const c of state.passengers){
-    if(!c.lateNoted && state.t > c.deadline){
-      c.lateNoted = true;
-      events.push({ kind: 'late', contract: c });
-    }
-  }
-}
-
 /* --------------------------------------------------------------- tolls */
 
 /* The Scatter: crossing into the belt in the Lamp's frame, without a stealth
@@ -2136,14 +1999,11 @@ export function callTow(state, reason = 'dry'){
   if(!state.visited.includes(q.port)) state.visited.push(q.port);
   logLine(state, 'towed', TEXT.logTemplates.towed, { port: portName(q.port), cost: fmtMoney(cost), days: fmtDays(q.days) });
   if(state.debt > 0) logLine(state, 'story', TEXT.events.bankDebt);
-  refreshOffers(state, q.port, true);
-  const delivered = deliverHere(state, q.port);
-  ageContracts(state);
   /* Arriving on the end of a rope is still arriving: whatever the place has to
      say to a first visitor, it says. */
   const events = [];
   milestonesOnDock(state, q.port, events);
-  return { ...q, cost, story, delivered, events };
+  return { ...q, cost, story, events };
 }
 
 /* Paying the bank back happens whenever there is coin: quietly, first. */
@@ -2186,7 +2046,7 @@ export function restore(json){
   const s = typeof json === 'string' ? JSON.parse(json) : json;
   const bad = why => { throw new Error(`Not a save this game understands: ${why}.`); };
   if(!s || typeof s !== 'object') bad('it is not an object');
-  if(s.version !== 4) bad(`it is version ${s.version}, and this sky is version 4`);
+  if(s.version !== 5) bad(`it is version ${s.version}, and this sky is version 5`);
   if(!s.ship || typeof s.ship !== 'object') bad('it has no ship');
   if(!world.get(s.ship.body)) bad(`its ship is at "${s.ship.body}", which is nowhere`);
   for(const k of ['r', 'v']){
@@ -2201,10 +2061,9 @@ export function restore(json){
     || (n.prograde != null && !Number.isFinite(n.prograde))
     || (n.radial != null && !Number.isFinite(n.radial)))) bad('its plan is not a list of marks');
   if(!Array.isArray(s.cargo) || s.cargo.some(c => !c || !goodById(c.good) || !Number.isFinite(c.qty))) bad('its hold holds something unknown');
-  if(!Array.isArray(s.passengers)) bad('its passenger list is not a list');
   if(!s.tiers || ['tank', 'engine', 'hold'].some(k => !tiers(k)[s.tiers[k]])) bad('it is fitted with something this game does not have');
   // Everything below is either filled in or safely absent.
-  s.keys ??= {}; s.markets ??= {}; s.offers ??= {}; s.log ??= [];
+  s.keys ??= {}; s.markets ??= {}; s.log ??= [];
   s.rep = { emberkin: 0, otter: 0, cat: 0, frog: 0, ...(s.rep ?? {}) };
   s.pending ??= null; s.flags ??= {}; s.stats ??= {}; s.visited ??= [s.dockedAt].filter(Boolean);
   s.toll ??= { lastT: -1e9, inBelt: false };

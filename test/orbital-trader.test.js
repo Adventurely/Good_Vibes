@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 
 import * as O from '../public/orbital-trader/orbit.js';
 import {
-  CONST, BODIES, GOODS, PORTS, UPGRADES, FORMULAS, CONTRACT_TEMPLATES, TEXT, GLOSSARY, SPECIES, BELT_ROCKS,
+  CONST, BODIES, GOODS, PORTS, UPGRADES, FORMULAS, TEXT, GLOSSARY, SPECIES, BELT_ROCKS,
 } from '../public/orbital-trader/content.js';
 import * as S from '../public/orbital-trader/sim.js';
 import { createChart } from '../public/orbital-trader/render.js';
@@ -201,7 +201,6 @@ test('every port is a body with a port, and every reference resolves', () => {
     // Somebody, somewhere, has to want it, or it is a crate that cannot be sold.
     assert.ok(Object.keys(PORTS).some(id => S.wantsGood(id, g.id)), `${g.id} has no buyer anywhere`);
   }
-  assert.ok(GOODS.every(g => g.category !== 'passenger'), 'passengers are contracts, not crates');
 });
 
 test('upgrades come in complete ladders with a starter at the bottom', () => {
@@ -223,15 +222,6 @@ test('upgrades come in complete ladders with a starter at the bottom', () => {
   assert.ok(stealth.price > 0, 'and it is bought, so it has a price');
 });
 
-test('contract templates point at real places', () => {
-  for(const t of CONTRACT_TEMPLATES){
-    assert.ok(SPECIES[t.species], `template species ${t.species}`);
-    for(const p of [...(t.fromPorts ?? []), ...(t.toPorts ?? [])]) assert.ok(PORTS[p], `template names unknown port ${p}`);
-    assert.ok(['passenger', 'delivery'].includes(t.kind));
-    assert.ok(t.units >= 1 && t.payMul > 0);
-  }
-});
-
 test('the text has every line the game asks for', () => {
   /* The glossary shrank from 18 to 9 when the terms stopped needing a
      translation: "low point" and "docking range" explain themselves, so what
@@ -245,7 +235,7 @@ test('the text has every line the game asks for', () => {
   }
   for(const s of ['emberkin', 'otter', 'cat', 'frog']){
     const sp = TEXT.species[s];
-    assert.ok(sp && sp.passengerRequests?.length >= 5 && sp.onFastArrival && sp.onLateArrival && sp.onGift && sp.greeting, `species text for ${s}`);
+    assert.ok(sp && sp.onGift && sp.greeting, `species text for ${s}`);
   }
   for(const k of ['tollOffer', 'tollPaidCoin', 'tollPaidCargo', 'tollStealth', 'tollGiftLater', 'towDry', 'towCrash', 'towAtmosphere', 'bankDebt', 'firstSoiChange', 'firstTransfer', 'firstAssist', 'firstAerobrake', 'mawArrival']){
     assert.ok(TEXT.events[k], `event text ${k}`);
@@ -261,7 +251,7 @@ test('the text has every line the game asks for', () => {
     assert.ok(q.id && q.title && q.giver && q.blurb && q.done, `quest ${q.id} has its words`);
     assert.ok(q.steps?.length >= 1 && q.steps.every(st => st.id && st.text), `quest ${q.id} has steps`);
   }
-  for(const k of ['docked', 'undocked', 'burn', 'soiEnter', 'soiExit', 'sold', 'bought', 'contractTaken', 'contractDone', 'contractLate', 'towed', 'tolled', 'refuelled', 'upgraded']){
+  for(const k of ['docked', 'undocked', 'burn', 'soiEnter', 'soiExit', 'sold', 'bought', 'towed', 'tolled', 'refuelled', 'upgraded']){
     assert.match(TEXT.logTemplates[k], /\{\w+\}/, `log template ${k} has a placeholder`);
   }
   // One ship, one name: she is the Skipper.
@@ -373,7 +363,7 @@ test('zooming about a point keeps that point under the pointer, and keeps it the
 
 /* The game opens in flight, not at a mooring: there is no landing in Orbital
  * Trader and Tassel's harbour is a parking orbit you match. Tests about
- * markets, contracts and the shipyard want to be tied up, so they start the
+ * markets and the shipyard want to be tied up, so they start the
  * same way a player does and then tie up. */
 /* Put the ship where a ship would be: in a circular orbit at the docking
  * altitude, or sitting on a gravity-less port. Dropping it at rest used to
@@ -407,10 +397,6 @@ function newDocked(seed, port = 'tassel'){
   s.justLeft = null;
   const r = S.dock(s);
   assert.ok(r.ok, `could not tie up at ${port}: ${r.reason}`);
-  /* The opening crate for Slate is two units of hold and a payday waiting to
-     happen. Tests about shelves, purses and holds want neither; the crate has
-     its own test where the game starts. */
-  s.passengers = [];
   return s;
 }
 
@@ -427,7 +413,6 @@ test('a new game starts in orbit above Tassel, full, with an errand from Uncle T
   assert.ok(Math.abs(O.norm(s.ship.v) - Math.sqrt(b.mu / b.startAlt)) < 1e-12, 'and going round it');
   /* The opening is an errand, not a cargo: no crate in the hold, one quest on
      the list, and Slate already the target. */
-  assert.equal(s.passengers.length, 0);
   assert.equal(s.cargo.length, 0);
   assert.equal(s.quests.length, 1);
   assert.deepEqual(s.quests[0], { id: 'pebble', step: 0, done: false });
@@ -437,7 +422,6 @@ test('a new game starts in orbit above Tassel, full, with an errand from Uncle T
   assert.ok(Math.abs(S.kms(s.tank) - S.tiers('tank')[0].value) < 1e-9, 'the starter tank is the one the shipyard lists');
   assert.equal(s.money, CONST.START_MONEY);
   assert.equal(s.flags.tutorial, 0);
-  assert.ok(S.refreshOffers(s, 'tassel').length >= 1, 'somebody wants a ride from the starting port');
   // The save is JSON all the way down.
   const back = S.restore(S.serialize(s));
   assert.deepEqual(back, JSON.parse(JSON.stringify(s)));
@@ -731,7 +715,6 @@ test('fuel: the tank is a hard ceiling and coin a hard floor', () => {
 
 test('a tow moves the ship to the nearest port and costs money and days, never the save', () => {
   const s = S.newGame(9);
-  s.passengers = [];     // a tow that also delivers the opening crate pays, and this is about the bill
   s.dv = 0;
   const t0 = s.t, m0 = s.money;
   const q = S.towQuote(s);
@@ -748,7 +731,6 @@ test('crossing the Belt without stealth brings a toll that never takes everythin
   const start = O.circularState(MU, CONST.BELT.inner - 0.1, 1.0);
   s.ship = { body: 'lamp', r: start.r, v: O.scale(start.v, 1.12) };
   s.cargo = [{ good: 'tideglass', qty: 10, t: s.t, price: 80, from: 'tassel' }];
-  s.passengers = [{ id: 'x', kind: 'passenger', species: 'otter', from: 'tassel', to: 'slate', pay: 100, deadline: s.t + 100, units: 1, needs: [], title: 'x', takenAt: s.t }];
   const events = [];
   let guard = 0;
   while(!s.pending && guard++ < 1200) events.push(...S.tick(s, 0.5));
@@ -757,7 +739,6 @@ test('crossing the Belt without stealth brings a toll that never takes everythin
   assert.ok(s.pending.amount <= FORMULAS.toll.cap && s.pending.amount <= value * FORMULAS.toll.fraction + 1);
   const r = S.resolveToll(s, 'cargo');
   assert.ok(r.ok && s.cargo.reduce((a, c) => a + c.qty, 0) >= 6, 'they left most of the hold');
-  assert.equal(s.passengers.length, 1, 'passengers are never touched');
   assert.equal(s.pending, null);
   assert.ok(s.rep.cat > 0);
   // With stealth, the same crossing is quiet.
@@ -823,24 +804,6 @@ test('aerobraking: Grumm\'s clouds are a crash without a shield and a brake with
   const after = O.elementsFromState(g.mu, shielded.after.r, shielded.after.v);
   assert.ok(after.e < 1, `the clouds did not catch it: e ${after.e}`);
   assert.ok(after.rp > g.radius, 'and never dug it into the planet');
-});
-
-test('contracts: taken here, paid there, less when late', () => {
-  const s = newDocked(23);
-  const offers = S.refreshOffers(s, 'tassel');
-  const c = offers.find(o => S.canTake(s, o).ok);
-  assert.ok(c, 'an offer the starter ship can take');
-  assert.ok(S.takeContract(s, c.id).ok);
-  assert.equal(s.passengers.length, 1);
-  // Teleport to the destination, late, and dock.
-  s.t = c.deadline + 10;
-  S.undock(s);
-  parkAt(s, c.to);
-  const m0 = s.money;
-  const r = S.dock(s);
-  assert.ok(r.ok && r.delivered.length === 1 && r.delivered[0].late);
-  assert.equal(s.money - m0, Math.round(c.pay * FORMULAS.contract.latePayMul));
-  assert.equal(s.passengers.length, 0);
 });
 
 test('a harbour takes you when you are in a stable orbit close in, and not before', () => {
@@ -1130,14 +1093,16 @@ test('a save is refused at the door rather than halfway through a frame', () => 
     'a plan of nonsense': s => { s.nodes = [{ prograde: 1 }]; },
     'a tank that does not exist': s => { s.tiers.tank = 9; },
     /* Version 1 is the sky before the rescale, version 2 the map before the
-       setting was rewritten, and version 3 the price list before every good in
-       it was replaced. A ship's position, a port name or a hold full of crates
-       from any of them means nothing here, so those saves are refused rather
-       than repaired. */
+       setting was rewritten, version 3 the price list before every good in it
+       was replaced, and version 4 the game that still had a contract board and
+       a passenger list. A ship's position, a port name, a hold full of crates
+       or a list of people waiting to be somewhere: none of it means anything
+       here, so those saves are refused rather than repaired. */
     'a version this sky is not': s => { s.version = 1; },
     'the map before the setting changed': s => { s.version = 2; },
     'the price list before the goods changed': s => { s.version = 3; },
-    'a version from the future': s => { s.version = 5; },
+    'the contract board before it was taken away': s => { s.version = 4; },
+    'a version from the future': s => { s.version = 6; },
   };
   for(const [what, wreck] of Object.entries(broken)){
     const s = JSON.parse(good);
@@ -1146,10 +1111,10 @@ test('a save is refused at the door rather than halfway through a frame', () => 
   }
   // Fields a later version added are filled in quietly rather than refused.
   const old = JSON.parse(good);
-  for(const k of ['markets', 'offers', 'log', 'rep', 'visited', 'flags', 'justLeft', 'shipName']) delete old[k];
+  for(const k of ['markets', 'log', 'rep', 'visited', 'flags', 'justLeft', 'shipName']) delete old[k];
   old.warp = 1e9;        // the clock is a rate now, not a rung, and the rate has a ceiling
   const back = S.restore(old);
-  assert.ok(back.markets && back.offers && back.log && back.rep.otter === 0 && back.shipName);
+  assert.ok(back.markets && back.log && back.rep.otter === 0 && back.shipName);
   assert.equal(back.warp, CONST.MAX_WARP);
 });
 
@@ -1161,7 +1126,6 @@ test('a port with nothing to sell and no pumps is never somewhere a tow leaves y
   s.dockedAt = 'maw';
   assert.equal(S.fuelPrice(s), null, 'somebody is selling fuel at the Maw');
   assert.equal(S.refuel(s, 1).ok, false);
-  assert.equal(S.refreshOffers(s, 'maw', true).length, 0, 'somebody is hiring at the Maw');
   assert.equal(PORTS.maw.towAllowed, false);
 
   s.dockedAt = null;
@@ -1173,17 +1137,6 @@ test('a port with nothing to sell and no pumps is never somewhere a tow leaves y
     const q = S.towQuote(s);
     assert.notEqual(q.port, id, `a dry ship towed to ${id}, which sells no fuel`);
   }
-});
-
-test('a contract whose day has gone leaves the board', () => {
-  const s = S.newGame(5);
-  const offers = S.refreshOffers(s, 'tassel', true);
-  assert.ok(offers.length);
-  const c = offers[0];
-  s.t = c.deadline + 1;
-  assert.equal(S.canTake(s, c).ok, false, 'a dead contract is still takeable');
-  const after = S.refreshOffers(s, 'tassel');
-  assert.ok(!after.some(o => o.id === c.id), 'a dead contract is still on the board');
 });
 
 test('quantities are whole crates, and at least one', () => {

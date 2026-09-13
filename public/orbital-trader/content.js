@@ -159,8 +159,6 @@ export const goodById = id => goodIndex.get(id);
 
 /* ---------------------------------------------------------------- ports */
 
-const NO_OFFERS = new Set(['maw']);
-
 /* The goods table names who wants a thing, and it names them the way a trader
  * would: sometimes a port ("Veyra"), sometimes a whole people ("Otters"), and
  * once "Everyone". So a list is read against a port and its people, not looked
@@ -208,7 +206,6 @@ export const PORTS = Object.fromEntries(Object.entries(ECONOMY.ports).map(([id, 
     buys: GOODS.filter(g => wantsGood(id, g.id)).map(g => ({ good: g.id, priceMul: 1 })),
     gifts: p.gifts ?? null,
     openWithin: p.openWhen?.rAuBelow ?? null,
-    passengers: !NO_OFFERS.has(id),
     towAllowed: id !== 'maw',
   }];
 }));
@@ -252,20 +249,7 @@ export const FORMULAS = {
   aerobrake: { k: 0.04, maxFraction: 0.12, floorApo: 1.25 },
   toll: { ...F.toll, cooldownDays: 30, maxCargoFraction: 0.4, giftRep: 3, giftChance: 0.35 },
   tow: { ...F.tow, minDays: 3, crashMul: 1.5 },
-  contract: { ...F.contract, refreshDays: 10, latePayMul: 0.4, earlyFraction: 0.5 },
 };
-
-/* ---------------------------------------------------------- contracts */
-
-const DELIVERY = /crate|load|lot|parcel|case|fashions|medicine/i;
-export const CONTRACT_TEMPLATES = ECONOMY.contracts.templates.map(t => {
-  const out = { ...t, kind: DELIVERY.test(t.text) && !/apprentice|scholar|pilgrim|song-keeper|crew|cousins|family|caretakers|banker/i.test(t.text) ? 'delivery' : 'passenger' };
-  out.units = out.kind === 'delivery' ? 4 : 1;
-  if(typeof out.toClimate === 'string') out.toClimate = [out.toClimate];
-  if(typeof out.fromClimate === 'string') out.fromClimate = [out.fromClimate];
-  if(out.species === 'any') out.species = 'otter';
-  return out;
-});
 
 /* ----------------------------------------------------------------- text */
 

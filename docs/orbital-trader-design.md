@@ -8,7 +8,7 @@
 
 ### 1.1 Pitch
 
-A cozy, single-player 2D orbital trading game. You pilot a small merchant ship around a warm orange star called the Lamp, carrying goods and passengers between the worlds of four very different peoples. You don't steer like a car. You control your velocity, plan burns, and watch your trajectory bend around planets and moons. Beginners take the slow road on simple transfer orbits. Experts borrow speed from gas giants and arrive faster and cheaper than anyone thought possible.
+A cozy, single-player 2D orbital trading game. You pilot a small merchant ship around a warm orange star called the Lamp, carrying goods between the worlds of four very different peoples. You don't steer like a car. You control your velocity, plan burns, and watch your trajectory bend around planets and moons. Beginners take the slow road on simple transfer orbits. Experts borrow speed from gas giants and arrive faster and cheaper than anyone thought possible.
 
 ### 1.2 Design Pillars
 
@@ -91,7 +91,7 @@ Fuel is the only resource for movement and is displayed to the player as a delta
 
 ### 2.6 Time
 
-The game clock runs continuously, and every body moves along its orbit as time passes. Time is the second currency alongside fuel. Time pressure comes from perishable cargo, passenger deadlines, and scheduled orbital events. (A port can keep seasonal hours; nothing in the sky uses that yet.)
+The game clock runs continuously, and every body moves along its orbit as time passes. Time is the second currency alongside fuel. Time pressure comes from perishable cargo and from quests with a deadline on them. (A port can keep seasonal hours; nothing in the sky uses that yet.)
 
 **The sky is built at KSP's scale.** Every body is a tenth of the size a real one would be and many times denser, which is the trick that makes a world a place rather than a backdrop: Tassel is 498 km across, has 9.25 m/s² at the ground, air to 70 km, and a reach of 116,500 km — a Kerbin. A new game opens at 75 km, five above the air, on an orbit that takes thirty minutes of game time. Local flying is correspondingly cheap: the first lesson is a quarter of a km/s. Interplanetary flying is *not*, because a small world gives almost no gravity assist on departure or arrival, and that trade is deliberate.
 
@@ -178,7 +178,7 @@ Upgrades fall into two categories.
 | Upgrade | Unlocks | Likely source |
 |---|---|---|
 | Heat shield | Aerobraking at Grumm | Emberkin engine smiths, Cinder |
-| Refrigeration | Frog passengers, cold-chain cargo | Otter shipwrights, Slate |
+| Refrigeration | Cold-chain cargo | Otter shipwrights, Slate |
 | Stealth system | Slipping past cat tolls in the Belt | A Builder dampener, fitted on Whisker |
 | Long-range sensors | Arc salvage sites, quiet Belt work | Cat salvagers, the Arc |
 
@@ -213,7 +213,7 @@ One goal should always be in sight at each timescale.
 | Layer | Examples |
 |---|---|
 | Opening | One pebble, bought on Slate, for your aunt |
-| Short-term | This delivery, this passenger, this transfer window |
+| Short-term | This quest, this cargo, this transfer window |
 | Medium-term | A new upgrade, a relationship with a people, reaching a new region |
 | Long-term | The Builders' mystery and the Maw |
 
@@ -539,7 +539,10 @@ Seven kinds, and only the first is built.
 5. **Things in space that are not ports**, for #14 and #15.
 6. **A quest board.** Twenty quests do not arrive by uncle. Where a player
    picks the next one up — a port's Talk tab, a notice board, a character who
-   follows them — is not decided.
+   follows them — is not decided, and it is now the only way work reaches a
+   ship: the randomly generated contract board that used to sit behind a
+   Passengers tab has been removed, along with passengers themselves. Quests
+   are the whole of it.
 
 ### 5.3 Notes Against the Goods Table
 

@@ -322,54 +322,18 @@ export const NARRATIVE = {
  },
  "species": {
   "emberkin": {
-   "passengerRequests": [
-    "A courier with a sealed case and a deadline she regards as generous.",
-    "A smith going to see an engine he built, before it outlives him.",
-    "A fashion buyer who will ask you three times whether you can go faster.",
-    "An archivist carrying nine hundred years of dock records, by her reckoning.",
-    "An apprentice with a letter of introduction and no patience whatsoever."
-   ],
-   "onFastArrival": "She is out of the airlock before the lines are tied, delighted, already late for something else.",
-   "onLateArrival": "He says nothing about the delay, which from an Emberkin is the loudest thing available.",
    "onGift": "They write down what you did, which is how the Emberkin say thank you.",
    "greeting": "Everything here happens quickly, and they will assume you want it to."
   },
   "otter": {
-   "passengerRequests": [
-    "Cousins, a wedding, and a cake that must not be tilted.",
-    "A shipwright going out to look at somebody's terrible repair job.",
-    "A banker with a case she will not discuss and a manner that invites you to try.",
-    "Relief caretakers, plus three months of gossip in written form.",
-    "A farmer who has never left the moon he was born on and is not sure about it."
-   ],
-   "onFastArrival": "She tells the whole dock how you flew it, twice, with improvements.",
-   "onLateArrival": "He says it is fine, and means it, and will still mention it in a year.",
    "onGift": "You are fed before you can refuse, and introduced to eleven people.",
    "greeting": "Nobody here does anything alone, and they will wonder why you do."
   },
   "cat": {
-   "passengerRequests": [
-    "A crew on leave, bound for the tavern, who will critique every burn.",
-    "A salvager with a crate she keeps between her feet.",
-    "An oath-witness travelling to settle somebody else's argument.",
-    "A young cat going to meet a captain, terrified and pretending otherwise.",
-    "An exile going home the long way round, on purpose."
-   ],
-   "onFastArrival": "She tells you it was adequate, then tells everyone else it was not.",
-   "onLateArrival": "He shrugs. The story is better with the delay in it, and both of you know it.",
    "onGift": "A gift comes back later, larger, from somebody you did not expect.",
    "greeting": "They cannot land on heavy worlds, so everything here happens in the air."
   },
   "frog": {
-   "passengerRequests": [
-    "A song-keeper who has waited ninety years for a ride and can wait a little longer.",
-    "Pilgrims for Croak, who ask only that you keep the hold cold.",
-    "An elder going to see a sea she has been told about.",
-    "A healer carrying cultures that must not warm, travelling at whatever speed suits them.",
-    "Someone who wishes to sit near a window for the whole journey and say almost nothing."
-   ],
-   "onFastArrival": "She thanks you for the haste and does not appear to have noticed it.",
-   "onLateArrival": "He had not been counting. He offers you something warm and asks how you are.",
    "onGift": "They give you more than you brought, and will still be giving in a generation.",
    "greeting": "A conversation here may outlast your visit, and nobody minds."
   }
@@ -464,7 +428,6 @@ export const NARRATIVE = {
    "body": "Tassel is where Nellie is. Bring your high point inside Tassel's docking range the same way you did at Slate, tie up, and the pebble is hers."
   }
  ],
- "contractsIntro": "Cargo pays the fuel. People are why anyone flies at all: they want somewhere by some day, and they remember whether you managed it.",
  "shipNames": [
   "Skipper"
  ],
@@ -477,7 +440,7 @@ export const NARRATIVE = {
   ],
   "onLongCoast": [
    "Nothing to do for a while but watch the worlds go round, which is not nothing.",
-   "Coasting. The cargo is fine. The passengers are reading.",
+   "Coasting. The cargo is fine and the hull is quiet.",
    "Long quiet stretch. Somebody once wrote a whole book on one of these.",
    "The hold is steady and the Lamp is where it should be."
   ],
@@ -496,9 +459,6 @@ export const NARRATIVE = {
   "aerobrake": "Air braked at {body}: {dv} shed to the clouds.",
   "sold": "Sold {qty} × {good} at {port} for {price}.",
   "bought": "Bought {qty} × {good} at {port} for {price}.",
-  "contractTaken": "Took on {title}, for {to}, {pay}.",
-  "contractDone": "Delivered {title} at {port}. Paid {pay}.",
-  "contractLate": "Delivered {title} at {port}, late. Paid {pay}.",
   "towed": "Towed to {port}: {cost}, {days}.",
   "tolled": "Paid the Belt toll to {captain}.",
   "refuelled": "Took on {amount} at {port} for {price}.",

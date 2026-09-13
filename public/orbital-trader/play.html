@@ -210,10 +210,6 @@
   .padout{ display:grid; grid-template-columns:auto 1fr; gap:.1rem .8rem; margin:.5rem 0 .4rem; font-variant-numeric:tabular-nums; }
   .padout dt{ color:var(--dim); font-size:.78rem; } .padout dd{ margin:0; text-align:right; }
   @media (prefers-reduced-motion: reduce){ .pv:active{ transform:none; } }
-  #log{ list-style:none; margin:0; padding:0; font-size:.84rem; }
-  #log li{ padding:.3rem 0; border-bottom:1px solid var(--line); color:var(--dim); }
-  #log li b{ color:var(--faint); font-weight:500; font-variant-numeric:tabular-nums; margin-right:.4rem; }
-  #log li.story{ color:var(--ink); }
   .empty{ color:var(--faint); font-style:italic; }
   select{ font:inherit; background:var(--gv-sunk); color:var(--ink); border:1px solid var(--line-2); border-radius:8px; padding:.35rem .5rem; width:100%; }
 
@@ -357,10 +353,6 @@
   .padout{ display:grid; grid-template-columns:auto 1fr; gap:.1rem .8rem; margin:.5rem 0 .4rem; font-variant-numeric:tabular-nums; }
   .padout dt{ color:var(--dim); font-size:.78rem; } .padout dd{ margin:0; text-align:right; }
   @media (prefers-reduced-motion: reduce){ .pv:active{ transform:none; } }
-  #log{ list-style:none; margin:0; padding:0; font-size:.84rem; }
-  #log li{ padding:.3rem 0; border-bottom:1px solid var(--line); color:var(--dim); }
-  #log li b{ color:var(--faint); font-weight:500; font-variant-numeric:tabular-nums; margin-right:.4rem; }
-  #log li.story{ color:var(--ink); }
   .empty{ color:var(--faint); font-style:italic; }
   select{ font:inherit; background:var(--gv-sunk); color:var(--ink); border:1px solid var(--line-2); border-radius:8px; padding:.35rem .5rem; width:100%; }
 
@@ -727,7 +719,6 @@ function handleEvents(events){
     if(e.kind === 'toll'){ stopSkip(); showToll(e.pending); }
     if(e.kind === 'crash'){ stopSkip(); showCrash(e.body); }
     if(e.kind === 'dry'){ stopSkip(); toast(TEXT.captainLines.onStranded[1] ?? 'The tank is dry.', 'bad', 8000); if(tab === 'plan') renderTab(); }
-    if(e.kind === 'late') toast(`${e.contract.title}: you are late.`, 'bad');
     if(e.kind === 'missed'){ toast(e.count > 1 ? `${e.count} burns went by unspent.` : 'That burn went by unspent.', 'bad'); if(tab === 'plan') renderTab(); }
   }
 }
@@ -1172,8 +1163,8 @@ function lookAt(id){
 
 /* ------------------------------------------------------------- panel */
 
-const TABS_DOCKED = [['market', 'Market'], ['passengers', 'Passengers'], ['shipyard', 'Shipyard'], ['quests', 'Quests'], ['talk', 'Talk'], ['log', 'Log']];
-const TABS_FLIGHT = [['orbit', 'Orbit'], ['plan', 'Burns'], ['quests', 'Quests'], ['ship', 'Ship'], ['log', 'Log']];
+const TABS_DOCKED = [['market', 'Market'], ['shipyard', 'Shipyard'], ['quests', 'Quests'], ['talk', 'Talk']];
+const TABS_FLIGHT = [['orbit', 'Orbit'], ['plan', 'Burns'], ['quests', 'Quests'], ['ship', 'Ship']];
 let lastDockedMode = null;
 function renderTabs(){
   const mode = state.dockedAt ? 'docked' : 'flight';
@@ -1206,7 +1197,7 @@ function renderTab(){
      was and put it back. */
   const active = document.activeElement;
   const was = body.contains(active) ? (active.dataset?.act ?? active.id ?? null) : null;
-  const fn = { market, passengers, shipyard, talk, plan, quests: questsTab, orbit: orbitTab, ship: shipTab, log: logTab }[tab];
+  const fn = { market, shipyard, talk, plan, quests: questsTab, orbit: orbitTab, ship: shipTab }[tab];
   body.innerHTML = fn ? fn() : '';
   wire(body);
   if(was){
@@ -1300,29 +1291,6 @@ function market(){
   const rest = shopping.filter(r => !r.loved);
   if(rest.length){
     out += '<h3>They want</h3><p>' + rest.map(r => `${esc(r.g.name)} <span class="lock">${S.fmtMoney(r.price)}</span>`).join(' · ') + '</p>';
-  }
-  return out;
-}
-
-function passengers(){
-  const port = state.dockedAt;
-  const offers = S.refreshOffers(state, port);
-  let out = `<h2>Passengers &amp; deliveries</h2>`;
-  if(!state.flags.contractsIntro) out += `<p class="say">${esc(TEXT.contractsIntro)}</p>`;
-  out += '<h3>Looking for a ship</h3>';
-  if(!offers.length) out += '<p class="empty">Nobody is travelling today.</p>';
-  for(const c of offers){
-    const ok = S.canTake(state, c);
-    const days = c.deadline - state.t;
-    out += `<div class="row"><div class="name"><b>${esc(c.title)}</b><small>${sp(c.species)} · to ${esc(S.portName(c.to))} · by day ${S.calendar(c.deadline).day} of year ${S.calendar(c.deadline).year} (${S.fmtDays(days)}) · ${c.units} unit${c.units > 1 ? 's' : ''}${c.needs.includes('refrigeration') ? ' · <span class="lock">needs refrigeration</span>' : ''}</small><small><i>“${esc(c.line)}”</i></small></div>
-      <div class="price">${S.fmtMoney(c.pay)}</div>
-      <div class="btns"><button class="btn sm primary" data-act="take|${c.id}" ${ok.ok ? '' : 'disabled title="' + esc(ok.reason) + '"'}>Take</button></div></div>`;
-  }
-  out += '<h3>Aboard</h3>';
-  if(!state.passengers.length) out += '<p class="empty">No passengers, no parcels.</p>';
-  for(const c of state.passengers){
-    const days = c.deadline - state.t;
-    out += `<div class="row"><div class="name"><b>${esc(c.title)}</b><small>${sp(c.species)} · to ${esc(S.portName(c.to))} · ${days < 0 ? '<span class="down">late</span>' : S.fmtDays(days) + ' left'}</small></div><div class="price">${S.fmtMoney(c.pay)}</div><div class="btns"><button class="btn sm" data-act="target|${c.to}">Target</button></div></div>`;
   }
   return out;
 }
@@ -1563,9 +1531,8 @@ function shipTab(){
     out += el.rp < b.atmo ? (state.keys.heatShield ? `<p class="up">Air braking in ${esc(b.name)}'s clouds: the shield will slow you.</p>` : `<p class="down">Your low point is inside ${esc(b.name)}'s clouds, and you have no heat shield.</p>`) : '';
   }
   out += '<h3>Hold</h3>';
-  if(!state.cargo.length && !state.passengers.length) out += '<p class="empty">Empty.</p>';
+  if(!state.cargo.length) out += '<p class="empty">Empty.</p>';
   for(const c of state.cargo){ const g = S.goodById(c.good); out += `<p>${c.qty} × ${esc(g.name)} <span class="lock">from ${esc(S.portName(c.from))}${g.lifetimeDays ? ` · ${Math.round(S.freshness(g, state.t - c.t) * 100)}% fresh` : ''}</span></p>`; }
-  for(const c of state.passengers){ const days = c.deadline - state.t; out += `<p>${esc(c.title)} <span class="lock">→ ${esc(S.portName(c.to))} · ${days < 0 ? 'late' : S.fmtDays(days) + ' left'}</span> <button class="btn sm" data-act="target|${c.to}">Target</button></p>`; }
   out += '<h3>Fitted</h3>';
   out += `<p>${esc(S.tiers('tank')[state.tiers.tank].name)}, ${esc(S.tiers('engine')[state.tiers.engine].name)}, ${esc(S.tiers('hold')[state.tiers.hold].name)}.</p>`;
   out += `<p>${['heatShield', 'refrigeration', 'sensors', 'stealth'].filter(k => state.keys[k]).map(k => esc(UPGRADES.find(u => u.key === k)?.name ?? k)).join(', ') || '<span class="lock">No keys yet.</span>'}</p>`;
@@ -1574,10 +1541,11 @@ function shipTab(){
   return out;
 }
 
-/* What somebody has asked you to do, and how far along it is. A quest is not
-   a contract: there is no clock on it and no cargo hold full of somebody
-   else's crates — it is a reason to go somewhere, with the steps written out
-   so the chart is never the only thing telling you what to do next. */
+/* What somebody has asked you to do, and how far along it is. Quests are the
+   only jobs in the game now that the contract board is gone: there is no clock
+   on one and nothing in the hold belongs to anybody else — a quest is a reason
+   to go somewhere, with the steps written out so the chart is never the only
+   thing telling you what to do next. */
 function questsTab(){
   let out = '<h2>Quests</h2>';
   const live = (state.quests ?? []).map(l => ({ l, q: S.questById(l.id) })).filter(x => x.q);
@@ -1599,16 +1567,11 @@ function questsTab(){
   return out;
 }
 
-function logTab(){
-  return `<h2>Log</h2><ul id="log" aria-live="polite" aria-relevant="additions">` + [...state.log].reverse().map(l => `<li class="${l.kind === 'story' ? 'story' : ''}"><b>${S.calendar(l.t).year}.${S.calendar(l.t).day}</b>${esc(l.text)}</li>`).join('') + '</ul>';
-}
-
 /* ------------------------------------------------------------- actions */
 
 const actions = {
   buy(gid, q){ const r = S.buy(state, gid, Number(q)); if(!r.ok) toast(r.reason, 'bad'); renderTab(); save(); },
   sell(gid, q){ const r = S.sell(state, gid, Number(q)); if(!r.ok) toast(r.reason, 'bad'); else toast(`Sold for ${S.fmtMoney(r.total)} (${r.profit >= 0 ? '+' : ''}${S.fmtMoney(r.profit)}).`); renderTab(); save(); },
-  take(id){ const r = S.takeContract(state, id); if(!r.ok) toast(r.reason, 'bad'); renderTab(); save(); tutorialCheck(); },
   fuel(k){ const r = S.refuel(state, Number(k)); if(!r.ok) toast(r.reason, 'bad'); renderTab(); save(); },
   upgrade(id){ const r = S.buyUpgrade(state, id); if(!r.ok) toast(r.reason, 'bad'); else toast(`${S.upgradeById(id).name} fitted.`); renderTab(); save(); },
   wait(d){ const days = Number(d); S.wait(state, days); toast(`${S.fmtDays(days)} pass. ${S.calendar(state.t).text}.`); renderTab(); save(); },
@@ -1650,7 +1613,6 @@ function doDock(){
   const txt = TEXT.ports[r.port];
   const line = txt?.arrival?.[Math.floor(S.hash(r.port, Math.floor(state.t)) * txt.arrival.length)];
   toast(`Docked at ${S.portName(r.port)}.${line ? ' ' + line : ''}`, 'story', 7000);
-  for(const d of r.delivered){ toast(`${d.contract.title}: ${S.fmtMoney(d.pay)}${d.late ? ' (late)' : d.early ? ' (early!)' : ''}. ${d.say ?? ''}`, d.late ? 'bad' : 'story', 8000); }
   for(const e of r.events ?? []) if(e.kind === 'story') showStory(e.name, e.text);
   tutorialCheck();
   save();
@@ -1700,7 +1662,7 @@ function showCrash(bodyId){
   const atmo = state.pending?.atmosphere;
   const q = S.towQuote(state);
   openModal(`<h2>${atmo ? 'Too deep' : 'Hard landing'}</h2><p class="say">${esc(atmo ? TEXT.events.towAtmosphere : TEXT.events.towCrash[0])}</p>
-    <p>${atmo ? `${esc(b.name)}'s clouds took the ship without a heat shield.` : `The ship met ${esc(b.name)} faster than it should have.`} A tow to ${esc(S.portName(q.port))} will cost ${S.fmtMoney(Math.round(q.cost * 1.5))} and ${S.fmtDays(q.days)}. Cargo and passengers ride along.</p>
+    <p>${atmo ? `${esc(b.name)}'s clouds took the ship without a heat shield.` : `The ship met ${esc(b.name)} faster than it should have.`} A tow to ${esc(S.portName(q.port))} will cost ${S.fmtMoney(Math.round(q.cost * 1.5))} and ${S.fmtDays(q.days)}. The cargo rides along.</p>
     <div class="btns"><button class="btn primary" id="m-tow">Call for a tow</button></div>`, m => {
     m.querySelector('#m-tow').addEventListener('click', () => { const r = S.callTow(state, atmo ? 'atmosphere' : 'crash'); closeModal(); afterTow(r); });
   });
