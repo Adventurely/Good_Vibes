@@ -204,8 +204,8 @@
       }
       .tabs { display: flex; border-bottom: 2px solid var(--line); }
       .tabs button {
-        flex: 1; font: inherit; font-size: 0.92rem; font-weight: 600;
-        padding: 0.55rem 0.25rem;
+        flex: 1; font: inherit; font-size: 0.86rem; font-weight: 600; white-space: nowrap;
+        padding: 0.55rem 0.2rem;
         background: var(--sunk); border: 0; border-right: 1px solid var(--line);
         color: var(--muted); cursor: pointer;
       }
@@ -232,6 +232,7 @@
       .board-line { margin: 0.45rem 0 0; font-size: 0.8rem; color: var(--muted); }
       .boards { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0 1rem; padding: 0 0.5rem 0.6rem; }
       .board td:first-child { width: 2rem; color: var(--muted); }
+      .board td:nth-child(2) { text-align: left; }
       .board td:last-child { text-align: right; }
       .board tr.you td { background: #eef7e9; font-weight: 700; }
 
