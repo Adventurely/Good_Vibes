@@ -336,6 +336,38 @@
    "greeting": "A conversation here may outlast your visit, and nobody minds."
   }
  },
+ "crew": {
+  "captain": {
+   "role": "Captain",
+   "name": "You",
+   "species": "otter",
+   "line": "An otter who left their raft, which is either an adventure or a scandal depending on which cousin you ask."
+  },
+  "roles": [
+   {
+    "id": "engineer",
+    "name": "Engineer",
+    "species": "emberkin",
+    "does": "Keeps the burn honest and the tank from lying to you.",
+    "empty": "No engineer. The Emberkin train them and the Emberkin keep them, and one does not come aboard for money."
+   },
+   {
+    "id": "navigator",
+    "name": "Navigator",
+    "species": "cat",
+    "does": "Reads a rock at four au and tells you which way it is going.",
+    "empty": "No navigator. The cats have the eyes for it and the Belt is where you would have to go and ask."
+   },
+   {
+    "id": "appraiser",
+    "name": "Appraiser",
+    "species": "frog",
+    "does": "Knows what a thing is, which is rarer than knowing what it is worth.",
+    "empty": "No appraiser. The frogs study for a lifetime and are in no hurry; you would have to give them a reason."
+   }
+  ],
+  "note": "Nobody signs on yet. Three jobs in the line pay in a person and none of them are flyable until there is somewhere to take one on."
+ },
  "events": {
   "tollOffer": [
    {

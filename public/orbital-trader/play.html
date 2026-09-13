@@ -163,6 +163,18 @@
   /* A quest reads as a list with a place in it, so the step you are on is the
      only one that is fully lit: the ones behind are ticked and dimmed, the
      ones ahead are waiting. */
+  /* ---- Crew: a portrait, a name, and three berths with nobody in them -- */
+  .crew{ display:flex; gap:.7rem; align-items:flex-start; padding:.6rem 0; border-top:1px solid var(--line); }
+  .crew:first-of-type{ border-top:0; }
+  .crew img{
+    width:64px; height:64px; flex:0 0 64px; border-radius:10px;
+    image-rendering:pixelated; background:var(--gv-sunk); border:1px solid var(--line-2);
+  }
+  .crew.open img{ opacity:.8; }
+  .crew .who{ min-width:0; }
+  .crew .who b{ display:block; }
+  .crew .who small{ display:block; color:var(--faint); }
+  .crew .who p{ margin:.25rem 0 0; font-size:.84rem; }
   .quest{ border-top:1px solid var(--line); padding-top:.6rem; margin-top:.6rem; }
   .quest:first-of-type{ border-top:0; padding-top:0; margin-top:0; }
   .quest h3{ margin:0 0 .1rem; }
@@ -306,6 +318,18 @@
   /* A quest reads as a list with a place in it, so the step you are on is the
      only one that is fully lit: the ones behind are ticked and dimmed, the
      ones ahead are waiting. */
+  /* ---- Crew: a portrait, a name, and three berths with nobody in them -- */
+  .crew{ display:flex; gap:.7rem; align-items:flex-start; padding:.6rem 0; border-top:1px solid var(--line); }
+  .crew:first-of-type{ border-top:0; }
+  .crew img{
+    width:64px; height:64px; flex:0 0 64px; border-radius:10px;
+    image-rendering:pixelated; background:var(--gv-sunk); border:1px solid var(--line-2);
+  }
+  .crew.open img{ opacity:.8; }
+  .crew .who{ min-width:0; }
+  .crew .who b{ display:block; }
+  .crew .who small{ display:block; color:var(--faint); }
+  .crew .who p{ margin:.25rem 0 0; font-size:.84rem; }
   .quest{ border-top:1px solid var(--line); padding-top:.6rem; margin-top:.6rem; }
   .quest:first-of-type{ border-top:0; padding-top:0; margin-top:0; }
   .quest h3{ margin:0 0 .1rem; }
@@ -503,6 +527,7 @@
 
 <script type="module">
 import { createChart, PALETTE, locateOnPrediction, fmtAu, bodyColour } from './render.js';
+import { portraitURL } from './sprites.js';
 import * as S from './sim.js';
 import { CONST, PORTS, GOODS, UPGRADES, TEXT, SPECIES, GLOSSARY, BELT_ROCKS, ARC_DEBRIS } from './content.js';
 import { segmentApses, norm, sub, add, unit, dist, absState, elementsFromState } from './orbit.js';
@@ -1163,8 +1188,8 @@ function lookAt(id){
 
 /* ------------------------------------------------------------- panel */
 
-const TABS_DOCKED = [['market', 'Market'], ['shipyard', 'Shipyard'], ['quests', 'Quests'], ['talk', 'Talk']];
-const TABS_FLIGHT = [['orbit', 'Orbit'], ['plan', 'Burns'], ['quests', 'Quests'], ['ship', 'Ship']];
+const TABS_DOCKED = [['market', 'Market'], ['shipyard', 'Shipyard'], ['quests', 'Quests'], ['crew', 'Crew'], ['talk', 'Talk']];
+const TABS_FLIGHT = [['orbit', 'Orbit'], ['plan', 'Burns'], ['quests', 'Quests'], ['crew', 'Crew'], ['ship', 'Ship']];
 let lastDockedMode = null;
 function renderTabs(){
   const mode = state.dockedAt ? 'docked' : 'flight';
@@ -1197,7 +1222,7 @@ function renderTab(){
      was and put it back. */
   const active = document.activeElement;
   const was = body.contains(active) ? (active.dataset?.act ?? active.id ?? null) : null;
-  const fn = { market, shipyard, talk, plan, quests: questsTab, orbit: orbitTab, ship: shipTab }[tab];
+  const fn = { market, shipyard, talk, plan, quests: questsTab, crew: crewTab, orbit: orbitTab, ship: shipTab }[tab];
   body.innerHTML = fn ? fn() : '';
   wire(body);
   if(was){
@@ -1556,6 +1581,32 @@ function shipTab(){
    on one and nothing in the hold belongs to anybody else — a quest is a reason
    to go somewhere, with the steps written out so the chart is never the only
    thing telling you what to do next. */
+/* Who is aboard. The captain, and three berths that are empty because the
+   three jobs that fill them pay in a person and there is nowhere yet to take
+   one on. An empty berth says what the job is and who does it, so the menu
+   reads as a crew you have not met rather than as a menu that is broken. */
+function crewTab(){
+  const c = TEXT.crew;
+  const card = (src, role, name, species, line, open) =>
+    `<div class="crew${open ? ' open' : ''}">`
+    + (src ? `<img src="${src}" alt="" width="24" height="24">` : '')
+    + `<div class="who"><b>${esc(name)}</b><small>${esc(role)}${species ? ' · ' : ''}${species ? sp(species) : ''}</small>`
+    + `<p${open ? ' class="lock"' : ' class="say"'}>${esc(line)}</p></div></div>`;
+
+  let out = '<h2>Crew</h2>';
+  out += card(portraitURL('captain'), c.captain.role, c.captain.name, c.captain.species, c.captain.line, false);
+  out += `<p class="lock">${esc(state.shipName)} · ${state.stats.docks} docking${state.stats.docks === 1 ? '' : 's'} · ${S.fmtKms(state.stats.dvSpent)} burned</p>`;
+  out += '<h3>Berths</h3>';
+  for(const r of c.roles ?? []){
+    const aboard = state.crew?.[r.id] ?? null;
+    out += aboard
+      ? card(portraitURL('captain'), r.name, aboard.name, r.species, r.does, false)
+      : card(portraitURL('berth'), r.name, 'Nobody', r.species, r.empty, true);
+  }
+  if(c.note) out += `<p class="lock">${esc(c.note)}</p>`;
+  return out;
+}
+
 function questsTab(){
   let out = '<h2>Quests</h2>';
   const live = (state.quests ?? []).map(l => ({ l, q: S.questById(l.id) })).filter(x => x.q);

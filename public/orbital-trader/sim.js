@@ -89,6 +89,10 @@ export function newGame(seed = 1){
     marketEpoch: 0,
     lastMarket: null,
     rep: { emberkin: 0, otter: 0, cat: 0, frog: 0 },
+    /* Three berths, and nobody in them. The line pays out an Emberkin
+       engineer, a cat navigator and a frog appraiser; until there is a board
+       to take those jobs from, this is a list of who is missing. */
+    crew: { engineer: null, navigator: null, appraiser: null },
     nodes: [],
     quests: [],
     target: null,
@@ -2185,6 +2189,7 @@ export function restore(json){
   s.quests ??= QUESTS.map(q => ({ id: q.id, step: 0, done: false }));
   s.debt ??= 0; s.target ??= null; s.justLeft ??= null; s.justLeftAt ??= -1e9;
   s.marketEpoch ??= 0; s.lastMarket ??= null;
+  s.crew = { engineer: null, navigator: null, appraiser: null, ...(s.crew ?? {}) };
   s.warp = Number.isFinite(s.warp) ? Math.max(1, Math.min(CONST.MAX_WARP, s.warp)) : 1;
   s.rng = Number.isFinite(s.rng) ? s.rng : 1;
   s.shipName ??= TEXT.shipNames[0];

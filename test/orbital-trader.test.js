@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 
 import * as O from '../public/orbital-trader/orbit.js';
+import { PORTRAITS, PORTRAIT_SIZE, portraitURL } from '../public/orbital-trader/sprites.js';
 import {
   CONST, BODIES, GOODS, PORTS, UPGRADES, FORMULAS, TEXT, GLOSSARY, SPECIES, BELT_ROCKS,
 } from '../public/orbital-trader/content.js';
@@ -265,6 +266,49 @@ test('the text has every line the game asks for', () => {
   // One ship, one name: she is the Skipper.
   assert.deepEqual(TEXT.shipNames, ['Skipper']);
   assert.ok(TEXT.captainLines.onStranded.length >= 3);
+});
+
+/* --------------------------------------------------------------- crew */
+
+test('the crew menu has a captain to show and three berths to leave empty', () => {
+  const c = TEXT.crew;
+  assert.ok(c?.captain?.role && c.captain.name && c.captain.line, 'the captain has no card');
+  assert.ok(SPECIES[c.captain.species], `captain species ${c.captain.species}`);
+  assert.equal(c.roles.length, 3);
+  assert.deepEqual(c.roles.map(r => r.id), ['engineer', 'navigator', 'appraiser']);
+  for(const r of c.roles){
+    assert.ok(r.name && r.does && r.empty, `${r.id} has no words`);
+    assert.ok(SPECIES[r.species], `${r.id}: species ${r.species}`);
+  }
+  /* The three berths are the three jobs in the line that pay in a person, so
+     the peoples have to match: an Emberkin engineer, a cat navigator, a frog
+     appraiser. If one of those ever moves, this is what notices. */
+  assert.deepEqual(c.roles.map(r => r.species), ['emberkin', 'cat', 'frog']);
+
+  // And a new ship carries a berth for each of them, with nobody in it.
+  const s = S.newGame(5);
+  assert.deepEqual(s.crew, { engineer: null, navigator: null, appraiser: null });
+  // A save from before there were berths still gets them.
+  const old = JSON.parse(S.serialize(s));
+  delete old.crew;
+  assert.deepEqual(S.restore(old).crew, { engineer: null, navigator: null, appraiser: null });
+});
+
+test('a portrait is a square grid the palette can actually paint', () => {
+  /* Portraits are hand-drawn character grids like the Arc and the Maw, only
+     bigger, and a mistyped row is invisible until somebody opens the menu.
+     Checked as data, because there is no canvas under Node. */
+  assert.ok(Object.keys(PORTRAITS).length >= 2);
+  for(const [id, art] of Object.entries(PORTRAITS)){
+    assert.equal(art.rows.length, PORTRAIT_SIZE, `${id}: ${art.rows.length} rows`);
+    for(const [i, row] of art.rows.entries()){
+      assert.equal(row.length, PORTRAIT_SIZE, `${id} row ${i} is ${row.length} wide`);
+      for(const ch of row) assert.ok(ch in art.legend, `${id} row ${i} uses "${ch}", which the legend has no colour for`);
+    }
+  }
+  // Nothing is drawn under Node, and asking for one says so rather than throwing.
+  assert.equal(portraitURL('captain'), null);
+  assert.equal(portraitURL('nobody-by-that-name'), null);
 });
 
 /* --------------------------------------------------------------- page */
