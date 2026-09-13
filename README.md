@@ -367,10 +367,10 @@ public/theme.css    the one look every page shares: paper, ink, the rounded
 public/index.html   the shelf: every game, thumbnails painted by their own
                     renderers rather than screenshotted
 public/solarium/    Save Solarium, client and content
-public/sunward/content.js  Sunward as data — the twelve growers and their curve,
-                    the forty-two upgrades, the medals, the day, the record, and
+public/sunward/content.js  Sunward as data — the nine growers and their curve,
+                    the eighteen upgrades, the medals, the day, the record, and
                     the pure functions over all of it. No DOM, no clock, no save
-public/sunward/art.js  the lot: sky, ground, twelve prop sprites, and a tree
+public/sunward/art.js  the lot: sky, ground, nine prop sprites, and a tree
                     that is grown by a recursion rather than drawn as a sprite
 public/sunward/index.html  Sunward's title screen: the lot, running, with the
                     sky doing a day every twenty seconds
@@ -1523,7 +1523,7 @@ not something they did.
 
 **The curve is one number.** Costs multiply by about 11.2 a tier and output by
 about 6.4, so each tier pays for itself in 1.75&times; the time the one below it
-does: two minutes for a moss bed, most of a day for a canopy tower. Flat, and
+does: two minutes for a moss bed, three hours for a canopy tower. Flat, and
 the newest tier is always the right buy — the shop becomes a list with one live
 row. Much steeper and the top tiers are ornaments. The test asserts the ratio
 stays between 1.3 and 2.6 for every pair, because a tier that pays back *faster*
@@ -1613,7 +1613,7 @@ round, which is the one thing a clicker's output graph does not usually have.
 
 | Thing | Convention |
 | --- | --- |
-| Resolution | 320 &times; 180 internal, scaled by whole numbers only |
+| Resolution | 320 &times; 240 internal, scaled by whole numbers only |
 | Palette | Good Vibes' sixteen, imported rather than copied |
 | Font | the same 5 &times; 7 bitmap, from `pixel.js` |
 | Sky | two ordered dithers at once — down the frame, and across the clock |
@@ -1642,8 +1642,8 @@ ink and dawn plum is black with bright pink dots in a 4&times;4 grid, which
 looks like a fault in the screen. Every neighbouring pair in `SKIES` is one or
 two steps apart in the palette, and that is the whole fix.
 
-**The sky is cached and the tree is not.** The sky alone is 320 by 134 pixels of
-ordered dither, which is forty-three thousand `fillRect` calls; it is a pure
+**The sky is cached and the tree is not.** The sky alone is 320 by 168 pixels of
+ordered dither, which is fifty-four thousand `fillRect` calls; it is a pure
 function of the time of day, so it is painted once a second into an offscreen
 canvas and stamped back with one `drawImage` — the same trick the build map in
 Good Vibes uses. The tree sways, so it is different on every frame by design,

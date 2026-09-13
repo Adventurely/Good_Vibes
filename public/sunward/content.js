@@ -44,7 +44,7 @@ export const DAY_LENGTH = 240;
    says so on the row — and it is what makes a night grower worth buying when
    you already have twelve panels.
 
-   The `steady` upgrades shave the swing, and they shave it off the BOTTOM
+   The one `steady` upgrade shaves the swing, and it shaves it off the BOTTOM
    only: a bought one lifts the trough without touching the peak. Shrinking it
    from both ends, which is what they did at first, is worth exactly nothing —
    the swing already averages to one over a day, so a symmetric shave changes
@@ -83,7 +83,7 @@ export function phaseName(phase){
 /* ------------------------------------------------------------- the growers */
 
 /* The curve. Costs multiply by about 11.2 a tier and output by about 6.4, so a
- * tier pays for itself in 1.75x the time the one below it does: two minutes
+ * tier pays for itself in 1.75x the time the one below it does.
  *
  * Nine tiers. There were twelve, and three of them were the same idea as a
  * tier already on the list — a second fungus, a coral reef nobody could
@@ -96,8 +96,8 @@ export function phaseName(phase){
  * makes the shop a list with one live row. Much steeper and the top tiers are
  * ornaments nobody can justify. At 1.75 a new tier is a treat you save for and
  * the tier below it is still worth topping up while you save, which is the
- * rhythm a clicker is actually made of. Two minutes for a moss bed, most of
- * a day for a canopy tower.
+ * rhythm a clicker is actually made of. Two minutes for a moss bed, three
+ * hours for a canopy tower.
  *
  * `rate` is the AVERAGE over a whole day. A day grower makes half again as
  * much at noon and half as much at midnight; the number on the row is what it
@@ -442,15 +442,18 @@ export const ACHIEVEMENTS = [
 
   { id: 'ten-upgrades', name: 'Well read', need: { upgrades: 10 },
     blurb: 'Ten upgrades bought.' },
-  { id: 'fifteen-upgrades', name: 'Studious', need: { upgrades: 15 },
+  // The id is from when there were forty-two upgrades and this took thirty.
+  // It is in the saves of anyone who earned it, so the id stays and the
+  // threshold does not — the same rule as 'first-light'.
+  { id: 'thirty-upgrades', name: 'Studious', need: { upgrades: 15 },
     blurb: 'Fifteen upgrades bought.' },
   { id: 'every-upgrade', name: 'The whole shelf', need: { upgrades: UPGRADES.length },
     blurb: 'Every upgrade there is, in one run.' },
 
   { id: 'first-seed', name: 'Let it seed', need: { prestiges: 1 },
-    blurb: 'Give the lot back once.' },
+    blurb: 'Replant the lot once.' },
   { id: 'five-seeds', name: 'Crop rotation', need: { prestiges: 5 },
-    blurb: 'Give the lot back five times.' },
+    blurb: 'Replant the lot five times.' },
   { id: 'hundred-seeds', name: 'Seed bank', need: { seeds: 100 },
     blurb: 'Hold a hundred seeds.' },
 
@@ -506,7 +509,7 @@ export function newGame(){
 
 /* Every multiplier in the game, folded out of the upgrades once. Called from
  * the tick and from every shop row that wants to show what a purchase would
- * do, so it is a fold over ~40 booleans and nothing more expensive than that.
+ * do, so it is a fold over at most eighteen booleans and nothing more expensive than that.
  */
 export function bonuses(state){
   const out = {
@@ -544,7 +547,7 @@ export const seedBonus = seeds => 1 + SEED_RATE * seeds;
    1 + swing at its best hour, and down to 1 - (swing - lift) at its worst. An
    `any` grower ignores the sky entirely.
 
-   `lift` is what the steady upgrades have bought, and it only applies on the
+   `lift` is what the steady upgrade has bought, and it only applies on the
    way down. That asymmetry is the whole value of them: the peak is untouched,
    the trough comes up, and the area under the day goes with it. */
 export function phaseFactor(phase, at, swing = SWING, lift = 0){

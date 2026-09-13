@@ -1,6 +1,6 @@
 /* Sunward — the lot, drawn.
  *
- * One scene, painted at 320x180 and scaled up by whole numbers, and one entry
+ * One scene, painted at 320x240 and scaled up by whole numbers, and one entry
  * point: `paintLot`. The game page calls it sixty times a second and the shelf
  * on the front page calls it once for its thumbnail, which is the reason it
  * takes everything it needs as arguments and reads nothing from anywhere — the
@@ -440,22 +440,25 @@ export function drawProp(ctx, rows, x, y, light){
 
 /* Where each kind stands, and where the second, third and fourth of them go.
  *
- * Hand-placed rather than laid out by a rule. A rule that packs twelve sprites
+ * Hand-placed rather than laid out by a rule. A rule that packs nine sprites
  * into 320 pixels without any of them landing on the tree or walking off the
- * edge is a harder thing to write than forty-eight numbers, and it goes wrong
+ * edge is a harder thing to write than thirty-six numbers, and it goes wrong
  * silently — a sprite half off the canvas looks like a rendering fault.
  *
  * `y` is the sprite's ground line, and everything on the lot is drawn in order
  * of it, so a thing standing further forward is painted over the thing behind.
  */
 export const PROP_SPOTS = {
-  orchard:    [{ x: 4, y: 184 }, { x: 24, y: 191 }, { x: 46, y: 179 }, { x: 66, y: 187 }],  glasshouse: [{ x: 196, y: 182 }, { x: 218, y: 190 }, { x: 176, y: 177 }, { x: 240, y: 185 }],
+  orchard:    [{ x: 4, y: 184 }, { x: 24, y: 191 }, { x: 46, y: 179 }, { x: 66, y: 187 }],
+  glasshouse: [{ x: 196, y: 182 }, { x: 218, y: 190 }, { x: 176, y: 177 }, { x: 240, y: 185 }],
   turbine:    [{ x: 276, y: 179 }, { x: 262, y: 188 }, { x: 292, y: 185 }, { x: 248, y: 177 }],
   hive:       [{ x: 62, y: 207 }, { x: 76, y: 215 }, { x: 48, y: 213 }, { x: 90, y: 206 }],
   panel:      [{ x: 212, y: 204 }, { x: 230, y: 212 }, { x: 246, y: 202 }, { x: 196, y: 213 }],
   canopy:     [{ x: 296, y: 206 }, { x: 282, y: 215 }, { x: 306, y: 220 }, { x: 270, y: 209 }],
   moss:       [{ x: 20, y: 234 }, { x: 40, y: 226 }, { x: 4, y: 221 }, { x: 58, y: 238 }],
-  mushroom:   [{ x: 92, y: 229 }, { x: 108, y: 238 }, { x: 76, y: 235 }, { x: 122, y: 226 }],  fern:       [{ x: 246, y: 227 }, { x: 262, y: 237 }, { x: 230, y: 235 }, { x: 278, y: 229 }],};
+  mushroom:   [{ x: 92, y: 229 }, { x: 108, y: 238 }, { x: 76, y: 235 }, { x: 122, y: 226 }],
+  fern:       [{ x: 246, y: 227 }, { x: 262, y: 237 }, { x: 230, y: 235 }, { x: 278, y: 229 }],
+};
 
 /* How many you have to own before the second, third and fourth copies appear.
    The lot should keep changing well past the first purchase, and it should
@@ -691,7 +694,7 @@ export function paintLot(ctx, {
 /* The same scene, with the parts that do not change every frame kept in
  * offscreen canvases.
  *
- * The sky alone is 320 by 134 pixels of ordered dither, which is forty-three
+ * The sky alone is 320 by 168 pixels of ordered dither, which is fifty-four
  * thousand `fillRect` calls; at sixty frames a second that is a slideshow with
  * a fan running. It is a pure function of the time of day, so it is painted
  * once per bucket and stamped back with a single `drawImage` — the same trick

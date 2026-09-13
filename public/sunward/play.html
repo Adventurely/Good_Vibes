@@ -474,7 +474,7 @@
         newGame, fromSave, toSave, tick, tap, plant, plantRefusal, study, studyRefusal,
         prestige, prestigeRefusal, pendingSeeds, energyForSeeds, seedBonus, MAX_TICK,
         catchUp, OFFLINE_CAP, GROWERS, GROWER_BY_ID, GROWER_IDS,
-        bulkCost, affordable, bonuses, totalRate, steadyRate,
+        bulkCost, affordable, bonuses, totalRate, steadyRate, averageFactor,
         tapValue, snapshot, offered, award, breakdown, note, sample, tapRate,
         dayPhase, phaseName, sunHeight, HISTORY_STEP,
         STAT_KEYS, STAT_LABELS, STAT_SHORT, formatEnergy, formatTime, formatStat,
@@ -485,6 +485,7 @@
       import { drawText, textWidth, fitCanvas } from '../good-vibes/pixel.js';
 
       const els = id => document.getElementById(id);
+      const plural = n => n === 1 ? '' : 's';
       const ui = {
         lot: els('lot'), light: els('light'), rate: els('rate'),
         phase: els('phase'), phaseNote: els('phase-note'),
@@ -582,7 +583,7 @@
         const decade = Math.floor(Math.log10(Math.max(1, state.life.earned)));
         if(decade > state.decade){
           if(decade >= 3 && state.decade >= 3){
-            note(state, `Earned ${formatEnergy(Math.pow(10, decade))} light, all told.`);
+            note(state, `Earned ${formatEnergy(Math.pow(10, decade))} energy, all told.`);
           }
           state.decade = decade;
         }
@@ -796,7 +797,7 @@
         if(e.clickMult) return `A tap is worth ${e.clickMult}&times; as much.`;
         if(e.allMult) return `Everything makes ${Math.round((e.allMult - 1) * 100)}% more.`;
         if(e.fingers) return `A tap also pays ${(e.fingers * 100).toFixed(0)}% of your energy per second.`;
-        if(e.steady) return `Night stops costing anything: nothing marked day or night ever makes`
+        if(e.steady) return `The off hours stop costing anything: nothing marked day or night ever makes`
           + ` less than its rated output again — about ${(e.steady / Math.PI * 100).toFixed(0)}% more over a day.`;
         if(e.grower) return `${GROWER_BY_ID[e.grower].name}s make ${e.mult}&times; as much.`;
         return up.flavour;
@@ -812,7 +813,11 @@
           const afford = state.light >= price;
           row.dataset.afford = String(afford);
           row.setAttribute('aria-disabled', String(!afford));
-          const each = g.rate * bonus.grower[g.id] * bonus.allMult * bonus.seedMult;
+          // Through averageFactor, so a row moves when the trough is lifted:
+          // without it, Night bloom bought and every row unchanged read as an
+          // upgrade that did nothing.
+          const each = g.rate * bonus.grower[g.id] * bonus.allMult * bonus.seedMult
+            * averageFactor(g.phase, bonus.lift, bonus.swing);
           note.textContent = owned
             ? `${owned} planted · ${formatEnergy(each * owned)}/s`
             : g.flavour;
@@ -1010,8 +1015,6 @@
         const want = energyForSeeds(earnedSeeds + 1);
         const bonusNow = Math.round((seedBonus(held) - 1) * 100);
         const after = Math.round((seedBonus(earnedSeeds) - 1) * 100);
-        const plural = n => n === 1 ? '' : 's';
-
         ui.seedHeld.textContent = `${held} · +${bonusNow}%`;
         ui.seedPending.textContent = pending ? `${pending} · +${after - bonusNow}% more` : '0';
         ui.seedNext.textContent = `${formatEnergy(want)} all told`;
@@ -1043,8 +1046,8 @@
           + `You keep every medal and the all-time record.\n`
           + `The energy, the growers and the upgrades on the lot start again from nothing.`)) return;
         prestige(state);
-        note(state, `Replanted the lot. ${state.seeds} seeds held.`);
-        say(`${state.seeds} seeds held — everything you plant makes +${after}% now.`, 'Replanted');
+        note(state, `Replanted the lot. ${state.seeds} seed${plural(state.seeds)} held.`);
+        say(`${state.seeds} seed${plural(state.seeds)} held — everything you plant makes +${after}% now.`, 'Replanted');
         shopKey = null;
         drawShop();
         writeSave();
