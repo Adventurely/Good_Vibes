@@ -415,6 +415,26 @@ test('a portrait is a square grid the palette can actually paint', () => {
  * take your lines, and nothing anywhere listened for a click on it. The
  * button lit up and did nothing, and only the `d` key and the HUD hint
  * actually docked. */
+test('the lesson cannot finish itself in the orbit it started in', () => {
+  /* A text check, because the lesson's tests live inside the page's module
+     and there is no canvas or DOM here to run them against. It is worth the
+     awkwardness: the last card used to be a bare "docked at Tassel", which is
+     true two minutes into a new game — the opening orbit sits inside Tassel's
+     own harbour mouth and the quiet window expires on its own — and because
+     the list is folded cumulative from the back, that one true card made all
+     fourteen true. A brand new ship finished the whole lesson without moving,
+     and Nellie got her scene before anybody had been to Slate. */
+  const html = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  const list = html.match(/const raw = \[([\s\S]*?)\n  \];/);
+  assert.ok(list, 'the lesson no longer keeps its cards in one list; check this still holds');
+  const lines = list[1].split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('/*') && !l.startsWith('*') && !l.startsWith('//'));
+  const last = lines[lines.length - 1];
+  assert.match(last, /bought/, `the last card of the lesson is "${last}", which does not ask for the pebble`);
+
+  // And the fold really is from the back, which is what makes that matter.
+  assert.match(html, /raw\[i\] = raw\[i\] \|\| raw\[i \+ 1\]/);
+});
+
 test('every button the page draws for itself has something listening to it', () => {
   const html = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
   const ids = [...html.matchAll(/<button id="([a-z0-9-]+)"/g)].map(m => m[1]);

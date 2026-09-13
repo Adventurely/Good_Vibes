@@ -260,9 +260,9 @@
      there the rest of the time. It replaced a card across the bottom of the
      sky that spent most of its life telling you what you had not done yet. */
   #dock-go{ color:var(--gold); border-color:var(--gold-2); }
-  #dock-go svg{ width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; }
+  #dock-go svg, #m-ship svg, #m-dock svg{ width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
   #dock-go:hover{ background:var(--gold); color:#1a1310; }
-  #dock-go[hidden]{ display:none; }
+  #dock-go[hidden], #m-dock[hidden]{ display:none; }
 
   /* ---- The panel: right column on wide screens, a sheet on narrow ---- */
   #panel{
@@ -476,7 +476,7 @@
     #view button{ width:32px; height:30px; border-radius:8px; font-size:.95rem; }
     /* Only the panel toggle stays on top; the rest tuck under it in a column
        that the chart can still be seen around. */
-    #view button:not(#v-panel){ opacity:.85; }
+    #view button:not(#m-ship):not(#m-dock){ opacity:.85; }
 
     #panel{
       top:auto; left:0; right:0; bottom:0; width:100%; height:min(64vh, 560px);
@@ -554,7 +554,8 @@
 <div id="view">
   <button id="dock-go" hidden title="Dock (d)" aria-label="Dock here"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="3.4"/><path d="M12 10.4 V20"/><path d="M8 13.5 H16"/><path d="M5 15.5 a7 7 0 0 0 14 0"/></svg></button>
   <button id="v-fit" title="Back to your ship, and frame it (f)">&#9678;</button>
-  <button id="v-panel" title="Show or hide the panel (p)" aria-pressed="true">&#9776;</button>
+  <button id="m-dock" hidden title="The port (p)" aria-label="Open the port menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20 h16"/><path d="M8 20 V5"/><path d="M8 5 h10"/><path d="M15 5 V9"/><path d="M13 9 h4 v4 h-4 z"/></svg></button>
+  <button id="m-ship" title="Your ship (p)" aria-pressed="true" aria-label="Open the ship menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 c3 3.4 4.2 7 4.2 10.2 L12 16.5 7.8 13.2 C7.8 10 9 6.4 12 3z"/><path d="M7.8 12 L4.8 16.4 7.8 15.2"/><path d="M16.2 12 L19.2 16.4 16.2 15.2"/><circle cx="12" cy="9.4" r="1.7"/></svg></button>
 </div>
 
 <aside id="panel" aria-label="Ship and port">
@@ -971,7 +972,8 @@ function askAtPath(t){
 /* ------------------------------------------------------------- view */
 
 $('v-fit').addEventListener('click', () => backToShip(true));
-$('v-panel').addEventListener('click', () => togglePanel());
+$('m-ship').addEventListener('click', () => openMenu('ship'));
+$('m-dock').addEventListener('click', () => openMenu('dock'));
 /* The view is locked; there is nothing to keep in sync but the panel. */
 function syncView(){}
 /* `quiet` is for the times the layout moves the panel on its own — the first
@@ -980,7 +982,7 @@ function togglePanel(open = !panelOpen, quiet = false){
   panelOpen = open;
   if(!quiet) setPaused(open);
   $('panel').classList.toggle('closed', !panelOpen);
-  $('v-panel').setAttribute('aria-pressed', String(panelOpen));
+  refreshMenuButtons();
   // On a phone the sheet covers the bottom of the chart, so the cards that
   // live there stand down while it is up.
   document.body.classList.toggle('sheet', panelOpen && innerWidth <= 760);
@@ -1154,7 +1156,9 @@ addEventListener('keydown', e => {
     case '+': case '=': chart.zoomBy(1.4); noteLook('chartPanned'); break;
     case '-': case '_': chart.zoomBy(1 / 1.4); noteLook('chartPanned'); break;
     case 'f': backToShip(); break;
-    case 'p': togglePanel(); break;
+    /* One key for both: it opens the ship, and at a port it steps on to the
+       dock and then shuts, which is the whole cycle in one thumb. */
+    case 'p': openMenu(state.dockedAt && panelOpen && panelMenu === 'ship' ? 'dock' : 'ship'); break;
     case 'Escape': if(selectedNode >= 0){ selectedNode = -1; renderTab(); } else togglePanel(false); break;
     case 'Delete': case 'Backspace': if(state.nodes[selectedNode]){ S.removeNode(state, selectedNode); selectedNode = -1; replan(true); renderTab(); } break;
     /* The arrows push the selected burn; with nothing selected they are the
@@ -1267,18 +1271,44 @@ function lookAt(id){
 
 /* ------------------------------------------------------------- panel */
 
-/* Two rows, and the split down the middle of the docked one is the point:
-   Market, Dock and Talk are the port — they exist because you are tied up at
-   somewhere, and they go when you cast off. Ship, Quests and Crew are yours
-   and follow you, so they read the same either side of the airlock. */
-const TABS_DOCKED = [['market', 'Market'], ['dock', 'Dock'], ['talk', 'Talk'], ['ship', 'Ship'], ['quests', 'Quests'], ['crew', 'Crew']];
-const TABS_FLIGHT = [['orbit', 'Orbit'], ['plan', 'Burns'], ['ship', 'Ship'], ['quests', 'Quests'], ['crew', 'Crew']];
-let lastDockedMode = null;
+/* Two menus, not one, and a button apiece in the chart controls. The ship
+   goes where you go, so its button is always there; the port only exists
+   while you are tied up at one, so its button arrives with the mooring lines
+   and leaves with them. Both behind a single hamburger meant a row of six
+   tabs where half of them stopped meaning anything the moment you cast off.
+
+   The dock menu is the port: what the yard will fit, what the stalls have,
+   who is looking for a ship, and who will talk to you. */
+const TABS_SHIP_FLIGHT = [['orbit', 'Orbit'], ['plan', 'Burns'], ['ship', 'Ship'], ['quests', 'Quests'], ['crew', 'Crew']];
+const TABS_SHIP_DOCKED = [['ship', 'Ship'], ['quests', 'Quests'], ['crew', 'Crew']];
+const TABS_DOCK = [['shipyard', 'Shipyard'], ['market', 'Trading'], ['requests', 'Requests'], ['talk', 'Talk']];
+let panelMenu = 'ship';
+let lastTabsKey = null;
+function tabsFor(){
+  if(panelMenu === 'dock' && state.dockedAt) return TABS_DOCK;
+  return state.dockedAt ? TABS_SHIP_DOCKED : TABS_SHIP_FLIGHT;
+}
+/* Open one of the two, or shut the panel if it is already showing that one. */
+function openMenu(which){
+  if(which === 'dock' && !state.dockedAt) which = 'ship';
+  if(panelOpen && panelMenu === which){ togglePanel(false); return; }
+  panelMenu = which;
+  renderTabs();
+  togglePanel(true);
+  refreshMenuButtons();
+}
+function refreshMenuButtons(){
+  $('m-dock').hidden = !state.dockedAt;
+  $('m-ship').setAttribute('aria-pressed', String(panelOpen && panelMenu === 'ship'));
+  $('m-dock').setAttribute('aria-pressed', String(panelOpen && panelMenu === 'dock'));
+}
 function renderTabs(){
-  const mode = state.dockedAt ? 'docked' : 'flight';
-  if(mode === lastDockedMode) return;
-  lastDockedMode = mode;
-  const tabs = mode === 'docked' ? TABS_DOCKED : TABS_FLIGHT;
+  // Casting off takes the port menu with it; there is nothing left in it.
+  if(panelMenu === 'dock' && !state.dockedAt) panelMenu = 'ship';
+  const tabs = tabsFor();
+  const key = panelMenu + (state.dockedAt ? ':docked' : ':flight');
+  if(key === lastTabsKey){ refreshMenuButtons(); return; }
+  lastTabsKey = key;
   const bar = $('tabs'); bar.innerHTML = '';
   for(const [id, label] of tabs){
     const b = document.createElement('button');
@@ -1288,6 +1318,7 @@ function renderTabs(){
   }
   if(!tabs.some(t => t[0] === tab)) tab = tabs[0][0];
   setTab(tab, panelOpen);
+  refreshMenuButtons();
 }
 function setTab(id, open = true){
   tab = id;
@@ -1305,7 +1336,7 @@ function renderTab(){
      was and put it back. */
   const active = document.activeElement;
   const was = body.contains(active) ? (active.dataset?.act ?? active.id ?? null) : null;
-  const fn = { market, dock: dockTab, talk, plan, quests: questsTab, crew: crewTab, orbit: orbitTab, ship: shipTab }[tab];
+  const fn = { market, shipyard: shipyardTab, requests: requestsTab, talk, plan, quests: questsTab, crew: crewTab, orbit: orbitTab, ship: shipTab }[tab];
   body.innerHTML = fn ? fn() : '';
   wire(body);
   if(was){
@@ -1414,7 +1445,7 @@ function market(){
    is bolted to your ship is on the Ship tab, which you can read anywhere —
    this used to list it too, so the only place you could see your own tank was
    somewhere you happened to be moored. */
-function dockTab(){
+function shipyardTab(){
   const port = state.dockedAt;
   const p = PORTS[port];
   let out = `<h2>${esc(S.portName(port))} <small class="lock">${p.shipyard ? 'shipyard' : 'dock'}</small></h2>`;
@@ -1695,6 +1726,33 @@ function crewTab(){
   return out;
 }
 
+/* The board. Fourteen quests have been written and flyable for a while with
+   nowhere to press; this is the somewhere. A job says who is asking, what it
+   is, and what it pays, and the Take button carries the rules: three at once,
+   and a delivery needs the hold room (and the cold hold) before anybody will
+   hand it to you. */
+function requestsTab(){
+  const port = state.dockedAt;
+  const open = S.questsAt(state, port);
+  let out = `<h2>Looking for a ship</h2>`;
+  if(!open.length) return out + '<p class="empty">Nobody here needs anything carrying.</p>';
+  out += `<p class="lock">You can hold ${S.MAX_ACTIVE_QUESTS} jobs at once. ${S.activeQuests(state).length} taken.</p>`;
+  for(const q of open){
+    const can = S.canAcceptQuest(state, q);
+    const load = S.questLoad(q);
+    out += `<div class="quest">`;
+    out += `<h3>${esc(q.title)}</h3>`;
+    out += `<p class="lock">${esc(q.giver)}${load ? ` · ${load} unit${load === 1 ? '' : 's'} of hold` : ''}</p>`;
+    out += `<p class="say">${esc(q.blurb)}</p>`;
+    out += '<ol class="steps">' + S.questSteps(q).map(st => `<li>${esc(st.text)}</li>`).join('') + '</ol>';
+    out += `<div class="row"><div class="name"><small>${q.pay ? `Pays ${S.fmtMoney(q.pay)}` : ''}</small></div>
+      <div class="btns"><button class="btn sm primary" data-act="takequest|${q.id}" ${can.ok ? '' : 'disabled title="' + esc(can.reason) + '"'}>Take it on</button></div></div>`;
+    if(!can.ok) out += `<p class="lock">${esc(can.reason)}</p>`;
+    out += '</div>';
+  }
+  return out;
+}
+
 function questsTab(){
   let out = '<h2>Quests</h2>';
   const live = (state.quests ?? []).map(l => ({ l, q: S.questById(l.id) })).filter(x => x.q);
@@ -1721,6 +1779,13 @@ function questsTab(){
 const actions = {
   buy(gid, q){ const r = S.buy(state, gid, Number(q)); if(!r.ok) toast(r.reason, 'bad'); renderTab(); save(); },
   sell(gid, q){ const r = S.sell(state, gid, Number(q)); if(!r.ok) toast(r.reason, 'bad'); else toast(`Sold for ${S.fmtMoney(r.total)} (${r.profit >= 0 ? '+' : ''}${S.fmtMoney(r.profit)}).`); renderTab(); save(); },
+  takequest(id){
+    const r = S.acceptQuest(state, id);
+    if(!r.ok){ toast(r.reason, 'bad'); return; }
+    toast(`Took on ${r.quest.title}.`, 'story', 6000);
+    if(!state.target) state.target = S.questTarget(r.quest);
+    renderTab(); save(); tutorialCheck();
+  },
   fuel(k){ const r = S.refuel(state, Number(k)); if(!r.ok) toast(r.reason, 'bad'); renderTab(); save(); },
   upgrade(id){ const r = S.buyUpgrade(state, id); if(!r.ok) toast(r.reason, 'bad'); else toast(`${S.upgradeById(id).name} fitted.`); renderTab(); save(); },
   wait(d){ const days = Number(d); S.wait(state, days); toast(`${S.fmtDays(days)} pass. ${S.calendar(state.t).text}.`); renderTab(); save(); },
@@ -1758,7 +1823,7 @@ function doDock(){
   const r = S.dock(state);
   if(!r.ok){ toast(r.reason === 'too fast' ? 'Too fast to dock. Kill some speed first.' : 'No port nearby.', 'bad'); return; }
   stopSkip();
-  selectedNode = -1; replan(true); renderTabs(); setTab('market');
+  selectedNode = -1; replan(true); panelMenu = 'dock'; tab = 'market'; renderTabs(); setTab('market');
   const txt = TEXT.ports[r.port];
   const line = txt?.arrival?.[Math.floor(S.hash(r.port, Math.floor(state.t)) * txt.arrival.length)];
   toast(`Docked at ${S.portName(r.port)}.${line ? ' ' + line : ''}`, 'story', 7000);
@@ -1825,7 +1890,7 @@ function showTow(reason){
   });
 }
 function afterTow(r){
-  selectedNode = -1; replan(true); renderTabs(); setTab('dock'); stopSkip();
+  selectedNode = -1; replan(true); panelMenu = 'dock'; tab = 'shipyard'; renderTabs(); setTab('shipyard'); stopSkip();
   openModal(`<h2>Towed to ${esc(S.portName(r.port))}</h2><p class="say">${esc(r.story)}</p><p>${S.fmtDays(r.days)} later and ${S.fmtMoney(r.cost)} poorer, you are docked. ${state.debt > 0 ? esc(TEXT.events.bankDebt) : ''}</p><div class="btns"><button class="btn primary" id="m-ok">Carry on</button></div>`, m => m.querySelector('#m-ok').addEventListener('click', closeModal));
   save();
 }
@@ -1909,7 +1974,14 @@ function tutorialTests(){
     dockableAt(target),                               // bring the high point inside docking range
     bought,                                           // buy the pebble
     bought && !atTarget,                              // climb back out
-    dockableAt(CONST.START_PORT),                     // and get home
+    /* Home *with the pebble*. "Docked at Tassel" on its own is true two
+       minutes into a new game — the opening orbit sits inside Tassel's own
+       harbour mouth, and the quiet window after casting off expires on its
+       own — and because the list is made cumulative from the back, one true
+       card at the end made all fourteen true. The lesson finished itself in
+       the orbit it started in, and Nellie got her scene before anybody had
+       been to Slate. */
+    bought && dockableAt(CONST.START_PORT),           // and get home
   ];
   /* Every test has to be true of every state past its own card, not only of
      the moment it is passed: a pilot standing in Slate's gravity has no burn

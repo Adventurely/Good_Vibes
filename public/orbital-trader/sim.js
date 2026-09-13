@@ -655,6 +655,14 @@ function handOver(state, goodId, qty = 1, questId = null){
 /* ---- taking one on */
 
 export const activeQuests = state => (state.quests ?? []).filter(l => !l.done);
+/* What is on offer at a port: the jobs given out there that you have not
+ * taken and have not already done. This is the board — the one thing the
+ * quest catalogue was missing, and the reason fourteen written quests could
+ * only be reached from a test. */
+export function questsAt(state, portId){
+  const held = new Set((state.quests ?? []).map(l => l.id));
+  return QUESTS.filter(q => q.from === portId && !held.has(q.id));
+}
 /* Hold units a job will cost you the moment you accept it. Only a delivery
  * hands you anything; a message weighs nothing, which is the whole joke. */
 export function questLoad(q){
