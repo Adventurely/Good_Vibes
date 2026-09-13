@@ -474,7 +474,25 @@ frog system — so that every new place arrives with a reason to be there, and
 each of the three crew members is the reward for the stretch that introduces
 their people.
 
-Only **#1** is built. It is the opening errand and the tutorial's spine.
+**Fourteen of the twenty are built** — every one that is neither salvage nor
+paid in crew. They are written out in `narrative.json` and they work: their
+steps, their goods, their pay and the ports they name are all real. What is
+missing is the board, so #1 is still the only one a player meets.
+
+The six that are not built, and why:
+
+| # | Quest | Why not |
+|---|---|---|
+| 6 | Engine Trouble | pays in an Emberkin engineer |
+| 13 | A Cat's Request | pays in a cat navigator |
+| 14 | First Salvage | salvage, and needs the navigator |
+| 15 | Lost Cargo | salvage |
+| 19 | Appraisal | pays in a frog appraiser |
+| 20 | What Is This Worth? | needs the appraiser |
+
+Both of the quest chains are in that list, so the chain type is built and has
+nothing to run on yet. Settling crew (§7.2) unblocks four of the six on its
+own; salvage flight unblocks the other two.
 
 | # | Quest | Type | Route / Goal | Reward |
 |---|---|---|---|---|
@@ -483,21 +501,21 @@ Only **#1** is built. It is the opening errand and the tutorial's spine.
 | 3 | Green Medicine | Retrieval | Moss: retrieve medicinal herbs → Tassel | Credits |
 | 4 | A Message for Slate | Message | Tassel → Slate | Credits |
 | 5 | The Heavy Stuff | Delivery | Slate → Cinder: deliver iron ore | Credits |
-| 6 | Engine Trouble | Retrieval | Cinder: retrieve spare engine parts → Slate | **Emberkin Engineer** |
+| 6 | Engine Trouble | Retrieval | Cinder: retrieve spare engine parts → Slate | **Emberkin Engineer** *(not built)* |
 | 7 | A Favor for an Engineer | Message | Cinder → Scorch: deliver a message | Credits / faction reputation |
 | 8 | Emberkin Luxury | Retrieval | Scorch: retrieve fire crystals → Veyra | Credits |
 | 9 | The Collector | Shopping List | Veyra: acquire pearls, coral carvings, precision clock | Large payout |
 | 10 | Faction Business | Message | Veyra → Cinder: deliver confidential message | Faction reputation |
 | 11 | Into the Belt | Delivery | Cinder → Nail: deliver reactor coils | Credits |
 | 12 | Something Shiny | Retrieval | Nail: retrieve salvaged sensors → Veyra | Credits |
-| 13 | A Cat's Request | Quest Chain | Nail → several cat settlements | **Cat Navigator** |
-| 14 | First Salvage | Salvage | With the cat navigator: recover a drifting wreck | Salvage + credits |
-| 15 | Lost Cargo | Salvage | Belt: intercept a derelict cargo ship | Salvage |
+| 13 | A Cat's Request | Quest Chain | Nail → several cat settlements | **Cat Navigator** *(not built)* |
+| 14 | First Salvage | Salvage | With the cat navigator: recover a drifting wreck | Salvage + credits *(not built)* |
+| 15 | Lost Cargo | Salvage | Belt: intercept a derelict cargo ship | Salvage *(not built)* |
 | 16 | Medicine Run | Delivery | Nail → Brine: deliver medicinal supplies | Credits |
 | 17 | The Amber Collector | Retrieval | Brine: retrieve brine amber → Veyra | Credits |
 | 18 | A Frog's Question | Message | Brine → Glass: deliver a message | Credits / frog reputation |
-| 19 | Appraisal | Quest Chain | Brine: retrieve several unusual goods for examination | **Frog Appraiser** |
-| 20 | What Is This Worth? | Appraisal / Retrieval | With the frog appraiser: investigate an Arc fragment | Major lore reveal |
+| 19 | Appraisal | Quest Chain | Brine: retrieve several unusual goods for examination | **Frog Appraiser** *(not built)* |
+| 20 | What Is This Worth? | Appraisal / Retrieval | With the frog appraiser: investigate an Arc fragment | Major lore reveal *(not built)* |
 
 ### 5.1 The Types
 
@@ -548,10 +566,16 @@ would kill a job with no way back.
 
 A message weighs nothing, which is the whole joke.
 
-**None of this is visible yet.** There is no board to take a job from, so the
-opening errand is still the only quest a player meets. The other six in the
-catalogue — one of each type, written from the table above — sit there proving
-the machinery works and waiting for somewhere to be offered from.
+**A job has to be worth doing.** A retrieval pays more than selling the same
+goods on the open market at the same destination would — otherwise a player who
+understood the market would never take one — and a test holds that line as
+prices move.
+
+Every quest names the port it is offered at, so a board has something to read.
+
+**There is still no board.** Fourteen quests are written, tested and flyable,
+and the opening errand is the only one a player can take, because there is
+nowhere to press. That is the last piece.
 
 ### 5.2 What the Line Needs That the Game Does Not Have
 
@@ -580,22 +604,21 @@ the machinery works and waiting for somewhere to be offered from.
 
 ### 5.3 Notes Against the Goods Table
 
-Checked against the shipped price list; three want a decision before anybody
-writes them.
+Checked against the shipped price list. Three wanted a decision; all three are
+settled, and the settlements are written into the quests.
 
-- **#2, moonfish oil to Moss.** Moss is not a buyer of it. That is fine for a
-  quest — a named person can want a thing their whole moon does not — but it
-  means the reward has to be the quest's own payment rather than the market's,
-  and the player should not be able to look at Moss's shelf and feel lied to.
+- **#2, moonfish oil to Moss.** Moss is not a buyer of it. Settled as a
+  delivery: the oil is handed to you on Tassel and to a named farm on Moss, so
+  the market is never consulted and the pay is the quest's own.
 - **#9, the collector's list.** Pearls and coral carvings are made on Tassel,
   so the list is a round trip home. Precision clocks are made on Veyra, where
-  the collector is, so the third item is bought from under their nose — which
-  is either a joke worth keeping or a sign the item should be something else.
-- **#16, "medicinal supplies" out of Nail.** There is no such good. Medicinal
-  gel is made *on* Brine, so carrying it there is backwards, and smuggled
-  medicine is made on Whisker and Brine does not buy it. The quest probably
-  wants Whisker's smuggled medicine routed through Nail, which would make it
-  the first quest that asks the player to do something the market would not.
+  the collector is, so the third item is bought from under their nose. Kept as
+  the joke, and House Ahl is written as finding it funny.
+- **#16, "medicinal supplies" out of Nail.** Settled as Whisker's smuggled
+  medicine, routed through Nail — the first quest that asks a player to do
+  something the market would not. A delivery hands you the goods, so Nail
+  never needed to stock them and Brine never needed to buy them. It is also
+  the one quest that needs a cold hold before anybody can hand it to you.
 
 Everything else lines up with the table as shipped: iron ore to Cinder, engine
 parts to Slate, fire crystals to Veyra (who love them), reactor coils to Nail

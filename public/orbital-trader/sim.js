@@ -578,9 +578,12 @@ export const MAX_ACTIVE_QUESTS = 3;
 
 export const QUESTS = TEXT.quests ?? [];
 export const questById = id => QUESTS.find(q => q.id === id);
-/* Where the chart should point when a job is taken: where you are going to
- * fetch the thing, or failing that where it has to end up. */
-export const questTarget = q => q?.target ?? q?.from ?? q?.to ?? null;
+/* Where the chart should point when a job is taken: wherever the first step
+ * wants you. For a retrieval that is the stall it names; for a delivery or a
+ * message the goods are already aboard, or there are none, so the first place
+ * you have to be is the far end. Reading it off the built steps rather than
+ * off `from` is what keeps those two apart. */
+export const questTarget = q => q?.target ?? questSteps(q)[0]?.port ?? q?.to ?? null;
 
 const goodName = id => goodById(id)?.name ?? id;
 const someOf = st => `${st.qty > 1 ? `${st.qty} × ` : ''}${goodName(st.good)}`;
@@ -658,6 +661,13 @@ export function canAcceptQuest(state, q){
   if(activeQuests(state).length >= MAX_ACTIVE_QUESTS) return { ok: false, reason: `Three jobs is all anybody can hold in their head.` };
   const load = questLoad(q);
   if(load > freeUnits(state)) return { ok: false, reason: 'No room in the hold for it.' };
+  /* A consignment skips the market, so it also skips the market's one check:
+     nothing stops somebody handing you four cases of cold medicine and a warm
+     hold to put them in except this. */
+  if(q.type === 'delivery' && !state.keys.refrigeration
+     && (q.goods ?? []).some(g => goodById(g.good)?.needsRefrigeration)){
+    return { ok: false, reason: 'That wants a cold hold.' };
+  }
   return { ok: true, load };
 }
 export function acceptQuest(state, id){

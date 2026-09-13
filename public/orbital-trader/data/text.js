@@ -526,7 +526,7 @@ export const NARRATIVE = {
      "qty": 6
     }
    ],
-   "pay": 220,
+   "pay": 320,
    "rep": "otter",
    "blurb": "The Tassel rafts are short of cut herbs and the physician is short of patience. Moss has them by the bundle. Buy six and get them back before they are hay.",
    "done": "She checks one bundle, smells it, and looks at you with something like respect. The rest goes straight into the dispensary."
@@ -557,16 +557,48 @@ export const NARRATIVE = {
      "qty": 4
     }
    ],
-   "pay": 260,
+   "pay": 600,
    "rep": "emberkin",
    "blurb": "Four crates of ore for the engine smiths, loaded before you agreed to it. It is heavy and it is dull and the Emberkin are waiting on it, which is the whole job.",
    "done": "A smith signs for it without looking up, then looks up, then asks where you learned to fly an approach like that."
+  },
+  {
+   "id": "engineerfavour",
+   "title": "A Favor for an Engineer",
+   "giver": "Sath of the Ninth Forge",
+   "type": "message",
+   "from": "cinder",
+   "to": "scorch",
+   "goods": [],
+   "pay": 200,
+   "rep": "emberkin",
+   "blurb": "A sealed note for somebody on Scorch, from a smith who will not say who they are to her. She has written the name in a hand that took a long time. It weighs nothing, and she would like it to go quickly.",
+   "done": "The woman on the dock reads it standing up, puts it inside her coat, and asks you to say that she is well. She is not well, and you both know you will say it anyway."
+  },
+  {
+   "id": "emberkinluxury",
+   "title": "Emberkin Luxury",
+   "giver": "A Veyra buying agent",
+   "type": "retrieval",
+   "from": "scorch",
+   "to": "veyra",
+   "goods": [
+    {
+     "good": "firecrystals",
+     "qty": 3
+    }
+   ],
+   "pay": 1300,
+   "rep": "emberkin",
+   "blurb": "Three fire crystals, cut cold on Scorch, wanted on Veyra before the month turns. The agent does not say which house wants them and looks faintly pained when you ask.",
+   "done": "The three go under a lamp and hold the light for a long moment. The agent settles up without haggling, which on Veyra is nearly a compliment."
   },
   {
    "id": "collector",
    "title": "The Collector",
    "giver": "House Ahl of Veyra",
    "type": "shopping",
+   "from": "veyra",
    "to": "veyra",
    "goods": [
     {
@@ -588,22 +620,102 @@ export const NARRATIVE = {
    "done": "The three go on a velvet board in that order and a steward writes the sum out longhand. You are not told what it is for."
   },
   {
-   "id": "catsrequest",
-   "title": "A Cat's Request",
-   "giver": "Captain Ashgrin",
-   "type": "chain",
-   "from": "nail",
-   "to": "nail",
-   "stops": [
-    "nail",
-    "whisker",
-    "arc"
-   ],
+   "id": "factionbusiness",
+   "title": "Faction Business",
+   "giver": "A steward of House Ahl",
+   "type": "message",
+   "from": "veyra",
+   "to": "cinder",
    "goods": [],
-   "pay": 900,
+   "pay": 400,
+   "rep": "emberkin",
+   "blurb": "Confidential, the steward says, twice. It goes to a name on Cinder and into that person's hand and nobody else's. You are being paid for the part where you do not ask.",
+   "done": "The hand it goes into belongs to somebody who was clearly expecting it and clearly hoping not to get it. Nobody explains anything. The money is already arranged."
+  },
+  {
+   "id": "intothebelt",
+   "title": "Into the Belt",
+   "giver": "The Ninth Forge",
+   "type": "delivery",
+   "from": "cinder",
+   "to": "nail",
+   "goods": [
+    {
+     "good": "coils",
+     "qty": 2
+    }
+   ],
+   "pay": 1200,
    "rep": "cat",
-   "blurb": "Ashgrin wants you to go and be seen. Nail, then Whisker, then the Arc, in that order, and come back and tell her who was where. She will not say why and it is rude to ask a cat twice.",
-   "done": "She hears you out, nods once, and introduces you to somebody who has been sitting behind you the entire time."
+   "blurb": "Two reactor coils for the cats at Nail, crated and aboard before the paperwork was finished. The Forge would like it known that these are a favour and not a precedent.",
+   "done": "Half the rock comes out to watch the crates open. Somebody says a word in cat that Ashgrin declines to translate, and you are bought drinks for the rest of the evening."
+  },
+  {
+   "id": "somethingshiny",
+   "title": "Something Shiny",
+   "giver": "A Veyra buying agent",
+   "type": "retrieval",
+   "from": "nail",
+   "to": "veyra",
+   "goods": [
+    {
+     "good": "sensorsalvage",
+     "qty": 2
+    }
+   ],
+   "pay": 650,
+   "rep": "cat",
+   "blurb": "Two sets of salvaged sensors off Nail, for a client on Veyra who wants to see further than they are supposed to. Buy them honestly. The agent is very keen that you buy them honestly.",
+   "done": "They are unpacked, powered up, and pointed at something outside. Whatever the client sees, they do not mention it, and you are paid on the spot."
+  },
+  {
+   "id": "medicinerun",
+   "title": "Medicine Run",
+   "giver": "Captain Ashgrin",
+   "type": "delivery",
+   "from": "nail",
+   "to": "brine",
+   "goods": [
+    {
+     "good": "greymeds",
+     "qty": 4
+    }
+   ],
+   "pay": 1400,
+   "rep": "frog",
+   "blurb": "Four cases of medicine that came through Whisker and did not come with paperwork. Ashgrin wants them on Brine, cold, and soon. The apothecaries there will know exactly what they are and will not say so.",
+   "done": "A frog with very old hands checks each case, says nothing about where it came from, and gives you a jar of something for the journey home."
+  },
+  {
+   "id": "ambercollector",
+   "title": "The Amber Collector",
+   "giver": "A Veyra buying agent",
+   "type": "retrieval",
+   "from": "brine",
+   "to": "veyra",
+   "goods": [
+    {
+     "good": "amber",
+     "qty": 2
+    }
+   ],
+   "pay": 850,
+   "rep": "emberkin",
+   "blurb": "Two pieces of brine amber, the kind with something inside that is not quite a leaf. Veyra has a collector and the collector has an opinion about which two.",
+   "done": "The collector turns each piece for a long time without speaking. Then they thank you, precisely, and you are shown out of a room you were never really in."
+  },
+  {
+   "id": "frogsquestion",
+   "title": "A Frog's Question",
+   "giver": "A Brine apothecary",
+   "type": "message",
+   "from": "brine",
+   "to": "glass",
+   "goods": [],
+   "pay": 350,
+   "rep": "frog",
+   "blurb": "A question for the scholars under the ice on Glass. It is one sentence long and the apothecary has been working on it for eleven years. She would like an answer, eventually, and is in no hurry.",
+   "done": "A scholar reads it, sits down, and reads it again. She says the answer will take some time. She seems delighted about that."
   }
  ]
 };
