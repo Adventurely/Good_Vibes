@@ -26,7 +26,7 @@ import {
   rateOf, totalRate, steadyRate, tapValue, tapPays, momentum, isWindfall, STREAK_CAP, WINDFALL_EVERY,
   snapshot, meets, offered, award,
   MAX_TICK, tick, tap, plantRefusal, plant, studyRefusal, study,
-  SEED_SCALE, seedsFrom, pendingSeeds, lightForSeeds, prestigeRefusal, prestige,
+  SEED_SCALE, seedsFrom, pendingSeeds, lightForSeeds, energyForSeeds, prestigeRefusal, prestige, winters, winterMedal,
   OFFLINE_RATE, OFFLINE_CAP, offlineGain, catchUp,
   toSave, fromSave, formatLight, formatTime, formatStat, breakdown,
 } from '../public/sunward/content.js';
@@ -311,6 +311,43 @@ test('every medal is winnable and names things that exist', () => {
       if(key === 'owned') assert.ok(GROWER_BY_ID[a.need.owned.id], `medal "${a.id}": unknown grower`);
     }
   }
+});
+
+test('there is a medal for every one of the first ten winters, and the ladder goes on', () => {
+  /* A replanting is a winter the tree has stood through, and each of the
+     first ten is its own medal — that is what makes the tree's ageing a thing
+     the record can show. The first and fifth keep the ids they had when
+     they were the only two, because those ids are in every save that has
+     ever replanted. */
+  const ladder = ACHIEVEMENTS.filter(a => a.need.prestiges !== undefined);
+  for(let n = 1; n <= 10; n++){
+    assert.ok(ladder.some(a => a.need.prestiges === n), `no medal for winter ${n}`);
+  }
+  assert.equal(winterMedal(1).id, 'first-seed', 'the first winter keeps its old id');
+  assert.equal(winterMedal(5).id, 'five-seeds', 'and so does the fifth');
+  assert.equal(winterMedal(11), null, 'the eleventh winter is not a medal');
+  const counts = ladder.map(a => a.need.prestiges);
+  assert.deepEqual(counts, [...counts].sort((a, b) => a - b), 'the ladder must be in order');
+  assert.equal(new Set(counts).size, counts.length, 'no two medals for the same winter');
+  assert.ok(counts[counts.length - 1] >= 100, 'the ladder should reach a hundred winters');
+  for(const a of ladder){
+    assert.ok(Object.keys(a.need).length === 1, `winter medal "${a.id}" should be won by the winter alone`);
+  }
+});
+
+test('a replanting is a winter, and each one wins its medal', () => {
+  const state = newGame();
+  assert.equal(winters(state), 0, 'a fresh lot has stood through nothing');
+  for(let n = 1; n <= 3; n++){
+    state.life.earned = energyForSeeds(n);
+    assert.equal(prestige(state), 1, `the ${n}th replanting should bank a seed`);
+    assert.equal(winters(state), n);
+    const won = award(state);
+    assert.ok(won.some(a => a.id === winterMedal(n).id), `winter ${n} should win "${winterMedal(n).name}"`);
+  }
+  // Kept through the save, as the tree's age has to be.
+  const back = fromSave(JSON.parse(JSON.stringify(toSave(state))));
+  assert.equal(winters(back), 3);
 });
 
 test('a condition that names a key nothing reports is false, not true', () => {

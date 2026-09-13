@@ -482,10 +482,43 @@ export const ACHIEVEMENTS = [
   { id: 'every-upgrade', name: 'The whole shelf', need: { upgrades: UPGRADES.length },
     blurb: 'Every upgrade there is, in one run.' },
 
-  { id: 'first-seed', name: 'Let it seed', need: { prestiges: 1 },
-    blurb: 'Replant the lot once.' },
-  { id: 'five-seeds', name: 'Crop rotation', need: { prestiges: 5 },
-    blurb: 'Replant the lot five times.' },
+  /* One medal per winter. A replanting is a winter the tree has stood
+     through — the lot goes back to bare ground and the tree comes back a
+     year older and drawn bigger — so each of the first ten gets its own
+     medal, named for the year and saying what the tree gained that year,
+     and the ladder goes on in steps after that. The first and fifth keep
+     the ids they had when they were the only two, because those ids are in
+     every save that has ever replanted. */
+  { id: 'first-seed', name: 'First winter', need: { prestiges: 1 },
+    blurb: 'Replant the lot once. The tree comes back stouter, with its roots showing.' },
+  { id: 'second-winter', name: 'Second winter', need: { prestiges: 2 },
+    blurb: 'Replant twice. The trunk forks low.' },
+  { id: 'third-winter', name: 'Third winter', need: { prestiges: 3 },
+    blurb: 'Three winters. A knot hole, and moss on the shaded side.' },
+  { id: 'fourth-winter', name: 'Fourth winter', need: { prestiges: 4 },
+    blurb: 'Four winters. The crown spreads wider than it is tall, and somebody has hung a swing.' },
+  { id: 'five-seeds', name: 'Fifth winter', need: { prestiges: 5 },
+    blurb: 'Five winters. Buttress roots, and blossom in the canopy.' },
+  { id: 'sixth-winter', name: 'Sixth winter', need: { prestiges: 6 },
+    blurb: 'Six winters. Lanterns in the low branches, and a bench underneath.' },
+  { id: 'seventh-winter', name: 'Seventh winter', need: { prestiges: 7 },
+    blurb: 'Seven winters. The trunk splits in two and the crown reaches the top of the picture.' },
+  { id: 'eighth-winter', name: 'Eighth winter', need: { prestiges: 8 },
+    blurb: 'Eight winters. Older, and bigger again.' },
+  { id: 'ninth-winter', name: 'Ninth winter', need: { prestiges: 9 },
+    blurb: 'Nine winters.' },
+  { id: 'tenth-winter', name: 'Tenth winter', need: { prestiges: 10 },
+    blurb: 'Ten winters stood through.' },
+  { id: 'fifteen-winters', name: 'Fifteen winters', need: { prestiges: 15 },
+    blurb: 'Fifteen winters stood through.' },
+  { id: 'twenty-winters', name: 'Twenty winters', need: { prestiges: 20 },
+    blurb: 'Twenty winters stood through.' },
+  { id: 'thirty-winters', name: 'Thirty winters', need: { prestiges: 30 },
+    blurb: 'Thirty winters stood through.' },
+  { id: 'fifty-winters', name: 'Fifty winters', need: { prestiges: 50 },
+    blurb: 'Half a century of winters.' },
+  { id: 'hundred-winters', name: 'A hundred winters', need: { prestiges: 100 },
+    blurb: 'A hundred winters. The tree was here before you.' },
   { id: 'hundred-seeds', name: 'Seed bank', need: { seeds: 100 },
     blurb: 'Hold a hundred seeds.' },
 
@@ -881,8 +914,24 @@ export function prestigeRefusal(state){
   return null;
 }
 
+/* How many winters the tree has stood through, which is how many times the
+   lot has been replanted. The art reads this to decide how old a tree to
+   draw, and the medals read it under the older name. One name for the page
+   and the picture, so that "winters" on the Seeds tab and the tree on the lot
+   can never disagree. */
+export const winters = state => state.prestiges;
+
+/* Which winter medals a replanting would win: what the confirmation can
+   promise. Pure, and reads the same table the award does. */
+export const winterMedal = count =>
+  ACHIEVEMENTS.find(a => a.need.prestiges === count) || null;
+
 /* Give the lot back. Keeps the seeds, the medals, the lifetime record and the
  * sitting; everything else starts again. Returns how many seeds it paid.
+ *
+ * This is a winter. The tree stands through it and comes back a year older,
+ * which is the one thing on the lot that a replanting makes bigger rather
+ * than smaller, and the reason the word for it on the page is not "reset".
  */
 export function prestige(state){
   if(prestigeRefusal(state)) return null;

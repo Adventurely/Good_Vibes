@@ -1616,6 +1616,32 @@ changed shape with the state — sometimes a count, sometimes a percentage,
 sometimes a threshold — and a player could not tell which of the three they
 were being told.
 
+**The tree ages with each winter.** A replanting is a winter the tree has
+stood through: the lot goes back to bare ground, the seeds stay, and the tree
+comes back a year older — and drawn bigger and grander, with a design of its
+own for each of the first eight winters (stouter and rooted; forked low; a knot
+hole and moss; broad, with a swing; buttress roots and blossom; lanterns and a
+bench; twin trunks and vines, with the crown clipping the top of the picture)
+and a slow swelling after that. `TREE_STAGES` in `art.js` is the table; the
+age is the save's replant count, read through `winters` in `content.js`, and
+the tap target grows with it. Each of the first ten winters is its own medal,
+and the ladder goes on to a hundred. The word on the page is "winter" and
+never "reset", because a reset is a thing that makes the lot smaller and this
+is the one thing on it that a replanting makes bigger.
+
+**The board is opt-in, and the name is the only thing that leaves the
+device.** Four lists — most taps, most winters, most energy earned all told,
+fastest hands — behind one Durable Object and one HTTP route, the first on
+this site that is not a socket. The id that goes with a name is random and
+made in the browser; whoever holds it can update the row and nobody else can,
+which is as much of an account as a clicker wants, and it lives under its own
+key so that starting over on the lot does not orphan the row. The scores are
+self-reported. The server's answer to that is plausibility caps and a
+fifteen-second rate limit, not proof, and the page says as much. The board is
+fetched only while its tab is open, and a joined player's row goes up every
+few minutes while they play, after a replanting, and on the way out by
+`sendBeacon`.
+
 **Upgrades unlock on the run, medals on all time.** Upgrades are spent at a
 reset, so their unlocks reset with them — measured against a lifetime total, a
 returning player is handed the whole shop at once on their second run and the

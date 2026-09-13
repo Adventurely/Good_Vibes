@@ -215,6 +215,25 @@
       .tabs .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%;
         background: var(--sun); margin-left: 0.25rem; vertical-align: 0.1em; }
       .tabs .dot[hidden] { display: none; }
+      /* Five tabs across a phone: "Upgrades" with its dot is the one that
+         decides the size, and at the desktop size it wrapped. */
+      @media (max-width: 30rem){ .tabs button { font-size: 0.8rem; padding-inline: 0.15rem; } }
+
+      /* The board. A form to join it, then four short tables. */
+      .boardbox { padding: 0.6rem 0.5rem 0.3rem; border-bottom: 1px solid var(--line); }
+      .board-what { margin: 0 0 0.5rem; font-size: 0.86rem; color: var(--text); }
+      .board-what b { color: var(--accent); }
+      .board-join { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+      .board-join label { flex: 1 0 100%; margin: 0; font-size: 0.64rem; letter-spacing: 0.05em;
+        font-weight: 600; text-transform: uppercase; color: var(--muted); }
+      .board-join input { flex: 1 1 9rem; min-width: 0; font: inherit; padding: 0.45rem 0.6rem;
+        border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--text); }
+      .board-join .btn-go { padding: 0.5rem 0.8rem; }
+      .board-line { margin: 0.45rem 0 0; font-size: 0.8rem; color: var(--muted); }
+      .boards { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0 1rem; padding: 0 0.5rem 0.6rem; }
+      .board td:first-child { width: 2rem; color: var(--muted); }
+      .board td:last-child { text-align: right; }
+      .board tr.you td { background: #eef7e9; font-weight: 700; }
 
       .sheet { padding: 0.5rem; overflow-y: auto; max-height: 40rem; }
       @media (max-width: 61rem) { .sheet { max-height: none; } }
@@ -384,6 +403,7 @@
             Seeds<span class="dot" id="seeds-dot" hidden></span>
           </button>
           <button role="tab" id="tab-record" aria-controls="sheet-record" aria-selected="false" type="button">Record</button>
+          <button role="tab" id="tab-board" aria-controls="sheet-board" aria-selected="false" type="button">Board</button>
         </div>
 
         <section class="sheet" id="sheet-grow" role="tabpanel" aria-labelledby="tab-grow">
@@ -411,8 +431,10 @@
         <div class="seedbox">
           <div class="grow">
             <p class="seed-what"><b>Seeds.</b> Replant the lot from scratch and keep your seeds.
-               Every seed you hold makes everything you plant <b>+2%, for good</b>.</p>
+               Every seed you hold makes everything you plant <b>+2%, for good</b>.
+               Each replanting is a winter the tree has stood through, and it comes back bigger.</p>
             <dl class="seed-facts">
+              <div><dt>Winters</dt><dd id="seed-winters">0</dd></div>
               <div><dt>Seeds held</dt><dd id="seed-held">0</dd></div>
               <div><dt>Ready to bank</dt><dd id="seed-pending">0</dd></div>
               <div><dt>Next seed at</dt><dd id="seed-next">1.00M</dd></div>
@@ -450,6 +472,26 @@
           <ul class="log" id="log"></ul>
           <p class="saved" id="saved">saving&hellip;</p>
         </section>
+
+        <!-- The board is opt-in and the name is the only thing that leaves the
+             device. The id that goes with it is made here at random and kept
+             under its own key, not in the save, so starting the lot over does
+             not orphan the row. -->
+        <section class="sheet" id="sheet-board" role="tabpanel" aria-labelledby="tab-board" hidden>
+          <div class="boardbox">
+            <p class="board-what"><b>The board.</b> Who has tapped the most, stood through the most winters,
+               earned the most and gone fastest. Only the name you type here leaves this device.</p>
+            <form class="board-join" id="board-join">
+              <label for="board-name">Your name on the board</label>
+              <input id="board-name" maxlength="16" autocomplete="nickname" spellcheck="false"
+                     placeholder="Two to sixteen characters">
+              <button class="btn btn-go" id="board-send" type="submit">Put me on the board</button>
+            </form>
+            <p class="board-line" id="board-line"></p>
+          </div>
+          <div class="boards" id="boards"></div>
+          <p class="empty" id="board-note">Fetching the board&hellip;</p>
+        </section>
       </div>
 
     </div>
@@ -473,6 +515,7 @@
       import {
         newGame, fromSave, toSave, tick, tap, plant, plantRefusal, study, studyRefusal,
         prestige, prestigeRefusal, pendingSeeds, energyForSeeds, seedBonus, MAX_TICK,
+        winters, winterMedal,
         catchUp, OFFLINE_CAP, GROWERS, GROWER_BY_ID, GROWER_IDS,
         bulkCost, affordable, bonuses, totalRate, steadyRate, averageFactor,
         tapValue, momentum, isWindfall, STREAK_CAP, WINDFALL_EVERY,
@@ -499,6 +542,9 @@
         seedLine: els('seed-line'), seedMeter: els('seed-meter'), reset: els('reset'),
         seedHeld: els('seed-held'), seedPending: els('seed-pending'), seedNext: els('seed-next'),
         studyDot: els('study-dot'), seedsDot: els('seeds-dot'), wipe: els('wipe'),
+        seedWinters: els('seed-winters'),
+        boards: els('boards'), boardNote: els('board-note'), boardLine: els('board-line'),
+        boardJoin: els('board-join'), boardName: els('board-name'),
       };
 
       /* ---- the save file ------------------------------------------------ */
@@ -662,7 +708,7 @@
         // that pays per tap.
         if(event.repeat) return;
         event.preventDefault();
-        const bounds = treeBounds(growthFor(growers()));
+        const bounds = treeBounds(growthFor(growers()), winters(state));
         doTap(bounds.x + bounds.w / 2, bounds.y + bounds.h * 0.4);
       });
 
@@ -1026,6 +1072,7 @@
         const want = energyForSeeds(earnedSeeds + 1);
         const bonusNow = Math.round((seedBonus(held) - 1) * 100);
         const after = Math.round((seedBonus(earnedSeeds) - 1) * 100);
+        ui.seedWinters.textContent = String(winters(state));
         ui.seedHeld.textContent = `${held} · +${bonusNow}%`;
         ui.seedPending.textContent = pending ? `${pending} · +${after - bonusNow}% more` : '0';
         ui.seedNext.textContent = `${formatEnergy(want)} all told`;
@@ -1051,17 +1098,20 @@
         const refusal = prestigeRefusal(state);
         if(refusal) return say(refusal);
         const after = Math.round((seedBonus(state.seeds + pending) - 1) * 100);
+        const year = winters(state) + 1;
         if(!confirm(`Replant the lot?\n\n`
           + `You bank ${pending} seed${pending === 1 ? '' : 's'} — ${state.seeds + pending} in all, worth +${after}%`
           + ` on everything you plant from now on.\n`
           + `You keep every medal and the all-time record.\n`
-          + `The energy, the growers and the upgrades on the lot start again from nothing.`)) return;
+          + `The energy, the growers and the upgrades on the lot start again from nothing.\n`
+          + `The tree stands through its ${ordinal(year)} winter and comes back bigger.`)) return;
         prestige(state);
-        note(state, `Replanted the lot. ${state.seeds} seed${plural(state.seeds)} held.`);
+        note(state, `Winter ${winters(state)}. Replanted the lot; ${state.seeds} seed${plural(state.seeds)} held.`);
         say(`${state.seeds} seed${plural(state.seeds)} held — everything you plant makes +${after}% now.`, 'Replanted');
         shopKey = null;
         drawShop();
         writeSave();
+        sendBoard();
       });
 
       ui.wipe.addEventListener('click', () => {
@@ -1082,6 +1132,7 @@
         }
         if(id === 'record') drawRecord();
         if(id === 'seeds') drawSeeds();
+        if(id === 'board') openBoard();
       }
       for(const tab of tabs){
         tab.addEventListener('click', () => showTab(tab.id.replace('tab-', '')));
@@ -1172,6 +1223,10 @@
         }
         if(document.body.dataset.tab === 'record' && sinceRecord >= 0.5){ sinceRecord = 0; drawRecord(); }
         if(sinceSave >= 10){ sinceSave = 0; writeSave(); }
+        // The board is refreshed only while it is being looked at, and a
+        // joined player's row is sent along every few minutes while they play.
+        if(document.body.dataset.tab === 'board' && now - board.fetchedAt > BOARD_REFRESH) fetchBoard();
+        if(board.joined && now - board.sentAt > BOARD_SEND_EVERY) sendBoard();
 
         paint(now);
         requestAnimationFrame(frame);
@@ -1187,6 +1242,7 @@
         paintLot(lotCtx, {
           phase,
           growth: growthFor(planted),
+          age: winters(state),
           owned: state.owned,
           growers: planted,
           now: still.matches ? 0 : now,
@@ -1227,6 +1283,155 @@
           drawText(lotCtx, f.text, left, Math.round(y), key, scale);
         }
       }
+
+      /* ---- the board ------------------------------------------------------ */
+
+      /* A public board, opt-in. Four lists — taps, winters, energy earned all
+         told, best taps a second — and the name typed here is the only thing
+         that leaves the device. The id that goes with it is random and made
+         here; whoever holds it can update the row and nobody else can, which
+         is as much of an account as a clicker wants. It lives under its own
+         key so that starting over on the lot does not orphan the row.
+
+         The scores are self-reported, and the server's answer to that is
+         plausibility caps and a rate limit, not proof. It is a board for a
+         hobby site, and it says so on the page. */
+      const BOARD_KEY = 'sunward:board';
+      const BOARD_URL = '/api/sunward/board';
+      const BOARD_REFRESH = 60 * 1000;          // while the tab is open
+      const BOARD_SEND_EVERY = 5 * 60 * 1000;   // while joined and playing
+      const BOARD_LABELS = {
+        taps: 'Most taps', winters: 'Most winters', earned: 'Most energy, all told', peakTaps: 'Fastest hands',
+      };
+      const ordinal = n => {
+        const tail = n % 100;
+        const end = tail >= 11 && tail <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th';
+        return `${n}${end}`;
+      };
+
+      function readBoard(){
+        try {
+          const raw = localStorage.getItem(BOARD_KEY);
+          const data = raw ? JSON.parse(raw) : {};
+          return { id: typeof data.id === 'string' ? data.id : null,
+            name: typeof data.name === 'string' ? data.name : '', joined: data.joined === true };
+        } catch { return { id: null, name: '', joined: false }; }
+      }
+      const board = { ...readBoard(), fetchedAt: -Infinity, sentAt: -Infinity, data: null };
+      function writeBoard(){
+        try { localStorage.setItem(BOARD_KEY, JSON.stringify({ id: board.id, name: board.name, joined: board.joined })); }
+        catch { /* a private window; the row still goes up this sitting */ }
+      }
+      const boardStats = () => ({
+        taps: Math.floor(state.life.taps), winters: winters(state),
+        earned: state.life.earned, peakTaps: state.life.peakTaps,
+      });
+      const boardValue = (key, value) => key === 'taps' ? Math.floor(value).toLocaleString('en-US')
+        : key === 'winters' ? String(value)
+        : key === 'earned' ? formatEnergy(value)
+        : `${(Math.round(value * 10) / 10).toFixed(1)} a second`;
+
+      function drawBoard(){
+        const data = board.data;
+        ui.boardNote.hidden = Boolean(data);
+        if(!data) return;
+        ui.boards.replaceChildren(...Object.keys(BOARD_LABELS).map(key => {
+          const box = document.createElement('div');
+          box.className = 'board';
+          const rows = Array.isArray(data.boards?.[key]) ? data.boards[key] : [];
+          const mine = data.you?.[key] || null;
+          const h2 = document.createElement('h2');
+          h2.textContent = BOARD_LABELS[key];
+          box.append(h2);
+          if(!rows.length){
+            const p = document.createElement('p');
+            p.className = 'empty';
+            p.textContent = 'Nobody yet.';
+            box.append(p);
+            return box;
+          }
+          const table = document.createElement('table');
+          const body = document.createElement('tbody');
+          rows.forEach((row, i) => {
+            const tr = document.createElement('tr');
+            if(mine === i + 1) tr.className = 'you';
+            // Names are typed by strangers: textContent, never markup.
+            for(const text of [String(i + 1), String(row.name ?? ''), boardValue(key, Number(row.value) || 0)]){
+              const td = document.createElement('td');
+              td.textContent = text;
+              tr.append(td);
+            }
+            body.append(tr);
+          });
+          table.append(body);
+          box.append(table);
+          if(mine && mine > rows.length){
+            const p = document.createElement('p');
+            p.className = 'empty';
+            p.textContent = `You are ${ordinal(mine)} of ${data.players}.`;
+            box.append(p);
+          }
+          return box;
+        }));
+      }
+
+      async function fetchBoard(){
+        board.fetchedAt = performance.now();
+        try {
+          const you = board.joined && board.id ? `?you=${encodeURIComponent(board.id)}` : '';
+          const res = await fetch(BOARD_URL + you, { cache: 'no-store' });
+          if(!res.ok) throw new Error(String(res.status));
+          board.data = await res.json();
+          if(board.joined) ui.boardLine.textContent = `On the board as ${board.name}.`;
+        } catch {
+          ui.boardLine.textContent = 'The board is out of reach right now.';
+        }
+        drawBoard();
+      }
+
+      async function sendBoard(){
+        if(!board.joined || !board.id) return;
+        board.sentAt = performance.now();
+        try {
+          const res = await fetch(BOARD_URL, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: board.id, name: board.name, stats: boardStats() }),
+          });
+          const data = await res.json().catch(() => null);
+          if(res.ok && data){
+            board.data = data;
+            board.fetchedAt = performance.now();
+            ui.boardLine.textContent = `On the board as ${board.name}.`;
+          } else if(res.status !== 429){
+            // 429 is "too soon", which is the timer's problem and not the player's.
+            ui.boardLine.textContent = data?.error || 'The board did not take that.';
+          }
+        } catch {
+          ui.boardLine.textContent = 'The board is out of reach right now.';
+        }
+        drawBoard();
+      }
+
+      function openBoard(){
+        ui.boardName.value = board.name;
+        if(board.joined) ui.boardLine.textContent = `On the board as ${board.name}.`;
+        if(performance.now() - board.fetchedAt > 10 * 1000) fetchBoard();
+      }
+
+      ui.boardJoin.addEventListener('submit', event => {
+        event.preventDefault();
+        const name = ui.boardName.value.trim().replace(/\s+/g, ' ');
+        if(name.length < 2 || name.length > 16){
+          ui.boardLine.textContent = 'A name is two to sixteen characters.';
+          return;
+        }
+        if(!board.id) board.id = crypto.randomUUID();
+        board.name = name;
+        board.joined = true;
+        writeBoard();
+        board.sentAt = -Infinity;
+        sendBoard();
+      });
 
       /* ---- boot ------------------------------------------------------------ */
 
@@ -1306,6 +1511,15 @@
       // nine seconds after a purchase should not lose the purchase.
       addEventListener('visibilitychange', () => { if(document.hidden) writeSave(); });
       addEventListener('pagehide', writeSave);
+      // A joined player's row goes up on the way out too, if it has been a
+      // while: the sendBeacon survives the page closing where a fetch would not.
+      addEventListener('pagehide', () => {
+        if(!board.joined || !board.id || performance.now() - board.sentAt < 20 * 1000) return;
+        try {
+          navigator.sendBeacon(BOARD_URL, new Blob(
+            [JSON.stringify({ id: board.id, name: board.name, stats: boardStats() })], { type: 'application/json' }));
+        } catch { /* nothing lost; the next sitting sends it */ }
+      });
 
       requestAnimationFrame(frame);
     </script>
