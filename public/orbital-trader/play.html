@@ -823,6 +823,11 @@ function handleEvents(events){
     if(e.kind === 'crash'){ stopSkip(); showCrash(e.body); }
     if(e.kind === 'dry'){ stopSkip(); toast(TEXT.captainLines.onStranded[1] ?? 'The tank is dry.', 'bad', 8000); if(tab === 'plan') renderTab(); }
     if(e.kind === 'missed'){ toast(e.count > 1 ? `${e.count} burns went by unspent.` : 'That burn went by unspent.', 'bad'); if(tab === 'plan') renderTab(); }
+    /* A handover takes the crates out of the hold and puts the pay in the
+       purse, and both of those are on the panel. Without this the Ship card
+       went on listing Nellie's pebble after Nellie had it — the HUD said the
+       hold was empty and the panel underneath disagreed, in the same frame. */
+    if(e.kind === 'questStep' || e.kind === 'questDone'){ renderTab(); save(); }
   }
 }
 
@@ -1921,8 +1926,13 @@ function confirmNew(){
 
 /* ------------------------------------------------------------- toasts */
 
+/* A toast stays up for as long as it takes to read, never less than the time
+   the caller asked for. Nellie's scene at the end of the lesson is sixty words
+   and used to be pulled off the screen in nine seconds, which is halfway
+   through it: a story beat somebody only sees once should not be a race. */
 function toast(text, kind = '', ms = 4200){
   if(!text) return;
+  ms = Math.max(ms, 1200 + text.split(/\s+/).length * 280);
   const el = document.createElement('div');
   el.className = `toast ${kind}`; el.textContent = text;
   $('toasts').appendChild(el);

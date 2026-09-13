@@ -556,7 +556,7 @@ export const NARRATIVE = {
      "text": "Bring it home to Tassel"
     }
    ],
-   "done": "Nellie turns the pebble over twice, says nothing, and puts it in her pocket. Theo settles up, and looks like a man who has got away with something."
+   "done": "Nellie takes one look and shrieks. A hole through the top, she says, and a cord through the hole, and she is wearing it to the Full Moons Festival with both of them up over the water. Theo settles up, looking like a man who has got away with something."
   },
   {
    "id": "tasteofhome",
