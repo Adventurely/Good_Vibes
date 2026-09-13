@@ -338,6 +338,34 @@ export const NARRATIVE = {
    "greeting": "A conversation here may outlast your visit, and nobody minds."
   }
  },
+ "crew": {
+  "captain": {
+   "role": "Captain",
+   "name": "You",
+   "species": "otter",
+   "line": "An otter who left their raft, which is either an adventure or a scandal depending on which cousin you ask."
+  },
+  "roles": [
+   {
+    "id": "engineer",
+    "name": "Engineer",
+    "species": "emberkin",
+    "does": "Keeps the burn honest and the tank from lying to you."
+   },
+   {
+    "id": "navigator",
+    "name": "Navigator",
+    "species": "cat",
+    "does": "Reads a rock at four au and tells you which way it is going."
+   },
+   {
+    "id": "appraiser",
+    "name": "Appraiser",
+    "species": "frog",
+    "does": "Knows what a thing is, which is rarer than knowing what it is worth."
+   }
+  ]
+ },
  "events": {
   "tollOffer": [
    {

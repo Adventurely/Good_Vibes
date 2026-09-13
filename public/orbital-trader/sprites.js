@@ -406,7 +406,7 @@ function paintWorld(id, spec){
 }
 
 function paintShape(shape){
-  const n = SIZE, c = document.createElement('canvas');
+  const n = shape.rows.length, c = document.createElement('canvas');
   c.width = n; c.height = n;
   const ctx = c.getContext('2d');
   shape.rows.forEach((row, y) => {
@@ -419,6 +419,91 @@ function paintShape(shape){
   });
   return c;
 }
+
+
+/* ---------------------------------------------------------- portraits */
+
+/* People, at twenty-four pixels instead of sixteen. A world can be a dot and
+ * still be a world; a face cannot. These are drawn on a grid the same way the
+ * Arc and the Maw are, and they share one legend because two portraits with
+ * two palettes would drift apart the first time either was touched. */
+export const PORTRAIT_SIZE = 24;
+const PORTRAIT_INK = {
+  '.': null,
+  d: '#4a3524',   // fur, shadowed — and the outline the whole head is drawn with
+  f: '#7d5c3c',   // fur
+  F: '#a07a50',   // fur, lit from the upper left like every world in the sky
+  m: '#e2cdaa',   // muzzle
+  n: '#2a1c12',   // nose and the one line of mouth
+  e: '#15100c',   // eye
+  W: '#c9b9a2',   // whiskers, muted: white ones read as snow at this size
+  k: '#12314a',   // jacket, shadowed
+  j: '#245f86',   // jacket
+  J: '#3fa9dd',   // jacket, lit
+  g: '#ffd23f',   // the gold on a harbourmaster's collar
+  s: '#414150',   // an empty berth: the shape of somebody who is not there
+};
+
+export const PORTRAITS = {
+  /* You. An otter who left their raft — which the design document still has
+     down as a proposal (7.1), so this is the one sprite in the game written to
+     be replaced. */
+  captain: { legend: PORTRAIT_INK,
+    rows: [
+      '........................',
+      '........................',
+      '...........dd...........',
+      '.........ddFfdd.........',
+      '........dFFFFffd........',
+      '....ddddFFFFFFffdddd....',
+      '...ddFdFFFFFFFfffdFdd...',
+      '...dFFdFFFFFFFfffdFFd...',
+      '...ddFdFddFFFFddfdFdd...',
+      '....dddFeeFFFfeefddd....',
+      '......dFeeFmmfeefd......',
+      '......dffmmnnmmffd......',
+      '......dffmmnnmmffd......',
+      '......WWfmnmmnmfWW......',
+      '........dmmnnmmd........',
+      '.........dfmmfd.........',
+      '..........dddd..........',
+      '.......kgkddddkgk.......',
+      '.....kkjjgJJJJgjjkk.....',
+      '...kkjjjjjJJJJjjjjjkk...',
+      '..kjjjjjjjJJJJjjjjjjjk..',
+      '.kjjjjjjjjJJJJjjjjjjjjk.',
+      '.kjjjjjjjjJJJJjjjjjjjjk.',
+      'kkkkkkkkkkkkkkkkkkkkkkkk',
+    ]},
+  /* Nobody, yet. */
+  berth: { legend: PORTRAIT_INK,
+    rows: [
+      '........................',
+      '........................',
+      '...........ss...........',
+      '.........ssssss.........',
+      '........ssssssss........',
+      '.......ssssssssss.......',
+      '......ssssssssssss......',
+      '......ssssssssssss......',
+      '......ssssssssssss......',
+      '......ssssssssssss......',
+      '......ssssssssssss......',
+      '......ssssssssssss......',
+      '......ssssssssssss......',
+      '.......ssssssssss.......',
+      '........ssssssss........',
+      '.........ssssss.........',
+      '..........ssss..........',
+      '.......ssssssssss.......',
+      '.....ssssssssssssss.....',
+      '...ssssssssssssssssss...',
+      '..ssssssssssssssssssss..',
+      '.ssssssssssssssssssssss.',
+      '.ssssssssssssssssssssss.',
+      'ssssssssssssssssssssssss',
+    ]},
+};
 
 /* ------------------------------------------------------------- the API */
 
@@ -441,6 +526,23 @@ export function sprite(id){
   }
   cache.set(id, c);
   return c;
+}
+
+/* A portrait as something an <img> can take. The panel is HTML, not canvas,
+ * so the one thing it needs is a data URL — built once and kept, because a
+ * tab that re-renders on every frame must not re-encode a PNG on every
+ * frame. Null under Node, where there is no canvas and no need for one. */
+const portraitCache = new Map();
+export function portraitURL(id){
+  if(portraitCache.has(id)) return portraitCache.get(id);
+  let url = null;
+  try{
+    if(PORTRAITS[id] && typeof document !== 'undefined') url = paintShape(PORTRAITS[id]).toDataURL('image/png');
+  }catch(e){
+    console.warn('portrait failed for', id, e);
+  }
+  portraitCache.set(id, url);
+  return url;
 }
 
 /* Blit one, centred, `d` pixels across. Smoothing off, because the whole

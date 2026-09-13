@@ -642,6 +642,24 @@ A leading proposal is that the player is an otter who left their raft. That woul
 
 ### 7.2 Crew — TBD
 
+**There is a Crew menu now**, reachable docked or in flight. It shows the
+captain with a pixel-art portrait and three berths — Missing Engineer, Missing
+Navigator, Missing Appraiser — and nothing else about them. An empty berth
+names the job and keeps the rest: who does that work and where you would have
+to go to ask is something to find out, not something the menu tells you before
+you have been anywhere. The three are the three jobs in the line that pay in a
+person (§5), so the menu is the shape of the answer rather than the answer:
+`state.crew` carries a slot per berth and every one of them is null.
+
+The captain is drawn as an otter. §7.1 still has that down as a proposal, but
+the shipped fiction already leans that way — the game opens among otters, and
+Uncle Theo and Aunt Nellie are family — so the portrait follows the fiction
+and is written to be the one sprite in the game that is easy to replace.
+
+What is still open is everything the berths are for: how somebody is recruited
+beyond "a quest pays in them", whether crew have mechanical effects or are
+purely narrative, and whether three is the number.
+
 Crew reacting to the player's burns is a desired feature, working as characterization, soft tutorial, and feedback on skill. Early flavor notes per species: Emberkin crew cheer big burns and complain through long coasts. Otter crew are chatty, point out sights, and grow anxious when the radio goes quiet. Cat crew love tight slingshots, mock safe routes, and are secretly terrified of landing. Frog crew hum during coasts, dislike high-g burns, and never complain about the slow road.
 
 Open questions include how crew are recruited, how many the ship can carry, whether crew have mechanical effects or are purely narrative, and how crew relate to the player's standing with each species.
