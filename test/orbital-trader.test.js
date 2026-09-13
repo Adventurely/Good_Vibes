@@ -837,6 +837,63 @@ function pushedToSlate(){
   return { g, ix, P };
 }
 
+test('a burn that slows you down never reads as a number going up', () => {
+  /* The note both playtesters wrote. The chart labelled a mark with the size
+     of the burn — the fuel it will spend — and they were braking at Slate:
+     they pressed Back to slow down and watched it climb. A length of engine
+     is positive however you point it, so the mark says what the engine will
+     do instead, in the words on the buttons. */
+  const ms = v => S.auDay(v / 1000);
+  assert.equal(S.burnWords({ prograde: ms(120), radial: 0 }), 'forward 120 m/s');
+  assert.equal(S.burnWords({ prograde: -ms(120), radial: 0 }), 'back 120 m/s');
+  assert.equal(S.burnWords({ prograde: 0, radial: ms(40) }), 'out 40 m/s');
+  assert.equal(S.burnWords({ prograde: 0, radial: -ms(40) }), 'in 40 m/s');
+  assert.equal(S.burnWords({ prograde: -ms(120), radial: ms(40) }), 'back 120 m/s · out 40 m/s');
+  assert.equal(S.burnWords({ prograde: 0, radial: 0 }), 'nothing yet');
+  assert.equal(S.burnWords(null), 'nothing yet');
+
+  /* The property that matters: pressing Back repeatedly says "back", and the
+     number in it counts the braking rather than the fuel. Both are the same
+     magnitude here, but only one of them has a word in front of it that a
+     pilot slowing down would agree with. */
+  const n = { prograde: 0, radial: 0 };
+  let last = 0;
+  for(let press = 1; press <= 6; press++){
+    n.prograde -= ms(20);
+    const words = S.burnWords(n);
+    assert.match(words, /^back /, `press ${press}: ${words}`);
+    const said = Number(words.match(/back (\d+)/)[1]);
+    assert.ok(said > last, 'the amount of braking still counts up, which is what it should do');
+    last = said;
+  }
+  /* The two numbers now live in different places and say different things:
+     the mark says "back", and the thing that climbs is the fuel, on the
+     gauge, with the word fuel next to it. */
+  const g = S.newGame(5);
+  g.dockedAt = null; g.justLeft = null;
+  const ix = S.addNode(g, g.t + 0.004);
+  g.nodes[ix].prograde = -ms(120);
+  assert.match(S.burnWords(g.nodes[ix]), /^back /);
+  const spend = S.planCost(g, 900);
+  assert.ok(spend > 0, 'a braking burn still costs fuel');
+  assert.ok(Math.abs(spend - ms(120)) < ms(1), `the gauge counts ${S.fmtKms(spend)} for a 120 m/s brake`);
+
+  /* And the four words are the four buttons. If a label ever disagreed with
+     the arrow a player just pressed, that is the same bug again. */
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  const axes = PLAY.slice(PLAY.indexOf('const AXES = {'), PLAY.indexOf('};', PLAY.indexOf('const AXES = {')));
+  for(const word of ['Forward', 'Back', 'Out', 'In']) assert.ok(axes.includes(`'${word}'`), `the pad has no ${word} button`);
+});
+
+test('the cost of a burn is shown against the fuel, not against the burn', () => {
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.match(PLAY, /nodeLabel = n \? `\$\{S\.burnWords\(n\)\}/, 'the mark is labelled with a length of engine again');
+  assert.doesNotMatch(PLAY, /nodeLabel = `\$\{S\.fmtKms/, 'the old bare-magnitude label is back');
+  assert.match(PLAY, /planned`/, 'the gauge does not say what the plan will spend');
+  assert.match(PLAY, /id="h-dvplan"/, 'the gauge has no planned-spend segment');
+  assert.match(PLAY, /uses \$\{S\.fmtKms\(marks\[i\]\?\.cost \?\? 0\)\} of fuel/, 'the Burns tab does not call the cost fuel');
+});
+
 test('dragging a mark a little earlier never throws it laps into the future', () => {
   /* Both testers hit this inside ten minutes. Once the burn is pushed out to
      a moon, the yellow road it makes is an ellipse that returns to the very

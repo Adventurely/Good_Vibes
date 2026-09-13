@@ -72,9 +72,18 @@
   .stat small{ font-size:.66rem; letter-spacing:.12em; text-transform:uppercase; color:var(--faint); }
   .stat b{ font-weight:600; font-size:.92rem; white-space:nowrap; }
   .stat.warn b{ color:var(--rose); }
-  #dvbar{ width:120px; height:5px; background:var(--gv-sunk); border-radius:3px; overflow:hidden; margin-top:3px; }
+  #dvbar{ position:relative; width:120px; height:5px; background:var(--gv-sunk); border-radius:3px; overflow:hidden; margin-top:3px; }
   #dvbar i{ display:block; height:100%; background:linear-gradient(90deg, var(--gold-2), var(--gold)); width:100%; transition:width .2s; }
   #dvbar i.low{ background:var(--rose); }
+  /* What the marks on the chart will spend, eaten off the right-hand end of
+     the gauge. Hatched rather than solid: it is not gone yet. The selector
+     has to out-rank `#dvbar i` above, or the gold gradient paints over it and
+     the segment is invisible. */
+  #dvbar i#h-dvplan{
+    position:absolute; top:0; right:0; width:0; transition:width .2s, right .2s;
+    border-left:1px solid rgba(20,16,12,.85);
+    background:repeating-linear-gradient(-45deg, rgba(20,16,12,.75) 0 2px, rgba(255,255,255,.35) 2px 4px);
+  }
   #where{ flex:1 1 auto; text-align:right; }
   #where b{ color:var(--dim); font-weight:500; }
   #dockhint{ color:var(--mint); font-size:.85rem; }
@@ -543,7 +552,7 @@
 <canvas id="chart" aria-label="The navigation chart: the Lamp, its worlds, and your ship's predicted path." role="img"></canvas>
 
 <header id="hud" aria-live="off">
-  <div class="stat" id="h-dv-wrap"><small>Fuel</small><b id="h-dv">—</b><div id="dvbar"><i id="h-dvfill"></i></div></div>
+  <div class="stat" id="h-dv-wrap"><small>Fuel</small><b id="h-dv">—</b><div id="dvbar"><i id="h-dvfill"></i><i id="h-dvplan"></i></div></div>
   <div class="stat"><small>Coin</small><b id="h-money">—</b></div>
   <div class="stat"><small>Hold</small><b id="h-hold">—</b></div>
   <div class="stat" id="clock-stat" hidden><small>Clock</small><b id="h-warp">—</b></div>
@@ -739,14 +748,24 @@ let lockedTo = null;
 /* The one number the on-chart editor shows. Recomputed when the burn changes,
    not every frame: solving what a mark costs is not free. */
 let nodeLabel = null, nodeLabelKey = '', interceptLabel = null, insetLabel = null;
+/* What every mark written down will take out of the tank, drawn on the gauge. */
+let plannedSpend = 0;
+/* What the selected mark says on the chart, and what the whole plan will
+   spend. Both come from one solve, keyed on every mark rather than on the
+   open one: the fuel gauge shows the total, so a mark nobody has selected
+   still has to count. */
 function refreshNodeLabel(){
-  const n = state.nodes[selectedNode];
-  if(!n || state.dockedAt){ nodeLabel = null; nodeLabelKey = ''; return; }
-  const key = `${selectedNode}|${n.prograde}|${n.radial}|${n.t}`;
+  const key = state.dockedAt ? '' : state.nodes.map(n => `${n.t}|${n.prograde}|${n.radial}`).join(';') + `@${selectedNode}`;
   if(key === nodeLabelKey) return;
   nodeLabelKey = key;
-  const m = S.markStates(state, horizonFor())[selectedNode];
-  nodeLabel = `${S.fmtKms(m?.cost ?? 0)} · in ${S.fmtDays(n.t - state.t)}`;
+  const n = state.nodes[selectedNode];
+  if(state.dockedAt || !state.nodes.length){ nodeLabel = null; plannedSpend = 0; return; }
+  const marks = S.markStates(state, horizonFor());
+  plannedSpend = marks.reduce((sum, m) => sum + (m?.cost ?? 0), 0);
+  /* Direction words, not a length. "0.12 km/s" is the fuel this will burn,
+     and two playtesters braking at Slate read it as their speed and were
+     baffled that pressing Back made it climb. The fuel is on the gauge. */
+  nodeLabel = n ? `${S.burnWords(n)} · in ${S.fmtDays(n.t - state.t)}` : null;
 }
 function frame(now){
   const real = Math.min(0.1, (now - last) / 1000);
@@ -846,11 +865,20 @@ function handleEvents(events){
 /* ------------------------------------------------------------- HUD */
 
 function renderHud(docking){
-  $('h-dv').textContent = `${S.fmtKms(state.dv)} / ${S.fmtKms(state.tank)}`;
+  /* The tank, and what the plan will take out of it. The cost of a burn is
+     shown here and nowhere near the burn itself: it is a length of fuel, and
+     next to a mark it read as a speed — which made pressing Back to slow down
+     look like it was speeding the ship up. */
+  const spend = Math.min(plannedSpend, state.dv);
+  $('h-dv').textContent = `${S.fmtKms(state.dv)} / ${S.fmtKms(state.tank)}`
+    + (plannedSpend > 1e-12 ? ` · ${S.fmtKms(plannedSpend)} planned` : '');
   const fill = $('h-dvfill');
   const frac = state.tank > 0 ? state.dv / state.tank : 0;
   fill.style.width = `${Math.round(frac * 100)}%`;
   fill.classList.toggle('low', frac < 0.15);
+  const planBar = $('h-dvplan');
+  planBar.style.right = `${Math.round((1 - frac) * 100)}%`;
+  planBar.style.width = `${Math.round((state.tank > 0 ? spend / state.tank : 0) * 100)}%`;
   $('h-dv-wrap').classList.toggle('warn', frac < 0.15);
   $('h-money').textContent = S.fmtMoney(state.money) + (state.debt > 0 ? ` (owe ${S.fmtMoney(state.debt)})` : '');
   $('h-hold').textContent = `${S.usedUnits(state)} / ${S.holdUnits(state)}`;
@@ -1625,8 +1653,9 @@ function plan(){
       const fwd = Math.round(S.kms(n.prograde) * 1000), side = Math.round(S.kms(n.radial) * 1000);
       out += `<div class="node ${i === selectedNode ? 'sel' : ''}" data-act="selnode|${i}">
         <b>Burn ${i + 1}</b>
-        <small>in ${S.fmtDays(n.t - state.t)} · ${esc(frame)}'s gravity · ${S.fmtKms(marks[i]?.cost ?? 0)}</small>
+        <small>in ${S.fmtDays(n.t - state.t)} · ${esc(frame)}'s gravity</small>
         <small>${fwd >= 0 ? 'forward' : 'back'} ${Math.abs(fwd)} m/s · ${side >= 0 ? 'out' : 'in'} ${Math.abs(side)} m/s</small>
+        <small class="lock">uses ${S.fmtKms(marks[i]?.cost ?? 0)} of fuel</small>
       </div>`;
     });
     out += '<p class="lock">A burn fires by itself the moment the clock reaches it. Tap one here, or its ring on the chart, to open it: four arrows and a cross appear round the ring, and tapping the ring again puts them away.</p>';
@@ -1854,12 +1883,17 @@ const actions = {
   newgame(){ confirmNew(); },
 };
 
-for(const el of document.querySelectorAll('.node[data-act]')) void el;
-// Node cards select on click, but their buttons should not also select.
-document.addEventListener('click', e => {
-  const card = e.target.closest('.node[data-act]');
-  if(card && !e.target.closest('button')){ selectedNode = Number(card.dataset.act.split('|')[1]); renderTab(); }
-}, true);
+/* Tapping a burn card in the Burns tab used to be handled twice, and the two
+   cancelled out. A listener on `document` in the *capture* phase selected the
+   card and re-rendered the panel; the card's own `selnode` action then ran in
+   the bubble phase on the element it had just replaced, and toggled the
+   selection straight back off. So the card never opened: the panel's own line
+   — "tap one here, or its ring on the chart" — was a lie, and a player
+   following card nine to brake at Slate could only get at the arrows through
+   the chart. The capture listener was doing nothing the action does not, and
+   its one extra job (a button inside the card should not also select it) is
+   already the innermost-wins rule in `wire`. Gone, and the card toggles like
+   the ring does. */
 
 function doDock(){
   const r = S.dock(state);

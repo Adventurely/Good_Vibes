@@ -820,6 +820,29 @@ export function addNodeAhead(state){
   const floor = Math.max(MIN_LEAD * 1.1, CONST.BASE_RATE_DAYS_PER_SEC * 25);
   return addNode(state, Math.max(state.t, last) + Math.max(floor, ahead));
 }
+/* What a burn *does*, in the words the four buttons use.
+ *
+ * The chart used to label a mark with the size of the burn and nothing else —
+ * "0.12 km/s" — which is the fuel it will spend. Two playtesters read that as
+ * their speed, and both were braking at the time: they pressed Back to slow
+ * down and watched the number climb, which is exactly backwards from what
+ * they were trying to do. The number was never speed. It is a length of
+ * engine, and a length of engine is always positive however you point it.
+ *
+ * So the mark says what the engine will do instead, in the direction words
+ * that are already written on the buttons, and the fuel it costs is shown
+ * against the fuel gauge where the word "fuel" is. Nothing about a burn that
+ * slows you down now goes up. */
+export function burnWords(node){
+  if(!node) return 'nothing yet';
+  const parts = [];
+  const pro = node.prograde ?? 0, rad = node.radial ?? 0;
+  if(Math.abs(pro) > 1e-15) parts.push(`${pro > 0 ? 'forward' : 'back'} ${fmtKms(pro)}`);
+  if(Math.abs(rad) > 1e-15) parts.push(`${rad > 0 ? 'out' : 'in'} ${fmtKms(rad)}`);
+  if(!parts.length) return 'nothing yet';
+  return parts.join(' · ');
+}
+
 export function planCost(state, horizon){
   if(!state.nodes.length) return 0;
   return markStates(state, horizon).reduce((s, m) => s + m.cost, 0);

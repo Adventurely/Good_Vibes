@@ -454,7 +454,7 @@ export const NARRATIVE = {
   {
    "step": "push",
    "title": "Push it out to Slate's height",
-   "body": "Four arrows appeared around the burn. Green adds speed. Orange takes it back.\n\nGreen pushes the far side of your orbit outward. Press green until the yellow line reaches Slate's circle.\n\nWithin a tenth is close enough."
+   "body": "Four arrows appeared around the burn. Green adds speed. Orange takes it back.\n\nGreen pushes the far side of your orbit outward. Press green until the yellow line reaches Slate's circle. Within a tenth is close enough.\n\nThe label by the burn says what the engine will do, like 'forward 120 m/s'. What it costs you comes off the Fuel gauge at the top."
   },
   {
    "step": "aim",
