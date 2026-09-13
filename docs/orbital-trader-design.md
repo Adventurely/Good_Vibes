@@ -578,8 +578,8 @@ nowhere to press. That is the last piece.
 ### 5.2 What the Line Needs That the Game Does Not Have
 
 1. ~~**Crew as a reward.**~~ Done, as far as the line needs. Three of the
-   twenty hand over a person — Vashk the Emberkin engineer at #6, Keel the cat
-   navigator at #13, Oon the frog appraiser at #19 — one each from the three
+   twenty hand over a person — Brikka the Emberkin engineer at #6, Celia the cat
+   navigator at #13, Wicket the frog appraiser at #19 — one each from the three
    peoples whose region the player has just finished crossing. Finishing one
    of those quests fills that berth and the Crew menu shows who is in it. What
    a crew member *does* is still open (§7.2); the quests no longer wait on it.
@@ -634,12 +634,12 @@ parts to Slate, fire crystals to Veyra (who love them), reactor coils to Nail
 
 ### 7.1 Player Character — TBD
 
-A leading proposal is that the player is an otter who left their raft. That would explain flying solo, make the player a slight outsider in their own culture, and give each crew member the role of a surrogate raft. The alternative is leaving the player's species open or customizable.
+The shipped Crew menu names the captain **Finn**, an otter who left their raft. That explains flying solo, makes the player a slight outsider in their own culture, and gives each crew member the role of a surrogate raft. Leaving the species open or customizable is still the alternative, and the card is one line of `narrative.json` if it changes; the captain's own blurb is written without a pronoun so a change of species costs nothing.
 
 ### 7.2 Crew — TBD
 
 **The three berths fill.** The Crew menu is reachable docked or in flight. It
-shows the captain with a pixel-art portrait, then three berths — Engineer,
+shows Finn with a pixel-art portrait, then three berths — Engineer,
 Navigator, Appraiser — and each is the reward for one of the three quests in
 the line that pays in a person (§5). Until that quest is finished the berth
 reads only **Missing Engineer** and shows an empty chair: who does that work
@@ -649,9 +649,9 @@ berth fills with a name, a species, a portrait and a line:
 
 | Berth | Who | People | From |
 |---|---|---|---|
-| Engineer | Vashk | Emberkin | #6 Engine Trouble |
-| Navigator | Keel | Cats | #13 A Cat's Request |
-| Appraiser | Oon | Frogs | #19 Appraisal |
+| Engineer | Brikka | Emberkin | #6 Engine Trouble |
+| Navigator | Celia | Cats | #13 A Cat's Request |
+| Appraiser | Wicket | Frogs | #19 Appraisal |
 
 `state.crew` carries a slot per berth, null until earned and then `{ role,
 from, joinedAt }` — who they are, which job brought them, and when. That is

@@ -341,7 +341,7 @@ export const NARRATIVE = {
  "crew": {
   "captain": {
    "role": "Captain",
-   "name": "You",
+   "name": "Finn",
    "species": "otter",
    "line": "An otter who left their raft, which is either an adventure or a scandal depending on which cousin you ask."
   },
@@ -352,7 +352,7 @@ export const NARRATIVE = {
     "species": "emberkin",
     "does": "Keeps the burn honest and the tank from lying to you.",
     "person": {
-     "name": "Vashk",
+     "name": "Brikka",
      "line": "Eleven years at the Ninth Forge and nothing left there she has not taken apart. She has opinions about your tank and will share them."
     }
    },
@@ -362,7 +362,7 @@ export const NARRATIVE = {
     "species": "cat",
     "does": "Reads a rock at four au and tells you which way it is going.",
     "person": {
-     "name": "Keel",
+     "name": "Celia",
      "line": "Can read a rock at four au and tell you which way it is going. Says almost nothing and is always already looking at the thing you are about to point at."
     }
    },
@@ -372,7 +372,7 @@ export const NARRATIVE = {
     "species": "frog",
     "does": "Knows what a thing is, which is rarer than knowing what it is worth.",
     "person": {
-     "name": "Oon",
+     "name": "Wicket",
      "line": "Knows what a thing is, which is rarer than knowing what it is worth. Has been studying one question for longer than you have been alive."
     }
    }
@@ -629,7 +629,7 @@ export const NARRATIVE = {
   {
    "id": "enginetrouble",
    "title": "Engine Trouble",
-   "giver": "Vashk of the Ninth Forge",
+   "giver": "Brikka of the Ninth Forge",
    "type": "retrieval",
    "from": "cinder",
    "to": "slate",
@@ -642,7 +642,7 @@ export const NARRATIVE = {
    "pay": 700,
    "rep": "emberkin",
    "crew": "engineer",
-   "blurb": "Three crates of spare parts for the Slate yards, and Vashk wants to ride along and see them fitted. She has been at the Ninth Forge eleven years and has run out of things there she has not already taken apart.",
+   "blurb": "Three crates of spare parts for the Slate yards, and Brikka wants to ride along and see them fitted. She has been at the Ninth Forge eleven years and has run out of things there she has not already taken apart.",
    "done": "She watches the Slate shipwrights work for about four minutes, says one sentence nobody enjoys, and fixes it herself. Then she asks what your tank is rated at, and does not get off the ship."
   },
   {
@@ -768,7 +768,7 @@ export const NARRATIVE = {
    "rep": "cat",
    "crew": "navigator",
    "blurb": "Ashgrin wants you to go and be seen. Nail, then Whisker, then the Arc, in that order, and come back and tell her who was where. She will not say why, and it is rude to ask a cat twice.",
-   "done": "She hears you out, nods once, and introduces you to Keel, who has been sitting behind you the entire time and who apparently already knows what your ship is called."
+   "done": "She hears you out, nods once, and introduces you to Celia, who has been sitting behind you the entire time and who apparently already knows what your ship is called."
   },
   {
    "id": "medicinerun",
@@ -822,7 +822,7 @@ export const NARRATIVE = {
   {
    "id": "appraisal",
    "title": "Appraisal",
-   "giver": "Oon of the deep shelf",
+   "giver": "Wicket of the deep shelf",
    "type": "shopping",
    "from": "brine",
    "to": "brine",
@@ -843,7 +843,7 @@ export const NARRATIVE = {
    "pay": 3200,
    "rep": "frog",
    "crew": "appraiser",
-   "blurb": "Oon would like to look at three things at once: a piece of the Arc off Nail, a storm crystal fished out of Grumm's cloud tops, and one of Cinder's reactor coils. She is not buying them. She wants them on the same table under the same lamp, and she has wanted that for some while.",
+   "blurb": "Wicket would like to look at three things at once: a piece of the Arc off Nail, a storm crystal fished out of Grumm's cloud tops, and one of Cinder's reactor coils. She is not buying them. She wants them on the same table under the same lamp, and she has wanted that for some while.",
    "done": "She puts all three under the same lamp, is quiet for a long time, and then says something that is not an answer. Then she asks where you are going next, and starts packing."
   }
  ]

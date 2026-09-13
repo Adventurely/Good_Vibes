@@ -479,7 +479,7 @@ export const PORTRAITS = {
       '.kjjjjjjjjJJJJjjjjjjjjk.',
       'kkkkkkkkkkkkkkkkkkkkkkkk',
     ]},
-  /* Vashk, Emberkin, off the Ninth Forge: a crest, and the goggles pushed up
+  /* Brikka, Emberkin, off the Ninth Forge: a crest, and the goggles pushed up
      on it because she has just stopped doing something. */
   engineer: { legend: PORTRAIT_INK,
     rows: [
@@ -508,7 +508,7 @@ export const PORTRAITS = {
       '.kjjjjjjjjJJJJjjjjjjjjk.',
       'kkkkkkkkkkkkkkkkkkkkkkkk',
     ]},
-  /* Keel, cat, who can read a rock at four au. Ears tall and narrow — a wide
+  /* Celia, cat, who can read a rock at four au. Ears tall and narrow — a wide
      one is a dog at this size. */
   navigator: { legend: PORTRAIT_INK,
     rows: [
@@ -537,7 +537,7 @@ export const PORTRAITS = {
       '.kkkkkkkkkjjjjkkkkkkkkk.',
       'kkkkkkkkkkjjjjkkkkkkkkkk',
     ]},
-  /* Oon, frog, with the eyes riding on top of the skull where a frog's are
+  /* Wicket, frog, with the eyes riding on top of the skull where a frog's are
      and a loupe swung out of the way. */
   appraiser: { legend: PORTRAIT_INK,
     rows: [

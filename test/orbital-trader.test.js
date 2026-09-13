@@ -424,6 +424,13 @@ test('the crew menu has a captain to show and three berths to leave empty', () =
      appraiser. If one of those ever moves, this is what notices. */
   assert.deepEqual(c.roles.map(r => r.species), ['emberkin', 'cat', 'frog']);
 
+  /* Everybody aboard is somebody by name. The names live in narrative.json and
+     reach the page through a build step, so this is also what notices a
+     text.js that was not rebuilt after the fiction changed. */
+  assert.equal(c.captain.name, 'Finn');
+  assert.deepEqual(c.roles.map(r => r.person?.name), ['Brikka', 'Celia', 'Wicket']);
+  for(const r of c.roles) assert.ok(r.person?.line, `${r.id} has nobody in it to say anything`);
+
   // And a new ship carries a berth for each of them, with nobody in it.
   const s = S.newGame(5);
   assert.deepEqual(s.crew, { engineer: null, navigator: null, appraiser: null });
