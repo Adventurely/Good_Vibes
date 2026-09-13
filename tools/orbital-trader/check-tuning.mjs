@@ -68,8 +68,14 @@ for(const b of T.bodies){ if(b.parent) periods[b.id] = +period(by[b.parent].mu, 
    particular number — the sky has been squeezed once and would otherwise
    have left the calendar behind it. */
 check('C1 the calendar is Tassel\'s year', Math.abs(periods.tassel - T.constants.YEAR_DAYS) < 0.01, `${periods.tassel} d vs YEAR_DAYS ${T.constants.YEAR_DAYS}`);
-check('C1 a Cinder year is under a month', periods.cinder > 12 && periods.cinder < 30, `${periods.cinder} d`);
-check('C1 Veyra sits between Cinder and Tassel', by.cinder.a < by.veyra.a && by.veyra.a < by.tassel.a, `${by.cinder.a} < ${by.veyra.a} < ${by.tassel.a} au`);
+/* The two Emberkin worlds are the inner pair, in some order. Which of them is
+   nearer the Lamp is a design decision that has been taken both ways; what
+   must hold is that they are both inside Tassel and not on top of each other. */
+const emberkin = [by.cinder, by.veyra].sort((a, b) => a.a - b.a);
+check('C1 the Emberkin worlds are the inner pair', emberkin[1].a < by.tassel.a && emberkin[0].a < emberkin[1].a * 0.8,
+  `${emberkin[0].id} ${emberkin[0].a} then ${emberkin[1].id} ${emberkin[1].a}, both inside Tassel's ${by.tassel.a} au`);
+check('C1 the innermost year is under a month', periods[emberkin[0].id] > 12 && periods[emberkin[0].id] < 30,
+  `${emberkin[0].id}: ${periods[emberkin[0].id]} d`);
 check('C1 both cat havens ride inside the Belt', by.nail.a > T.belt.inner && by.nail.a < T.belt.outer && by.whisker.a > T.belt.inner && by.whisker.a < T.belt.outer, `${by.nail.a} and ${by.whisker.a} in ${T.belt.inner}-${T.belt.outer} au`);
 check('C1 the Arc rides just beyond the Belt', by.arc.a > T.belt.outer && by.arc.a < T.belt.outer + 0.5, `${by.arc.a} au, belt ends at ${T.belt.outer}`);
 check('C1 the Maw is the far edge', by.maw.a > 3 * by.grumm.a, `${by.maw.a} au`);
@@ -203,8 +209,14 @@ check('C7 the Belt is within the starter tank', dv('Tassel -> Nail') <= starter,
 check('C7 the Arc costs more than the Belt', dv('Tassel -> the Arc') > dv('Tassel -> Nail'));
 check('C7 Grumm is a loose capture on the starter tank', dv('Tassel -> Grumm (loose') <= starter, `${dv('Tassel -> Grumm (loose')} of ${starter}`);
 check('C7 Haven costs more than a loose capture at Grumm', dv('Tassel -> Haven') > dv('Tassel -> Grumm (loose'));
-check('C7 Cinder is dearer than Veyra', dv('Tassel -> Cinder (dock)') > dv('Tassel -> Veyra'), `${dv('Tassel -> Cinder (dock)')} vs ${dv('Tassel -> Veyra')}`);
-check('C7 Cinder is a long-haul destination', dv('Tassel -> Cinder (dock)') > starter && dv('Tassel -> Cinder (dock)') <= longhaul, `${dv('Tassel -> Cinder (dock)')}: past ${starter}, within ${longhaul}`);
+/* One Emberkin world is an errand and the other is an expedition, and the
+   quest line counts on knowing which. It sends a ship to Cinder at job five
+   and to Veyra at job eight, so the one it asks for first has to be the one a
+   starter tank can reach — which is what swapping the two of them was for. */
+const near = dv('Tassel -> Cinder (dock)'), far = dv('Tassel -> Veyra');
+check('C7 the errand comes before the expedition', near <= starter && far > starter,
+  `Cinder ${near} within ${starter}, Veyra ${far} past it`);
+check('C7 the far Emberkin world is a long haul, not a wall', far <= longhaul, `${far}: within ${longhaul}`);
 /* The Maw is cheap and slow: years of coasting. The deep tank is what makes it
    a journey you come back from. */
 check('C7 the deep tank reaches the Maw with 20% spare', dv('Tassel -> the Maw') <= 0.8 * deep, `${dv('Tassel -> the Maw')} of ${deep}`);

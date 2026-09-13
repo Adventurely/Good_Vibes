@@ -72,7 +72,7 @@ Burns are **instantaneous impulses**. What you plan is exactly what you get, whi
 
 Ten times the ground, plus however much air stands over it. A big world earns a big harbour and a pebble earns a small one, so widening a world widens its approach and no table can quietly disagree with the sky it is describing. Grumm's approach is enormous because Grumm is enormous and carries sixty thousand kilometres of cloud on top of that, not because somebody typed a number.
 
-Two consequences are worth stating plainly, because the formula means different things at different sizes. On a planet the mouth is a small target — Veyra's is 2% of its sphere of influence, so arriving in Veyra's gravity and tying up at Veyra are two separate pieces of flying. On a small moon it is most of the well — Glass's mouth is 90% of Glass's reach, Brine's 79%, Slate's 64% — so crossing into a little moon's gravity is very nearly arriving. That is the shape ten radii has: it scales with the ground, and a moon's reach does not.
+Two consequences are worth stating plainly, because the formula means different things at different sizes. On a planet the mouth is a small target — Grumm's is 2% of its sphere of influence and Cinder's 4%, so arriving in a planet's gravity and tying up at it are two separate pieces of flying. On a small moon it is most of the well — Glass's mouth is 90% of Glass's reach, Brine's 79%, Slate's 64% — so crossing into a little moon's gravity is very nearly arriving. That is the shape ten radii has: it scales with the ground, and a moon's reach does not.
 
 On the chart the mouth is a dashed ring with **a small anchor hung at the top of it**, green where they will take your lines and amber where they will not yet. The anchor is there because a dashed circle round a world is the same shape as three other things the chart draws — a sphere of influence, an atmosphere, a hollow rock — and this is the only one you can tie up inside.
 
@@ -121,9 +121,16 @@ Fuel is the only resource for movement and is displayed to the player as a delta
 
 The game clock runs continuously, and every body moves along its orbit as time passes. Time is the second currency alongside fuel. Time pressure comes from perishable cargo and from quests with a deadline on them. (A port can keep seasonal hours; nothing in the sky uses that yet.)
 
-**The sky was squeezed by three.** Every orbit about the Lamp is a third of the size it was, and the Lamp is a third of the mass. Those two together are the whole trick: `v = √(μ/r)` with both halves moved the same way leaves every speed — and so **every delta-v in the game unchanged**. What changes is time. A lap, a transfer and a launch window all take a third as long, so Tassel's year is **120 days**, a crossing to Veyra is **43 days** instead of 129, and a missed window at Veyra costs **104 days** instead of 313. The sky was hard to hit because a player got one attempt a session; now they get three, at the same price in fuel.
+**The sky was squeezed by three.** Every orbit about the Lamp is a third of the size it was, and the Lamp is a third of the mass. Those two together are the whole trick: `v = √(μ/r)` with both halves moved the same way leaves every speed — and so **every delta-v in the game unchanged**. What changes is time. A lap, a transfer and a launch window all take a third as long, so Tassel's year is **120 days**, a crossing to Cinder is **43 days** instead of 129, and a missed window there costs **104 days** instead of 313. The sky was hard to hit because a player got one attempt a session; now they get three, at the same price in fuel.
 
-Moons kept their distance from their planets. Scorch is the one exception — Cinder's reach shrank with its orbit, until it no longer held a moon at 0.00045 au — so Scorch moved in to 0.00026 and took the mass its own harbour needs.
+Moons kept their distance from their planets, Scorch included: it had to move in when the squeeze shrank Cinder's reach below it, and moved back out to 0.00045 au when Cinder swapped places with Veyra and got its reach back.
+
+**The two Emberkin worlds then changed places.** Veyra took the inner orbit at 0.1 au and Cinder the outer at 0.2. This is a quest-line fix rather than a fictional one: the line sends a ship to Cinder at job five and to Veyra at job eight, and the inner orbit is the expensive one — so before the swap the line asked for the 18.5 km/s world first and the 6.5 km/s world three jobs later, with a starter tank of 14. Now the errand comes before the expedition. The checker asserts that ordering by name, because it is the line that depends on it.
+
+| | orbit | to dock there | crossing | windows every | year |
+|---|---|---|---|---|---|
+| **Veyra** | 0.1 au | 18.5 km/s | 31 d | 24 d | 20 d |
+| **Cinder** | 0.2 au | 6.5 km/s | 43 d | 104 d | 56 d |
 
 **The sky is built at KSP's scale.** Every body is a tenth of the size a real one would be and many times denser, which is the trick that makes a world a place rather than a backdrop: Tassel is 498 km across, has 9.25 m/s² at the ground, air to 70 km, and a reach of 116,500 km — a Kerbin. A new game opens at 75 km, five above the air, on an orbit that takes thirty minutes of game time. Local flying is correspondingly cheap: the first lesson is a quarter of a km/s. Interplanetary flying is *not*, because a small world gives almost no gravity assist on departure or arrival, and that trade is deliberate.
 

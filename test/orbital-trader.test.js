@@ -153,14 +153,17 @@ test('every body has what the kernel and the chart read', () => {
 test('the rails keep the promises the design makes', () => {
   const yr = O.period(MU, world.get('tassel').a);
   assert.ok(Math.abs(yr - CONST.YEAR_DAYS) < 1e-6, `Tassel's year is ${yr} days`);
-  /* Cinder's year is a fraction of Tassel's, which is what the fiction is
-     about — the New Year party that never quite stops — rather than any
-     particular number of days. The sky has been squeezed once already. */
-  const cinderYear = O.period(MU, world.get('cinder').a);
-  assert.ok(cinderYear < yr / 4, `Cinder's year is a fraction of Tassel's (${cinderYear.toFixed(1)} of ${yr.toFixed(0)} d)`);
-  // The inner worlds are in the order the setting puts them, and the Maw is
-  // the far edge of everything.
-  assert.ok(world.get('cinder').a < world.get('veyra').a && world.get('veyra').a < world.get('tassel').a);
+  /* The innermost world's year is a fraction of Tassel's, which is what the
+     fiction is about — the New Year party that never quite stops. Asked of
+     whichever of the Emberkin pair is nearer the Lamp rather than of Cinder
+     by name: the two of them have now changed places once, and the fiction
+     belongs to the orbit rather than to the word. */
+  const emberkin = ['cinder', 'veyra'].map(id => world.get(id)).sort((a, b) => a.a - b.a);
+  const innerYear = O.period(MU, emberkin[0].a);
+  assert.ok(innerYear < yr / 4, `${emberkin[0].id}'s year is a fraction of Tassel's (${innerYear.toFixed(1)} of ${yr.toFixed(0)} d)`);
+  // Both Emberkin worlds are inside Tassel, and the Maw is the far edge of all of it.
+  assert.ok(emberkin[0].a < emberkin[1].a && emberkin[1].a < world.get('tassel').a,
+    `${emberkin[0].id} ${emberkin[0].a} < ${emberkin[1].id} ${emberkin[1].a} < Tassel ${world.get('tassel').a}`);
   assert.ok(world.get('maw').a > world.get('grumm').a * 3, 'the Maw is the long way out');
   assert.ok(world.get('grumm').mu > world.get('tassel').mu * 10, 'Grumm has the deepest well');
 });

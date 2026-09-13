@@ -50,7 +50,7 @@ export const NARRATIVE = {
  ],
  "ports": {
   "cinder": {
-   "blurb": "A world tide-locked to the Lamp, with a molten face, a frozen back, and every Emberkin city crowded into the twilight between. The year lasts twenty days, so the New Year party has never entirely stopped. The best engines anywhere are built here by people who will not live to see them wear out.",
+   "blurb": "A world tide-locked to the Lamp, with a molten face, a frozen back, and every Emberkin city crowded into the twilight between. The year lasts fifty-six days, so the New Year party has never entirely stopped. The best engines anywhere are built here by people who will not live to see them wear out.",
    "arrival": [
     "The dock crew has your lines tied before you have finished thinking about it.",
     "Somebody is already asking what you brought, what it cost, and whether you will take a letter back.",
@@ -86,7 +86,7 @@ export const NARRATIVE = {
    ]
   },
   "veyra": {
-   "blurb": "The wealthy Emberkin world, close enough to the Lamp to be brilliant and far enough to be comfortable. Houses measure each other in public, and the measuring is done at auction. Nothing is bought here quietly and nothing is sold here cheap.",
+   "blurb": "The wealthy Emberkin world, and the nearest of them to the Lamp: bright enough that shade is bought and sold here like anything else. Houses measure each other in public, and the measuring is done at auction. Nothing is bought here quietly and nothing is sold here cheap.",
    "arrival": [
     "A steward meets you at the lock with a list of who is in port and who is not speaking to whom.",
     "The dock is swept. You had not realised a dock could be swept.",
