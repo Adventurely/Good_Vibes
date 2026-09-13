@@ -164,12 +164,14 @@ export function affordable(grower, owned, light){
 
 /* ------------------------------------------------------------- the upgrades */
 
-/* An upgrade is bought once and never sold. Four things one can do:
+/* An upgrade is bought once and never sold. Seven things one can do:
  *
  *   clickMult   multiply what a tap is worth
+ *   streak      a tap is worth this much more per tap-a-second the hand is going
+ *   windfall    every WINDFALL_EVERYth tap pays this many times over
  *   allMult     multiply everything, taps included
  *   grower      multiply one grower's output (with `mult`)
- *   fingers     a tap also pays this fraction of your light per second
+ *   fingers     a tap also pays this fraction of your energy per second
  *   steady      shave this off the day/night swing, to a floor of nothing
  *
  * `need` is what has to be true before it appears in the shop at all, and it
@@ -187,33 +189,63 @@ export function affordable(grower, owned, light){
  * achievements use the same shapes so there is one evaluator and not two.
  */
 export const UPGRADES = [
-  /* Eighteen. There were forty-two, and most of the difference was the same
+  /* Twenty. There were forty-two, and most of the difference was the same
      upgrade sold twice — six doublings of the tap, four slices of the rate,
      five global percentages, three shavings of the swing, and two rows for
      every grower. A shop where every row is "the last row, again, bigger" is
      a shop nobody reads. What is left is one line of each kind, and every row
      in it does something the row before it did not.
 
+     The two that came back are for the hand, and they are new kinds rather
+     than more steps: a tap that is worth more the faster you go, and a tenth
+     tap that pays ten. The first cut of this shop had the hand worth two
+     energy at the forty-five minute mark against a lot making a hundred and
+     fifty a second — the sim put tapping at two percent of income from the
+     half hour on, and eight taps a second for an hour reached the first
+     replant forty minutes sooner than thirty taps and a closed lid. A
+     clicker in which clicking does not matter is a screensaver.
+
      None of them is named for the sun any more, either. The tree runs on
      what you give it — energy, not light — and the sun in the sky is weather. */
 
   /* --- the hand ---------------------------------------------------------- */
+  /* Priced to land in the first quarter hour, because that is when a flat
+     multiplier can still be felt: the lot grows by elevens a tier and the hand
+     by twos a row, so a doubling that arrives at the forty-minute mark (where
+     Steady hands used to, at 30,000) is a doubling of nothing anyone notices.
+     Past the quarter hour the hand keeps up through `fingers`, not these. */
   { id: 'warm-hands', name: 'Warm hands', cost: 100, effect: { clickMult: 2 },
     need: { runTaps: 15 }, flavour: 'Cold fingers drop things.' },
-  { id: 'steady-hands', name: 'Steady hands', cost: 30000, effect: { clickMult: 2 },
-    need: { runTaps: 400 }, flavour: 'The tremor goes once you stop hurrying.' },
-  { id: 'green-fingers', name: 'Green fingers', cost: 8e7, effect: { clickMult: 3 },
-    need: { runTaps: 5000 }, flavour: 'Everything you touch takes.' },
+  { id: 'steady-hands', name: 'Steady hands', cost: 900, effect: { clickMult: 2 },
+    need: { runTaps: 100 }, flavour: 'The tremor goes once you stop hurrying.' },
+  { id: 'green-fingers', name: 'Green fingers', cost: 40000, effect: { clickMult: 3 },
+    need: { runTaps: 1000 }, flavour: 'Everything you touch takes.' },
+
+  /* --- the hand, going -------------------------------------------------- */
+  /* Momentum reads the hand's speed: a quarter more per tap a second, to a
+     cap of eight, so four a second is a doubling and a real flurry is a
+     trebling. It is the one upgrade whose worth is decided by how the player
+     is playing right now rather than by what they own, which is what makes it
+     a different thing from Warm hands and not a fourth step of it. */
+  { id: 'momentum', name: 'Momentum', cost: 2500, effect: { streak: 0.25 },
+    need: { runTaps: 250 }, flavour: 'The second tap is easier than the first.' },
+  /* Windfall is a rhythm: every tenth tap pays ten. Over a hundred taps it is
+     worth as much as a doubling, but it is not shaped like one — it gives the
+     hand a beat, and a beat is what makes a hundred taps in a row feel like a
+     hundred and not like a chore. It is counted off the run's taps, so it is
+     the same tenth tap on every device and in every test. */
+  { id: 'windfall', name: 'Windfall', cost: 8000, effect: { windfall: 10 },
+    need: { runTaps: 400 }, flavour: 'One apple in ten comes down on its own.' },
 
   /* --- the hand borrows from the garden ---------------------------------- */
   /* Every clicker eventually has to answer "why am I still tapping at hour
      three", and this is the answer that works: a tap pays a slice of what the
      whole garden makes in a second, so the hand keeps up with the engine
      instead of being left behind by it in the first ten minutes. */
-  { id: 'gleaning', name: 'Gleaning', cost: 25000, effect: { fingers: 0.01 },
-    need: { runTaps: 200 }, flavour: 'Take what the harvest left. It adds up.' },
-  { id: 'whole-orchard', name: 'The whole orchard', cost: 2e9, effect: { fingers: 0.05 },
-    need: { runTaps: 4000 }, flavour: 'Every tree leans in a little when you reach.' },
+  { id: 'gleaning', name: 'Gleaning', cost: 600, effect: { fingers: 0.02 },
+    need: { runTaps: 150 }, flavour: 'Take what the harvest left. It adds up.' },
+  { id: 'whole-orchard', name: 'The whole orchard', cost: 1.5e6, effect: { fingers: 0.05 },
+    need: { runTaps: 2500 }, flavour: 'Every tree leans in a little when you reach.' },
 
   /* --- everything at once ------------------------------------------------ */
   { id: 'long-summer', name: 'Long summer', cost: 1.2e5, effect: { allMult: 1.05 },
@@ -509,11 +541,13 @@ export function newGame(){
 
 /* Every multiplier in the game, folded out of the upgrades once. Called from
  * the tick and from every shop row that wants to show what a purchase would
- * do, so it is a fold over at most eighteen booleans and nothing more expensive than that.
+ * do, so it is a fold over at most twenty booleans and nothing more expensive than that.
  */
 export function bonuses(state){
   const out = {
     clickMult: 1,
+    streak: 0,
+    windfall: 1,
     allMult: 1,
     fingers: 0,
     swing: SWING,
@@ -528,6 +562,8 @@ export function bonuses(state){
     if(!up || !state.bought[id]) continue;
     const e = up.effect;
     if(e.clickMult) out.clickMult *= e.clickMult;
+    if(e.streak) out.streak += e.streak;
+    if(e.windfall) out.windfall *= e.windfall;
     if(e.allMult) out.allMult *= e.allMult;
     if(e.fingers) out.fingers += e.fingers;
     if(e.steady) out.lift = Math.min(out.swing, out.lift + e.steady);
@@ -606,11 +642,39 @@ export function steadyRate(state, bonus = bonuses(state)){
   return sum;
 }
 
-/* What a tap is worth. The base is one, and the garden lends the hand a slice
-   of its own output once `fingers` is bought. */
+/* What a tap is worth at rest. The base is one, and the garden lends the hand
+   a slice of its own output once `fingers` is bought. This is the figure the
+   record shows as "per tap": what the hand is worth before it starts moving. */
 export function tapValue(state, bonus = bonuses(state)){
   const base = 1 * bonus.clickMult * bonus.allMult * bonus.seedMult;
   return base + bonus.fingers * totalRate(state, bonus);
+}
+
+/* Momentum is capped at eight taps a second. Past that the hand is not a hand,
+   it is an autoclicker, and the cap is what keeps one from being the whole
+   game: a script at forty a second is worth exactly what a flurry is. */
+export const STREAK_CAP = 8;
+
+/* How much more a tap is worth for the speed the hand is going: 1 with no
+   Momentum, or at a standstill. */
+export const momentum = (rate, bonus) =>
+  1 + bonus.streak * Math.max(0, Math.min(STREAK_CAP, rate || 0));
+
+/* Every tenth tap of the run is the windfall, once Windfall is bought. Counted
+   off the run rather than off all time so that a replant starts the count
+   again, and off a count rather than a die so that there is no randomness in
+   here — the same tap is the tenth in the browser and in the test. */
+export const WINDFALL_EVERY = 10;
+
+export const isWindfall = (state, bonus = bonuses(state)) =>
+  bonus.windfall > 1 && (state.run.taps + 1) % WINDFALL_EVERY === 0;
+
+/* What the NEXT tap will actually pay: the resting worth, times the momentum
+   for the speed the hand is going, times the windfall if this is the tenth.
+   `rate` is taps a second and comes from the page, which owns the clock. */
+export function tapPays(state, rate = 0, bonus = bonuses(state)){
+  const value = tapValue(state, bonus) * momentum(rate, bonus);
+  return isWindfall(state, bonus) ? value * bonus.windfall : value;
 }
 
 /* ------------------------------------------------------------ conditions */
@@ -728,7 +792,7 @@ export function tick(state, dt){
  * counter for the same thing sat at zero.
  */
 export function tap(state, rate = 0){
-  const value = tapValue(state);
+  const value = tapPays(state, rate);
   state.light += value;
   score(state, 'taps', 1);
   score(state, 'tapped', value);

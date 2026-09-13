@@ -52,11 +52,31 @@ The four directions are drawn around the mark on the chart as well, growing with
 
 Planning is free. Nothing is spent until the clock reaches the mark, and a mark can be moved, re-pressed, zeroed or scrapped.
 
+**The tapped point stays on the chart while the card is up.** Two roads can lie a few pixels apart — the one you are on and the one a burn would put you on — and the card that opens names a time, not a place. A breathing ring marks the exact point that was tapped until the card closes, so a player can see which line they hit before pressing anything on it.
+
+**A drag is continuous.** Moving a mark along the road takes the time under the pointer, kept on the lap it was on and between its neighbours — and never more than half a lap from where it was in one pointer event. That last rule closed a bug two playtesters found in ten minutes: once a burn is pushed out to a moon, the yellow road it makes is an ellipse that returns to the very pixel the mark sits on, one whole transfer later, so a finger a few pixels off the white line caught the return leg and put the burn twenty-one laps into the future. A move that far is a misread, not a drag, and is refused.
+
+**A mark says what the engine will do; the gauge says what it costs.** The chart used to label a mark with the size of the burn — "0.12 km/s" — which is the fuel it will spend. Two playtesters read that as their speed, and both were braking at the time: they pressed **Back** to slow down and watched the number climb. It was never speed. A length of engine is positive however you point it. So a mark now reads in the words on the buttons — `back 120 m/s`, `forward 1.2 km/s`, `back 120 m/s · out 40 m/s` — and the cost of the whole plan is shown against the fuel gauge, where the word *fuel* already is: the readout gains "· 0.12 km/s planned" and the gauge grows a hatched stretch at the right-hand end for what the marks will eat. Nothing about a burn that slows you down goes up any more.
+
+**A planned burn is what the lesson calls it.** "Burn" alone meant nothing to two new players; the card that introduces it now says what it is — a point on your path where the engine will fire and change your speed, and nothing happens until the clock gets there.
+
 Burns are **instantaneous impulses**. What you plan is exactly what you get, which removes execution error and keeps the challenge in route design rather than timing reflexes.
 
 ### 2.3 Arrival, and Why There Is No Landing
 
 **Nothing lands.** Every harbour in the system is an orbit, and docking means matching one: you arrive by getting close enough and slow enough inside a port's **harbour mouth**, and the port's own lighters carry goods the rest of the way down. A world's surface is scenery and a crash hazard, never a destination.
+
+**How wide a harbour mouth is, is not a design number.** Like a world's reach, it comes out of the world:
+
+> `r_dock = 10 × radius + (atmosphere height)`
+
+Ten times the ground, plus however much air stands over it. A big world earns a big harbour and a pebble earns a small one, so widening a world widens its approach and no table can quietly disagree with the sky it is describing. Grumm's approach is enormous because Grumm is enormous and carries sixty thousand kilometres of cloud on top of that, not because somebody typed a number.
+
+Two consequences are worth stating plainly, because the formula means different things at different sizes. On a planet the mouth is a small target — Grumm's is 2% of its sphere of influence and Cinder's 4%, so arriving in a planet's gravity and tying up at it are two separate pieces of flying. On a small moon it is most of the well — Glass's mouth is 90% of Glass's reach, Brine's 79%, Slate's 64% — so crossing into a little moon's gravity is very nearly arriving. That is the shape ten radii has: it scales with the ground, and a moon's reach does not.
+
+On the chart the mouth is a dashed ring with **a small anchor hung at the top of it**, green where they will take your lines and amber where they will not yet. The anchor is there because a dashed circle round a world is the same shape as three other things the chart draws — a sphere of influence, an atmosphere, a hollow rock — and this is the only one you can tie up inside.
+
+The **drifting havens keep their authored mouths.** Nail, Whisker and the Maw have no surface to be ten times of and no air over it; their radius is a dot on a chart rather than a ground. A pilot arrives at those by matching speeds, and the size of that rendezvous is a design choice with nothing physical to derive it from.
 
 This is a scope decision as much as a fictional one. Landing would need a second control scheme, a second set of physics, and a second art problem, and it would buy nothing the orbital game does not already have. The fiction absorbs it easily: Tassel is an ocean of floating harbour cities that meet ships in orbit, the cats cannot survive a heavy world at all, and the frogs' balloon villages have no ground under them either.
 
@@ -64,9 +84,17 @@ The player therefore **starts in orbit**, not moored. A new game opens with the 
 
 ### 2.3.1 Forgiveness Systems
 
-Arrival uses a generous **docking zone** around each port. Entering it below a relative-speed threshold counts as arrival. If the player comes in too fast, they can simply plan a correction burn and try again. Mid-course corrections are cheap and encouraged. Planning previews show everything the player needs, so failure comes from choices, not surprises.
+Arrival uses a **docking zone** around each port, sized by the rule in 2.3. Entering it below a relative-speed threshold counts as arrival. If the player comes in too fast, they can simply plan a correction burn and try again. Mid-course corrections are cheap and encouraged. Planning previews show everything the player needs, so failure comes from choices, not surprises.
 
-Running out of fuel is not a game over. A stranded ship can call for a tow at a cost in money and time, and a stranding is a natural hook for an event.
+Running out of fuel is not a game over, and there are two ways out of it, which cost different things.
+
+A **tow** can be called at any time, stranded or not. A tug comes from the nearest port that sells fuel, charges a fixed sum by distance, and takes months. If the purse cannot cover it the Tassel harbour bank fronts the rest and takes the difference out of later sales — so a tow always works, but it can leave a ship in debt.
+
+A **distress call** opens only when the tank is completely empty and the ship is adrift. It goes to the last dock the ship tied up at, they come and get you, and they take **half of everything you have**. No days, no debt, and the hold comes with you. The price is a share rather than a sum on purpose: half of nothing is nothing, so the one player a tow cannot rescue — dry tank, empty purse, nobody to lend to them — is rescued for free. That is the floor under the guarantee that nothing costs a save.
+
+The two are a real choice rather than a better and a worse. A tow is usually far cheaper in coin and costs a season; a distress call is instant and expensive, and gets more expensive the better the run has been going. And the destination differs: a tug takes you to whatever is nearest, which may be nowhere you were going, while a distress call takes you back to the port you set out from. If that port sells nothing to burn — the Arc and the Maw do not — the call is answered by the nearest port that does, and the card says so rather than delivering a dry ship somewhere it could never leave.
+
+A stranding remains a natural hook for an event.
 
 ### 2.4 Skill Curve
 
@@ -92,6 +120,17 @@ Fuel is the only resource for movement and is displayed to the player as a delta
 ### 2.6 Time
 
 The game clock runs continuously, and every body moves along its orbit as time passes. Time is the second currency alongside fuel. Time pressure comes from perishable cargo and from quests with a deadline on them. (A port can keep seasonal hours; nothing in the sky uses that yet.)
+
+**The sky was squeezed by three.** Every orbit about the Lamp is a third of the size it was, and the Lamp is a third of the mass. Those two together are the whole trick: `v = √(μ/r)` with both halves moved the same way leaves every speed — and so **every delta-v in the game unchanged**. What changes is time. A lap, a transfer and a launch window all take a third as long, so Tassel's year is **120 days**, a crossing to Cinder is **43 days** instead of 129, and a missed window there costs **104 days** instead of 313. The sky was hard to hit because a player got one attempt a session; now they get three, at the same price in fuel.
+
+Moons kept their distance from their planets, Scorch included: it had to move in when the squeeze shrank Cinder's reach below it, and moved back out to 0.00045 au when Cinder swapped places with Veyra and got its reach back.
+
+**The two Emberkin worlds then changed places.** Veyra took the inner orbit at 0.1 au and Cinder the outer at 0.2. This is a quest-line fix rather than a fictional one: the line sends a ship to Cinder at job five and to Veyra at job eight, and the inner orbit is the expensive one — so before the swap the line asked for the 18.5 km/s world first and the 6.5 km/s world three jobs later, with a starter tank of 14. Now the errand comes before the expedition. The checker asserts that ordering by name, because it is the line that depends on it.
+
+| | orbit | to dock there | crossing | windows every | year |
+|---|---|---|---|---|---|
+| **Veyra** | 0.1 au | 18.5 km/s | 31 d | 24 d | 20 d |
+| **Cinder** | 0.2 au | 6.5 km/s | 43 d | 104 d | 56 d |
 
 **The sky is built at KSP's scale.** Every body is a tenth of the size a real one would be and many times denser, which is the trick that makes a world a place rather than a backdrop: Tassel is 498 km across, has 9.25 m/s² at the ground, air to 70 km, and a reach of 116,500 km — a Kerbin. A new game opens at 75 km, five above the air, on an orbit that takes thirty minutes of game time. Local flying is correspondingly cheap: the first lesson is a quarter of a km/s. Interplanetary flying is *not*, because a small world gives almost no gravity assist on departure or arrival, and that trade is deliberate.
 
@@ -127,6 +166,38 @@ The road has three voices and they always mean the same thing: the orbit you are
 
 A road that predicts nine encounters is a road nobody can read, and every prediction past the first is a guess that a single burn will erase anyway. One crossing at a time is enough.
 
+**Every drawn rail carries a lead: a short bright stretch just ahead of its world, ending in a chevron.** Which way a moon is going is the first thing an aiming card asks a player to know — "thirty degrees ahead of Slate" — and on a faint grey circle two new players could not tell ahead from behind. The lead is sampled from the same function that places the world, so it sits on the rail rather than on a tangent to it, and it is left off rails too small on screen to carry one.
+
+**Where the road first cuts a world's rail, the chart says where that world
+will be.** Two orange diamonds, and nothing joining them: one on the road at
+the crossing, one on the rail at the place that world has reached by then.
+This is the reading interplanetary flight actually turns on. Crossing Veyra's
+orbit means nothing on its own — the road and the rail are both drawn, so the
+crossing has always been visible — but crossing it with Veyra a quarter of a
+lap away means you left too early, and the gap between the marks is how much
+too early.
+
+The same refusal as the road itself: **one crossing, the soonest, and no
+more.** A long ellipse cuts five rails going out and the same five coming
+back, and ten honest pairs of diamonds is a chart nobody can read. The rail
+also has to be on the screen — a crossing of a ring nobody can see is two
+marks in the dark with nothing to be against. And the pair is left unjoined
+on purpose: a dashed line between them was the obvious thing to draw and the
+wrong one, because a straight line across a chart of curves reads as a path
+you could fly.
+
+**Tapping a world's rail asks the clock to wait until that world gets there.**
+The other half of the same question. Everything else on the chart answers
+"where will I be"; until this, nothing answered "when is anybody else
+anywhere". A tap on the ring a world travels on offers the same skip-ahead
+card a tap on your own road does, with the time counted to the moment that
+world reaches the point under your finger — so the usual way to plan a
+transfer is to tap a rail, read the wait, and burn from there. The road wins a
+tie over a rail and a world wins over both, because a rail runs straight
+through its own world and a planet has to stay tappable. Tied up at a dock,
+neither the road nor a rail takes a tap: a skip started at a port sets the
+rate and never stops.
+
 ### 2.7 Trading
 
 Trade is built around one central tension: **time versus fuel.**
@@ -153,7 +224,7 @@ home, belt, outer, deep — and a good is worth what it costs at the stall in it
 own region and **×1.6 anywhere else**. A port that loves it pays **×2.2** on top.
 So the trade is: buy at the source, carry it out of its region, and sell it to
 the people who care. Tide glass bought on Tassel for 60 sells on Brine, who love
-it and live four au away, for over 200.
+it and live most of the system away, for over 200.
 
 **Shelves are what a merchant keeps, not what a factory makes.** Every good has
 a stock range, a stall's shelf is rolled inside it, and the shelf is rolled
@@ -454,6 +525,8 @@ at Chime and Hush. The Maw does the endgame's job now. The Scatter, which was a
 belt region rather than a body, is the Belt, and it moved inward from 2.6–3.2
 au to 2.0–2.5 so the Arc could ride just outside it.
 
+*(Every distance in this section is from before the sky was squeezed by three — see 2.6. Divide by three for where things actually are.)*
+
 **What moved with them.** The dampener used to be lying about at Hush and is
 now fitted, for money and no questions, on Whisker. The tow debt used to be
 owed to Ledger and is now owed to the harbour bank on Tassel. Goods whose
@@ -474,25 +547,23 @@ frog system — so that every new place arrives with a reason to be there, and
 each of the three crew members is the reward for the stretch that introduces
 their people.
 
-**Fourteen of the twenty are built** — every one that is neither salvage nor
-paid in crew. They are written out in `narrative.json` and they work: their
-steps, their goods, their pay and the ports they name are all real. What is
-missing is the board, so #1 is still the only one a player meets.
+**Seventeen of the twenty are built** — every one that is not salvage. They
+are written out in `narrative.json`, they work, and a player meets them: the
+Requests tab on the dock menu lists whatever jobs the port you are tied up at
+is offering, and you can hold three at once.
 
-The six that are not built, and why:
+The three that are not built, and why:
 
 | # | Quest | Why not |
 |---|---|---|
-| 6 | Engine Trouble | pays in an Emberkin engineer |
-| 13 | A Cat's Request | pays in a cat navigator |
-| 14 | First Salvage | salvage, and needs the navigator |
+| 14 | First Salvage | salvage, which is flight the game does not have |
 | 15 | Lost Cargo | salvage |
-| 19 | Appraisal | pays in a frog appraiser |
-| 20 | What Is This Worth? | needs the appraiser |
+| 20 | What Is This Worth? | needs a thing to find, not a person — the appraiser exists now |
 
-Both of the quest chains are in that list, so the chain type is built and has
-nothing to run on yet. Settling crew (§7.2) unblocks four of the six on its
-own; salvage flight unblocks the other two.
+Both quest chains run. Crew is settled far enough to pay out (§7.2): three of
+the seventeen hand over a person, and finishing one fills that berth. Salvage
+flight is what is left, and #20 needs an Arc fragment to exist as a good
+before it can be asked for.
 
 | # | Quest | Type | Route / Goal | Reward |
 |---|---|---|---|---|
@@ -501,20 +572,20 @@ own; salvage flight unblocks the other two.
 | 3 | Green Medicine | Retrieval | Moss: retrieve medicinal herbs → Tassel | Credits |
 | 4 | A Message for Slate | Message | Tassel → Slate | Credits |
 | 5 | The Heavy Stuff | Delivery | Slate → Cinder: deliver iron ore | Credits |
-| 6 | Engine Trouble | Retrieval | Cinder: retrieve spare engine parts → Slate | **Emberkin Engineer** *(not built)* |
+| 6 | Engine Trouble | Retrieval | Cinder: retrieve spare engine parts → Slate | **Emberkin Engineer** |
 | 7 | A Favor for an Engineer | Message | Cinder → Scorch: deliver a message | Credits / faction reputation |
 | 8 | Emberkin Luxury | Retrieval | Scorch: retrieve fire crystals → Veyra | Credits |
 | 9 | The Collector | Shopping List | Veyra: acquire pearls, coral carvings, precision clock | Large payout |
 | 10 | Faction Business | Message | Veyra → Cinder: deliver confidential message | Faction reputation |
 | 11 | Into the Belt | Delivery | Cinder → Nail: deliver reactor coils | Credits |
 | 12 | Something Shiny | Retrieval | Nail: retrieve salvaged sensors → Veyra | Credits |
-| 13 | A Cat's Request | Quest Chain | Nail → several cat settlements | **Cat Navigator** *(not built)* |
+| 13 | A Cat's Request | Quest Chain | Nail → several cat settlements | **Cat Navigator** |
 | 14 | First Salvage | Salvage | With the cat navigator: recover a drifting wreck | Salvage + credits *(not built)* |
 | 15 | Lost Cargo | Salvage | Belt: intercept a derelict cargo ship | Salvage *(not built)* |
 | 16 | Medicine Run | Delivery | Nail → Brine: deliver medicinal supplies | Credits |
 | 17 | The Amber Collector | Retrieval | Brine: retrieve brine amber → Veyra | Credits |
 | 18 | A Frog's Question | Message | Brine → Glass: deliver a message | Credits / frog reputation |
-| 19 | Appraisal | Quest Chain | Brine: retrieve several unusual goods for examination | **Frog Appraiser** *(not built)* |
+| 19 | Appraisal | Shopping List | Brine: bring an arc shard, storm crystals and reactor coils to be looked at | **Frog Appraiser** |
 | 20 | What Is This Worth? | Appraisal / Retrieval | With the frog appraiser: investigate an Arc fragment | Major lore reveal *(not built)* |
 
 ### 5.1 The Types
@@ -579,11 +650,12 @@ nowhere to press. That is the last piece.
 
 ### 5.2 What the Line Needs That the Game Does Not Have
 
-1. **Crew as a reward.** (Still open.) Three of the twenty hand over a person — an Emberkin
-   engineer at #6, a cat navigator at #13, a frog appraiser at #19 — and one
-   each from the three peoples whose region the player has just finished
-   crossing. Crew is still open (§7.2); this line is the strongest argument yet
-   for settling it, because #14 and #20 are gated behind having one.
+1. ~~**Crew as a reward.**~~ Done, as far as the line needs. Three of the
+   twenty hand over a person — Brikka the Emberkin engineer at #6, Celia the cat
+   navigator at #13, Wicket the frog appraiser at #19 — one each from the three
+   peoples whose region the player has just finished crossing. Finishing one
+   of those quests fills that berth and the Crew menu shows who is in it. What
+   a crew member *does* is still open (§7.2); the quests no longer wait on it.
 2. **Faction reputation.** #7 and #10 pay in it. The game keeps reputation per
    *people*, not per house, and the Emberkin are explicitly factional — so
    either the Emberkin score splits into houses, or "faction reputation" means
@@ -594,13 +666,10 @@ nowhere to press. That is the last piece.
    one step per line and closes when they are all aboard at the destination.
 5. **Things in space that are not ports**, for #14 and #15. Still open, and
    still the only part of the line that needs new flight.
-6. **A quest board.** Twenty quests do not arrive by uncle. Where a player
-   picks the next one up — a port's Talk tab, a notice board, a character who
-   follows them — is not decided, and it is now the only way work reaches a
-   ship: the randomly generated contract board that used to sit behind a
-   Passengers tab has been removed, along with passengers themselves. Quests
-   are the whole of it, and taking one on already works; there is simply
-   nowhere to press.
+6. ~~A quest board.~~ Done: the dock menu's Requests tab lists the jobs the
+   port you are tied up at is offering, and a ship can hold three at once.
+   The randomly generated contract board that used to sit behind a Passengers
+   tab is gone, along with passengers themselves; quests are the whole of it.
 
 ### 5.3 Notes Against the Goods Table
 
@@ -628,7 +697,7 @@ parts to Slate, fire crystals to Veyra (who love them), reactor coils to Nail
 
 ## 6. Technical Notes
 
-**Decided since the first draft.** Reaches are computed from mass rather than written down (2.1), and the invariant checker proves the promises a hand-tuned table used to make. The Belt is decorative — a field of drawn rocks — and the two cat havens inside it are massless rendezvous zones with a harbour mouth rather than bodies with a well, as are the Arc and the Maw: a pilot arrives at those by matching speeds, not by falling in.
+**Decided since the first draft.** Reaches are computed from mass and harbour mouths from size rather than written down (2.1, 2.3), and the invariant checker proves the promises a hand-tuned table used to make. The Belt is decorative — a field of drawn rocks — and the two cat havens inside it are massless rendezvous zones with a harbour mouth rather than bodies with a well, as are the Arc and the Maw: a pilot arrives at those by matching speeds, not by falling in.
 
 **Still to tune.** Gravity-assist approaches at Grumm, and the Δv ladder between the tanks now that the map has been respaced.
 
@@ -638,31 +707,47 @@ parts to Slate, fire crystals to Veyra (who love them), reactor coils to Nail
 
 ### 7.1 Player Character — TBD
 
-A leading proposal is that the player is an otter who left their raft. That would explain flying solo, make the player a slight outsider in their own culture, and give each crew member the role of a surrogate raft. The alternative is leaving the player's species open or customizable.
+The shipped Crew menu names the captain **Finn**, an otter who left their raft. That explains flying solo, makes the player a slight outsider in their own culture, and gives each crew member the role of a surrogate raft. Leaving the species open or customizable is still the alternative, and the card is one line of `narrative.json` if it changes; the captain's own blurb is written without a pronoun so a change of species costs nothing.
 
 ### 7.2 Crew — TBD
 
-**There is a Crew menu now**, reachable docked or in flight. It shows the
-captain with a pixel-art portrait and three berths — Missing Engineer, Missing
-Navigator, Missing Appraiser — and nothing else about them. An empty berth
-names the job and keeps the rest: who does that work and where you would have
-to go to ask is something to find out, not something the menu tells you before
-you have been anywhere. The three are the three jobs in the line that pay in a
-person (§5), so the menu is the shape of the answer rather than the answer:
-`state.crew` carries a slot per berth and every one of them is null.
+**The three berths fill.** The Crew menu is reachable docked or in flight. It
+shows Finn with a pixel-art portrait, then three berths — Engineer,
+Navigator, Appraiser — and each is the reward for one of the three quests in
+the line that pays in a person (§5). Until that quest is finished the berth
+reads only **Missing Engineer** and shows an empty chair: who does that work
+and where you would have to go to ask is something to find out, not something
+the menu tells you before you have been anywhere. Finish the quest and the
+berth fills with a name, a species, a portrait and a line:
+
+| Berth | Who | People | From |
+|---|---|---|---|
+| Engineer | Brikka | Emberkin | #6 Engine Trouble |
+| Navigator | Celia | Cats | #13 A Cat's Request |
+| Appraiser | Wicket | Frogs | #19 Appraisal |
+
+`state.crew` carries a slot per berth, null until earned and then `{ role,
+from, joinedAt }` — who they are, which job brought them, and when. That is
+deliberately all of it: **a crew member does nothing yet.** No bonus, no
+discount, no change to flight. The berth is a record of a journey taken, and
+whatever crew eventually do can be added to the slot without touching how they
+arrive.
 
 The captain is drawn as an otter. §7.1 still has that down as a proposal, but
 the shipped fiction already leans that way — the game opens among otters, and
 Uncle Theo and Aunt Nellie are family — so the portrait follows the fiction
-and is written to be the one sprite in the game that is easy to replace.
+and is written to be the one sprite in the game that is easy to replace. All
+five portraits — captain, the three crew, and the empty chair — are 24×24
+character grids in `sprites.js` sharing one ink legend, drawn to a cached data
+URL by `portraitURL(id)`.
 
-What is still open is everything the berths are for: how somebody is recruited
-beyond "a quest pays in them", whether crew have mechanical effects or are
-purely narrative, and whether three is the number.
+What is still open is everything the berths are for: whether crew have
+mechanical effects or are purely narrative, whether anybody can be recruited
+outside the quest line, and whether three is the number.
 
 Crew reacting to the player's burns is a desired feature, working as characterization, soft tutorial, and feedback on skill. Early flavor notes per species: Emberkin crew cheer big burns and complain through long coasts. Otter crew are chatty, point out sights, and grow anxious when the radio goes quiet. Cat crew love tight slingshots, mock safe routes, and are secretly terrified of landing. Frog crew hum during coasts, dislike high-g burns, and never complain about the slow road.
 
-Open questions include how crew are recruited, how many the ship can carry, whether crew have mechanical effects or are purely narrative, and how crew relate to the player's standing with each species.
+How crew relate to the player's standing with each species is also unsettled: each of the three comes from the people whose region their quest crosses, so reputation and crew already move together in the fiction without being wired together in the code.
 
 ### 7.3 Events — TBD
 
