@@ -448,28 +448,28 @@ export const NARRATIVE = {
   },
   {
    "step": "mark",
-   "title": "Make a mark",
-   "body": "Good. Let's get that present. Tap the white line you are riding and pick 'Plan a burn'.\n\nDon't worry about where you put it. We'll fix that next."
+   "title": "Plan a burn",
+   "body": "Good. Let's get that present. Tap the white line you are riding and choose 'Plan a burn'.\n\nA planned burn is a point on your path where the engine will fire and change your speed. Nothing happens yet: you keep coasting until the clock reaches it, and until then you can move it or change it as much as you like.\n\nDon't worry about where you put it. We'll fix that next."
   },
   {
    "step": "push",
    "title": "Push it out to Slate's height",
-   "body": "Four arrows appeared around the mark. Green adds speed. Orange takes it back.\n\nGreen pushes the far side of your orbit outward. Press green until the yellow line reaches Slate's circle.\n\nWithin a tenth is close enough."
+   "body": "Four arrows appeared around the burn. Green adds speed. Orange takes it back.\n\nGreen pushes the far side of your orbit outward. Press green until the yellow line reaches Slate's circle.\n\nWithin a tenth is close enough."
   },
   {
    "step": "aim",
    "title": "Put Slate in the way",
-   "body": "Perfect. You'll reach Slate's circle — but not Slate.\n\nDrag the mark around your orbit until the yellow line crosses that circle about thirty degrees ahead of Slate. It has to travel while you do.\n\nWhen the chart says it has found Slate, you're set."
+   "body": "Perfect. You'll reach Slate's circle, but not Slate.\n\nSlate is moving: the little arrow on its circle shows which way. Drag the burn around your orbit until the yellow line crosses Slate's circle about thirty degrees ahead of Slate, so you both arrive together.\n\nIf a red cross appears, you'd hit the ground. Nudge the burn until it goes."
   },
   {
    "step": "skip",
    "title": "Don't sit there watching",
-   "body": "You don't have to wait around. Tap your path past the mark and choose 'Warp here'.\n\nTime runs itself, and the burn fires on its own. Keep going until you're inside Slate's gravity."
+   "body": "You don't have to wait around. Tap your path past the burn and choose 'Warp here'.\n\nTime runs itself, and the burn fires on its own when the clock reaches it. Keep going until you're inside Slate's gravity."
   },
   {
    "step": "brake",
    "title": "Fall in, then stop falling",
-   "body": "You've made it to Slate. You're just going too fast.\n\nMake a mark near the low point and press orange to slow down. Slowing down here is what stops you flying back out.\n\nKeep pressing orange until the path closes into a loop."
+   "body": "You've made it to Slate. You're just going too fast, and the path flies straight back out.\n\nPlan a burn near the low point and press orange to slow down. Slowing down here pulls the far side in. Tap orange one press at a time until the path closes into a loop.\n\nGone too far and the loop is shrinking toward the ground? Press green once."
   },
   {
    "step": "lower",
@@ -484,7 +484,7 @@ export const NARRATIVE = {
   {
    "step": "leave",
    "title": "Climb back out",
-   "body": "Halfway there! Cast off and press green until the path opens and lets go of Slate."
+   "body": "Halfway there! Three things.\n\nCast off from the Shipyard tab. Tap the white line and plan a burn. Press green until the loop opens and the path leaves Slate's circle; the chart marks the way out.\n\nThen warp past the burn and keep going until you're back in Tassel's gravity."
   },
   {
    "step": "home",

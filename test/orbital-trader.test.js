@@ -8,7 +8,7 @@ import {
   CONST, BODIES, GOODS, PORTS, UPGRADES, FORMULAS, TEXT, GLOSSARY, SPECIES, BELT_ROCKS,
 } from '../public/orbital-trader/content.js';
 import * as S from '../public/orbital-trader/sim.js';
-import { createChart, railCrossings, PALETTE } from '../public/orbital-trader/render.js';
+import { createChart, railCrossings, railLead, locateOnPrediction, PALETTE } from '../public/orbital-trader/render.js';
 import { DURATION, BREACH, BEATS, beatAt, ascent, skyAt, ROCKET } from '../public/orbital-trader/intro.js';
 
 /* Orbital Trader has no server: everything it knows is in public/ and is
@@ -820,6 +820,145 @@ test('the harbour mouth wears an anchor, and only when it is the harbour you are
   } finally { chart.restore(); }
   assert.ok(strokes(waiting).includes(PALETTE.zoneWait), 'a mouth you cannot use yet is not drawn in the waiting colour');
   assert.ok(flukes(waiting), 'and it still wears its anchor');
+});
+
+/* ----------------------------------------------------- the playtest fixes */
+
+/* The opening orbit with a burn a third of a lap ahead, pushed out to Slate's
+ * height: the state card seven leaves a player in, and the one both testers
+ * broke by dragging the mark. */
+function pushedToSlate(){
+  const g = S.newGame(5);
+  const tas = world.get('tassel');
+  const P = O.elementsFromState(tas.mu, g.ship.r, g.ship.v).period;
+  const ix = S.addNode(g, g.t + 0.3 * P);
+  const r = O.norm(g.ship.r), vc = Math.sqrt(tas.mu / r);
+  g.nodes[ix].prograde = vc * (Math.sqrt(2 * world.get('slate').a / (r + world.get('slate').a)) - 1);
+  return { g, ix, P };
+}
+
+test('dragging a mark a little earlier never throws it laps into the future', () => {
+  /* Both testers hit this inside ten minutes. Once the burn is pushed out to
+     a moon, the yellow road it makes is an ellipse that returns to the very
+     pixel the mark sits on, one whole transfer later — twenty-one parking
+     laps here. A finger a few pixels off the white line caught that return
+     leg, and "a little earlier" became "after lunch". The ship then went
+     round twenty-one times waiting for it. */
+  const chart = stubChart(1000, 800);
+  try{
+    const { g, ix, P } = pushedToSlate();
+    let pred = S.planImmediate(g);
+    const n = g.nodes[ix];
+    chart.camera.follow = 'tassel'; chart.camera.zoom = 6e6;
+    const frame = () => {
+      chart.camera.anchor = [...O.absState(world, 'tassel', g.t).r]; chart.settle();
+      chart.draw({ t: g.t, now: 0, shipAbs: { r: S.shipAbsPos(g), v: S.shipAbsVel(g) }, shipBody: 'tassel',
+        prediction: pred, nodes: g.nodes, nodePositions: [], selectedNode: 0, apses: [], railCrossings: [] });
+    };
+    frame();
+    const centre = chart.toScreen(O.absState(world, 'tassel', g.t).r);
+    const rpx = O.norm(g.ship.r) * chart.camera.zoom;
+    const th0 = Math.atan2(g.ship.r[1], g.ship.r[0]);
+    const dir = Math.sign(O.cross(g.ship.r, g.ship.v)) || 1;
+    const t0 = n.t;
+    // The pointer is never exactly on the line: sweep backwards at a few offsets.
+    for(const off of [-5, 0, 5, 10, 15]){
+      n.t = t0; pred = S.planImmediate(g); frame();
+      for(let deg = 108; deg >= -300; deg -= 3){
+        const th = th0 + dir * deg * Math.PI / 180;
+        const x = centre[0] + (rpx + off) * Math.cos(th), y = centre[1] - (rpx + off) * Math.sin(th);
+        const before = n.t;
+        const t = chart.dragNodeTime(x, y, pred, g.t, g.nodes, ix);
+        if(t == null) continue;
+        assert.ok(Math.abs(t - before) <= P * 0.5 + 1e-9, `offset ${off}px at ${deg}°: one move took the mark ${((t - before) / P).toFixed(1)} laps`);
+        n.t = t; pred = S.planImmediate(g); frame();
+        assert.ok(n.t - g.t < P * 1.5, `offset ${off}px at ${deg}°: the mark is ${((n.t - g.t) / P).toFixed(1)} laps out`);
+      }
+    }
+    /* And the rule refuses, it does not freeze: dragged a little way along the
+       line the mark still comes. */
+    n.t = t0; pred = S.planImmediate(g); frame();
+    const th = th0 + dir * (108 - 20) * Math.PI / 180;
+    const t = chart.dragNodeTime(centre[0] + rpx * Math.cos(th), centre[1] - rpx * Math.sin(th), pred, g.t, g.nodes, ix);
+    assert.ok(t != null && t < t0 && t0 - t < P * 0.2, 'a small drag earlier still moves the mark a little earlier');
+  } finally { chart.restore(); }
+});
+
+test('a world wears a lead on its rail that points the way it is going', () => {
+  /* Card seven asks for a mark thirty degrees *ahead* of Slate, and two
+     players could not tell ahead from behind on a grey circle. The lead is a
+     short bright stretch of rail in front of the world, with a chevron. It
+     comes from the same function that places the world, so it is on the
+     rail — checked here for every world at a zoom where its rail is drawn,
+     Croak included, which goes the other way round. */
+  const chart = stubChart(1000, 800);
+  try{
+    for(const b of world.bodies){
+      if(b.parent == null) continue;
+      const parent = world.get(b.parent);
+      chart.camera.follow = b.parent; chart.camera.anchor = [...O.absState(world, b.parent, 0).r]; chart.settle();
+      chart.camera.zoom = 200 / b.a;                    // the rail is 200 px across
+      const centre = O.absState(world, b.parent, 0).r;
+      const lead = railLead(chart, b, centre, parent.mu, 0);
+      assert.ok(lead, `${b.id} has no lead at a size where it should`);
+      const here = chart.toScreen(O.add(centre, O.railState(b, parent.mu, 0).r));
+      const v = O.railState(b, parent.mu, 0).v;
+      const vS = [v[0], -v[1]];
+      // The head is ahead of the world along its motion, not behind it.
+      const toHead = [lead.head[0] - here[0], lead.head[1] - here[1]];
+      assert.ok(toHead[0] * vS[0] + toHead[1] * vS[1] > 0, `${b.id}: the lead points backwards`);
+      // Clear of the world's own disc, and not a whole lap away.
+      const d = Math.hypot(toHead[0], toHead[1]);
+      assert.ok(d > (b.radius ?? 0) * chart.camera.zoom + 4 && d < 60, `${b.id}: the lead is ${d.toFixed(0)} px from the world`);
+      // Every point of the arc is on the rail.
+      for(const q of lead.arc){
+        const w = chart.toWorld(q);
+        const rel = O.sub(w, centre);
+        const th = Math.atan2(rel[1], rel[0]);
+        const e = b.e ?? 0, om = b.omega ?? 0;
+        const railR = e ? b.a * (1 - e * e) / (1 + e * Math.cos((b.retrograde ? -th : th) - om)) : b.a;
+        assert.ok(Math.abs(O.norm(rel) - railR) < b.a * 1e-3, `${b.id}: the lead leaves the rail`);
+      }
+      // The chevron faces the way the rail is walked.
+      const dot = Math.cos(lead.angle) * vS[0] + Math.sin(lead.angle) * vS[1];
+      assert.ok(dot > 0, `${b.id}: the chevron faces backwards`);
+    }
+    // Too small on screen and there is no lead: a chevron on a dot is clutter.
+    chart.camera.zoom = 10 / world.get('slate').a;
+    assert.equal(railLead(chart, world.get('slate'), [0, 0], world.get('tassel').mu, 0), null);
+  } finally { chart.restore(); }
+});
+
+test('the point that was tapped stays on the chart while the card is open', () => {
+  /* Two roads can lie a few pixels apart, and the card that opens names a
+     time rather than a place. Both testers wanted to see which line they had
+     hit before pressing anything. */
+  const ops = [];
+  const chart = stubChart(800, 600, ops);
+  try{
+    const g = S.newGame(5); const pred = S.planImmediate(g);
+    chart.camera.follow = 'tassel'; chart.camera.anchor = [...O.absState(world, 'tassel', 0).r]; chart.settle();
+    const t = g.t + 0.004;
+    const where = locateOnPrediction(world, pred, t);
+    const view = { t: g.t, now: 0, shipAbs: { r: S.shipAbsPos(g), v: S.shipAbsVel(g) }, shipBody: 'tassel',
+      prediction: pred, nodes: [], nodePositions: [], apses: [], railCrossings: [] };
+    chart.draw(view);
+    const rings = () => ops.filter(o => o[0] === 'arc' && Math.abs(o[3] - 9) <= 2.01).length;
+    const before = rings();
+    ops.length = 0;
+    chart.draw({ ...view, tapMark: where });
+    assert.ok(rings() > before, 'nothing was drawn at the tapped point');
+  } finally { chart.restore(); }
+});
+
+test('the page keeps the playtest fixes wired', () => {
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.match(PLAY, /chart\.dragNodeTime\(/, 'a dragged mark no longer goes through the chart rule');
+  assert.match(PLAY, /tapMark = t;/, 'a tap on the road no longer leaves a mark while the card is up');
+  assert.match(PLAY, /tapMark: tapMark != null/, 'the tap mark never reaches the chart');
+  assert.match(PLAY, /tapMark = null; \}/, 'the tap mark is never cleared');
+  /* Card seven: a road through the middle of the moon is not aimed. */
+  assert.match(PLAY, /const aimed = \([^\n]*\) && !hits;/, 'the aiming card passes a path into the ground');
 });
 
 test('only the first crossing is marked, however many the road makes', () => {

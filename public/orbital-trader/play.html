@@ -655,6 +655,10 @@ const belt = { inner: CONST.BELT.inner, outer: CONST.BELT.outer, rocks: BELT_ROC
 addEventListener('resize', () => chart.resize());
 
 let prediction = null, nodePositions = [], apses = [], crossedRails = [], predictedAt = -1, predictedReal = -1e9;
+/* The moment on the road that was just tapped, while the card about it is
+   up: drawn as a breathing ring so the player can see which line they hit
+   before choosing what to do with it. Gone when the card closes. */
+let tapMark = null;
 let selectedNode = -1;
 let panelOpen = innerWidth > 760;
 let tab = null;
@@ -787,6 +791,7 @@ function frame(now){
   chart.draw({
     t: state.t, now, shipAbs, shipBody: state.ship.body, docked: !!state.dockedAt,
     prediction, nodes: state.nodes, nodePositions, selectedNode, apses, railCrossings: crossedRails,
+    tapMark: tapMark != null && prediction && !state.dockedAt ? locateOnPrediction(world, prediction, tapMark) : null,
     editing: selectedNode >= 0 && !!state.nodes[selectedNode],
     shipLocalV: state.dockedAt ? null : state.ship.v,
     nodeLabel, interceptLabel, insetLabel,
@@ -967,6 +972,7 @@ function askSkip(t, what){
    burn down at that moment, or skip the clock to it. One gesture, two big
    buttons, and the time to that point on the card either way. */
 function askAtPath(t){
+  tapMark = t;
   /* One mark at a time while the lesson is running. The button is simply not
      available — no toast, no explanation: a beginner who has not been told
      they may have six does not need telling they may not. */
@@ -1112,23 +1118,14 @@ canvas.addEventListener('pointermove', e => {
   if(drag.kind === 'node'){
     if(Math.hypot(dx, dy) > 4) drag.moved = true;
     if(!drag.moved || !prediction) return;
-    const p = chart.nearestPathPoint(e.clientX, e.clientY, prediction, state.t);
-    if(p){
-      const n = state.nodes[drag.index];
-      // Only slide within the leg the node is on, so it cannot jump past a later node.
-      const later = state.nodes.find((o, i) => i !== drag.index && o.t > n.t);
-      const earlier = [...state.nodes].reverse().find((o, i) => state.nodes.indexOf(o) !== drag.index && o.t < n.t);
-      let t = p.t;
-      /* The chart draws one lap of a leg however many it holds, so the times
-         under the pointer only ever span that lap. Dragging a mark that sits
-         three laps along would otherwise snap it back to the first one, where
-         it fires at once and vanishes — so put it back on the lap it was on.
-         Sliding it right round the ellipse still moves it a lap at a time. */
-      const P = p.seg?.elements?.period;
-      if(p.seg?.lapped && Number.isFinite(P) && P > 0) t += Math.round((n.t - t) / P) * P;
-      if(later) t = Math.min(t, later.t - 1e-3);
-      if(earlier) t = Math.max(t, earlier.t + 1e-3);
-      n.t = Math.max(state.t + 1e-3, t);
+    /* Where the mark goes is the chart's rule (render.js, dragNodeTime): the
+       time under the pointer, kept on its lap, between its neighbours, and
+       never more than half a lap from where it was in one move. A finger a
+       few pixels off the line used to catch the yellow road's return leg and
+       throw the burn twenty laps out. */
+    const t = chart.dragNodeTime(e.clientX, e.clientY, prediction, state.t, state.nodes, drag.index);
+    if(t != null){
+      state.nodes[drag.index].t = t;
       replan(true); if(tab === 'plan') renderTab();
     }
   }
@@ -1907,7 +1904,7 @@ function openModal(html, wireFn){
   const first = modal.querySelector('.btn.primary') ?? modal.querySelector('button');
   if(first) first.focus();
 }
-function closeModal(){ if(modal.open) modal.close(); modal.innerHTML = ''; }
+function closeModal(){ if(modal.open) modal.close(); modal.innerHTML = ''; tapMark = null; }
 modal.addEventListener('cancel', e => { if(state.pending) e.preventDefault(); });
 
 function showToll(p){
@@ -2022,7 +2019,12 @@ function tutorialTests(){
   const reached = !!state.flags.reachedTarget;
   const bought = (state.quests ?? []).some(q => q.id === 'pebble' && (q.step >= 1 || q.done));
   const atTarget = state.ship.body === target;
-  const aimed = segs.some(sg => sg.body === target) || prediction?.intercept?.body === target;
+  /* Aimed means the road reaches the moon *and misses the ground*. "Put Slate
+     in the way" was being read literally: a road through the middle of the
+     moon passed this card, and card nine then opened on a ship falling into
+     a rock it had been told to slow down at. */
+  const hits = !!prediction?.intercept?.grazes || (prediction?.events ?? []).some(e => e.kind === 'crash');
+  const aimed = (segs.some(sg => sg.body === target) || prediction?.intercept?.body === target) && !hits;
   const highEnough = Number.isFinite(raAfter) && Math.abs(raAfter - moon.a) <= moon.a * 0.1;
   const dockableAt = id => state.dockedAt === id || (docking?.port === id && docking.ok);
 

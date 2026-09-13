@@ -52,6 +52,12 @@ The four directions are drawn around the mark on the chart as well, growing with
 
 Planning is free. Nothing is spent until the clock reaches the mark, and a mark can be moved, re-pressed, zeroed or scrapped.
 
+**The tapped point stays on the chart while the card is up.** Two roads can lie a few pixels apart — the one you are on and the one a burn would put you on — and the card that opens names a time, not a place. A breathing ring marks the exact point that was tapped until the card closes, so a player can see which line they hit before pressing anything on it.
+
+**A drag is continuous.** Moving a mark along the road takes the time under the pointer, kept on the lap it was on and between its neighbours — and never more than half a lap from where it was in one pointer event. That last rule closed a bug two playtesters found in ten minutes: once a burn is pushed out to a moon, the yellow road it makes is an ellipse that returns to the very pixel the mark sits on, one whole transfer later, so a finger a few pixels off the white line caught the return leg and put the burn twenty-one laps into the future. A move that far is a misread, not a drag, and is refused.
+
+**A planned burn is what the lesson calls it.** "Burn" alone meant nothing to two new players; the card that introduces it now says what it is — a point on your path where the engine will fire and change your speed, and nothing happens until the clock gets there.
+
 Burns are **instantaneous impulses**. What you plan is exactly what you get, which removes execution error and keeps the challenge in route design rather than timing reflexes.
 
 ### 2.3 Arrival, and Why There Is No Landing
@@ -146,6 +152,8 @@ Two rules keep the chart readable, and both of them are about refusing to show t
 The road has three voices and they always mean the same thing: the orbit you are on now, the orbit your burns put you on, and the orbit waiting on the far side of the crossing.
 
 A road that predicts nine encounters is a road nobody can read, and every prediction past the first is a guess that a single burn will erase anyway. One crossing at a time is enough.
+
+**Every drawn rail carries a lead: a short bright stretch just ahead of its world, ending in a chevron.** Which way a moon is going is the first thing an aiming card asks a player to know — "thirty degrees ahead of Slate" — and on a faint grey circle two new players could not tell ahead from behind. The lead is sampled from the same function that places the world, so it sits on the rail rather than on a tangent to it, and it is left off rails too small on screen to carry one.
 
 **Where the road first cuts a world's rail, the chart says where that world
 will be.** Two orange diamonds, and nothing joining them: one on the road at

@@ -46,6 +46,11 @@ export const PALETTE = {
   orbit:      'rgba(245,234,214,0.13)',
   orbitMoon:  'rgba(245,234,214,0.20)',
   orbitFocus: 'rgba(245,234,214,0.30)',
+  /* The short bright stretch of rail just ahead of a world, ending in a
+     chevron: which way it is going. Card seven asks a beginner to put a
+     mark thirty degrees *ahead* of a moon, and two of them could not tell
+     ahead from behind on a faint grey circle. */
+  orbitLead:  'rgba(245,234,214,0.80)',
   soi:        'rgba(245,154,46,0.05)',
   soiEdge:    'rgba(245,154,46,0.30)',
   /* The harbour mouth. It was dim enough to lose against a bright road drawn
@@ -239,6 +244,7 @@ export function createChart(canvas, world, opts = {}){
   chart.hitTest = (x, y) => hitTest(chart, x, y);
   chart.nearestPathPoint = (x, y, prediction, t) => nearestPathPoint(chart, x, y, prediction, t);
   chart.nearestRailPoint = (x, y, t) => nearestRailPoint(chart, x, y, t);
+  chart.dragNodeTime = (x, y, prediction, t, nodes, index) => dragNodeTime(chart, x, y, prediction, t, nodes, index);
   chart.resize();
   return chart;
 }
@@ -294,6 +300,7 @@ function draw(chart, view){
   if(view.prediction) drawPrediction(chart, view, pos);
   drawShip(chart, view);
   if(view.prediction && view.nodes) drawNodes(chart, view, pos);
+  if(view.tapMark) drawTapMark(chart, view, pos);
   if(view.prediction) drawEncounterInset(chart, view);
   if(chart.showScale) drawScaleBar(chart);
 }
@@ -405,6 +412,49 @@ function drawOrbits(chart, pos, t){
     chart.hits.rails.push({ id: b.id, el: b, mu: world.get(b.parent).mu, centre: parent });
   }
   ctx.setLineDash([]);
+  /* Then the lead on each of them, over the rail so it reads as part of it. */
+  for(const rail of chart.hits.rails){
+    const lead = railLead(chart, rail.el, rail.centre, rail.mu, t);
+    if(!lead) continue;
+    ctx.strokeStyle = PALETTE.orbitLead; ctx.lineWidth = 1.5;
+    ctx.lineJoin = ctx.lineCap = 'round';
+    ctx.beginPath();
+    lead.arc.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]));
+    ctx.stroke();
+    const [hx, hy] = lead.head, a = lead.angle;
+    ctx.beginPath();
+    ctx.moveTo(hx - 5 * Math.cos(a - 0.6), hy - 5 * Math.sin(a - 0.6));
+    ctx.lineTo(hx, hy);
+    ctx.lineTo(hx - 5 * Math.cos(a + 0.6), hy - 5 * Math.sin(a + 0.6));
+    ctx.stroke();
+    ctx.lineJoin = ctx.lineCap = 'butt';
+  }
+}
+
+/* The stretch of rail just ahead of a world, in screen space: a short arc
+ * starting clear of the world's own disc and running a couple of dozen
+ * pixels along the way it is going, and the pose of the chevron at its end.
+ * Sampled from the same rail function that places the world, so the arc is
+ * on the rail and not on a tangent to it. Null when the rail is too small on
+ * screen for a lead to be anything but clutter. */
+export function railLead(chart, el, centre, mu, t){
+  const zoom = chart.camera.zoom;
+  if(!(el.a * zoom >= 30)) return null;
+  const now = railState(el, mu, t);
+  const pxPerDay = norm(now.v) * zoom;
+  if(!(pxPerDay > 0)) return null;
+  const clear = Math.max(6, (el.radius ?? 0) * zoom + 4);   // start outside the disc
+  const length = 22;
+  const arc = [];
+  const N = 6;
+  for(let i = 0; i <= N; i++){
+    const along = clear + (length * i) / N;
+    const st = railState(el, mu, t + along / pxPerDay);
+    arc.push(chart.toScreen(add(centre, st.r)));
+  }
+  const end = railState(el, mu, t + (clear + length) / pxPerDay);
+  const angle = Math.atan2(-end.v[1], end.v[0]);    // screen y is down
+  return { arc, head: arc[N], angle };
 }
 
 function drawSoiRings(chart, pos){
@@ -845,6 +895,25 @@ function drawShip(chart, view){
   }
 }
 
+/* The point that was just tapped, while the card asking what to do with it
+ * is open. Two lines can run a few pixels apart on this chart — the road you
+ * are on and the one a burn would put you on — and the card that opens says
+ * a time, not a place. Both testers wanted to see which line they had hit
+ * before they pressed anything on it. So: a ring on the road at that moment,
+ * breathing so it is not mistaken for a mark already written down, and it
+ * goes when the card does. */
+function drawTapMark(chart, view, pos){
+  const { ctx } = chart;
+  const m = view.tapMark;
+  if(!m || !pos.has(m.body)) return;
+  const p = chart.toScreen(add(pos.get(m.body).r, m.r));
+  const breath = chart.reducedMotion ? 0 : Math.sin((view.now ?? 0) / 180);
+  ctx.strokeStyle = PALETTE.pathNow; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(p[0], p[1], 9 + 2 * breath, 0, Math.PI * 2); ctx.stroke();
+  ctx.fillStyle = PALETTE.pathNow;
+  ctx.beginPath(); ctx.arc(p[0], p[1], 3, 0, Math.PI * 2); ctx.fill();
+}
+
 /* Maneuver nodes. A ring on the road at the moment the burn fires; when it is
  * open, four arrows around it and a cross beside it. That is the whole
  * editor — no panel, no card over the sky, nothing to cover a phone. The
@@ -1117,6 +1186,47 @@ function nearestPathPoint(chart, x, y, prediction, tNow){
   }
   if(!best || best.d > 18 || best.t <= (tNow ?? -Infinity)) return null;
   return best;
+}
+
+/* Where a dragged mark goes: the time under the pointer, kept on the lap the
+ * mark was on, kept between its neighbours, and never further from where it
+ * was than half a lap in one move.
+ *
+ * That last rule is the fix for a bug two playtesters found inside ten
+ * minutes. Once a burn is pushed out to a moon, the yellow road it makes is
+ * a long ellipse that comes back to the very place the mark sits — so the
+ * pixels just behind the mark belong to two legs at once: the white orbit
+ * you are on, a few minutes ahead, and the yellow ellipse's return, one
+ * whole transfer later. A finger a few pixels off the white line picked the
+ * yellow one, and a drag meant as "a little earlier" put the burn twenty-one
+ * laps into the future. The ship then dutifully went round twenty-one times
+ * waiting for it. A drag is continuous; a mark that has moved further than
+ * half of its own orbit in one pointer event has not been dragged there, it
+ * has been misread, so the move is refused and the mark stays put. */
+function dragNodeTime(chart, x, y, prediction, tNow, nodes, index){
+  const p = nearestPathPoint(chart, x, y, prediction, tNow);
+  if(!p) return null;
+  const n = nodes[index];
+  if(!n) return null;
+  const later = nodes.find((o, i) => i !== index && o.t > n.t);
+  const earlier = [...nodes].reverse().find(o => nodes.indexOf(o) !== index && o.t < n.t);
+  let t = p.t;
+  /* The chart draws one lap of a leg however many it holds, so the times
+     under the pointer only ever span that lap. A mark three laps along would
+     otherwise snap back to the first, where it fires at once and vanishes —
+     so put it back on the lap it was on. */
+  const P = p.seg?.elements?.period;
+  if(p.seg?.lapped && Number.isFinite(P) && P > 0) t += Math.round((n.t - t) / P) * P;
+  /* The orbit the mark is on: the leg that ends at it, which is the road it
+     is being dragged along. Half of that lap is as far as one move may go;
+     a leg with no lap (an escape) allows its own length. */
+  const own = prediction.segments.find(sg => n.t >= sg.t0 - 1e-9 && n.t <= sg.t1 + 1e-9) ?? prediction.segments[0];
+  const ownP = own?.elements?.period;
+  const reach = Number.isFinite(ownP) && ownP > 0 ? ownP * 0.5 : own ? Math.max(1e-6, own.t1 - own.t0) : Infinity;
+  if(Math.abs(t - n.t) > reach) return null;
+  if(later) t = Math.min(t, later.t - 1e-3);
+  if(earlier) t = Math.max(t, earlier.t + 1e-3);
+  return Math.max(tNow + 1e-3, t);
 }
 
 /* Nearest point on a world's rail to a screen point, and the moment that
