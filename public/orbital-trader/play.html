@@ -710,9 +710,11 @@ function replan(force = false){
         ? 'this path hits it'
         : `${fmtAu(ic.altitude)} · ${S.fmtKms(ic.speed)}${ic.inMouth ? ' · in docking range' : ''}`)
     : null;
-  /* Every rail the road cuts across, and where that world will be when it
-     does. Worked out here rather than every frame: it is a bisection per
-     crossing, and it only changes when the road does. */
+  /* The first rail the road cuts across, and where that world will be when it
+     does. Every crossing is found, because the soonest one is not the first
+     one discovered — bodies are walked in turn, not in time — and then all
+     but that one is dropped. Worked out here rather than every frame: it is a
+     bisection per crossing, and it only changes when the road does. */
   crossedRails = railCrossings(world, prediction, state.t, { minLead: S.MIN_LEAD });
   apses = [];
   prediction.segments.forEach((seg, i) => {

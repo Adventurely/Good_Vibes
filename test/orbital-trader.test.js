@@ -733,7 +733,8 @@ function transferShip(from = 'tassel', toRadius = 0.6){
 test('a rail crossing sits on the rail, and the world is marked where it will really be', () => {
   const g = transferShip();
   const pred = S.planImmediate(g);
-  const list = railCrossings(world, pred, g.t, { minLead: S.MIN_LEAD });
+  // Asking for the lot, to check the arithmetic on every one of them.
+  const list = railCrossings(world, pred, g.t, { minLead: S.MIN_LEAD, limit: 8 });
   assert.ok(list.length >= 2, `a fall from 1 au to 0.6 au crosses something; found ${list.length}`);
   assert.ok(list.some(c => c.body === 'veyra'), 'including the rail it was aimed at');
 
@@ -752,8 +753,43 @@ test('a rail crossing sits on the rail, and the world is marked where it will re
     assert.ok(O.dist(c.ghost, O.absState(world, c.body, c.t).r) < 1e-12, `${b.name}: the ghost is not where the world is`);
     assert.ok(c.t > g.t, 'and it is ahead, not behind');
   }
-  // Soonest first, so a chart with room for a few shows the ones about to happen.
+  // Soonest first, so the one that survives the cap is the one about to happen.
   for(let i = 1; i < list.length; i++) assert.ok(list[i].t >= list[i - 1].t, 'crossings come in time order');
+});
+
+test('only the first crossing is marked, however many the road makes', () => {
+  /* The same refusal the road itself makes. A long ellipse cuts five rails
+     going out and the same five coming back, and ten honest pairs of orange
+     diamonds is a chart nobody can read. */
+  const g = transferShip();
+  const pred = S.planImmediate(g);
+  const all = railCrossings(world, pred, g.t, { minLead: S.MIN_LEAD, limit: 8 });
+  assert.ok(all.length > 1, 'this road makes more than one, so there is something to refuse');
+  const shown = railCrossings(world, pred, g.t, { minLead: S.MIN_LEAD });
+  assert.equal(shown.length, 1, 'and only one is drawn');
+  assert.deepEqual(shown[0], all[0], 'the soonest one');
+
+  /* A long ellipse right out past the Belt, which is the case that made this
+     necessary: five rails, twice each. */
+  const wide = transferShip('tassel', 3.4);
+  wide.ship.v = O.scale(O.unit(wide.ship.v), O.norm(wide.ship.v) * 1.28);
+  const far = railCrossings(world, S.planImmediate(wide), wide.t, { minLead: S.MIN_LEAD, limit: 64 });
+  assert.ok(far.length >= 4, `the busy case needs to be busy; found ${far.length}`);
+  assert.equal(railCrossings(world, S.planImmediate(wide), wide.t, { minLead: S.MIN_LEAD }).length, 1);
+});
+
+test('nothing is drawn joining the pair', () => {
+  /* A dashed line between the two marks was the obvious thing to draw and the
+     wrong one: a straight line across a chart of curves reads as a path you
+     could fly. Checked at the source, because a line nobody can see in a
+     screenshot is exactly the kind of thing that comes back. */
+  const src = readFileSync(new URL('../public/orbital-trader/render.js', import.meta.url), 'utf8');
+  const fn = src.slice(src.indexOf('function drawRailCrossings'), src.indexOf('/* The intercept:'));
+  assert.ok(fn.length > 200, 'found the drawing pass');
+  /* `diamond` is a helper outside this function, so a lineTo in here is
+     something else being drawn — which is the thing that was removed. */
+  assert.doesNotMatch(fn, /setLineDash|lineTo/, 'something is drawing a line between the diamonds again');
+  assert.doesNotMatch(src, /railTie/, 'the tie colour is still in the palette');
 });
 
 test('the rail a ship is standing on is not a crossing', () => {

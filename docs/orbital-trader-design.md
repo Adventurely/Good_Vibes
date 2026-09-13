@@ -135,15 +135,23 @@ The road has three voices and they always mean the same thing: the orbit you are
 
 A road that predicts nine encounters is a road nobody can read, and every prediction past the first is a guess that a single burn will erase anyway. One crossing at a time is enough.
 
-**Where the road cuts a world's rail, the chart says where that world will be.**
-Two orange diamonds joined by a faint dashed tie: one on the road at the
-crossing, one on the rail at the place that world has reached by then. This is
-the reading interplanetary flight actually turns on. Crossing Veyra's orbit
-means nothing on its own — the road and the rail are both drawn, so the
+**Where the road first cuts a world's rail, the chart says where that world
+will be.** Two orange diamonds, and nothing joining them: one on the road at
+the crossing, one on the rail at the place that world has reached by then.
+This is the reading interplanetary flight actually turns on. Crossing Veyra's
+orbit means nothing on its own — the road and the rail are both drawn, so the
 crossing has always been visible — but crossing it with Veyra a quarter of a
-lap away means you left too early, and the tie is how much too early. Only
-rails that are on the screen are marked, only the soonest handful, and only one
-name per world however many times the road cuts its ring.
+lap away means you left too early, and the gap between the marks is how much
+too early.
+
+The same refusal as the road itself: **one crossing, the soonest, and no
+more.** A long ellipse cuts five rails going out and the same five coming
+back, and ten honest pairs of diamonds is a chart nobody can read. The rail
+also has to be on the screen — a crossing of a ring nobody can see is two
+marks in the dark with nothing to be against. And the pair is left unjoined
+on purpose: a dashed line between them was the obvious thing to draw and the
+wrong one, because a straight line across a chart of curves reads as a path
+you could fly.
 
 **Tapping a world's rail asks the clock to wait until that world gets there.**
 The other half of the same question. Everything else on the chart answers

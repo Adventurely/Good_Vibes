@@ -79,7 +79,6 @@ export const PALETTE = {
      diamonds is neither, which is the point — they are a question about
      timing, and the gap between them is the answer. */
   railCross:  '#f59a2e',
-  railTie:    'rgba(245,154,46,0.38)',
   prograde:   '#6cc24a',
   retrograde: '#f59a2e',
   radial:     '#5aa6e8',
@@ -693,14 +692,19 @@ function drawCrossings(chart, view, anchors, afterBurnAt){
   }
 }
 
-/* Cutting across a world's rail: two orange diamonds and a dashed tie.
+/* Cutting across a world's rail: two orange diamonds, and nothing joining
+ * them. A dashed tie between the pair was the obvious thing to draw and the
+ * wrong one — a straight line across a chart of curves reads as a path you
+ * could fly, which is the one thing it is not. Two marks of the same shape
+ * and colour already pair themselves.
  *
  * One sits where the road crosses the ring the world travels on; the other
  * sits where that world will actually be at that moment. That pair is the
- * whole of interplanetary timing. Crossing Veyra's rail means nothing on its
+ * whole of interplanetary timing, and it is drawn for the first crossing
+ * only. Crossing Veyra's rail means nothing on its
  * own — the chart has always drawn the crossing, because the rail and the
  * road are both on it — but crossing it with Veyra a quarter of a lap away
- * means you left too early, and the length of the tie says by how much.
+ * means you left too early, and the gap between the two says by how much.
  *
  * Both marks are drawn in the frame of the leg the crossing is on, not the
  * frame the rail is drawn in. Those are the same thing for the first leg,
@@ -723,11 +727,6 @@ function drawRailCrossings(chart, view, anchors){
      see is two orange diamonds floating in the dark with nothing to be
      against. */
   const drawn = new Set(chart.hits.rails.map(r => r.id));
-  /* One name per world, on the crossing you reach first. A road that cuts a
-     rail going in and again coming out earns two pairs of diamonds — both are
-     real and both are worth drawing — but not two labels saying the same word
-     a few pixels apart. */
-  const named = new Set();
   ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
   for(const c of list){
     if(!drawn.has(c.body)) continue;
@@ -738,12 +737,6 @@ function drawRailCrossings(chart, view, anchors){
     const out = s => s[0] < -80 || s[1] < -40 || s[0] > chart.width + 80 || s[1] > chart.height + 40;
     if(out(p) && out(q)) continue;
     const apart = Math.hypot(q[0] - p[0], q[1] - p[1]);
-    if(apart > 12){
-      ctx.strokeStyle = PALETTE.railTie; ctx.lineWidth = 1;
-      ctx.setLineDash([4, 4]);
-      ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); ctx.stroke();
-      ctx.setLineDash([]);
-    }
     ctx.strokeStyle = PALETTE.railCross; ctx.lineWidth = 1.5;
     diamond(ctx, p, 5); ctx.stroke();
     diamond(ctx, q, 5); ctx.stroke();
@@ -752,8 +745,7 @@ function drawRailCrossings(chart, view, anchors){
        is already saying so in words, and a third label on the same pixels is
        a pile rather than a chart. */
     const b = world.get(c.body);
-    if(b && apart > 18 && !out(q) && !named.has(c.body)){
-      named.add(c.body);
+    if(b && apart > 18 && !out(q)){
       ctx.fillStyle = PALETTE.textDim;
       ctx.fillText(labelFor(b), q[0] + 9, q[1] + 4);
     }
@@ -1154,7 +1146,11 @@ export function railCrossings(world, prediction, tNow, opts = {}){
      that has just left Tassel is sitting exactly on Tassel's rail, so the
      first sample is a crossing at t = now — true, useless, and drawn right
      on top of the ship. */
-  const { limit = 8, minLead = 0 } = opts;
+  /* One, unless a caller asks for more. A road that cuts five rails twice
+     over earns ten honest pairs of diamonds and becomes unreadable; the rest
+     of this chart already refuses to draw past the first thing that happens,
+     and this is the same refusal. */
+  const { limit = 1, minLead = 0 } = opts;
   const out = [];
   if(!prediction?.segments) return out;
   for(let si = 0; si < prediction.segments.length; si++){
@@ -1191,8 +1187,8 @@ export function railCrossings(world, prediction, tNow, opts = {}){
       }
     }
   }
-  /* Soonest first, so that when there are more crossings than the chart has
-     room for, the ones that survive are the ones you are about to fly. */
+  /* Soonest first, so the one that survives the cap is the one you are about
+     to fly. */
   return out.sort((a, b) => a.t - b.t).slice(0, limit);
 }
 
