@@ -204,3 +204,102 @@ test('non-GET methods return 405', async () => {
   assert.equal(res.status, 405);
   assert.equal(res.headers.get('allow'), 'GET, HEAD');
 });
+
+/* ---------------------------------------------------------- Sunward's board */
+
+/* The one route on this server that takes a POST. The rules are all in
+   src/sunward-board.js and tested there; what is checked here is the HTTP
+   around them — that the route exists, that it reads a body and answers JSON,
+   that the size cap and the bad-JSON path are wired, and that adding a POST
+   route did not loosen the 405 for everything else. The store is in memory
+   and these run in order, so the GET comes first and finds it empty. */
+
+const BOARD = '/api/sunward/board';
+const PLAYER = '3f2a9c1e-7b4d-4e8a-9f0c-1a2b3c4d5e6f';
+const post = (body, init = {}) => fetch(`${baseUrl}${BOARD}`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: typeof body === 'string' ? body : JSON.stringify(body),
+  ...init,
+});
+
+test('GET the board when nobody is on it', async () => {
+  const res = await fetch(`${baseUrl}${BOARD}`);
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type'), /application\/json/);
+  assert.equal(res.headers.get('cache-control'), 'no-store');
+  const body = await res.json();
+  assert.deepEqual(body.boards, { taps: [], winters: [], earned: [], peakTaps: [] });
+  assert.equal(body.players, 0);
+  assert.deepEqual(body.you, { taps: null, winters: null, earned: null, peakTaps: null });
+  assert.equal(typeof body.updated, 'number');
+});
+
+test('POST a score and it is on the board', async () => {
+  const res = await post({ id: PLAYER, name: '  Finn  ', stats: { taps: 120, winters: 1, earned: 2.5e6, peakTaps: 7.5 } });
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type'), /application\/json/);
+  const body = await res.json();
+  assert.deepEqual(body.boards.taps, [{ name: 'Finn', value: 120 }]);
+  assert.deepEqual(body.boards.winters, [{ name: 'Finn', value: 1 }]);
+  assert.deepEqual(body.you, { taps: 1, winters: 1, earned: 1, peakTaps: 1 });
+  assert.equal(body.players, 1);
+  // Nothing in the public shape names the id that would let anyone else
+  // write to that row.
+  assert.doesNotMatch(JSON.stringify(body), new RegExp(PLAYER));
+
+  const again = await (await fetch(`${baseUrl}${BOARD}?you=${PLAYER}`)).json();
+  assert.deepEqual(again.boards.taps, [{ name: 'Finn', value: 120 }]);
+  assert.equal(again.you.taps, 1);
+});
+
+test('POST a bad name is a 400 with a reason', async () => {
+  const res = await post({ id: crypto.randomUUID(), name: 'F!', stats: { taps: 1 } });
+  assert.equal(res.status, 400);
+  const body = await res.json();
+  assert.deepEqual(Object.keys(body), ['error']);
+  assert.match(body.error, /Names are/);
+});
+
+test('POST again inside fifteen seconds is a 429 that says how long', async () => {
+  const res = await post({ id: PLAYER, name: 'Finn', stats: { taps: 121 } });
+  assert.equal(res.status, 429);
+  const body = await res.json();
+  assert.equal(body.error, 'Too soon.');
+  assert.ok(body.retryIn > 0 && body.retryIn <= 15000, `retryIn was ${body.retryIn}`);
+  assert.equal(res.headers.get('retry-after'), String(Math.ceil(body.retryIn / 1000)));
+  // And the refused figure did not land.
+  const board = await (await fetch(`${baseUrl}${BOARD}`)).json();
+  assert.deepEqual(board.boards.taps, [{ name: 'Finn', value: 120 }]);
+});
+
+test('POST five kilobytes is a 413 before it is even parsed', async () => {
+  // Valid JSON, so the only thing wrong with it is the size.
+  const res = await post({ id: crypto.randomUUID(), name: 'Finn', stats: { taps: 1 }, padding: 'x'.repeat(5000) });
+  assert.equal(res.status, 413);
+  const body = await res.json();
+  assert.deepEqual(Object.keys(body), ['error']);
+});
+
+test('POST something that is not JSON is a 400', async () => {
+  const res = await post('{"id": nope');
+  assert.equal(res.status, 400);
+  assert.equal((await res.json()).error, 'That was not JSON.');
+});
+
+test('PUT the board is a 405, and the static 405 still holds elsewhere', async () => {
+  const res = await fetch(`${baseUrl}${BOARD}`, { method: 'PUT', body: '{}' });
+  assert.equal(res.status, 405);
+  assert.equal(res.headers.get('allow'), 'GET, POST');
+  assert.deepEqual(Object.keys(await res.json()), ['error']);
+
+  // The board is the only path that takes a POST. Anywhere else is what it was.
+  for(const path of ['/', '/healthz', '/sunward/', '/api/sunward/boards', '/api/sunward/board/']){
+    const other = await fetch(`${baseUrl}${path}`, { method: 'POST', body: '{}' });
+    assert.equal(other.status, 405, `POST ${path} returned ${other.status}`);
+    assert.equal(other.headers.get('allow'), 'GET, HEAD');
+  }
+  const health = await fetch(`${baseUrl}/healthz`);
+  assert.equal(health.status, 200);
+  assert.deepEqual(await health.json(), { status: 'ok' });
+});

@@ -182,13 +182,41 @@ One Worker on **good-vibe-games.com** serves the shelf and every game on it.
       ├── /orbital-trader/     Orbital Trader   — no socket either
       ├── /greener-thumbs/     Greener Thumbs   — nor that
       ├── /api/good-vibes/ws   src/worker.js → GameRoom,     one per room code
-      └── /api/solarium/ws     src/worker.js → SolariumRoom, one per room code
+      ├── /api/solarium/ws     src/worker.js → SolariumRoom, one per room code
+      └── /api/sunward/board   src/worker.js → SunwardBoard, one for the whole game
 
-**Two of the four never touch the Worker.** Sunward and Greener Thumbs are one
-player and a save file, so they are files in `public/` and nothing else — no
-route, no Durable Object, no binding, and nothing to go down. A single-player
-game that needs a server to be played is a single-player game that stops
-working when somebody else's deploy fails.
+**Three of the five play without the Worker.** Sunward, Orbital Trader and
+Greener Thumbs are one player and a save file, so the games are files in
+`public/` and nothing else — no socket, no room, and nothing to go down. A
+single-player game that needs a server to be played is a single-player game
+that stops working when somebody else's deploy fails. Sunward has one route
+now, for its leaderboard, and it is built to that rule: the game never waits on
+it and plays the same with it gone.
+
+**Sunward's board is one Durable Object, named for the game.**
+`/api/sunward/board` is the first route here that is not a socket. A
+leaderboard is read when the record is opened and written at most once every
+fifteen seconds, and nothing about that is live enough to hold a connection
+open for, so it is plain HTTP: a GET for the boards, a POST for your row.
+There is one object, `SunwardBoard`, reached by `idFromName('sunward')`,
+because a leaderboard is everyone in one place by definition — there is
+nothing to shard by, and one object is what makes the top ten one answer
+rather than a merge. The rules are `src/sunward-board.js`, pure and clockless
+like the rest of that game, and `src/board-do.js` and the route in
+`src/app.js` are each a few lines around it, the way the rooms are.
+
+Opting in is typing a name. The id that lets a player update their own row is
+a UUID the browser makes once and keeps; whoever holds it holds the row, and
+nobody else can touch it — the room-code idea again, and no accounts for the
+same reason. Nothing but that id, the typed name and four numbers ever leaves
+the device, and the board never hands the id back to anyone. The numbers are
+self-reported and there is no way to verify one, so this is honest about what
+it is: a board for people who want to be on one. What defends it is a
+plausibility cap on each figure, a fifteen-second gap between accepted posts
+from one id, a record that only ever goes up, and a ceiling of five thousand
+rows with the ones nobody has heard from in longest pruned first. Somebody who
+wants to sit at the top with fifty million taps can, and the cap is the number
+they will sit at.
 
 `public/` ships verbatim, no build step. The Worker is not invoked for files at
 all — assets are matched first — so the clients cost zero Worker calls and each
@@ -235,15 +263,16 @@ hand a game to four friends in a message instead of in an onboarding flow, and
 the cost is that a short code is a guessable code. The answer to that is a
 longer code, not an account.
 
-**`npm start` serves all of it** — the shelf, both games, and both sockets.
-Rooms live in a Map locally and in a Durable Object in production; the rules
-module is the same either way.
+**`npm start` serves all of it** — the shelf, every game, both sockets and the
+board. Rooms live in a Map locally and in a Durable Object in production, and
+the board is an object in memory that forgets on restart; the rules modules are
+the same either way.
 
 **Deploys are GitHub Actions**, not Cloudflare's Workers Builds:
 `.github/workflows/deploy.yml` runs the tests, builds the Worker with
 `wrangler deploy --dry-run`, and — only then, and only on `main` — uploads it.
-One `wrangler deploy` ships the Worker, both room classes and the whole of
-`public/` together, so a client and the socket it talks to can never be
+One `wrangler deploy` ships the Worker, its three object classes and the whole
+of `public/` together, so a client and the socket it talks to can never be
 different ages.
 
 Keeping it here rather than in the dashboard buys two things: a pull request
@@ -362,6 +391,11 @@ src/solarium.js     Save Solarium's rules engine: pure functions over a state
 src/worker.js       the deployed front door: assets, and both socket routes
 src/room-do.js      one Durable Object per Good Vibes room code
 src/solarium-do.js  one Durable Object per Save Solarium room code
+src/sunward-board.js  Sunward's leaderboard as rules: what a name may be, what
+                    a figure may be, the rate limit, the ranking, and the whole
+                    HTTP answer — pure, with the clock and the store handed in
+src/board-do.js     the one Durable Object the board lives in, named for the
+                    game rather than for a code
 public/theme.css    the one look every page shares: paper, ink, the rounded
                     face, and the sun and the leaf for what you can press
 public/index.html   the shelf: every game, thumbnails painted by their own
