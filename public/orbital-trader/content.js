@@ -138,21 +138,56 @@ export const ARC_DEBRIS = (() => {
 
 /* ---------------------------------------------------------------- goods */
 
-/* Passengers travel by contract, not by the crate; the table's boarding-fee
- * rows are bookkeeping the game does not need. */
-export const GOODS = ECONOMY.goods.filter(g => g.category !== 'passenger').map(g => ({
+/* A crate is a crate: light goods take one unit of the hold, heavy ones three.
+ * The table says "Light" or "Heavy" because that is what a dockhand says, and
+ * basePrice is per crate, so a heavy crate of cheap ore still costs more than a
+ * light one of the same stuff per unit of hold. */
+const UNITS = { light: 1, heavy: 3 };
+export const GOODS = ECONOMY.goods.map(g => ({
   ...g,
-  units: g.units ?? 1,
+  units: UNITS[g.weight] ?? 1,
   lifetimeDays: g.lifetimeDays ?? null,
   needsRefrigeration: !!g.needsRefrigeration,
   producedAt: g.producedAt ?? [],
-  demandBy: g.demandBy ?? {},
+  stock: g.stock ?? [1, 1],
+  buyers: g.buyers ?? [],
+  lovedBy: g.lovedBy ?? [],
 }));
 const goodIds = new Set(GOODS.map(g => g.id));
+const goodIndex = new Map(GOODS.map(g => [g.id, g]));
+export const goodById = id => goodIndex.get(id);
 
 /* ---------------------------------------------------------------- ports */
 
 const NO_OFFERS = new Set(['maw']);
+
+/* The goods table names who wants a thing, and it names them the way a trader
+ * would: sometimes a port ("Veyra"), sometimes a whole people ("Otters"), and
+ * once "Everyone". So a list is read against a port and its people, not looked
+ * up in one index. A producer never appears on its own buying list — a stall
+ * that buys back what it is selling two feet away is a money pump. */
+const speciesAt = portId => normaliseSpecies(bodyIndex.get(portId)?.species ?? ECONOMY.ports[portId]?.species);
+/* "Everyone" means everyone there is: a port with nobody living at it is not
+   a customer, whatever the table says. */
+const namesPort = (list, id) => {
+  const sp = speciesAt(id);
+  return list.some(x => (x === 'everyone' ? sp !== 'none' : x === id || x === sp));
+};
+export const lovesGood = (portId, goodId) => {
+  const g = goodById(goodId);
+  return !!g && !!ECONOMY.ports[portId] && namesPort(g.lovedBy, portId);
+};
+/* Loving a thing is wanting it. The table lists the two separately because
+   they answer different questions — who will take it, and who will pay
+   stupidly for it — but a people who love a good and are not on its buyer
+   list would be a stall that turns away the one customer who cares. */
+export const wantsGood = (portId, goodId) => {
+  const g = goodById(goodId);
+  if(!g || !ECONOMY.ports[portId] || g.producedAt.includes(portId)) return false;
+  return namesPort(g.buyers, portId) || lovesGood(portId, goodId);
+};
+export const REGION_OF = Object.fromEntries(Object.entries(ECONOMY.ports).map(([id, p]) => [id, p.region ?? null]));
+
 export const PORTS = Object.fromEntries(Object.entries(ECONOMY.ports).map(([id, p]) => {
   const body = bodyIndex.get(id);
   return [id, {
@@ -164,8 +199,13 @@ export const PORTS = Object.fromEntries(Object.entries(ECONOMY.ports).map(([id, 
     fuelPricePerKms: p.fuelPricePerKms ?? null,
     shipyard: !!p.shipyard,
     upgrades: p.upgrades ?? [],
-    sells: (p.sells ?? []).filter(s => goodIds.has(s.good)),
-    buys: (p.buys ?? []).filter(s => goodIds.has(s.good)),
+    region: p.region ?? null,
+    /* The shelves are not written down per port any more: a stall sells what
+       the place produces and buys what the goods table says it wants, so one
+       row in one table moves both ends of a trade. How *much* is on the shelf
+       is rolled per visit and lives in the save, not here. */
+    sells: GOODS.filter(g => g.producedAt.includes(id)).map(g => ({ good: g.id, priceMul: 1 })),
+    buys: GOODS.filter(g => wantsGood(id, g.id)).map(g => ({ good: g.id, priceMul: 1 })),
     gifts: p.gifts ?? null,
     openWithin: p.openWhen?.rAuBelow ?? null,
     passengers: !NO_OFFERS.has(id),
@@ -192,7 +232,9 @@ export const UPGRADES = ECONOMY.upgrades.map(u => {
 
 const F = ECONOMY.formulas;
 export const FORMULAS = {
-  alignment: F.alignment,
+  region: F.region,
+  loved: F.loved,
+  stock: F.stock,
   saturation: F.saturation,
   perishable: F.perishable,
   reputation: F.reputation,
@@ -215,7 +257,7 @@ export const FORMULAS = {
 
 /* ---------------------------------------------------------- contracts */
 
-const DELIVERY = /crate|load|lot|parcel|case|cultures|fashions/i;
+const DELIVERY = /crate|load|lot|parcel|case|fashions|medicine/i;
 export const CONTRACT_TEMPLATES = ECONOMY.contracts.templates.map(t => {
   const out = { ...t, kind: DELIVERY.test(t.text) && !/apprentice|scholar|pilgrim|song-keeper|crew|cousins|family|caretakers|banker/i.test(t.text) ? 'delivery' : 'passenger' };
   out.units = out.kind === 'delivery' ? 4 : 1;

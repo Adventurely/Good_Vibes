@@ -5,496 +5,1088 @@ export const ECONOMY = {
  "currencyName": "cowries",
  "goods": [
   {
-   "id": "pebble",
-   "name": "Moon pebble",
-   "category": "curio",
-   "basePrice": 10,
-   "units": 1,
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
-   "producedAt": [
-    "slate"
+   "id": "pearls",
+   "name": "Pearls",
+   "category": "luxury",
+   "basePrice": 120,
+   "weight": "light",
+   "stock": [
+    3,
+    12
    ],
-   "demandBy": {
-    "emberkin": 0.8,
-    "otter": 1.2,
-    "cat": 0.9,
-    "frog": 1
-   },
-   "blurb": "A smooth grey pebble off Slate's one beach, polished by a moon with no weather. Otters give them to each other and mean it."
-  },
-  {
-   "id": "grain",
-   "name": "Hedgerow grain",
-   "category": "bulk",
-   "basePrice": 8,
-   "units": 1,
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
-   "producedAt": [
-    "moss"
-   ],
-   "demandBy": {
-    "otter": 1,
-    "emberkin": 1.15,
-    "cat": 1.3,
-    "frog": 0.7
-   },
-   "blurb": "Sacks of Moss barley, still smelling of hedgerow. Cats will pay for anything that did not come out of a tube."
-  },
-  {
-   "id": "paper",
-   "name": "Bond-paper & ink",
-   "category": "bulk",
-   "basePrice": 9,
-   "units": 1,
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
-   "producedAt": [
-    "moss"
-   ],
-   "demandBy": {
-    "otter": 1,
-    "emberkin": 1.6,
-    "cat": 0.6,
-    "frog": 0.4
-   },
-   "blurb": "Moss-pressed paper and squid ink. The Emberkin write everything down and are always out of both."
-  },
-  {
-   "id": "parts",
-   "name": "Ship fittings",
-   "category": "bulk",
-   "basePrice": 18,
-   "units": 2,
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
-   "producedAt": [
-    "slate"
-   ],
-   "demandBy": {
-    "otter": 0.9,
-    "emberkin": 1.1,
-    "cat": 1.5,
-    "frog": 0.8
-   },
-   "blurb": "Crates of Slate-made valves, seals and struts. Far from any dry dock, cats keep ships flying with these and oaths."
-  },
-  {
-   "id": "rope",
-   "name": "Kelp rope & sailcloth",
-   "category": "bulk",
-   "basePrice": 10,
-   "units": 1,
    "lifetimeDays": null,
    "needsRefrigeration": false,
    "producedAt": [
     "tassel"
    ],
-   "demandBy": {
-    "otter": 0.8,
-    "emberkin": 1.2,
-    "cat": 1.3,
-    "frog": 1
-   },
-   "blurb": "Tassel harbour cordage. Every port in the system tethers something with it."
-  },
-  {
-   "id": "ore",
-   "name": "Belt ore",
-   "category": "bulk",
-   "basePrice": 14,
-   "units": 2,
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
-   "producedAt": [
-    "nail",
-    "arc"
-   ],
-   "demandBy": {
-    "emberkin": 1.5,
-    "otter": 1.1,
-    "cat": 0.6,
-    "frog": 0.5
-   },
-   "blurb": "Nickel-iron chipped off belt rocks. The engine smiths of Cinder melt it into things that go very fast."
-  },
-  {
-   "id": "ice",
-   "name": "Ring ice",
-   "category": "bulk",
-   "basePrice": 6,
-   "units": 2,
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
-   "producedAt": [
-    "croak",
-    "glass"
-   ],
-   "demandBy": {
-    "emberkin": 1.7,
-    "otter": 1,
-    "cat": 1.2,
-    "frog": 0.3
-   },
-   "blurb": "Blocks of clean outer-system ice. Parched Cinder pays for every drop; the frogs cannot imagine why."
-  },
-  {
-   "id": "sulfur",
-   "name": "Ember-salt",
-   "category": "bulk",
-   "basePrice": 11,
-   "units": 2,
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
-   "producedAt": [
-    "cinder",
-    "scorch"
-   ],
-   "demandBy": {
-    "otter": 1.2,
-    "emberkin": 0.5,
-    "cat": 1,
-    "frog": 1.3
-   },
-   "blurb": "Yellow sulfur salts raked from Cinder's dayside. Fertilizer for Moss, heater chemistry for the frogs."
-  },
-  {
-   "id": "produce",
-   "name": "Hedgerow fruit",
-   "category": "perishable",
-   "basePrice": 14,
-   "units": 1,
-   "lifetimeDays": 40,
-   "needsRefrigeration": false,
-   "producedAt": [
-    "moss"
-   ],
-   "demandBy": {
-    "otter": 0.9,
-    "emberkin": 1.5,
-    "cat": 1.6,
-    "frog": 0.8
-   },
-   "blurb": "Plums, pears and hedge-berries. Nothing tastes better in microgravity, and nothing rots faster."
-  },
-  {
-   "id": "oysters",
-   "name": "Tidepool oysters",
-   "category": "perishable",
-   "basePrice": 20,
-   "units": 1,
-   "lifetimeDays": 20,
-   "needsRefrigeration": false,
-   "producedAt": [
-    "tassel"
-   ],
-   "demandBy": {
-    "otter": 0.8,
-    "emberkin": 1.4,
-    "cat": 1.6,
-    "frog": 0.6
-   },
-   "blurb": "Packed in wet kelp. Twenty days of shelf life if you are lucky, and cats are never lucky enough."
-  },
-  {
-   "id": "fashions",
-   "name": "Ember fashions",
-   "category": "perishable",
-   "basePrice": 45,
-   "units": 1,
-   "lifetimeDays": 90,
-   "needsRefrigeration": false,
-   "producedAt": [
+   "buyers": [
     "veyra",
-    "cinder"
+    "cinder",
+    "otter"
    ],
-   "demandBy": {
-    "emberkin": 1.8,
-    "otter": 1.3,
-    "cat": 1,
-    "frog": 0.3
-   },
-   "blurb": "This week's Veyra look, folded in heat-paper. Worth a fortune fresh and an embarrassment in three months."
+   "lovedBy": [
+    "veyra"
+   ],
+   "blurb": "Grown in the shallow beds off the rafts and picked by hand. An otter wedding needs three; a Veyra house will pay for thirty."
   },
   {
    "id": "tideglass",
-   "name": "Tideglass lanterns",
-   "category": "luxury",
-   "basePrice": 80,
-   "units": 1,
+   "name": "Tide glass",
+   "category": "craft",
+   "basePrice": 60,
+   "weight": "light",
+   "stock": [
+    8,
+    25
+   ],
    "lifetimeDays": null,
    "needsRefrigeration": false,
    "producedAt": [
     "tassel"
    ],
-   "demandBy": {
-    "emberkin": 1.5,
-    "frog": 1.7,
-    "cat": 1.3,
-    "otter": 0.7
-   },
-   "blurb": "Otter glasswork that glows sea-green in the dark. The frogs hang them under the lily-pads and sing to them."
-  },
-  {
-   "id": "emberwork",
-   "name": "Ember filigree",
-   "category": "luxury",
-   "basePrice": 110,
-   "units": 1,
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
-   "producedAt": [
-    "cinder",
-    "veyra"
+   "buyers": [
+    "brine",
+    "frog"
    ],
-   "demandBy": {
-    "otter": 1.3,
-    "frog": 1.6,
-    "cat": 1.4,
-    "emberkin": 0.6
-   },
-   "blurb": "Brass and obsidian filigree forged in a week and treasured for a lifetime, which for the maker is about the same thing."
-  },
-  {
-   "id": "frogsong",
-   "name": "Song-shells",
-   "category": "luxury",
-   "basePrice": 130,
-   "units": 1,
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
-   "producedAt": [
-    "haven",
+   "lovedBy": [
     "brine"
    ],
-   "demandBy": {
-    "otter": 1.5,
-    "emberkin": 1.4,
-    "cat": 1.2,
-    "frog": 0.3
-   },
-   "blurb": "Resonant shells that hold a frog song for centuries. Tassel plays them at parties; Cinder scholars transcribe them."
+   "blurb": "Otter glasswork that glows sea-green in the dark. The frogs hang it under the lily-terraces and sing to it."
   },
   {
-   "id": "shadowsilk",
-   "name": "Whisker shadow-silk",
-   "category": "luxury",
-   "basePrice": 160,
-   "units": 1,
+   "id": "moonfishoil",
+   "name": "Moonfish oil",
+   "category": "bulk",
+   "basePrice": 45,
+   "weight": "light",
+   "stock": [
+    8,
+    20
+   ],
    "lifetimeDays": null,
    "needsRefrigeration": false,
    "producedAt": [
-    "whisker"
+    "tassel"
    ],
-   "demandBy": {
-    "otter": 1.5,
-    "emberkin": 1.6,
-    "frog": 1.2,
-    "cat": 0.7
-   },
-   "blurb": "Spun on Whisker from something nobody there will name. Drinks light, and arrives without paperwork."
+   "buyers": [
+    "cinder",
+    "brine",
+    "cat"
+   ],
+   "lovedBy": [],
+   "blurb": "Pressed from a fish that only rises on the dark of the moon. Burns clean, keeps forever, smells like a harbour."
   },
   {
-   "id": "cometdust",
-   "name": "Maw dust",
+   "id": "coral",
+   "name": "Coral carvings",
    "category": "luxury",
-   "basePrice": 200,
-   "units": 1,
+   "basePrice": 150,
+   "weight": "light",
+   "stock": [
+    2,
+    8
+   ],
    "lifetimeDays": null,
    "needsRefrigeration": false,
    "producedAt": [
-    "maw"
+    "tassel"
    ],
-   "demandBy": {
-    "emberkin": 1.6,
-    "otter": 1.3,
-    "cat": 1.3,
-    "frog": 1.3
-   },
-   "blurb": "Glittering grit swept off the ring the Maw wears. Fireworks on Cinder, wedding confetti on Tassel, and dear because of where it comes from."
-  },
-  {
-   "id": "lilywine",
-   "name": "Haven ice-wine",
-   "category": "cold",
-   "basePrice": 90,
-   "units": 1,
-   "lifetimeDays": null,
-   "needsRefrigeration": true,
-   "producedAt": [
+   "buyers": [
+    "veyra",
     "haven"
    ],
-   "demandBy": {
-    "otter": 1.6,
-    "emberkin": 1.3,
-    "cat": 1.5,
-    "frog": 0.4
-   },
-   "blurb": "Fermented under ammonia ice over a frog lifetime. Boils into vinegar above freezing, so keep it cold."
+   "lovedBy": [
+    "otter"
+   ],
+   "blurb": "A year of somebody's evenings, cut from living reef and finished with a thumb. Otters give them and otters keep them."
   },
   {
-   "id": "cultures",
-   "name": "Cold cultures",
-   "category": "cold",
-   "basePrice": 60,
-   "units": 1,
+   "id": "pebble",
+   "name": "Shiny moon pebbles",
+   "category": "curio",
+   "basePrice": 10,
+   "weight": "light",
+   "stock": [
+    10,
+    40
+   ],
    "lifetimeDays": null,
+   "needsRefrigeration": false,
+   "producedAt": [
+    "slate"
+   ],
+   "buyers": [
+    "otter"
+   ],
+   "lovedBy": [
+    "otter"
+   ],
+   "blurb": "Smooth grey pebbles off Slate's one beach, polished by a moon with no weather. Otters give them to each other and mean it."
+  },
+  {
+   "id": "ironore",
+   "name": "Iron ore",
+   "category": "bulk",
+   "basePrice": 18,
+   "weight": "heavy",
+   "stock": [
+    40,
+    100
+   ],
+   "lifetimeDays": null,
+   "needsRefrigeration": false,
+   "producedAt": [
+    "slate",
+    "scorch"
+   ],
+   "buyers": [
+    "cinder",
+    "scorch"
+   ],
+   "lovedBy": [],
+   "blurb": "Crates of nickel-iron, dug and sorted and not much else. The engine smiths of Cinder melt it into things that go very fast."
+  },
+  {
+   "id": "masonry",
+   "name": "Engraved masonry",
+   "category": "craft",
+   "basePrice": 30,
+   "weight": "heavy",
+   "stock": [
+    30,
+    80
+   ],
+   "lifetimeDays": null,
+   "needsRefrigeration": false,
+   "producedAt": [
+    "slate"
+   ],
+   "buyers": [
+    "haven",
+    "brine",
+    "croak"
+   ],
+   "lovedBy": [
+    "haven",
+    "croak"
+   ],
+   "blurb": "Cut stone with the old patterns on it. The frogs build their terraces out of it and will not be talked into anything lighter."
+  },
+  {
+   "id": "herbs",
+   "name": "Medicinal herbs",
+   "category": "perishable",
+   "basePrice": 40,
+   "weight": "light",
+   "stock": [
+    10,
+    30
+   ],
+   "lifetimeDays": 45,
+   "needsRefrigeration": false,
+   "producedAt": [
+    "moss"
+   ],
+   "buyers": [
+    "tassel",
+    "cat"
+   ],
+   "lovedBy": [
+    "scorch",
+    "cinder"
+   ],
+   "blurb": "Cut green and bundled in the field. Half the remedies in the system start here, and the good ones do not travel slowly."
+  },
+  {
+   "id": "starwine",
+   "name": "Starfruit wine",
+   "category": "luxury",
+   "basePrice": 90,
+   "weight": "light",
+   "stock": [
+    5,
+    15
+   ],
+   "lifetimeDays": null,
+   "needsRefrigeration": false,
+   "producedAt": [
+    "moss"
+   ],
+   "buyers": [
+    "tassel",
+    "veyra",
+    "haven"
+   ],
+   "lovedBy": [
+    "veyra"
+   ],
+   "blurb": "Pale and faintly sharp. Moss makes it in small runs and Veyra buys it in whole small runs."
+  },
+  {
+   "id": "glowmoss",
+   "name": "Glowmoss",
+   "category": "craft",
+   "basePrice": 35,
+   "weight": "light",
+   "stock": [
+    8,
+    20
+   ],
+   "lifetimeDays": null,
+   "needsRefrigeration": false,
+   "producedAt": [
+    "moss"
+   ],
+   "buyers": [
+    "cat",
+    "haven"
+   ],
+   "lovedBy": [],
+   "blurb": "A living lamp in a jar. Cats line their tunnels with it because it needs nothing and never goes out."
+  },
+  {
+   "id": "riverfish",
+   "name": "Rare riverfish",
+   "category": "perishable",
+   "basePrice": 70,
+   "weight": "light",
+   "stock": [
+    3,
+    8
+   ],
+   "lifetimeDays": 22,
    "needsRefrigeration": true,
    "producedAt": [
+    "moss"
+   ],
+   "buyers": [
+    "tassel",
+    "cat",
+    "haven"
+   ],
+   "lovedBy": [
+    "cat"
+   ],
+   "blurb": "Silver, quick, and only in three rivers. Worth a fortune fresh and worth an apology otherwise."
+  },
+  {
+   "id": "engineparts",
+   "name": "Spare engine parts",
+   "category": "craft",
+   "basePrice": 90,
+   "weight": "heavy",
+   "stock": [
+    10,
+    30
+   ],
+   "lifetimeDays": null,
+   "needsRefrigeration": false,
+   "producedAt": [
+    "cinder"
+   ],
+   "buyers": [
+    "slate",
+    "scorch",
+    "cat"
+   ],
+   "lovedBy": [],
+   "blurb": "Valves, seals and struts in oiled paper. Far from any dry dock, a crate of these is the difference between a ship and a wreck."
+  },
+  {
+   "id": "weapons",
+   "name": "Weapons",
+   "category": "craft",
+   "basePrice": 180,
+   "weight": "heavy",
+   "stock": [
+    5,
+    15
+   ],
+   "lifetimeDays": null,
+   "needsRefrigeration": false,
+   "producedAt": [
+    "cinder"
+   ],
+   "buyers": [
+    "veyra",
+    "cat"
+   ],
+   "lovedBy": [
+    "emberkin"
+   ],
+   "blurb": "Emberkin house arms, crated and sealed with somebody's mark. Nobody asks what they are for and everybody knows."
+  },
+  {
+   "id": "plating",
+   "name": "Heat-resistant plating",
+   "category": "craft",
+   "basePrice": 110,
+   "weight": "heavy",
+   "stock": [
+    10,
+    25
+   ],
+   "lifetimeDays": null,
+   "needsRefrigeration": false,
+   "producedAt": [
+    "cinder"
+   ],
+   "buyers": [
+    "scorch",
+    "cat",
+    "haven"
+   ],
+   "lovedBy": [],
+   "blurb": "Sheet that will sit in a cloud top all day and come out grumbling. Half the shielded hulls in the sky are wearing Cinder's."
+  },
+  {
+   "id": "steel",
+   "name": "Refined steel",
+   "category": "bulk",
+   "basePrice": 45,
+   "weight": "heavy",
+   "stock": [
+    30,
+    80
+   ],
+   "lifetimeDays": null,
+   "needsRefrigeration": false,
+   "producedAt": [
+    "cinder"
+   ],
+   "buyers": [
+    "slate",
+    "cat"
+   ],
+   "lovedBy": [],
+   "blurb": "Bar stock, graded and stamped. The dullest cargo in the system and the one everybody is always short of."
+  },
+  {
+   "id": "coils",
+   "name": "Reactor coils",
+   "category": "relic",
+   "basePrice": 220,
+   "weight": "light",
+   "stock": [
+    3,
+    10
+   ],
+   "lifetimeDays": null,
+   "needsRefrigeration": false,
+   "producedAt": [
+    "cinder"
+   ],
+   "buyers": [
+    "veyra",
+    "cat",
+    "frog"
+   ],
+   "lovedBy": [
+    "cat"
+   ],
+   "blurb": "Wound by hand over nine days by somebody who will not tell you the order. A cat mechanic will trade a ship for one."
+  },
+  {
+   "id": "firecrystals",
+   "name": "Fire crystals",
+   "category": "luxury",
+   "basePrice": 140,
+   "weight": "light",
+   "stock": [
+    5,
+    15
+   ],
+   "lifetimeDays": null,
+   "needsRefrigeration": false,
+   "producedAt": [
+    "scorch"
+   ],
+   "buyers": [
+    "veyra",
+    "cinder",
+    "frog"
+   ],
+   "lovedBy": [
+    "veyra"
+   ],
+   "blurb": "Grown in the vents and cut cold. They hold a light for a week after you take them out of the sun."
+  },
+  {
+   "id": "volcanicglass",
+   "name": "Volcanic glass",
+   "category": "bulk",
+   "basePrice": 40,
+   "weight": "heavy",
+   "stock": [
+    15,
+    40
+   ],
+   "lifetimeDays": null,
+   "needsRefrigeration": false,
+   "producedAt": [
+    "scorch"
+   ],
+   "buyers": [
+    "tassel",
+    "veyra",
     "brine",
-    "glass"
+    "haven"
    ],
-   "demandBy": {
-    "otter": 1.6,
-    "emberkin": 1.2,
-    "cat": 1.3,
-    "frog": 0.5
-   },
-   "blurb": "Living medicinal cultures from the lily-pad apothecaries. Otter healers swear by them; warmth kills them."
+   "lovedBy": [],
+   "blurb": "Sheets of black glass off the flows, packed in ash. Cheap on Scorch because there is nothing else on Scorch."
   },
   {
-   "id": "chorustube",
-   "name": "Builder tube-segment",
-   "category": "relic",
-   "basePrice": 600,
-   "units": 3,
+   "id": "emberstone",
+   "name": "Emberstone",
+   "category": "luxury",
+   "basePrice": 160,
+   "weight": "light",
+   "stock": [
+    3,
+    10
+   ],
    "lifetimeDays": null,
    "needsRefrigeration": false,
    "producedAt": [
-    "arc"
+    "scorch"
    ],
-   "demandBy": {
-    "emberkin": 1.5,
-    "otter": 1.2,
-    "frog": 1.3,
-    "cat": 1
-   },
-   "blurb": "A length of seamless Builder tube cut from the Arc. Hums when you tap it. Nobody knows what it was for."
+   "buyers": [
+    "veyra",
+    "cat",
+    "otter"
+   ],
+   "lovedBy": [
+    "cat"
+   ],
+   "blurb": "Warm to the hand a year after it comes out of the ground, and nobody on Scorch has ever explained why."
   },
   {
-   "id": "ringglass",
-   "name": "Ringing glass",
+   "id": "embersilk",
+   "name": "Ember silk",
+   "category": "luxury",
+   "basePrice": 200,
+   "weight": "light",
+   "stock": [
+    3,
+    10
+   ],
+   "lifetimeDays": null,
+   "needsRefrigeration": false,
+   "producedAt": [
+    "veyra"
+   ],
+   "buyers": [
+    "tassel",
+    "haven",
+    "emberkin"
+   ],
+   "lovedBy": [
+    "veyra"
+   ],
+   "blurb": "Woven in a heated room by people who are paid not to talk about it. This season's colour is worth twice last season's."
+  },
+  {
+   "id": "medals",
+   "name": "Faction medals",
+   "category": "luxury",
+   "basePrice": 260,
+   "weight": "light",
+   "stock": [
+    2,
+    6
+   ],
+   "lifetimeDays": null,
+   "needsRefrigeration": false,
+   "producedAt": [
+    "veyra"
+   ],
+   "buyers": [
+    "cinder",
+    "scorch",
+    "haven"
+   ],
+   "lovedBy": [],
+   "blurb": "Struck in small numbers for houses settling scores in public. The metal is worth nothing; the name on it is worth a great deal."
+  },
+  {
+   "id": "clocks",
+   "name": "Precision clocks",
+   "category": "craft",
+   "basePrice": 170,
+   "weight": "light",
+   "stock": [
+    5,
+    15
+   ],
+   "lifetimeDays": null,
+   "needsRefrigeration": false,
+   "producedAt": [
+    "veyra"
+   ],
+   "buyers": [
+    "tassel",
+    "cat"
+   ],
+   "lovedBy": [
+    "otter"
+   ],
+   "blurb": "Good enough to navigate by and pretty enough to argue over. Otters buy them for the harbourmaster and then borrow them back."
+  },
+  {
+   "id": "perfume",
+   "name": "Perfume oils",
+   "category": "luxury",
+   "basePrice": 120,
+   "weight": "light",
+   "stock": [
+    5,
+    15
+   ],
+   "lifetimeDays": null,
+   "needsRefrigeration": false,
+   "producedAt": [
+    "veyra"
+   ],
+   "buyers": [
+    "tassel",
+    "moss",
+    "haven",
+    "croak"
+   ],
+   "lovedBy": [],
+   "blurb": "Small stoppered bottles in a padded case. Half the system finds them ridiculous and buys them anyway."
+  },
+  {
+   "id": "stormcrystals",
+   "name": "Storm crystals",
    "category": "relic",
-   "basePrice": 900,
-   "units": 2,
+   "basePrice": 240,
+   "weight": "light",
+   "stock": [
+    3,
+    10
+   ],
+   "lifetimeDays": null,
+   "needsRefrigeration": false,
+   "producedAt": [
+    "grumm"
+   ],
+   "buyers": [
+    "cinder",
+    "veyra",
+    "cat"
+   ],
+   "lovedBy": [
+    "cat"
+   ],
+   "blurb": "Fished out of the cloud tops on a line, still ticking. A cat will hold one up to a lamp and go quiet."
+  },
+  {
+   "id": "filters",
+   "name": "Advanced filters",
+   "category": "craft",
+   "basePrice": 100,
+   "weight": "heavy",
+   "stock": [
+    10,
+    25
+   ],
+   "lifetimeDays": null,
+   "needsRefrigeration": false,
+   "producedAt": [
+    "grumm"
+   ],
+   "buyers": [
+    "cinder",
+    "brine",
+    "glass",
+    "cat"
+   ],
+   "lovedBy": [],
+   "blurb": "Frog-made, patient, and better than anything the inner worlds can build. They will not say how and you will not work it out."
+  },
+  {
+   "id": "cider",
+   "name": "Ancient cider",
+   "category": "luxury",
+   "basePrice": 280,
+   "weight": "light",
+   "stock": [
+    2,
+    6
+   ],
+   "lifetimeDays": null,
+   "needsRefrigeration": false,
+   "producedAt": [
+    "grumm"
+   ],
+   "buyers": [
+    "tassel",
+    "veyra",
+    "haven",
+    "croak"
+   ],
+   "lovedBy": [
+    "otter"
+   ],
+   "blurb": "Laid down in a balloon city before anyone alive was hatched. Otters weep at it; the frogs think that is the point."
+  },
+  {
+   "id": "gel",
+   "name": "Medicinal gel",
+   "category": "perishable",
+   "basePrice": 130,
+   "weight": "light",
+   "stock": [
+    5,
+    15
+   ],
+   "lifetimeDays": 70,
+   "needsRefrigeration": true,
+   "producedAt": [
+    "brine"
+   ],
+   "buyers": [
+    "everyone"
+   ],
+   "lovedBy": [
+    "scorch"
+   ],
+   "blurb": "Cold, clear, and it will close a wound that nothing else will. Scorch buys it by the crate and never haggles."
+  },
+  {
+   "id": "amber",
+   "name": "Brine amber",
+   "category": "luxury",
+   "basePrice": 190,
+   "weight": "light",
+   "stock": [
+    3,
+    10
+   ],
+   "lifetimeDays": null,
+   "needsRefrigeration": false,
+   "producedAt": [
+    "brine"
+   ],
+   "buyers": [
+    "veyra",
+    "haven"
+   ],
+   "lovedBy": [],
+   "blurb": "Ammonia-sea amber with something inside it that is not quite a leaf. The frogs sell it without explaining."
+  },
+  {
+   "id": "resin",
+   "name": "Sea-foam resin",
+   "category": "craft",
+   "basePrice": 55,
+   "weight": "light",
+   "stock": [
+    10,
+    30
+   ],
+   "lifetimeDays": null,
+   "needsRefrigeration": false,
+   "producedAt": [
+    "brine"
+   ],
+   "buyers": [
+    "tassel",
+    "cat",
+    "glass"
+   ],
+   "lovedBy": [
+    "cat"
+   ],
+   "blurb": "Sets hard in vacuum and stays a little soft forever. A cat with a crate of this can fix almost anything."
+  },
+  {
+   "id": "lenses",
+   "name": "Ice lenses",
+   "category": "craft",
+   "basePrice": 210,
+   "weight": "light",
+   "stock": [
+    5,
+    15
+   ],
    "lifetimeDays": null,
    "needsRefrigeration": false,
    "producedAt": [
     "glass"
    ],
-   "demandBy": {
-    "emberkin": 1.5,
-    "frog": 1.6,
-    "otter": 1.3,
-    "cat": 1
-   },
-   "blurb": "Glass snow off the shell of Glass, still faintly ringing the note the Builders left in it."
+   "buyers": [
+    "veyra",
+    "cat"
+   ],
+   "lovedBy": [
+    "veyra"
+   ],
+   "blurb": "Ground from shell ice that has never melted. You can read a ship's name off it from further than you would believe."
   },
   {
-   "id": "hushshard",
-   "name": "Dampener shard",
-   "category": "relic",
-   "basePrice": 1400,
-   "units": 2,
+   "id": "cryofuel",
+   "name": "Cryo fuel",
+   "category": "bulk",
+   "basePrice": 80,
+   "weight": "heavy",
+   "stock": [
+    10,
+    25
+   ],
+   "lifetimeDays": null,
+   "needsRefrigeration": false,
+   "producedAt": [
+    "glass"
+   ],
+   "buyers": [
+    "cinder",
+    "cat"
+   ],
+   "lovedBy": [],
+   "blurb": "Drawn from under the ice and shipped in double-walled crates. Heavy, dull, and the outer system runs on it."
+  },
+  {
+   "id": "incense",
+   "name": "Moon incense",
+   "category": "craft",
+   "basePrice": 110,
+   "weight": "light",
+   "stock": [
+    5,
+    12
+   ],
    "lifetimeDays": null,
    "needsRefrigeration": false,
    "producedAt": [
     "croak"
    ],
-   "demandBy": {
-    "emberkin": 1.6,
-    "otter": 1.4,
-    "frog": 1.4,
-    "cat": 1.1
-   },
-   "blurb": "A splinter of Builder dampener, kept by the Croak ascetics. Sound dies within a hand of it. The engine smiths want it very badly."
-  },
-  {
-   "id": "pax_otter",
-   "name": "Otter travelers",
-   "category": "passenger",
-   "basePrice": 40,
-   "units": 4,
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
-   "producedAt": [
-    "tassel",
-    "slate",
-    "moss"
-   ],
-   "demandBy": {
-    "otter": 1,
-    "emberkin": 1.1,
-    "cat": 1.1,
-    "frog": 1.2
-   },
-   "blurb": "Cousins visiting cousins. They will talk the whole way and know everyone at the other end."
-  },
-  {
-   "id": "pax_ember",
-   "name": "Emberkin travelers",
-   "category": "passenger",
-   "basePrice": 55,
-   "units": 4,
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
-   "producedAt": [
-    "cinder",
-    "scorch",
+   "buyers": [
+    "haven",
     "veyra"
    ],
-   "demandBy": {
-    "otter": 1.1,
-    "emberkin": 1,
-    "cat": 1,
-    "frog": 1
-   },
-   "blurb": "In heated suits, tapping their feet. They pay most for speed and remind you of the deadline hourly."
+   "lovedBy": [
+    "haven"
+   ],
+   "blurb": "Rolled in silence by people who chose to live somewhere expensive to reach. Haven burns it by the armful at festival."
   },
   {
-   "id": "pax_cat",
-   "name": "Cat crew on leave",
-   "category": "passenger",
+   "id": "beads",
+   "name": "Pilgrim beads",
+   "category": "curio",
    "basePrice": 50,
-   "units": 4,
+   "weight": "light",
+   "stock": [
+    8,
+    20
+   ],
    "lifetimeDays": null,
    "needsRefrigeration": false,
    "producedAt": [
-    "arc",
-    "nail",
-    "whisker"
+    "croak"
    ],
-   "demandBy": {
-    "otter": 1,
-    "emberkin": 1,
-    "cat": 1,
-    "frog": 1.1
-   },
-   "blurb": "Lanky, bored, and full of opinions about your approach vector. Never carry them to a heavy world."
+   "buyers": [
+    "haven",
+    "tassel",
+    "moss"
+   ],
+   "lovedBy": [
+    "croak"
+   ],
+   "blurb": "Strung one a day for a year. A pilgrim carries them out and a pilgrim carries them back, and the ones that come back cost more."
   },
   {
-   "id": "pax_frog",
-   "name": "Frog pilgrims",
-   "category": "passenger",
-   "basePrice": 75,
-   "units": 4,
+   "id": "frogtea",
+   "name": "Ancient frog tea",
+   "category": "luxury",
+   "basePrice": 300,
+   "weight": "light",
+   "stock": [
+    2,
+    6
+   ],
    "lifetimeDays": null,
-   "needsRefrigeration": true,
+   "needsRefrigeration": false,
    "producedAt": [
-    "grumm",
-    "brine",
-    "glass",
-    "croak",
+    "croak"
+   ],
+   "buyers": [
+    "haven",
+    "tassel",
+    "veyra"
+   ],
+   "lovedBy": [
+    "otter"
+   ],
+   "blurb": "Pressed into bricks longer ago than the records go. Otters have started a fashion for it, which the ascetics find funny."
+  },
+  {
+   "id": "lanterns",
+   "name": "Prayer lanterns",
+   "category": "craft",
+   "basePrice": 65,
+   "weight": "light",
+   "stock": [
+    8,
+    20
+   ],
+   "lifetimeDays": null,
+   "needsRefrigeration": false,
+   "producedAt": [
     "haven"
    ],
-   "demandBy": {
-    "otter": 1.1,
-    "emberkin": 1,
-    "cat": 1,
-    "frog": 1
-   },
-   "blurb": "Bound for Haven to walk in the festival. They need the hold kept cold and will hum the entire way."
+   "buyers": [
+    "tassel",
+    "croak"
+   ],
+   "lovedBy": [
+    "croak"
+   ],
+   "blurb": "Paper, wire and a wish. They go up over the terraces at the turn of the year and Croak buys them all year round."
+  },
+  {
+   "id": "dyes",
+   "name": "Festival dyes",
+   "category": "craft",
+   "basePrice": 45,
+   "weight": "light",
+   "stock": [
+    10,
+    30
+   ],
+   "lifetimeDays": null,
+   "needsRefrigeration": false,
+   "producedAt": [
+    "haven"
+   ],
+   "buyers": [
+    "moss",
+    "tassel",
+    "veyra"
+   ],
+   "lovedBy": [],
+   "blurb": "Ground pigment in twists of waxed cloth. Cheap here, and in the wrong month worth whatever you say it is."
+  },
+  {
+   "id": "instruments",
+   "name": "Frogwood instruments",
+   "category": "luxury",
+   "basePrice": 250,
+   "weight": "heavy",
+   "stock": [
+    3,
+    10
+   ],
+   "lifetimeDays": null,
+   "needsRefrigeration": false,
+   "producedAt": [
+    "haven"
+   ],
+   "buyers": [
+    "tassel",
+    "veyra",
+    "croak"
+   ],
+   "lovedBy": [
+    "otter"
+   ],
+   "blurb": "Cut from a wood that only grows on one terrace, and tuned over a frog lifetime. An otter crew will fight over one."
+  },
+  {
+   "id": "hullplate",
+   "name": "Salvaged ship plating",
+   "category": "bulk",
+   "basePrice": 60,
+   "weight": "heavy",
+   "stock": [
+    15,
+    40
+   ],
+   "lifetimeDays": null,
+   "needsRefrigeration": false,
+   "producedAt": [
+    "nail"
+   ],
+   "buyers": [
+    "slate",
+    "cinder",
+    "cat"
+   ],
+   "lovedBy": [],
+   "blurb": "Cut off whatever came in last, straightened, and stacked by thickness. Nobody on Nail asks what it used to be."
+  },
+  {
+   "id": "thrusters",
+   "name": "Rebuilt thrusters",
+   "category": "craft",
+   "basePrice": 200,
+   "weight": "heavy",
+   "stock": [
+    3,
+    10
+   ],
+   "lifetimeDays": null,
+   "needsRefrigeration": false,
+   "producedAt": [
+    "nail"
+   ],
+   "buyers": [
+    "otter",
+    "scorch",
+    "cat"
+   ],
+   "lovedBy": [
+    "otter"
+   ],
+   "blurb": "Stripped, cleaned and put back together better than new by somebody who did it for the argument."
+  },
+  {
+   "id": "sensorsalvage",
+   "name": "Salvaged sensors",
+   "category": "craft",
+   "basePrice": 150,
+   "weight": "light",
+   "stock": [
+    5,
+    15
+   ],
+   "lifetimeDays": null,
+   "needsRefrigeration": false,
+   "producedAt": [
+    "nail"
+   ],
+   "buyers": [
+    "veyra",
+    "cat",
+    "frog"
+   ],
+   "lovedBy": [
+    "cat"
+   ],
+   "blurb": "Working, mostly. The ones that came off the Arc see further than they are supposed to and nobody sells those cheap."
+  },
+  {
+   "id": "arcshard",
+   "name": "Arc fragments",
+   "category": "relic",
+   "basePrice": 450,
+   "weight": "light",
+   "stock": [
+    1,
+    5
+   ],
+   "lifetimeDays": null,
+   "needsRefrigeration": false,
+   "producedAt": [
+    "nail"
+   ],
+   "buyers": [
+    "veyra",
+    "otter",
+    "frog"
+   ],
+   "lovedBy": [
+    "veyra",
+    "frog"
+   ],
+   "blurb": "A hand's length of seamless Builder metal. It hums when you tap it, and the frogs will hear you coming."
+  },
+  {
+   "id": "hotweapons",
+   "name": "Stolen Ember weapons",
+   "category": "contraband",
+   "basePrice": 260,
+   "weight": "heavy",
+   "stock": [
+    2,
+    8
+   ],
+   "lifetimeDays": null,
+   "needsRefrigeration": false,
+   "producedAt": [
+    "whisker"
+   ],
+   "buyers": [
+    "cat",
+    "emberkin"
+   ],
+   "lovedBy": [
+    "cat"
+   ],
+   "blurb": "House arms with the marks taken off badly. Worth a great deal to the wrong people and a great deal of trouble to the right ones."
+  },
+  {
+   "id": "fakemedals",
+   "name": "Counterfeit faction medals",
+   "category": "contraband",
+   "basePrice": 70,
+   "weight": "light",
+   "stock": [
+    5,
+    20
+   ],
+   "lifetimeDays": null,
+   "needsRefrigeration": false,
+   "producedAt": [
+    "whisker"
+   ],
+   "buyers": [
+    "scorch",
+    "veyra",
+    "cat"
+   ],
+   "lovedBy": [],
+   "blurb": "Struck this morning, aged this afternoon. Good enough for a dock and not good enough for a house."
+  },
+  {
+   "id": "greymeds",
+   "name": "Smuggled medicine",
+   "category": "contraband",
+   "basePrice": 100,
+   "weight": "light",
+   "stock": [
+    5,
+    15
+   ],
+   "lifetimeDays": 60,
+   "needsRefrigeration": true,
+   "producedAt": [
+    "whisker"
+   ],
+   "buyers": [
+    "moss",
+    "scorch",
+    "haven"
+   ],
+   "lovedBy": [
+    "scorch"
+   ],
+   "blurb": "The same gel Brine makes, in the wrong crates, at half the price and twice the risk. Scorch does not care."
+  },
+  {
+   "id": "cyberparts",
+   "name": "Cybernetic body parts",
+   "category": "contraband",
+   "basePrice": 320,
+   "weight": "light",
+   "stock": [
+    2,
+    8
+   ],
+   "lifetimeDays": null,
+   "needsRefrigeration": false,
+   "producedAt": [
+    "whisker"
+   ],
+   "buyers": [
+    "cat",
+    "emberkin"
+   ],
+   "lovedBy": [
+    "cat"
+   ],
+   "blurb": "Hands, eyes and a spine or two, packed in gel. Whisker will fit them as well as sell them and asks for cash."
   }
  ],
  "ports": {
@@ -504,6 +1096,7 @@ export const ECONOMY = {
    "climate": "hot",
    "orbitAu": 0.3,
    "parent": null,
+   "region": "inner",
    "marketSize": 1.5,
    "fuelPricePerKms": 6,
    "shipyard": true,
@@ -512,96 +1105,6 @@ export const ECONOMY = {
     "engine_2",
     "hold_1",
     "heatshield"
-   ],
-   "sells": [
-    {
-     "good": "fashions",
-     "stock": 40,
-     "regenPerDay": 3,
-     "priceMul": 0.7
-    },
-    {
-     "good": "emberwork",
-     "stock": 20,
-     "regenPerDay": 0.8,
-     "priceMul": 0.85
-    },
-    {
-     "good": "sulfur",
-     "stock": 200,
-     "regenPerDay": 10,
-     "priceMul": 0.7
-    }
-   ],
-   "buys": [
-    {
-     "good": "grain",
-     "priceMul": 1.2
-    },
-    {
-     "good": "produce",
-     "priceMul": 1.3
-    },
-    {
-     "good": "oysters",
-     "priceMul": 1.3
-    },
-    {
-     "good": "paper",
-     "priceMul": 1.3
-    },
-    {
-     "good": "ice",
-     "priceMul": 1.4
-    },
-    {
-     "good": "ore",
-     "priceMul": 1.2
-    },
-    {
-     "good": "rope",
-     "priceMul": 1.1
-    },
-    {
-     "good": "parts",
-     "priceMul": 1
-    },
-    {
-     "good": "tideglass",
-     "priceMul": 1.2
-    },
-    {
-     "good": "frogsong",
-     "priceMul": 1.2
-    },
-    {
-     "good": "lilywine",
-     "priceMul": 1.2
-    },
-    {
-     "good": "cultures",
-     "priceMul": 1.1
-    },
-    {
-     "good": "shadowsilk",
-     "priceMul": 1.2
-    },
-    {
-     "good": "cometdust",
-     "priceMul": 1.2
-    },
-    {
-     "good": "chorustube",
-     "priceMul": 1.3
-    },
-    {
-     "good": "ringglass",
-     "priceMul": 1.3
-    },
-    {
-     "good": "hushshard",
-     "priceMul": 1.3
-    }
    ]
   },
   "scorch": {
@@ -610,12 +1113,11 @@ export const ECONOMY = {
    "climate": "hot",
    "orbitAu": 0.3,
    "parent": "cinder",
+   "region": "inner",
    "marketSize": 0.6,
    "fuelPricePerKms": 12,
    "shipyard": false,
-   "upgrades": [],
-   "sells": [],
-   "buys": []
+   "upgrades": []
   },
   "veyra": {
    "name": "Veyra",
@@ -623,12 +1125,11 @@ export const ECONOMY = {
    "climate": "hot",
    "orbitAu": 0.6,
    "parent": null,
+   "region": "inner",
    "marketSize": 1.6,
    "fuelPricePerKms": 11,
    "shipyard": false,
-   "upgrades": [],
-   "sells": [],
-   "buys": []
+   "upgrades": []
   },
   "tassel": {
    "name": "Tassel",
@@ -636,96 +1137,11 @@ export const ECONOMY = {
    "climate": "temperate",
    "orbitAu": 1,
    "parent": null,
+   "region": "home",
    "marketSize": 2,
    "fuelPricePerKms": 10,
    "shipyard": false,
-   "upgrades": [],
-   "sells": [
-    {
-     "good": "tideglass",
-     "stock": 30,
-     "regenPerDay": 1,
-     "priceMul": 0.85
-    },
-    {
-     "good": "rope",
-     "stock": 150,
-     "regenPerDay": 8,
-     "priceMul": 0.8
-    },
-    {
-     "good": "oysters",
-     "stock": 60,
-     "regenPerDay": 6,
-     "priceMul": 0.75
-    }
-   ],
-   "buys": [
-    {
-     "good": "pebble",
-     "priceMul": 1.2
-    },
-    {
-     "good": "grain",
-     "priceMul": 1.1
-    },
-    {
-     "good": "produce",
-     "priceMul": 1.1
-    },
-    {
-     "good": "ice",
-     "priceMul": 1
-    },
-    {
-     "good": "ore",
-     "priceMul": 1
-    },
-    {
-     "good": "sulfur",
-     "priceMul": 1.1
-    },
-    {
-     "good": "fashions",
-     "priceMul": 1.3
-    },
-    {
-     "good": "emberwork",
-     "priceMul": 1.2
-    },
-    {
-     "good": "frogsong",
-     "priceMul": 1.4
-    },
-    {
-     "good": "lilywine",
-     "priceMul": 1.3
-    },
-    {
-     "good": "cultures",
-     "priceMul": 1.2
-    },
-    {
-     "good": "shadowsilk",
-     "priceMul": 1.3
-    },
-    {
-     "good": "cometdust",
-     "priceMul": 1.2
-    },
-    {
-     "good": "chorustube",
-     "priceMul": 1.1
-    },
-    {
-     "good": "ringglass",
-     "priceMul": 1.1
-    },
-    {
-     "good": "hushshard",
-     "priceMul": 1.1
-    }
-   ]
+   "upgrades": []
   },
   "slate": {
    "name": "Slate",
@@ -733,6 +1149,7 @@ export const ECONOMY = {
    "climate": "temperate",
    "orbitAu": 1,
    "parent": "tassel",
+   "region": "home",
    "marketSize": 0.8,
    "fuelPricePerKms": 9,
    "shipyard": true,
@@ -745,62 +1162,6 @@ export const ECONOMY = {
     "hold_1",
     "hold_2",
     "refrigeration"
-   ],
-   "sells": [
-    {
-     "good": "pebble",
-     "stock": 40,
-     "regenPerDay": 2,
-     "priceMul": 1
-    },
-    {
-     "good": "parts",
-     "stock": 60,
-     "regenPerDay": 3,
-     "priceMul": 0.85
-    }
-   ],
-   "buys": [
-    {
-     "good": "ore",
-     "priceMul": 1.4
-    },
-    {
-     "good": "sulfur",
-     "priceMul": 1.3
-    },
-    {
-     "good": "rope",
-     "priceMul": 1.1
-    },
-    {
-     "good": "grain",
-     "priceMul": 1.1
-    },
-    {
-     "good": "produce",
-     "priceMul": 1.1
-    },
-    {
-     "good": "oysters",
-     "priceMul": 1
-    },
-    {
-     "good": "paper",
-     "priceMul": 1
-    },
-    {
-     "good": "chorustube",
-     "priceMul": 1.4
-    },
-    {
-     "good": "ringglass",
-     "priceMul": 1.1
-    },
-    {
-     "good": "hushshard",
-     "priceMul": 1.2
-    }
    ]
   },
   "moss": {
@@ -809,58 +1170,11 @@ export const ECONOMY = {
    "climate": "temperate",
    "orbitAu": 1,
    "parent": "tassel",
+   "region": "home",
    "marketSize": 1,
    "fuelPricePerKms": 12,
    "shipyard": false,
-   "upgrades": [],
-   "sells": [
-    {
-     "good": "grain",
-     "stock": 150,
-     "regenPerDay": 8,
-     "priceMul": 0.8
-    },
-    {
-     "good": "produce",
-     "stock": 80,
-     "regenPerDay": 6,
-     "priceMul": 0.8
-    }
-   ],
-   "buys": [
-    {
-     "good": "paper",
-     "priceMul": 1.15
-    },
-    {
-     "good": "parts",
-     "priceMul": 1.25
-    },
-    {
-     "good": "sulfur",
-     "priceMul": 1.4
-    },
-    {
-     "good": "ice",
-     "priceMul": 0.9
-    },
-    {
-     "good": "rope",
-     "priceMul": 1.1
-    },
-    {
-     "good": "fashions",
-     "priceMul": 1
-    },
-    {
-     "good": "lilywine",
-     "priceMul": 1.3
-    },
-    {
-     "good": "emberwork",
-     "priceMul": 1
-    }
-   ]
+   "upgrades": []
   },
   "nail": {
    "name": "Nail",
@@ -868,12 +1182,11 @@ export const ECONOMY = {
    "climate": "micro",
    "orbitAu": 2.15,
    "parent": null,
+   "region": "belt",
    "marketSize": 0.8,
    "fuelPricePerKms": 20,
    "shipyard": false,
-   "upgrades": [],
-   "sells": [],
-   "buys": []
+   "upgrades": []
   },
   "whisker": {
    "name": "Whisker",
@@ -881,14 +1194,13 @@ export const ECONOMY = {
    "climate": "micro",
    "orbitAu": 2.38,
    "parent": null,
+   "region": "belt",
    "marketSize": 0.7,
    "fuelPricePerKms": 26,
    "shipyard": true,
    "upgrades": [
     "stealth"
-   ],
-   "sells": [],
-   "buys": []
+   ]
   },
   "arc": {
    "name": "The Arc",
@@ -896,75 +1208,12 @@ export const ECONOMY = {
    "climate": "micro",
    "orbitAu": 2.7,
    "parent": null,
+   "region": "belt",
    "marketSize": 0.6,
    "fuelPricePerKms": null,
    "shipyard": false,
    "upgrades": [
     "sensors"
-   ],
-   "sells": [
-    {
-     "good": "chorustube",
-     "stock": 6,
-     "regenPerDay": 0.05,
-     "priceMul": 1
-    },
-    {
-     "good": "ore",
-     "stock": 80,
-     "regenPerDay": 2,
-     "priceMul": 0.9
-    }
-   ],
-   "buys": [
-    {
-     "good": "grain",
-     "priceMul": 1.3
-    },
-    {
-     "good": "produce",
-     "priceMul": 1.3
-    },
-    {
-     "good": "oysters",
-     "priceMul": 1.3
-    },
-    {
-     "good": "rope",
-     "priceMul": 1.2
-    },
-    {
-     "good": "parts",
-     "priceMul": 1.3
-    },
-    {
-     "good": "fashions",
-     "priceMul": 1
-    },
-    {
-     "good": "tideglass",
-     "priceMul": 1.1
-    },
-    {
-     "good": "emberwork",
-     "priceMul": 1.1
-    },
-    {
-     "good": "lilywine",
-     "priceMul": 1.2
-    },
-    {
-     "good": "cometdust",
-     "priceMul": 1.1
-    },
-    {
-     "good": "ice",
-     "priceMul": 1
-    },
-    {
-     "good": "paper",
-     "priceMul": 1
-    }
    ]
   },
   "grumm": {
@@ -973,12 +1222,11 @@ export const ECONOMY = {
    "climate": "cold",
    "orbitAu": 5,
    "parent": null,
+   "region": "outer",
    "marketSize": 1,
    "fuelPricePerKms": 24,
    "shipyard": false,
-   "upgrades": [],
-   "sells": [],
-   "buys": []
+   "upgrades": []
   },
   "brine": {
    "name": "Brine",
@@ -986,12 +1234,11 @@ export const ECONOMY = {
    "climate": "cold",
    "orbitAu": 5,
    "parent": "grumm",
+   "region": "outer",
    "marketSize": 0.8,
    "fuelPricePerKms": 26,
    "shipyard": false,
-   "upgrades": [],
-   "sells": [],
-   "buys": []
+   "upgrades": []
   },
   "glass": {
    "name": "Glass",
@@ -999,12 +1246,11 @@ export const ECONOMY = {
    "climate": "cold",
    "orbitAu": 5,
    "parent": "grumm",
+   "region": "outer",
    "marketSize": 0.7,
    "fuelPricePerKms": 26,
    "shipyard": false,
-   "upgrades": [],
-   "sells": [],
-   "buys": []
+   "upgrades": []
   },
   "croak": {
    "name": "Croak",
@@ -1012,12 +1258,11 @@ export const ECONOMY = {
    "climate": "cold",
    "orbitAu": 5,
    "parent": "grumm",
+   "region": "outer",
    "marketSize": 0.3,
    "fuelPricePerKms": 34,
    "shipyard": false,
    "upgrades": [],
-   "sells": [],
-   "buys": [],
    "retrograde": true
   },
   "haven": {
@@ -1026,6 +1271,7 @@ export const ECONOMY = {
    "climate": "cold",
    "orbitAu": 5,
    "parent": "grumm",
+   "region": "outer",
    "marketSize": 1.4,
    "fuelPricePerKms": 22,
    "shipyard": true,
@@ -1033,15 +1279,13 @@ export const ECONOMY = {
     "tank_1",
     "tank_2"
    ],
-   "sells": [],
-   "buys": [],
    "gifts": {
     "perVisitValue": 40,
     "perRepPoint": 12,
     "goods": [
-     "cultures",
-     "lilywine",
-     "frogsong"
+     "lanterns",
+     "dyes",
+     "incense"
     ]
    }
   },
@@ -1051,12 +1295,11 @@ export const ECONOMY = {
    "climate": "cold",
    "orbitAu": 18,
    "parent": null,
+   "region": "deep",
    "marketSize": 0,
    "fuelPricePerKms": null,
    "shipyard": false,
-   "upgrades": [],
-   "sells": [],
-   "buys": []
+   "upgrades": []
   }
  },
  "upgrades": [
@@ -1172,7 +1415,7 @@ export const ECONOMY = {
     "slate"
    ],
    "effect": "Largest cargo capacity (units from tuning).",
-   "unlocks": "Relic hauls and full frog gift-exchanges in one trip."
+   "unlocks": "Ore and masonry by the barge, and full frog gift-exchanges in one trip."
   },
   {
    "id": "heatshield",
@@ -1196,7 +1439,7 @@ export const ECONOMY = {
     "slate"
    ],
    "effect": "Hold can carry goods and passengers flagged needsRefrigeration.",
-   "unlocks": "Ice-wine, cold cultures and frog pilgrims."
+   "unlocks": "Riverfish, medicinal gel and frog pilgrims."
   },
   {
    "id": "sensors",
@@ -1225,17 +1468,10 @@ export const ECONOMY = {
  ],
  "formulas": {
   "price": {
-   "description": "You pay base*sells.priceMul*(1-repDiscount)*haggle. A port pays base*demandBy[species]*buys.priceMul*alignment*saturation*perishable*haggle*(1+volatility wobble). A port with no people of its own uses the mean of the four species demands."
-  },
-  "alignment": {
-   "description": "For a good at buyer port B, d = current distance to the good's nearest producer port A. With dmin/dmax the geometric min/max separation of the two orbits (capped at maxSeparationAu), x = clamp((d-dmin)/(dmax-dmin),0,1); mul = clamp(1 + k*(x-0.5), minMul, maxMul). Same-parent pairs (dmax-dmin < 0.05 au) get mul 1. Close worlds flood the market, far worlds go hungry.",
-   "k": 0.6,
-   "maxSeparationAu": 12,
-   "minMul": 0.7,
-   "maxMul": 1.3
+   "description": "You pay base * sells.priceMul * scarcity * (1 - repDiscount) * mood. A port pays base * (it is on the good's buyer list ? 1 : disinterestMul) * region * loved * saturation * mood * freshness. Nothing on the buying side depends on which species you are selling to except through the buyer and loved lists, which name ports and peoples alike."
   },
   "saturation": {
-   "description": "Each port remembers recentSold[good] (items), decaying with half-life halfLifeDays. The k-th item you sell fetches q0eff/(q0eff+recentSold) of the price, q0eff = q0*port.marketSize, updated after every item.",
+   "description": "Each port remembers what you have landed on it lately, decaying with half-life halfLifeDays. The k-th item you sell fetches q0eff/(q0eff+recentSold) of the price, q0eff = q0 * port.marketSize.",
    "halfLifeDays": 20,
    "q0": 48
   },
@@ -1302,6 +1538,19 @@ export const ECONOMY = {
    "emberkin": "Volatile prices; perishable fashions; contracts pay the most for speed (speciesMul 1.3, earlyBonus counts double).",
    "cat": "Tolls in the Belt under strict custom (never everything, never passengers). Impress a captain and a gift may follow.",
    "frog": "No haggling. \"Prices\" are exchange rates: you are paid in trade credit at the stall plus goodwill (reputation), and every visit ends with a gift."
+  },
+  "region": {
+   "description": "Where a good is worth carrying. A port in the same region as the good's nearest producer pays homeMul; a port anywhere else pays awayMul. Regions are named in the ports table: inner, home, belt, outer, deep.",
+   "homeMul": 1,
+   "awayMul": 1.6
+  },
+  "loved": {
+   "description": "A port named in a good's lovedBy list — by its own id or by its people — pays this on top of everything else. This is the big lever: a loved good in another region is worth three and a half times what it costs at the stall it came from.",
+   "mul": 2.2
+  },
+  "stock": {
+   "description": "A stall's shelves hold a number rolled out of the good's own stock range, and they are rolled again when you come back from somewhere else. Staying at one dock and waiting does not restock it; going and trading elsewhere does. What you bought this visit is what is missing, and a thin shelf costs more (scarcity).",
+   "scarcityK": 0.5
   }
  },
  "contracts": {
@@ -1488,5 +1737,12 @@ export const ECONOMY = {
     "text": "A belt family heading in-system. They know a route you do not."
    }
   ]
+ },
+ "regions": {
+  "inner": "The Emberkin worlds: Cinder, Scorch and Veyra.",
+  "home": "Tassel and its moons, Slate and Moss.",
+  "belt": "The Belt: Nail, Whisker and the Arc.",
+  "outer": "Grumm and its moons: Brine, Glass, Croak and Haven.",
+  "deep": "The Maw, and nothing else."
  }
 };

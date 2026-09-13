@@ -1232,6 +1232,10 @@ function wire(root){
 
 const trend = (price, base) => price > base * 1.12 ? '<span class="up">▲</span>' : price < base * 0.88 ? '<span class="down">▼</span>' : '<span class="flat">•</span>';
 const plenty = (state, port, good) => { const m = S.saturationMul(state, port, good); return m >= 0.95 ? '' : ' · ' + S.saturationWords(m); };
+/* Whether this crate has left the region it was made in, which is most of what
+   it is worth. Said in words rather than as a multiplier, because "a long way
+   from home" is the thing a trader knows and 1.6 is not. */
+const away = (port, good) => S.regionMul(port, good) > 1 ? ' · <span class="up">a long way from home</span>' : '';
 
 function market(){
   const port = state.dockedAt;
@@ -1253,9 +1257,15 @@ function market(){
     const stock = S.stockAvailable(state, port, gid);
     const c1 = S.canBuy(state, gid, 1);
     const lock = g.needsRefrigeration && !state.keys.refrigeration ? '<span class="lock">needs refrigeration</span>' : '';
-    const maxQ = Math.min(stock, Math.floor(state.money / price), Math.floor(S.freeUnits(state) / g.units));
-    const back = S.restockIn(state, port, gid);
-    const restock = stock === 0 && back ? (back === Infinity ? ' · <span class="down">none left, and none coming</span>' : ` · <span class="down">none left; more in ${S.fmtDays(back)}</span>`) : '';
+    /* How many you could actually take. It has to start from canBuy rather
+       than from the arithmetic: a cold-chain good with no cold hold priced out
+       the +1 button and left +10 and "all" lit, which is a button that exists
+       to tell you no. If one is impossible, ten is impossible. */
+    const maxQ = c1.ok ? Math.min(stock, Math.floor(state.money / price), Math.floor(S.freeUnits(state) / g.units)) : 0;
+    /* Shelves do not refill on a clock any more: a merchant finds more while
+       you are away, so the only way to see a full stall again is to have gone
+       and traded somewhere else. */
+    const restock = stock === 0 ? ' · <span class="down">picked clean; they will have found more once you have been elsewhere</span>' : '';
     out += `<div class="row"><div class="name"><b>${esc(g.name)}</b><small>${esc(g.blurb ?? g.category)} · ${stock} in stock${restock} · ${g.units} unit${g.units > 1 ? 's' : ''} each ${lock}</small></div>
       <div class="price">${S.fmtMoney(price)}<small>${trend(price, g.basePrice)} base ${S.fmtMoney(g.basePrice)}</small></div>
       <div class="btns"><button class="btn sm" data-act="buy|${gid}|1" ${c1.ok ? '' : 'disabled title="' + esc(c1.reason) + '"'}>+1</button><button class="btn sm" data-act="buy|${gid}|10" ${maxQ >= 10 ? '' : 'disabled'}>+10</button><button class="btn sm" data-act="buy|${gid}|${maxQ}" ${maxQ > 1 ? '' : 'disabled'}>all</button></div></div>`;
@@ -1267,17 +1277,29 @@ function market(){
   for(const [gid, e] of aboard){
     const g = S.goodById(gid);
     const price = S.sellPrice(state, port, gid, e.oldest);
-    const wants = p.buys.some(b => b.good === gid) || (g.demandBy?.[p.species] ?? 1) > 1;
+    const loved = S.lovesGood(port, gid);
+    const wants = p.buys.some(b => b.good === gid);
     const fr = S.freshness(g, state.t - e.oldest);
     const fresh = g.lifetimeDays ? `<span class="fresh" title="freshness"><i class="${fr > 0.66 ? '' : fr > 0.33 ? 'mid' : 'low'}" style="width:${Math.round(fr * 100)}%"></i></span> ${esc(S.freshnessWords(g, state.t - e.oldest))}` : '';
     const avg = e.paid / e.qty;
-    out += `<div class="row"><div class="name"><b>${esc(g.name)}</b><small>${e.qty} aboard · paid ${S.fmtMoney(avg)} each ${fresh}${wants ? ' · <span class="up">wanted here</span>' : ''}${plenty(state, port, gid)}</small></div>
+    out += `<div class="row"><div class="name"><b>${esc(g.name)}</b><small>${e.qty} aboard · paid ${S.fmtMoney(avg)} each ${fresh}${loved ? ' · <span class="up">they love this here</span>' : wants ? ' · <span class="up">wanted here</span>' : ''}${away(port, gid)}${plenty(state, port, gid)}</small></div>
       <div class="price">${S.fmtMoney(price)}<small>${price > avg ? '<span class="up">' : '<span class="down">'}${price >= avg ? '+' : ''}${S.fmtMoney(price - avg)}</span></small></div>
       <div class="btns"><button class="btn sm" data-act="sell|${gid}|1">−1</button><button class="btn sm" data-act="sell|${gid}|10" ${e.qty >= 10 ? '' : 'disabled'}>−10</button><button class="btn sm primary" data-act="sell|${gid}|${e.qty}">all</button></div></div>`;
   }
-  const wants = p.buys.map(b => S.goodById(b.good)).filter(g => !aboard.has(g.id));
-  if(wants.length){
-    out += '<h3>They want</h3><p>' + wants.map(g => `${esc(g.name)} <span class="lock">${S.fmtMoney(S.sellPrice(state, port, g.id))}</span>`).join(' · ') + '</p>';
+  /* What to bring back here, worth most first, because that is the question a
+     trader is actually asking the board. The ones they love are called out:
+     those are the routes, and a player should be able to see one from the
+     stall rather than work it out with a notebook. */
+  const shopping = p.buys.map(b => S.goodById(b.good)).filter(g => !aboard.has(g.id))
+    .map(g => ({ g, price: S.sellPrice(state, port, g.id), loved: S.lovesGood(port, g.id) }))
+    .sort((a, b) => b.price - a.price);
+  const loves = shopping.filter(r => r.loved);
+  if(loves.length){
+    out += '<h3>They love</h3><p>' + loves.map(r => `${esc(r.g.name)} <span class="up">${S.fmtMoney(r.price)}</span>`).join(' · ') + '</p>';
+  }
+  const rest = shopping.filter(r => !r.loved);
+  if(rest.length){
+    out += '<h3>They want</h3><p>' + rest.map(r => `${esc(r.g.name)} <span class="lock">${S.fmtMoney(r.price)}</span>`).join(' · ') + '</p>';
   }
   return out;
 }

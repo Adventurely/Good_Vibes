@@ -133,14 +133,37 @@ Trade is built around one central tension: **time versus fuel.**
 
 | Cargo type | Examples | Behavior |
 |---|---|---|
-| Bulk | Ore, grain, ice | Cheap, durable, low margin. The slow road is fine. |
-| Perishables | Fresh produce, Emberkin fashions | Value decays in transit. Rewards fast routes. |
-| Passengers | Travelers of all four species | Pay for speed or comfort, often with special requests. |
-| Climate-sensitive | Frog goods, frog passengers | Require refrigeration (a gate-key upgrade). |
-| Luxuries | Inner-world crafts, frog songs | High value, driven by species demand. |
-| Relics | Builder artifacts | Rare, often tied to story and upgrades. |
+| Bulk | Iron ore, refined steel, cryo fuel | Cheap, durable, low margin. The slow road is fine. |
+| Craft | Engine parts, tide glass, prayer lanterns | The working middle of the price list. |
+| Perishables | Riverfish, medicinal herbs and gel | Value decays in transit. Rewards fast routes. |
+| Climate-sensitive | Riverfish, medicinal gel, smuggled medicine | Require refrigeration (a gate-key upgrade). |
+| Luxuries | Ember silk, frog tea, frogwood instruments | High value, and the things a people loves. |
+| Contraband | Stolen arms, forged medals, cybernetics | Whisker's whole shelf. |
+| Relics | Arc fragments, reactor coils, storm crystals | Rare, often tied to story and upgrades. |
 
-Markets respond to the sky. **Alignment-driven prices:** when two worlds swing close, trade between them floods and prices drop, while worlds far from their partners grow hungry for goods. **Market saturation:** selling the same good repeatedly in one market lowers its price, which discourages grinding a single loop. **Species demand:** each people wants what only others produce, so trade becomes a way of connecting cultures.
+**One table drives both ends of every trade.** Each good names where it is made,
+who buys it, and who *loves* it — and "who" is named the way a trader would name
+them, sometimes a port (Veyra) and sometimes a whole people (Otters). A stall
+sells what its port produces and buys what the goods table says it wants; no
+port carries a hand-written price list. Loving a thing is wanting it: a people
+who love a good are on its buyer list whether or not the table says so twice.
+
+**Prices are a region rule and a love rule.** The sky is five regions — inner,
+home, belt, outer, deep — and a good is worth what it costs at the stall in its
+own region and **×1.6 anywhere else**. A port that loves it pays **×2.2** on top.
+So the trade is: buy at the source, carry it out of its region, and sell it to
+the people who care. Tide glass bought on Tassel for 60 sells on Brine, who love
+it and live four au away, for over 200.
+
+**Shelves are what a merchant keeps, not what a factory makes.** Every good has
+a stock range, a stall's shelf is rolled inside it, and the shelf is rolled
+again when you come back from somewhere else. Waiting at a dock does nothing;
+trading elsewhere is the restock. A picked-over shelf also costs more, so buying
+a stall out is never free.
+
+**Market saturation** still applies on the selling side: landing the same good
+in the same market repeatedly walks the price down, and the market forgets over
+about three weeks, which is what stops one loop being the whole game.
 
 Money is treated as a **key** (to upgrades, access, and relationships) rather than a scoreboard.
 

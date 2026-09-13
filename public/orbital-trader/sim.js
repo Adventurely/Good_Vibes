@@ -20,6 +20,7 @@ import {
 } from './orbit.js';
 import {
   CONST, BODIES, GOODS, PORTS, UPGRADES, FORMULAS, CONTRACT_TEMPLATES, TEXT, SPECIES,
+  REGION_OF, wantsGood, lovesGood,
 } from './content.js';
 
 export const world = makeWorld(BODIES);
@@ -68,13 +69,13 @@ export const FIRST_DELIVERY = { to: 'slate', pay: 420, days: 14, units: 2 };
 export function newGame(seed = 1){
   const start = CONST.START_PORT;
   const state = {
-    /* 3: the setting was rewritten. Ten bodies left the sky, six arrived,
-       and four were renamed — so a version 2 save names places that are not
-       there any more, and a version 1 save's ship position means nothing at
-       all. Those saves are refused rather than repaired: the page catches it
-       and opens a new game, which is the honest outcome when the world under
-       a ship has changed shape. */
-    version: 3,
+    /* 4: every good in the sky was replaced, and shelves stopped regrowing on
+       a clock. A version 3 save's hold is full of goods that do not exist and
+       its market book is in the old shape; a version 2 save names places that
+       are not there any more. Those saves are refused rather than repaired:
+       the page catches it and opens a new game, which is the honest outcome
+       when the world under a ship has changed shape. */
+    version: 4,
     seed, rng: (seed * 2654435761) >>> 0 || 1,
     t: 0, warp: 1, paused: false,
     shipName: TEXT.shipNames[Math.abs(seed) % TEXT.shipNames.length],
@@ -86,7 +87,14 @@ export function newGame(seed = 1){
     money: CONST.START_MONEY, debt: 0,
     cargo: [], passengers: [],
     offers: {},
+    /* markets holds, per port, what you have landed on it lately (`sold`),
+       what you have taken off its shelves this visit (`bought`), and which
+       visit that was (`visit`). marketEpoch turns over every time you tie up
+       somewhere other than where you last tied up, which is what makes a
+       stall find more stock while you were away. */
     markets: {},
+    marketEpoch: 0,
+    lastMarket: null,
     rep: { emberkin: 0, otter: 0, cat: 0, frog: 0 },
     nodes: [],
     quests: [],
@@ -281,6 +289,7 @@ export function dock(state){
   state.dockedAt = port;
   state.nodes = [];
   placeDocked(state, port);
+  openMarket(state, port);
   if(!state.visited.includes(port)) state.visited.push(port);
   state.stats.docks++;
   const dAbs = norm(absState(world, port, state.t).r);
@@ -1533,25 +1542,24 @@ export function supplierDistance(portId, goodId, t){
   return best;
 }
 
-export function alignmentMul(portId, goodId, t){
-  const f = FORMULAS.alignment;
+/* Where a good is worth carrying, which is the whole of trade: a thing is
+ * cheap where it is made and dear where it is not. The rule is regions rather
+ * than distance, because a region is something a player can hold in their head
+ * — inner, home, belt, outer — and "carry it out of the region it came from"
+ * is an instruction, where "carry it 3.4 au" is a sum. */
+export function regionMul(portId, goodId){
+  const f = FORMULAS.region;
   const g = goodById(goodId);
-  if(!g.producedAt.length || g.producedAt.includes(portId)) return 1;
-  // Nearest producer now, then how that sits between the closest and the
-  // farthest the two orbits ever bring them.
-  const here = absState(world, portId, t).r;
-  let best = null;
-  for(const p of g.producedAt){
-    const d = dist(here, absState(world, p, t).r);
-    if(!best || d < best.d) best = { d, p };
-  }
-  const A = helioOf(portId), B = helioOf(best.p);
-  if(!A || !B || A.id === B.id) return 1;
-  const dmin = Math.max(0, Math.abs(A.a - B.a) - (A.a * (A.e ?? 0) + B.a * (B.e ?? 0)));
-  const dmax = Math.min(f.maxSeparationAu, A.a * (1 + (A.e ?? 0)) + B.a * (1 + (B.e ?? 0)));
-  if(dmax - dmin < 0.05) return 1;
-  const x = Math.max(0, Math.min(1, (best.d - dmin) / (dmax - dmin)));
-  return Math.max(f.minMul, Math.min(f.maxMul, 1 + f.k * (x - 0.5)));
+  if(!g.producedAt.length || g.producedAt.includes(portId)) return f.homeMul;
+  const here = REGION_OF[portId];
+  return g.producedAt.some(p => REGION_OF[p] === here) ? f.homeMul : f.awayMul;
+}
+
+/* And the big lever. A port that loves a thing — by its own name or its
+ * people's — pays over the odds for it, and loving it in another region is
+ * what a trade route is made of: three and a half times the stall price. */
+export function lovedMul(portId, goodId){
+  return lovesGood(portId, goodId) ? FORMULAS.loved.mul : 1;
 }
 
 function decayed(entry, t){
@@ -1560,18 +1568,11 @@ function decayed(entry, t){
 }
 const q0For = portId => FORMULAS.saturation.q0 * (PORTS[portId].marketSize ?? 1);
 
-/* How much of a stall's stock is still missing. Selling into a market and
- * buying out of one are not the same thing and must not decay the same way:
- * a market's appetite fades on its own clock, but a shelf refills at the rate
- * the people behind it can make more. Moss grows grain by the sackful every
- * day; the Arc cuts a relic out of a ruin twice a year. A single half-life for
- * both made a rare thing as easy to strip-mine as a common one. */
+/* How much of a stall's shelf you have already taken this visit. Shelves do
+ * not regrow on a clock any more — waiting at a dock gets you nothing — so
+ * this is simply a count, cleared when the shelves are rolled again. */
 function shortfall(state, portId, goodId){
-  const row = PORTS[portId].sells.find(r => r.good === goodId);
-  const e = state.markets[portId]?.bought?.[goodId];
-  if(!row || !e) return 0;
-  const regen = row.regenPerDay ?? 0;
-  return Math.max(0, e.q - regen * Math.max(0, state.t - e.t));
+  return state.markets[portId]?.bought?.[goodId] ?? 0;
 }
 export function saturationMul(state, portId, goodId){
   const m = state.markets[portId];
@@ -1579,8 +1580,12 @@ export function saturationMul(state, portId, goodId){
   const q0 = q0For(portId);
   return q0 / (q0 + q);
 }
+/* A picked-over shelf costs more, so buying a stall out is never free. */
 function scarcityMul(state, portId, goodId){
-  return 1 + 0.5 * (shortfall(state, portId, goodId) / q0For(portId));
+  const full = stockFull(state, portId, goodId);
+  if(full <= 0) return 1;
+  const gone = Math.min(full, shortfall(state, portId, goodId));
+  return 1 + FORMULAS.stock.scarcityK * (gone / full);
 }
 
 /* Emberkin fashion: a slow wave per good, so what Cinder wants this week is
@@ -1625,9 +1630,8 @@ export function sellPrice(state, portId, goodId, boughtAt = null){
   const p = PORTS[portId];
   const g = goodById(goodId);
   const row = p.buys.find(s => s.good === goodId);
-  const demand = g.demandBy?.[p.species] ?? 1;
   const mul = row ? row.priceMul : FORMULAS.market.disinterestMul;
-  let price = g.basePrice * mul * demand * alignmentMul(portId, goodId, state.t)
+  let price = g.basePrice * mul * regionMul(portId, goodId) * lovedMul(portId, goodId)
     * saturationMul(state, portId, goodId) * speciesMood(portId, goodId, state.t);
   price *= 1 + repDiscount(state, p.species) * 0.5;
   if(boughtAt != null) price *= freshness(g, state.t - boughtAt);
@@ -1653,18 +1657,33 @@ export function freshness(g, ageDays){
   return Math.max(FORMULAS.perishable.floor, 1 - ageDays / g.lifetimeDays);
 }
 
-export function stockAvailable(state, portId, goodId){
-  const row = PORTS[portId].sells.find(s => s.good === goodId);
-  if(!row) return 0;
-  return Math.max(0, Math.round(row.stock - shortfall(state, portId, goodId)));
+/* What this stall had on the shelf when you walked in. A merchant keeps what
+ * they keep — a number out of the good's own range — and the number is rolled
+ * from the port, the good and which visit this is, so it is the same shelf
+ * every time the frame is drawn and needs nothing stored but the visit count.
+ *
+ * The shelves are rolled again when you come back from somewhere else. That is
+ * the whole restocking rule: trade elsewhere and this stall will have found
+ * more; stand at the dock and wait and it will not. */
+export function stockFull(state, portId, goodId){
+  const g = goodById(goodId);
+  if(!PORTS[portId]?.sells.some(r => r.good === goodId)) return 0;
+  const [lo, hi] = g.stock ?? [1, 1];
+  const visit = state.markets[portId]?.visit ?? 0;
+  return lo + Math.floor(hash(portId, goodId, visit) * (hi - lo + 1));
 }
-/* When a stall expects to have this back on the shelf, in days. Null when it
- * is not short, or when nobody is making any more of it. */
-export function restockIn(state, portId, goodId){
-  const short = shortfall(state, portId, goodId);
-  if(short <= 0) return null;
-  const regen = PORTS[portId].sells.find(r => r.good === goodId)?.regenPerDay ?? 0;
-  return regen > 0 ? short / regen : Infinity;
+export function stockAvailable(state, portId, goodId){
+  return Math.max(0, stockFull(state, portId, goodId) - shortfall(state, portId, goodId));
+}
+
+/* A visit is a market you have come back to, not a door you opened twice.
+ * Docking somewhere new turns the page; the next time you tie up anywhere,
+ * that stall rolls fresh shelves. Casting off and immediately tying up again
+ * gets you the shelves you just picked over, which is the point. */
+export function openMarket(state, portId){
+  if(state.lastMarket !== portId){ state.marketEpoch = (state.marketEpoch ?? 0) + 1; state.lastMarket = portId; }
+  const m = market(state, portId);
+  if(m.visit !== state.marketEpoch){ m.visit = state.marketEpoch; m.bought = {}; }
 }
 
 function market(state, portId){
@@ -1699,11 +1718,8 @@ export function buy(state, goodId, qty){
   const port = state.dockedAt;
   const total = c.price * qty;
   state.money -= total;
-  // The shelf book, which refills at the stall's own rate rather than fading.
-  {
-    const book = market(state, port).bought;
-    book[goodId] = { q: shortfall(state, port, goodId) + qty, t: state.t };
-  }
+  // What is missing off the shelf this visit, until the shelves are rolled again.
+  market(state, port).bought[goodId] = shortfall(state, port, goodId) + qty;
   // Stacks are split by purchase time, because freshness is per crate.
   const stack = state.cargo.find(s => s.good === goodId && Math.abs(s.t - state.t) < 1e-9 && s.price === c.price);
   if(stack) stack.qty += qty; else state.cargo.push({ good: goodId, qty, t: state.t, price: c.price, from: port });
@@ -1738,7 +1754,7 @@ export function sell(state, goodId, qty){
   state.stats.sold += qty;
   const sp = PORTS[port].species;
   const g = goodById(goodId);
-  if(sp in state.rep && (g.demandBy?.[sp] ?? 1) > 1) state.rep[sp] += 0.1 * qty * Math.min(1, g.basePrice / 100);
+  if(sp in state.rep && lovesGood(port, goodId)) state.rep[sp] += 0.1 * qty * Math.min(1, g.basePrice / 100);
   logLine(state, 'sold', TEXT.logTemplates.sold, { qty, good: g.name, price: fmtMoney(total), port: portName(port) });
   return { ok: true, total, profit: total - cost };
 }
@@ -2170,7 +2186,7 @@ export function restore(json){
   const s = typeof json === 'string' ? JSON.parse(json) : json;
   const bad = why => { throw new Error(`Not a save this game understands: ${why}.`); };
   if(!s || typeof s !== 'object') bad('it is not an object');
-  if(s.version !== 3) bad(`it is version ${s.version}, and this sky is version 3`);
+  if(s.version !== 4) bad(`it is version ${s.version}, and this sky is version 4`);
   if(!s.ship || typeof s.ship !== 'object') bad('it has no ship');
   if(!world.get(s.ship.body)) bad(`its ship is at "${s.ship.body}", which is nowhere`);
   for(const k of ['r', 'v']){
@@ -2194,6 +2210,7 @@ export function restore(json){
   s.toll ??= { lastT: -1e9, inBelt: false };
   s.quests ??= QUESTS.map(q => ({ id: q.id, step: 0, done: false }));
   s.debt ??= 0; s.target ??= null; s.justLeft ??= null; s.justLeftAt ??= -1e9;
+  s.marketEpoch ??= 0; s.lastMarket ??= null;
   s.warp = Number.isFinite(s.warp) ? Math.max(1, Math.min(CONST.MAX_WARP, s.warp)) : 1;
   s.rng = Number.isFinite(s.rng) ? s.rng : 1;
   s.shipName ??= TEXT.shipNames[0];
@@ -2224,3 +2241,4 @@ export function approachTo(state, prediction, targetId){
 }
 
 export { elementsFromState, propagate, absState, railState, predict, norm, sub, add, scale, unit, perp, dist, hohmann };
+export { wantsGood, lovesGood, REGION_OF };

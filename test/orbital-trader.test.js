@@ -179,17 +179,27 @@ test('every port is a body with a port, and every reference resolves', () => {
     const b = world.get(id);
     assert.ok(b && b.port, `port ${id} is a dockable body`);
     assert.ok(SPECIES[p.species], `${id}: species ${p.species}`);
-    for(const s of p.sells){ assert.ok(goodIds.has(s.good), `${id} sells unknown ${s.good}`); assert.ok(s.stock > 0 && s.priceMul > 0); }
+    assert.ok(['inner', 'home', 'belt', 'outer', 'deep'].includes(p.region), `${id}: region ${p.region}`);
+    for(const s of p.sells){ assert.ok(goodIds.has(s.good), `${id} sells unknown ${s.good}`); assert.ok(s.priceMul > 0); }
     for(const s of p.buys){ assert.ok(goodIds.has(s.good), `${id} buys unknown ${s.good}`); assert.ok(s.priceMul > 0); }
     const both = p.sells.filter(s => p.buys.some(b => b.good === s.good));
     assert.equal(both.length, 0, `${id} both buys and sells ${both.map(s => s.good)}`);
   }
   for(const b of BODIES) if(b.port) assert.ok(PORTS[b.id], `${b.id} is a port body with no port table`);
+  const known = new Set([...Object.keys(PORTS), ...Object.keys(SPECIES), 'everyone']);
   for(const g of GOODS){
     assert.ok(g.basePrice > 0 && g.units > 0, `${g.id}: price and size`);
+    assert.ok(g.producedAt.length >= 1, `${g.id} is made nowhere`);
     for(const p of g.producedAt) assert.ok(PORTS[p], `${g.id} produced at unknown ${p}`);
-    for(const s of Object.keys(g.demandBy)) assert.ok(SPECIES[s], `${g.id} demanded by unknown ${s}`);
+    // Buyers and loved-by name ports and peoples in the same breath, the way a
+    // trader would; either kind has to be a real name.
+    for(const x of [...g.buyers, ...g.lovedBy]) assert.ok(known.has(x), `${g.id} names unknown ${x}`);
+    const [lo, hi] = g.stock;
+    assert.ok(Number.isInteger(lo) && Number.isInteger(hi) && lo >= 1 && hi >= lo, `${g.id}: stock range ${g.stock}`);
+    assert.ok(['light', 'heavy'].includes(g.weight), `${g.id}: weight ${g.weight}`);
     if(g.lifetimeDays != null) assert.ok(g.lifetimeDays > 0);
+    // Somebody, somewhere, has to want it, or it is a crate that cannot be sold.
+    assert.ok(Object.keys(PORTS).some(id => S.wantsGood(id, g.id)), `${g.id} has no buyer anywhere`);
   }
   assert.ok(GOODS.every(g => g.category !== 'passenger'), 'passengers are contracts, not crates');
 });
@@ -634,6 +644,74 @@ test('markets: buying costs, selling elsewhere pays, and selling a lot walks the
   }
 });
 
+test('a good is worth more out of its region, and much more where it is loved', () => {
+  const s = S.newGame(5);
+  /* The two rules the market runs on. Tide glass is made on Tassel, in the
+     home region; Brine is in the outer region and loves it. */
+  const home = S.sellPrice(s, 'tassel', 'tideglass');      // where it is made
+  const away = S.sellPrice(s, 'haven', 'tideglass');       // outer, buys it, does not love it
+  const loved = S.sellPrice(s, 'brine', 'tideglass');      // outer, and loves it
+  assert.ok(away > home * 1.4, `carrying it out of its region is worth it: ${home} -> ${away}`);
+  assert.ok(loved > away * 1.8, `and the ones who love it pay much more: ${away} -> ${loved}`);
+  assert.ok(loved > S.buyPrice(s, 'tassel', 'tideglass') * 2.5, 'a loved good abroad is a trade route');
+
+  // Region is a region, not a distance: a sibling port pays the home rate.
+  assert.equal(S.regionMul('slate', 'tideglass'), S.regionMul('moss', 'tideglass'));
+  assert.ok(S.regionMul('cinder', 'tideglass') > S.regionMul('slate', 'tideglass'));
+  // Loving something names a port or a whole people; both count.
+  assert.ok(S.lovesGood('brine', 'tideglass'), 'Brine loves tide glass by name');
+  assert.ok(S.lovesGood('tassel', 'frogtea') && S.lovesGood('moss', 'frogtea'), 'otters love frog tea as a people');
+  // And loving a thing is wanting it: nobody turns away the customer who cares.
+  for(const g of GOODS) for(const id of Object.keys(PORTS)){
+    if(S.lovesGood(id, g.id) && !g.producedAt.includes(id)) assert.ok(S.wantsGood(id, g.id), `${id} loves ${g.id} and will not buy it`);
+  }
+});
+
+test('a stall keeps what it keeps, and finds more only while you are away', () => {
+  const s = S.newGame(5);
+  s.dockedAt = null; s.justLeft = null;
+  parkAt(s, 'slate');
+  assert.ok(S.dock(s).ok);
+  const full = S.stockAvailable(s, 'slate', 'pebble');
+  const [lo, hi] = S.goodById('pebble').stock;
+  assert.ok(full >= lo && full <= hi, `a shelf of ${full} is outside ${lo}-${hi}`);
+
+  s.money = 10000;
+  assert.ok(S.buy(s, 'pebble', 3).ok);
+  assert.equal(S.stockAvailable(s, 'slate', 'pebble'), full - 3, 'what you took is what is missing');
+
+  // Waiting does nothing. This is the whole change: no shelf regrows on a clock.
+  S.wait(s, 400);
+  assert.equal(S.stockAvailable(s, 'slate', 'pebble'), full - 3, 'the shelf refilled by itself');
+
+  // Nor does casting off and tying up again at the same stall.
+  S.undock(s); s.justLeft = null; parkAt(s, 'slate');
+  assert.ok(S.dock(s).ok);
+  assert.equal(S.stockAvailable(s, 'slate', 'pebble'), full - 3, 'walking out and back in restocked it');
+
+  // Trading somewhere else does. Come back and the shelves have been rolled.
+  S.undock(s); s.justLeft = null; parkAt(s, 'moss');
+  assert.ok(S.dock(s).ok);
+  S.undock(s); s.justLeft = null; parkAt(s, 'slate');
+  assert.ok(S.dock(s).ok);
+  const again = S.stockAvailable(s, 'slate', 'pebble');
+  assert.ok(again >= lo && again <= hi, `the new shelf of ${again} is outside ${lo}-${hi}`);
+  assert.equal(again, S.stockFull(s, 'slate', 'pebble'), 'and it is a whole shelf, not the picked-over one');
+
+  /* A thin shelf costs more than a full one, so buying a stall out is not
+     free. Pebbles, because they are light: a hold is twenty-four units and an
+     ore crate is three of them, so a heavy good runs out of ship long before
+     it runs out of shelf. */
+  const t = S.newGame(9);
+  t.dockedAt = null; t.justLeft = null; parkAt(t, 'slate'); S.dock(t);
+  t.money = 100000;
+  const first = S.buyPrice(t, 'slate', 'pebble');
+  const room = Math.min(S.stockAvailable(t, 'slate', 'pebble') - 1, S.freeUnits(t));
+  assert.ok(room >= 4, `nothing to buy: ${room} crates of room`);
+  assert.ok(S.buy(t, 'pebble', room).ok);
+  assert.ok(S.buyPrice(t, 'slate', 'pebble') > first, 'the last crates on the shelf cost no more than the first');
+});
+
 test('perishables lose value with age, down to a floor', () => {
   const g = GOODS.find(g => g.lifetimeDays);
   assert.ok(g);
@@ -995,8 +1073,8 @@ test('the Belt toll takes a share by worth, never nothing and never the hold', (
      hold is worth, and the cats' oath is the ceiling. */
   const cases = [
     ['a light hold of dear things', [{ good: 'tideglass', qty: 3 }]],
-    ['a heavy hold of cheap things', [{ good: 'grain', qty: 24 }]],
-    ['a mixed hold', [{ good: 'tideglass', qty: 4 }, { good: 'grain', qty: 10 }]],
+    ['a heavy hold of cheap things', [{ good: 'ironore', qty: 24 }]],
+    ['a mixed hold', [{ good: 'tideglass', qty: 4 }, { good: 'ironore', qty: 10 }]],
     ['one crate', [{ good: 'tideglass', qty: 1 }]],
   ];
   for(const [name, hold] of cases){
@@ -1016,9 +1094,12 @@ test('the Belt toll takes a share by worth, never nothing and never the hold', (
     const paidCoin = CONST.START_MONEY - s.money;
     assert.ok(tookValue > 0 || paidCoin > 0, `${name}: nothing changed hands and they thanked you for it`);
     assert.ok(tookValue <= worth * FORMULAS.toll.maxCargoFraction + 1e-9, `${name}: took ${tookValue} of ${worth}`);
-    // Crates are lumpy: a toll settled in goods can only be made of what is
-    // aboard, and nothing small enough means coin instead of a bigger crate.
-    if(tookValue > 0) assert.ok(tookValue <= asked * 1.1 + 1 || before - left === 1, `${name}: took ${tookValue} against a toll of ${asked}`);
+    /* Crates are lumpy: a toll settled in goods can only be made of what is
+       aboard, and the last crate is taken whenever it leaves the debt smaller
+       than it found it. So they can overshoot — by at most half of one crate,
+       and never by more. */
+    const halfCrate = Math.max(...hold.map(h => S.goodById(h.good).basePrice)) * 0.5;
+    if(tookValue > 0) assert.ok(tookValue <= asked + halfCrate + 1 || before - left === 1, `${name}: took ${tookValue} against a toll of ${asked}`);
     assert.ok(left > 0, `${name}: they took the hold`);
     assert.ok(s.rep.cat > rep0, `${name}: no goodwill for yielding`);
   }
@@ -1026,7 +1107,7 @@ test('the Belt toll takes a share by worth, never nothing and never the hold', (
      toll is a custom, not a shakedown. */
   const poor = S.newGame(13);
   S.undock(poor);
-  poor.cargo = [{ good: 'grain', qty: 1, t: poor.t, price: 8, from: 'moss' }];
+  poor.cargo = [{ good: 'pebble', qty: 1, t: poor.t, price: 8, from: 'slate' }];
   poor.ship = { body: 'lamp', ...O.circularState(MU, CONST.BELT.inner - 0.1, 1.0) };
   poor.ship.v = O.scale(poor.ship.v, 1.12);
   let guard = 0;
@@ -1048,13 +1129,15 @@ test('a save is refused at the door rather than halfway through a frame', () => 
     'a hold of something unknown': s => { s.cargo = [{ good: 'moonbeams', qty: 2 }]; },
     'a plan of nonsense': s => { s.nodes = [{ prograde: 1 }]; },
     'a tank that does not exist': s => { s.tiers.tank = 9; },
-    /* Version 1 is the sky before the rescale and version 2 the map before
-       the setting was rewritten. A ship's position in either is not a place in
-       this one, and half the port names in a version 2 save no longer exist,
-       so those saves are refused rather than repaired. */
+    /* Version 1 is the sky before the rescale, version 2 the map before the
+       setting was rewritten, and version 3 the price list before every good in
+       it was replaced. A ship's position, a port name or a hold full of crates
+       from any of them means nothing here, so those saves are refused rather
+       than repaired. */
     'a version this sky is not': s => { s.version = 1; },
     'the map before the setting changed': s => { s.version = 2; },
-    'a version from the future': s => { s.version = 4; },
+    'the price list before the goods changed': s => { s.version = 3; },
+    'a version from the future': s => { s.version = 5; },
   };
   for(const [what, wreck] of Object.entries(broken)){
     const s = JSON.parse(good);
@@ -1068,35 +1151,6 @@ test('a save is refused at the door rather than halfway through a frame', () => 
   const back = S.restore(old);
   assert.ok(back.markets && back.offers && back.log && back.rep.otter === 0 && back.shipName);
   assert.equal(back.warp, CONST.MAX_WARP);
-});
-
-test('shelves refill at the rate the people behind them work', () => {
-  /* Moss grows grain by the sackful every day; the Arc cuts a relic out of a
-     ruin twice a year. One decay curve for both made a rare thing as easy to
-     strip-mine as a common one. */
-  const quick = ['moss', 'grain'], slow = ['arc', 'chorustube'];
-  for(const [port, good] of [quick, slow]){
-    const s = S.newGame(5);
-    const row = PORTS[port].sells.find(r => r.good === good);
-    assert.ok(row, `${port} does not sell ${good}`);
-    const full = S.stockAvailable(s, port, good);
-    s.markets[port] = { sold: {}, bought: { [good]: { q: full, t: s.t } } };
-    assert.equal(S.stockAvailable(s, port, good), 0);
-    const wait = S.restockIn(s, port, good);
-    assert.ok(wait > 0 && Number.isFinite(wait));
-    s.t += wait * 1.01;
-    assert.equal(S.stockAvailable(s, port, good), full, `${port}/${good} did not come back`);
-  }
-  // And the slow one really is slower, by a lot.
-  const s = S.newGame(5);
-  const stock = id => S.stockAvailable(s, id[0], id[1]);
-  const wasQuick = stock(quick), wasSlow = stock(slow);
-  for(const id of [quick, slow]) s.markets[id[0]] = { sold: {}, bought: { [id[1]]: { q: stock(id), t: s.t } } };
-  void wasQuick; void wasSlow;
-  const fullQuick = wasQuick, fullSlow = wasSlow;
-  s.t += 20;
-  assert.ok(S.stockAvailable(s, quick[0], quick[1]) >= fullQuick, 'grain did not grow back in three weeks');
-  assert.ok(S.stockAvailable(s, slow[0], slow[1]) <= fullSlow * 0.25, 'a relic all but grew back in three weeks');
 });
 
 test('a port with nothing to sell and no pumps is never somewhere a tow leaves you', () => {
