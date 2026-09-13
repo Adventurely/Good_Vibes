@@ -117,7 +117,10 @@
   #panel.closed{ transform:translateX(calc(100% + 1rem)); opacity:0; pointer-events:none; }
   #tabs{ display:flex; gap:2px; padding:.4rem .4rem 0; border-bottom:1px solid var(--line); overflow-x:auto; scrollbar-width:none; }
   .tab{
-    flex:1 0 auto; padding:.5rem .55rem; border:0; border-bottom:2px solid transparent; background:none;
+    /* Six tabs is the widest the docked row ever gets and it overran by five
+       pixels at .55rem a side. Tabs are short words; they do not need the
+       room. */
+    flex:1 0 auto; padding:.5rem .45rem; border:0; border-bottom:2px solid transparent; background:none;
     color:var(--dim); cursor:pointer; font-size:.82rem; letter-spacing:.04em; white-space:nowrap;
   }
   .tab[aria-selected="true"]{ color:var(--gold-ink); border-bottom-color:var(--gold-2); }
@@ -272,7 +275,10 @@
   #panel.closed{ transform:translateX(calc(100% + 1rem)); opacity:0; pointer-events:none; }
   #tabs{ display:flex; gap:2px; padding:.4rem .4rem 0; border-bottom:1px solid var(--line); overflow-x:auto; scrollbar-width:none; }
   .tab{
-    flex:1 0 auto; padding:.5rem .55rem; border:0; border-bottom:2px solid transparent; background:none;
+    /* Six tabs is the widest the docked row ever gets and it overran by five
+       pixels at .55rem a side. Tabs are short words; they do not need the
+       room. */
+    flex:1 0 auto; padding:.5rem .45rem; border:0; border-bottom:2px solid transparent; background:none;
     color:var(--dim); cursor:pointer; font-size:.82rem; letter-spacing:.04em; white-space:nowrap;
   }
   .tab[aria-selected="true"]{ color:var(--gold-ink); border-bottom-color:var(--gold-2); }
@@ -1261,8 +1267,12 @@ function lookAt(id){
 
 /* ------------------------------------------------------------- panel */
 
-const TABS_DOCKED = [['market', 'Market'], ['shipyard', 'Shipyard'], ['quests', 'Quests'], ['crew', 'Crew'], ['talk', 'Talk']];
-const TABS_FLIGHT = [['orbit', 'Orbit'], ['plan', 'Burns'], ['quests', 'Quests'], ['crew', 'Crew'], ['ship', 'Ship']];
+/* Two rows, and the split down the middle of the docked one is the point:
+   Market, Dock and Talk are the port — they exist because you are tied up at
+   somewhere, and they go when you cast off. Ship, Quests and Crew are yours
+   and follow you, so they read the same either side of the airlock. */
+const TABS_DOCKED = [['market', 'Market'], ['dock', 'Dock'], ['talk', 'Talk'], ['ship', 'Ship'], ['quests', 'Quests'], ['crew', 'Crew']];
+const TABS_FLIGHT = [['orbit', 'Orbit'], ['plan', 'Burns'], ['ship', 'Ship'], ['quests', 'Quests'], ['crew', 'Crew']];
 let lastDockedMode = null;
 function renderTabs(){
   const mode = state.dockedAt ? 'docked' : 'flight';
@@ -1295,7 +1305,7 @@ function renderTab(){
      was and put it back. */
   const active = document.activeElement;
   const was = body.contains(active) ? (active.dataset?.act ?? active.id ?? null) : null;
-  const fn = { market, shipyard, talk, plan, quests: questsTab, crew: crewTab, orbit: orbitTab, ship: shipTab }[tab];
+  const fn = { market, dock: dockTab, talk, plan, quests: questsTab, crew: crewTab, orbit: orbitTab, ship: shipTab }[tab];
   body.innerHTML = fn ? fn() : '';
   wire(body);
   if(was){
@@ -1399,10 +1409,15 @@ function market(){
   return out;
 }
 
-function shipyard(){
+/* The dock: everything a port does for you, and nothing that follows you out
+   of it. Fuel, what the yard will fit, the clock, and the way back off. What
+   is bolted to your ship is on the Ship tab, which you can read anywhere —
+   this used to list it too, so the only place you could see your own tank was
+   somewhere you happened to be moored. */
+function dockTab(){
   const port = state.dockedAt;
   const p = PORTS[port];
-  let out = `<h2>${p.shipyard ? 'Shipyard' : 'Dock'}</h2>`;
+  let out = `<h2>${esc(S.portName(port))} <small class="lock">${p.shipyard ? 'shipyard' : 'dock'}</small></h2>`;
   out += '<h3>Fuel</h3>';
   const fp = S.fuelPrice(state);
   const room = S.kms(state.tank - state.dv);
@@ -1413,31 +1428,23 @@ function shipyard(){
       <button class="btn" data-act="fuel|5" ${room >= 0.05 && state.money >= fp ? '' : 'disabled'}>+5 km/s</button>
       <button class="btn primary" data-act="fuel|999" ${room >= 0.05 && state.money >= fp ? '' : 'disabled'}>Fill (${S.fmtMoney(Math.min(room, state.money / fp) * fp)})</button></div>`;
   }
-  out += '<h3>Fitted</h3>';
-  const t = state.tiers;
-  out += `<dl class="kv"><dt>Tank</dt><dd>${esc(S.tiers('tank')[t.tank].name)} · ${S.fmtKms(state.tank)}</dd><dt>Engine</dt><dd>${esc(S.tiers('engine')[t.engine].name)}</dd><dt>Hold</dt><dd>${esc(S.tiers('hold')[t.hold].name)} · ${S.holdUnits(state)} units</dd>
-    <dt>Keys</dt><dd>${['heatShield', 'refrigeration', 'sensors', 'stealth'].filter(k => state.keys[k]).map(k => esc(UPGRADES.find(u => u.key === k)?.name ?? k)).join(', ') || '<span class="lock">none yet</span>'}</dd></dl>`;
   const ups = S.upgradesFor(port);
-  if(ups.length){
-    out += '<h3>On offer</h3>';
-    for(const u of ups){
-      const c = S.canBuyUpgrade(state, u.id);
-      const owned = S.ownsUpgrade(state, u);
-      out += `<div class="row"><div class="name"><b>${esc(u.name)}</b><small>${esc(u.effect)}${u.unlocks ? ' · ' + esc(u.unlocks) : ''}</small></div><div class="price">${owned ? '<span class="lock">fitted</span>' : S.fmtMoney(c.price ?? u.price)}</div>
-        <div class="btns">${owned ? '' : `<button class="btn sm primary" data-act="upgrade|${u.id}" ${c.ok ? '' : 'disabled title="' + esc(c.reason) + '"'}>Fit</button>`}</div></div>`;
-      if(!owned && !c.ok && c.reason !== 'Not enough coin.') out += `<p class="lock">${esc(c.reason)}</p>`;
-    }
+  out += '<h3>On offer</h3>';
+  if(!ups.length) out += `<p class="empty">${p.shipyard ? 'Nothing on the rack today.' : 'Nobody fits anything here.'}</p>`;
+  for(const u of ups){
+    const c = S.canBuyUpgrade(state, u.id);
+    const owned = S.ownsUpgrade(state, u);
+    out += `<div class="row"><div class="name"><b>${esc(u.name)}</b><small>${esc(u.effect)}${u.unlocks ? ' · ' + esc(u.unlocks) : ''}</small></div><div class="price">${owned ? '<span class="lock">fitted</span>' : S.fmtMoney(c.price ?? u.price)}</div>
+      <div class="btns">${owned ? '' : `<button class="btn sm primary" data-act="upgrade|${u.id}" ${c.ok ? '' : 'disabled title="' + esc(c.reason) + '"'}>Fit</button>`}</div></div>`;
+    if(!owned && !c.ok && c.reason !== 'Not enough coin.') out += `<p class="lock">${esc(c.reason)}</p>`;
   }
-  out += '<h3>Wait here</h3><div class="btns"><button class="btn" data-act="wait|1">1 day</button><button class="btn" data-act="wait|10">10 days</button><button class="btn" data-act="wait|30">30 days</button>';
-  out += '</div>';
+  out += '<h3>Wait here</h3><div class="btns"><button class="btn" data-act="wait|1">1 day</button><button class="btn" data-act="wait|10">10 days</button><button class="btn" data-act="wait|30">30 days</button></div>';
   out += `<button class="btn primary wide" data-act="undock">Undock</button>`;
   /* Being stuck at a dock is still being stuck: a ship with a dry tank at a
      port that sells no fuel needs the same rope as one adrift. */
-  if(S.fuelPrice(state) == null || state.dv <= 1e-9){
-    out += `<p class="lock">${S.fuelPrice(state) == null ? 'Nothing to burn is sold here.' : 'The tank is dry.'}</p><button class="btn wide" data-act="tow">Call for a tow</button>`;
+  if(fp == null || state.dv <= 1e-9){
+    out += `<p class="lock">${fp == null ? 'Nothing to burn is sold here.' : 'The tank is dry.'}</p><button class="btn wide" data-act="tow">Call for a tow</button>`;
   }
-  out += `<h3>Ship</h3><p>${esc(state.shipName)} · ${state.stats.docks} dockings · ${S.fmtKms(state.stats.dvSpent)} burned in ${state.stats.burns} burns · farthest ${fmtAu(state.stats.farthest)} from the Lamp.</p>`;
-  out += `<div class="btns"><button class="btn sm danger" data-act="newgame">New game</button><a class="btn sm" href="./">&larr; Title screen</a></div>`;
   return out;
 }
 
@@ -1618,22 +1625,23 @@ function orbitTab(){
   return out;
 }
 
+/* The ship: what is bolted to it, what is in the hold, and what it has done.
+   Readable tied up or adrift, because none of it stops being true when you
+   throw a line. It used to open with the whole of the Orbit tab repeated —
+   low point, high point, speed, lap — which was two places for one set of
+   numbers, and only one of them was right when you were moored. */
 function shipTab(){
-  const b = world.get(state.ship.body);
-  const el = elementsFromState(b.mu, state.ship.r, state.ship.v);
-  /* Heights above the ground, the same as the Orbit tab. They used to be
-     distances from the middle of the world here and altitudes there, under
-     two different names, so nobody noticed they disagreed; one name for one
-     number means they have to. */
-  const alt = d => fmtAu(Math.max(0, d - (b.radius ?? 0)));
+  const flying = !state.dockedAt;
   let out = `<h2>${esc(state.shipName)}</h2>`;
-  out += `<dl class="kv"><dt>Orbiting</dt><dd>${esc(b.name)}</dd><dt>Height now</dt><dd>${alt(norm(state.ship.r))}</dd><dt>Speed</dt><dd>${S.fmtKms(norm(state.ship.v))}</dd>`;
-  out += `<dt>Low point</dt><dd>${alt(el.rp)}</dd><dt>High point</dt><dd>${Number.isFinite(el.ra) ? alt(el.ra) : 'none — you are leaving'}</dd>`;
-  if(Number.isFinite(el.period)) out += `<dt>A lap takes</dt><dd>${S.fmtDays(el.period)}</dd>`;
-  out += `<dt>Shape</dt><dd>${el.e < 0.005 ? 'a circle' : el.e < 1 ? `an oval (${el.e.toFixed(2)} out of round)` : 'not a loop at all'}</dd></dl>`;
-  if(b.atmo){
-    out += el.rp < b.atmo ? (state.keys.heatShield ? `<p class="up">Air braking in ${esc(b.name)}'s clouds: the shield will slow you.</p>` : `<p class="down">Your low point is inside ${esc(b.name)}'s clouds, and you have no heat shield.</p>`) : '';
-  }
+  out += `<p class="lock">${flying ? `In ${esc(world.get(state.ship.body).name)}'s gravity` : `Tied up at ${esc(S.portName(state.dockedAt))}`}</p>`;
+
+  out += '<h3>Fitted</h3>';
+  const t = state.tiers;
+  out += `<dl class="kv"><dt>Tank</dt><dd>${esc(S.tiers('tank')[t.tank].name)} · ${S.fmtKms(state.dv)} of ${S.fmtKms(state.tank)}</dd>
+    <dt>Engine</dt><dd>${esc(S.tiers('engine')[t.engine].name)}</dd>
+    <dt>Hold</dt><dd>${esc(S.tiers('hold')[t.hold].name)} · ${S.usedUnits(state)} of ${S.holdUnits(state)} units</dd>
+    <dt>Keys</dt><dd>${['heatShield', 'refrigeration', 'sensors', 'stealth'].filter(k => state.keys[k]).map(k => esc(UPGRADES.find(u => u.key === k)?.name ?? k)).join(', ') || '<span class="lock">none yet</span>'}</dd></dl>`;
+
   out += '<h3>Hold</h3>';
   if(!state.cargo.length) out += '<p class="empty">Empty.</p>';
   for(const c of state.cargo){
@@ -1641,11 +1649,15 @@ function shipTab(){
     const forWhom = c.questId != null ? ` · <span class="up">for ${esc(S.questById(c.questId)?.title ?? 'a job')}</span>` : '';
     out += `<p>${c.qty} × ${esc(g.name)} <span class="lock">from ${esc(S.portName(c.from))}${g.lifetimeDays ? ` · ${Math.round(S.freshness(g, state.t - c.t) * 100)}% fresh` : ''}</span>${forWhom}</p>`;
   }
-  out += '<h3>Fitted</h3>';
-  out += `<p>${esc(S.tiers('tank')[state.tiers.tank].name)}, ${esc(S.tiers('engine')[state.tiers.engine].name)}, ${esc(S.tiers('hold')[state.tiers.hold].name)}.</p>`;
-  out += `<p>${['heatShield', 'refrigeration', 'sensors', 'stealth'].filter(k => state.keys[k]).map(k => esc(UPGRADES.find(u => u.key === k)?.name ?? k)).join(', ') || '<span class="lock">No keys yet.</span>'}</p>`;
-  const line = TEXT.captainLines.onLongCoast[Math.floor(S.hash(Math.floor(state.t / 20)) * TEXT.captainLines.onLongCoast.length)];
-  out += `<p class="say">${esc(line)}</p>`;
+
+  out += '<h3>Record</h3>';
+  out += `<p>${state.stats.docks} docking${state.stats.docks === 1 ? '' : 's'} · ${S.fmtKms(state.stats.dvSpent)} burned in ${state.stats.burns} burn${state.stats.burns === 1 ? '' : 's'} · farthest ${fmtAu(state.stats.farthest)} from the Lamp.</p>`;
+  if(state.debt > 0) out += `<p class="down">${S.fmtMoney(state.debt)} owed to the harbour bank.</p>`;
+  if(flying){
+    const line = TEXT.captainLines.onLongCoast[Math.floor(S.hash(Math.floor(state.t / 20)) * TEXT.captainLines.onLongCoast.length)];
+    out += `<p class="say">${esc(line)}</p>`;
+  }
+  out += `<div class="btns"><button class="btn sm danger" data-act="newgame">New game</button><a class="btn sm" href="./">&larr; Title screen</a></div>`;
   return out;
 }
 
@@ -1813,7 +1825,7 @@ function showTow(reason){
   });
 }
 function afterTow(r){
-  selectedNode = -1; replan(true); renderTabs(); setTab('shipyard'); stopSkip();
+  selectedNode = -1; replan(true); renderTabs(); setTab('dock'); stopSkip();
   openModal(`<h2>Towed to ${esc(S.portName(r.port))}</h2><p class="say">${esc(r.story)}</p><p>${S.fmtDays(r.days)} later and ${S.fmtMoney(r.cost)} poorer, you are docked. ${state.debt > 0 ? esc(TEXT.events.bankDebt) : ''}</p><div class="btns"><button class="btn primary" id="m-ok">Carry on</button></div>`, m => m.querySelector('#m-ok').addEventListener('click', closeModal));
   save();
 }
