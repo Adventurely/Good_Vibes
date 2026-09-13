@@ -1875,6 +1875,16 @@ that mark, so the same press means the same thing round a moon and round the
 Lamp. Hold a button and it repeats. There is nothing to type and nothing to
 drag.
 
+**The axes are at right angles.** Out and in are square across the way you are
+going — the maneuver-node frame — rather than along the line out from the
+world. That is the same thing on a circle and a different one everywhere else:
+on a working eccentric orbit a press of Out used to put an eighth of itself
+into going faster, so a button sold as turning the path quietly resized it.
+Squared up, out and in add nothing along your track, the two numbers on a
+mark's card add up as a triangle so the card is what the tank is charged, and a
+ship falling dead straight at a world can be handed the one mark that saves it
+— braking a radial fall does not lift it, and only a push across the line does.
+
 The one search in the whole kernel is *when* a conic crosses a sphere of
 influence. It is done by conservative advancement: each step is bounded by the
 clearance to the nearest boundary divided by the fastest either side could

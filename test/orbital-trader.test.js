@@ -2178,24 +2178,34 @@ test('a kiss dug into a moon can always be lifted back out of it', () => {
   assert.ok(after.distance > b.radius * 2, `kiss only reached ${after.distance}`);
   assert.ok(s.dv < s.tank, 'it cost something');
 
-  /* A ship falling dead straight at a world is a different matter: forward and
-     outward are the same line for it, so there is no pair of numbers on a mark
-     that adds up to a push across, and the game says nothing rather than
-     offering two enormous opposing ones that cancel. It is still told what is
-     about to happen, and a crash is a tow, not an ending. */
+  /* A ship falling dead straight at a world used to be beyond help: forward
+     and outward were the same line for it, so no pair of numbers on a mark
+     added up to a push across, and the game said nothing. With the axes at
+     right angles it can say something — and it has to, because braking a
+     radial fall does not lift it. A dead-straight drop has no angular momentum
+     and therefore no periapsis to raise; the only way to miss is to push
+     across the line, which is exactly the mark there was no way to write. */
   const straight = S.newGame(5);
   S.undock(straight);
   straight.ship = { body: 'moss', r: [b.soi * 0.95, 0], v: [-speed, 0] };
   const k = S.kiss(straight);
   assert.ok(k && k.crashes, 'a straight drop is not even reported');
-  assert.equal(S.brakeAtKiss(straight), -1, 'a mark was offered that cannot be expressed');
+  const jx = S.brakeAtKiss(straight);
+  assert.ok(jx >= 0, 'nothing was offered to a ship falling straight in');
+  assert.ok(Math.abs(straight.nodes[jx].radial) > 0, 'what was offered does not push across the fall');
+  guard = 0;
+  while(straight.nodes.length && guard++ < 40000) S.tick(straight, 0.002);
+  assert.equal(straight.pending, null, 'the ship flew into the moon anyway');
+  assert.ok(!S.kiss(straight)?.crashes, 'the straight drop still digs in');
 });
 
-test('what a mark costs is what the tank is charged, on any orbit', () => {
-  /* Prograde and radial only sit at right angles on a circle. Adding the two
-     numbers on a mark's card as a triangle overstates a burn badly on an
-     eccentric orbit — and the tank is charged the real thing, so the two must
-     agree or the plan lies about what it can afford. */
+test('what a mark costs is the triangle on its card, on any orbit', () => {
+  /* The two axes are at right angles everywhere now — forward along the
+     velocity, out perpendicular to it — so the two numbers on a mark's card
+     really do add up as a triangle, and that triangle is what the tank is
+     charged. Out used to be true radial, which leans into forward on anything
+     but a circle: the card and the tank then disagreed, badly, on an eccentric
+     orbit. */
   const s = S.newGame(5);
   S.undock(s);
   const b = world.get('tassel');
@@ -2215,9 +2225,16 @@ test('what a mark costs is what the tank is charged, on any orbit', () => {
      million of Kepler arithmetic. The claim is that the card does not lie
      about what it can afford, and five millionths of a burn does not. */
   assert.ok(Math.abs(charged - shown) <= shown * 1e-4, `told ${S.fmtKms(shown)}, charged ${S.fmtKms(charged)}`);
-  // And the naive triangle really is different, so this test has something to say.
-  const naive = Math.hypot(S.auDay(0.4), S.auDay(-0.3));
-  assert.ok(Math.abs(naive - charged) > charged * 0.05, 'the two axes were at right angles after all');
+  /* And the triangle is the answer, on an orbit chosen to be as far from a
+     circle as this sky allows — which is the whole of the change. */
+  const triangle = Math.hypot(S.auDay(0.4), S.auDay(-0.3));
+  assert.ok(Math.abs(triangle - shown) <= shown * 1e-12, `card says ${triangle}, plan says ${shown}`);
+  assert.ok(Math.abs(triangle - charged) <= charged * 1e-4, 'the triangle is not what the tank was charged');
+  // Because the frame really is orthonormal, wherever the ship is.
+  const fr = O.burnFrame(s.ship.r, s.ship.v);
+  assert.ok(Math.abs(O.dot(fr.pro, fr.out)) < 1e-12, 'forward and out are not at right angles');
+  assert.ok(Math.abs(O.norm(fr.pro) - 1) < 1e-12 && Math.abs(O.norm(fr.out) - 1) < 1e-12, 'the frame is not unit length');
+  assert.ok(O.dot(fr.out, s.ship.r) > 0, '"out" does not point away from the world');
 });
 
 test('a dry ship with an empty purse can still leave the dock', () => {
