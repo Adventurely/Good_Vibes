@@ -474,25 +474,23 @@ frog system — so that every new place arrives with a reason to be there, and
 each of the three crew members is the reward for the stretch that introduces
 their people.
 
-**Fourteen of the twenty are built** — every one that is neither salvage nor
-paid in crew. They are written out in `narrative.json` and they work: their
-steps, their goods, their pay and the ports they name are all real. What is
-missing is the board, so #1 is still the only one a player meets.
+**Seventeen of the twenty are built** — every one that is not salvage. They
+are written out in `narrative.json`, they work, and a player meets them: the
+Requests tab on the dock menu lists whatever jobs the port you are tied up at
+is offering, and you can hold three at once.
 
-The six that are not built, and why:
+The three that are not built, and why:
 
 | # | Quest | Why not |
 |---|---|---|
-| 6 | Engine Trouble | pays in an Emberkin engineer |
-| 13 | A Cat's Request | pays in a cat navigator |
-| 14 | First Salvage | salvage, and needs the navigator |
+| 14 | First Salvage | salvage, which is flight the game does not have |
 | 15 | Lost Cargo | salvage |
-| 19 | Appraisal | pays in a frog appraiser |
-| 20 | What Is This Worth? | needs the appraiser |
+| 20 | What Is This Worth? | needs a thing to find, not a person — the appraiser exists now |
 
-Both of the quest chains are in that list, so the chain type is built and has
-nothing to run on yet. Settling crew (§7.2) unblocks four of the six on its
-own; salvage flight unblocks the other two.
+Both quest chains run. Crew is settled far enough to pay out (§7.2): three of
+the seventeen hand over a person, and finishing one fills that berth. Salvage
+flight is what is left, and #20 needs an Arc fragment to exist as a good
+before it can be asked for.
 
 | # | Quest | Type | Route / Goal | Reward |
 |---|---|---|---|---|
@@ -501,20 +499,20 @@ own; salvage flight unblocks the other two.
 | 3 | Green Medicine | Retrieval | Moss: retrieve medicinal herbs → Tassel | Credits |
 | 4 | A Message for Slate | Message | Tassel → Slate | Credits |
 | 5 | The Heavy Stuff | Delivery | Slate → Cinder: deliver iron ore | Credits |
-| 6 | Engine Trouble | Retrieval | Cinder: retrieve spare engine parts → Slate | **Emberkin Engineer** *(not built)* |
+| 6 | Engine Trouble | Retrieval | Cinder: retrieve spare engine parts → Slate | **Emberkin Engineer** |
 | 7 | A Favor for an Engineer | Message | Cinder → Scorch: deliver a message | Credits / faction reputation |
 | 8 | Emberkin Luxury | Retrieval | Scorch: retrieve fire crystals → Veyra | Credits |
 | 9 | The Collector | Shopping List | Veyra: acquire pearls, coral carvings, precision clock | Large payout |
 | 10 | Faction Business | Message | Veyra → Cinder: deliver confidential message | Faction reputation |
 | 11 | Into the Belt | Delivery | Cinder → Nail: deliver reactor coils | Credits |
 | 12 | Something Shiny | Retrieval | Nail: retrieve salvaged sensors → Veyra | Credits |
-| 13 | A Cat's Request | Quest Chain | Nail → several cat settlements | **Cat Navigator** *(not built)* |
+| 13 | A Cat's Request | Quest Chain | Nail → several cat settlements | **Cat Navigator** |
 | 14 | First Salvage | Salvage | With the cat navigator: recover a drifting wreck | Salvage + credits *(not built)* |
 | 15 | Lost Cargo | Salvage | Belt: intercept a derelict cargo ship | Salvage *(not built)* |
 | 16 | Medicine Run | Delivery | Nail → Brine: deliver medicinal supplies | Credits |
 | 17 | The Amber Collector | Retrieval | Brine: retrieve brine amber → Veyra | Credits |
 | 18 | A Frog's Question | Message | Brine → Glass: deliver a message | Credits / frog reputation |
-| 19 | Appraisal | Quest Chain | Brine: retrieve several unusual goods for examination | **Frog Appraiser** *(not built)* |
+| 19 | Appraisal | Shopping List | Brine: bring an arc shard, storm crystals and reactor coils to be looked at | **Frog Appraiser** |
 | 20 | What Is This Worth? | Appraisal / Retrieval | With the frog appraiser: investigate an Arc fragment | Major lore reveal *(not built)* |
 
 ### 5.1 The Types
@@ -579,11 +577,12 @@ nowhere to press. That is the last piece.
 
 ### 5.2 What the Line Needs That the Game Does Not Have
 
-1. **Crew as a reward.** (Still open.) Three of the twenty hand over a person — an Emberkin
-   engineer at #6, a cat navigator at #13, a frog appraiser at #19 — and one
-   each from the three peoples whose region the player has just finished
-   crossing. Crew is still open (§7.2); this line is the strongest argument yet
-   for settling it, because #14 and #20 are gated behind having one.
+1. ~~**Crew as a reward.**~~ Done, as far as the line needs. Three of the
+   twenty hand over a person — Vashk the Emberkin engineer at #6, Keel the cat
+   navigator at #13, Oon the frog appraiser at #19 — one each from the three
+   peoples whose region the player has just finished crossing. Finishing one
+   of those quests fills that berth and the Crew menu shows who is in it. What
+   a crew member *does* is still open (§7.2); the quests no longer wait on it.
 2. **Faction reputation.** #7 and #10 pay in it. The game keeps reputation per
    *people*, not per house, and the Emberkin are explicitly factional — so
    either the Emberkin score splits into houses, or "faction reputation" means
@@ -594,13 +593,10 @@ nowhere to press. That is the last piece.
    one step per line and closes when they are all aboard at the destination.
 5. **Things in space that are not ports**, for #14 and #15. Still open, and
    still the only part of the line that needs new flight.
-6. **A quest board.** Twenty quests do not arrive by uncle. Where a player
-   picks the next one up — a port's Talk tab, a notice board, a character who
-   follows them — is not decided, and it is now the only way work reaches a
-   ship: the randomly generated contract board that used to sit behind a
-   Passengers tab has been removed, along with passengers themselves. Quests
-   are the whole of it, and taking one on already works; there is simply
-   nowhere to press.
+6. ~~A quest board.~~ Done: the dock menu's Requests tab lists the jobs the
+   port you are tied up at is offering, and a ship can hold three at once.
+   The randomly generated contract board that used to sit behind a Passengers
+   tab is gone, along with passengers themselves; quests are the whole of it.
 
 ### 5.3 Notes Against the Goods Table
 
@@ -642,27 +638,43 @@ A leading proposal is that the player is an otter who left their raft. That woul
 
 ### 7.2 Crew — TBD
 
-**There is a Crew menu now**, reachable docked or in flight. It shows the
-captain with a pixel-art portrait and three berths — Missing Engineer, Missing
-Navigator, Missing Appraiser — and nothing else about them. An empty berth
-names the job and keeps the rest: who does that work and where you would have
-to go to ask is something to find out, not something the menu tells you before
-you have been anywhere. The three are the three jobs in the line that pay in a
-person (§5), so the menu is the shape of the answer rather than the answer:
-`state.crew` carries a slot per berth and every one of them is null.
+**The three berths fill.** The Crew menu is reachable docked or in flight. It
+shows the captain with a pixel-art portrait, then three berths — Engineer,
+Navigator, Appraiser — and each is the reward for one of the three quests in
+the line that pays in a person (§5). Until that quest is finished the berth
+reads only **Missing Engineer** and shows an empty chair: who does that work
+and where you would have to go to ask is something to find out, not something
+the menu tells you before you have been anywhere. Finish the quest and the
+berth fills with a name, a species, a portrait and a line:
+
+| Berth | Who | People | From |
+|---|---|---|---|
+| Engineer | Vashk | Emberkin | #6 Engine Trouble |
+| Navigator | Keel | Cats | #13 A Cat's Request |
+| Appraiser | Oon | Frogs | #19 Appraisal |
+
+`state.crew` carries a slot per berth, null until earned and then `{ role,
+from, joinedAt }` — who they are, which job brought them, and when. That is
+deliberately all of it: **a crew member does nothing yet.** No bonus, no
+discount, no change to flight. The berth is a record of a journey taken, and
+whatever crew eventually do can be added to the slot without touching how they
+arrive.
 
 The captain is drawn as an otter. §7.1 still has that down as a proposal, but
 the shipped fiction already leans that way — the game opens among otters, and
 Uncle Theo and Aunt Nellie are family — so the portrait follows the fiction
-and is written to be the one sprite in the game that is easy to replace.
+and is written to be the one sprite in the game that is easy to replace. All
+five portraits — captain, the three crew, and the empty chair — are 24×24
+character grids in `sprites.js` sharing one ink legend, drawn to a cached data
+URL by `portraitURL(id)`.
 
-What is still open is everything the berths are for: how somebody is recruited
-beyond "a quest pays in them", whether crew have mechanical effects or are
-purely narrative, and whether three is the number.
+What is still open is everything the berths are for: whether crew have
+mechanical effects or are purely narrative, whether anybody can be recruited
+outside the quest line, and whether three is the number.
 
 Crew reacting to the player's burns is a desired feature, working as characterization, soft tutorial, and feedback on skill. Early flavor notes per species: Emberkin crew cheer big burns and complain through long coasts. Otter crew are chatty, point out sights, and grow anxious when the radio goes quiet. Cat crew love tight slingshots, mock safe routes, and are secretly terrified of landing. Frog crew hum during coasts, dislike high-g burns, and never complain about the slow road.
 
-Open questions include how crew are recruited, how many the ship can carry, whether crew have mechanical effects or are purely narrative, and how crew relate to the player's standing with each species.
+How crew relate to the player's standing with each species is also unsettled: each of the three comes from the people whose region their quest crosses, so reputation and crew already move together in the fiction without being wired together in the code.
 
 ### 7.3 Events — TBD
 

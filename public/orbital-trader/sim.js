@@ -733,6 +733,13 @@ export function questCheck(state, events = []){
       live.done = true;
       if(q.pay) state.money += q.pay;
       if(q.rep && q.rep in state.rep) state.rep[q.rep] += 1;
+      /* Some jobs pay in a person. The berth is filled with who they are and
+         nothing else: crew do nothing yet, and a berth with somebody in it is
+         the whole of the reward until they do. */
+      if(q.crew && state.crew && q.crew in state.crew && !state.crew[q.crew]){
+        state.crew[q.crew] = { role: q.crew, from: q.id, joinedAt: state.t };
+        events.push({ kind: 'crewJoined', role: q.crew, quest: q });
+      }
       logLine(state, 'questDone', TEXT.logTemplates.questDone ?? 'Finished {title}. Paid {pay}.',
         { title: q.title, pay: fmtMoney(q.pay ?? 0) });
       events.push({ kind: 'questDone', quest: q });

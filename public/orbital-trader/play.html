@@ -797,7 +797,19 @@ function frame(now){
   requestAnimationFrame(frame);
 }
 
+/* Somebody signing on is the one reward that does not show up in the purse,
+   and finishing a quest is otherwise silent — the Quests card just quietly
+   ticks over. Without this a berth fills and nothing says so. */
+function noteCrew(events){
+  for(const e of events ?? []){
+    if(e.kind !== 'crewJoined') continue;
+    const r = (TEXT.crew?.roles ?? []).find(x => x.id === e.role);
+    toast(`${r?.person?.name ?? 'Somebody'} has signed on as your ${(r?.name ?? e.role).toLowerCase()}.`, 'story', 9000);
+  }
+}
+
 function handleEvents(events){
+  noteCrew(events);
   for(const e of events){
     /* A skip runs through the burns it was told about. Pointing at somewhere
        past a mark is a player saying "and that one too" — stopping dead at
@@ -1721,9 +1733,9 @@ function crewTab(){
   for(const r of c.roles ?? []){
     const aboard = state.crew?.[r.id] ?? null;
     out += aboard
-      ? `<div class="crew"><img src="${portraitURL('captain')}" alt="" width="24" height="24">`
-        + `<div class="who"><b>${esc(aboard.name)}</b><small>${esc(r.name)} · ${sp(r.species)}</small>`
-        + `<p class="say">${esc(r.does)}</p></div></div>`
+      ? `<div class="crew"><img src="${portraitURL(r.id)}" alt="" width="24" height="24">`
+        + `<div class="who"><b>${esc(r.person?.name ?? r.name)}</b><small>${esc(r.name)} · ${sp(r.species)}</small>`
+        + `<p class="say">${esc(r.person?.line ?? r.does)}</p></div></div>`
       : `<div class="crew open"><img src="${portraitURL('berth')}" alt="" width="24" height="24">`
         + `<div class="who"><b>Missing ${esc(r.name)}</b></div></div>`;
   }
@@ -1827,6 +1839,7 @@ function doDock(){
   const line = txt?.arrival?.[Math.floor(S.hash(r.port, Math.floor(state.t)) * txt.arrival.length)];
   toast(`Docked at ${S.portName(r.port)}.${line ? ' ' + line : ''}`, 'story', 7000);
   for(const e of r.events ?? []) if(e.kind === 'story') showStory(e.name, e.text);
+  noteCrew(r.events);
   tutorialCheck();
   save();
 }

@@ -365,11 +365,55 @@ test('the lighter is a rectangle of pixels the painter knows every letter of', (
 
 /* --------------------------------------------------------------- crew */
 
+test('three jobs pay in a person, and finishing one fills that berth', () => {
+  /* The only reward that does not land in the purse. Each of the three names
+     a berth, the berths are the three the menu shows, and the peoples line up
+     with the quest givers: an Emberkin engineer, a cat navigator, a frog
+     appraiser. */
+  const paying = S.QUESTS.filter(q => q.crew);
+  assert.deepEqual(paying.map(q => q.crew), ['engineer', 'navigator', 'appraiser']);
+  const roles = Object.fromEntries(TEXT.crew.roles.map(r => [r.id, r]));
+  for(const q of paying){
+    assert.ok(roles[q.crew], `${q.id} pays in "${q.crew}", which is not a berth`);
+    assert.equal(q.rep, roles[q.crew].species, `${q.id}: ${q.rep} job for a ${roles[q.crew].species}`);
+    assert.ok(roles[q.crew].person?.name && roles[q.crew].person?.line, `${q.crew} has nobody to be`);
+  }
+
+  // Flying one to the end puts somebody in the berth, and only that one.
+  for(const q of paying){
+    const s = S.newGame(11);
+    s.quests = []; s.money = 300000; s.keys.refrigeration = true;
+    s.dockedAt = q.from; s.justLeft = null;
+    assert.ok(S.acceptQuest(s, q.id).ok, q.id);
+    const live = s.quests.find(l => l.id === q.id);
+    const steps = S.questSteps(q);
+    let guard = 0;
+    while(!live.done && guard++ <= steps.length + 2){
+      const st = steps[live.step];
+      assert.ok(st, `${q.id} ran out of steps`);
+      if(st.kind === 'acquire'){
+        s.dockedAt = st.port ?? S.goodById(st.good).producedAt[0];
+        assert.ok(S.buy(s, st.good, st.qty - S.carrying(s, st.good)).ok, `${q.id}: could not buy ${st.good}`);
+      }else s.dockedAt = st.port;
+      S.tick(s, 0.01);
+    }
+    assert.ok(live.done, `${q.id} did not finish`);
+    assert.ok(s.crew[q.crew], `${q.id} finished and the ${q.crew} berth is still empty`);
+    const filled = Object.entries(s.crew).filter(([, v]) => v).map(([k]) => k);
+    assert.deepEqual(filled, [q.crew], `${q.id} filled ${filled}`);
+    /* And they do nothing. Crew is a face in a menu until it is not, so this
+       is what notices the day somebody wires one up. */
+    assert.deepEqual(Object.keys(s.crew[q.crew]).sort(), ['from', 'joinedAt', 'role']);
+  }
+});
+
 test('the crew menu has a captain to show and three berths to leave empty', () => {
   const c = TEXT.crew;
   assert.ok(c?.captain?.role && c.captain.name && c.captain.line, 'the captain has no card');
   assert.ok(SPECIES[c.captain.species], `captain species ${c.captain.species}`);
   assert.equal(c.roles.length, 3);
+  // Each berth has somebody waiting to be in it, and a portrait to be them with.
+  for(const r of c.roles) assert.ok(PORTRAITS[r.id], `no portrait for the ${r.id}`);
   assert.deepEqual(c.roles.map(r => r.id), ['engineer', 'navigator', 'appraiser']);
   for(const r of c.roles){
     assert.ok(r.name && r.does, `${r.id} has no words`);
@@ -808,14 +852,10 @@ test('a job of each kind builds the steps its kind earns', () => {
   assert.deepEqual(kinds(S.questById('tasteofhome')), ['handover'], 'delivery: it is already aboard');
   assert.deepEqual(kinds(S.questById('collector')), ['acquire', 'acquire', 'acquire', 'handover'], 'shopping: one step per line on the list');
   assert.deepEqual(kinds(S.questById('slatemessage')), ['handover'], 'message: just be there');
-  /* No chain ships. Both of the quest chains in the line pay in crew, and
-     crew does not exist, so the type is checked on a quest built here rather
-     than on one in the catalogue. */
-  const chain = { id: 'x', type: 'chain', stops: ['nail', 'whisker', 'arc'], to: 'nail' };
-  assert.deepEqual(kinds(chain), ['visit', 'visit', 'visit', 'handover']);
-  assert.deepEqual(S.questSteps(chain).map(st => st.text),
+  assert.deepEqual(kinds(S.questById('catsrequest')), ['visit', 'visit', 'visit', 'handover'], 'chain: one step per stop');
+  assert.deepEqual(S.questSteps(S.questById('catsrequest')).map(st => st.text),
     ['Call at Nail', 'Call at Whisker', 'Call at The Arc', 'Report to Nail']);
-  assert.equal(S.questTarget(chain), 'nail', 'a chain points at its first stop');
+  assert.equal(S.questTarget(S.questById('catsrequest')), 'nail', 'a chain points at its first stop');
 
   // Authored wording wins where a quest bothers to write it.
   assert.equal(S.questSteps(S.questById('pebble'))[1].text, 'Bring it home to Tassel');
@@ -835,12 +875,14 @@ test('a job of each kind builds the steps its kind earns', () => {
   assert.equal(S.questTarget(S.questById('slatemessage')), 'slate');
 });
 
-test('every quest in the catalogue is one a ship without crew can finish', () => {
-  /* Salvage needs flight the game does not have, and three of the twenty pay
-     in crew that does not exist. None of those are here: what is written down
-     is what can actually be flown today. */
+test('every quest in the catalogue is one a ship can actually finish', () => {
+  /* Salvage needs flight the game does not have, so it is not here. Crew is
+     no longer a reason to leave a quest out — three of them pay in a person —
+     but nothing yet *requires* one, so every quest in the list is flyable by
+     a ship with empty berths. */
   for(const q of S.QUESTS){
-    assert.ok(['retrieval', 'delivery', 'shopping', 'message'].includes(q.type), `${q.id}: ${q.type}`);
+    assert.ok(['retrieval', 'delivery', 'shopping', 'message', 'chain'].includes(q.type), `${q.id}: ${q.type}`);
+    assert.ok(q.requires == null, `${q.id} needs something the game cannot check yet`);
     // Every job says where it is offered, so a board will know what to put up.
     assert.ok(PORTS[q.from], `${q.id} does not say where it is given out`);
     for(const g of q.goods ?? []){

@@ -425,23 +425,27 @@ function paintShape(shape){
 
 /* People, at twenty-four pixels instead of sixteen. A world can be a dot and
  * still be a world; a face cannot. These are drawn on a grid the same way the
- * Arc and the Maw are, and they share one legend because two portraits with
- * two palettes would drift apart the first time either was touched. */
+ * Arc and the Maw are, and they share one legend because five portraits with
+ * five palettes would drift apart the first time any of them was touched.
+ *
+ * They also share a build: every head is an ellipse with the light coming
+ * from the upper left, and every one of them is wearing the same blue jacket,
+ * so four species read as one crew. */
 export const PORTRAIT_SIZE = 24;
 const PORTRAIT_INK = {
   '.': null,
-  d: '#4a3524',   // fur, shadowed — and the outline the whole head is drawn with
-  f: '#7d5c3c',   // fur
-  F: '#a07a50',   // fur, lit from the upper left like every world in the sky
-  m: '#e2cdaa',   // muzzle
-  n: '#2a1c12',   // nose and the one line of mouth
-  e: '#15100c',   // eye
-  W: '#c9b9a2',   // whiskers, muted: white ones read as snow at this size
-  k: '#12314a',   // jacket, shadowed
-  j: '#245f86',   // jacket
-  J: '#3fa9dd',   // jacket, lit
-  g: '#ffd23f',   // the gold on a harbourmaster's collar
-  s: '#414150',   // an empty berth: the shape of somebody who is not there
+  // Otter
+  d: '#4a3524', f: '#7d5c3c', F: '#a07a50', m: '#e2cdaa',
+  // Emberkin
+  r: '#7a2c14', E: '#c8502a', R: '#e8703c', C: '#ffb347', L: '#6fd0e8',
+  // Cat
+  t: '#8a7c62', T: '#d8cbb0', U: '#f2e8d0',
+  // Frog
+  h: '#2f5c2a', G: '#5fa84e', H: '#86c96f',
+  // Shared: features, the jacket they all wear, and an empty berth
+  n: '#2a1c12', e: '#15100c', O: '#ffd23f', W: '#c9b9a2',
+  k: '#12314a', j: '#245f86', J: '#3fa9dd', g: '#ffd23f',
+  s: '#414150',
 };
 
 export const PORTRAITS = {
@@ -474,6 +478,93 @@ export const PORTRAITS = {
       '.kjjjjjjjjJJJJjjjjjjjjk.',
       '.kjjjjjjjjJJJJjjjjjjjjk.',
       'kkkkkkkkkkkkkkkkkkkkkkkk',
+    ]},
+  /* Vashk, Emberkin, off the Ninth Forge: a crest, and the goggles pushed up
+     on it because she has just stopped doing something. */
+  engineer: { legend: PORTRAIT_INK,
+    rows: [
+      '........................',
+      '........................',
+      '...........C...C........',
+      '.........CrCrC.C........',
+      '.......WLLRRRCWLL.......',
+      '.......LLLRRRRLLL.......',
+      '......rrrrrrrrrrrr......',
+      '.......rRRRRRREEr.......',
+      '.......rRRRRRREEr.......',
+      '......rRRRRRREEEEr......',
+      '......rRRCeRECeEEr......',
+      '.......rECeEECeEr.......',
+      '.......rEERRRREEr.......',
+      '.......rERRnnRREr.......',
+      '........rRRRRRRr........',
+      '.........rRRRRr.........',
+      '..........rrrr..........',
+      '.......kgkrrrrkgk.......',
+      '.....kkjjgJJJJgjjkk.....',
+      '...kkjjjjjJJJJjjjjjkk...',
+      '..kjjjjjjjJJJJjjjjjjjk..',
+      '.kjjjjjjjjJJJJjjjjjjjjk.',
+      '.kjjjjjjjjJJJJjjjjjjjjk.',
+      'kkkkkkkkkkkkkkkkkkkkkkkk',
+    ]},
+  /* Keel, cat, who can read a rock at four au. Ears tall and narrow — a wide
+     one is a dog at this size. */
+  navigator: { legend: PORTRAIT_INK,
+    rows: [
+      '........................',
+      '......ttt......ttt......',
+      '......ttt......ttt......',
+      '......UUU......UUU......',
+      '......UUU.tttt.UUU......',
+      '......UUttUUUTttUU......',
+      '.....tUtUUUUUUTTtUt.....',
+      '.....tUtUUUUUUTTtUt.....',
+      '......tUUUUUUUTTTt......',
+      '......tUeOUUUUeOTt......',
+      '......tUOeUUUTOeTt......',
+      '......tUUUUUTTTTTt......',
+      '......tTTUUUUUTTTt......',
+      '.......tTUUnnUUTt.......',
+      '.....WWtTUUnnUUTtWW.....',
+      '........ttUUUUtt........',
+      '..........tttt..........',
+      '.......ktkttttktk.......',
+      '.....kkkktjjjjtkkkk.....',
+      '...kkkkkkkjjjjkkkkkkk...',
+      '..kkkkkkkkjjjjkkkkkkkk..',
+      '.kkkkkkkkkjjjjkkkkkkkkk.',
+      '.kkkkkkkkkjjjjkkkkkkkkk.',
+      'kkkkkkkkkkjjjjkkkkkkkkkk',
+    ]},
+  /* Oon, frog, with the eyes riding on top of the skull where a frog's are
+     and a loupe swung out of the way. */
+  appraiser: { legend: PORTRAIT_INK,
+    rows: [
+      '........................',
+      '........................',
+      '........................',
+      '........................',
+      '........................',
+      '....g.hhh......hhh......',
+      '..gg.hOWOh....hOWOh.....',
+      '...g.hOeehhhhhhOeeh.....',
+      '..gg.hOeehHHHhhOeeh.....',
+      '....g.hhhHHHHHhhhh......',
+      '......hHHHHHHHhhhh......',
+      '.....hHHHHHHHhhGhhh.....',
+      '.....hHHHHHHHhhGhhh.....',
+      '.....hhHHHHHhhGGhhh.....',
+      '......hhhhhhhGGhhh......',
+      '......HHHHHHHhhhhh......',
+      '.......hhhhhhhhhh.......',
+      '.......kghhhhhhgk.......',
+      '.....kkkkgjjjjgkkkk.....',
+      '...kkkkkkkjjjjkkkkkkk...',
+      '..kkkkkkkkjjjjkkkkkkkk..',
+      '.kkkkkkkkkjjjjkkkkkkkkk.',
+      '.kkkkkkkkkjjjjkkkkkkkkk.',
+      'kkkkkkkkkkjjjjkkkkkkkkkk',
     ]},
   /* Nobody, yet. */
   berth: { legend: PORTRAIT_INK,

@@ -350,19 +350,31 @@ export const NARRATIVE = {
     "id": "engineer",
     "name": "Engineer",
     "species": "emberkin",
-    "does": "Keeps the burn honest and the tank from lying to you."
+    "does": "Keeps the burn honest and the tank from lying to you.",
+    "person": {
+     "name": "Vashk",
+     "line": "Eleven years at the Ninth Forge and nothing left there she has not taken apart. She has opinions about your tank and will share them."
+    }
    },
    {
     "id": "navigator",
     "name": "Navigator",
     "species": "cat",
-    "does": "Reads a rock at four au and tells you which way it is going."
+    "does": "Reads a rock at four au and tells you which way it is going.",
+    "person": {
+     "name": "Keel",
+     "line": "Can read a rock at four au and tell you which way it is going. Says almost nothing and is always already looking at the thing you are about to point at."
+    }
    },
    {
     "id": "appraiser",
     "name": "Appraiser",
     "species": "frog",
-    "does": "Knows what a thing is, which is rarer than knowing what it is worth."
+    "does": "Knows what a thing is, which is rarer than knowing what it is worth.",
+    "person": {
+     "name": "Oon",
+     "line": "Knows what a thing is, which is rarer than knowing what it is worth. Has been studying one question for longer than you have been alive."
+    }
    }
   ]
  },
@@ -615,6 +627,25 @@ export const NARRATIVE = {
    "done": "A smith signs for it without looking up, then looks up, then asks where you learned to fly an approach like that."
   },
   {
+   "id": "enginetrouble",
+   "title": "Engine Trouble",
+   "giver": "Vashk of the Ninth Forge",
+   "type": "retrieval",
+   "from": "cinder",
+   "to": "slate",
+   "goods": [
+    {
+     "good": "engineparts",
+     "qty": 3
+    }
+   ],
+   "pay": 700,
+   "rep": "emberkin",
+   "crew": "engineer",
+   "blurb": "Three crates of spare parts for the Slate yards, and Vashk wants to ride along and see them fitted. She has been at the Ninth Forge eleven years and has run out of things there she has not already taken apart.",
+   "done": "She watches the Slate shipwrights work for about four minutes, says one sentence nobody enjoys, and fixes it herself. Then she asks what your tank is rated at, and does not get off the ship."
+  },
+  {
    "id": "engineerfavour",
    "title": "A Favor for an Engineer",
    "giver": "Sath of the Ninth Forge",
@@ -721,6 +752,25 @@ export const NARRATIVE = {
    "done": "They are unpacked, powered up, and pointed at something outside. Whatever the client sees, they do not mention it, and you are paid on the spot."
   },
   {
+   "id": "catsrequest",
+   "title": "A Cat's Request",
+   "giver": "Captain Ashgrin",
+   "type": "chain",
+   "from": "nail",
+   "to": "nail",
+   "stops": [
+    "nail",
+    "whisker",
+    "arc"
+   ],
+   "goods": [],
+   "pay": 900,
+   "rep": "cat",
+   "crew": "navigator",
+   "blurb": "Ashgrin wants you to go and be seen. Nail, then Whisker, then the Arc, in that order, and come back and tell her who was where. She will not say why, and it is rude to ask a cat twice.",
+   "done": "She hears you out, nods once, and introduces you to Keel, who has been sitting behind you the entire time and who apparently already knows what your ship is called."
+  },
+  {
    "id": "medicinerun",
    "title": "Medicine Run",
    "giver": "Captain Ashgrin",
@@ -768,6 +818,33 @@ export const NARRATIVE = {
    "rep": "frog",
    "blurb": "A question for the scholars under the ice on Glass. It is one sentence long and the apothecary has been working on it for eleven years. She would like an answer, eventually, and is in no hurry.",
    "done": "A scholar reads it, sits down, and reads it again. She says the answer will take some time. She seems delighted about that."
+  },
+  {
+   "id": "appraisal",
+   "title": "Appraisal",
+   "giver": "Oon of the deep shelf",
+   "type": "shopping",
+   "from": "brine",
+   "to": "brine",
+   "goods": [
+    {
+     "good": "arcshard",
+     "qty": 1
+    },
+    {
+     "good": "stormcrystals",
+     "qty": 1
+    },
+    {
+     "good": "coils",
+     "qty": 1
+    }
+   ],
+   "pay": 3200,
+   "rep": "frog",
+   "crew": "appraiser",
+   "blurb": "Oon would like to look at three things at once: a piece of the Arc off Nail, a storm crystal fished out of Grumm's cloud tops, and one of Cinder's reactor coils. She is not buying them. She wants them on the same table under the same lamp, and she has wanted that for some while.",
+   "done": "She puts all three under the same lamp, is quiet for a long time, and then says something that is not an answer. Then she asks where you are going next, and starts packing."
   }
  ]
 };
