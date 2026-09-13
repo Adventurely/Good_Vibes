@@ -22,7 +22,7 @@ A cozy, single-player 2D orbital trading game. You pilot a small merchant ship a
 
 ### 1.3 Target Players
 
-The game is single-player and non-combat. It serves three motivations, loosely following Bartle's player types. **Narrative players** are driven by events, characters, and the long-term mystery. **Experimenters** are driven by the physics: finding cheaper routes, chaining gravity assists, intercepting the comet. **Achievers** are driven by ship upgrades, wealth, and unlocking new regions. Competitive, "killer"-type drives are not a target, though some can be channeled through non-combat rivalry (see Section 6.4).
+The game is single-player and non-combat. It serves three motivations, loosely following Bartle's player types. **Narrative players** are driven by events, characters, and the long-term mystery. **Experimenters** are driven by the physics: finding cheaper routes, chaining gravity assists, threading a salvage intercept. **Achievers** are driven by ship upgrades, wealth, and unlocking new regions. Competitive, "killer"-type drives are not a target, though some can be channeled through non-combat rivalry (see Section 7.4).
 
 ---
 
@@ -216,6 +216,10 @@ One goal should always be in sight at each timescale.
 | Short-term | This delivery, this passenger, this transfer window |
 | Medium-term | A new upgrade, a relationship with a people, reaching a new region |
 | Long-term | The Builders' mystery and the Maw |
+
+Section 5 is the first twenty quests, which is the opening and short-term
+layers written out: the line walks outward one region at a time and hands over
+a crew member at the end of each.
 
 ---
 
@@ -456,12 +460,113 @@ owed to Ledger and is now owed to the harbour bank on Tassel. Goods whose
 producer was dropped were re-sourced rather than deleted, so the price list is
 the length it always was.
 
-**Saves.** A version 2 save names places that are not in the sky any more, so
-the save format is at version 3 and anything older is refused at the door.
+**Saves.** A version 2 save names places that are not in the sky any more, and
+a version 3 save's hold is full of goods that were replaced wholesale, so the
+save format is at version 4 and anything older is refused at the door.
 
 ---
 
-## 5. Technical Notes
+## 5. The Quest Line
+
+The first twenty quests, in the order a player meets them. The line walks
+outward — Tassel's moons, then the Emberkin worlds, then the Belt, then the
+frog system — so that every new place arrives with a reason to be there, and
+each of the three crew members is the reward for the stretch that introduces
+their people.
+
+Only **#1** is built. It is the opening errand and the tutorial's spine.
+
+| # | Quest | Type | Route / Goal | Reward |
+|---|---|---|---|---|
+| 1 | First Shipment | Retrieval | Slate: retrieve shiny moon pebbles → Tassel | Tutorial; unlocks trading |
+| 2 | A Taste of Home | Delivery | Tassel → Moss: deliver moonfish oil | Credits |
+| 3 | Green Medicine | Retrieval | Moss: retrieve medicinal herbs → Tassel | Credits |
+| 4 | A Message for Slate | Message | Tassel → Slate | Credits |
+| 5 | The Heavy Stuff | Delivery | Slate → Cinder: deliver iron ore | Credits |
+| 6 | Engine Trouble | Retrieval | Cinder: retrieve spare engine parts → Slate | **Emberkin Engineer** |
+| 7 | A Favor for an Engineer | Message | Cinder → Scorch: deliver a message | Credits / faction reputation |
+| 8 | Emberkin Luxury | Retrieval | Scorch: retrieve fire crystals → Veyra | Credits |
+| 9 | The Collector | Shopping List | Veyra: acquire pearls, coral carvings, precision clock | Large payout |
+| 10 | Faction Business | Message | Veyra → Cinder: deliver confidential message | Faction reputation |
+| 11 | Into the Belt | Delivery | Cinder → Nail: deliver reactor coils | Credits |
+| 12 | Something Shiny | Retrieval | Nail: retrieve salvaged sensors → Veyra | Credits |
+| 13 | A Cat's Request | Quest Chain | Nail → several cat settlements | **Cat Navigator** |
+| 14 | First Salvage | Salvage | With the cat navigator: recover a drifting wreck | Salvage + credits |
+| 15 | Lost Cargo | Salvage | Belt: intercept a derelict cargo ship | Salvage |
+| 16 | Medicine Run | Delivery | Nail → Brine: deliver medicinal supplies | Credits |
+| 17 | The Amber Collector | Retrieval | Brine: retrieve brine amber → Veyra | Credits |
+| 18 | A Frog's Question | Message | Brine → Glass: deliver a message | Credits / frog reputation |
+| 19 | Appraisal | Quest Chain | Brine: retrieve several unusual goods for examination | **Frog Appraiser** |
+| 20 | What Is This Worth? | Appraisal / Retrieval | With the frog appraiser: investigate an Arc fragment | Major lore reveal |
+
+### 5.1 The Types
+
+Seven kinds, and only the first is built.
+
+- **Retrieval** — go there, buy the thing, bring it back. #1 is exactly this
+  and the shape of it is already in the game: a step for buying and a step for
+  arriving home.
+- **Delivery** — the same trip with the cargo handed to you at the start.
+- **Message** — a parcel with no weight and no market price. Nothing in the
+  hold today is weightless; either messages sit outside the cargo system
+  entirely, or a good with zero units is added for them.
+- **Shopping List** — one quest, several goods, gathered from several ports
+  before any of them is handed over. Needs a quest step that counts a set
+  rather than a single item.
+- **Quest Chain** — several stops, in order, with the reward at the end. The
+  quest system already carries ordered steps; what it lacks is a step that
+  means "be at this port" without a purchase.
+- **Salvage** — intercept something that is not a port: a drifting wreck on
+  its own rail, matched like a harbour with no harbour in it. This is the one
+  type that needs new *flight*, not just new bookkeeping, and it is the first
+  real use of the Belt for something other than passing through.
+- **Appraisal** — carry a thing to somebody who can read it. Mechanically a
+  retrieval; narratively the payoff, and where the Builders come in.
+
+### 5.2 What the Line Needs That the Game Does Not Have
+
+1. **Crew as a reward.** Three of the twenty hand over a person — an Emberkin
+   engineer at #6, a cat navigator at #13, a frog appraiser at #19 — and one
+   each from the three peoples whose region the player has just finished
+   crossing. Crew is still open (§7.2); this line is the strongest argument yet
+   for settling it, because #14 and #20 are gated behind having one.
+2. **Faction reputation.** #7 and #10 pay in it. The game keeps reputation per
+   *people*, not per house, and the Emberkin are explicitly factional — so
+   either the Emberkin score splits into houses, or "faction reputation" means
+   the Emberkin score and the houses stay fiction.
+3. **A weightless parcel**, for the four message quests.
+4. **A set-counting quest step**, for #9 and #19.
+5. **Things in space that are not ports**, for #14 and #15.
+6. **A quest board.** Twenty quests do not arrive by uncle. Where a player
+   picks the next one up — a port's Talk tab, a notice board, a character who
+   follows them — is not decided.
+
+### 5.3 Notes Against the Goods Table
+
+Checked against the shipped price list; three want a decision before anybody
+writes them.
+
+- **#2, moonfish oil to Moss.** Moss is not a buyer of it. That is fine for a
+  quest — a named person can want a thing their whole moon does not — but it
+  means the reward has to be the quest's own payment rather than the market's,
+  and the player should not be able to look at Moss's shelf and feel lied to.
+- **#9, the collector's list.** Pearls and coral carvings are made on Tassel,
+  so the list is a round trip home. Precision clocks are made on Veyra, where
+  the collector is, so the third item is bought from under their nose — which
+  is either a joke worth keeping or a sign the item should be something else.
+- **#16, "medicinal supplies" out of Nail.** There is no such good. Medicinal
+  gel is made *on* Brine, so carrying it there is backwards, and smuggled
+  medicine is made on Whisker and Brine does not buy it. The quest probably
+  wants Whisker's smuggled medicine routed through Nail, which would make it
+  the first quest that asks the player to do something the market would not.
+
+Everything else lines up with the table as shipped: iron ore to Cinder, engine
+parts to Slate, fire crystals to Veyra (who love them), reactor coils to Nail
+(who love them), salvaged sensors and brine amber to Veyra.
+
+---
+
+## 6. Technical Notes
 
 **Decided since the first draft.** Reaches are computed from mass rather than written down (2.1), and the invariant checker proves the promises a hand-tuned table used to make. The Belt is decorative — a field of drawn rocks — and the two cat havens inside it are massless rendezvous zones with a harbour mouth rather than bodies with a well, as are the Arc and the Maw: a pilot arrives at those by matching speeds, not by falling in.
 
@@ -469,19 +574,19 @@ the save format is at version 3 and anything older is refused at the door.
 
 ---
 
-## 6. Undecided Systems (TBD)
+## 7. Undecided Systems (TBD)
 
-### 6.1 Player Character — TBD
+### 7.1 Player Character — TBD
 
 A leading proposal is that the player is an otter who left their raft. That would explain flying solo, make the player a slight outsider in their own culture, and give each crew member the role of a surrogate raft. The alternative is leaving the player's species open or customizable.
 
-### 6.2 Crew — TBD
+### 7.2 Crew — TBD
 
 Crew reacting to the player's burns is a desired feature, working as characterization, soft tutorial, and feedback on skill. Early flavor notes per species: Emberkin crew cheer big burns and complain through long coasts. Otter crew are chatty, point out sights, and grow anxious when the radio goes quiet. Cat crew love tight slingshots, mock safe routes, and are secretly terrified of landing. Frog crew hum during coasts, dislike high-g burns, and never complain about the slow road.
 
 Open questions include how crew are recruited, how many the ship can carry, whether crew have mechanical effects or are purely narrative, and how crew relate to the player's standing with each species.
 
-### 6.3 Events — TBD
+### 7.3 Events — TBD
 
 Coasting stretches are natural pacing gaps and the likely home for events. The guiding principle is that events should ask for **orbital decisions** where possible, not just text choices.
 
@@ -489,20 +594,20 @@ Candidates from brainstorming include distress beacons (requiring a rendezvous),
 
 Open questions include event frequency, trigger conditions (location, cargo, reputation, time), and how events tie into species relationships.
 
-### 6.4 Competition and Rivalry — TBD
+### 7.4 Competition and Rivalry — TBD
 
 Options for channeling competitive drives without combat include a named rival trader who taunts the player over the radio and races them to markets, economic plays like cornering a market before a festival, and asynchronous route leaderboards or ghost trajectories. None are committed.
 
-### 6.5 Ending and Long-Term Goal — TBD
+### 7.5 Ending and Long-Term Goal — TBD
 
 The Builders and the Maw are the long-term hook, with breadcrumbs at the Arc, on Whisker, and in the research station under the ice on Glass. Undecided: what the Builder station at the Maw is for, what the Builders were and why they vanished, whether reaching the Maw ends the game or opens a post-game, and how the frogs' songs pay off.
 
-### 6.6 Art Direction — TBD
+### 7.6 Art Direction — TBD
 
 A fully hand-drawn navigation chart was considered and ruled out as unrealistic in scope. Visual style, UI treatment, and how species are presented (portraits, animated sprites, text only) are undecided.
 
-### 6.7 Open Technical Questions
+### 7.7 Open Technical Questions
 
 **Decided since the first draft**, and recorded above rather than here: burns are instantaneous impulses (2.2); the control is four buttons on two axes, reached by tapping the road (2.2); there is no landing and the game starts in orbit (2.3); the clock runs at ten real minutes to a lap of the low orbit the game opens in, with no warp ladder and skipping by pointing at a place (2.6); the chart is locked to the body the ship orbits and draws only the immediate orbit plus the next crossing (2.6.1); the opening mission is a single errand to Slate.
 
-**Still open.** Distance compression beyond the inner system needs prototyping. Docking-zone size and speed thresholds need tuning for the right level of forgiveness. The representation of belts and debris fields (Section 5) is settled; what a player can *do* in the Belt beyond docking at the two havens is not. Whether landing is ever added — and if so, whether it is a third control scheme or a cutscene over an orbital rendezvous — is deferred, not refused.
+**Still open.** Distance compression beyond the inner system needs prototyping. Docking-zone size and speed thresholds need tuning for the right level of forgiveness. The representation of belts and debris fields (Section 6) is settled; what a player can *do* in the Belt beyond docking at the two havens is not. Whether landing is ever added — and if so, whether it is a third control scheme or a cutscene over an orbital rendezvous — is deferred, not refused.
