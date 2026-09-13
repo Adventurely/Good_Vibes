@@ -2132,7 +2132,7 @@ function rollFilm(begin = () => {}){
   const wasPaused = state.paused;
   setPaused(true);
   const f = film = playIntro($('intro-art'), {
-    onBeat: name => { if(name === 'space') host.classList.add('say'); },
+    onCaption: () => host.classList.add('say'),
   });
   /* While it runs the keyboard is the film's: caught on the way down, so that
      space does not pause a game nobody can see yet. */

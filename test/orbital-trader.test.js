@@ -9,7 +9,7 @@ import {
 } from '../public/orbital-trader/content.js';
 import * as S from '../public/orbital-trader/sim.js';
 import { createChart } from '../public/orbital-trader/render.js';
-import { DURATION, BREACH, BEATS, beatAt, ascent, skyAt, ROCKET } from '../public/orbital-trader/intro.js';
+import { DURATION, BREACH, BEATS, CAPTION_AT, beatAt, ascent, skyAt, ROCKET } from '../public/orbital-trader/intro.js';
 
 /* Orbital Trader has no server: everything it knows is in public/ and is
  * imported here as the browser imports it. These tests are the gate that a
@@ -336,9 +336,14 @@ test('the opening film is over in five to seven seconds, beats and all', () => {
     assert.ok(BEATS[i].at > BEATS[i - 1].at, `beat ${BEATS[i].name} does not come after ${BEATS[i - 1].name}`);
     assert.ok(BEATS[i].at < DURATION, `beat ${BEATS[i].name} is after the end of the film`);
   }
-  // And the page hangs its closing line on this one.
   assert.ok(BEATS.some(b => b.name === 'space'), 'no beat called space');
   for(const b of BEATS) assert.equal(beatAt(b.at), b.name, `${b.name} is not what is playing at its own mark`);
+  /* The page's caption is hung on its own time rather than on a beat, so it
+     can sit where it reads best rather than where something happens to happen.
+     It needs the whole of its 1.2s reveal inside the film, and then a moment
+     to be read, or it arrives to be dissolved. */
+  assert.ok(CAPTION_AT > BREACH, 'the caption comes up before the ship is out of the water');
+  assert.ok(CAPTION_AT + 1.2 < DURATION - 0.5, `the caption cannot finish appearing: ${CAPTION_AT} of ${DURATION}`);
   assert.equal(beatAt(-1), BEATS[0].name, 'before the beginning is the first beat');
   assert.equal(beatAt(DURATION * 2), BEATS[BEATS.length - 1].name, 'and after the end is the last');
 });
