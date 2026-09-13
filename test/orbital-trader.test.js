@@ -664,6 +664,24 @@ test('every button the page draws for itself has something listening to it', () 
   assert.match(html, /\$\('dock-go'\)\.addEventListener\('click'/, 'the dock button is not wired');
 });
 
+/* The title screen is one fixed screen with no scrolling, because the chart is
+ * behind it — so anything that does not fit is simply not there. It stopped
+ * fitting on a phone in a way nothing here could see: `main` is a grid whose
+ * single column was auto-sized, so it took its width from its own max-content,
+ * and the card grid's `repeat(auto-fit, minmax(150px, 1fr))` asks for four
+ * columns when it has no width to fit itself to. The page laid itself out in a
+ * 629px box inside a 390px window and clipped the rest. A definite column is
+ * the fix, and this is the guard on it. */
+test('the title screen tells its grid how wide the column is', () => {
+  const html = readFileSync(new URL('../public/orbital-trader/index.html', import.meta.url), 'utf8');
+  const main = html.match(/\n {2}main\{([\s\S]*?)\n {2}\}/)?.[1];
+  assert.ok(main, 'the title screen no longer has a main rule to check');
+  assert.match(main, /grid-template-columns/, 'main is a grid with an auto-sized column again');
+  assert.match(main, /overflow-y:\s*auto/, 'a title screen that does not fit has no way to reach its own back link');
+  // And the cards are still the thing that needs the width to be definite.
+  assert.match(html, /repeat\(auto-fit, minmax\(150px, 1fr\)\)/);
+});
+
 /* The four cards at the front of the lesson are passed with the chart rather
  * than with the ship — a drag, a zoom, a tap on the moon, and the way back —
  * and none of those leave a mark on the game state by themselves. The page
