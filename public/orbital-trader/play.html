@@ -1585,25 +1585,28 @@ function shipTab(){
    three jobs that fill them pay in a person and there is nowhere yet to take
    one on. An empty berth says what the job is and who does it, so the menu
    reads as a crew you have not met rather than as a menu that is broken. */
+/* Who is aboard. The captain, and three berths. An empty one says only that
+   it is empty and which job it is: naming the people who do that work, and
+   where you would have to go to ask, was the whole of it explained before
+   anybody had been anywhere. The mystery is the point. */
 function crewTab(){
   const c = TEXT.crew;
-  const card = (src, role, name, species, line, open) =>
-    `<div class="crew${open ? ' open' : ''}">`
-    + (src ? `<img src="${src}" alt="" width="24" height="24">` : '')
-    + `<div class="who"><b>${esc(name)}</b><small>${esc(role)}${species ? ' · ' : ''}${species ? sp(species) : ''}</small>`
-    + `<p${open ? ' class="lock"' : ' class="say"'}>${esc(line)}</p></div></div>`;
-
   let out = '<h2>Crew</h2>';
-  out += card(portraitURL('captain'), c.captain.role, c.captain.name, c.captain.species, c.captain.line, false);
+  out += '<div class="crew">'
+    + `<img src="${portraitURL('captain')}" alt="" width="24" height="24">`
+    + `<div class="who"><b>${esc(c.captain.name)}</b><small>${esc(c.captain.role)} · ${sp(c.captain.species)}</small>`
+    + `<p class="say">${esc(c.captain.line)}</p></div></div>`;
   out += `<p class="lock">${esc(state.shipName)} · ${state.stats.docks} docking${state.stats.docks === 1 ? '' : 's'} · ${S.fmtKms(state.stats.dvSpent)} burned</p>`;
   out += '<h3>Berths</h3>';
   for(const r of c.roles ?? []){
     const aboard = state.crew?.[r.id] ?? null;
     out += aboard
-      ? card(portraitURL('captain'), r.name, aboard.name, r.species, r.does, false)
-      : card(portraitURL('berth'), r.name, 'Nobody', r.species, r.empty, true);
+      ? `<div class="crew"><img src="${portraitURL('captain')}" alt="" width="24" height="24">`
+        + `<div class="who"><b>${esc(aboard.name)}</b><small>${esc(r.name)} · ${sp(r.species)}</small>`
+        + `<p class="say">${esc(r.does)}</p></div></div>`
+      : `<div class="crew open"><img src="${portraitURL('berth')}" alt="" width="24" height="24">`
+        + `<div class="who"><b>Missing ${esc(r.name)}</b></div></div>`;
   }
-  if(c.note) out += `<p class="lock">${esc(c.note)}</p>`;
   return out;
 }
 

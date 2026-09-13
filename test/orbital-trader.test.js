@@ -277,7 +277,7 @@ test('the crew menu has a captain to show and three berths to leave empty', () =
   assert.equal(c.roles.length, 3);
   assert.deepEqual(c.roles.map(r => r.id), ['engineer', 'navigator', 'appraiser']);
   for(const r of c.roles){
-    assert.ok(r.name && r.does && r.empty, `${r.id} has no words`);
+    assert.ok(r.name && r.does, `${r.id} has no words`);
     assert.ok(SPECIES[r.species], `${r.id}: species ${r.species}`);
   }
   /* The three berths are the three jobs in the line that pay in a person, so

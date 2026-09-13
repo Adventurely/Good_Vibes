@@ -643,11 +643,13 @@ A leading proposal is that the player is an otter who left their raft. That woul
 ### 7.2 Crew — TBD
 
 **There is a Crew menu now**, reachable docked or in flight. It shows the
-captain with a pixel-art portrait and three berths — Engineer, Navigator,
-Appraiser — each empty, each naming the people who do that work. The three are
-the three jobs in the line that pay in a person (§5), so the menu is the shape
-of the answer rather than the answer: `state.crew` carries a slot per berth
-and every one of them is null.
+captain with a pixel-art portrait and three berths — Missing Engineer, Missing
+Navigator, Missing Appraiser — and nothing else about them. An empty berth
+names the job and keeps the rest: who does that work and where you would have
+to go to ask is something to find out, not something the menu tells you before
+you have been anywhere. The three are the three jobs in the line that pay in a
+person (§5), so the menu is the shape of the answer rather than the answer:
+`state.crew` carries a slot per berth and every one of them is null.
 
 The captain is drawn as an otter. §7.1 still has that down as a proposal, but
 the shipped fiction already leans that way — the game opens among otters, and
