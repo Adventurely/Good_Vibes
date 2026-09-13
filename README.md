@@ -355,6 +355,7 @@ PORT=8080 HOST=127.0.0.1 npm start
 | ---------- | --------------------------------- |
 | `/`        | The title screen                  |
 | `/healthz` | `{"status":"ok"}`                 |
+| `/api/sunward/board` | Sunward's leaderboard: `GET` reads it, `POST` a score to it |
 | anything else | `404 Not Found`                |
 
 ## Tests
@@ -413,6 +414,8 @@ public/greener-thumbs/  Greener Thumbs, three.js and a greenhouse
 test/sunward.test.js  Sunward's tables and the balance of them: that no tier is
                     a dead row, that a save full of rubbish still loads, and
                     that asking a question does not change the answer
+test/sunward-board.test.js  the board's rules: what a name may be, what a
+                    figure may be, who is too soon, and who is pruned
 public/orbital-trader/  Orbital Trader: kernel, rules, chart, pages. No server
                     side at all — see "Orbital Trader" below
 tools/orbital-trader/   its design tables, the module generator, and the
@@ -1517,8 +1520,9 @@ animation or no sound.
 
 ## Sunward
 
-A clicker, and the second game here with no server in it — Greener Thumbs got
-there first. Every tap is energy for the tree; you spend the energy on things
+A clicker, and the second game here that plays with no server — Greener
+Thumbs got there first; the one thing on the Worker for it is an opt-in
+leaderboard, below. Every tap is energy for the tree; you spend the energy on things
 that make their own, and the lot fills in around you. It was called light for
 the first week, and the game's name still points at the sun — but the sun in
 the sky is weather here, and what the tree runs on is what you give it. `public/sunward/content.js` is the

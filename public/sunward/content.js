@@ -7,10 +7,11 @@
  * Node without a browser anywhere near it.
  *
  * The other two games keep their rules here because a Durable Object imports
- * them. Sunward has no server and never will — a clicker is one player and a
- * save file — but the split earns its keep anyway: the balance of the game is
- * in one file that a test can read, rather than smeared through the page that
- * draws it.
+ * them. Sunward plays with no server — a clicker is one player and a save
+ * file, and the only thing on the Worker for it is a leaderboard the save can
+ * be posted to, with its own rules in src/sunward-board.js — but the split
+ * earns its keep anyway: the balance of the game is in one file that a test
+ * can read, rather than smeared through the page that draws it.
  *
  * --- The shape of a state -------------------------------------------------
  *
