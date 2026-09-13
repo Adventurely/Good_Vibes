@@ -484,6 +484,9 @@ export function tick(state, dtDays){
       const entering = to.parent === from.id;
       logLine(state, 'soi', entering ? TEXT.logTemplates.soiEnter : TEXT.logTemplates.soiExit, { body: entering ? to.name : from.name, parent: to.name });
       events.push({ kind: 'soi', from: e.from, to: e.to });
+      /* The flag is still set — it is how the game knows you have crossed one
+         before — but there is no longer a line of story attached to it, so
+         crossing a reach says nothing beyond the log entry above. */
       flag(state, 'firstSoiChange', events);
       if(e.to === 'lamp' && from.kind === 'planet') flag(state, 'firstTransfer', events);
       if(e.from === 'grumm' && e.to === 'lamp'){

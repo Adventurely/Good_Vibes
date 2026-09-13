@@ -238,7 +238,7 @@ test('the text has every line the game asks for', () => {
     const sp = TEXT.species[s];
     assert.ok(sp && sp.onGift && sp.greeting, `species text for ${s}`);
   }
-  for(const k of ['tollOffer', 'tollPaidCoin', 'tollPaidCargo', 'tollStealth', 'tollGiftLater', 'towDry', 'towCrash', 'towAtmosphere', 'bankDebt', 'firstSoiChange', 'firstTransfer', 'firstAssist', 'firstAerobrake', 'mawArrival']){
+  for(const k of ['tollOffer', 'tollPaidCoin', 'tollPaidCargo', 'tollStealth', 'tollGiftLater', 'towDry', 'towCrash', 'towAtmosphere', 'bankDebt', 'firstTransfer', 'firstAssist', 'firstAerobrake', 'mawArrival']){
     assert.ok(TEXT.events[k], `event text ${k}`);
   }
   assert.ok(TEXT.events.tollOffer.length >= 3 && TEXT.events.tollOffer.every(v => v.captain && v.line));
