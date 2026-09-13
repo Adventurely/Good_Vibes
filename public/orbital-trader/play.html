@@ -98,7 +98,13 @@
   #view button{
     width:40px; height:40px; border-radius:10px; border:1px solid var(--line);
     background:var(--glass); color:var(--dim); cursor:pointer; backdrop-filter:blur(8px); font-size:1.05rem;
+    /* An inline <svg> sits on the text baseline, which left the ship and the
+       harbour drawn low and a little left in their boxes while the ◎ next to
+       them — a glyph, centred by the button itself — sat true. Centring the
+       box's content puts all three on the same middle. */
+    display:flex; align-items:center; justify-content:center; padding:0; line-height:1;
   }
+  #view button svg{ display:block; }
   #view button:hover{ color:var(--ink); border-color:var(--line-2); }
   #view button[aria-pressed="true"]{ color:var(--gold-ink); border-color:var(--gold-2); }
   /* Dragged off the thing the chart is locked to. The button that brings you
@@ -256,7 +262,16 @@
      stable orbit close in around a harbour makes it possible, and is not
      there the rest of the time. It replaced a card across the bottom of the
      sky that spent most of its life telling you what you had not done yet. */
-  #dock-go{ color:var(--gold); border-color:var(--gold-2); }
+  #dock-go{ color:var(--gold); border-color:var(--gold-2); animation:dockflash 2.8s ease-in-out infinite; }
+  /* Slow on purpose. It is the one control that appears out of nowhere, and it
+     has to catch an eye that is on the chart without becoming a strobe next to
+     two buttons that are always there — so it breathes rather than blinks, and
+     it stops the moment the pointer is on it. */
+  @keyframes dockflash{
+    0%, 100%{ opacity:.62; box-shadow:0 0 0 0 transparent; }
+    50%{ opacity:1; box-shadow:0 0 10px -1px var(--gold-2); }
+  }
+  #dock-go:hover, #dock-go:focus-visible{ animation:none; opacity:1; }
   #dock-go svg, #m-ship svg, #m-dock svg{ width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
   #dock-go:hover{ background:var(--gold); color:#1a1310; }
   #dock-go[hidden], #m-dock[hidden]{ display:none; }
@@ -529,6 +544,9 @@
     /* It never plays under this, but if it is asked for by hand it does not
        also slide and fade. */
     #intro, #intro.say #intro-cap{ transition:none; animation:none; }
+    /* The mooring ring still has to be noticed, so it keeps the brightness the
+       flash was carrying it to and drops the breathing. */
+    #dock-go{ animation:none; opacity:1; }
   }
 </style>
 </head>
@@ -854,11 +872,23 @@ function renderHud(docking){
   $('clock-stat').hidden = clockWord == null;
   if(clockWord != null) $('h-warp').textContent = clockWord;
   const b = world.get(state.ship.body);
-  $('h-where').textContent = state.dockedAt ? `Docked at ${S.portName(state.dockedAt)}` : `In ${b.name}'s gravity`;
+  /* Where you are, in the three states a ship is ever in: tied up, going round
+     something, or on your way through its gravity and not coming back. It used
+     to say "In Slate's gravity" for both of the last two, which is true of a
+     ship in a neat circle and of one falling past at four km/s, and those are
+     not the same news. A closed path is one with a period. */
+  const el = state.dockedAt ? null : elementsFromState(b.mu, state.ship.r, state.ship.v);
+  $('h-where').textContent = state.dockedAt ? `Docked at ${S.portName(state.dockedAt)}`
+    : Number.isFinite(el.period) ? `In orbit around ${b.name}`
+    : `Passing through ${b.name}'s gravity`;
   const hint = $('dockhint');
   if(!docking){ hint.textContent = ''; return; }
   const pb = world.get(docking.port);
-  if(docking.ok){ hint.textContent = ` · ${pb.name} will take your lines`; hint.className = ''; return; }
+  /* The hint is a button as much as a label, so when the answer is yes it says
+     what pressing it does. It used to say the harbour "will take your lines",
+     which is a rope nobody in this game has ever thrown: there is no landing
+     and no mooring, only an orbit you match. */
+  if(docking.ok){ hint.textContent = ` · dock at ${pb.name}`; hint.className = ''; return; }
   hint.className = 'far';
   if(docking.kind === 'orbit'){
     hint.textContent = !docking.bound ? ` · ${pb.name}: not in orbit`
@@ -1854,8 +1884,7 @@ function doDock(){
    it appeared beside the other view buttons without ever being wired to
    anything, so it lit up the moment a harbour would take you and then did
    nothing when you pressed it. The HUD hint docks too, because it is the thing
-   that says the harbour will take your lines, and `d` because a keyboard is a
-   keyboard. */
+   that says you can, and `d` because a keyboard is a keyboard. */
 const dockIfWeCan = () => { const d = S.dockingStatus(state); if(d?.ok) doDock(); };
 $('dock-go').addEventListener('click', dockIfWeCan);
 $('dockhint').addEventListener('click', dockIfWeCan);

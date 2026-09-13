@@ -45,7 +45,7 @@ export const NARRATIVE = {
   {
    "term": "docking range",
    "plain": "docking zone",
-   "tip": "Get into a steady orbit whose high point is inside this and a port will take your lines. Generous, on purpose."
+   "tip": "Get into a steady orbit whose high point is inside this and you can dock. Generous, on purpose."
   }
  ],
  "ports": {
