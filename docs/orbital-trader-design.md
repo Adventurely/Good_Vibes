@@ -501,31 +501,61 @@ Only **#1** is built. It is the opening errand and the tutorial's spine.
 
 ### 5.1 The Types
 
-Seven kinds, and only the first is built.
+Seven kinds. **Five of them are built**; the two that need new flight are not.
 
-- **Retrieval** — go there, buy the thing, bring it back. #1 is exactly this
-  and the shape of it is already in the game: a step for buying and a step for
-  arriving home.
-- **Delivery** — the same trip with the cargo handed to you at the start.
-- **Message** — a parcel with no weight and no market price. Nothing in the
-  hold today is weightless; either messages sit outside the cargo system
-  entirely, or a good with zero units is added for them.
-- **Shopping List** — one quest, several goods, gathered from several ports
-  before any of them is handed over. Needs a quest step that counts a set
-  rather than a single item.
-- **Quest Chain** — several stops, in order, with the reward at the end. The
-  quest system already carries ordered steps; what it lacks is a step that
-  means "be at this port" without a purchase.
-- **Salvage** — intercept something that is not a port: a drifting wreck on
-  its own rail, matched like a harbour with no harbour in it. This is the one
-  type that needs new *flight*, not just new bookkeeping, and it is the first
-  real use of the Belt for something other than passing through.
-- **Appraisal** — carry a thing to somebody who can read it. Mechanically a
-  retrieval; narratively the payoff, and where the Builders come in.
+A quest is written as data — its type, the ports it names, the goods it wants
+— and the steps are generated from that. Authored wording wins where a quest
+supplies it, so the opening errand still says "Bring it home to Tassel" rather
+than anything a generator would produce. Adding a quest is a few lines in
+`narrative.json` and no code.
+
+| Type | Steps it earns | Built |
+|---|---|---|
+| Retrieval | one *acquire* per good, then *handover* at the destination | yes |
+| Delivery | *handover* only — the goods come aboard when you accept | yes |
+| Shopping List | one *acquire* per line on the list, then *handover* | yes |
+| Quest Chain | one *visit* per stop, in order, then *handover* | yes |
+| Message | *handover* with nothing in it: be there, that is all | yes |
+| Salvage | — | no |
+| Appraisal | mechanically a retrieval | via retrieval |
+
+Three step primitives do all of it. **acquire** is satisfied by having the
+goods aboard, however you came by them. **visit** is satisfied by being tied up
+at a port. **handover** is satisfied by being tied up at the destination with
+the goods, and it is the one step that takes something out of the hold.
+
+Retrieval and shopping run on the same machinery. The difference — one good
+from a named place against a list from anywhere — is in the telling, not the
+rules, and saying so is cheaper than inventing a mechanical distinction.
+
+**Salvage** is still the outlier: intercept something that is not a port, a
+drifting wreck on its own rail, matched like a harbour with no harbour in it.
+It needs new *flight*, not just new bookkeeping, and it is the first real use
+of the Belt for something other than passing through.
+
+### 5.1.1 Taking a Job On
+
+**Three at once, and no more.** Finished jobs do not count against the three;
+abandoning one gives the berth straight back.
+
+**A delivery is loaded when you accept it**, at the sender's expense, so you
+need the hold room before you can say yes — twelve units of ore is half a
+starter hold, and that is the job. A consignment is in the hold but it is not
+stock: it cannot be sold, the market's Aboard list does not show it, the cats
+do not count it when they work out a toll, and giving the job up puts it over
+the side. The toll rule matters — a crossing that took somebody's consignment
+would kill a job with no way back.
+
+A message weighs nothing, which is the whole joke.
+
+**None of this is visible yet.** There is no board to take a job from, so the
+opening errand is still the only quest a player meets. The other six in the
+catalogue — one of each type, written from the table above — sit there proving
+the machinery works and waiting for somewhere to be offered from.
 
 ### 5.2 What the Line Needs That the Game Does Not Have
 
-1. **Crew as a reward.** Three of the twenty hand over a person — an Emberkin
+1. **Crew as a reward.** (Still open.) Three of the twenty hand over a person — an Emberkin
    engineer at #6, a cat navigator at #13, a frog appraiser at #19 — and one
    each from the three peoples whose region the player has just finished
    crossing. Crew is still open (§7.2); this line is the strongest argument yet
@@ -534,15 +564,19 @@ Seven kinds, and only the first is built.
    *people*, not per house, and the Emberkin are explicitly factional — so
    either the Emberkin score splits into houses, or "faction reputation" means
    the Emberkin score and the houses stay fiction.
-3. **A weightless parcel**, for the four message quests.
-4. **A set-counting quest step**, for #9 and #19.
-5. **Things in space that are not ports**, for #14 and #15.
+3. ~~A weightless parcel, for the four message quests.~~ Done: a message
+   carries no goods, so it costs no hold room.
+4. ~~A set-counting quest step, for #9 and #19.~~ Done: a shopping list earns
+   one step per line and closes when they are all aboard at the destination.
+5. **Things in space that are not ports**, for #14 and #15. Still open, and
+   still the only part of the line that needs new flight.
 6. **A quest board.** Twenty quests do not arrive by uncle. Where a player
    picks the next one up — a port's Talk tab, a notice board, a character who
    follows them — is not decided, and it is now the only way work reaches a
    ship: the randomly generated contract board that used to sit behind a
    Passengers tab has been removed, along with passengers themselves. Quests
-   are the whole of it.
+   are the whole of it, and taking one on already works; there is simply
+   nowhere to press.
 
 ### 5.3 Notes Against the Goods Table
 

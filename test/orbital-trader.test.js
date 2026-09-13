@@ -249,7 +249,15 @@ test('the text has every line the game asks for', () => {
   assert.ok(TEXT.quests?.length >= 1, 'there is an opening quest');
   for(const q of TEXT.quests){
     assert.ok(q.id && q.title && q.giver && q.blurb && q.done, `quest ${q.id} has its words`);
-    assert.ok(q.steps?.length >= 1 && q.steps.every(st => st.id && st.text), `quest ${q.id} has steps`);
+    assert.ok(['retrieval', 'delivery', 'shopping', 'chain', 'message'].includes(q.type), `quest ${q.id}: type ${q.type}`);
+    /* Steps are built from the type, not written out — so what the words have
+       to supply is only the wording a generator would do worse, and it has to
+       line up with the steps the type actually earns. */
+    const built = S.questSteps(q);
+    assert.ok(built.length >= 1 && built.every(st => st.id && st.text), `quest ${q.id} builds no steps`);
+    assert.ok((q.steps ?? []).length <= built.length, `quest ${q.id} writes more step text than it has steps`);
+    for(const st of q.goods ?? []) assert.ok(GOODS.some(g => g.id === st.good), `quest ${q.id} wants unknown ${st.good}`);
+    for(const id of [q.from, q.to, ...(q.stops ?? [])]) if(id) assert.ok(PORTS[id], `quest ${q.id} names unknown port ${id}`);
   }
   for(const k of ['docked', 'undocked', 'burn', 'soiEnter', 'soiExit', 'sold', 'bought', 'towed', 'tolled', 'refuelled', 'upgraded']){
     assert.match(TEXT.logTemplates[k], /\{\w+\}/, `log template ${k} has a placeholder`);
@@ -415,7 +423,7 @@ test('a new game starts in orbit above Tassel, full, with an errand from Uncle T
      the list, and Slate already the target. */
   assert.equal(s.cargo.length, 0);
   assert.equal(s.quests.length, 1);
-  assert.deepEqual(s.quests[0], { id: 'pebble', step: 0, done: false });
+  assert.deepEqual(s.quests[0], { id: 'pebble', step: 0, done: false, takenAt: 0 });
   assert.equal(s.target, 'slate', 'the errand is already the target');
   assert.ok(S.planImmediate(s), 'and there is a road drawn from the first frame');
   assert.ok(Math.abs(s.dv - s.tank) < 1e-12 && s.tank > 0);
@@ -558,6 +566,111 @@ test('the whole first lesson can be flown: hop, brake at the kiss, and tie up at
   const r = S.dock(s);
   assert.ok(r.ok && s.dockedAt === 'moss', 'tied up at Moss');
   assert.ok(s.dv > 0, 'with fuel to spare');
+});
+
+test('a job of each kind builds the steps its kind earns', () => {
+  /* The five shapes, checked against the catalogue rather than against
+     invented ones: what a quest says is its type, and the steps that come out
+     of it, are the whole of the contract between the words and the rules. */
+  const kinds = q => S.questSteps(q).map(st => st.kind);
+  assert.deepEqual(kinds(S.questById('pebble')), ['acquire', 'handover'], 'retrieval');
+  assert.deepEqual(kinds(S.questById('tasteofhome')), ['handover'], 'delivery: it is already aboard');
+  assert.deepEqual(kinds(S.questById('collector')), ['acquire', 'acquire', 'acquire', 'handover'], 'shopping: one step per line on the list');
+  assert.deepEqual(kinds(S.questById('catsrequest')), ['visit', 'visit', 'visit', 'handover'], 'chain: one step per stop');
+  assert.deepEqual(kinds(S.questById('slatemessage')), ['handover'], 'message: just be there');
+
+  // Authored wording wins where a quest bothers to write it.
+  assert.equal(S.questSteps(S.questById('pebble'))[1].text, 'Bring it home to Tassel');
+  assert.match(S.questSteps(S.questById('greenmedicine'))[0].text, /6 × Medicinal herbs at Moss/);
+
+  // Only a delivery costs you hold room before you have been anywhere.
+  assert.equal(S.questLoad(S.questById('pebble')), 0);
+  assert.equal(S.questLoad(S.questById('slatemessage')), 0, 'a message weighs nothing');
+  assert.equal(S.questLoad(S.questById('heavystuff')), 12, 'four heavy crates, three units each');
+});
+
+test('three jobs is all anybody can hold in their head', () => {
+  const s = newDocked(5);
+  s.money = 100000;
+  assert.equal(S.activeQuests(s).length, 1, 'the opening errand is one of the three');
+  assert.ok(S.acceptQuest(s, 'greenmedicine').ok);
+  assert.ok(S.acceptQuest(s, 'slatemessage').ok);
+  const full = S.acceptQuest(s, 'collector');
+  assert.equal(full.ok, false);
+  assert.match(full.reason, /Three jobs/);
+
+  // Taking the same one twice is not a way round it.
+  assert.equal(S.acceptQuest(s, 'slatemessage').ok, false);
+  // Nor is a job you have already finished counted against you.
+  s.quests.find(l => l.id === 'slatemessage').done = true;
+  assert.equal(S.activeQuests(s).length, 2);
+  assert.ok(S.acceptQuest(s, 'collector').ok, 'a finished job still fills a berth');
+});
+
+test('a delivery is loaded when you take it, and you must have the room', () => {
+  const s = newDocked(5, 'slate');
+  const q = S.questById('heavystuff');
+
+  // Twelve units of ore into a hold with four units left in it: no.
+  s.cargo = [{ good: 'pebble', qty: 20, t: s.t, price: 10, from: 'slate' }];
+  const no = S.acceptQuest(s, q.id);
+  assert.equal(no.ok, false);
+  assert.match(no.reason, /room in the hold/);
+  assert.equal(s.quests.length, 1, 'and it was not taken anyway');
+
+  // With the hold clear it comes aboard, at nobody's expense but the sender's.
+  s.cargo = [];
+  const before = s.money;
+  assert.ok(S.acceptQuest(s, q.id).ok);
+  assert.equal(S.usedUnits(s), 12, 'four heavy crates are aboard');
+  assert.equal(s.money, before, 'and you did not pay for them');
+  const stack = s.cargo.find(c => c.questId === q.id);
+  assert.ok(stack && stack.qty === 4 && stack.price === 0);
+
+  /* A consignment is not stock. It cannot be sold, the cats do not count it
+     when they work out a toll, and giving the job up puts it over the side. */
+  assert.equal(S.sellable(s, 'ironore'), 0);
+  assert.equal(S.sell(s, 'ironore', 1).ok, false);
+  assert.equal(S.cargoValue(s), 0, 'somebody else\'s crates are not your worth');
+  assert.ok(S.abandonQuest(s, q.id).ok);
+  assert.equal(s.cargo.length, 0, 'the consignment went with the job');
+});
+
+test('a delivery, a shopping list and a chain each finish the way their kind says', () => {
+  // Delivery: take it, fly it, tie up, done. Nothing to buy anywhere.
+  const d = newDocked(5, 'slate');
+  assert.ok(S.acceptQuest(d, 'heavystuff').ok);
+  const paid = d.money;
+  d.dockedAt = 'cinder';
+  S.tick(d, 0.01);
+  const live = d.quests.find(l => l.id === 'heavystuff');
+  assert.equal(live.done, true, 'arriving with it is the whole job');
+  assert.equal(S.carrying(d, 'ironore'), 0, 'and it was handed over');
+  assert.equal(d.money - paid, S.questById('heavystuff').pay);
+  assert.ok(d.rep.emberkin >= 1);
+
+  // Shopping list: three separate goods, then all three at once.
+  const sh = newDocked(5, 'veyra');
+  sh.money = 100000;
+  assert.ok(S.acceptQuest(sh, 'collector').ok);
+  const l = sh.quests.find(x => x.id === 'collector');
+  sh.cargo = [{ good: 'pearls', qty: 1, t: sh.t, price: 120, from: 'tassel' }];
+  S.tick(sh, 0.01);
+  assert.equal(l.step, 1, 'one line of the list is one step');
+  sh.cargo.push({ good: 'coral', qty: 1, t: sh.t, price: 150, from: 'tassel' });
+  sh.cargo.push({ good: 'clocks', qty: 1, t: sh.t, price: 170, from: 'veyra' });
+  S.tick(sh, 0.01);
+  assert.equal(l.done, true, 'and standing at Veyra with all three closes it');
+  assert.equal(sh.cargo.length, 0, 'all three went on the table');
+
+  // Chain: the stops in order, and out of order gets you nowhere.
+  const c = newDocked(5, 'whisker');
+  assert.ok(S.acceptQuest(c, 'catsrequest').ok);
+  const cl = c.quests.find(x => x.id === 'catsrequest');
+  S.tick(c, 0.01);
+  assert.equal(cl.step, 0, 'Whisker is the second stop, not the first');
+  for(const stop of ['nail', 'whisker', 'arc', 'nail']){ c.dockedAt = stop; S.tick(c, 0.01); }
+  assert.equal(cl.done, true);
 });
 
 test("the opening errand: Theo's purse buys exactly one pebble, and Nellie pays for it", () => {

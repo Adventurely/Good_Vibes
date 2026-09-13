@@ -469,8 +469,15 @@
    "id": "pebble",
    "title": "A pebble for Aunt Nellie",
    "giver": "Uncle Theo",
-   "target": "slate",
-   "gives": "pebble",
+   "type": "retrieval",
+   "from": "slate",
+   "to": "tassel",
+   "goods": [
+    {
+     "good": "pebble",
+     "qty": 1
+    }
+   ],
    "pay": 420,
    "rep": "otter",
    "blurb": "Nellie's birthday is coming and Theo has left it late, as Theo does. There is a beach on Slate — the only one — and the pebbles off it are worth going for. He has put what he has in your purse. It is enough for one.",
@@ -485,6 +492,116 @@
     }
    ],
    "done": "Nellie turns the pebble over twice, says nothing, and puts it in her pocket. Theo settles up, and looks like a man who has got away with something."
+  },
+  {
+   "id": "tasteofhome",
+   "title": "A Taste of Home",
+   "giver": "Harbourmaster Wren",
+   "type": "delivery",
+   "from": "tassel",
+   "to": "moss",
+   "goods": [
+    {
+     "good": "moonfishoil",
+     "qty": 4
+    }
+   ],
+   "pay": 180,
+   "rep": "otter",
+   "blurb": "Four jars of moonfish oil for a farm on Moss that has not smelled the sea in two generations. Wren has already had them carried aboard; she says they will not ask what it cost and you are not to tell them.",
+   "done": "They open one jar on the step and stand there with it. Nobody says anything for a while, which on Moss is a compliment."
+  },
+  {
+   "id": "greenmedicine",
+   "title": "Green Medicine",
+   "giver": "The harbour physician",
+   "type": "retrieval",
+   "from": "moss",
+   "to": "tassel",
+   "goods": [
+    {
+     "good": "herbs",
+     "qty": 6
+    }
+   ],
+   "pay": 220,
+   "rep": "otter",
+   "blurb": "The Tassel rafts are short of cut herbs and the physician is short of patience. Moss has them by the bundle. Buy six and get them back before they are hay.",
+   "done": "She checks one bundle, smells it, and looks at you with something like respect. The rest goes straight into the dispensary."
+  },
+  {
+   "id": "slatemessage",
+   "title": "A Message for Slate",
+   "giver": "Uncle Theo",
+   "type": "message",
+   "from": "tassel",
+   "to": "slate",
+   "goods": [],
+   "pay": 150,
+   "rep": "otter",
+   "blurb": "A sealed note for the yard foreman on Slate. Theo will not say what is in it and has gone slightly pink about the ears. It weighs nothing and it is not to be opened.",
+   "done": "The foreman reads it twice, laughs once, and writes something on the back. She does not offer to show you."
+  },
+  {
+   "id": "heavystuff",
+   "title": "The Heavy Stuff",
+   "giver": "The Slate yard foreman",
+   "type": "delivery",
+   "from": "slate",
+   "to": "cinder",
+   "goods": [
+    {
+     "good": "ironore",
+     "qty": 4
+    }
+   ],
+   "pay": 260,
+   "rep": "emberkin",
+   "blurb": "Four crates of ore for the engine smiths, loaded before you agreed to it. It is heavy and it is dull and the Emberkin are waiting on it, which is the whole job.",
+   "done": "A smith signs for it without looking up, then looks up, then asks where you learned to fly an approach like that."
+  },
+  {
+   "id": "collector",
+   "title": "The Collector",
+   "giver": "House Ahl of Veyra",
+   "type": "shopping",
+   "to": "veyra",
+   "goods": [
+    {
+     "good": "pearls",
+     "qty": 1
+    },
+    {
+     "good": "coral",
+     "qty": 1
+    },
+    {
+     "good": "clocks",
+     "qty": 1
+    }
+   ],
+   "pay": 2400,
+   "rep": "emberkin",
+   "blurb": "A list, not a cargo: one string of Tassel pearls, one coral carving, one precision clock. House Ahl wants all three on the table at once and does not care where you get them. The clock is made on Veyra, which they appear to find funny.",
+   "done": "The three go on a velvet board in that order and a steward writes the sum out longhand. You are not told what it is for."
+  },
+  {
+   "id": "catsrequest",
+   "title": "A Cat's Request",
+   "giver": "Captain Ashgrin",
+   "type": "chain",
+   "from": "nail",
+   "to": "nail",
+   "stops": [
+    "nail",
+    "whisker",
+    "arc"
+   ],
+   "goods": [],
+   "pay": 900,
+   "rep": "cat",
+   "blurb": "Ashgrin wants you to go and be seen. Nail, then Whisker, then the Arc, in that order, and come back and tell her who was where. She will not say why and it is rude to ask a cat twice.",
+   "done": "She hears you out, nods once, and introduces you to somebody who has been sitting behind you the entire time."
   }
  ]
 }

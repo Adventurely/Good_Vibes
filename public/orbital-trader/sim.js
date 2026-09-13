@@ -60,12 +60,6 @@ export function hash(...parts){
 
 export function tiers(kind){ return UPGRADES.filter(u => u.kind === kind).sort((a, b) => a.tier - b.tier); }
 
-/* The first delivery: one crate, already aboard, for the nearest moon. It is
- * the whole of the opening brief. A player who has never flown anything has
- * somewhere to be before they have learned what a market is, and the road
- * there is the shortest one in the game. */
-export const FIRST_DELIVERY = { to: 'slate', pay: 420, days: 14, units: 2 };
-
 export function newGame(seed = 1){
   const start = CONST.START_PORT;
   const state = {
@@ -122,11 +116,11 @@ export function newGame(seed = 1){
      Nellie, and the purse holds just about enough to buy one.
      It is also the tutorial's spine — every step of the lesson is a step of
      this quest — so the game opens with a reason rather than a cargo. */
-  state.quests = QUESTS.map(q => ({ id: q.id, step: 0, done: false }));
+  state.quests = [];
   const opening = QUESTS[0];
   if(opening){
-    state.target = opening.target ?? FIRST_DELIVERY.to;
-    logLine(state, 'questTaken', TEXT.logTemplates.questTaken ?? 'Took on {title}.', { title: opening.title });
+    acceptQuest(state, opening.id);
+    state.target = questTarget(opening);
   }
   return state;
 }
@@ -559,27 +553,136 @@ function flag(state, name, events){
  * "fetch your aunt a pebble" is a thing a person does for a person, and
  * because it can teach the whole game on the way: it is the tutorial's
  * spine. */
-const QUEST_TESTS = {
-  pebble: {
-    buy: state => carrying(state, 'pebble') > 0,
-    home: state => state.dockedAt === 'tassel' && carrying(state, 'pebble') > 0,
-  },
-};
+/* The five shapes a job comes in. A quest in narrative.json says what kind it
+ * is and names the places and the goods; the steps are built from that rather
+ * than written out, so a new quest is five lines of data and no code.
+ *
+ *   retrieval  go and get the goods yourself, then take them to `to`
+ *   delivery   the goods are handed to you when you accept, so you need the
+ *              hold room before you can say yes
+ *   shopping   several goods from wherever you can find them, handed over
+ *              together at the end
+ *   chain      call at each of `stops` in order, then report back
+ *   message    a sealed nothing: no goods, no weight, just be there
+ *
+ * Retrieval and shopping run on the same machinery — the difference is one
+ * good from a named place against a list from anywhere, which is a difference
+ * in the telling and not in the rules. Saying so here is cheaper than
+ * inventing a mechanical distinction nobody asked for.
+ *
+ * Nothing shows any of this yet. There is no board to take a job from, so the
+ * opening errand is still the only quest a player meets; the rest of the
+ * catalogue sits there waiting for somewhere to be offered from. */
+
+export const MAX_ACTIVE_QUESTS = 3;
 
 export const QUESTS = TEXT.quests ?? [];
 export const questById = id => QUESTS.find(q => q.id === id);
+/* Where the chart should point when a job is taken: where you are going to
+ * fetch the thing, or failing that where it has to end up. */
+export const questTarget = q => q?.target ?? q?.from ?? q?.to ?? null;
+
+const goodName = id => goodById(id)?.name ?? id;
+const someOf = st => `${st.qty > 1 ? `${st.qty} × ` : ''}${goodName(st.good)}`;
+const stepText = {
+  acquire: st => st.port ? `Buy ${someOf(st)} at ${portName(st.port)}` : `Get ${someOf(st)}`,
+  visit: st => `Call at ${portName(st.port)}`,
+  handover: st => !st.goods.length ? `Report to ${portName(st.port)}`
+    : `Take ${st.goods.length > 1 || st.goods[0].qty > 1 ? 'them' : 'it'} to ${portName(st.port)}`,
+};
+
+/* The steps a quest's type earns it. Authored text wins where a quest supplies
+ * it — the opening errand says "Bring it home to Tassel", which no generator
+ * is going to beat — and the generated wording fills in everywhere else. */
+export function questSteps(q){
+  if(!q) return [];
+  const goods = (q.goods ?? []).map(g => ({ good: g.good, qty: g.qty ?? 1 }));
+  const out = [];
+  if(q.type === 'retrieval' || q.type === 'shopping'){
+    for(const g of goods) out.push({ kind: 'acquire', good: g.good, qty: g.qty, port: q.type === 'retrieval' ? (q.from ?? null) : null });
+  }
+  if(q.type === 'chain') for(const port of q.stops ?? []) out.push({ kind: 'visit', port });
+  if(q.to) out.push({ kind: 'handover', port: q.to, goods });
+  return out.map((st, i) => ({
+    ...st,
+    id: q.steps?.[i]?.id ?? `${st.kind}${i}`,
+    text: q.steps?.[i]?.text ?? stepText[st.kind](st),
+  }));
+}
+
+const stepDone = {
+  acquire: (state, st) => carrying(state, st.good) >= st.qty,
+  visit: (state, st) => state.dockedAt === st.port,
+  handover: (state, st) => state.dockedAt === st.port && st.goods.every(g => carrying(state, g.good) >= g.qty),
+};
+
 export function carrying(state, goodId){
   return state.cargo.reduce((n, c) => n + (c.good === goodId ? c.qty : 0), 0);
 }
-/* Take one unit out of the hold, oldest crate first. */
-function handOver(state, goodId){
-  for(const c of state.cargo){
+/* Crates you own, as against crates you are carrying for somebody. A
+ * consignment is not merchandise: it cannot be sold, and the cats do not
+ * count it when they work out a toll — which also stops a toll quietly
+ * killing a job you had no way to protect. */
+export const isConsigned = stack => stack.questId != null;
+export function sellable(state, goodId){
+  return state.cargo.reduce((n, c) => n + (c.good === goodId && !isConsigned(c) ? c.qty : 0), 0);
+}
+/* Take `qty` of a good out of the hold, the quest's own crates first, then the
+ * oldest of your own. */
+function handOver(state, goodId, qty = 1, questId = null){
+  let left = qty;
+  const order = [...state.cargo].sort((a, b) => (b.questId === questId ? 1 : 0) - (a.questId === questId ? 1 : 0) || a.t - b.t);
+  for(const c of order){
+    if(left <= 0) break;
     if(c.good !== goodId || c.qty <= 0) continue;
-    c.qty -= 1;
-    state.cargo = state.cargo.filter(x => x.qty > 0);
-    return true;
+    const take = Math.min(left, c.qty);
+    c.qty -= take; left -= take;
   }
-  return false;
+  state.cargo = state.cargo.filter(x => x.qty > 0);
+  return left === 0;
+}
+
+/* ---- taking one on */
+
+export const activeQuests = state => (state.quests ?? []).filter(l => !l.done);
+/* Hold units a job will cost you the moment you accept it. Only a delivery
+ * hands you anything; a message weighs nothing, which is the whole joke. */
+export function questLoad(q){
+  if(q?.type !== 'delivery') return 0;
+  return (q.goods ?? []).reduce((n, g) => n + (g.qty ?? 1) * (goodById(g.good)?.units ?? 1), 0);
+}
+export function canAcceptQuest(state, q){
+  if(!q) return { ok: false, reason: 'No such job.' };
+  const live = (state.quests ?? []).find(l => l.id === q.id);
+  if(live) return { ok: false, reason: live.done ? 'Already done.' : 'Already taken.' };
+  if(activeQuests(state).length >= MAX_ACTIVE_QUESTS) return { ok: false, reason: `Three jobs is all anybody can hold in their head.` };
+  const load = questLoad(q);
+  if(load > freeUnits(state)) return { ok: false, reason: 'No room in the hold for it.' };
+  return { ok: true, load };
+}
+export function acceptQuest(state, id){
+  const q = typeof id === 'string' ? questById(id) : id;
+  const can = canAcceptQuest(state, q);
+  if(!can.ok) return can;
+  state.quests.push({ id: q.id, step: 0, done: false, takenAt: state.t });
+  /* A delivery is handed over at the dock, so it is aboard before you leave:
+     paid for by somebody else, worth nothing to you, and taking up room. */
+  if(q.type === 'delivery'){
+    for(const g of q.goods ?? []){
+      state.cargo.push({ good: g.good, qty: g.qty ?? 1, t: state.t, price: 0, from: q.from ?? state.dockedAt ?? null, questId: q.id });
+    }
+  }
+  logLine(state, 'questTaken', TEXT.logTemplates.questTaken ?? 'Took on {title}.', { title: q.title });
+  return { ok: true, quest: q };
+}
+/* Giving up. The consignment goes back over the side with the job — there is
+ * nobody to give it to any more. */
+export function abandonQuest(state, id){
+  const live = (state.quests ?? []).find(l => l.id === id && !l.done);
+  if(!live) return { ok: false, reason: 'Not carrying that one.' };
+  state.quests = state.quests.filter(l => l !== live);
+  state.cargo = state.cargo.filter(c => c.questId !== id);
+  return { ok: true };
 }
 
 /* Walk every live quest forward as far as it will go. Steps only ever move
@@ -591,18 +694,18 @@ export function questCheck(state, events = []){
     if(live.done) continue;
     const q = questById(live.id);
     if(!q) continue;
-    const tests = QUEST_TESTS[q.id] ?? {};
+    const steps = questSteps(q);
     let moved = false;
-    while(live.step < q.steps.length){
-      const step = q.steps[live.step];
-      const test = tests[step.id];
-      if(!test || !test(state)) break;
+    while(live.step < steps.length){
+      const step = steps[live.step];
+      if(!stepDone[step.kind]?.(state, step)) break;
+      // Handing a thing over is the one step that takes something with it.
+      if(step.kind === 'handover') for(const g of step.goods) handOver(state, g.good, g.qty, q.id);
       live.step++;
       moved = true;
     }
-    if(live.step >= q.steps.length && !live.done){
+    if(live.step >= steps.length && !live.done){
       live.done = true;
-      if(q.gives) handOver(state, q.gives);
       if(q.pay) state.money += q.pay;
       if(q.rep && q.rep in state.rep) state.rep[q.rep] += 1;
       logLine(state, 'questDone', TEXT.logTemplates.questDone ?? 'Finished {title}. Paid {pay}.',
@@ -1729,9 +1832,9 @@ export function sell(state, goodId, qty){
   if(!port) return { ok: false, reason: 'Not docked.' };
   if(!portOpen(port, state.t)) return { ok: false, reason: 'The market is closed.' };
   if(!Number.isInteger(qty) || qty < 1) return { ok: false, reason: 'That is not a number of crates.' };
-  const stacks = state.cargo.filter(s => s.good === goodId).sort((a, b) => a.t - b.t);
+  const stacks = state.cargo.filter(s => s.good === goodId && !isConsigned(s)).sort((a, b) => a.t - b.t);
   const have = stacks.reduce((s, c) => s + c.qty, 0);
-  if(have < qty) return { ok: false, reason: 'Not that many aboard.' };
+  if(have < qty) return { ok: false, reason: have ? 'The rest of those belong to somebody.' : 'Not that many aboard.' };
   let left = qty, total = 0, cost = 0;
   for(const s of stacks){
     if(left <= 0) break;
@@ -1753,8 +1856,10 @@ export function sell(state, goodId, qty){
 }
 
 export function cargoValue(state, portId = null){
-  // Valued at the going rate here if docked, else at base.
-  return state.cargo.reduce((s, c) => {
+  // Valued at the going rate here if docked, else at base. A consignment is
+  // not in this sum: it is not yours, and a toll that took it would kill a
+  // job with no way back.
+  return state.cargo.filter(c => !isConsigned(c)).reduce((s, c) => {
     const g = goodById(c.good);
     const unitPrice = portId ? sellPrice(state, portId, c.good, c.t) : g.basePrice * freshness(g, state.t - c.t);
     return s + unitPrice * c.qty;
@@ -1905,7 +2010,7 @@ export function resolveToll(state, choice){
        crates cannot come out untouched because no single crate was small
        enough to fit under the figure. */
     const crates = [];
-    for(const stack of state.cargo) for(let i = 0; i < stack.qty; i++) crates.push(stack);
+    for(const stack of state.cargo){ if(isConsigned(stack)) continue; for(let i = 0; i < stack.qty; i++) crates.push(stack); }
     crates.sort((a, b) => goodById(a.good).basePrice - goodById(b.good).basePrice);
     let left = crates.length;
     for(const stack of crates){

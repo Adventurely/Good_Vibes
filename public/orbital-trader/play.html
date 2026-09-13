@@ -1263,7 +1263,13 @@ function market(){
   }
   out += '<h3>Aboard</h3>';
   const aboard = new Map();
-  for(const c of state.cargo){ const e = aboard.get(c.good) ?? { qty: 0, oldest: c.t, paid: 0 }; e.qty += c.qty; e.oldest = Math.min(e.oldest, c.t); e.paid += c.price * c.qty; aboard.set(c.good, e); }
+  /* Only your own crates. A consignment is in the hold but it is not stock:
+     it cannot be sold, so a row with a Sell button on it would be a lie. The
+     Ship tab lists it, which is where a pilot looks to see what is aboard. */
+  for(const c of state.cargo){
+    if(c.questId != null) continue;
+    const e = aboard.get(c.good) ?? { qty: 0, oldest: c.t, paid: 0 }; e.qty += c.qty; e.oldest = Math.min(e.oldest, c.t); e.paid += c.price * c.qty; aboard.set(c.good, e);
+  }
   if(!aboard.size) out += '<p class="empty">The hold is empty.</p>';
   for(const [gid, e] of aboard){
     const g = S.goodById(gid);
@@ -1532,7 +1538,11 @@ function shipTab(){
   }
   out += '<h3>Hold</h3>';
   if(!state.cargo.length) out += '<p class="empty">Empty.</p>';
-  for(const c of state.cargo){ const g = S.goodById(c.good); out += `<p>${c.qty} × ${esc(g.name)} <span class="lock">from ${esc(S.portName(c.from))}${g.lifetimeDays ? ` · ${Math.round(S.freshness(g, state.t - c.t) * 100)}% fresh` : ''}</span></p>`; }
+  for(const c of state.cargo){
+    const g = S.goodById(c.good);
+    const forWhom = c.questId != null ? ` · <span class="up">for ${esc(S.questById(c.questId)?.title ?? 'a job')}</span>` : '';
+    out += `<p>${c.qty} × ${esc(g.name)} <span class="lock">from ${esc(S.portName(c.from))}${g.lifetimeDays ? ` · ${Math.round(S.freshness(g, state.t - c.t) * 100)}% fresh` : ''}</span>${forWhom}</p>`;
+  }
   out += '<h3>Fitted</h3>';
   out += `<p>${esc(S.tiers('tank')[state.tiers.tank].name)}, ${esc(S.tiers('engine')[state.tiers.engine].name)}, ${esc(S.tiers('hold')[state.tiers.hold].name)}.</p>`;
   out += `<p>${['heatShield', 'refrigeration', 'sensors', 'stealth'].filter(k => state.keys[k]).map(k => esc(UPGRADES.find(u => u.key === k)?.name ?? k)).join(', ') || '<span class="lock">No keys yet.</span>'}</p>`;
@@ -1556,7 +1566,7 @@ function questsTab(){
     out += `<p class="lock">${esc(q.giver)}${l.done ? ' · done' : ''}</p>`;
     out += `<p class="say">${esc(l.done && q.done ? q.done : q.blurb)}</p>`;
     out += '<ol class="steps">';
-    q.steps.forEach((st, i) => {
+    S.questSteps(q).forEach((st, i) => {
       const state_ = l.done || i < l.step ? 'ok' : i === l.step ? 'now' : '';
       out += `<li class="${state_}">${esc(st.text)}</li>`;
     });
@@ -1711,7 +1721,7 @@ function toast(text, kind = '', ms = 4200){
    the state rather than the clicks, so doing a step your own way still
    counts, and it steps out of the way the moment you are tied up. */
 const TUT = TEXT.tutorial;
-const FIRST_TARGET = S.QUESTS[0]?.target ?? CONST.START_PORT;
+const FIRST_TARGET = S.questTarget(S.QUESTS[0]) ?? CONST.START_PORT;
 
 /* One test per step of the lesson, in order, each asking the game the same
    question the card asks the player.
