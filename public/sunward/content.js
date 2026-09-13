@@ -84,14 +84,20 @@ export function phaseName(phase){
 
 /* The curve. Costs multiply by about 11.2 a tier and output by about 6.4, so a
  * tier pays for itself in 1.75x the time the one below it does: two minutes
- * for a moss bed, most of a day for an orbital mirror.
+ *
+ * Nine tiers. There were twelve, and three of them were the same idea as a
+ * tier already on the list — a second fungus, a coral reef nobody could
+ * explain, and an orbital mirror that was a second sun in a game whose sun
+ * is scenery. A shop row that is a costlier copy of the row above it is not a
+ * choice, it is a longer list.
  *
  * That ratio is the whole balance of the game in one number. Flat (cost and
  * output growing together) and the newest tier is always the right buy, which
  * makes the shop a list with one live row. Much steeper and the top tiers are
  * ornaments nobody can justify. At 1.75 a new tier is a treat you save for and
  * the tier below it is still worth topping up while you save, which is the
- * rhythm a clicker is actually made of.
+ * rhythm a clicker is actually made of. Two minutes for a moss bed, most of
+ * a day for a canopy tower.
  *
  * `rate` is the AVERAGE over a whole day. A day grower makes half again as
  * much at noon and half as much at midnight; the number on the row is what it
@@ -115,14 +121,8 @@ export const GROWERS = [
     flavour: 'Turns whether or not anybody is watching it.' },
   { id: 'glasshouse', name: 'Glasshouse', cost: 2.7e8, rate: 44000, phase: 'day', art: 'glasshouse',
     flavour: 'Keeps one summer going all the way through a winter.' },
-  { id: 'mycelium', name: 'Mycelial net', cost: 3.0e9, rate: 280000, phase: 'night', art: 'mycelium',
-    flavour: "The forest's own switchboard, wired into yours." },
-  { id: 'reef', name: 'Reef garden', cost: 3.3e10, rate: 1.8e6, phase: 'night', art: 'reef',
-    flavour: 'Coral under grow-lights. Nobody believed it would take.' },
-  { id: 'canopy', name: 'Canopy tower', cost: 3.7e11, rate: 1.15e7, phase: 'any', art: 'canopy',
+  { id: 'canopy', name: 'Canopy tower', cost: 3.0e9, rate: 280000, phase: 'any', art: 'canopy',
     flavour: 'A building with a forest on it, or the other way round.' },
-  { id: 'mirror', name: 'Orbital mirror', cost: 4.2e12, rate: 7.4e7, phase: 'day', art: 'mirror',
-    flavour: 'A second sun on a short leash. Aim it kindly.' },
 ];
 
 export const GROWER_IDS = GROWERS.map(g => g.id);
@@ -187,19 +187,23 @@ export function affordable(grower, owned, light){
  * achievements use the same shapes so there is one evaluator and not two.
  */
 export const UPGRADES = [
+  /* Eighteen. There were forty-two, and most of the difference was the same
+     upgrade sold twice — six doublings of the tap, four slices of the rate,
+     five global percentages, three shavings of the swing, and two rows for
+     every grower. A shop where every row is "the last row, again, bigger" is
+     a shop nobody reads. What is left is one line of each kind, and every row
+     in it does something the row before it did not.
+
+     None of them is named for the sun any more, either. The tree runs on
+     what you give it — energy, not light — and the sun in the sky is weather. */
+
   /* --- the hand ---------------------------------------------------------- */
   { id: 'warm-hands', name: 'Warm hands', cost: 100, effect: { clickMult: 2 },
     need: { runTaps: 15 }, flavour: 'Cold fingers drop things.' },
-  { id: 'sun-gloves', name: 'Sun gloves', cost: 1200, effect: { clickMult: 2 },
-    need: { runTaps: 100 }, flavour: 'Woven from the last crop of flax on the block.' },
-  { id: 'photic-touch', name: 'Photic touch', cost: 30000, effect: { clickMult: 2 },
-    need: { runTaps: 400 }, flavour: 'The light comes off on your hands now.' },
-  { id: 'heliotropism', name: 'Heliotropism', cost: 1.5e6, effect: { clickMult: 2 },
-    need: { runTaps: 1500 }, flavour: 'You have started turning to face it without noticing.' },
-  { id: 'solar-palm', name: 'Solar palm', cost: 8e7, effect: { clickMult: 3 },
-    need: { runTaps: 5000 }, flavour: 'A whole growing season in one hand.' },
-  { id: 'long-fingers', name: 'Long fingers', cost: 4e9, effect: { clickMult: 3 },
-    need: { runTaps: 15000 }, flavour: 'Reaching further than they strictly should.' },
+  { id: 'steady-hands', name: 'Steady hands', cost: 30000, effect: { clickMult: 2 },
+    need: { runTaps: 400 }, flavour: 'The tremor goes once you stop hurrying.' },
+  { id: 'green-fingers', name: 'Green fingers', cost: 8e7, effect: { clickMult: 3 },
+    need: { runTaps: 5000 }, flavour: 'Everything you touch takes.' },
 
   /* --- the hand borrows from the garden ---------------------------------- */
   /* Every clicker eventually has to answer "why am I still tapping at hour
@@ -208,112 +212,50 @@ export const UPGRADES = [
      instead of being left behind by it in the first ten minutes. */
   { id: 'gleaning', name: 'Gleaning', cost: 25000, effect: { fingers: 0.01 },
     need: { runTaps: 200 }, flavour: 'Take what the harvest left. It adds up.' },
-  { id: 'sun-catcher', name: 'Sun catcher', cost: 6e6, effect: { fingers: 0.02 },
-    need: { runTaps: 1000 }, flavour: 'Hung in the window, and it does more than it looks like.' },
-  { id: 'prism-hand', name: 'Prism hand', cost: 2e9, effect: { fingers: 0.05 },
-    need: { runTaps: 4000 }, flavour: 'One tap, split eight ways.' },
-  { id: 'whole-orchard', name: 'The whole orchard', cost: 5e11, effect: { fingers: 0.1 },
-    need: { runTaps: 12000 }, flavour: 'Every tree leans in a little when you reach.' },
+  { id: 'whole-orchard', name: 'The whole orchard', cost: 2e9, effect: { fingers: 0.05 },
+    need: { runTaps: 4000 }, flavour: 'Every tree leans in a little when you reach.' },
 
   /* --- everything at once ------------------------------------------------ */
   { id: 'long-summer', name: 'Long summer', cost: 1.2e5, effect: { allMult: 1.05 },
     need: { runEarned: 5e5 }, flavour: 'The frost comes a fortnight late these days.' },
   { id: 'deep-roots', name: 'Deep roots', cost: 6e7, effect: { allMult: 1.1 },
     need: { runEarned: 1e8 }, flavour: 'What is under the lot is bigger than what is on it.' },
-  { id: 'clean-air', name: 'Clean air', cost: 1.5e10, effect: { allMult: 1.15 },
-    need: { runEarned: 2e10 }, flavour: 'You can see the far ridge again.' },
   { id: 'good-water', name: 'Good water', cost: 2e12, effect: { allMult: 1.2 },
     need: { runEarned: 4e12 }, flavour: 'The stream runs clear enough to drink from.' },
-  { id: 'old-weather', name: 'The old weather', cost: 4e14, effect: { allMult: 1.25 },
-    need: { runEarned: 8e14 }, flavour: 'Rain when it should rain. Nobody thought it would come back.' },
 
   /* --- the trough --------------------------------------------------------- */
-  /* Each of these lifts the bottom of the swing without touching the top, so
-     a bad hour gets less bad and a good one stays as good. Worth lift/pi on
-     everything marked day or night, forever — about 6% each for the first two
-     and 3% for the last, which takes the trough all the way up to flat.
-
-     They shaved the swing symmetrically at first and were worth exactly
-     nothing: the swing already averages out over a day, so taking the same
-     slice off both ends changes the shape of the line and not the area under
-     it. Three upgrades at 8M, 900M and 7T light, sold as improvements, that a
-     player could buy and measure no difference from at all. */
-  { id: 'night-bloom', name: 'Night bloom', cost: 1.5e6, effect: { steady: 0.2 },
+  /* One upgrade, and it takes the whole trough out: a day or night grower
+     never makes less than its rated output again, and still makes half again
+     as much at its best hour. Worth SWING/pi — about 16% — on everything
+     marked day or night, forever. It was three upgrades in three slices, and
+     three rows that each say "a bit less bad at night" are one row said
+     slowly. */
+  { id: 'night-bloom', name: 'Night bloom', cost: 1.5e6, effect: { steady: 0.5 },
     need: { owned: { id: 'mushroom', count: 5 } },
     flavour: 'Flowers that open at dusk, for the things that fly then.' },
-  { id: 'dawn-chorus', name: 'Dawn chorus', cost: 4e7, effect: { steady: 0.2 },
-    need: { owned: { id: 'glasshouse', count: 5 } },
-    flavour: 'Everything wakes fifteen minutes earlier than it used to.' },
-  { id: 'even-keel', name: 'Even keel', cost: 8e10, effect: { steady: 0.1 },
-    need: { owned: { id: 'canopy', count: 10 } },
-    flavour: 'Enough of it now that a cloudy week is just a week.' },
 
-  /* --- one per grower, twice ---------------------------------------------- */
-  /* The first at ten owned, the second at twenty-five. Both numbers are off
-     the simulation rather than off a feel: a player buying whatever pays for
-     itself soonest holds about ten of a tier within an hour of unlocking it and
-     twenty-five within four, so the pair lands as "soon" and "later this
-     session". Fifty — the obvious round number, and where these started — was
-     four days away, which is not an upgrade, it is a decoration. */
+  /* --- one per grower, at ten owned -------------------------------------- */
+  /* Ten is off the simulation: a player buying whatever pays for itself
+     soonest holds about ten of a tier within an hour of unlocking it, so the
+     row lands while the tier still matters. */
   { id: 'damp-corners', name: 'Damp corners', cost: 300, effect: { grower: 'moss', mult: 2 },
     need: { owned: { id: 'moss', count: 10 } }, flavour: 'Where the wall meets the north side.' },
-  { id: 'moss-lawn', name: 'Moss lawn', cost: 30000, effect: { grower: 'moss', mult: 2 },
-    need: { owned: { id: 'moss', count: 25 } }, flavour: 'Nobody has to mow it, which was always the argument.' },
-
   { id: 'fiddleheads', name: 'Fiddleheads', cost: 3300, effect: { grower: 'fern', mult: 2 },
     need: { owned: { id: 'fern', count: 10 } }, flavour: 'Tight little spirals, and every one is a frond.' },
-  { id: 'fern-gully', name: 'Fern gully', cost: 330000, effect: { grower: 'fern', mult: 2 },
-    need: { owned: { id: 'fern', count: 25 } }, flavour: 'The whole cut of it, green to the top.' },
-
   { id: 'cleaned-glass', name: 'Cleaned glass', cost: 38000, effect: { grower: 'panel', mult: 2 },
     need: { owned: { id: 'panel', count: 10 } }, flavour: 'A cloth and an afternoon, for eleven percent.' },
-  { id: 'sun-tracking', name: 'Sun tracking', cost: 3.8e6, effect: { grower: 'panel', mult: 2 },
-    need: { owned: { id: 'panel', count: 25 } }, flavour: 'They lean west by four in the afternoon.' },
-
   { id: 'second-queen', name: 'A second queen', cost: 425000, effect: { grower: 'hive', mult: 2 },
     need: { owned: { id: 'hive', count: 10 } }, flavour: 'Split the hive before it swarms and you keep both.' },
-  { id: 'apiary-row', name: 'Apiary row', cost: 4.25e7, effect: { grower: 'hive', mult: 2 },
-    need: { owned: { id: 'hive', count: 25 } }, flavour: 'Painted different colours so they find their own door.' },
-
   { id: 'deeper-cellar', name: 'A deeper cellar', cost: 4.75e6, effect: { grower: 'mushroom', mult: 2 },
     need: { owned: { id: 'mushroom', count: 10 } }, flavour: 'Cold, dark and exactly damp enough.' },
-  { id: 'spore-drift', name: 'Spore drift', cost: 4.75e8, effect: { grower: 'mushroom', mult: 2 },
-    need: { owned: { id: 'mushroom', count: 25 } }, flavour: 'They spread themselves if you leave a door open.' },
-
   { id: 'grafted-stock', name: 'Grafted stock', cost: 5.25e7, effect: { grower: 'orchard', mult: 2 },
     need: { owned: { id: 'orchard', count: 10 } }, flavour: 'One root, four kinds of apple.' },
-  { id: 'windbreak', name: 'Windbreak', cost: 5.25e9, effect: { grower: 'orchard', mult: 2 },
-    need: { owned: { id: 'orchard', count: 25 } }, flavour: 'A hedge on the weather side and the blossom stays on.' },
-
   { id: 'longer-blades', name: 'Longer blades', cost: 6e8, effect: { grower: 'turbine', mult: 2 },
     need: { owned: { id: 'turbine', count: 10 } }, flavour: 'Twice the sweep for the same tower.' },
-  { id: 'ridge-line', name: 'The ridge line', cost: 6e10, effect: { grower: 'turbine', mult: 2 },
-    need: { owned: { id: 'turbine', count: 25 } }, flavour: 'Where the wind was always going to be.' },
-
   { id: 'double-glazing', name: 'Double glazing', cost: 6.75e9, effect: { grower: 'glasshouse', mult: 2 },
     need: { owned: { id: 'glasshouse', count: 10 } }, flavour: 'The night stops taking back what the day made.' },
-  { id: 'heat-sink', name: 'Heat sink', cost: 6.75e11, effect: { grower: 'glasshouse', mult: 2 },
-    need: { owned: { id: 'glasshouse', count: 25 } }, flavour: 'A wall of water barrels, painted black.' },
-
-  { id: 'wider-mesh', name: 'Wider mesh', cost: 7.5e10, effect: { grower: 'mycelium', mult: 2 },
-    need: { owned: { id: 'mycelium', count: 10 } }, flavour: 'It was already going that way. You only helped.' },
-  { id: 'old-growth', name: 'Old growth', cost: 7.5e12, effect: { grower: 'mycelium', mult: 2 },
-    need: { owned: { id: 'mycelium', count: 25 } }, flavour: 'Threads older than the street they run under.' },
-
-  { id: 'warmer-water', name: 'Warmer water', cost: 8.25e11, effect: { grower: 'reef', mult: 2 },
-    need: { owned: { id: 'reef', count: 10 } }, flavour: 'Two degrees, held steady, and it stops bleaching.' },
-  { id: 'atoll', name: 'Atoll', cost: 8.25e13, effect: { grower: 'reef', mult: 2 },
-    need: { owned: { id: 'reef', count: 25 } }, flavour: 'A ring of it, with a lagoon in the middle.' },
-
-  { id: 'higher-floors', name: 'Higher floors', cost: 9.25e12, effect: { grower: 'canopy', mult: 2 },
+  { id: 'higher-floors', name: 'Higher floors', cost: 7.5e10, effect: { grower: 'canopy', mult: 2 },
     need: { owned: { id: 'canopy', count: 10 } }, flavour: 'The lift goes up into the leaves.' },
-  { id: 'sky-bridge', name: 'Sky bridge', cost: 9.25e14, effect: { grower: 'canopy', mult: 2 },
-    need: { owned: { id: 'canopy', count: 25 } }, flavour: 'You can cross the district without coming down.' },
-
-  { id: 'better-aim', name: 'Better aim', cost: 1.05e14, effect: { grower: 'mirror', mult: 2 },
-    need: { owned: { id: 'mirror', count: 10 } }, flavour: 'Warm the field, not the town.' },
-  { id: 'constellation', name: 'Constellation', cost: 1.05e16, effect: { grower: 'mirror', mult: 2 },
-    need: { owned: { id: 'mirror', count: 25 } }, flavour: 'A ring of them, holding station over the dark side.' },
 ];
 
 export const UPGRADE_BY_ID = Object.fromEntries(UPGRADES.map(u => [u.id, u]));
@@ -333,13 +275,13 @@ export const UPGRADE_BY_ID = Object.fromEntries(UPGRADES.map(u => [u.id, u]));
  */
 export const STAT_LABELS = {
   taps: 'Taps',
-  tapped: 'Light from tapping',
-  grown: 'Light from growers',
-  earned: 'Light earned',
-  spent: 'Light spent',
+  tapped: 'Energy from tapping',
+  grown: 'Energy from growers',
+  earned: 'Energy earned',
+  spent: 'Energy spent',
   planted: 'Growers planted',
   studied: 'Upgrades bought',
-  peakRate: 'Best light per second',
+  peakRate: 'Best energy per second',
   peakTaps: 'Best taps per second',
   seconds: 'Time',
 };
@@ -354,7 +296,7 @@ export const STAT_SHORT = {
   spent: 'Spent',
   planted: 'Planted',
   studied: 'Upgrades',
-  peakRate: 'Best l/s',
+  peakRate: 'Best e/s',
   peakTaps: 'Best t/s',
   seconds: 'Time',
 };
@@ -367,7 +309,10 @@ export const PEAK_KEYS = ['peakRate', 'peakTaps'];
 
 /* Which want a clock rendering rather than a number, and which are light. */
 export const TIME_KEYS = ['seconds'];
-export const LIGHT_KEYS = ['tapped', 'grown', 'earned', 'spent', 'peakRate'];
+export const ENERGY_KEYS = ['tapped', 'grown', 'earned', 'spent', 'peakRate'];
+// The name it had when the resource was called light. Kept, so nothing that
+// imported it stops resolving; the export list is a contract.
+export const LIGHT_KEYS = ENERGY_KEYS;
 
 export const blankStats = () =>
   Object.fromEntries(STAT_KEYS.map(key => [key, 0]));
@@ -452,7 +397,9 @@ export function note(state, text){
  * stats screen has. That is why they are shown on it.
  */
 export const ACHIEVEMENTS = [
-  { id: 'first-light', name: 'First light', need: { taps: 1 },
+  // The id is from when the resource was called light. It is in every save
+  // that has ever tapped once, so the id stays and the name does not.
+  { id: 'first-light', name: 'First tap', need: { taps: 1 },
     blurb: 'Tap the tree once.' },
   { id: 'hundred-taps', name: 'Persistent', need: { taps: 100 },
     blurb: 'A hundred taps.' },
@@ -473,30 +420,30 @@ export const ACHIEVEMENTS = [
     blurb: 'A hundred growers on the lot.' },
   { id: 'five-hundred', name: 'A district', need: { growers: 500 },
     blurb: 'Five hundred growers on the lot.' },
-  { id: 'one-of-each', name: 'Diversified', need: { kinds: 12 },
+  { id: 'one-of-each', name: 'Diversified', need: { kinds: GROWERS.length },
     blurb: 'One of every kind of grower at once.' },
   { id: 'fifty-moss', name: 'Ground cover', need: { owned: { id: 'moss', count: 50 } },
     blurb: 'Fifty moss beds. It started somewhere.' },
-  { id: 'fifty-mirror', name: 'Second sun', need: { owned: { id: 'mirror', count: 50 } },
-    blurb: 'Fifty orbital mirrors.' },
+  { id: 'fifty-canopy', name: 'Skyline', need: { owned: { id: 'canopy', count: 50 } },
+    blurb: 'Fifty canopy towers.' },
 
   { id: 'first-thousand', name: 'A thousand', need: { lifetime: 1000 },
-    blurb: 'Earn a thousand light.' },
+    blurb: 'Earn a thousand energy.' },
   { id: 'first-million', name: 'A million', need: { lifetime: 1e6 },
-    blurb: 'Earn a million light.' },
+    blurb: 'Earn a million energy.' },
   { id: 'first-billion', name: 'A billion', need: { lifetime: 1e9 },
-    blurb: 'Earn a billion light.' },
+    blurb: 'Earn a billion energy.' },
   { id: 'first-trillion', name: 'A trillion', need: { lifetime: 1e12 },
-    blurb: 'Earn a trillion light.' },
+    blurb: 'Earn a trillion energy.' },
   { id: 'rate-thousand', name: 'Ticking over', need: { rate: 1000 },
-    blurb: 'A thousand light a second.' },
+    blurb: 'A thousand energy a second.' },
   { id: 'rate-million', name: 'Humming', need: { rate: 1e6 },
-    blurb: 'A million light a second.' },
+    blurb: 'A million energy a second.' },
 
   { id: 'ten-upgrades', name: 'Well read', need: { upgrades: 10 },
     blurb: 'Ten upgrades bought.' },
-  { id: 'thirty-upgrades', name: 'Studious', need: { upgrades: 30 },
-    blurb: 'Thirty upgrades bought.' },
+  { id: 'fifteen-upgrades', name: 'Studious', need: { upgrades: 15 },
+    blurb: 'Fifteen upgrades bought.' },
   { id: 'every-upgrade', name: 'The whole shelf', need: { upgrades: UPGRADES.length },
     blurb: 'Every upgrade there is, in one run.' },
 
@@ -531,10 +478,10 @@ export const freshOwned = () => Object.fromEntries(GROWER_IDS.map(id => [id, 0])
 export function newGame(){
   return {
     version: SAVE_VERSION,
-    light: 0,
+    light: 0,            // energy in hand. Named `light` in every save since day one
     elapsed: DAY_START,  // seconds into this run; the sky reads from it
     owned: freshOwned(),
-    earnedBy: freshOwned(),  // light each kind has made this run, for the table
+    earnedBy: freshOwned(),  // energy each kind has made this run, for the table
     bought: {},          // upgrade id -> true, this run
     medals: {},          // achievement id -> true, forever
     seeds: 0,            // banked at the last reset
@@ -551,7 +498,7 @@ export function newGame(){
        spent twenty-one of the graph's three hundred points on copies of the
        same moment. */
     sampledAt: DAY_START,
-    decade: 0,           // biggest power of ten of lifetime light already logged
+    decade: 0,           // biggest power of ten of lifetime energy already logged
   };
 }
 
@@ -798,7 +745,7 @@ export function plantRefusal(state, id, count = 1){
   if(!Number.isInteger(count) || count < 1) return 'One at a time, at least.';
   const owned = state.owned[id] || 0;
   const cost = bulkCost(g, owned, count);
-  if(state.light < cost) return `Not enough light — ${formatLight(cost - state.light)} short.`;
+  if(state.light < cost) return `Not enough energy — ${formatEnergy(cost - state.light)} short.`;
   return null;
 }
 
@@ -819,7 +766,7 @@ export function studyRefusal(state, id){
   if(!up) return 'There is no such upgrade.';
   if(state.bought[id]) return 'You have that already.';
   if(!meets(up.need, snapshot(state))) return 'Not yet.';
-  if(state.light < up.cost) return `Not enough light — ${formatLight(up.cost - state.light)} short.`;
+  if(state.light < up.cost) return `Not enough energy — ${formatEnergy(up.cost - state.light)} short.`;
   return null;
 }
 
@@ -856,12 +803,13 @@ export const pendingSeeds = state =>
 
 /* What lifetime total the next seed wants, so the reset panel can show a bar
    rather than a number that sits still for an hour. */
-export const lightForSeeds = seeds => Math.pow(seeds, 3) * SEED_SCALE;
+export const energyForSeeds = seeds => Math.pow(seeds, 3) * SEED_SCALE;
+export const lightForSeeds = energyForSeeds;   // the old name, kept
 
 export function prestigeRefusal(state){
   if(pendingSeeds(state) < 1){
-    const want = lightForSeeds(state.seeds + 1);
-    return `Not yet — ${formatLight(want - state.life.earned)} more light, all told.`;
+    const want = energyForSeeds(state.seeds + 1);
+    return `Not yet — ${formatEnergy(want - state.life.earned)} more energy, all told.`;
   }
   return null;
 }
@@ -1048,7 +996,7 @@ export function fromSave(raw){
    stopped meaning anything, and by then the exponent is the interesting part. */
 const SUFFIXES = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc'];
 
-export function formatLight(n){
+export function formatEnergy(n){
   if(!Number.isFinite(n)) return '—';
   const sign = n < 0 ? '-' : '';
   const value = Math.abs(n);
@@ -1083,6 +1031,9 @@ export function formatLight(n){
   return sign + scaled.toFixed(places) + SUFFIXES[tier];
 }
 
+/* The name the formatter had when the resource was called light. */
+export const formatLight = formatEnergy;
+
 /* A duration, at the coarsest two units that still say something. */
 export function formatTime(seconds){
   if(!Number.isFinite(seconds) || seconds < 0) return '—';
@@ -1098,7 +1049,7 @@ export function formatTime(seconds){
    three screens show these numbers and they should agree. */
 export function formatStat(key, value){
   if(TIME_KEYS.includes(key)) return formatTime(value);
-  if(LIGHT_KEYS.includes(key)) return formatLight(value);
+  if(ENERGY_KEYS.includes(key)) return formatEnergy(value);
   if(key === 'peakTaps') return (Math.round(value * 10) / 10).toString();
   return Math.floor(value).toLocaleString('en-US');
 }

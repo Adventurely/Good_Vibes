@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="../theme.css">
     <title>Sunward</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23f4efe4'/%3E%3Ccircle cx='8' cy='4' r='2.6' fill='%23ffd23f'/%3E%3Cpath d='M8 15V8' stroke='%23a97142' stroke-width='1.6'/%3E%3Cpath d='M8 9C8 6.5 6 5 3.6 5 3.6 7.5 5.6 9 8 9zM8 10c0-2.5 2-4 4.4-4 0 2.5-2 4-4.4 4z' fill='%233fa34d'/%3E%3C/svg%3E">
-    <meta name="description" content="Tap a bare lot into a canopy. Light pays for growers, growers pay while you are away, and the day turns while you spend it." />
+    <meta name="description" content="Every tap is energy for the tree. Energy pays for growers, growers keep working while you are away, and the day turns while you spend it." />
     <style>
       /* The page is the frame and the canvas is the game, so the frame is
          quiet: the same warm light theme the other two games' pages use, a
@@ -178,6 +178,19 @@
       }
       .seedbox .grow { flex: 1 1 12rem; min-width: 0; }
       .seedbox p { margin: 0; font-size: 0.84rem; color: var(--muted); }
+      /* What replanting is, in one sentence, and the three numbers that
+         matter, with names. The old box was one sentence that changed shape
+         depending on the state — sometimes a count, sometimes a percentage,
+         sometimes a threshold — and a player could not tell which of the
+         three they were being told. */
+      .seed-what { color: var(--text) !important; font-size: 0.86rem !important; }
+      .seed-what b { color: var(--accent); }
+      .seed-facts { display: flex; flex-wrap: wrap; gap: 0.35rem 1.25rem; margin: 0.45rem 0 0.4rem; }
+      .seed-facts div { min-width: 0; }
+      .seed-facts dt { margin: 0; font-size: 0.64rem; letter-spacing: 0.05em; font-weight: 600;
+                       text-transform: uppercase; color: var(--muted); }
+      .seed-facts dd { margin: 0; font-size: 0.95rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+      .seed-note { margin-top: 0.35rem !important; font-size: 0.8rem !important; }
       .meter { height: 6px; background: var(--sunk); border-radius: 999px; margin-top: 0.35rem; overflow: hidden; }
       .meter i { display: block; height: 100%; background: var(--accent); width: 0; }
 
@@ -315,7 +328,7 @@
     <div class="wrap">
       <header>
         <h1>Sunward</h1>
-        <span class="sub">tap the tree &mdash; everything you plant keeps working</span>
+        <span class="sub">every tap is energy for the tree &mdash; what you plant keeps working while you are away</span>
         <span class="away">
           <button class="btn btn-quiet" id="wipe" type="button">Start over</button>
         </span>
@@ -327,8 +340,8 @@
                focusable, keyboard-operable, and labelled with what it is and
                what pressing it does. -->
           <canvas id="lot" width="320" height="240" tabindex="0" role="button"
-                  aria-label="The lot. Click, or press Enter, to draw light from the tree."></canvas>
-          <!-- Not aria-hidden. This is the only place the light in hand is
+                  aria-label="The lot. Click, or press Enter, to give the tree energy."></canvas>
+          <!-- Not aria-hidden. This is the only place the energy in hand is
                written down, and hiding it meant a screen reader could hear
                every price in the shop and nothing about whether any of them
                was affordable. It is not a live region either: it changes
@@ -359,15 +372,22 @@
 
         <div class="seedbox">
           <div class="grow">
-            <p id="seed-line">Nothing to give back yet.</p>
+            <p class="seed-what"><b>Seeds.</b> Replant the lot from scratch and keep your seeds.
+               Every seed you hold makes everything you plant <b>+2%, for good</b>.</p>
+            <dl class="seed-facts">
+              <div><dt>Seeds held</dt><dd id="seed-held">0</dd></div>
+              <div><dt>Ready to bank</dt><dd id="seed-pending">0</dd></div>
+              <div><dt>Next seed at</dt><dd id="seed-next">1.00M</dd></div>
+            </dl>
             <div class="meter"><i id="seed-meter"></i></div>
+            <p class="seed-note" id="seed-line"></p>
           </div>
-          <button class="btn btn-go" id="reset" type="button" disabled>Let it seed</button>
+          <button class="btn btn-go" id="reset" type="button" disabled>Replant</button>
         </div>
       </main>
 
       <div class="panel">
-        <div class="tabs" role="tablist" aria-label="What to do with the light">
+        <div class="tabs" role="tablist" aria-label="What to do with the energy">
           <button role="tab" id="tab-grow" aria-controls="sheet-grow" aria-selected="true" type="button">Grow</button>
           <button role="tab" id="tab-study" aria-controls="sheet-study" aria-selected="false" type="button">
             Upgrades<span class="dot" id="study-dot" hidden></span>
@@ -394,8 +414,8 @@
         <section class="sheet" id="sheet-record" role="tabpanel" aria-labelledby="tab-record" hidden>
           <h2>The last ten minutes</h2>
           <canvas id="graph" width="320" height="76"
-                  aria-label="Light per second and taps per second over the last ten minutes."></canvas>
-          <p class="empty" id="graph-note">Light per second, on a log scale. The wave is the day going round.</p>
+                  aria-label="Energy per second and taps per second over the last ten minutes."></canvas>
+          <p class="empty" id="graph-note">Energy per second, on a log scale. The wave is the day going round.</p>
 
           <h2>Counters</h2>
           <table id="counters">
@@ -403,7 +423,7 @@
             <tbody></tbody>
           </table>
 
-          <h2>Where the light comes from</h2>
+          <h2>Where the energy comes from</h2>
           <table id="sources">
             <thead><tr><th>Grower</th><th>Owned</th><th>Now</th><th>Share</th><th>Made</th></tr></thead>
             <tbody></tbody>
@@ -444,12 +464,12 @@
        */
       import {
         newGame, fromSave, toSave, tick, tap, plant, plantRefusal, study, studyRefusal,
-        prestige, prestigeRefusal, pendingSeeds, lightForSeeds, seedBonus, MAX_TICK,
+        prestige, prestigeRefusal, pendingSeeds, energyForSeeds, seedBonus, MAX_TICK,
         catchUp, OFFLINE_CAP, GROWERS, GROWER_BY_ID, GROWER_IDS,
         bulkCost, affordable, bonuses, totalRate, steadyRate,
         tapValue, snapshot, offered, award, breakdown, note, sample, tapRate,
         dayPhase, phaseName, sunHeight, HISTORY_STEP,
-        STAT_KEYS, STAT_LABELS, STAT_SHORT, formatLight, formatTime, formatStat,
+        STAT_KEYS, STAT_LABELS, STAT_SHORT, formatEnergy, formatTime, formatStat,
         ACHIEVEMENTS, UPGRADE_BY_ID,
       } from './content.js';
       import { createLot, growthFor, treeBounds, PROP_ART, drawProp, SCENE_W, SCENE_H, hex }
@@ -467,6 +487,7 @@
         medals: els('medals'), medalCount: els('medal-count'), log: els('log'),
         graph: els('graph'), toasts: els('toasts'), saved: els('saved'),
         seedLine: els('seed-line'), seedMeter: els('seed-meter'), reset: els('reset'),
+        seedHeld: els('seed-held'), seedPending: els('seed-pending'), seedNext: els('seed-next'),
         studyDot: els('study-dot'), wipe: els('wipe'),
       };
 
@@ -551,7 +572,7 @@
         const decade = Math.floor(Math.log10(Math.max(1, state.life.earned)));
         if(decade > state.decade){
           if(decade >= 3 && state.decade >= 3){
-            note(state, `Earned ${formatLight(Math.pow(10, decade))} light, all told.`);
+            note(state, `Earned ${formatEnergy(Math.pow(10, decade))} light, all told.`);
           }
           state.decade = decade;
         }
@@ -580,7 +601,7 @@
           x: x + nudge,
           y: y - (tapSeq % 3) * 5,
           drift: 24 + (tapSeq % 4) * 5,
-          text: '+' + formatLight(value),
+          text: '+' + formatEnergy(value),
           born: performance.now(),
         });
         while(floaters.length > 12) floaters.shift();
@@ -733,7 +754,7 @@
             row.style.gridTemplateColumns = 'minmax(0, 1fr) auto';
             row.innerHTML = `<span><span class="name">${up.name}</span>`
               + `<span class="note">${describe(up)}</span></span>`
-              + `<span class="cost">${formatLight(up.cost)}</span>`;
+              + `<span class="cost">${formatEnergy(up.cost)}</span>`;
             row.addEventListener('click', () => buyUpgrade(up.id));
             ui.upgrades.append(row);
           }
@@ -753,9 +774,9 @@
         const e = up.effect;
         if(e.clickMult) return `A tap is worth ${e.clickMult}&times; as much.`;
         if(e.allMult) return `Everything makes ${Math.round((e.allMult - 1) * 100)}% more.`;
-        if(e.fingers) return `A tap also pays ${(e.fingers * 100).toFixed(0)}% of your light per second.`;
-        if(e.steady) return `Bad hours get less bad: everything marked day or night`
-          + ` makes about ${(e.steady / Math.PI * 100).toFixed(0)}% more over a day.`;
+        if(e.fingers) return `A tap also pays ${(e.fingers * 100).toFixed(0)}% of your energy per second.`;
+        if(e.steady) return `Night stops costing anything: nothing marked day or night ever makes`
+          + ` less than its rated output again — about ${(e.steady / Math.PI * 100).toFixed(0)}% more over a day.`;
         if(e.grower) return `${GROWER_BY_ID[e.grower].name}s make ${e.mult}&times; as much.`;
         return up.flavour;
       }
@@ -772,10 +793,10 @@
           row.setAttribute('aria-disabled', String(!afford));
           const each = g.rate * bonus.grower[g.id] * bonus.allMult * bonus.seedMult;
           note.textContent = owned
-            ? `${owned} planted · ${formatLight(each * owned)}/s`
+            ? `${owned} planted · ${formatEnergy(each * owned)}/s`
             : g.flavour;
-          cost.innerHTML = `${formatLight(price)}<small>${count > 1 ? '&times;' + count + ' · ' : ''}`
-            + `+${formatLight(each * count)}/s</small>`;
+          cost.innerHTML = `${formatEnergy(price)}<small>${count > 1 ? '&times;' + count + ' · ' : ''}`
+            + `+${formatEnergy(each * count)}/s</small>`;
         }
         const list = offered(state);
         for(const up of list){
@@ -823,9 +844,9 @@
           tr.innerHTML = `<th scope="row">${row.name}`
             + `<span class="when">${WHEN[row.phase]}</span></th>`
             + `<td class="num">${row.owned}</td>`
-            + `<td class="num">${formatLight(row.rate)}/s</td>`
+            + `<td class="num">${formatEnergy(row.rate)}/s</td>`
             + `<td class="num">${Math.round(row.share * 100)}%</td>`
-            + `<td class="num">${formatLight(row.earned)}</td>`;
+            + `<td class="num">${formatEnergy(row.earned)}</td>`;
           return tr;
         }));
 
@@ -939,53 +960,69 @@
           graphCtx.fillRect(x, y, 1, 1);
         }
 
-        drawText(graphCtx, formatLight(top) + '/S', 2, 2, 'y', 1);
+        drawText(graphCtx, formatEnergy(top) + '/S', 2, 2, 'y', 1);
         // The floor as well as the ceiling: an axis that does not start at zero
         // has to say where it does start, or the wave on it means nothing.
-        if(!flat) drawText(graphCtx, formatLight(Math.pow(10, lo)) + '/S', 2, H - 16, 'o', 1);
+        if(!flat) drawText(graphCtx, formatEnergy(Math.pow(10, lo)) + '/S', 2, H - 16, 'o', 1);
         // How far back it actually reaches, not how far back it can reach. A
         // new run's first two minutes were labelled "10M 00S AGO", and so was
         // every run's first ten minutes after a reset.
         const span = (series.length - 1) * HISTORY_STEP;
         drawText(graphCtx, formatTime(span) + ' AGO', 2, H - 8, 's', 1);
-        const nowLabel = formatLight(live) + ' T/S';
+        const nowLabel = formatEnergy(live) + ' T/S';
         drawText(graphCtx, nowLabel, W - textWidth(nowLabel, 1) - 2, H - 8, 'c', 1);
       }
 
       /* ---- the reset ------------------------------------------------------ */
 
+      /* Three named numbers and one sentence. "Held" is what you have and what
+         it is worth; "ready to bank" is what replanting now would add; "next
+         seed at" is the lifetime total the one after that wants, and the bar
+         is the climb to it — from the last seed earned, not from the last one
+         banked, so it keeps moving once there is something to bank. */
       function drawSeeds(){
         const pending = pendingSeeds(state);
-        const want = lightForSeeds(state.seeds + 1);
         const held = state.seeds;
+        const earnedSeeds = held + pending;
+        const from = energyForSeeds(earnedSeeds);
+        const want = energyForSeeds(earnedSeeds + 1);
         const bonusNow = Math.round((seedBonus(held) - 1) * 100);
-        const after = Math.round((seedBonus(held + pending) - 1) * 100);
+        const after = Math.round((seedBonus(earnedSeeds) - 1) * 100);
+        const plural = n => n === 1 ? '' : 's';
 
+        ui.seedHeld.textContent = `${held} · +${bonusNow}%`;
+        ui.seedPending.textContent = pending ? `${pending} · +${after - bonusNow}% more` : '0';
+        ui.seedNext.textContent = `${formatEnergy(want)} all told`;
         ui.reset.disabled = pending < 1;
+        ui.reset.textContent = pending >= 1 ? `Replant · bank ${pending}` : 'Replant';
+
         if(pending >= 1){
-          ui.seedLine.textContent = `Give the lot back for ${pending} seed${pending === 1 ? '' : 's'}`
-            + ` — everything you plant next time makes ${after}% more instead of ${bonusNow}%.`;
+          ui.seedLine.textContent = `Replanting now banks ${pending} seed${plural(pending)}: everything you plant`
+            + ` afterwards makes +${after}% instead of +${bonusNow}%. Medals and the all-time record stay.`;
         } else if(held > 0){
-          ui.seedLine.textContent = `${held} seed${held === 1 ? '' : 's'} held, worth ${bonusNow}% on everything.`
-            + ` Next seed at ${formatLight(want)} lifetime light.`;
+          ui.seedLine.textContent = `Nothing new to bank yet. The next seed lands at ${formatEnergy(want)}`
+            + ` energy earned, all told — you are at ${formatEnergy(state.life.earned)}.`;
         } else {
-          ui.seedLine.textContent = `Nothing to give back yet — the first seed wants ${formatLight(want)} light, all told.`;
+          ui.seedLine.textContent = `No seeds yet. The first one lands at ${formatEnergy(want)} energy earned,`
+            + ` all told — you are at ${formatEnergy(state.life.earned)}.`;
         }
-        const floor = lightForSeeds(state.seeds);
-        const span = Math.max(1, want - floor);
-        ui.seedMeter.style.width = `${Math.max(0, Math.min(1, (state.life.earned - floor) / span)) * 100}%`;
+        const span = Math.max(1, want - from);
+        ui.seedMeter.style.width = `${Math.max(0, Math.min(1, (state.life.earned - from) / span)) * 100}%`;
       }
 
       ui.reset.addEventListener('click', () => {
         const pending = pendingSeeds(state);
         const refusal = prestigeRefusal(state);
         if(refusal) return say(refusal);
-        if(!confirm(`Give the lot back?\n\nYou keep ${state.seeds + pending} seeds, every medal and the`
-          + ` all-time record. The light, the growers and the upgrades all start again.`)) return;
+        const after = Math.round((seedBonus(state.seeds + pending) - 1) * 100);
+        if(!confirm(`Replant the lot?\n\n`
+          + `You bank ${pending} seed${pending === 1 ? '' : 's'} — ${state.seeds + pending} in all, worth +${after}%`
+          + ` on everything you plant from now on.\n`
+          + `You keep every medal and the all-time record.\n`
+          + `The energy, the growers and the upgrades on the lot start again from nothing.`)) return;
         prestige(state);
-        note(state, `Gave the lot back. ${state.seeds} seeds held.`);
-        say(`${state.seeds} seeds held — everything makes ${Math.round((seedBonus(state.seeds) - 1) * 100)}% more.`,
-          'Let it seed');
+        note(state, `Replanted the lot. ${state.seeds} seeds held.`);
+        say(`${state.seeds} seeds held — everything you plant makes +${after}% now.`, 'Replanted');
         shopKey = null;
         drawShop();
         writeSave();
@@ -1045,17 +1082,17 @@
         const phase = dayPhase(state.elapsed);
         const height = sunHeight(phase);
 
-        ui.light.textContent = formatLight(state.light);
-        ui.rate.textContent = `${formatLight(live)} per second`;
+        ui.light.textContent = formatEnergy(state.light);
+        ui.rate.textContent = `${formatEnergy(live)} per second`;
         ui.phase.textContent = phaseName(phase);
         ui.phaseNote.textContent = steady > 0
           ? `${live >= steady ? '+' : ''}${Math.round((live / steady - 1) * 100)}% on the average`
           : (height > 0 ? 'day growers at their best' : 'night growers at their best');
 
-        ui.sRate.textContent = formatLight(live);
+        ui.sRate.textContent = formatEnergy(live);
         ui.sTaps.textContent = Math.floor(state.life.taps).toLocaleString('en-US');
         ui.sTapRate.textContent = (Math.round(tapRate(taps, performance.now() / 1000) * 10) / 10).toFixed(1);
-        ui.sTap.textContent = formatLight(tapValue(state, bonus));
+        ui.sTap.textContent = formatEnergy(tapValue(state, bonus));
       }
 
       function frame(now){
@@ -1140,8 +1177,8 @@
       if(boot.away > 60 && steadyRate(state) > 0){
         const gain = catchUp(state, boot.away);
         if(gain.light > 0){
-          note(state, `Away ${formatTime(gain.seconds)} — the lot made ${formatLight(gain.light)}.`);
-          say(`Away for ${formatTime(boot.away)}. The lot made ${formatLight(gain.light)} at half rate`
+          note(state, `Away ${formatTime(gain.seconds)} — the lot made ${formatEnergy(gain.light)}.`);
+          say(`Away for ${formatTime(boot.away)}. The lot made ${formatEnergy(gain.light)} at half rate`
             + `${gain.capped ? `, counting the first ${formatTime(OFFLINE_CAP)}` : ''}.`, 'Back');
         }
       } else if(boot.away > 60){

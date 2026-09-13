@@ -247,14 +247,24 @@ test('upgrades unlock on this run, not on all time', () => {
   }
 });
 
-test('every grower can be improved, and the steady upgrades come in a pair at least', () => {
-  const helped = new Set(UPGRADES.filter(u => u.effect.grower).map(u => u.effect.grower));
+test('every grower can be improved, and no row is another row again', () => {
+  /* The shop had forty-two rows, and most of the difference was the same
+     upgrade sold twice: two doublings per grower, six of the tap, three slices
+     off the swing. What is pinned here is the shape that replaced it — one line
+     of each kind, every grower improved exactly once — and the rule behind it:
+     no two rows may do the same thing to the same target. A row that is "the
+     row above, again, bigger" is not a choice; it is a longer list. */
+  const helped = UPGRADES.filter(u => u.effect.grower).map(u => u.effect.grower);
   for(const g of GROWERS){
-    assert.ok(helped.has(g.id), `nothing in the shop ever improves "${g.id}"`);
+    assert.equal(helped.filter(id => id === g.id).length, 1,
+      `"${g.id}" should be improved by exactly one upgrade, not ${helped.filter(id => id === g.id).length}`);
   }
-  assert.ok(UPGRADES.filter(u => u.effect.clickMult).length >= 4, 'the hand needs a line of upgrades');
+  assert.ok(UPGRADES.filter(u => u.effect.clickMult).length >= 3, 'the hand needs a line of upgrades');
   assert.ok(UPGRADES.filter(u => u.effect.fingers).length >= 2,
     'without these the hand is left behind by the garden within the hour');
+  assert.equal(UPGRADES.filter(u => u.effect.steady).length, 1,
+    'the trough is one upgrade; three slices of it were one row said slowly');
+  assert.ok(UPGRADES.length <= 24, `${UPGRADES.length} upgrades is a list again, not a shop`);
 });
 
 test('the shop opens one row at a time', () => {
@@ -295,7 +305,8 @@ test('medals are awarded once and kept through a reset', () => {
   const state = newGame();
   state.life.taps = 1;
   const won = award(state);
-  assert.ok(won.some(a => a.id === 'first-light'), 'one tap must win First light');
+  // The id is from when the resource was light; the medal is "First tap" now.
+  assert.ok(won.some(a => a.id === 'first-light'), 'one tap must win First tap');
   assert.equal(award(state).length, 0, 'a medal must not be won twice');
 
   state.life.earned = 1e9;

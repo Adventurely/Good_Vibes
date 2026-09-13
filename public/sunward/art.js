@@ -285,7 +285,7 @@ export function drawGround(ctx, light){
  * both the other games author art, so a sprite can be read and edited in the
  * source without a tool.
  *
- * Twelve of them and nothing else: the lot is meant to fill up with the things
+ * Nine of them and nothing else: the lot is meant to fill up with the things
  * you bought, and a thing you bought that does not appear is the clearest way
  * for a clicker to feel like a spreadsheet.
  */
@@ -386,26 +386,6 @@ export const PROP_ART = {
     '..wwwwwwwwwwwwww..',
     '..NNNNNNNNNNNNNN..',
   ],
-  mycelium: [
-    '..w....w...w..',
-    '.wNw..wNw.wNw.',
-    'w.NNwwNNNwNN.w',
-    '.wwNNNwwNNNww.',
-    '...wNw..wNw...',
-    '....w....w....',
-  ],
-  reef: [
-    '...r..p...t...',
-    '..rpr.p..tct..',
-    '..prp.pp.tct..',
-    '...p..pp..t...',
-    '.p.p.rpp..t.c.',
-    '.pppprpp.tttc.',
-    '..pp.rpp.tcc..',
-    '...ppppp..t...',
-    '..G.pppp.GG...',
-    '.GGGGGGGGGGGG.',
-  ],
   canopy: [
     '....ggg......',
     '...gGggg.....',
@@ -426,16 +406,6 @@ export const PROP_ART = {
     '...sswss.....',
     '...sswss.....',
     '..sssssss....',
-  ],
-  mirror: [
-    '...wwwwww.....',
-    '..wccccccw....',
-    '.wcwwwwwwcw...',
-    '.wcwccccwcw...',
-    '.wcwwwwwwcw...',
-    '..wccccccw....',
-    '...wwwwww.....',
-    '.....ss.......',
   ],
 };
 
@@ -479,19 +449,13 @@ export function drawProp(ctx, rows, x, y, light){
  * of it, so a thing standing further forward is painted over the thing behind.
  */
 export const PROP_SPOTS = {
-  orchard:    [{ x: 4, y: 184 }, { x: 24, y: 191 }, { x: 46, y: 179 }, { x: 66, y: 187 }],
-  reef:       [{ x: 88, y: 179 }, { x: 106, y: 187 }, { x: 70, y: 176 }, { x: 124, y: 182 }],
-  glasshouse: [{ x: 196, y: 182 }, { x: 218, y: 190 }, { x: 176, y: 177 }, { x: 240, y: 185 }],
+  orchard:    [{ x: 4, y: 184 }, { x: 24, y: 191 }, { x: 46, y: 179 }, { x: 66, y: 187 }],  glasshouse: [{ x: 196, y: 182 }, { x: 218, y: 190 }, { x: 176, y: 177 }, { x: 240, y: 185 }],
   turbine:    [{ x: 276, y: 179 }, { x: 262, y: 188 }, { x: 292, y: 185 }, { x: 248, y: 177 }],
   hive:       [{ x: 62, y: 207 }, { x: 76, y: 215 }, { x: 48, y: 213 }, { x: 90, y: 206 }],
   panel:      [{ x: 212, y: 204 }, { x: 230, y: 212 }, { x: 246, y: 202 }, { x: 196, y: 213 }],
   canopy:     [{ x: 296, y: 206 }, { x: 282, y: 215 }, { x: 306, y: 220 }, { x: 270, y: 209 }],
   moss:       [{ x: 20, y: 234 }, { x: 40, y: 226 }, { x: 4, y: 221 }, { x: 58, y: 238 }],
-  mushroom:   [{ x: 92, y: 229 }, { x: 108, y: 238 }, { x: 76, y: 235 }, { x: 122, y: 226 }],
-  mycelium:   [{ x: 140, y: 240 }, { x: 158, y: 234 }, { x: 176, y: 240 }, { x: 122, y: 235 }],
-  fern:       [{ x: 246, y: 227 }, { x: 262, y: 237 }, { x: 230, y: 235 }, { x: 278, y: 229 }],
-  mirror:     [{ x: 26, y: 38 }, { x: 258, y: 28 }, { x: 140, y: 20 }, { x: 76, y: 55 }],
-};
+  mushroom:   [{ x: 92, y: 229 }, { x: 108, y: 238 }, { x: 76, y: 235 }, { x: 122, y: 226 }],  fern:       [{ x: 246, y: 227 }, { x: 262, y: 237 }, { x: 230, y: 235 }, { x: 278, y: 229 }],};
 
 /* How many you have to own before the second, third and fourth copies appear.
    The lot should keep changing well past the first purchase, and it should
@@ -649,10 +613,7 @@ function lotPieces(owned){
     const n = Math.min(propCount(owned[id] || 0), spots.length);
     for(let i = 0; i < n; i++){
       const spot = spots[i];
-      pieces.push({ rows, x: spot.x, y: spot.y - rows.length, ground: spot.y,
-        // The mirrors are in the sky, and a shadow under a thing in the sky is
-        // a mistake somebody has to notice before they can explain it.
-        footed: id !== 'mirror' });
+      pieces.push({ rows, x: spot.x, y: spot.y - rows.length, ground: spot.y, footed: true });
     }
   }
   return pieces.sort((a, b) => a.ground - b.ground);
