@@ -8,6 +8,7 @@ import {
 } from '../public/orbital-trader/content.js';
 import * as S from '../public/orbital-trader/sim.js';
 import { createChart } from '../public/orbital-trader/render.js';
+import { DURATION, BREACH, BEATS, beatAt, ascent, skyAt, ROCKET } from '../public/orbital-trader/intro.js';
 
 /* Orbital Trader has no server: everything it knows is in public/ and is
  * imported here as the browser imports it. These tests are the gate that a
@@ -267,6 +268,87 @@ test('the text has every line the game asks for', () => {
   assert.ok(TEXT.captainLines.onStranded.length >= 3);
 });
 
+/* --------------------------------------------------------------- film */
+
+/* The opening film is drawn on a canvas, so what can be checked under Node is
+ * its timeline and its art — which is most of what goes wrong with one. A
+ * cinematic that outstays its welcome is the classic fault, and it is the one
+ * nobody notices in review because everybody skips it after the first time. */
+
+test('the opening film is over in five to seven seconds, beats and all', () => {
+  assert.ok(DURATION >= 5 && DURATION <= 7, `the film runs ${DURATION}s`);
+  assert.equal(BEATS[0].at, 0, 'the film starts at nought');
+  for(let i = 1; i < BEATS.length; i++){
+    assert.ok(BEATS[i].at > BEATS[i - 1].at, `beat ${BEATS[i].name} does not come after ${BEATS[i - 1].name}`);
+    assert.ok(BEATS[i].at < DURATION, `beat ${BEATS[i].name} is after the end of the film`);
+  }
+  // And the page hangs its closing line on this one.
+  assert.ok(BEATS.some(b => b.name === 'space'), 'no beat called space');
+  for(const b of BEATS) assert.equal(beatAt(b.at), b.name, `${b.name} is not what is playing at its own mark`);
+  assert.equal(beatAt(-1), BEATS[0].name, 'before the beginning is the first beat');
+  assert.equal(beatAt(DURATION * 2), BEATS[BEATS.length - 1].name, 'and after the end is the last');
+});
+
+test('the climb starts in the water, never goes backwards, and ends in space', () => {
+  assert.equal(ascent(0), 0, 'it is in the water at nought');
+  assert.equal(ascent(BREACH), 0, 'and still in it at the breach');
+  assert.ok(ascent(BREACH + 0.01) > 0, 'and out of it the instant after');
+  let last = -1;
+  for(let t = 0; t <= DURATION + 1; t += DURATION / 400){
+    const h = ascent(t);
+    assert.ok(h >= last - 1e-12, `the climb went backwards at ${t.toFixed(2)}s`);
+    assert.ok(h >= 0 && h <= 1, `the climb left [0,1] at ${t.toFixed(2)}s`);
+    last = h;
+  }
+  assert.equal(ascent(DURATION), 1, 'the film ends at the top of the climb');
+  assert.equal(ascent(DURATION + 5), 1, 'and stays there');
+});
+
+test('the sky goes out as it climbs, and is a colour the whole way', () => {
+  const lum = c => c[0] * 0.299 + c[1] * 0.587 + c[2] * 0.114;
+  let last = Infinity;
+  for(let h = 0; h <= 1.0001; h += 0.02){
+    const sky = skyAt(h);
+    for(const key of ['top', 'low', 'sea', 'glow']){
+      assert.equal(sky[key].length, 3, `${key} is not a colour at h=${h}`);
+      for(const ch of sky[key]) assert.ok(Number.isFinite(ch) && ch >= 0 && ch <= 255, `${key} is off the end of the ramp at h=${h}`);
+    }
+    /* The first stretch brightens on purpose — it is dawn at the water and
+       full day a few kilometres up — but from the top of that on, the zenith
+       only ever goes out, which is what climbing out of the air is. */
+    if(h >= 0.2){
+      /* A step of slack: the ramp rounds to whole channels, and a blue that
+         deepens can gain a point of blue while losing two of everything else. */
+      assert.ok(lum(sky.top) <= last + 2, `the sky brightened again at h=${h.toFixed(2)}`);
+      last = lum(sky.top);
+    }
+  }
+  // And over the film it is not slack at all: each stretch is properly darker.
+  let prev = Infinity;
+  for(const h of [0.2, 0.4, 0.6, 0.8, 1]){
+    assert.ok(lum(skyAt(h).top) < prev - 4, `the sky did not go out between the last mark and h=${h}`);
+    prev = lum(skyAt(h).top);
+  }
+  assert.ok(lum(skyAt(1).top) < lum(skyAt(0).top) * 0.5, 'space is no darker than the dawn it started in');
+  assert.ok(lum(skyAt(1).top) < 12, 'the film does not end on a black sky');
+  assert.deepEqual(skyAt(-1), skyAt(0), 'below the water is the sky at the water');
+  assert.deepEqual(skyAt(2), skyAt(1), 'and above the top is the top');
+});
+
+test('the lighter is a rectangle of pixels the painter knows every letter of', () => {
+  assert.equal(ROCKET.rows.length, ROCKET.h, 'the grid is not as tall as it says');
+  for(const [i, row] of ROCKET.rows.entries()){
+    assert.equal(row.length, ROCKET.w, `row ${i} is not ${ROCKET.w} across`);
+    for(const ch of row) assert.ok(ch in ROCKET.legend, `row ${i} uses '${ch}', which the legend does not have`);
+  }
+  // Nose up: the fins are the widest part and they are at the bottom, which is
+  // the one thing a rocket cannot get wrong.
+  const width = row => [...row].filter(ch => ROCKET.legend[ch]).length;
+  const widest = ROCKET.rows.reduce((best, row, i) => width(row) > width(ROCKET.rows[best]) ? i : best, 0);
+  assert.ok(widest > ROCKET.h * 0.6, 'the widest part of the lighter is not near its tail');
+  assert.ok(width(ROCKET.rows[0]) < width(ROCKET.rows[widest]), 'the nose is not narrower than the fins');
+});
+
 /* --------------------------------------------------------------- page */
 
 /* The page is not importable under Node — it is a document with a module in
@@ -286,6 +368,24 @@ test('every button the page draws for itself has something listening to it', () 
   }
   // And the anchor in particular, which is the only way to dock on a phone.
   assert.match(html, /\$\('dock-go'\)\.addEventListener\('click'/, 'the dock button is not wired');
+});
+
+/* The film is six and a half seconds long and the page is the only thing that
+ * decides whether anybody has to watch them. These are the four rules it is
+ * held to: a new ship gets it, a saved ship does not, reduced motion does not,
+ * and the clock waits for it either way. */
+test('the opening film plays for a new ship and gets out of the way of every other one', () => {
+  const html = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.match(html, /import \{ playIntro \} from '\.\/intro\.js'/, 'the page does not import the film');
+  assert.match(html, /<canvas id="intro-art"/, 'the film has nothing to draw on');
+  assert.match(html, /aria-label="[^"]+"/, 'the film canvas says nothing to a reader');
+  // A save is picked back up without a launch, and less motion means none.
+  assert.match(html, /return freshShip && !reduced;/, 'the film no longer asks whose ship this is');
+  assert.match(html, /if\(filmWanted\(fresh\)\) rollFilm\(startClock\);\n\s*else startClock\(\);/,
+    'the clock no longer waits for the film');
+  assert.match(html, /function startClock\(\)\{ last = performance\.now\(\); requestAnimationFrame\(frame\); \}/,
+    'the clock does not start from the film');
+  assert.doesNotMatch(html, /^requestAnimationFrame\(frame\);$/m, 'the loop is started behind the film as well');
 });
 
 /* ------------------------------------------------------------- chart */

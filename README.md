@@ -25,6 +25,7 @@ single-player and need nothing but the files.
 | ✅ Verified in this repo | `src/rooms.js` runs on Workers: no `node:` built-ins, and no `Date.now()` or `Math.random()` |
 | ✅ Verified in this repo | Every game answers on its own path, and each keeps its own `content.js` |
 | ✅ Verified in this repo | Orbital Trader's sky passes its own checker, and its kernel matches a numerical integrator |
+| ✅ Verified in this repo | Orbital Trader's opening film is over inside seven seconds, and the page plays it for a new ship only |
 | ✅ Verified in this repo | Every name `content.js` has ever exported is still exported (a test pins it) |
 | ✅ Verified in this repo | A room survives eviction — `serialize`/`restore`, including the generator's draw count |
 | ✅ Verified in this repo | The Worker builds, binds and bundles — `npm run check` |
@@ -1628,6 +1629,7 @@ socket, no server. One save in `localStorage`.
       content.js      the world as data, assembled from the design tables
       render.js       the chart
       sprites.js      the worlds as pixels: sixteen across, drawn once
+      intro.js        the opening film: six and a half seconds of launch
       data/*.js       generated from tools/orbital-trader/design/*.json
 
 ### How the flying works
@@ -1672,6 +1674,31 @@ Arc's broken ring, Claw Rock (which has ears, and the cats insist that is a
 coincidence), Merrow's bazaar-covered snowball, the Far Lantern, and the ship.
 A silhouette is the whole character of those, and a silhouette is what a
 generator is worst at.
+
+### The opening film
+
+A new ship starts with six and a half seconds of pixels, in `intro.js`: a
+lighter comes up out of Tassel's ocean at dawn, through the weather, and out
+of the top of the sky, which is where a new game opens. Nothing lands in this
+game and nothing in the film does either — the lighter is the boat that meets
+ships, and this is the one ride of it anybody sees.
+
+It is drawn the way the sprites are, one buffer of about a hundred and seventy
+art pixels blitted up whole with smoothing off, so a frame costs the same on a
+phone as on a wall. One number drives all of it: `ascent(t)`, the climb from
+nought to one. The sky's colours, how far the water has fallen away, how hard
+the horizon bends, the stars coming out, the plume going from a fat orange
+cone to a thin white needle — every one of them reads that, so re-cutting the
+film is moving times in `BEATS` and colours in `SKY` and nothing has to be
+kept in agreement by hand. `draw(t)` is a function of `t` and nothing else,
+flicker included, so a dropped frame costs a frame and never knocks the film
+out of step with itself.
+
+Who sees it: a new ship, and nobody else. A saved ship is picked back up
+without a launch, `prefers-reduced-motion` skips it, any key or click ends it,
+and the clock does not start until it is over — so the six seconds are not six
+seconds of an orbit nobody was watching. `?intro` plays it for anyone who asks
+by hand and `?intro=0` refuses it.
 
 ### The road, the lock, and the clock
 

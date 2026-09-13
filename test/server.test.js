@@ -81,7 +81,7 @@ test('Orbital Trader ships its own modules, and they are pure', async () => {
      imported by the browser and by the tests alike. A content module that
      stopped answering, or answered as text/plain, is a page that draws
      nothing and says nothing. */
-  for(const file of ['orbit.js', 'sim.js', 'content.js', 'render.js', 'data/world.js', 'data/economy.js', 'data/text.js']){
+  for(const file of ['orbit.js', 'sim.js', 'content.js', 'render.js', 'sprites.js', 'intro.js', 'data/world.js', 'data/economy.js', 'data/text.js']){
     const res = await fetch(`${baseUrl}/orbital-trader/${file}`);
     assert.equal(res.status, 200, `${file} returned ${res.status}`);
     assert.match(res.headers.get('content-type'), /javascript/, `${file} content type`);
