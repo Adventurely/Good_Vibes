@@ -475,7 +475,8 @@
         prestige, prestigeRefusal, pendingSeeds, energyForSeeds, seedBonus, MAX_TICK,
         catchUp, OFFLINE_CAP, GROWERS, GROWER_BY_ID, GROWER_IDS,
         bulkCost, affordable, bonuses, totalRate, steadyRate, averageFactor,
-        tapValue, snapshot, offered, award, breakdown, note, sample, tapRate,
+        tapValue, momentum, isWindfall, STREAK_CAP, WINDFALL_EVERY,
+        snapshot, offered, award, breakdown, note, sample, tapRate,
         dayPhase, phaseName, sunHeight, HISTORY_STEP,
         STAT_KEYS, STAT_LABELS, STAT_SHORT, formatEnergy, formatTime, formatStat,
         ACHIEVEMENTS, UPGRADE_BY_ID,
@@ -607,6 +608,8 @@
         const now = performance.now() / 1000;
         taps.push(now);
         while(taps.length && taps[0] < now - 60) taps.shift();
+        // Read before the tap, because the tap is what moves the count on.
+        const big = isWindfall(state);
         const value = tap(state, tapRate(taps, now));
         const nudge = SPREAD[tapSeq % SPREAD.length];
         tapSeq++;
@@ -618,16 +621,21 @@
           drift: 48 + (tapSeq % 4) * 10,
           text: '+' + formatEnergy(value),
           born: performance.now(),
+          big,
         });
         while(floaters.length > 10) floaters.shift();
         /* Three things happen to the picture: the number, a burst of leaves at
            the point of the tap, and the canopy swelling. The first cut had a
            five-pixel number and a one-pixel wobble, which on a phone was a tap
            you could not see land. */
-        bursts.push({ x, y, born: performance.now() });
+        /* The tenth tap is the windfall, and it has to look like one: twice
+           the leaves thrown twice as far, the number a size up again, and the
+           canopy given the whole swell at once. A tap that paid ten times and
+           looked like the other nine would read as a counter glitch. */
+        bursts.push({ x, y, born: performance.now(), size: big ? 2 : 1 });
         while(bursts.length > 8) bursts.shift();
-        pulse = Math.min(1, pulse + 0.55);
-        shake = Math.min(4, shake + 1.8);
+        pulse = Math.min(1, pulse + (big ? 1 : 0.55));
+        shake = Math.min(4, shake + (big ? 3.2 : 1.8));
         logMilestones();
       }
 
@@ -795,6 +803,9 @@
       function describe(up){
         const e = up.effect;
         if(e.clickMult) return `A tap is worth ${e.clickMult}&times; as much.`;
+        if(e.streak) return `A tap is worth ${Math.round(e.streak * 100)}% more for every tap a second`
+          + ` you are making, up to ${STREAK_CAP} a second — ${1 + e.streak * STREAK_CAP}&times; flat out.`;
+        if(e.windfall) return `Every ${WINDFALL_EVERY}th tap pays ${e.windfall}&times; over.`;
         if(e.allMult) return `Everything makes ${Math.round((e.allMult - 1) * 100)}% more.`;
         if(e.fingers) return `A tap also pays ${(e.fingers * 100).toFixed(0)}% of your energy per second.`;
         if(e.steady) return `The off hours stop costing anything: nothing marked day or night ever makes`
@@ -1118,7 +1129,11 @@
         ui.sRate.textContent = formatEnergy(live);
         ui.sTaps.textContent = Math.floor(state.life.taps).toLocaleString('en-US');
         ui.sTapRate.textContent = (Math.round(tapRate(taps, performance.now() / 1000) * 10) / 10).toFixed(1);
-        ui.sTap.textContent = formatEnergy(tapValue(state, bonus));
+        // The hand's worth at the speed it is going, so the number climbs as
+        // the player speeds up — which is the whole point of Momentum being
+        // visible. The windfall is left out: it is a spike, not a rate.
+        ui.sTap.textContent = formatEnergy(tapValue(state, bonus)
+          * momentum(tapRate(taps, performance.now() / 1000), bonus));
       }
 
       function frame(now){
@@ -1187,7 +1202,7 @@
           const b = bursts[i];
           const age = (now - b.born) / 520;
           if(age >= 1){ bursts.splice(i, 1); continue; }
-          drawBurst(lotCtx, b.x, b.y, still.matches ? 0.45 : age, light);
+          drawBurst(lotCtx, b.x, b.y, still.matches ? 0.45 : age, light, b.size || 1);
         }
 
         // The numbers that drift off the tree, drawn in the game's own font so
@@ -1204,7 +1219,9 @@
           const key = age > 0.7 ? 'o' : 'y';
           // Twice the font, and a fresh number a size bigger again for its
           // first moment: a tap should land like something.
-          const scale = age < 0.18 ? 3 : 2;
+          // A windfall's number is a size up throughout, and holds its
+          // first-moment size for longer.
+          const scale = f.big ? (age < 0.3 ? 4 : 3) : (age < 0.18 ? 3 : 2);
           const left = Math.round(f.x - textWidth(f.text, scale) / 2);
           drawText(lotCtx, f.text, left + scale, Math.round(y) + scale, 'k', scale);
           drawText(lotCtx, f.text, left, Math.round(y), key, scale);

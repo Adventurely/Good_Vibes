@@ -23,7 +23,8 @@ import {
   STAT_KEYS, STAT_LABELS, STAT_SHORT, PEAK_KEYS, blankStats, score,
   HISTORY_STEP, HISTORY_SAMPLES, freshHistory, sample, tapRate, MILESTONES, note,
   SAVE_VERSION, newGame, freshOwned, bonuses, SEED_RATE, seedBonus, phaseFactor,
-  rateOf, totalRate, steadyRate, tapValue, snapshot, meets, offered, award,
+  rateOf, totalRate, steadyRate, tapValue, tapPays, momentum, isWindfall, STREAK_CAP, WINDFALL_EVERY,
+  snapshot, meets, offered, award,
   MAX_TICK, tick, tap, plantRefusal, plant, studyRefusal, study,
   SEED_SCALE, seedsFrom, pendingSeeds, lightForSeeds, prestigeRefusal, prestige,
   OFFLINE_RATE, OFFLINE_CAP, offlineGain, catchUp,
@@ -173,12 +174,24 @@ test('every upgrade in the shop is worth buying', () => {
   /* The failure this exists for is not a crash: it is a row that charges for a
      multiplier that multiplies nothing. Each one is bought against a lot that
      owns some of everything, and the steady rate has to move. */
+  /* The hand is measured over a whole round of taps at four a second, so the
+     two upgrades that pay by rhythm — Momentum by speed, Windfall by the tenth
+     tap — count for what they actually pay and not for what a single tap at a
+     standstill would. */
+  const hand = state => {
+    let sum = 0;
+    for(let i = 0; i < WINDFALL_EVERY; i++){
+      state.run.taps = i;
+      sum += tapPays(state, 4);
+    }
+    return sum / WINDFALL_EVERY;
+  };
   for(const up of UPGRADES){
     const state = newGame();
     for(const g of GROWERS) state.owned[g.id] = 20;
-    const before = { rate: steadyRate(state), tap: tapValue(state) };
+    const before = { rate: steadyRate(state), tap: hand(state) };
     state.bought[up.id] = true;
-    const after = { rate: steadyRate(state), tap: tapValue(state) };
+    const after = { rate: steadyRate(state), tap: hand(state) };
     assert.ok(after.rate > before.rate || after.tap > before.tap,
       `"${up.id}" costs ${formatLight(up.cost)} and changes neither the rate nor the tap`);
   }
@@ -216,8 +229,10 @@ test('every upgrade is buyable, does something, and names things that exist', ()
     assert.ok(up.cost > 0, `${where}: must cost something`);
 
     const e = up.effect;
-    const does = ['clickMult', 'allMult', 'fingers', 'steady', 'grower'].filter(k => e[k]);
+    const does = ['clickMult', 'streak', 'windfall', 'allMult', 'fingers', 'steady', 'grower'].filter(k => e[k]);
     assert.equal(does.length, 1, `${where}: must do exactly one thing, does ${does.length}`);
+    if(e.streak) assert.ok(e.streak > 0, `${where}: a streak of nothing is not an upgrade`);
+    if(e.windfall) assert.ok(e.windfall > 1, `${where}: a windfall must pay more than the tap did`);
     if(e.grower){
       assert.ok(GROWER_BY_ID[e.grower], `${where}: multiplies unknown grower "${e.grower}"`);
       assert.ok(e.mult > 1, `${where}: a multiplier of ${e.mult} is not an upgrade`);
@@ -264,6 +279,10 @@ test('every grower can be improved, and no row is another row again', () => {
     'without these the hand is left behind by the garden within the hour');
   assert.equal(UPGRADES.filter(u => u.effect.steady).length, 1,
     'the trough is one upgrade; three slices of it were one row said slowly');
+  assert.equal(UPGRADES.filter(u => u.effect.streak).length, 1,
+    'momentum is one upgrade: a second one would be a fourth step of the hand');
+  assert.equal(UPGRADES.filter(u => u.effect.windfall).length, 1,
+    'the windfall is one upgrade: a second one is a second beat over the first');
   assert.ok(UPGRADES.length <= 24, `${UPGRADES.length} upgrades is a list again, not a shop`);
 });
 
@@ -408,11 +427,69 @@ test('a tap pays, and it pays more once the hand is upgraded', () => {
 
 test('the hand borrows from the garden once it can', () => {
   const state = newGame();
-  state.owned.moss = 100;              // ten light a second
-  state.bought.gleaning = true;        // a tap is worth a further 1% of that
+  state.owned.moss = 100;              // ten energy a second
+  state.bought.gleaning = true;        // a tap is worth a slice of that
+  const slice = UPGRADE_BY_ID.gleaning.effect.fingers;
   const rate = totalRate(state);
-  assert.ok(Math.abs(tapValue(state) - (1 + rate * 0.01)) < 1e-9,
+  assert.ok(Math.abs(tapValue(state) - (1 + rate * slice)) < 1e-9,
     'a tap must be worth its base plus its share of the rate');
+});
+
+test('momentum pays for speed, stops at the cap, and is nothing at a standstill', () => {
+  const state = newGame();
+  assert.equal(tapPays(state, 8), tapValue(state), 'without Momentum, speed is worth nothing extra');
+  state.bought.momentum = true;
+  const bonus = bonuses(state);
+  assert.equal(momentum(0, bonus), 1, 'the first tap after a pause is an ordinary tap');
+  assert.ok(momentum(4, bonus) > momentum(2, bonus), 'faster must be worth more');
+  assert.ok(Math.abs(momentum(4, bonus) - 2) < 1e-9, 'four a second is a doubling');
+  assert.equal(momentum(STREAK_CAP, bonus), momentum(40, bonus),
+    'past the cap an autoclicker is worth exactly what a flurry is');
+  assert.equal(momentum(-3, bonus), 1, 'a negative rate is a broken clock, not a penalty');
+  assert.equal(tap(state, 4), 2, 'and the tap itself pays the momentum');
+  assert.equal(tap(state, 0), 1);
+});
+
+test('every tenth tap is the windfall, and it is the same tenth everywhere', () => {
+  const state = newGame();
+  for(let i = 0; i < 30; i++) assert.equal(tap(state, 4), 1, 'without Windfall there is no tenth tap');
+
+  const rich = newGame();
+  rich.bought.windfall = true;
+  const paid = [];
+  for(let i = 0; i < 2 * WINDFALL_EVERY; i++) paid.push(tap(rich, 0));
+  const big = paid.filter(v => v > 1);
+  assert.equal(big.length, 2, `two rounds of ${WINDFALL_EVERY} are two windfalls, not ${big.length}`);
+  assert.equal(paid[WINDFALL_EVERY - 1], UPGRADE_BY_ID.windfall.effect.windfall, 'the tenth pays ten');
+  assert.equal(paid[WINDFALL_EVERY - 2], 1, 'and the ninth pays one');
+  assert.ok(isWindfall(rich) === false, 'the twenty-first tap is not the windfall');
+  rich.run.taps = WINDFALL_EVERY - 1;
+  assert.ok(isWindfall(rich), 'the page can ask before it taps, so it can draw the tenth bigger');
+
+  // Counted off the run, so a replant starts the count again and the medals'
+  // all-time tap count has nothing to do with it.
+  rich.life.taps = 12345;
+  rich.run.taps = 0;
+  assert.equal(isWindfall(rich), false);
+});
+
+test('at the quarter hour the hand is still worth at least as much as the lot', () => {
+  /* The failure this pins: the shop where the hand was worth two energy at the
+     forty-five minute mark against a lot making a hundred and fifty a second,
+     and tapping was two percent of income from the half hour on. The lot here
+     is what the balance harness holds at fifteen minutes, with the hand's
+     upgrades that unlock by then bought. */
+  const state = newGame();
+  Object.assign(state.owned, { moss: 13, fern: 9, panel: 4 });
+  for(const id of ['warm-hands', 'steady-hands', 'gleaning', 'momentum', 'windfall']){
+    assert.ok(UPGRADE_BY_ID[id].need.runTaps <= 4 * 900, `${id} should be on the shelf inside fifteen minutes at four a second`);
+    state.bought[id] = true;
+  }
+  let round = 0;
+  for(let i = 0; i < WINDFALL_EVERY; i++){ state.run.taps = i; round += tapPays(state, 4); }
+  const handPerSecond = 4 * round / WINDFALL_EVERY;
+  assert.ok(handPerSecond >= steadyRate(state),
+    `four taps a second is worth ${formatLight(handPerSecond)}/s against a lot making ${formatLight(steadyRate(state))}/s`);
 });
 
 test('a tick pays what the rate says and no more', () => {
