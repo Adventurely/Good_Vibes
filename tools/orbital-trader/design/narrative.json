@@ -48,7 +48,7 @@
  ],
  "ports": {
   "cinder": {
-   "blurb": "A world tide-locked to the Lamp, with a molten face, a frozen back, and every Emberkin city crowded into the twilight between. The year lasts fifty-nine days, so the New Year party has never entirely stopped. The best engines anywhere are built here by people who will not live to see them wear out.",
+   "blurb": "A world tide-locked to the Lamp, with a molten face, a frozen back, and every Emberkin city crowded into the twilight between. The year lasts fifty-six days, so the New Year party has never entirely stopped. The best engines anywhere are built here by people who will not live to see them wear out.",
    "arrival": [
     "The dock crew has your lines tied before you have finished thinking about it.",
     "Somebody is already asking what you brought, what it cost, and whether you will take a letter back.",
@@ -84,7 +84,7 @@
    ]
   },
   "veyra": {
-   "blurb": "The wealthy Emberkin world, close enough to the Lamp to be brilliant and far enough to be comfortable. Houses measure each other in public, and the measuring is done at auction. Nothing is bought here quietly and nothing is sold here cheap.",
+   "blurb": "The wealthy Emberkin world, and the nearest of them to the Lamp: bright enough that shade is bought and sold here like anything else. Houses measure each other in public, and the measuring is done at auction. Nothing is bought here quietly and nothing is sold here cheap.",
    "arrival": [
     "A steward meets you at the lock with a list of who is in port and who is not speaking to whom.",
     "The dock is swept. You had not realised a dock could be swept.",
@@ -358,10 +358,10 @@
     "id": "navigator",
     "name": "Navigator",
     "species": "cat",
-    "does": "Reads a rock at four au and tells you which way it is going.",
+    "does": "Reads a rock an au off and tells you which way it is going.",
     "person": {
      "name": "Celia",
-     "line": "Can read a rock at four au and tell you which way it is going. Says almost nothing and is always already looking at the thing you are about to point at."
+     "line": "Can read a rock an au off and tell you which way it is going. Says almost nothing and is always already looking at the thing you are about to point at."
     }
    },
    {
@@ -405,6 +405,11 @@
    "A salvage crew arrives before the tug does, looks disappointed, and helps anyway.",
    "You are fished out, dusted off, and handed a bill written in a very steady hand."
   ],
+  "distress": [
+   "They come out for you without being asked twice, which is its own kind of comment. Nobody mentions the fee; the fee mentions itself.",
+   "The harbour master remembers your ship, remembers what you paid last time, and works out what half of everything is before the ship is even alongside.",
+   "A long quiet ride home behind somebody else's engine, with your own tank ticking as it cools and nothing to do but think about it."
+  ],
   "towAtmosphere": "The clouds took the hull without a shield on it. The frogs fished you out and hummed the whole time they were doing it.",
   "firstTransfer": "You are out of every world's gravity now, on the Lamp's own books. The transfer starts here and ends wherever you aimed it.",
   "firstAssist": "You fell past Grumm and came out faster than you went in, with the tank untouched. The frogs call that a slingshot. Grumm has not noticed.",
@@ -440,28 +445,28 @@
   },
   {
    "step": "mark",
-   "title": "Make a mark",
-   "body": "Good. Let's get that present. Tap the white line you are riding and pick 'Plan a burn'.\n\nDon't worry about where you put it. We'll fix that next."
+   "title": "Plan a burn",
+   "body": "Good. Let's get that present. Tap the white line you are riding and choose 'Plan a burn'.\n\nA planned burn is a point on your path where the engine will fire and change your speed. Nothing happens yet: you keep coasting until the clock reaches it, and until then you can move it or change it as much as you like.\n\nDon't worry about where you put it. We'll fix that next."
   },
   {
    "step": "push",
    "title": "Push it out to Slate's height",
-   "body": "Four arrows appeared around the mark. Green adds speed. Orange takes it back.\n\nGreen pushes the far side of your orbit outward. Press green until the yellow line reaches Slate's circle.\n\nWithin a tenth is close enough."
+   "body": "Four arrows appeared around the burn. Green adds speed. Orange takes it back.\n\nGreen pushes the far side of your orbit outward. Press green until the yellow line reaches Slate's circle. Within a tenth is close enough.\n\nThe label by the burn says what the engine will do, like 'forward 120 m/s'. What it costs you comes off the Fuel gauge at the top."
   },
   {
    "step": "aim",
    "title": "Put Slate in the way",
-   "body": "Perfect. You'll reach Slate's circle — but not Slate.\n\nDrag the mark around your orbit until the yellow line crosses that circle about thirty degrees ahead of Slate. It has to travel while you do.\n\nWhen the chart says it has found Slate, you're set."
+   "body": "Perfect. You'll reach Slate's circle, but not Slate.\n\nSlate is moving: the little arrow on its circle shows which way. Drag the burn around your orbit until the yellow line crosses Slate's circle about thirty degrees ahead of Slate, so you both arrive together.\n\nIf a red cross appears, you'd hit the ground. Nudge the burn until it goes."
   },
   {
    "step": "skip",
    "title": "Don't sit there watching",
-   "body": "You don't have to wait around. Tap your path past the mark and choose 'Warp here'.\n\nTime runs itself, and the burn fires on its own. Keep going until you're inside Slate's gravity."
+   "body": "You don't have to wait around. Tap your path past the burn and choose 'Warp here'.\n\nTime runs itself, and the burn fires on its own when the clock reaches it. Keep going until you're inside Slate's gravity."
   },
   {
    "step": "brake",
    "title": "Fall in, then stop falling",
-   "body": "You've made it to Slate. You're just going too fast.\n\nMake a mark near the low point and press orange to slow down. Slowing down here is what stops you flying back out.\n\nKeep pressing orange until the path closes into a loop."
+   "body": "You've made it to Slate. You're just going too fast, and the path flies straight back out.\n\nPlan a burn near the low point and press orange to slow down. Slowing down here pulls the far side in. Tap orange one press at a time until the path closes into a loop.\n\nGone too far and the loop is shrinking toward the ground? Press green once."
   },
   {
    "step": "lower",
@@ -476,7 +481,7 @@
   {
    "step": "leave",
    "title": "Climb back out",
-   "body": "Halfway there! Cast off and press green until the path opens and lets go of Slate."
+   "body": "Halfway there! Three things.\n\nCast off from the Shipyard tab. Tap the white line and plan a burn. Press green until the loop opens and the path leaves Slate's circle; the chart marks the way out.\n\nThen warp past the burn and keep going until you're back in Tassel's gravity."
   },
   {
    "step": "home",
@@ -508,7 +513,7 @@
   "onStranded": [
    "The tank is dry. Nothing is on fire; we simply cannot change our mind about anything now.",
    "Out of what you had left. The path we are on is the path we get, unless somebody comes out.",
-   "Dry. A tow costs money and days. It has happened to better pilots, most of whom deny it."
+   "Dry. A distress call costs half of everything and no time at all; a tow costs less and takes months. It has happened to better pilots, most of whom deny it."
   ]
  },
  "logTemplates": {
@@ -521,6 +526,7 @@
   "sold": "Sold {qty} × {good} at {port} for {price}.",
   "bought": "Bought {qty} × {good} at {port} for {price}.",
   "towed": "Towed to {port}: {cost}, {days}.",
+  "rescued": "Distress call answered by {port}. Half the purse: {cost}.",
   "tolled": "Paid the Belt toll to {captain}.",
   "refuelled": "Took on {amount} at {port} for {price}.",
   "upgraded": "Fitted {name} at {port}.",

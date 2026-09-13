@@ -368,7 +368,7 @@ public/index.html   the shelf: every game, thumbnails painted by their own
                     renderers rather than screenshotted
 public/solarium/    Save Solarium, client and content
 public/sunward/content.js  Sunward as data — the nine growers and their curve,
-                    the eighteen upgrades, the medals, the day, the record, and
+                    the twenty upgrades, the medals, the day, the record, and
                     the pure functions over all of it. No DOM, no clock, no save
 public/sunward/art.js  the lot: sky, ground, nine prop sprites, and a tree
                     that is grown by a recursion rather than drawn as a sprite
@@ -1541,8 +1541,9 @@ node test/sunward-balance.mjs 345600 8      # four days, at eight
 ```
 
 It runs as part of `npm test`, the way `test/balance.mjs` does for Good Vibes,
-and it carries four coarse guardrails: something is making energy after a
-minute, three kinds are planted within the hour, the first seed is inside an
+and it carries five coarse guardrails: something is making energy after a
+minute, the hand has made at least two fifths of the energy at the quarter
+hour, three kinds are planted within the hour, the first seed is inside an
 evening, and all but one of the nine kinds are on the lot within a day. The
 shape of the curve
 is pinned in `test/sunward.test.js`; this measures what a player actually ends
@@ -1555,7 +1556,7 @@ second at all — see below. And the lot's sprites appeared at 1, 10, 25 and 60
 owned, which drew four things for a garden of ninety-one — the picture was a
 third of the way through the game while the shop was most of the way.
 
-**Nine growers and eighteen upgrades**, down from twelve and forty-two. Three of
+**Nine growers and twenty upgrades**, down from twelve and forty-two. Three of
 the twelve were the same idea as a tier already on the list — a second fungus, a
 coral reef nobody could explain, an orbital mirror that was a second sun — and
 most of the forty-two were the same upgrade sold twice: six doublings of the
@@ -1564,6 +1565,30 @@ swing, two rows per grower. A row that is "the row above, again, bigger" is not
 a choice, it is a longer list. What is left is one line of each kind, every
 grower improved exactly once, and a test that fails the moment two rows do the
 same thing to the same target.
+
+**The hand has to keep up, and for a week it did not.** The question was how
+long the first replant takes, and the harness answered it for eight ways of
+playing: between an hour and nine minutes (eight taps a second, never
+stopping) and an hour and forty-nine (thirty taps and a closed lid). Tapping
+was worth forty minutes over an hour and three quarters, because a tap was
+worth two energy from the first minute to the forty-fifth, by which time the
+lot made a hundred and fifty a second — the hand was two percent of income
+from the half hour on, and the second and third doublings of it were priced
+to land at forty minutes and five hours, where a doubling of two is nothing
+anybody notices. Three things changed. The hand's rows now land in the first
+quarter hour — Steady hands at 900 rather than 30,000, Gleaning at 600 for two
+percent of the rate rather than 25,000 for one. And two rows came back, as
+new kinds rather than more steps: *Momentum*, a quarter more per tap a second
+the hand is going, capped at eight so an autoclicker is worth exactly what a
+flurry is; and *Windfall*, every tenth tap of the run paying ten, counted off
+the run rather than rolled so the same tap is the tenth in the browser and in
+the test. Over a hundred taps Windfall is worth a doubling, but it is not
+shaped like one — it gives the hand a beat. The harness now reads: at four
+taps a second and not stopping, the first replant at forty-nine minutes; at
+eight, twenty-five; tapping for the first quarter hour and leaving, an hour
+and twenty-four, with the hand making two thirds of the energy while it is
+at the desk. The idle path is untouched, which is the point: the lever that
+moved was the one the player is holding.
 
 **The lot is the page.** The frame around it is one thin row — the name, a
 way back, a way to start over — the four numbers that never go away, and the
@@ -1863,7 +1888,7 @@ timestep anywhere, and nothing tunnels through a small moon at high warp.
 | Time | days (Tessel's year is 360 of them) |
 | Speed, Δv | au/day inside; 1 au/day shows as 1706 km/s, so Tessel's orbit reads 29.8 km/s |
 | Fuel | *is* the Δv budget. A burn subtracts its own size. No mass, no rocket equation |
-| Clock | ×1 is 0.0000347222222 days a second: ten real minutes to a lap of the 75 km orbit a new game opens in over Tessel, which takes 30 minutes of game time |
+| Clock | ×1 is 0.0000370182663 days a second: ten real minutes to a lap of the 100 km orbit a new game opens in over Tassel, which takes 32 minutes of game time. Ten minutes a lap is the rate's only job, so moving the opening orbit moves the rate |
 | Scale | KSP's, not ours: every body is a tenth of real size and many times denser. Tessel is 498 km across with 9.25 m/s² at the ground, air to 70 km, and a reach of 116,500 km |
 
 ### Aiming
@@ -1910,31 +1935,31 @@ node tools/orbital-trader/check-tuning.mjs        # check, and print the Δv tab
 node tools/orbital-trader/check-tuning.mjs --write  # and record it in tuning.json
 ```
 
-It asserts what the design document promises — Tessel's year is exactly 360
-days, no moon can leave its planet's reach, sibling moons never overlap, every
-harbour mouth fits inside a third of its world's reach, Grumm turns a Hohmann
-arrival through at least sixty degrees, Wanderwell reaches kissing distance
-about a year in — and it prints the Δv table the ladder is built on:
+It asserts what the design document promises — the calendar and the sky are
+the same thing, no moon can leave its planet's reach, sibling moons never
+overlap, every harbour mouth sits well inside its world's reach, every harbour
+sits inside its own mouth, Grumm turns a Hohmann arrival through at least
+sixty degrees, a lap of the opening orbit is ten real minutes at ×1 — and it
+prints the Δv table the ladder is built on:
 
 | Route | Δv | Time |
 | --- | --- | --- |
-| Bramble → Ledger, the second lesson | 0.9 km/s | 5 d |
-| Tessel dock → Bramble, the first | 2.2 km/s | 2 d |
-| Tessel → Wanderwell at its kiss | 6.6 km/s | 117 d |
-| Tessel → the Arc | 8.6 km/s | 364 d |
-| Tessel → Claw Rock | 10.0 km/s | 490 d |
-| Tessel → Grumm, loose capture | 7.6 km/s | 935 d |
-| Tessel → Lillimoor's height, circular | 10.7 km/s | 935 d |
-| Tessel → Cinder, docked | 15.9 km/s | 94 d |
-| Tessel → Chime, docked, no assist | 13.6 km/s | 2012 d |
-| Tessel → the Far Lantern | 12.6 km/s | 5271 d |
+| Slate → Moss, the moon hop | 0.15 km/s | 1.1 d |
+| Tassel dock → Slate, the first lesson | 0.18 km/s | 0.3 d |
+| Tassel → Cinder, loose capture | 4.8 km/s | 43 d |
+| Tassel → Cinder, docked | 6.5 km/s | 43 d |
+| Tassel → Nail, the Belt | 8.4 km/s | 119 d |
+| Tassel → the Arc | 10.2 km/s | 151 d |
+| Tassel → Grumm, loose capture | 12.1 km/s | 312 d |
+| Tassel → Haven's height, circular | 12.4 km/s | 312 d |
+| Tassel → the Maw | 15.1 km/s | 1757 d |
+| Tassel → Veyra, docked | 18.5 km/s | 31 d |
 
-The starter tank is 14 km/s, so that table *is* the map: the rafts, the
-festival at Wanderwell, the belt and Grumm are all open from the first hour,
-and Cinder and Chime wait for a bigger tank. **Falling inward is dearer than
-climbing out** — Cinder sits at 0.3 au and the arrival is most of the bill —
-which is real orbital mechanics and, happily, exactly what the Emberkin would
-tell you.
+The starter tank is 14 km/s, so that table *is* the map: the moons, Cinder,
+the Belt, the Arc and a loose capture at Grumm are all open from the first
+hour, and Veyra and the Maw wait for a bigger tank. **The errand comes before
+the expedition** — Cinder is the near Emberkin world and Veyra the far one, and
+the difference between them is most of a tank.
 
 ### What a stall pays
 

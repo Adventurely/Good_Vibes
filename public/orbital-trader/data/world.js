@@ -2,18 +2,19 @@
  * Do not edit: change the JSON and run the build script. */
 export const TUNING = {
  "constants": {
-  "MU_LAMP": 0.00030461741978670857,
-  "YEAR_DAYS": 360,
+  "MU_LAMP": 0.00010153883531178769,
+  "YEAR_DAYS": 120,
   "KMS_PER_AU_DAY": 1706,
-  "BASE_RATE_DAYS_PER_SEC": 0.0000347222222,
+  "BASE_RATE_DAYS_PER_SEC": 0.0000370182663,
   "SKIP_SECONDS": 10,
   "MAX_WARP": 4280000,
   "MU_EARTH": 8.887692587e-10,
-  "MASS_NOTE": "Masses are mu (GM) in au^3/day^2; MU_EARTH is Earth's, kept for scale. The sky is built the way KSP builds one: every body is a tenth of the size a real one would be and many times denser, so a world is a place you can see all of and get off in a couple of minutes. Tassel is the anchor — 498 km of radius, surface gravity 9.25 m/s^2, density 66 g/cc, one reach of 116,500 km — and it is what it is because a 75 km orbit has to take 30 minutes. Every other body took the same two factors: radius x1/10, mu x0.01203911, which leaves every surface gravity in the same proportion it always had.",
-  "SOI_NOTE": "No body carries a soi. A reach is r = a * (mu/mu_parent)^(2/5), computed in content.js (and mirrored in check-tuning.mjs) so that mass is the only knob and no table can disagree with the physics. Bodies with no mass, or nothing to go round, have no reach. Because a planet keeps its heliocentric a, its reach shrank by the mass scale to the 2/5 (x0.1707); every length inside a system — moon orbits, docking altitudes, harbour mouths — took that same factor, so every reach-relative proportion in the sky is exactly where it was before the rescale.",
+  "MASS_NOTE": "Masses are mu (GM) in au^3/day^2; MU_EARTH is Earth's, kept for scale. The sky is built the way KSP builds one: every body is a tenth of the size a real one would be and many times denser, so a world is a place you can see all of and get off in a couple of minutes. Tassel is the anchor — 498 km of radius, surface gravity 9.25 m/s^2, density 66 g/cc, one reach of 116,500 km — and it is what it is because a low orbit over it has to take about half an hour: the 100 km a new game opens in takes 32 game minutes. Every other body took the same two factors: radius x1/10, mu x0.01203911, which leaves every surface gravity in the same proportion it always had.",
+  "SOI_NOTE": "No body carries a soi, and no port carries a docking range. A reach is r = a * (mu/mu_parent)^(2/5) and a harbour mouth is 10*radius + the air over it, both computed in content.js (and mirrored in check-tuning.mjs) so that size and mass are the only knobs and no table can disagree with the physics. Bodies with no mass, or nothing to go round, have no reach; the drifting havens keep an authored mouth because they have no ground to be ten times of.",
   "DV_DISPLAY_NOTE": "1 au/day shows as 1706 km/s, so Tassel's circular speed reads 29.8 km/s like Earth's.",
-  "RATE_NOTE": "At x1 a lap of the orbit a new game starts in — 75 km over Tassel, 30 game minutes — takes 600 real seconds: ten minutes, the slowest clock the game ever runs. Nothing in the sky is quicker than that; a game day is 8 real minutes.",
-  "SKIP_NOTE": "There is no ladder of warp speeds. A player points at a place on their road and the clock runs at whatever rate covers it in SKIP_SECONDS, capped at MAX_WARP (about 149 days a second); anything longer than the cap allows simply takes proportionally more than ten seconds, and the confirmation says so."
+  "RATE_NOTE": "At x1 a lap of the orbit a new game starts in — 100 km over Tassel, 32 game minutes — takes 600 real seconds: ten minutes, the slowest clock the game ever runs. That is the rate's only job, so moving the starting orbit moves the rate with it. Nothing in the sky is quicker than that; a game day is 7.5 real hours.",
+  "SKIP_NOTE": "There is no ladder of warp speeds. A player points at a place on their road and the clock runs at whatever rate covers it in SKIP_SECONDS, capped at MAX_WARP (about 149 days a second); anything longer than the cap allows simply takes proportionally more than ten seconds, and the confirmation says so.",
+  "SCALE_NOTE": "The sky was squeezed by three: every orbit about the Lamp is a third of the size it was, and the Lamp is a third of the mass. Those two together are what keep every speed — and so every delta-v in the table below — exactly where it was, because v = sqrt(mu/r) and both halves moved the same way. What changed is time: a lap, a transfer and a launch window all take a third as long, so Tassel's year is 120 days and a crossing to Veyra is six weeks instead of four months. Moons kept their distance from their planets. Scorch is the one exception — Cinder's reach shrank below where Scorch was orbiting, so it moved in to 0.00026 au and took the mass its own harbour needs."
  },
  "bodies": [
   {
@@ -26,34 +27,35 @@ export const TUNING = {
    "omega": 0,
    "M0": 0,
    "retrograde": false,
-   "mu": 0.00030461741978670857,
+   "mu": 0.00010153883531178769,
    "radius": 0.005,
    "port": false,
    "species": null,
    "climate": "hot",
    "notes": "A warm orange star. Its radius is the crash radius; its reach is everything.",
-   "soi": null
+   "soi": null,
+   "zoneRadius": 0.030000000000000002
   },
   {
    "id": "cinder",
    "name": "Cinder",
    "kind": "planet",
    "parent": "lamp",
-   "a": 0.3,
-   "e": 0,
-   "omega": 0,
-   "M0": 2.1,
+   "a": 0.2,
+   "e": 0.02,
+   "omega": 1.2,
+   "M0": 3.4,
    "retrograde": false,
    "mu": 9.63129e-11,
    "radius": 0.000003,
-   "dockAlt": 0.0000682807,
-   "zoneRadius": 0.000136561,
+   "dockAlt": 0.000015,
    "dockSpeed": 0.000293,
    "port": true,
    "species": "emberkin",
    "climate": "hot",
    "notes": "The Emberkin homeworld. Industrial, volcanic, crowded; cities in the twilight band.",
-   "soi": 0.0007535171556727867
+   "soi": 0.0007795624440749096,
+   "zoneRadius": 0.000018
   },
   {
    "id": "scorch",
@@ -68,41 +70,41 @@ export const TUNING = {
    "mu": 9.63129e-14,
    "radius": 0.000002,
    "dockAlt": 0.000004,
-   "zoneRadius": 0.000008,
    "dockSpeed": 0.000293,
    "port": true,
    "species": "emberkin",
    "climate": "hot",
    "notes": "Cinder's mining moon. Barren, mineral-rich, and the frontier every Emberkin house sends its unlucky to.",
-   "soi": 0.000028393080501608693
+   "soi": 0.000028393080501608693,
+   "zoneRadius": 0.000011999999999999999
   },
   {
    "id": "veyra",
    "name": "Veyra",
    "kind": "planet",
    "parent": "lamp",
-   "a": 0.6,
-   "e": 0.02,
-   "omega": 1.2,
-   "M0": 3.4,
+   "a": 0.1,
+   "e": 0,
+   "omega": 0,
+   "M0": 2.1,
    "retrograde": false,
    "mu": 1.44469e-10,
    "radius": 0.000003,
-   "dockAlt": 0.0000853508,
-   "zoneRadius": 0.000170702,
+   "dockAlt": 0.000015,
    "dockSpeed": 0.000293,
    "port": true,
    "species": "emberkin",
    "climate": "hot",
    "notes": "The wealthy Emberkin world. Luxury, auctions and houses that measure each other in public.",
-   "soi": 0.001772389722237027
+   "soi": 0.00045841307438006826,
+   "zoneRadius": 0.000018
   },
   {
    "id": "tassel",
    "name": "Tassel",
    "kind": "planet",
    "parent": "lamp",
-   "a": 1,
+   "a": 0.333333,
    "e": 0,
    "omega": 0,
    "M0": 0.4,
@@ -110,15 +112,15 @@ export const TUNING = {
    "mu": 5.34999497e-12,
    "radius": 0.0000033801725,
    "dockAlt": 0.0000204842,
-   "startAlt": 0.00000388899204,
-   "zoneRadius": 0.0000341403,
+   "startAlt": 0.00000405859855,
    "dockSpeed": 0.000293,
    "port": true,
    "species": "otter",
    "climate": "temperate",
-   "notes": "The starting port, and the body the whole sky is scaled around: 498 km of radius, 9.25 m/s^2 at the ground, 66 g/cc, air to 70 km. startAlt is the orbit a new game opens in and nothing else — 75 km, a lap in 30 game minutes, five above the air, which is where a pilot parks. The harbour is far higher up at 2521 km and its mouth reaches 4534.",
+   "notes": "The starting port, and the body the whole sky is scaled around: 498 km of radius, 9.25 m/s^2 at the ground, 66 g/cc, air to 70 km. startAlt is the orbit a new game opens in and nothing else — 100 km, a lap in 32 game minutes, thirty above the air, which is where a pilot parks. The harbour is far higher up at 2521 km and its mouth reaches 2561.",
    "atmo": 0.00000385507074,
-   "soi": 0.0007903863937605581
+   "soi": 0.0004088526240506391,
+   "zoneRadius": 0.000020755933240000002
   },
   {
    "id": "slate",
@@ -133,13 +135,13 @@ export const TUNING = {
    "mu": 2.14e-13,
    "radius": 0.000001,
    "dockAlt": 0.00000290193,
-   "zoneRadius": 0.00000495035,
    "dockSpeed": 0.000293,
    "port": true,
    "species": "otter",
    "climate": "temperate",
    "notes": "The tutorial moon. Rocky, barren, industrial: otter mining colonies, shipyards, and the first lessons.",
-   "soi": 0.000015544454130799086
+   "soi": 0.000015544454130799086,
+   "zoneRadius": 0.000005999999999999999
   },
   {
    "id": "moss",
@@ -154,20 +156,20 @@ export const TUNING = {
    "mu": 1.68548e-13,
    "radius": 0.000002,
    "dockAlt": 0.00000512105,
-   "zoneRadius": 0.00000921789,
    "dockSpeed": 0.000293,
    "port": true,
    "species": "otter",
    "climate": "temperate",
    "notes": "Green, lush and oceanic. Agriculture, medicine and exotic plants; where otter crews are found.",
-   "soi": 0.00002911348981803809
+   "soi": 0.00002911348981803809,
+   "zoneRadius": 0.000011999999999999999
   },
   {
    "id": "nail",
    "name": "Nail",
    "kind": "zone",
    "parent": "lamp",
-   "a": 2.15,
+   "a": 0.716667,
    "e": 0.01,
    "omega": 2,
    "M0": 1.3,
@@ -187,7 +189,7 @@ export const TUNING = {
    "name": "Whisker",
    "kind": "zone",
    "parent": "lamp",
-   "a": 2.38,
+   "a": 0.793333,
    "e": 0.02,
    "omega": 4.4,
    "M0": 5.1,
@@ -207,28 +209,28 @@ export const TUNING = {
    "name": "The Arc",
    "kind": "station",
    "parent": "lamp",
-   "a": 2.7,
+   "a": 0.9,
    "e": 0,
    "omega": 0,
    "M0": 5,
    "retrograde": false,
    "mu": 2.40782e-15,
    "radius": 0.000001,
-   "dockAlt": 0.00000682807,
-   "zoneRadius": 0.0000170702,
+   "dockAlt": 0.000005,
    "dockSpeed": 0.000293,
    "port": true,
    "species": "cat",
    "climate": "micro",
-   "notes": "The Builders' station, enormous and abandoned, riding just beyond the Belt. The cats salvage its edges.",
-   "soi": 0.00009783888102918474
+   "notes": "The Builders' station, enormous and abandoned, riding just beyond the Belt. The cats salvage its edges. Its harbour sits at five radii, as Cinder's and Veyra's do: at six it was outside its own docking range, which is five radii above the ground.",
+   "soi": 0.00005061033889305786,
+   "zoneRadius": 0.000005999999999999999
   },
   {
    "id": "grumm",
    "name": "Grumm",
    "kind": "planet",
    "parent": "lamp",
-   "a": 5,
+   "a": 1.66667,
    "e": 0,
    "omega": 0,
    "M0": 0.9,
@@ -237,13 +239,13 @@ export const TUNING = {
    "radius": 0.00005,
    "atmo": 0.00006,
    "dockAlt": 0.0003,
-   "zoneRadius": 0.0005,
    "dockSpeed": 0.000293,
    "port": true,
    "species": "frog",
    "climate": "cold",
    "notes": "The gas giant. Floating frog cities in the cold upper clouds, and a harbour well above them at six planet radii — the same proportion Tassel keeps — because the whole outer system's trade is parked there. The clouds above its atmosphere brake a shielded ship.",
-   "soi": 0.04976018783414571
+   "soi": 0.025740124784103466,
+   "zoneRadius": 0.00031
   },
   {
    "id": "brine",
@@ -258,13 +260,13 @@ export const TUNING = {
    "mu": 1.80587e-13,
    "radius": 0.0000011,
    "dockAlt": 0.00000273123,
-   "zoneRadius": 0.00000443824,
    "dockSpeed": 0.000293,
    "port": true,
    "species": "frog",
    "climate": "cold",
    "notes": "Ammonia seas and floating settlements. Pharmaceuticals, chemicals and biology nobody else can read.",
-   "soi": 0.000013924179243748983
+   "soi": 0.000013924179243748983,
+   "zoneRadius": 0.0000065999999999999995
   },
   {
    "id": "glass",
@@ -279,13 +281,13 @@ export const TUNING = {
    "mu": 2.2e-13,
    "radius": 0.000003,
    "dockAlt": 0.000006,
-   "zoneRadius": 0.000009,
    "dockSpeed": 0.000293,
    "port": true,
    "species": "frog",
    "climate": "cold",
    "notes": "Icy and beautiful, with an ocean under the shell. Research, deep history and the study of the Builders.",
-   "soi": 0.00003323888374983374
+   "soi": 0.00003323888374983374,
+   "zoneRadius": 0.000018
   },
   {
    "id": "croak",
@@ -300,13 +302,13 @@ export const TUNING = {
    "mu": 1.44469e-13,
    "radius": 0.000003,
    "dockAlt": 0.000009,
-   "zoneRadius": 0.000013,
    "dockSpeed": 0.000293,
    "port": true,
    "species": "frog",
    "climate": "cold",
    "notes": "Retrograde, isolated and austere. The approach is dear on purpose, which is the whole point of the ascetics on it.",
-   "soi": 0.00005243895122059096
+   "soi": 0.00005243895122059096,
+   "zoneRadius": 0.000018
   },
   {
    "id": "haven",
@@ -321,20 +323,20 @@ export const TUNING = {
    "mu": 3.00978e-13,
    "radius": 0.000004,
    "dockAlt": 0.000012,
-   "zoneRadius": 0.000019,
    "dockSpeed": 0.000293,
    "port": true,
    "species": "frog",
    "climate": "cold",
    "notes": "The frog capital: peaceful, populous and beautiful. Pilgrimages, festivals and the outer system's great market.",
-   "soi": 0.00011805866228095024
+   "soi": 0.00011805866228095024,
+   "zoneRadius": 0.000023999999999999997
   },
   {
    "id": "maw",
    "name": "The Maw",
    "kind": "zone",
    "parent": "lamp",
-   "a": 18,
+   "a": 6,
    "e": 0,
    "omega": 0,
    "M0": 2.6,
@@ -352,8 +354,8 @@ export const TUNING = {
   }
  ],
  "belt": {
-  "inner": 2,
-  "outer": 2.5,
+  "inner": 0.666667,
+  "outer": 0.833333,
   "count": 1400,
   "seed": 11
  },
@@ -421,76 +423,76 @@ export const TUNING = {
   },
   {
    "route": "Tassel -> Veyra (dock)",
-   "dv_kms": 6.6,
-   "dep_kms": 3.3,
-   "arr_kms": 3.3,
-   "days": 129
+   "dv_kms": 18.5,
+   "dep_kms": 8.8,
+   "arr_kms": 9.7,
+   "days": 31
   },
   {
    "route": "Tassel -> Cinder (dock)",
-   "dv_kms": 20.1,
-   "dep_kms": 8.8,
-   "arr_kms": 11.3,
-   "days": 94
+   "dv_kms": 6.5,
+   "dep_kms": 3.3,
+   "arr_kms": 3.2,
+   "days": 43
   },
   {
    "route": "Tassel -> Cinder (loose capture)",
-   "dv_kms": 19.4,
-   "dep_kms": 8.8,
-   "arr_kms": 10.7,
-   "days": 94
+   "dv_kms": 4.8,
+   "dep_kms": 3.3,
+   "arr_kms": 1.5,
+   "days": 43
   },
   {
    "route": "Tassel -> Nail (the Belt)",
    "dv_kms": 8.4,
    "dep_kms": 4.3,
    "arr_kms": 4.1,
-   "days": 356
+   "days": 119
   },
   {
    "route": "Tassel -> the Arc",
    "dv_kms": 10.2,
    "dep_kms": 5.4,
    "arr_kms": 4.8,
-   "days": 453
+   "days": 151
   },
   {
    "route": "Tassel -> Grumm (loose capture)",
-   "dv_kms": 12,
+   "dv_kms": 12.1,
    "dep_kms": 7.9,
-   "arr_kms": 4.1,
-   "days": 935
+   "arr_kms": 4.2,
+   "days": 312
   },
   {
    "route": "Tassel -> Haven height, circular",
    "dv_kms": 12.4,
    "dep_kms": 7.9,
-   "arr_kms": 4.6,
-   "days": 935
+   "arr_kms": 4.5,
+   "days": 312
   },
   {
    "route": "Tassel -> the Maw",
    "dv_kms": 15.1,
    "dep_kms": 10.4,
    "arr_kms": 4.7,
-   "days": 5271
+   "days": 1757
   }
  ],
  "periods": {
-  "cinder": 59.15,
+  "cinder": 55.77,
   "scorch": 6.11,
-  "veyra": 167.31,
-  "tassel": 360,
+  "veyra": 19.72,
+  "tassel": 120,
   "slate": 1.15,
   "moss": 3.4,
-  "nail": 1134.91,
-  "whisker": 1321.81,
-  "arc": 1597.16,
-  "grumm": 4024.92,
+  "nail": 378.3,
+  "whisker": 440.6,
+  "arc": 532.39,
+  "grumm": 1341.65,
   "brine": 2.03,
   "glass": 6.65,
   "croak": 16.97,
   "haven": 36.9,
-  "maw": 27492.31
+  "maw": 9164.12
  }
 };

@@ -593,17 +593,22 @@ export function drawTree(ctx, growth, { sway = 0, light = 1, sunSide = -1, shake
  * off the particle's index, not a die — so two taps in the same place throw
  * the same shape, which is what makes it read as the tree reacting rather
  * than as confetti.
+ *
+ * `size` is for the windfall tap: twice the pixels, thrown half again as far,
+ * and more of them gold. Still the same shape, so it reads as the same tree
+ * reacting harder rather than as a different effect.
  */
-export function drawBurst(ctx, x, y, age, light = 1){
+export function drawBurst(ctx, x, y, age, light = 1, size = 1){
   const t = Math.max(0, Math.min(1, age));
-  const count = 12;
+  const count = 12 * Math.max(1, Math.round(size));
+  const reach = size > 1 ? 1.5 : 1;
   for(let i = 0; i < count; i++){
     const angle = -Math.PI * (0.15 + 0.7 * (i / (count - 1))) + ((i % 3) - 1) * 0.12;
-    const speed = 22 + (i % 4) * 7;
+    const speed = (22 + (i % 4) * 7) * reach;
     const px = x + Math.cos(angle) * speed * t;
     const py = y + Math.sin(angle) * speed * t + 34 * t * t;   // and gravity
     if(t > 0.85 && (i % 2)) continue;                           // thinning out
-    const key = i % 5 === 0 ? 'y' : i % 3 === 0 ? 't' : 'g';
+    const key = i % (size > 1 ? 2 : 5) === 0 ? 'y' : i % 3 === 0 ? 't' : 'g';
     fill(ctx, key, light, Math.round(px), Math.round(py), 2, 2);
   }
 }

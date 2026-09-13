@@ -20,7 +20,10 @@ const TAU = Math.PI * 2;
 const period = (mu, a) => TAU * Math.sqrt(a ** 3 / mu);
 /* The reach a mass earns, mirrored from content.js: no body carries one. */
 const soiOf = b => (b.mu > 0 && b.a > 0 && by[b.parent]?.mu > 0) ? b.a * Math.pow(b.mu / by[b.parent].mu, 2 / 5) : null;
-for(const b of T.bodies) b.soi = soiOf(b);
+/* And the mouth a size earns, mirrored the same way: five radii above the top
+   of the air. A drifting haven has neither, and keeps its authored one. */
+const mouthOf = b => b.mu > 0 && b.radius > 0 ? Math.max(b.radius, b.atmo ?? b.radius) + 5 * b.radius : b.zoneRadius;
+for(const b of T.bodies){ b.soi = soiOf(b); b.zoneRadius = mouthOf(b); }
 const km = v => (v * KMS);
 let fails = 0;
 const check = (name, ok, detail = '') => { console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? '  ' + detail : ''}`); if(!ok) fails++; };
@@ -59,9 +62,20 @@ function route(name, toRadius, arrive){
 // --- periods and the calendar
 const periods = {};
 for(const b of T.bodies){ if(b.parent) periods[b.id] = +period(by[b.parent].mu, b.a).toFixed(2); }
-check('C1 Tassel year is 360 days', Math.abs(periods.tassel - 360) < 0.01, `${periods.tassel}`);
-check('C1 Cinder year is weeks', periods.cinder > 40 && periods.cinder < 70, `${periods.cinder} d`);
-check('C1 Veyra sits between Cinder and Tassel', by.cinder.a < by.veyra.a && by.veyra.a < by.tassel.a, `${by.cinder.a} < ${by.veyra.a} < ${by.tassel.a} au`);
+/* The calendar and the sky have to be the same thing. YEAR_DAYS is what the
+   log and every date in the game count in, and Tassel's lap is what a year
+   *is*, so the check is that they agree rather than that either is some
+   particular number — the sky has been squeezed once and would otherwise
+   have left the calendar behind it. */
+check('C1 the calendar is Tassel\'s year', Math.abs(periods.tassel - T.constants.YEAR_DAYS) < 0.01, `${periods.tassel} d vs YEAR_DAYS ${T.constants.YEAR_DAYS}`);
+/* The two Emberkin worlds are the inner pair, in some order. Which of them is
+   nearer the Lamp is a design decision that has been taken both ways; what
+   must hold is that they are both inside Tassel and not on top of each other. */
+const emberkin = [by.cinder, by.veyra].sort((a, b) => a.a - b.a);
+check('C1 the Emberkin worlds are the inner pair', emberkin[1].a < by.tassel.a && emberkin[0].a < emberkin[1].a * 0.8,
+  `${emberkin[0].id} ${emberkin[0].a} then ${emberkin[1].id} ${emberkin[1].a}, both inside Tassel's ${by.tassel.a} au`);
+check('C1 the innermost year is under a month', periods[emberkin[0].id] > 12 && periods[emberkin[0].id] < 30,
+  `${emberkin[0].id}: ${periods[emberkin[0].id]} d`);
 check('C1 both cat havens ride inside the Belt', by.nail.a > T.belt.inner && by.nail.a < T.belt.outer && by.whisker.a > T.belt.inner && by.whisker.a < T.belt.outer, `${by.nail.a} and ${by.whisker.a} in ${T.belt.inner}-${T.belt.outer} au`);
 check('C1 the Arc rides just beyond the Belt', by.arc.a > T.belt.outer && by.arc.a < T.belt.outer + 0.5, `${by.arc.a} au, belt ends at ${T.belt.outer}`);
 check('C1 the Maw is the far edge', by.maw.a > 3 * by.grumm.a, `${by.maw.a} au`);
@@ -83,7 +97,17 @@ check('C4 the inner worlds never nest', by.cinder.soi + by.veyra.soi < 0.2 && by
 for(const b of T.bodies){
   if(!b.port) continue;
   if(b.mu > 0){
-    check(`C5 ${b.id} radius < dockAlt < zone <= soi/3`, b.radius < b.dockAlt && b.dockAlt < b.zoneRadius && b.zoneRadius <= b.soi / 3 + 1e-12, `${b.radius} < ${b.dockAlt} < ${b.zoneRadius} <= ${(b.soi / 3).toFixed(5)}`);
+    /* The ordering that has to hold: the ground, then the parking orbit, then
+       the harbour mouth, and all of it inside the world's own reach. The cap
+       used to be a third of the reach, back when the mouth was a number
+       somebody chose. Ten radii is a bigger bite out of a small moon than out
+       of a planet — Glass's mouth is most of Glass's gravity — so the cap is
+       now the physical one: the harbour has to be inside the reach, with
+       enough left over that crossing the line and tying up are still two
+       things. The fraction is printed because it is the number that decides
+       how much of an arrival is left. */
+    const frac = b.zoneRadius / b.soi;
+    check(`C5 ${b.id} ground < parking < mouth < reach`, b.radius < b.dockAlt && b.dockAlt < b.zoneRadius && frac <= 0.92, `mouth is ${(frac * 100).toFixed(0)}% of the reach`);
     const vc = Math.sqrt(b.mu / b.dockAlt);
     check(`C6 ${b.id} parked speed`, km(vc) < 20, `${km(vc).toFixed(2)} km/s`);
     const esc = Math.sqrt(b.mu * (2 / b.dockAlt - 1 / ((b.dockAlt + b.soi) / 2))) - vc;
@@ -185,18 +209,27 @@ check('C7 the Belt is within the starter tank', dv('Tassel -> Nail') <= starter,
 check('C7 the Arc costs more than the Belt', dv('Tassel -> the Arc') > dv('Tassel -> Nail'));
 check('C7 Grumm is a loose capture on the starter tank', dv('Tassel -> Grumm (loose') <= starter, `${dv('Tassel -> Grumm (loose')} of ${starter}`);
 check('C7 Haven costs more than a loose capture at Grumm', dv('Tassel -> Haven') > dv('Tassel -> Grumm (loose'));
-check('C7 Cinder is dearer than Veyra', dv('Tassel -> Cinder (dock)') > dv('Tassel -> Veyra'), `${dv('Tassel -> Cinder (dock)')} vs ${dv('Tassel -> Veyra')}`);
-check('C7 Cinder is a long-haul destination', dv('Tassel -> Cinder (dock)') > starter && dv('Tassel -> Cinder (dock)') <= longhaul, `${dv('Tassel -> Cinder (dock)')}: past ${starter}, within ${longhaul}`);
-/* Four rungs now — the one the ship comes with and three that are bought —
-   so each has to be worth its price, and the middle one has to be worth more
-   than the arrival it barely paid for on the rung below. */
+/* One Emberkin world is an errand and the other is an expedition, and the
+   quest line counts on knowing which. It sends a ship to Cinder at job five
+   and to Veyra at job eight, so the one it asks for first has to be the one a
+   starter tank can reach — which is what swapping the two of them was for. */
+const near = dv('Tassel -> Cinder (dock)'), far = dv('Tassel -> Veyra');
+check('C7 the errand comes before the expedition', near <= starter && far > starter,
+  `Cinder ${near} within ${starter}, Veyra ${far} past it`);
+check('C7 the far Emberkin world is a long haul, not a wall', far <= longhaul, `${far}: within ${longhaul}`);
+/* Four rungs now — the one the ship comes with and three that are bought — so
+   each has to be worth its price, and the rung above the one that barely
+   reaches the expedition has to make it comfortable rather than exact. */
 check('C7 the tanks climb', T.ship.tanks.every((t, i) => !i || t.dv_kms > T.ship.tanks[i - 1].dv_kms), T.ship.tanks.map(t => t.dv_kms).join(' < '));
 check('C7 the holds climb', T.ship.holds.every((h, i) => !i || h.units > T.ship.holds[i - 1].units), T.ship.holds.map(h => h.units).join(' < '));
-check('C7 the deep-sky tank makes Cinder comfortable rather than exact', dv('Tassel -> Cinder (dock)') <= 0.8 * deepsky, `${dv('Tassel -> Cinder (dock)')} of ${deepsky}`);
+check('C7 the deep-sky tank makes the expedition comfortable rather than exact', far <= 0.8 * deepsky, `${far} of ${deepsky}`);
 /* The Maw is cheap and slow: years of coasting. The deep tank is what makes it
    a journey you come back from. */
 check('C7 the deep tank reaches the Maw with 20% spare', dv('Tassel -> the Maw') <= 0.8 * deep, `${dv('Tassel -> the Maw')} of ${deep}`);
-check('C7 the Maw is the long way round, not the dear one', table.find(r => r.route.startsWith('Tassel -> the Maw')).days > 3000);
+check('C7 the Maw is the long way round, not the dear one',
+  table.find(r => r.route.startsWith('Tassel -> the Maw')).days > 1200
+  && table.every(r => r.route.startsWith('Tassel -> the Maw') || r.days < table.find(x => x.route.startsWith('Tassel -> the Maw')).days),
+  `${table.find(r => r.route.startsWith('Tassel -> the Maw')).days} d, the longest road there is`);
 
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASS');
 if(process.argv.includes('--write')){

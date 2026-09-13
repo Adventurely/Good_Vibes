@@ -72,9 +72,18 @@
   .stat small{ font-size:.66rem; letter-spacing:.12em; text-transform:uppercase; color:var(--faint); }
   .stat b{ font-weight:600; font-size:.92rem; white-space:nowrap; }
   .stat.warn b{ color:var(--rose); }
-  #dvbar{ width:120px; height:5px; background:var(--gv-sunk); border-radius:3px; overflow:hidden; margin-top:3px; }
+  #dvbar{ position:relative; width:120px; height:5px; background:var(--gv-sunk); border-radius:3px; overflow:hidden; margin-top:3px; }
   #dvbar i{ display:block; height:100%; background:linear-gradient(90deg, var(--gold-2), var(--gold)); width:100%; transition:width .2s; }
   #dvbar i.low{ background:var(--rose); }
+  /* What the marks on the chart will spend, eaten off the right-hand end of
+     the gauge. Hatched rather than solid: it is not gone yet. The selector
+     has to out-rank `#dvbar i` above, or the gold gradient paints over it and
+     the segment is invisible. */
+  #dvbar i#h-dvplan{
+    position:absolute; top:0; right:0; width:0; transition:width .2s, right .2s;
+    border-left:1px solid rgba(20,16,12,.85);
+    background:repeating-linear-gradient(-45deg, rgba(20,16,12,.75) 0 2px, rgba(255,255,255,.35) 2px 4px);
+  }
   #where{ flex:1 1 auto; text-align:right; }
   #where b{ color:var(--dim); font-weight:500; }
   #dockhint{ color:var(--mint); font-size:.85rem; }
@@ -555,7 +564,7 @@
 <canvas id="chart" aria-label="The navigation chart: the Lamp, its worlds, and your ship's predicted path." role="img"></canvas>
 
 <header id="hud" aria-live="off">
-  <div class="stat" id="h-dv-wrap"><small>Fuel</small><b id="h-dv">—</b><div id="dvbar"><i id="h-dvfill"></i></div></div>
+  <div class="stat" id="h-dv-wrap"><small>Fuel</small><b id="h-dv">—</b><div id="dvbar"><i id="h-dvfill"></i><i id="h-dvplan"></i></div></div>
   <div class="stat"><small>Coin</small><b id="h-money">—</b></div>
   <div class="stat"><small>Hold</small><b id="h-hold">—</b></div>
   <div class="stat" id="clock-stat" hidden><small>Clock</small><b id="h-warp">—</b></div>
@@ -599,7 +608,7 @@
 </div>
 
 <script type="module">
-import { createChart, PALETTE, locateOnPrediction, fmtAu, bodyColour } from './render.js';
+import { createChart, PALETTE, locateOnPrediction, railCrossings, fmtAu, bodyColour } from './render.js';
 import { portraitURL } from './sprites.js';
 import * as S from './sim.js';
 import { CONST, PORTS, GOODS, UPGRADES, TEXT, SPECIES, GLOSSARY, BELT_ROCKS, ARC_DEBRIS } from './content.js';
@@ -666,7 +675,11 @@ addEventListener('resize', refreshInsets);
 const belt = { inner: CONST.BELT.inner, outer: CONST.BELT.outer, rocks: BELT_ROCKS, debris: ARC_DEBRIS };
 addEventListener('resize', () => chart.resize());
 
-let prediction = null, nodePositions = [], apses = [], predictedAt = -1, predictedReal = -1e9;
+let prediction = null, nodePositions = [], apses = [], crossedRails = [], predictedAt = -1, predictedReal = -1e9;
+/* The moment on the road that was just tapped, while the card about it is
+   up: drawn as a breathing ring so the player can see which line they hit
+   before choosing what to do with it. Gone when the card closes. */
+let tapMark = null;
 let selectedNode = -1;
 let panelOpen = innerWidth > 760;
 let tab = null;
@@ -686,7 +699,7 @@ function horizonFor(){
 }
 
 function replan(force = false){
-  if(state.dockedAt){ prediction = null; nodePositions = []; apses = []; return; }
+  if(state.dockedAt){ prediction = null; nodePositions = []; apses = []; crossedRails = []; return; }
   /* Re-solving the whole road is the most expensive thing this page does, so
      it happens on a real-time budget rather than a game-time one: at most a few
      times a second, whatever the warp. Measuring it in game days got it wrong
@@ -703,7 +716,7 @@ function replan(force = false){
      nothing written down at all there is one road, a whole lap of the orbit
      the ship is actually on. */
   prediction = S.planImmediate(state);
-  if(!prediction){ nodePositions = []; apses = []; return; }
+  if(!prediction){ nodePositions = []; apses = []; crossedRails = []; return; }
   nodePositions = state.nodes.map(n => locateOnPrediction(world, prediction, n.t));
   /* The low point and the high point of every closed leg on the drawn road.
      A near-circular heliocentric orbit has no meaningful pair — its two apses
@@ -722,6 +735,12 @@ function replan(force = false){
         ? 'this path hits it'
         : `${fmtAu(ic.altitude)} · ${S.fmtKms(ic.speed)}${ic.inMouth ? ' · in docking range' : ''}`)
     : null;
+  /* The first rail the road cuts across, and where that world will be when it
+     does. Every crossing is found, because the soonest one is not the first
+     one discovered — bodies are walked in turn, not in time — and then all
+     but that one is dropped. Worked out here rather than every frame: it is a
+     bisection per crossing, and it only changes when the road does. */
+  crossedRails = railCrossings(world, prediction, state.t, { minLead: S.MIN_LEAD });
   apses = [];
   prediction.segments.forEach((seg, i) => {
     const b = world.get(seg.body);
@@ -741,14 +760,24 @@ let lockedTo = null;
 /* The one number the on-chart editor shows. Recomputed when the burn changes,
    not every frame: solving what a mark costs is not free. */
 let nodeLabel = null, nodeLabelKey = '', interceptLabel = null, insetLabel = null;
+/* What every mark written down will take out of the tank, drawn on the gauge. */
+let plannedSpend = 0;
+/* What the selected mark says on the chart, and what the whole plan will
+   spend. Both come from one solve, keyed on every mark rather than on the
+   open one: the fuel gauge shows the total, so a mark nobody has selected
+   still has to count. */
 function refreshNodeLabel(){
-  const n = state.nodes[selectedNode];
-  if(!n || state.dockedAt){ nodeLabel = null; nodeLabelKey = ''; return; }
-  const key = `${selectedNode}|${n.prograde}|${n.radial}|${n.t}`;
+  const key = state.dockedAt ? '' : state.nodes.map(n => `${n.t}|${n.prograde}|${n.radial}`).join(';') + `@${selectedNode}`;
   if(key === nodeLabelKey) return;
   nodeLabelKey = key;
-  const m = S.markStates(state, horizonFor())[selectedNode];
-  nodeLabel = `${S.fmtKms(m?.cost ?? 0)} · in ${S.fmtDays(n.t - state.t)}`;
+  const n = state.nodes[selectedNode];
+  if(state.dockedAt || !state.nodes.length){ nodeLabel = null; plannedSpend = 0; return; }
+  const marks = S.markStates(state, horizonFor());
+  plannedSpend = marks.reduce((sum, m) => sum + (m?.cost ?? 0), 0);
+  /* Direction words, not a length. "0.12 km/s" is the fuel this will burn,
+     and two playtesters braking at Slate read it as their speed and were
+     baffled that pressing Back made it climb. The fuel is on the gauge. */
+  nodeLabel = n ? `${S.burnWords(n)} · in ${S.fmtDays(n.t - state.t)}` : null;
 }
 function frame(now){
   const real = Math.min(0.1, (now - last) / 1000);
@@ -792,7 +821,8 @@ function frame(now){
   const shipAbs = state.dockedAt ? { r: absState(world, state.dockedAt, state.t).r, v: absState(world, state.dockedAt, state.t).v } : { r: S.shipAbsPos(state), v: S.shipAbsVel(state) };
   chart.draw({
     t: state.t, now, shipAbs, shipBody: state.ship.body, docked: !!state.dockedAt,
-    prediction, nodes: state.nodes, nodePositions, selectedNode, apses,
+    prediction, nodes: state.nodes, nodePositions, selectedNode, apses, railCrossings: crossedRails,
+    tapMark: tapMark != null && prediction && !state.dockedAt ? locateOnPrediction(world, prediction, tapMark) : null,
     editing: selectedNode >= 0 && !!state.nodes[selectedNode],
     shipLocalV: state.dockedAt ? null : state.ship.v,
     nodeLabel, interceptLabel, insetLabel,
@@ -839,7 +869,7 @@ function handleEvents(events){
     if(e.kind === 'story') toast(e.text, 'story', 9000);
     if(e.kind === 'toll'){ stopSkip(); showToll(e.pending); }
     if(e.kind === 'crash'){ stopSkip(); showCrash(e.body); }
-    if(e.kind === 'dry'){ stopSkip(); toast(TEXT.captainLines.onStranded[1] ?? 'The tank is dry.', 'bad', 8000); if(tab === 'plan') renderTab(); }
+    if(e.kind === 'dry'){ stopSkip(); toast(`${TEXT.captainLines.onStranded[1] ?? 'The tank is dry.'} Burns has the distress call.`, 'bad', 9000); if(tab === 'plan') renderTab(); }
     if(e.kind === 'missed'){ toast(e.count > 1 ? `${e.count} burns went by unspent.` : 'That burn went by unspent.', 'bad'); if(tab === 'plan') renderTab(); }
     /* A handover takes the crates out of the hold and puts the pay in the
        purse, and both of those are on the panel. Without this the Ship card
@@ -852,11 +882,20 @@ function handleEvents(events){
 /* ------------------------------------------------------------- HUD */
 
 function renderHud(docking){
-  $('h-dv').textContent = `${S.fmtKms(state.dv)} / ${S.fmtKms(state.tank)}`;
+  /* The tank, and what the plan will take out of it. The cost of a burn is
+     shown here and nowhere near the burn itself: it is a length of fuel, and
+     next to a mark it read as a speed — which made pressing Back to slow down
+     look like it was speeding the ship up. */
+  const spend = Math.min(plannedSpend, state.dv);
+  $('h-dv').textContent = `${S.fmtKms(state.dv)} / ${S.fmtKms(state.tank)}`
+    + (plannedSpend > 1e-12 ? ` · ${S.fmtKms(plannedSpend)} planned` : '');
   const fill = $('h-dvfill');
   const frac = state.tank > 0 ? state.dv / state.tank : 0;
   fill.style.width = `${Math.round(frac * 100)}%`;
   fill.classList.toggle('low', frac < 0.15);
+  const planBar = $('h-dvplan');
+  planBar.style.right = `${Math.round((1 - frac) * 100)}%`;
+  planBar.style.width = `${Math.round((state.tank > 0 ? spend / state.tank : 0) * 100)}%`;
   $('h-dv-wrap').classList.toggle('warn', frac < 0.15);
   $('h-money').textContent = S.fmtMoney(state.money) + (state.debt > 0 ? ` (owe ${S.fmtMoney(state.debt)})` : '');
   $('h-hold').textContent = `${S.usedUnits(state)} / ${S.holdUnits(state)}`;
@@ -972,9 +1011,14 @@ function askSkip(t, what){
   const plan = S.skipPlan(state, t);
   if(!plan){ toast('That is not ahead of you.', 'bad'); return; }
   const place = whereAt(t);
+  /* Two sentences, not one: what you asked about, and then where *you* will
+     be when it happens. They used to be one clause, which read correctly for
+     a point on your own road and wrongly for anything else — "Veyra reaching
+     that point is 240 days from now, in Tassel's gravity" says the wrong
+     thing about Veyra. */
   openModal(`<h2>Skip ahead?</h2>
-    <p>${esc(what ?? 'That point on your path')} is <b>${S.fmtDays(plan.days)}</b> from now${place ? `, in ${esc(place.name)}'s gravity` : ''}.</p>
-    <p class="lock">The clock will run itself there and stop: ${saySeconds(plan.seconds)} of waiting.${plan.capped ? ' That is as fast as the clock goes.' : ''}</p>
+    <p>${esc(what ?? 'That point on your path')} is <b>${S.fmtDays(plan.days)}</b> from now.</p>
+    <p class="lock">${place ? `You will be in ${esc(place.name)}'s gravity. ` : ''}The clock will run itself there and stop: ${saySeconds(plan.seconds)} of waiting.${plan.capped ? ' That is as fast as the clock goes.' : ''}</p>
     <div class="btns"><button class="btn primary" id="m-go">Go</button><button class="btn ghost" id="m-stay">Close</button></div>`, m => {
     m.querySelector('#m-go').addEventListener('click', () => { closeModal(); skipTo(t); });
     m.querySelector('#m-stay').addEventListener('click', closeModal);
@@ -985,6 +1029,7 @@ function askSkip(t, what){
    burn down at that moment, or skip the clock to it. One gesture, two big
    buttons, and the time to that point on the card either way. */
 function askAtPath(t){
+  tapMark = t;
   /* One mark at a time while the lesson is running. The button is simply not
      available — no toast, no explanation: a beginner who has not been told
      they may have six does not need telling they may not. */
@@ -1130,23 +1175,14 @@ canvas.addEventListener('pointermove', e => {
   if(drag.kind === 'node'){
     if(Math.hypot(dx, dy) > 4) drag.moved = true;
     if(!drag.moved || !prediction) return;
-    const p = chart.nearestPathPoint(e.clientX, e.clientY, prediction, state.t);
-    if(p){
-      const n = state.nodes[drag.index];
-      // Only slide within the leg the node is on, so it cannot jump past a later node.
-      const later = state.nodes.find((o, i) => i !== drag.index && o.t > n.t);
-      const earlier = [...state.nodes].reverse().find((o, i) => state.nodes.indexOf(o) !== drag.index && o.t < n.t);
-      let t = p.t;
-      /* The chart draws one lap of a leg however many it holds, so the times
-         under the pointer only ever span that lap. Dragging a mark that sits
-         three laps along would otherwise snap it back to the first one, where
-         it fires at once and vanishes — so put it back on the lap it was on.
-         Sliding it right round the ellipse still moves it a lap at a time. */
-      const P = p.seg?.elements?.period;
-      if(p.seg?.lapped && Number.isFinite(P) && P > 0) t += Math.round((n.t - t) / P) * P;
-      if(later) t = Math.min(t, later.t - 1e-3);
-      if(earlier) t = Math.max(t, earlier.t + 1e-3);
-      n.t = Math.max(state.t + 1e-3, t);
+    /* Where the mark goes is the chart's rule (render.js, dragNodeTime): the
+       time under the pointer, kept on its lap, between its neighbours, and
+       never more than half a lap from where it was in one move. A finger a
+       few pixels off the line used to catch the yellow road's return leg and
+       throw the burn twenty laps out. */
+    const t = chart.dragNodeTime(e.clientX, e.clientY, prediction, state.t, state.nodes, drag.index);
+    if(t != null){
+      state.nodes[drag.index].t = t;
       replan(true); if(tab === 'plan') renderTab();
     }
   }
@@ -1168,6 +1204,18 @@ function endPointer(e){
     const insideDrawn = onBody && d.hit.d <= (d.hit.drawn ?? 0) + 2;
     if(p && !insideDrawn && p.t > state.t + S.MIN_LEAD){ askAtPath(p.t); return; }
     if(onBody){ lookAt(d.hit.id); return; }
+    /* Last, after the road and after the worlds: a tap on the ring a world
+       travels on asks the clock to wait until that world gets there. It is
+       the other half of a transfer — the road says where you will be, and
+       until now nothing on the chart would tell you when anybody else would
+       be anywhere. A rail runs through its own world, so the world has to
+       win that tie or a planet could not be tapped at all. */
+    /* Not while tied up. A skip started at a dock sets the rate and then
+       never stops — the loop drops `warpTarget` the moment it sees a docked
+       ship — so the clock would run away at a hundred days a second on a
+       promise of ten seconds. The same reason the road is not tappable here. */
+    const rail = state.dockedAt ? null : chart.nearestRailPoint(e.clientX, e.clientY, state.t);
+    if(rail){ askSkip(rail.t, `${S.portName(rail.id)} reaching that point`); return; }
     selectedNode = -1; if(tab === 'plan') renderTab();
   }
   if(d.kind === 'node'){ tutorialCheck(); save(); }
@@ -1639,16 +1687,27 @@ function plan(){
       const fwd = Math.round(S.kms(n.prograde) * 1000), side = Math.round(S.kms(n.radial) * 1000);
       out += `<div class="node ${i === selectedNode ? 'sel' : ''}" data-act="selnode|${i}">
         <b>Burn ${i + 1}</b>
-        <small>in ${S.fmtDays(n.t - state.t)} · ${esc(frame)}'s gravity · ${S.fmtKms(marks[i]?.cost ?? 0)}</small>
+        <small>in ${S.fmtDays(n.t - state.t)} · ${esc(frame)}'s gravity</small>
         <small>${fwd >= 0 ? 'forward' : 'back'} ${Math.abs(fwd)} m/s · ${side >= 0 ? 'out' : 'in'} ${Math.abs(side)} m/s</small>
+        <small class="lock">uses ${S.fmtKms(marks[i]?.cost ?? 0)} of fuel</small>
       </div>`;
     });
     out += '<p class="lock">A burn fires by itself the moment the clock reaches it. Tap one here, or its ring on the chart, to open it: four arrows and a cross appear round the ring, and tapping the ring again puts them away.</p>';
   }
   out += aheadList();
   if(state.dv <= 1e-9){
+    /* A dead tank is the one hole a tow cannot always dig you out of, because
+       a tow has a price and a purse can be empty. The distress call is the
+       floor under that: half of whatever you have, and the dock you last tied
+       up at comes and gets you. */
+    const d = S.distressQuote(state);
+    out += `<h3>Dry tank</h3><p>${esc(TEXT.captainLines.onStranded[2] ?? '')}</p>`;
+    if(d){
+      out += `<p>${d.home ? `A call to ${esc(S.portName(d.port))}, where you last tied up` : `Nobody is left at your last mooring who could fetch you; ${esc(S.portName(d.port))} would come instead`}. They ask half of everything: ${S.fmtMoney(d.cost)}.</p>`
+        + `<button class="btn wide danger" data-act="distress">Send a distress call</button>`;
+    }
     const q = S.towQuote(state);
-    out += `<h3>Dry tank</h3><p>${esc(TEXT.captainLines.onStranded[2] ?? '')}</p><p>A tow to ${esc(S.portName(q.port))}: ${S.fmtMoney(q.cost)}, ${S.fmtDays(q.days)}.</p><button class="btn wide" data-act="tow">Call for a tow</button>`;
+    out += `<p class="lock" style="margin-top:.8rem">Or a tow to ${esc(S.portName(q.port))}: ${S.fmtMoney(q.cost)}, ${S.fmtDays(q.days)}. <button class="btn sm" data-act="tow">Call for a tow</button></p>`;
   }else{
     out += `<p class="lock" style="margin-top:1rem">Stuck anywhere? <button class="btn sm" data-act="tow">Call for a tow</button></p>`;
   }
@@ -1805,23 +1864,52 @@ function requestsTab(){
   return out;
 }
 
+/* What you are carrying, and then what you have carried.
+ *
+ * A finished job used to sit wherever it had been taken on, in the middle of
+ * the live ones with its steps all ticked — which read as though it were
+ * still taking up one of the three, and there was nothing on this tab to say
+ * otherwise. It never was: the rule counts what is still open. So the live
+ * jobs come first with the count above them, and the finished ones go
+ * underneath, newest first, as a record of the trip rather than a list of
+ * things to do. */
 function questsTab(){
   let out = '<h2>Quests</h2>';
-  const live = (state.quests ?? []).map(l => ({ l, q: S.questById(l.id) })).filter(x => x.q);
-  if(!live.length) return out + '<p class="say">Nobody has asked you for anything yet.</p>';
+  const held = (state.quests ?? []).map(l => ({ l, q: S.questById(l.id) })).filter(x => x.q);
+  if(!held.length) return out + '<p class="say">Nobody has asked you for anything yet.</p>';
+  const live = held.filter(x => !x.l.done);
+  const done = held.filter(x => x.l.done)
+    .sort((a, b) => (b.l.doneAt ?? b.l.takenAt ?? 0) - (a.l.doneAt ?? a.l.takenAt ?? 0));
+
+  out += `<p class="lock">${live.length} of ${S.MAX_ACTIVE_QUESTS} in hand${done.length ? ` · ${done.length} finished, which cost you nothing` : ''}.</p>`;
+  if(!live.length) out += '<p class="say">Nothing in hand. A port\'s Requests tab is where the next one comes from.</p>';
   for(const { l, q } of live){
-    out += `<div class="quest${l.done ? ' done' : ''}">`;
+    out += '<div class="quest">';
     out += `<h3>${esc(q.title)}</h3>`;
-    out += `<p class="lock">${esc(q.giver)}${l.done ? ' · done' : ''}</p>`;
-    out += `<p class="say">${esc(l.done && q.done ? q.done : q.blurb)}</p>`;
+    out += `<p class="lock">${esc(q.giver)}</p>`;
+    out += `<p class="say">${esc(q.blurb)}</p>`;
     out += '<ol class="steps">';
     S.questSteps(q).forEach((st, i) => {
-      const state_ = l.done || i < l.step ? 'ok' : i === l.step ? 'now' : '';
+      const state_ = i < l.step ? 'ok' : i === l.step ? 'now' : '';
       out += `<li class="${state_}">${esc(st.text)}</li>`;
     });
     out += '</ol>';
-    if(!l.done && q.pay) out += `<p class="lock">Pays ${S.fmtMoney(q.pay)} when it is finished.</p>`;
+    if(q.pay) out += `<p class="lock">Pays ${S.fmtMoney(q.pay)} when it is finished.</p>`;
     out += '</div>';
+  }
+  /* The finished cards keep the payoff line and drop the steps: a ticked list
+     of things you are no longer doing is the longest part of the tab and the
+     least worth reading, and there will be twenty of these by the end. */
+  if(done.length){
+    out += '<h3>Finished</h3>';
+    for(const { l, q } of done){
+      void l;
+      out += '<div class="quest done">';
+      out += `<h3>${esc(q.title)}</h3>`;
+      out += `<p class="lock">${esc(q.giver)} · done${q.pay ? ` · paid ${S.fmtMoney(q.pay)}` : ''}</p>`;
+      out += `<p class="say">${esc(q.done ?? q.blurb)}</p>`;
+      out += '</div>';
+    }
   }
   return out;
 }
@@ -1856,15 +1944,21 @@ const actions = {
   zeronode(i){ const n = state.nodes[Number(i)]; if(!n) return; n.prograde = 0; n.radial = 0; replan(true); renderTab(); save(); },
   shift(i, d){ const n = state.nodes[Number(i)]; n.t = Math.max(state.t + 1e-3, n.t + Number(d)); state.nodes.sort((a, b) => a.t - b.t); selectedNode = state.nodes.indexOf(n); replan(true); renderTab(); },
   tow(){ showTow('dry'); },
+  distress(){ showDistress(); },
   newgame(){ confirmNew(); },
 };
 
-for(const el of document.querySelectorAll('.node[data-act]')) void el;
-// Node cards select on click, but their buttons should not also select.
-document.addEventListener('click', e => {
-  const card = e.target.closest('.node[data-act]');
-  if(card && !e.target.closest('button')){ selectedNode = Number(card.dataset.act.split('|')[1]); renderTab(); }
-}, true);
+/* Tapping a burn card in the Burns tab used to be handled twice, and the two
+   cancelled out. A listener on `document` in the *capture* phase selected the
+   card and re-rendered the panel; the card's own `selnode` action then ran in
+   the bubble phase on the element it had just replaced, and toggled the
+   selection straight back off. So the card never opened: the panel's own line
+   — "tap one here, or its ring on the chart" — was a lie, and a player
+   following card nine to brake at Slate could only get at the arrows through
+   the chart. The capture listener was doing nothing the action does not, and
+   its one extra job (a button inside the card should not also select it) is
+   already the innermost-wins rule in `wire`. Gone, and the card toggles like
+   the ring does. */
 
 function doDock(){
   const r = S.dock(state);
@@ -1908,7 +2002,7 @@ function openModal(html, wireFn){
   const first = modal.querySelector('.btn.primary') ?? modal.querySelector('button');
   if(first) first.focus();
 }
-function closeModal(){ if(modal.open) modal.close(); modal.innerHTML = ''; }
+function closeModal(){ if(modal.open) modal.close(); modal.innerHTML = ''; tapMark = null; }
 modal.addEventListener('cancel', e => { if(state.pending) e.preventDefault(); });
 
 function showToll(p){
@@ -1939,6 +2033,34 @@ function showTow(reason){
 function afterTow(r){
   selectedNode = -1; replan(true); panelMenu = 'dock'; tab = 'shipyard'; renderTabs(); setTab('shipyard'); stopSkip();
   openModal(`<h2>Towed to ${esc(S.portName(r.port))}</h2><p class="say">${esc(r.story)}</p><p>${S.fmtDays(r.days)} later and ${S.fmtMoney(r.cost)} poorer, you are docked. ${state.debt > 0 ? esc(TEXT.events.bankDebt) : ''}</p><div class="btns"><button class="btn primary" id="m-ok">Carry on</button></div>`, m => m.querySelector('#m-ok').addEventListener('click', closeModal));
+  save();
+}
+/* The distress call. Two numbers and no arithmetic to do: where they will
+   put you down, and what half of everything comes to. */
+function showDistress(){
+  const d = S.distressQuote(state);
+  if(!d){ toast('There is nobody within reach to call.', 'bad'); return; }
+  openModal(`<h2>Send a distress call?</h2>
+    <p>${d.home
+      ? `${esc(S.portName(d.port))} knows your ship. They will come out and bring you in.`
+      : `There is no getting you back to ${esc(S.portName(state.lastPort))} — nothing to burn is sold there, and a dry ship put down there would stay. ${esc(S.portName(d.port))} answers instead.`}</p>
+    <p>They take half of everything you have: <b>${S.fmtMoney(d.cost)}</b>, leaving you ${S.fmtMoney(state.money - d.cost)}. Your hold comes with you.</p>
+    <div class="btns"><button class="btn" id="m-no">Not yet</button><button class="btn danger" id="m-yes">Send it</button></div>`, m => {
+    m.querySelector('#m-no').addEventListener('click', closeModal);
+    m.querySelector('#m-yes').addEventListener('click', () => {
+      const r = S.callDistress(state);
+      closeModal();
+      if(!r){ toast('The call would not go out.', 'bad'); return; }
+      afterDistress(r);
+    });
+  });
+}
+function afterDistress(r){
+  selectedNode = -1; replan(true); panelMenu = 'dock'; tab = 'shipyard'; renderTabs(); setTab('shipyard'); stopSkip();
+  /* Arriving is arriving: whatever the place has to say to a first visitor,
+     and whatever job ended here, says itself. */
+  handleEvents(r.events ?? []);
+  openModal(`<h2>Brought in to ${esc(S.portName(r.port))}</h2><p class="say">${esc(r.story)}</p><p>${S.fmtMoney(r.cost)} lighter, and tied up. The pumps are over there.</p><div class="btns"><button class="btn primary" id="m-ok">Carry on</button></div>`, m => m.querySelector('#m-ok').addEventListener('click', closeModal));
   save();
 }
 function showStory(name, text){
@@ -2000,7 +2122,12 @@ function tutorialTests(){
   const reached = !!state.flags.reachedTarget;
   const bought = (state.quests ?? []).some(q => q.id === 'pebble' && (q.step >= 1 || q.done));
   const atTarget = state.ship.body === target;
-  const aimed = segs.some(sg => sg.body === target) || prediction?.intercept?.body === target;
+  /* Aimed means the road reaches the moon *and misses the ground*. "Put Slate
+     in the way" was being read literally: a road through the middle of the
+     moon passed this card, and card nine then opened on a ship falling into
+     a rock it had been told to slow down at. */
+  const hits = !!prediction?.intercept?.grazes || (prediction?.events ?? []).some(e => e.kind === 'crash');
+  const aimed = (segs.some(sg => sg.body === target) || prediction?.intercept?.body === target) && !hits;
   const highEnough = Number.isFinite(raAfter) && Math.abs(raAfter - moon.a) <= moon.a * 0.1;
   const dockableAt = id => state.dockedAt === id || (docking?.port === id && docking.ok);
 

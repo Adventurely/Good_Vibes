@@ -103,8 +103,12 @@ export function newGame(seed = 1){
     toll: { lastT: -1e9, inBelt: false },
     pending: null,
     justLeft: null, justLeftAt: -1e9,
-    stats: { burns: 0, dvSpent: 0, docks: 0, sold: 0, bought: 0, tows: 0, tolls: 0, farthest: 0 },
+    stats: { burns: 0, dvSpent: 0, docks: 0, sold: 0, bought: 0, tows: 0, tolls: 0, rescues: 0, farthest: 0 },
     visited: [start],
+    /* The last mooring this ship was tied up at, which is not the same thing
+       as the first entry in `visited` and not the same thing as the nearest
+       port either. It is who comes out when you call for help. */
+    lastPort: start,
   };
   state.tank = auDay(tiers('tank')[0].value);
   state.dv = state.tank;
@@ -286,6 +290,7 @@ export function dock(state){
   if(!st || !st.ok) return { ok: false, reason: dockRefusal(st) };
   const port = st.port;
   state.dockedAt = port;
+  state.lastPort = port;
   state.nodes = [];
   placeDocked(state, port);
   openMarket(state, port);
@@ -742,6 +747,8 @@ export function questCheck(state, events = []){
     }
     if(live.step >= steps.length && !live.done){
       live.done = true;
+      // When, so the finished list can put the last thing you did at the top.
+      live.doneAt = state.t;
       if(q.pay) state.money += q.pay;
       if(q.rep && q.rep in state.rep) state.rep[q.rep] += 1;
       /* Some jobs pay in a person. The berth is filled with who they are and
@@ -826,6 +833,29 @@ export function addNodeAhead(state){
   const floor = Math.max(MIN_LEAD * 1.1, CONST.BASE_RATE_DAYS_PER_SEC * 25);
   return addNode(state, Math.max(state.t, last) + Math.max(floor, ahead));
 }
+/* What a burn *does*, in the words the four buttons use.
+ *
+ * The chart used to label a mark with the size of the burn and nothing else —
+ * "0.12 km/s" — which is the fuel it will spend. Two playtesters read that as
+ * their speed, and both were braking at the time: they pressed Back to slow
+ * down and watched the number climb, which is exactly backwards from what
+ * they were trying to do. The number was never speed. It is a length of
+ * engine, and a length of engine is always positive however you point it.
+ *
+ * So the mark says what the engine will do instead, in the direction words
+ * that are already written on the buttons, and the fuel it costs is shown
+ * against the fuel gauge where the word "fuel" is. Nothing about a burn that
+ * slows you down now goes up. */
+export function burnWords(node){
+  if(!node) return 'nothing yet';
+  const parts = [];
+  const pro = node.prograde ?? 0, rad = node.radial ?? 0;
+  if(Math.abs(pro) > 1e-15) parts.push(`${pro > 0 ? 'forward' : 'back'} ${fmtKms(pro)}`);
+  if(Math.abs(rad) > 1e-15) parts.push(`${rad > 0 ? 'out' : 'in'} ${fmtKms(rad)}`);
+  if(!parts.length) return 'nothing yet';
+  return parts.join(' · ');
+}
+
 export function planCost(state, horizon){
   if(!state.nodes.length) return 0;
   return markStates(state, horizon).reduce((s, m) => s + m.cost, 0);
@@ -1097,7 +1127,18 @@ function seedFromLambert(state, targetId, node, scoreFn){
   const r2n = norm(sub(absState(world, target.id, state.t).r, frameNow.r));
   const hoh = period(frame.mu, (r1n + Math.max(r2n, target.a * (1 - (target.e ?? 0)))) / 2) / 2;
   const hohFor = hoh;
-  const offset = (target.zoneRadius ?? target.soi ?? 0) * 0.4;
+  /* Where to aim, off to one side of the target so the road passes it rather
+     than hits it: halfway between the top of its air and its harbour mouth.
+     A flat fraction of the mouth was enough while a mouth was ten radii, and
+     stopped being enough when it became five above the air — on a small world
+     that put the aim point barely two radii over the ground, and a hyperbola
+     drawn that close bends into it. Every seeded road to Cinder came back a
+     crash, and the aim fell back on a walk that never crossed its orbit. A
+     drifting haven has no ground to stand off from, so a fraction of its own
+     mouth is all there is to use there. */
+  const ground = Math.max(target.radius ?? 0, target.atmo ?? 0);
+  const reach = target.zoneRadius ?? target.soi ?? 0;
+  const offset = ground > 0 && reach > ground ? (ground + reach) / 2 : reach * 0.4;
   const sameFrame = frame.id === here.id;
   // Cheapest first, with anything the tank cannot pay for at the back.
   const rank = cost => (cost > state.dv ? 1e6 : 0) + cost;
@@ -2149,6 +2190,7 @@ export function callTow(state, reason = 'dry'){
   state.nodes = [];
   state.pending = null;
   state.dockedAt = q.port;
+  state.lastPort = q.port;
   placeDocked(state, q.port);
   state.stats.tows++;
   const pool = reason === 'crash' ? TEXT.events.towCrash : TEXT.events.towDry;
@@ -2161,6 +2203,70 @@ export function callTow(state, reason = 'dry'){
   const events = [];
   milestonesOnDock(state, q.port, events);
   return { ...q, cost, story, events };
+}
+
+/* The distress call: the way out of a dead stop, for a ship that has nothing
+ * left to bargain with but money.
+ *
+ * A tow is a service you buy — a fixed sum, a tug from the nearest port,
+ * and the harbour bank behind it if you cannot cover the bill. A distress
+ * call is not a purchase. It goes out to the last dock you tied up at, they
+ * come and get you, and they take half of everything you have for the
+ * trouble. Half, and not a sum, on purpose: a pilot who ran the tank dry
+ * with an empty purse is rescued for nothing, because the design is explicit
+ * that nothing may cost a player their save, and a price that is a share can
+ * never be one somebody cannot pay.
+ */
+export const DISTRESS_SHARE = 0.5;
+
+/* Who answers. The last mooring, because they know the ship — unless being
+ * put down there is not a rescue: the Arc and the Maw sell nothing to burn,
+ * and a dry ship left at either could never leave again. Then the nearest
+ * port with a pump answers instead, as it does for a tow. */
+export function distressPort(state){
+  const last = state.lastPort;
+  const usable = PORTS[last] && last !== state.dockedAt
+    && portOpen(last, state.t) && PORTS[last].fuelPricePerKms != null;
+  return usable ? last : (nearestPort(state)?.id ?? null);
+}
+
+export function distressQuote(state){
+  const port = distressPort(state);
+  if(port == null) return null;
+  /* Rounded down, so the share is never more than the share, and a purse of
+     one coin still buys a rescue and keeps the coin. */
+  return { port, cost: Math.floor(state.money * DISTRESS_SHARE), home: port === state.lastPort };
+}
+
+/* Only with the tank actually empty. Not low, not nearly: a ship with a
+ * metre per second left can still change its mind about something, and being
+ * able to buy a way home out of an awkward orbit would make every hard
+ * transfer optional. */
+export function canCallDistress(state){
+  return !state.dockedAt && state.dv <= 1e-9 && distressQuote(state) != null;
+}
+
+export function callDistress(state){
+  if(!canCallDistress(state)) return null;
+  const q = distressQuote(state);
+  state.money -= q.cost;   // a share of what there is, so it can never make a debt
+  state.nodes = [];
+  state.pending = null;
+  state.dockedAt = q.port;
+  state.lastPort = q.port;
+  placeDocked(state, q.port);
+  openMarket(state, q.port);
+  if(!state.visited.includes(q.port)) state.visited.push(q.port);
+  state.stats.rescues = (state.stats.rescues ?? 0) + 1;
+  const pool = TEXT.events.distress ?? [];
+  const story = pool.length ? pool[Math.floor(rnd(state) * pool.length)] : '';
+  logLine(state, 'towed', TEXT.logTemplates.rescued, { port: portName(q.port), cost: fmtMoney(q.cost) });
+  /* Arriving on somebody else's rope is still arriving, and the hold arrived
+     with you: a delivery that ends at this port is delivered. */
+  const events = [{ kind: 'docked', port: q.port }];
+  questCheck(state, events);
+  milestonesOnDock(state, q.port, events);
+  return { ...q, story, events };
 }
 
 /* Paying the bank back happens whenever there is coin: quietly, first. */
@@ -2226,6 +2332,10 @@ export function restore(json){
   s.toll ??= { lastT: -1e9, inBelt: false };
   s.quests ??= QUESTS.map(q => ({ id: q.id, step: 0, done: false }));
   s.debt ??= 0; s.target ??= null; s.justLeft ??= null; s.justLeftAt ??= -1e9;
+  /* A save written before anybody could call for help knows where it is tied
+     up but not where it was last tied up. Those are the same thing at a
+     mooring, and the first port is a fair guess in flight. */
+  if(!PORTS[s.lastPort]) s.lastPort = PORTS[s.dockedAt] ? s.dockedAt : (s.visited?.find(id => PORTS[id]) ?? CONST.START_PORT);
   s.marketEpoch ??= 0; s.lastMarket ??= null;
   s.crew = { engineer: null, navigator: null, appraiser: null, ...(s.crew ?? {}) };
   s.warp = Number.isFinite(s.warp) ? Math.max(1, Math.min(CONST.MAX_WARP, s.warp)) : 1;
