@@ -2121,6 +2121,9 @@ function tutorialTests(){
   if(state.ship.body === target) state.flags.reachedTarget = true;
   const reached = !!state.flags.reachedTarget;
   const bought = (state.quests ?? []).some(q => q.id === 'pebble' && (q.step >= 1 || q.done));
+  /* Handed over, not merely carried home. dock() runs the handover itself, so
+     this turns true in the same breath as tying up. */
+  const delivered = (state.quests ?? []).some(q => q.id === 'pebble' && q.done);
   const atTarget = state.ship.body === target;
   /* Aimed means the road reaches the moon *and misses the ground*. "Put Slate
      in the way" was being read literally: a road through the middle of the
@@ -2153,14 +2156,17 @@ function tutorialTests(){
     dockableAt(target),                               // bring the high point inside docking range
     bought,                                           // buy the pebble
     bought && !atTarget,                              // climb back out
-    /* Home *with the pebble*. "Docked at Tassel" on its own is true two
-       minutes into a new game — the opening orbit sits inside Tassel's own
-       harbour mouth, and the quiet window after casting off expires on its
-       own — and because the list is made cumulative from the back, one true
-       card at the end made all fourteen true. The lesson finished itself in
-       the orbit it started in, and Nellie got her scene before anybody had
-       been to Slate. */
-    bought && dockableAt(CONST.START_PORT),           // and get home
+    /* The pebble in Nellie's hand, which is the errand and therefore the
+       lesson. Asking whether Tassel *would* take you ran the last card — and
+       Nellie's scene with it — while the ship was still in the air with the
+       pebble in the hold: being able to dock is not docking, and the handover
+       is what finishes the job. Asking whether the quest is done also settles
+       an older trap, that "docked at Tassel" is true two minutes into a new
+       game, because the opening orbit sits inside Tassel's own harbour mouth
+       and the list is cumulative from the back: one true card at the end made
+       all fourteen true, and the lesson finished itself in the orbit it
+       started in. Neither is possible to reach without the pebble. */
+    delivered,                                        // and put it in her hand
   ];
   /* Every test has to be true of every state past its own card, not only of
      the moment it is passed: a pilot standing in Slate's gravity has no burn

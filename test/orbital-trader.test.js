@@ -681,23 +681,33 @@ test('the lesson allows one mark on the path at a time, and says nothing about i
   assert.doesNotMatch(html, /No room for another burn on this path/);
 });
 
-test('the lesson cannot finish itself in the orbit it started in', () => {
-  /* A text check, because the lesson's tests live inside the page's module
-     and there is no canvas or DOM here to run them against. It is worth the
-     awkwardness: the last card used to be a bare "docked at Tassel", which is
-     true two minutes into a new game — the opening orbit sits inside Tassel's
-     own harbour mouth and the quiet window expires on its own — and because
-     the list is folded cumulative from the back, that one true card made all
-     fourteen true. A brand new ship finished the whole lesson without moving,
-     and Nellie got her scene before anybody had been to Slate. */
+test('the lesson ends when the pebble is in Nellie\'s hand, and not a moment before', () => {
+  /* A text check, because the lesson's tests live inside the page's module and
+     there is no canvas or DOM here to run them against. It is worth the
+     awkwardness, because the last card has been wrong twice in two different
+     ways and the list is folded cumulative from the back, so whatever the last
+     card accepts the whole lesson accepts.
+
+     First it was a bare "docked at Tassel", which is true two minutes into a
+     new game — the opening orbit sits inside Tassel's own harbour mouth and
+     the quiet window expires on its own — so a brand new ship finished the
+     whole lesson without moving. Then it was "Tassel would take your lines",
+     which is true while the ship is still in the air with the pebble in the
+     hold: being able to dock is not docking, and the handover is what finishes
+     the job. It asks the quest now, which is the only thing that cannot be
+     true early. */
   const html = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
   const list = html.match(/const raw = \[([\s\S]*?)\n  \];/);
   assert.ok(list, 'the lesson no longer keeps its cards in one list; check this still holds');
   const lines = list[1].split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('/*') && !l.startsWith('*') && !l.startsWith('//'));
   const last = lines[lines.length - 1];
-  assert.match(last, /bought/, `the last card of the lesson is "${last}", which does not ask for the pebble`);
+  assert.match(last, /delivered/, `the last card of the lesson is "${last}", which does not ask for the pebble`);
+  assert.ok(!/dockable/i.test(last), `the last card is "${last}": being able to dock is not docking`);
+  // And "delivered" means the errand is finished, not that it is nearly finished.
+  assert.match(html, /const delivered = [^\n]*q\.id === 'pebble' && q\.done/,
+    'the lesson\'s last card no longer reads the quest it is about');
 
-  // And the fold really is from the back, which is what makes that matter.
+  // The fold really is from the back, which is what makes all of that matter.
   assert.match(html, /raw\[i\] = raw\[i\] \|\| raw\[i \+ 1\]/);
 });
 
