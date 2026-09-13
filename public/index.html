@@ -391,6 +391,9 @@ function paintSunward(now){
     growers: SW_GROWERS,
     now: still ? 0 : now,
     sway: still ? 0 : Math.sin(now / 1400) * 0.05,
+    // Three winters on: a knot hole, a low bough and a denser crown, which
+    // is a tree somebody has kept rather than one they have just planted.
+    age: 3,
   });
 }
 

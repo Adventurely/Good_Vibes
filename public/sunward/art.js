@@ -500,7 +500,84 @@ const run = (ctx, key, light, x, y, w) => {
   ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), 1);
 };
 
-function leafBlob(ctx, cx, cy, r, light){
+/* --------------------------------------------------------------- winters */
+
+/* How the tree comes back after each winter — which is what replanting the lot
+ * is. `growth` says how planted the lot is; `age` says how many winters the
+ * tree has stood through, and a tree that has stood through seven should not
+ * be the first-year sapling with a thicker trunk. Each stage keeps everything
+ * the earlier ones added and adds one thing of its own, so a player who has
+ * replanted four times can see all four winters in the tree, not just the
+ * last.
+ *
+ * The multipliers are on the trunk width, the leaf-blob radius and the spread
+ * of the forks — not on the height. At full growth the first-year tree already
+ * stands 178 pixels in a 240-pixel frame, so an older tree has to read as older
+ * by being stouter, broader and busier rather than taller, which is also how an
+ * old tree looks next to a young one. `reach` trims the limbs where a stage
+ * would otherwise put its crown through the top of the frame; the last stage
+ * is allowed to, on purpose — a tree too big for its picture is the point of
+ * seven winters. `fork` is the angle, in radians off vertical, of the low limb
+ * that leaves the trunk from the second winter on. `hit` is how much wider and
+ * taller the tap target gets, measured off the drawn extents.
+ *
+ * Stage 0 is today's tree and has to draw it pixel for pixel: the shelf card
+ * and the tests both depend on it. Every multiplier here is exactly 1, and a
+ * float times 1 is that float.
+ */
+const WINTERS = [
+  { id: 'sapling',     trunk: 1,    leaf: 1,    spread: 1,   depthBonus: 0, reach: 1,    fork: 0,    hit: [1, 1],
+    adds: [] },
+  { id: 'stout',       trunk: 1.35, leaf: 1.08, spread: 1,   depthBonus: 0, reach: 1,    fork: 0,    hit: [1.38, 1.28],
+    adds: ['flare', 'leaves'] },
+  { id: 'forked',      trunk: 1.6,  leaf: 1.15, spread: 1,   depthBonus: 0, reach: 1,    fork: 0.95, hit: [1.62, 1.28],
+    adds: ['fork'] },
+  { id: 'gnarled',     trunk: 1.85, leaf: 1.2,  spread: 1,   depthBonus: 1, reach: 0.94, fork: 0.95, hit: [1.7, 1.34],
+    adds: ['knot', 'moss'] },
+  { id: 'broad',       trunk: 2.1,  leaf: 1.25, spread: 1.3, depthBonus: 1, reach: 0.94, fork: 1.3,  hit: [1.8, 1.34],
+    adds: ['swing'] },
+  { id: 'rooted',      trunk: 2.4,  leaf: 1.3,  spread: 1.3, depthBonus: 1, reach: 0.96, fork: 1.3,  hit: [1.82, 1.36],
+    adds: ['buttress', 'glow', 'blossom'] },
+  { id: 'lantern-lit', trunk: 2.7,  leaf: 1.35, spread: 1.3, depthBonus: 1, reach: 0.98, fork: 1.3,  hit: [1.85, 1.37],
+    adds: ['lanterns', 'bench'] },
+  { id: 'ancient',     trunk: 3,    leaf: 1.42, spread: 1.3, depthBonus: 1, reach: 1,    fork: 1.3,  hit: [1.9, 1.42],
+    adds: ['twins', 'vines', 'mushrooms'] },
+];
+
+/* The same table with each stage's `features` filled in cumulatively and a
+   `has` lookup built off it, so the painter asks `stage.has.swing` rather than
+   searching an array sixty times a second. */
+export const TREE_STAGES = WINTERS.map((row, winters) => {
+  const features = [];
+  for(let i = 0; i <= winters; i++) features.push(...WINTERS[i].adds);
+  const has = {};
+  for(const f of features) has[f] = true;
+  return { winters, ...row, features, has };
+});
+
+/* The stage for a number of winters. Clamped at both ends and safe against a
+   save that reads as NaN: a tree with no legible age is a first-year tree. */
+export const stageFor = age => {
+  const i = Math.floor(age);
+  return TREE_STAGES[i > 0 ? Math.min(i, TREE_STAGES.length - 1) : 0];
+};
+
+/* Past the last stage the last design is reused and the tree simply goes on
+   thickening — four percent a winter on the trunk and the canopy, and never
+   more than half again in all. A tree that grew without bound would one day
+   fill the frame with a single colour. */
+export const AGED_STEP = 0.04;
+export const AGED_CAP = 1.5;
+export const agedScale = age => {
+  const past = Math.floor(age) - (TREE_STAGES.length - 1);
+  return past > 0 ? Math.min(AGED_CAP, 1 + past * AGED_STEP) : 1;
+};
+
+/* A hash off an index, for anything that has to be scattered but must land in
+   the same place on every frame: fallen leaves, blossom, vines. */
+const scatter = i => Math.imul(i + 11, 2654435761) >>> 0;
+
+function leafBlob(ctx, cx, cy, r, o){
   const R = Math.max(1, Math.round(r));
   for(let dy = -R; dy <= R; dy++){
     const half = Math.floor(Math.sqrt(Math.max(0, R * R - dy * dy + 0.5)));
@@ -511,18 +588,31 @@ function leafBlob(ctx, cx, cy, r, light){
     // dark on the lower ones. Two spans a row rather than a per-pixel dither,
     // which at this radius is a tenth of the work and reads the same.
     const split = Math.max(0, Math.min(w, Math.round(w * (dy < 0 ? 0.7 : 0.34))));
-    run(ctx, 'g', light, x0, Math.round(cy) + dy, split);
-    run(ctx, 'G', light, x0 + split, Math.round(cy) + dy, w - split);
+    run(ctx, 'g', o.light, x0, Math.round(cy) + dy, split);
+    run(ctx, 'G', o.light, x0 + split, Math.round(cy) + dy, w - split);
+  }
+
+  /* Blossom, from the fifth winter: five specks of rose and skin in one blob
+     in sixteen, placed off a hash of the blob's index so they hold still, and
+     drawn after the blob so they sit on top of it. */
+  if(o.blossom){
+    const h = scatter(o.blobs++);
+    if((h & 15) === 0){
+      for(let k = 0; k < 5; k++){
+        const bits = h >>> (4 + k * 5);
+        const dx = (bits % (R + 1)) - (R >> 1);
+        const dy = ((bits >>> 3) % (R + 1)) - (R >> 1);
+        fill(ctx, k & 1 ? 'n' : 'r', o.light, Math.round(cx) + dx, Math.round(cy) + dy);
+      }
+    }
   }
 }
 
-function limb(ctx, x, y, angle, len, width, depth, o){
-  // The sway is applied more to the thin ends than to the trunk, which is what
-  // a tree in wind actually does and what stops the whole thing sliding.
-  const a = angle + o.sway * (o.depth - depth + 1) * 0.35;
-  const x2 = x + Math.cos(a) * len;
-  const y2 = y + Math.sin(a) * len;
-
+/* One straight run of wood between two points, `width` across, lit on the sun
+   side and shadowed on the other. Every limb is one of these; so is the low
+   bough and the stub under the twin trunks, which is why it is its own
+   function rather than the top of limb(). */
+function bough(ctx, x, y, x2, y2, width, o){
   const w = Math.max(1, Math.round(width));
   const steps = Math.max(1, Math.ceil(Math.hypot(x2 - x, y2 - y)));
   for(let i = 0; i <= steps; i++){
@@ -536,20 +626,75 @@ function limb(ctx, x, y, angle, len, width, depth, o){
       run(ctx, 'v', o.light, o.sunSide < 0 ? px + w - 1 : px, py, 1);
     }
   }
+}
+
+/* A strand hanging off the crown: pine, six to twelve pixels, with a grass
+   tip. Only from tips that point sideways or down — the ones on the outside
+   and underside of the canopy — because a vine off a tip at the top of the
+   crown hangs inside the leaves where nobody can see it. One tip in five. */
+function vine(ctx, x, y, a, o){
+  const h = scatter(o.tips++);
+  if(Math.sin(a) < -0.35 || h % 5) return;
+  const drop = 6 + (h >>> 4) % 7;
+  const vx = Math.round(x) + ((h >>> 8) % 3) - 1;
+  const vy = Math.round(y) + Math.max(1, Math.round(o.leaf)) - 1;
+  fill(ctx, 'G', o.light, vx, vy, 1, drop);
+  fill(ctx, 'g', o.light, vx, vy + drop);
+}
+
+/* A lantern hung from the middle of a limb's lower side: an ink hook and a
+   two-by-three body with the flame in the middle row. Drawn unshaded, as the
+   fireflies are, because it is a light; at night it gets a pixel of gold at
+   each compass point, which at this size is what a glow is. */
+function lantern(ctx, x, y, x2, y2, width, o){
+  const dx = x2 - x, dy = y2 - y;
+  const L = Math.hypot(dx, dy) || 1;
+  // The perpendicular that points down — or, on a near-vertical limb,
+  // outward — so the lantern hangs clear of the wood rather than over it.
+  let nx = -dy / L, ny = dx / L;
+  if(ny < 0){ nx = -nx; ny = -ny; }
+  const off = Math.max(1, Math.round(width)) / 2 + 1;
+  const hx = Math.round((x + x2) / 2 + nx * off);
+  const hy = Math.round((y + y2) / 2 + ny * off);
+  fill(ctx, 'k', o.light, hx, hy);
+  fill(ctx, 'o', 1, hx, hy + 1, 2, 1);
+  fill(ctx, 'y', 1, hx, hy + 2, 2, 1);
+  fill(ctx, 'o', 1, hx, hy + 3, 2, 1);
+  if(o.light < 0){
+    fill(ctx, 'y', 1, hx - 1, hy + 2);
+    fill(ctx, 'y', 1, hx + 2, hy + 2);
+    fill(ctx, 'y', 1, hx + 1, hy);
+    fill(ctx, 'y', 1, hx, hy + 4);
+  }
+}
+
+function limb(ctx, x, y, angle, len, width, depth, o){
+  // The sway is applied more to the thin ends than to the trunk, which is what
+  // a tree in wind actually does and what stops the whole thing sliding.
+  const a = angle + o.sway * (o.depth - depth + 1) * 0.35;
+  const x2 = x + Math.cos(a) * len;
+  const y2 = y + Math.sin(a) * len;
+  bough(ctx, x, y, x2, y2, width, o);
 
   if(depth <= 0){
-    leafBlob(ctx, x2, y2, o.leaf, o.light);
+    leafBlob(ctx, x2, y2, o.leaf, o);
+    if(o.vines) vine(ctx, x2, y2, a, o);
     return;
   }
-  const spread = 0.26 + depth * 0.042;
+  /* A broad stage widens the two forks nearest the trunk and leaves the twigs
+     alone. The outer path of this recursion always curls over as the spreads
+     add up, and widening every level by the same number curled the crown down
+     to the grass either side: a weeping willow, not a broad oak. */
+  const spread = (0.26 + depth * 0.042) * (depth >= o.depth - 1 ? o.spread : 1);
   limb(ctx, x2, y2, a - spread, len * 0.74, width * 0.66, depth - 1, o);
   limb(ctx, x2, y2, a + spread * 0.88, len * 0.7, width * 0.66, depth - 1, o);
 
   /* A leader carrying straight on out of the first fork, so the crown is not
      a perfect binary Y. Two branches and nothing else is the shape of a
      catapult, and it was the single thing that made the first cut of this
-     read as a diagram of a tree rather than as a tree. */
-  if(depth === o.depth && o.depth >= 3){
+     read as a diagram of a tree rather than as a tree. `leaderAt` is the root
+     of the tree, except on twin trunks, where each trunk gets its own. */
+  if(depth === o.leaderAt && o.depth >= 3){
     limb(ctx, x2, y2, a + 0.05, len * 0.82, width * 0.62, depth - 1, o);
   }
 
@@ -557,23 +702,174 @@ function limb(ctx, x, y, angle, len, width, depth, o){
      between eight tip blobs are bigger than the blobs at this size, and a
      canopy you can see the sky through in eight places is a canopy that reads
      as being under construction. */
-  if(depth === 1) leafBlob(ctx, x2, y2, o.leaf * 0.62, o.light);
-  if(depth === 2 && o.depth >= 5) leafBlob(ctx, x2, y2, o.leaf * 0.5, o.light);
+  if(depth === 1) leafBlob(ctx, x2, y2, o.leaf * 0.62, o);
+  if(depth === 2 && o.depth >= 5) leafBlob(ctx, x2, y2, o.leaf * 0.5, o);
+
+  // Lanterns hang from the first limbs out of the trunk, which are the low
+  // ones, and are drawn after the limb's own crown so nothing paints over them.
+  if(o.lanterns && depth === o.depth - 1) lantern(ctx, x, y, x2, y2, width, o);
+}
+
+/* ---- what stands at the foot of an older tree --------------------------- */
+
+/* One row of roots either side of the trunk, `ext` pixels out, lit on the sun
+   side and shadowed on the other like the wood above it. */
+function rootRow(ctx, left, right, y, ext, o){
+  if(ext <= 0) return;
+  run(ctx, 'N', o.light, left - ext, y, ext);
+  run(ctx, 'N', o.light, right, y, ext);
+  run(ctx, o.sunSide < 0 ? 'n' : 'v', o.light, left - ext, y, 1);
+  run(ctx, o.sunSide < 0 ? 'v' : 'n', o.light, right + ext - 1, y, 1);
+}
+
+/* The root flare — two splayed runs each side at the ground line — and, from
+   the fifth winter, buttress roots over it: three runs each side reaching
+   about fourteen pixels out on a full-grown tree and stepping in as they
+   climb, so they taper. Both are sized off the trunk, so a sapling that has
+   stood through five winters has roots in proportion and not a plinth. */
+function roots(ctx, cx, trunk, o){
+  const w = Math.max(1, Math.round(trunk));
+  const left = Math.round(cx - w / 2);
+  const right = left + w;
+  const flare = 1 + Math.round(w * 0.25);
+  rootRow(ctx, left, right, TREE_Y - 1, flare, o);
+  rootRow(ctx, left, right, TREE_Y, flare * 2, o);
+  if(!o.buttress) return;
+  const reach = 4 + Math.round(w * 0.6);
+  rootRow(ctx, left, right, TREE_Y - 2, Math.round(reach * 0.25), o);
+  rootRow(ctx, left, right, TREE_Y - 1, Math.round(reach * 0.5), o);
+  rootRow(ctx, left, right, TREE_Y, Math.round(reach * 0.75), o);
+  // The lowest row runs under the trunk as well, so the tree stands on its
+  // roots rather than on a line of grass between them.
+  run(ctx, 'N', o.light, left - reach, TREE_Y + 1, w + reach * 2);
+  run(ctx, o.sunSide < 0 ? 'n' : 'v', o.light, left - reach, TREE_Y + 1, 2);
+  run(ctx, o.sunSide < 0 ? 'v' : 'n', o.light, right + reach - 2, TREE_Y + 1, 2);
+}
+
+/* Fallen leaves round the base: ten of them, ember and gold, at places hashed
+   off their index and kept clear of the trunk so none lands on the wood. Two
+   pixels wide, not one — one pixel of ember on a dithered lawn is a tuft that
+   has gone wrong, and two is a leaf. */
+function fallenLeaves(ctx, cx, trunk, o){
+  const half = Math.max(1, Math.round(trunk)) / 2;
+  for(let i = 0; i < 10; i++){
+    const h = scatter(i + 200);
+    const side = h & 1 ? 1 : -1;
+    const x = Math.round(cx + side * (half + 2 + (h >>> 3) % 24));
+    const y = TREE_Y - 1 + (h >>> 9) % 8;
+    fill(ctx, (h >>> 13) & 1 ? 'o' : 'y', o.light, x, y, 2, 1);
+  }
+}
+
+/* The knot hole: an oval of ink with a violet rim, sized off the trunk so it
+   is three by five on a middling tree and not a hole wider than the wood on a
+   sapling. The upper half is deep violet rather than ink — the light is from
+   above, and the top of a hole is the part you can see into. From the fifth
+   winter it glows gold at night, and the glow is drawn unshaded, like the
+   lanterns, because it is the light and not a thing lit. */
+function knot(ctx, cx, cy, trunk, o){
+  const kw = Math.max(2, Math.min(5, Math.round(trunk * 0.38)));
+  const kh = (kw + 2) | 1;
+  const half = kh >> 1;
+  const x0 = Math.round(cx) - (kw >> 1);
+  const y0 = Math.round(cy);
+  const glow = o.glow && o.light < 0;
+  for(let dy = -half; dy <= half; dy++){
+    const y = y0 + dy;
+    if(Math.abs(dy) === half){
+      const w = Math.max(1, kw - 2);
+      run(ctx, 'v', o.light, x0 + ((kw - w) >> 1), y, w);
+      continue;
+    }
+    fill(ctx, 'v', o.light, x0, y);
+    if(kw > 2) fill(ctx, 'v', o.light, x0 + kw - 1, y);
+    if(glow) fill(ctx, 'y', 1, x0 + 1, y, Math.max(1, kw - 2), 1);
+    else fill(ctx, dy < 0 ? 'd' : 'k', o.light, x0 + 1, y, Math.max(1, kw - 2), 1);
+  }
+}
+
+/* Moss on the shaded side of the trunk, low down, where moss is: five short
+   runs at heights fixed as fractions of the trunk, so they climb with it. One
+   pixel in from the edge, on the wood — on the edge itself, grass green
+   against the grass behind it read as a notch out of the trunk. */
+const MOSS_AT = [0.06, 0.13, 0.22, 0.31, 0.44];
+function moss(ctx, cx, len, trunk, o){
+  const w = Math.max(1, Math.round(trunk));
+  if(w < 4) return;
+  const left = Math.round(cx - w / 2);
+  for(let i = 0; i < MOSS_AT.length; i++){
+    const mw = 1 + (i & 1);
+    run(ctx, 'g', o.light, o.sunSide < 0 ? left + w - 1 - mw : left + 1, TREE_Y - len * MOSS_AT[i], mw);
+  }
+}
+
+/* A swing: two ropes from the low bough to a plank six pixels off the ground.
+   The ropes are as long as they need to be rather than a fixed fourteen,
+   because the bough is lower on a tree that has just been replanted, and a
+   fixed rope would put the seat in the soil. */
+function swing(ctx, hx, hy, o){
+  const seat = TREE_Y - 6;
+  const x0 = Math.round(hx) - 3;
+  const top = Math.round(hy) + 1;
+  const drop = seat - top;
+  if(drop < 3) return;
+  fill(ctx, 'w', o.light, x0, top, 1, drop);
+  fill(ctx, 'w', o.light, x0 + 7, top, 1, drop);
+  fill(ctx, 'N', o.light, x0, seat, 8, 1);
+  fill(ctx, 'v', o.light, x0, seat + 1, 8, 1);
+  fill(ctx, 'n', o.light, o.sunSide < 0 ? x0 : x0 + 7, seat);
+}
+
+/* A bench to the left of the trunk, under the bough the swing hangs from: a
+   plank of oak with its shadow under it, on two short legs. Left because that
+   is the side of the lot with nothing standing on it at that height. */
+function bench(ctx, cx, o){
+  const x = Math.round(cx) - 46, y = TREE_Y + 3;
+  fill(ctx, 'N', o.light, x, y, 12, 1);
+  fill(ctx, 'n', o.light, o.sunSide < 0 ? x : x + 11, y);
+  fill(ctx, 'v', o.light, x, y + 1, 12, 1);
+  fill(ctx, 'v', o.light, x + 1, y + 2, 1, 2);
+  fill(ctx, 'v', o.light, x + 10, y + 2, 1, 2);
+}
+
+/* A ring of small mushrooms round the base — rose caps on skin stalks, two
+   pixels by two — three a side, at fixed offsets from the trunk edge. */
+const MUSHROOM_AT = [[4, 2], [10, 5], [16, 3]];
+function mushrooms(ctx, cx, trunk, o){
+  const w = Math.max(1, Math.round(trunk));
+  const left = Math.round(cx - w / 2);
+  const right = left + w;
+  for(let i = 0; i < MUSHROOM_AT.length; i++){
+    const [out, down] = MUSHROOM_AT[i];
+    const y = TREE_Y + down;
+    fill(ctx, 'r', o.light, left - out - 2, y, 2, 1);
+    fill(ctx, 'n', o.light, left - out - 1, y + 1);
+    fill(ctx, 'r', o.light, right + out, y, 2, 1);
+    fill(ctx, 'n', o.light, right + out, y + 1);
+  }
 }
 
 /* `pulse` is how hard the tree is still ringing from a tap, 0 to 1: the
    canopy swells by up to a third of its blob radius and settles. It is the
    tap's own animation, and it is on the tree rather than on the number that
    floats away, because the tree is what you tapped. */
-export function drawTree(ctx, growth, { sway = 0, light = 1, sunSide = -1, shake = 0, pulse = 0 } = {}){
+export function drawTree(ctx, growth, { sway = 0, light = 1, sunSide = -1, shake = 0, pulse = 0, age = 0 } = {}){
   const g = Math.max(0, Math.min(1, growth));
-  const depth = 3 + Math.round(g * 3);
+  const stage = stageFor(age);
+  const has = stage.has;
+  const more = agedScale(age);
+  const depth = 3 + Math.round(g * 3) + stage.depthBonus;
   const o = {
     sway, light, sunSide, depth,
+    leaderAt: depth,
+    spread: stage.spread,
     // Bigger blobs on a young tree than the growth curve alone would give it.
     // A sapling drawn with a one-pixel trunk and eight two-pixel leaves is a
     // thread with specks on it, not a plant somebody wants to look after.
-    leaf: (3.8 + g * 4.2) * (1 + Math.max(0, Math.min(1, pulse)) * 0.35),
+    leaf: (3.8 + g * 4.2) * (1 + Math.max(0, Math.min(1, pulse)) * 0.35) * stage.leaf * more,
+    blossom: has.blossom, vines: has.vines, lanterns: has.lanterns,
+    glow: has.glow, buttress: has.buttress,
+    blobs: 0, tips: 0,
   };
   /* Nine pixels tall was the first cut of a fresh lot, and a nine-pixel sapling
      is not a thing anybody is going to want to tap four thousand times — it
@@ -583,8 +879,68 @@ export function drawTree(ctx, growth, { sway = 0, light = 1, sunSide = -1, shake
      new lot is fifty-six, which draws about eighty-four pixels of tree — a
      third of the frame — and a full one is nearly twice that. The thing you
      are here to tap should be the thing you look at first. */
-  limb(ctx, TREE_X + shake, TREE_Y, -Math.PI / 2, (62 + g * 50) * 0.44,
-    2 + g * 5, depth, o);
+  const cx = TREE_X + shake;
+  const len = (62 + g * 50) * 0.44 * stage.reach;
+  const trunk = (2 + g * 5) * stage.trunk * more;
+
+  // What lies on the ground goes down first, so the trunk stands on its roots
+  // and not the other way round.
+  if(has.flare) roots(ctx, cx, trunk, o);
+  if(has.leaves) fallenLeaves(ctx, cx, trunk, o);
+  if(has.mushrooms) mushrooms(ctx, cx, trunk, o);
+  if(has.bench) bench(ctx, cx, o);
+
+  // The trunk's own lean — the same sway term limb() applies at the root — so
+  // the fork and the knot stay on the wood when the tree moves.
+  const lean = -Math.PI / 2 + sway * 0.35;
+
+  let hangX = 0, hangY = 0;
+  if(has.fork){
+    /* The low fork: a bough out of the trunk a third of the way up, with a
+       crown of its own on the end of it aimed back upward. Running limb()
+       straight off a near-horizontal bough puts its outer branches under the
+       horizontal and into the ground. It leaves on the left every day of the
+       year rather than on the sunward side: the sun crosses the trunk twice a
+       day here, and a limb that jumped across at noon to stay sunward would
+       read as a fault, where a highlight that swaps sides does not. */
+    const fx = cx + Math.cos(lean) * len * 0.34;
+    const fy = TREE_Y + Math.sin(lean) * len * 0.34;
+    const af = -Math.PI / 2 - stage.fork + sway * 0.7;
+    const fl = len * 0.8;
+    const ex = fx + Math.cos(af) * fl, ey = fy + Math.sin(af) * fl;
+    bough(ctx, fx, fy, ex, ey, trunk * 0.6, o);
+    // The bough's crown is drawn at the plain spread whatever the stage: it
+    // starts out leaning, and widening it as well hung it down beside the
+    // bough like a lobe of wet washing.
+    const spread = o.spread;
+    o.spread = 1;
+    limb(ctx, ex, ey, -Math.PI / 2 - 0.3, len * 0.7, trunk * 0.4, depth - 1, o);
+    o.spread = spread;
+    hangX = fx + (ex - fx) * 0.72;
+    hangY = fy + (ey - fy) * 0.72 + Math.round(trunk * 0.6) / 2;
+  }
+
+  if(has.twins){
+    /* Twin trunks: a stub, then two leaders each carrying its own crown. Each
+       is a limb one level down from the root, so the pair together costs what
+       the single trunk's three first limbs did — the tree gets no dearer to
+       draw for being twice the tree. */
+    const sl = len * 0.4;
+    const sx = cx + Math.cos(lean) * sl, sy = TREE_Y + Math.sin(lean) * sl;
+    bough(ctx, cx, TREE_Y, sx, sy, trunk, o);
+    o.leaderAt = depth - 1;
+    limb(ctx, sx, sy, -Math.PI / 2 - 0.26, len * 0.98, trunk * 0.7, depth - 1, o);
+    limb(ctx, sx, sy, -Math.PI / 2 + 0.22, len * 0.94, trunk * 0.7, depth - 1, o);
+  } else {
+    limb(ctx, cx, TREE_Y, -Math.PI / 2, len, trunk, depth, o);
+  }
+
+  // On the trunk, after the trunk. The knot sits lower on twin trunks, where
+  // forty percent of the way up is the crotch.
+  const knotAt = has.twins ? 0.22 : 0.4;
+  if(has.knot) knot(ctx, cx + Math.cos(lean) * len * knotAt, TREE_Y + Math.sin(lean) * len * knotAt, trunk, o);
+  if(has.moss) moss(ctx, cx, len, trunk, o);
+  if(has.swing) swing(ctx, hangX, hangY, o);
 }
 
 /* A burst at the point of a tap: a dozen pixels flung outward and falling
@@ -615,10 +971,18 @@ export function drawBurst(ctx, x, y, age, light = 1, size = 1){
 
 /* The area a tap should feel like it landed on. Generous on purpose: a target
    you have to aim at is a target that hurts to click four thousand times. */
-export function treeBounds(growth){
+export function treeBounds(growth, age = 0){
   const g = Math.max(0, Math.min(1, growth));
-  const reach = 32 + g * 46;
-  const height = 66 + g * 90;
+  const stage = stageFor(age);
+  /* An older tree's box grows with its crown. Past the last stage the crown
+     only thickens, so the box takes a fraction of that growth; and both sides
+     are clamped to the frame, because the last stage's crown is allowed to
+     leave the picture and the thing you tap is not. Symmetric about the trunk
+     even though the low bough leans left — a box that covers the bough and a
+     little sky on the other side is a box that is easy to hit. */
+  const more = 1 + (agedScale(age) - 1) * 0.3;
+  const reach = Math.min(TREE_X, (32 + g * 46) * stage.hit[0] * more);
+  const height = Math.min(TREE_Y, (66 + g * 90) * stage.hit[1] * more);
   return { x: TREE_X - reach, y: TREE_Y - height, w: reach * 2, h: height + 6 };
 }
 
@@ -677,7 +1041,7 @@ function drawMotes(ctx, now, light, growers){
  * calls once, and neither of them can tell the other apart.
  */
 export function paintLot(ctx, {
-  phase = 0.25, growth = 0, owned = {}, now = 0, sway = 0, shake = 0, growers = 0, pulse = 0,
+  phase = 0.25, growth = 0, owned = {}, now = 0, sway = 0, shake = 0, growers = 0, pulse = 0, age = 0,
 } = {}){
   const light = Math.sin(phase * Math.PI * 2);
   const sunSide = Math.cos(phase * Math.PI * 2) > 0 ? -1 : 1;
@@ -690,7 +1054,7 @@ export function paintLot(ctx, {
   const pieces = lotPieces(owned);
   // Everything behind the tree, then the tree, then everything in front of it.
   for(const p of pieces) if(p.ground <= TREE_Y) drawPiece(ctx, p, light);
-  drawTree(ctx, growth, { sway, light, sunSide, shake, pulse });
+  drawTree(ctx, growth, { sway, light, sunSide, shake, pulse, age });
   for(const p of pieces) if(p.ground > TREE_Y) drawPiece(ctx, p, light);
 
   drawMotes(ctx, now, light, growers);
@@ -723,7 +1087,7 @@ export function createLot(){
   };
 
   return function paint(ctx, opts = {}){
-    const { phase = 0.25, growth = 0, owned = {}, now = 0, sway = 0, shake = 0, growers = 0, pulse = 0 } = opts;
+    const { phase = 0.25, growth = 0, owned = {}, now = 0, sway = 0, shake = 0, growers = 0, pulse = 0, age = 0 } = opts;
     const light = Math.sin(phase * Math.PI * 2);
     const sunSide = Math.cos(phase * Math.PI * 2) > 0 ? -1 : 1;
 
@@ -764,7 +1128,7 @@ export function createLot(){
     // which is the same order the uncached path produces for everything that
     // stands in front of the trunk — and the far ones are behind the ridge
     // anyway, where the tree does not reach.
-    drawTree(ctx, growth, { sway, light, sunSide, shake, pulse });
+    drawTree(ctx, growth, { sway, light, sunSide, shake, pulse, age });
     ctx.drawImage(props.canvas, 0, 0);
     drawMotes(ctx, now, light, growers);
   };
