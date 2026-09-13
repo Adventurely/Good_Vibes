@@ -235,8 +235,12 @@ function makeStars(seed){
   const stars = [];
   let s = seed >>> 0 || 1;
   const rnd = () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; };
-  for(let i = 0; i < 420; i++){
-    stars.push({ x: rnd(), y: rnd(), m: rnd(), tw: rnd() * 6.28 });
+  for(let i = 0; i < 900; i++){
+    /* Magnitude squared, so the field is mostly faint with a few bright ones
+       in it. Spread evenly, every star looks like the same star and the sky
+       reads as a texture rather than a depth. */
+    const m = rnd();
+    stars.push({ x: rnd(), y: rnd(), m: m * m, tw: rnd() * 6.28 });
   }
   return stars;
 }
@@ -283,16 +287,26 @@ function draw(chart, view){
 function drawStars(chart, view){
   const { ctx, camera } = chart;
   const W = chart.width, H = chart.height;
-  // Faint parallax with the camera, none with zoom: stars are infinitely far.
-  const ox = (camera.cx * 3) % 1, oy = (camera.cy * 3) % 1;
+  /* Faint parallax with the camera, none with zoom: stars are infinitely far.
+     The offset has to be continuous or the field jumps: it used to be
+     `(camera.cx * 3) % 1`, and every time that crossed a whole number the
+     whole sky hopped a couple of dozen pixels sideways — which at warp, when
+     the camera crosses au in a second, was a twitch. The wrap belongs on the
+     star's own position, where it is seamless, and not on the offset. */
+  const ox = camera.cx * 0.06, oy = camera.cy * 0.06;
+  const wrap = v => ((v % 1) + 1) % 1;
   const tw = chart.reducedMotion ? 0 : (view.now ?? 0) / 1000;
   for(const s of chart.stars){
-    const x = ((s.x - ox * 0.02 + 1) % 1) * W, y = ((s.y + oy * 0.02 + 1) % 1) * H;
-    const a = 0.25 + 0.55 * s.m * (tw ? 0.75 + 0.25 * Math.sin(tw * (0.6 + s.m) + s.tw) : 1);
-    // Ink specks on paper rather than lights on black: the bright ones gold
-    // ink, the rest the page's own ink, at the same alphas as before.
-    ctx.fillStyle = s.m > 0.94 ? `rgba(143,92,5,${a.toFixed(3)})` : `rgba(42,33,24,${a.toFixed(3)})`;
-    const r = s.m > 0.92 ? 1.6 : 1;
+    const x = wrap(s.x - ox) * W, y = wrap(s.y + oy) * H;
+    const a = 0.12 + 0.70 * s.m * (tw ? 0.78 + 0.22 * Math.sin(tw * (0.6 + s.m) + s.tw) : 1);
+    /* Lights on black. These were ink specks — a near-black brown, and gold
+       for the bright ones — from when the chart was drawn on paper; the
+       ground went black and they were never turned back into stars, so four
+       hundred of them were being drawn every frame at a contrast of nothing.
+       The brightest sit well under the road, which is pure white and has to
+       stay the one thing your eye goes to. */
+    ctx.fillStyle = s.m > 0.80 ? `rgba(255,222,168,${a.toFixed(3)})` : `rgba(226,224,216,${a.toFixed(3)})`;
+    const r = s.m > 0.90 ? 2 : 1;
     ctx.fillRect(x, y, r, r);
   }
 }
