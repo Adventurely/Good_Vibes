@@ -1565,6 +1565,22 @@ a choice, it is a longer list. What is left is one line of each kind, every
 grower improved exactly once, and a test that fails the moment two rows do the
 same thing to the same target.
 
+**The lot is the page.** The frame around it is one thin row — the name, a
+way back, a way to start over — the four numbers that never go away, and the
+panel. The tagline and the footer are gone; what the game is, the title screen
+says. Replanting lives in a *Seeds* tab rather than as a block under the
+picture, with a dot on the tab for the one moment it needs attention, and the
+lot takes up to three quarters of the window's height.
+
+**A tap lands like something.** Three things happen to the picture: the number
+at twice the font, a size bigger again for its first moment; a burst of a dozen
+leaf-pixels flung from the point of the tap and falling back; and the canopy
+swelling by a third of its blob radius and settling. The first cut was a
+five-pixel number and a one-pixel wobble, which on a phone was a tap you could
+not see land. Under `prefers-reduced-motion` the number holds still, the burst
+is a still shape, and the canopy still swells, because a single ease is not a
+repeated motion.
+
 **Replanting is three named numbers and one sentence.** Seeds held, and what
 they are worth; seeds ready to bank, and what banking them would add; the
 lifetime total the next seed lands at, with a bar climbing to it. The button

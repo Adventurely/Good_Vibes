@@ -558,7 +558,11 @@ function limb(ctx, x, y, angle, len, width, depth, o){
   if(depth === 2 && o.depth >= 5) leafBlob(ctx, x2, y2, o.leaf * 0.5, o.light);
 }
 
-export function drawTree(ctx, growth, { sway = 0, light = 1, sunSide = -1, shake = 0 } = {}){
+/* `pulse` is how hard the tree is still ringing from a tap, 0 to 1: the
+   canopy swells by up to a third of its blob radius and settles. It is the
+   tap's own animation, and it is on the tree rather than on the number that
+   floats away, because the tree is what you tapped. */
+export function drawTree(ctx, growth, { sway = 0, light = 1, sunSide = -1, shake = 0, pulse = 0 } = {}){
   const g = Math.max(0, Math.min(1, growth));
   const depth = 3 + Math.round(g * 3);
   const o = {
@@ -566,7 +570,7 @@ export function drawTree(ctx, growth, { sway = 0, light = 1, sunSide = -1, shake
     // Bigger blobs on a young tree than the growth curve alone would give it.
     // A sapling drawn with a one-pixel trunk and eight two-pixel leaves is a
     // thread with specks on it, not a plant somebody wants to look after.
-    leaf: 3.6 + g * 4.0,
+    leaf: (3.8 + g * 4.2) * (1 + Math.max(0, Math.min(1, pulse)) * 0.35),
   };
   /* Nine pixels tall was the first cut of a fresh lot, and a nine-pixel sapling
      is not a thing anybody is going to want to tap four thousand times — it
@@ -576,8 +580,29 @@ export function drawTree(ctx, growth, { sway = 0, light = 1, sunSide = -1, shake
      new lot is fifty-six, which draws about eighty-four pixels of tree — a
      third of the frame — and a full one is nearly twice that. The thing you
      are here to tap should be the thing you look at first. */
-  limb(ctx, TREE_X + shake, TREE_Y, -Math.PI / 2, (56 + g * 48) * 0.44,
+  limb(ctx, TREE_X + shake, TREE_Y, -Math.PI / 2, (62 + g * 50) * 0.44,
     2 + g * 5, depth, o);
+}
+
+/* A burst at the point of a tap: a dozen pixels flung outward and falling
+ * back, in the tree's own greens with a spark of gold. `age` runs 0 to 1 over
+ * the burst's life. Deterministic in everything but time — the spread comes
+ * off the particle's index, not a die — so two taps in the same place throw
+ * the same shape, which is what makes it read as the tree reacting rather
+ * than as confetti.
+ */
+export function drawBurst(ctx, x, y, age, light = 1){
+  const t = Math.max(0, Math.min(1, age));
+  const count = 12;
+  for(let i = 0; i < count; i++){
+    const angle = -Math.PI * (0.15 + 0.7 * (i / (count - 1))) + ((i % 3) - 1) * 0.12;
+    const speed = 22 + (i % 4) * 7;
+    const px = x + Math.cos(angle) * speed * t;
+    const py = y + Math.sin(angle) * speed * t + 34 * t * t;   // and gravity
+    if(t > 0.85 && (i % 2)) continue;                           // thinning out
+    const key = i % 5 === 0 ? 'y' : i % 3 === 0 ? 't' : 'g';
+    fill(ctx, key, light, Math.round(px), Math.round(py), 2, 2);
+  }
 }
 
 /* The area a tap should feel like it landed on. Generous on purpose: a target
@@ -644,7 +669,7 @@ function drawMotes(ctx, now, light, growers){
  * calls once, and neither of them can tell the other apart.
  */
 export function paintLot(ctx, {
-  phase = 0.25, growth = 0, owned = {}, now = 0, sway = 0, shake = 0, growers = 0,
+  phase = 0.25, growth = 0, owned = {}, now = 0, sway = 0, shake = 0, growers = 0, pulse = 0,
 } = {}){
   const light = Math.sin(phase * Math.PI * 2);
   const sunSide = Math.cos(phase * Math.PI * 2) > 0 ? -1 : 1;
@@ -657,7 +682,7 @@ export function paintLot(ctx, {
   const pieces = lotPieces(owned);
   // Everything behind the tree, then the tree, then everything in front of it.
   for(const p of pieces) if(p.ground <= TREE_Y) drawPiece(ctx, p, light);
-  drawTree(ctx, growth, { sway, light, sunSide, shake });
+  drawTree(ctx, growth, { sway, light, sunSide, shake, pulse });
   for(const p of pieces) if(p.ground > TREE_Y) drawPiece(ctx, p, light);
 
   drawMotes(ctx, now, light, growers);
@@ -690,7 +715,7 @@ export function createLot(){
   };
 
   return function paint(ctx, opts = {}){
-    const { phase = 0.25, growth = 0, owned = {}, now = 0, sway = 0, shake = 0, growers = 0 } = opts;
+    const { phase = 0.25, growth = 0, owned = {}, now = 0, sway = 0, shake = 0, growers = 0, pulse = 0 } = opts;
     const light = Math.sin(phase * Math.PI * 2);
     const sunSide = Math.cos(phase * Math.PI * 2) > 0 ? -1 : 1;
 
@@ -731,7 +756,7 @@ export function createLot(){
     // which is the same order the uncached path produces for everything that
     // stands in front of the trunk — and the far ones are behind the ridge
     // anyway, where the tree does not reach.
-    drawTree(ctx, growth, { sway, light, sunSide, shake });
+    drawTree(ctx, growth, { sway, light, sunSide, shake, pulse });
     ctx.drawImage(props.canvas, 0, 0);
     drawMotes(ctx, now, light, growers);
   };
