@@ -168,8 +168,8 @@
             aria-label="A lot at low sun: one big tree in the middle of a field filling up with beehives, glasshouses, solar panels and turbines."></canvas>
     <div class="about">
       <h2>Sunward</h2>
-      <p>Tap a bare lot into a canopy. Spend the light on things that make
-         their own, and watch the day turn while you do.</p>
+      <p>Every tap is energy for a tree. Spend it on things that make their
+         own, and watch the day turn while the lot fills in.</p>
       <ul class="tags">
         <li>Single player</li>
         <li class="sun">Clicker</li>
@@ -377,7 +377,7 @@ const paintSunwardLot = createLot();
    than noon: the card has to say what the game is in one glance, and "a tree
    in a field of things you built, at golden hour" is the sentence. */
 const SW_OWNED = { moss: 40, fern: 36, panel: 30, hive: 24, mushroom: 20, orchard: 15,
-                   turbine: 11, glasshouse: 8, mycelium: 6, reef: 4, canopy: 3, mirror: 1 };
+                   turbine: 11, glasshouse: 8, canopy: 5 };
 const SW_GROWERS = Object.values(SW_OWNED).reduce((a, b) => a + b, 0);
 
 function paintSunward(now){

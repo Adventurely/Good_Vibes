@@ -481,8 +481,46 @@
     body.sheet #tut{ display:none; }
   }
 
+  /* The opening film. Above everything, including the sheet and the cards,
+     because for six seconds it is the only thing there; then it dissolves and
+     the chart is underneath it, already drawn. The art is a canvas of chunky
+     pixels (intro.js); the words are words, so they stay crisp. */
+  #intro{
+    position:fixed; inset:0; z-index:20; background:#02030b;
+    opacity:1; transition:opacity .45s ease;
+  }
+  #intro[hidden]{ display:none; }
+  #intro.gone{ opacity:0; pointer-events:none; }
+  #intro-art{
+    position:absolute; inset:0; width:100%; height:100%; display:block;
+    image-rendering:pixelated;
+  }
+  #intro-cap{
+    position:absolute; left:50%; bottom:clamp(2.4rem, 10vh, 5.5rem); transform:translateX(-50%);
+    margin:0; width:min(92vw, 34rem); text-align:center; color:var(--ink); opacity:0;
+    font-size:clamp(.92rem, 2.5vw, 1.06rem); text-shadow:0 2px 12px #000, 0 0 26px #000;
+  }
+  #intro-cap small{
+    display:block; margin-bottom:.3rem; color:var(--gold-ink);
+    letter-spacing:.3em; text-transform:uppercase; font-size:.66rem;
+  }
+  /* The line arrives with the black, on the last beat, and stays through the
+     dissolve. */
+  #intro.say #intro-cap{ animation:introcap 1.2s ease both; }
+  @keyframes introcap{ from{ opacity:0; transform:translate(-50%, 7px); } to{ opacity:1; transform:translate(-50%, 0); } }
+  #intro-skip{
+    position:absolute; right:.9rem; bottom:max(.9rem, env(safe-area-inset-bottom));
+    padding:.4rem .8rem; border-radius:999px; border:1px solid var(--line-2);
+    background:var(--glass-2); color:var(--dim); font:inherit; font-size:.78rem;
+    letter-spacing:.1em; text-transform:uppercase; cursor:pointer;
+  }
+  #intro-skip:hover, #intro-skip:focus-visible{ color:var(--ink); border-color:var(--gold-2); }
+
   @media (prefers-reduced-motion: reduce){
     #panel, .toast{ transition:none; animation:none; }
+    /* It never plays under this, but if it is asked for by hand it does not
+       also slide and fade. */
+    #intro, #intro.say #intro-cap{ transition:none; animation:none; }
   }
 </style>
 </head>
@@ -525,12 +563,21 @@
 
 <dialog id="modal"></dialog>
 
+<!-- The opening film: a lighter coming up out of Tassel's ocean. Hidden until
+     a new ship starts, and gone for good once it has played or been skipped. -->
+<div id="intro" hidden>
+  <canvas id="intro-art" role="img" aria-label="A lighter lifts out of Tassel's ocean at dawn, climbs through the clouds, and reaches orbit."></canvas>
+  <p id="intro-cap"><small>Tassel</small>Out of the water, through the weather, and aboard by breakfast.</p>
+  <button id="intro-skip" title="Skip the opening (any key)">Skip &#9656;</button>
+</div>
+
 <script type="module">
 import { createChart, PALETTE, locateOnPrediction, fmtAu, bodyColour } from './render.js';
 import { portraitURL } from './sprites.js';
 import * as S from './sim.js';
 import { CONST, PORTS, GOODS, UPGRADES, TEXT, SPECIES, GLOSSARY, BELT_ROCKS, ARC_DEBRIS } from './content.js';
 import { segmentApses, norm, sub, add, unit, dist, absState, elementsFromState } from './orbit.js';
+import { playIntro } from './intro.js';
 
 const world = S.world;
 const $ = id => document.getElementById(id);
@@ -560,11 +607,16 @@ function freshSeed(){
   const asked = Number(params.get('seed'));
   return Number.isFinite(asked) && asked > 0 ? Math.floor(asked) : ((Date.now() % 100000) | 1);
 }
+/* A ship's first minute or a ship picked back up: the opening film plays for
+   the first of those and not for the second. */
+let fresh = true;
 if(params.has('new') || params.has('seed')){
   state = S.newGame(freshSeed());
   if(!params.has('seed')) history.replaceState(null, '', location.pathname);
 }else{
-  state = loadSave() || S.newGame(freshSeed());
+  const saved = loadSave();
+  if(saved){ state = saved; fresh = false; }
+  else state = S.newGame(freshSeed());
 }
 
 /* ------------------------------------------------------------- chart */
@@ -1752,7 +1804,7 @@ function storyTitle(name){ return { mawArrival: 'The Maw', tollGiftLater: 'A par
 function confirmNew(){
   openModal(`<h2>Start over?</h2><p>This save is replaced by a fresh ship at Tassel. There is one save slot.</p><div class="btns"><button class="btn" id="m-no">Keep playing</button><button class="btn danger" id="m-yes">New game</button></div>`, m => {
     m.querySelector('#m-no').addEventListener('click', closeModal);
-    m.querySelector('#m-yes').addEventListener('click', () => { closeModal(); state = S.newGame(freshSeed()); save(); selectedNode = -1; lastDockedMode = null; replan(true); renderTabs(); backToShip(true); tutorialCheck(); });
+    m.querySelector('#m-yes').addEventListener('click', () => { closeModal(); state = S.newGame(freshSeed()); save(); selectedNode = -1; lastDockedMode = null; replan(true); renderTabs(); backToShip(true); tutorialCheck(); if(filmWanted(true)) rollFilm(); });
   });
 }
 
@@ -1861,6 +1913,59 @@ $('tut-min').addEventListener('click', e => { e.stopPropagation(); setTutFolded(
 $('tut').addEventListener('click', () => { if(state.flags.tutorialFolded) setTutFolded(false); });
 setInterval(() => { if(!$('tut').hidden) tutorialCheck(); }, 1500);
 
+/* ------------------------------------------------------------- the film */
+
+/* Six and a half seconds of launch, and then the game: intro.js draws a
+   lighter coming up out of Tassel's ocean, through the weather, and out the
+   top of the sky, which is where a new game opens. It plays for a new ship and
+   not for a saved one, because a launch is how this game starts and not how it
+   resumes, and it does not play for anybody who has asked the system for less
+   motion — `?intro` plays it anyway for anyone who asks by hand, and
+   `?intro=0` refuses it.
+   Any key and any click is the way out of it, and the clock does not start
+   until it is over, so the six seconds are not six seconds of an orbit nobody
+   was watching. */
+let film = null;
+function filmWanted(freshShip){
+  if(params.has('intro')) return params.get('intro') !== '0';
+  return freshShip && !reduced;
+}
+function startClock(){ last = performance.now(); requestAnimationFrame(frame); }
+
+/* `begin` is whatever has to be true before the film dissolves: at boot it is
+   the clock, so the chart has painted itself once and the thing coming through
+   underneath is the game rather than a black rectangle. */
+function rollFilm(begin = () => {}){
+  if(film) return;
+  const host = $('intro');
+  host.hidden = false;
+  /* A restart from the menu rolls the film over a game that is already
+     running; hold the clock while it plays, and put it back as it was. */
+  const wasPaused = state.paused;
+  setPaused(true);
+  const f = film = playIntro($('intro-art'), {
+    onBeat: name => { if(name === 'space') host.classList.add('say'); },
+  });
+  /* While it runs the keyboard is the film's: caught on the way down, so that
+     space does not pause a game nobody can see yet. */
+  const key = e => { if(e.key === 'Tab' || e.ctrlKey || e.metaKey) return; e.preventDefault(); e.stopPropagation(); f.skip(); };
+  const tap = () => f.skip();
+  addEventListener('keydown', key, true);
+  host.addEventListener('click', tap);
+  f.done.then(() => {
+    removeEventListener('keydown', key, true);
+    host.removeEventListener('click', tap);
+    film = null;
+    setPaused(wasPaused);
+    begin();
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      host.classList.add('gone');
+      setTimeout(() => { host.hidden = true; host.classList.remove('gone', 'say'); }, 700);
+    }));
+  });
+}
+$('intro-skip').addEventListener('click', e => { e.stopPropagation(); film?.skip(); });
+
 /* ------------------------------------------------------------- boot */
 
 $('grab').addEventListener('click', () => togglePanel(false));
@@ -1879,7 +1984,8 @@ tutorialCheck();
 setTutFolded(!!state.flags.tutorialFolded);
 if(state.pending?.kind === 'toll') showToll(state.pending);
 if(state.pending?.kind === 'crash') showCrash(state.pending.body);
-requestAnimationFrame(frame);
+if(filmWanted(fresh)) rollFilm(startClock);
+else startClock();
 addEventListener('pagehide', save);
 document.addEventListener('visibilitychange', () => { if(document.hidden) save(); else last = performance.now(); });
 </script>

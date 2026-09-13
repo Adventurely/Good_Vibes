@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="../theme.css">
 <title>Sunward — a clicker about growing something back</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230d0b1f'/%3E%3Ccircle cx='8' cy='4' r='2.6' fill='%23ffd34e'/%3E%3Cpath d='M8 15V8' stroke='%23c07a58' stroke-width='1.6'/%3E%3Cpath d='M8 9C8 6.5 6 5 3.6 5 3.6 7.5 5.6 9 8 9zM8 10c0-2.5 2-4 4.4-4 0 2.5-2 4-4.4 4z' fill='%233fa34d'/%3E%3C/svg%3E">
-<meta name="description" content="A clicker about growing something back. Tap a bare lot into a canopy, spend the light on things that grow it for you, and watch the day turn while you do.">
+<meta name="description" content="A clicker about growing something back. Every tap is energy for the tree; spend it on things that grow the lot for you, and watch the day turn while you do.">
 <style>
   /* The site's look, from theme.css. This was a dark page for a while — the
      lot at dusk with the sky doing the work — and it was the one page on the
@@ -141,9 +141,9 @@
     <p class="eyebrow">Good Vibe Games</p>
     <h1>Sunward</h1>
     <p class="tag">A bare lot, one small tree, and a very long afternoon.
-       Tap it for light, spend the light on things that make their own, and
-       watch the whole thing fill in. <b>The day turns while you play</b> &mdash;
-       what pays at noon is not what pays at midnight.</p>
+       Every tap is energy for the tree. Spend it on things that make their
+       own, and watch the whole thing fill in. <b>The day turns while you
+       play</b> &mdash; what pays at noon is not what pays at midnight.</p>
 
     <a class="enter" id="enter" href="./play.html">Plant the lot</a>
 
@@ -166,7 +166,7 @@
  * should show the whole day in the time it takes to decide.
  */
 import { createLot, growthFor, SCENE_W, SCENE_H } from './art.js';
-import { formatLight, GROWERS, UPGRADES, fromSave } from './content.js';
+import { formatEnergy, GROWERS, UPGRADES, fromSave } from './content.js';
 
 /* Counted from the tables rather than typed into the markup, because a number
    in a sentence on a landing page is a number that goes stale the first time
@@ -194,7 +194,7 @@ addEventListener('resize', fitPlate);
 /* A lot worth looking at: most of the way through a run, so the picture is of
    a game somebody has played rather than of an empty field. */
 const OWNED = { moss: 44, fern: 40, panel: 34, hive: 28, mushroom: 24, orchard: 18,
-                turbine: 14, glasshouse: 11, mycelium: 8, reef: 6, canopy: 4, mirror: 2 };
+                turbine: 14, glasshouse: 11, canopy: 6 };
 const GROWERS_ON_LOT = Object.values(OWNED).reduce((a, b) => a + b, 0);
 
 /* If there is a save here already, say so — a returning player should not have
@@ -208,7 +208,7 @@ try {
     if(planted > 0 || state.life.earned > 0){
       document.getElementById('enter').textContent = 'Back to the lot';
       document.getElementById('saved').textContent =
-        `${planted} growers planted, ${formatLight(state.life.earned)} light earned all told`
+        `${planted} growers planted, ${formatEnergy(state.life.earned)} energy earned all told`
         + `${state.seeds ? `, ${state.seeds} seeds held` : ''}.`;
     }
   }

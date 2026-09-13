@@ -684,6 +684,8 @@ The Builders and the Maw are the long-term hook, with breadcrumbs at the Arc, on
 
 A fully hand-drawn navigation chart was considered and ruled out as unrealistic in scope. Visual style, UI treatment, and how species are presented (portraits, animated sprites, text only) are undecided.
 
+**Decided since the first draft.** The bodies are sixteen-pixel sprites — generated for the spheres, hand-drawn for everything that is not one — and a new game opens with a six-and-a-half-second pixel film of a harbour lighter leaving Tassel's ocean: out of the water, through the cloud deck, and into the dark. It is a cutscene over an orbital rendezvous rather than a landing (2.3): the lighter touches water, the merchant ship never does, and the player still starts in orbit with nothing to cast off from. It plays for a new ship only, it is skippable with any key, and the clock waits for it.
+
 ### 7.7 Open Technical Questions
 
 **Decided since the first draft**, and recorded above rather than here: burns are instantaneous impulses (2.2); the control is four buttons on two axes, reached by tapping the road (2.2); there is no landing and the game starts in orbit (2.3); the clock runs at ten real minutes to a lap of the low orbit the game opens in, with no warp ladder and skipping by pointing at a place (2.6); the chart is locked to the body the ship orbits and draws only the immediate orbit plus the next crossing (2.6.1); the opening mission is a single errand to Slate.

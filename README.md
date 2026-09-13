@@ -25,6 +25,7 @@ single-player and need nothing but the files.
 | ✅ Verified in this repo | `src/rooms.js` runs on Workers: no `node:` built-ins, and no `Date.now()` or `Math.random()` |
 | ✅ Verified in this repo | Every game answers on its own path, and each keeps its own `content.js` |
 | ✅ Verified in this repo | Orbital Trader's sky passes its own checker, and its kernel matches a numerical integrator |
+| ✅ Verified in this repo | Orbital Trader's opening film is over inside seven seconds, and the page plays it for a new ship only |
 | ✅ Verified in this repo | Every name `content.js` has ever exported is still exported (a test pins it) |
 | ✅ Verified in this repo | A room survives eviction — `serialize`/`restore`, including the generator's draw count |
 | ✅ Verified in this repo | The Worker builds, binds and bundles — `npm run check` |
@@ -1483,8 +1484,10 @@ animation or no sound.
 ## Sunward
 
 A clicker, and the second game here with no server in it — Greener Thumbs got
-there first. You tap a tree for light, spend the light on things that make
-their own, and the lot fills in around you. `public/sunward/content.js` is the
+there first. Every tap is energy for the tree; you spend the energy on things
+that make their own, and the lot fills in around you. It was called light for
+the first week, and the game's name still points at the sun — but the sun in
+the sky is weather here, and what the tree runs on is what you give it. `public/sunward/content.js` is the
 whole game as data; `art.js` draws it; the two HTML files are a title screen
 and a shop.
 
@@ -1500,15 +1503,16 @@ best hour and half as much at its worst — so a lot of nothing but solar panels
 watches its income halve every two minutes, and the fix is to own some
 mushrooms.
 
-**Three upgrades lift the trough**, and they lift it without touching the peak.
-That asymmetry is the whole value of them, and it was not there at first: they
-shaved the swing from both ends, and a swing that already averages to one over
-a day is not changed at all by taking the same slice off each end. Three
-upgrades at 8M, 900M and 7T light, each sold on its row as an improvement, that
-a player could buy and measure exactly no difference from. They lift the bottom
-now, which is worth `lift / pi` on everything marked day or night — about 6% for
-each of the first two and 3% for the last, which takes the trough all the way up
-to flat — and they are priced against that.
+**One upgrade lifts the trough**, and it lifts it without touching the peak.
+That asymmetry is the whole value of it, and it was not there at first: the
+first cut shaved the swing from both ends, and a swing that already averages to
+one over a day is not changed at all by taking the same slice off each end —
+three upgrades at 8M, 900M and 7T, each sold on its row as an improvement, that
+a player could buy and measure exactly no difference from. It lifts the bottom
+now, all the way to flat, which is worth `SWING / pi` — about 16% — on
+everything marked day or night, and it is priced against that. It was three
+rows in three slices for a while, and three rows that each say "a bit less bad
+at night" are one row said slowly.
 
 The number on a shop row is the **average over a whole day**, not the current
 one, and `test/sunward.test.js` samples two thousand points of a day to check
@@ -1519,7 +1523,7 @@ not something they did.
 
 **The curve is one number.** Costs multiply by about 11.2 a tier and output by
 about 6.4, so each tier pays for itself in 1.75&times; the time the one below it
-does: two minutes for a moss bed, most of a day for an orbital mirror. Flat, and
+does: two minutes for a moss bed, most of a day for a canopy tower. Flat, and
 the newest tier is always the right buy — the shop becomes a list with one live
 row. Much steeper and the top tiers are ornaments. The test asserts the ratio
 stays between 1.3 and 2.6 for every pair, because a tier that pays back *faster*
@@ -1537,17 +1541,55 @@ node test/sunward-balance.mjs 345600 8      # four days, at eight
 ```
 
 It runs as part of `npm test`, the way `test/balance.mjs` does for Good Vibes,
-and it carries four coarse guardrails: something is making light after a minute,
-three kinds are planted within the hour, the first seed is inside an evening,
-and nine of the twelve kinds are on the lot within a day. The shape of the curve
+and it carries four coarse guardrails: something is making energy after a
+minute, three kinds are planted within the hour, the first seed is inside an
+evening, and all but one of the nine kinds are on the lot within a day. The
+shape of the curve
 is pinned in `test/sunward.test.js`; this measures what a player actually ends
 up holding.
 
-Two numbers moved because of it. The second upgrade for each grower unlocked at
-fifty owned, which the model reaches after about four days, and is now
-twenty-five, which is the same evening. And the lot's sprites appeared at 1, 10,
-25 and 60 owned, which drew four things for a garden of ninety-one — the picture
-was a third of the way through the game while the shop was most of the way.
+Two numbers moved because of it. Each grower's upgrade unlocks at ten owned,
+which the model reaches within an hour of the tier opening; it had a second at
+fifty, which was four days away, and then at twenty-five, and then there was no
+second at all — see below. And the lot's sprites appeared at 1, 10, 25 and 60
+owned, which drew four things for a garden of ninety-one — the picture was a
+third of the way through the game while the shop was most of the way.
+
+**Nine growers and eighteen upgrades**, down from twelve and forty-two. Three of
+the twelve were the same idea as a tier already on the list — a second fungus, a
+coral reef nobody could explain, an orbital mirror that was a second sun — and
+most of the forty-two were the same upgrade sold twice: six doublings of the
+tap, four slices of the rate, five global percentages, three shavings of the
+swing, two rows per grower. A row that is "the row above, again, bigger" is not
+a choice, it is a longer list. What is left is one line of each kind, every
+grower improved exactly once, and a test that fails the moment two rows do the
+same thing to the same target.
+
+**The lot is the page.** The frame around it is one thin row — the name, a
+way back, a way to start over — the four numbers that never go away, and the
+panel. The tagline and the footer are gone; what the game is, the title screen
+says. Replanting lives in a *Seeds* tab rather than as a block under the
+picture, with a dot on the tab for the one moment it needs attention, and the
+lot takes up to three quarters of the window's height.
+
+**A tap lands like something.** Three things happen to the picture: the number
+at twice the font, a size bigger again for its first moment; a burst of a dozen
+leaf-pixels flung from the point of the tap and falling back; and the canopy
+swelling by a third of its blob radius and settling. The first cut was a
+five-pixel number and a one-pixel wobble, which on a phone was a tap you could
+not see land. Under `prefers-reduced-motion` the number holds still, the burst
+is a still shape, and the canopy still swells, because a single ease is not a
+repeated motion.
+
+**Replanting is three named numbers and one sentence.** Seeds held, and what
+they are worth; seeds ready to bank, and what banking them would add; the
+lifetime total the next seed lands at, with a bar climbing to it. The button
+says what it will do — *Replant · bank 2* — and the confirmation says what is
+kept (seeds, medals, the all-time record) and what starts again (the energy,
+the growers and the upgrades on the lot). The first cut was one sentence that
+changed shape with the state — sometimes a count, sometimes a percentage,
+sometimes a threshold — and a player could not tell which of the three they
+were being told.
 
 **Upgrades unlock on the run, medals on all time.** Upgrades are spent at a
 reset, so their unlocks reset with them — measured against a lifetime total, a
@@ -1628,6 +1670,7 @@ socket, no server. One save in `localStorage`.
       content.js      the world as data, assembled from the design tables
       render.js       the chart
       sprites.js      the worlds as pixels: sixteen across, drawn once
+      intro.js        the opening film: six and a half seconds of launch
       data/*.js       generated from tools/orbital-trader/design/*.json
 
 ### How the flying works
@@ -1672,6 +1715,31 @@ Arc's broken ring, Claw Rock (which has ears, and the cats insist that is a
 coincidence), Merrow's bazaar-covered snowball, the Far Lantern, and the ship.
 A silhouette is the whole character of those, and a silhouette is what a
 generator is worst at.
+
+### The opening film
+
+A new ship starts with six and a half seconds of pixels, in `intro.js`: a
+lighter comes up out of Tassel's ocean at dawn, through the weather, and out
+of the top of the sky, which is where a new game opens. Nothing lands in this
+game and nothing in the film does either — the lighter is the boat that meets
+ships, and this is the one ride of it anybody sees.
+
+It is drawn the way the sprites are, one buffer of about a hundred and seventy
+art pixels blitted up whole with smoothing off, so a frame costs the same on a
+phone as on a wall. One number drives all of it: `ascent(t)`, the climb from
+nought to one. The sky's colours, how far the water has fallen away, how hard
+the horizon bends, the stars coming out, the plume going from a fat orange
+cone to a thin white needle — every one of them reads that, so re-cutting the
+film is moving times in `BEATS` and colours in `SKY` and nothing has to be
+kept in agreement by hand. `draw(t)` is a function of `t` and nothing else,
+flicker included, so a dropped frame costs a frame and never knocks the film
+out of step with itself.
+
+Who sees it: a new ship, and nobody else. A saved ship is picked back up
+without a launch, `prefers-reduced-motion` skips it, any key or click ends it,
+and the clock does not start until it is over — so the six seconds are not six
+seconds of an orbit nobody was watching. `?intro` plays it for anyone who asks
+by hand and `?intro=0` refuses it.
 
 ### The road, the lock, and the clock
 

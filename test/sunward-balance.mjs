@@ -125,6 +125,6 @@ if(HORIZON >= 24 * 3600){
     `the first seed took ${firstSeed === null ? 'longer than the run' : formatTime(firstSeed)};`
     + ' a reset nobody reaches in an evening is a reset nobody reaches');
   const day = rows.find(row => row.at === 24 * 3600);
-  assert.ok(day && day.kinds >= 9,
+  assert.ok(day && day.kinds >= GROWERS.length - 1,
     `a day in, only ${day ? day.kinds : 0} of ${GROWERS.length} kinds are planted`);
 }
