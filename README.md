@@ -1725,6 +1725,30 @@ and the clock does not start until it is over — so the six seconds are not six
 seconds of an orbit nobody was watching. `?intro` plays it for anyone who asks
 by hand and `?intro=0` refuses it.
 
+### The lesson
+
+Fourteen cards from Uncle Theo, in `narrative.json` and shown one at a time in
+the bottom card. Four of them are about the chart before any of them is about
+flying: drag the map, zoom out until Slate is in the frame, tap Slate and watch
+the chart follow it, press F to come back. Then the errand — write a burn
+down, push it out to Slate's height, aim it thirty degrees ahead of the moon
+because the moon moves while you cross, warp, brake, dock, buy the pebble,
+climb out, bring it home — and a last card that says well done and goes away.
+
+The card on screen is **the first one whose test is false**, and the tests
+watch the game rather than the clicks, so doing a card your own way still
+counts and undoing something walks the lesson back. Each test carries the
+proof that comes after it, which is one pass backwards over the list rather
+than a disjunction on every line: a pilot already in Slate's gravity is never
+sent back to write the burn that got them there.
+
+The four chart cards are the exception to "watch the state": a drag that is
+undone leaves no trace in the save, so those are latched as the gesture
+happens (`noteLook`), and whether the moon is in the frame is answered by the
+draw loop, which is the only thing that knows. Zooming counts as looking
+around too — the card is teaching that the view moves, and somebody who
+scrolled instead of dragging has learned it.
+
 ### The road, the lock, and the clock
 
 Three rules decide what the chart shows, and all three are about showing less.

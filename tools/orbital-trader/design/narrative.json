@@ -409,49 +409,74 @@
  },
  "tutorial": [
   {
+   "step": "look",
+   "title": "Welcome to space — look around",
+   "body": "Uncle Theo to the Skipper. You made it to space! Now comes the hard part. I can show you the ropes if you help me pick up a present for Aunt Nellie.\n\nFirst, look around. Drag the map to pan around your ship."
+  },
+  {
+   "step": "find",
+   "title": "Find Slate — zoom out",
+   "body": "Slate is a little farther out. Zoom out until you can see it: scroll, pinch, or press the minus key."
+  },
+  {
+   "step": "focus",
+   "title": "Focus Slate",
+   "body": "There it is. Tap Slate.\n\nThe map will follow whatever you focus. Planets, moons and your own ship, all the same way."
+  },
+  {
+   "step": "back",
+   "title": "Back to the ship",
+   "body": "Now get back to the Skipper. Press F, or tap the ◎ button by the chart."
+  },
+  {
    "step": "mark",
-   "title": "Write a burn down",
-   "body": "Morning. Uncle Theo here. Nellie wants a pebble off Slate and I have left it late. Tap the white line you are riding and pick 'Plan a burn'. That only writes it down — you have not spent a drop yet."
+   "title": "Make a mark",
+   "body": "Good. Let's get that present. Tap the white line you are riding and pick 'Plan a burn'.\n\nDon't worry about where you put it. We'll fix that next."
   },
   {
    "step": "push",
    "title": "Push it out to Slate's height",
-   "body": "Four arrows appear round the mark. Green throws the far side of your orbit outward; orange pulls it back. Press green until the high point on the yellow line sits at Slate's own height. Close is close enough — within a tenth of it."
+   "body": "Four arrows appeared around the mark. Green adds speed. Orange takes it back.\n\nGreen pushes the far side of your orbit outward. Press green until the yellow line reaches Slate's circle.\n\nWithin a tenth is close enough."
   },
   {
    "step": "aim",
-   "title": "Now put Slate in the way",
-   "body": "Right height, wrong moment. Drag the mark round your orbit until the yellow line runs into Slate's circle. When the chart says it has found Slate, you have it."
+   "title": "Put Slate in the way",
+   "body": "Perfect. You'll reach Slate's circle — but not Slate.\n\nDrag the mark around your orbit until the yellow line crosses that circle about thirty degrees ahead of Slate. It has to travel while you do.\n\nWhen the chart says it has found Slate, you're set."
   },
   {
    "step": "skip",
-   "title": "Do not sit there watching",
-   "body": "Tap your path somewhere past the mark and choose 'Warp here'. The clock runs itself along and the burn fires on its own. Keep going until you are inside Slate's gravity."
+   "title": "Don't sit there watching",
+   "body": "You don't have to wait around. Tap your path past the mark and choose 'Warp here'.\n\nTime runs itself, and the burn fires on its own. Keep going until you're inside Slate's gravity."
   },
   {
    "step": "brake",
    "title": "Fall in, then stop falling",
-   "body": "You are falling past Slate, not round it. Write a mark near the low point and press orange — burning back sheds the speed that would carry you out the other side. Keep pressing until the path closes into a loop."
+   "body": "You've made it to Slate. You're just going too fast.\n\nMake a mark near the low point and press orange to slow down. Slowing down here is what stops you flying back out.\n\nKeep pressing orange until the path closes into a loop."
   },
   {
    "step": "lower",
    "title": "Bring the loop inside docking range",
-   "body": "A loop is not a harbour. The high point has to sit inside Slate's docking range before they will take your lines. Burn back a little more at the low point until it does, then press the anchor."
+   "body": "Wow. You're a natural.\n\nNow get close enough to dock: the high point of your orbit has to sit inside Slate's docking range.\n\nRemember, changing your speed changes the opposite side of your orbit. Burn back at the low point, then press the anchor."
   },
   {
    "step": "buy",
-   "title": "One pebble, and mind the price",
-   "body": "The Market has the beach pebbles on it, the cheapest thing on the shelf. Theo has left you just about enough for one. Buy it."
+   "title": "One pebble, mind the price",
+   "body": "The Market has beach pebbles on the shelf — the cheapest thing here. Theo left you just enough for one.\n\nBuy it."
   },
   {
    "step": "leave",
    "title": "Climb back out",
-   "body": "Cast off and burn forward — green — until the path opens and lets go of Slate. You are back on Tassel's books the moment it does."
+   "body": "Halfway there! Cast off and press green until the path opens and lets go of Slate."
   },
   {
    "step": "home",
-   "title": "And bring it home",
-   "body": "Tassel is where Nellie is. Bring your high point inside Tassel's docking range the same way you did at Slate, tie up, and the pebble is hers."
+   "title": "Bring it home",
+   "body": "Now bring it home. Docking with Tassel works the same way: bring your high point inside Tassel's docking range.\n\nSame trick as before."
+  },
+  {
+   "step": "done",
+   "title": "There you are",
+   "body": "First trip. First trade. And you made it home.\n\nNellie will love it."
   }
  ],
  "shipNames": [

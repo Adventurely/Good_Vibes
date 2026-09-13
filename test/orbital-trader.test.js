@@ -246,8 +246,21 @@ test('the text has every line the game asks for', () => {
   assert.ok(/\?\s*$/.test(TEXT.events.mawArrival.trim()), 'the Maw ends on a question, as the design leaves it');
   /* The lesson is nine steps now and each one is a step of the opening quest,
      so the two lists have to stay the same shape as each other. */
-  assert.equal(TEXT.tutorial.length, 9);
+  /* Fourteen cards: four about reading the chart, nine about flying the
+     errand, and one that says well done and goes away. */
+  assert.equal(TEXT.tutorial.length, 14);
   for(const t of TEXT.tutorial) assert.ok(t.step && t.title && t.body, `tutorial step ${t.step}`);
+  assert.deepEqual(TEXT.tutorial.slice(0, 4).map(t => t.step), ['look', 'find', 'focus', 'back'],
+    'the lesson no longer opens by teaching the chart');
+  assert.equal(TEXT.tutorial[TEXT.tutorial.length - 1].step, 'done', 'the lesson does not end on a goodbye');
+  assert.equal(new Set(TEXT.tutorial.map(t => t.step)).size, TEXT.tutorial.length, 'two cards share a name');
+  for(const t of TEXT.tutorial){
+    /* The page breaks a card on a blank line and puts the rest in one
+       paragraph, so a lone newline would be a line break that vanishes. */
+    assert.doesNotMatch(t.body, /(^|[^\n])\n(?!\n)/, `${t.step}: a single newline in the body`);
+    assert.ok(t.body.length <= 400, `${t.step}: ${t.body.length} characters is more card than screen`);
+    assert.ok(t.title.length <= 44, `${t.step}: the title is too long for the card`);
+  }
   assert.ok(TEXT.quests?.length >= 1, 'there is an opening quest');
   for(const q of TEXT.quests){
     assert.ok(q.id && q.title && q.giver && q.blurb && q.done, `quest ${q.id} has its words`);
@@ -412,6 +425,25 @@ test('every button the page draws for itself has something listening to it', () 
   }
   // And the anchor in particular, which is the only way to dock on a phone.
   assert.match(html, /\$\('dock-go'\)\.addEventListener\('click'/, 'the dock button is not wired');
+});
+
+/* The four cards at the front of the lesson are passed with the chart rather
+ * than with the ship — a drag, a zoom, a tap on the moon, and the way back —
+ * and none of those leave a mark on the game state by themselves. The page
+ * has to notice them as they happen or the card never clears, which is the
+ * one way this lesson can strand somebody. */
+test('the lesson notices the four things that only the chart knows', () => {
+  const html = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  for(const flag of ['chartPanned', 'sawTarget', 'lookedAtTarget', 'lookedBack']){
+    assert.ok(new RegExp(`noteLook\\('${flag}'\\)`).test(html), `nothing ever sets ${flag}`);
+  }
+  // And each of them is read back by the tests the card list is built from.
+  for(const flag of ['chartPanned', 'sawTarget', 'lookedAtTarget', 'lookedBack']){
+    assert.ok(new RegExp(`f\\.${flag}`).test(html), `${flag} is set and never read`);
+  }
+  // The moon has to actually be in the frame, not merely somewhere on the sky.
+  assert.match(html, /function targetOnScreen\(\)/, 'nothing works out whether the moon is on screen');
+  assert.match(html, /chart\.labelInsets/, 'on-screen does not account for the HUD and the panel');
 });
 
 /* The film is six and a half seconds long and the page is the only thing that

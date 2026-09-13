@@ -422,7 +422,15 @@
   #tut small{ color:var(--gold-ink); letter-spacing:.14em; text-transform:uppercase; font-size:.66rem; }
   #tut h3{ margin:.15rem 0 .2rem; font-size:1rem; padding-right:1.6rem; }
   #tut p{ margin:0; color:var(--dim); font-size:.88rem; }
+  /* The cards carry their own paragraphs now: a blank line in the writing is
+     a break on the screen, because eight sentences in one block is a card
+     nobody reads to the end of. */
+  #tut p + p{ margin-top:.5rem; }
   #tut .btns{ margin-top:.5rem; justify-content:flex-end; }
+  /* The last card asks for nothing, so it stops wearing the gold the working
+     cards use to say "you are in the middle of something". */
+  #tut.done{ border-color:var(--leaf); }
+  #tut.done small{ color:var(--leaf); }
   #tut[hidden]{ display:none; }
   /* Fold it away. Theo is good company and still in the way of the sky, so
      the card keeps its name and its number and loses everything else — one
@@ -557,7 +565,7 @@
   <button id="tut-min" title="Fold it away" aria-label="Fold this message away" aria-expanded="true">&#8211;</button>
   <small id="tut-step"></small>
   <h3 id="tut-title"></h3>
-  <p id="tut-body"></p>
+  <div id="tut-body"></div>
   <div class="btns"><button class="btn sm" id="tut-skip">Stop writing, Theo</button></div>
 </div>
 
@@ -774,6 +782,11 @@ function frame(now){
   renderHud(docking);
   renderDockCard(docking);
   refreshRecentre();
+  /* Seen is seen, even for a moment. Nothing else in the page knows what is
+     actually in the frame, and a moon that swings through it between two
+     reads of the lesson would otherwise not count. One arithmetic check a
+     frame, and only until it has happened once. */
+  if(!state.flags.sawTarget && !state.flags.tutorialSkipped && targetOnScreen()) noteLook('sawTarget');
   requestAnimationFrame(frame);
 }
 
@@ -1047,6 +1060,7 @@ canvas.addEventListener('pointermove', e => {
     // Two fingers do both at once: the gap is the scale, the middle is the pan.
     if(d > 0 && pinch.d > 0) chart.zoomBy(d / pinch.d, m);
     chart.panBy(m[0] - pinch.m[0], m[1] - pinch.m[1]);
+    noteLook('chartPanned');
     pinch.d = d; pinch.m = m; return;
   }
   if(!drag) return;
@@ -1056,7 +1070,7 @@ canvas.addEventListener('pointermove', e => {
       drag.moved = true;
       canvas.classList.add('grab');
     }
-    if(drag.moved) chart.panBy(dx, dy);
+    if(drag.moved){ chart.panBy(dx, dy); noteLook('chartPanned'); }
     drag.x = e.clientX; drag.y = e.clientY;
     return;
   }
@@ -1107,7 +1121,7 @@ function endPointer(e){
 }
 canvas.addEventListener('pointerup', endPointer);
 canvas.addEventListener('pointercancel', endPointer);
-canvas.addEventListener('wheel', e => { e.preventDefault(); chart.zoomBy(Math.pow(1.0015, -e.deltaY), [e.clientX, e.clientY]); }, { passive: false });
+canvas.addEventListener('wheel', e => { e.preventDefault(); chart.zoomBy(Math.pow(1.0015, -e.deltaY), [e.clientX, e.clientY]); noteLook('chartPanned'); }, { passive: false });
 canvas.addEventListener('dblclick', e => { const hit = chart.hitTest(e.clientX, e.clientY); if(hit?.kind === 'body') lookAt(hit.id); });
 
 /* A shortcut must never fire while somebody is typing into a control, and must
@@ -1123,14 +1137,16 @@ function typing(e){
 /* One arrow press, in screen pixels: a seventh of the short side of the chart,
    or a fortieth with shift held, so the same key is both a stride and a nudge. */
 function panStep(e){ return Math.min(chart.width, chart.height) * (e.shiftKey ? 0.025 : 0.15); }
+/* The keyboard's pan is a pan: the lesson's first card is passed by either. */
+function keyPan(dx, dy){ chart.panBy(dx, dy); noteLook('chartPanned'); }
 addEventListener('keydown', e => {
   if(typing(e) || e.ctrlKey || e.metaKey || e.altKey) return;
   if($('modal').open) return;
   const fine = e.shiftKey ? 0.2 : 1;   // a fraction of one press of the pad
   switch(e.key){
     case ' ': e.preventDefault(); setPaused(!state.paused); break;
-    case '+': case '=': chart.zoomBy(1.4); break;
-    case '-': case '_': chart.zoomBy(1 / 1.4); break;
+    case '+': case '=': chart.zoomBy(1.4); noteLook('chartPanned'); break;
+    case '-': case '_': chart.zoomBy(1 / 1.4); noteLook('chartPanned'); break;
     case 'f': backToShip(); break;
     case 'p': togglePanel(); break;
     case 'Escape': if(selectedNode >= 0){ selectedNode = -1; renderTab(); } else togglePanel(false); break;
@@ -1138,10 +1154,10 @@ addEventListener('keydown', e => {
     /* The arrows push the selected burn; with nothing selected they are the
        keyboard's pan, so the chart can be walked around without a pointer.
        Shift makes both of them fine. */
-    case 'ArrowRight': e.preventDefault(); if(state.nodes[selectedNode]) pushAxis(selectedNode, 'pro', fine); else chart.panBy(-panStep(e), 0); break;
-    case 'ArrowLeft': e.preventDefault(); if(state.nodes[selectedNode]) pushAxis(selectedNode, 'retro', fine); else chart.panBy(panStep(e), 0); break;
-    case 'ArrowUp': e.preventDefault(); if(state.nodes[selectedNode]) pushAxis(selectedNode, 'out', fine); else chart.panBy(0, panStep(e)); break;
-    case 'ArrowDown': e.preventDefault(); if(state.nodes[selectedNode]) pushAxis(selectedNode, 'in', fine); else chart.panBy(0, -panStep(e)); break;
+    case 'ArrowRight': e.preventDefault(); if(state.nodes[selectedNode]) pushAxis(selectedNode, 'pro', fine); else keyPan(-panStep(e), 0); break;
+    case 'ArrowLeft': e.preventDefault(); if(state.nodes[selectedNode]) pushAxis(selectedNode, 'retro', fine); else keyPan(panStep(e), 0); break;
+    case 'ArrowUp': e.preventDefault(); if(state.nodes[selectedNode]) pushAxis(selectedNode, 'out', fine); else keyPan(0, panStep(e)); break;
+    case 'ArrowDown': e.preventDefault(); if(state.nodes[selectedNode]) pushAxis(selectedNode, 'in', fine); else keyPan(0, -panStep(e)); break;
   }
 });
 
@@ -1219,7 +1235,11 @@ function lookAtEncounter(){
 
 /* Come home. Both halves matter: the lock goes back to the ship *and* the
    pan goes back to nothing, so one press undoes any amount of wandering. */
-function backToShip(fit = false){ chart.focus('ship', null, false); if(fit) frameShipOrbit(); }
+function backToShip(fit = false){
+  chart.focus('ship', null, false);
+  if(state.flags.lookedAtTarget) noteLook('lookedBack');
+  if(fit) frameShipOrbit();
+}
 function frameShipOrbit(){
   const span = roadSpan();
   const half = usableHalf();
@@ -1235,6 +1255,7 @@ function frameShipOrbit(){
    thing, and the next pan is measured from it. */
 function lookAt(id){
   chart.focus(id, null, false);
+  if(id === FIRST_TARGET) noteLook('lookedAtTarget');
   toast(`Looking at ${esc(world.get(id).name)}. Press f for your ship.`);
 }
 
@@ -1821,25 +1842,20 @@ function toast(text, kind = '', ms = 4200){
 
 /* ------------------------------------------------------------- tutorial */
 
-/* The lesson is the first delivery: the orbit you open in, out to Slate, the
-   nearest moon. There is no casting off to do — the game starts in flight —
-   so step one is the first thing a player actually has to decide. It watches
-   the state rather than the clicks, so doing a step your own way still
-   counts, and it steps out of the way the moment you are tied up. */
+/* The lesson is the chart and then the first delivery: four cards to learn
+   what the map does — drag it, zoom it, tap a moon, come back — and then the
+   orbit you open in, out to Slate, and home again. There is no casting off to
+   do, since the game starts in flight, so the flying half begins at the first
+   thing a player actually has to decide.
+
+   It watches the state rather than the clicks, so doing a step your own way
+   still counts, and it steps out of the way the moment you are tied up. */
 const TUT = TEXT.tutorial;
 const FIRST_TARGET = S.questTarget(S.QUESTS[0]) ?? CONST.START_PORT;
 
-/* One test per step of the lesson, in order, each asking the game the same
-   question the card asks the player.
-
-   Every test has to be true of *every* state past its own step, not only of
-   the moment it is passed — a pilot standing in Slate's gravity has no burn
-   written down, and a lesson that reads its tests one at a time would send
-   them back to step one to write one. So each test carries the proof that
-   comes after it: reaching the moon proves the aiming, and the pebble in the
-   hold proves everything up to buying it. The card is then simply the first
-   step whose test is false, which also means undoing something walks it back
-   on its own. */
+/* One test per card, in order, each asking the game the same question the
+   card asks the player. The card on screen is the first one whose test is
+   false. */
 function tutorialTests(){
   const target = FIRST_TARGET;
   const moon = world.get(target);
@@ -1859,40 +1875,105 @@ function tutorialTests(){
   const highEnough = Number.isFinite(raAfter) && Math.abs(raAfter - moon.a) <= moon.a * 0.1;
   const dockableAt = id => state.dockedAt === id || (docking?.port === id && docking.ok);
 
-  return [
-    () => state.nodes.length > 0 || aimed || reached || bought,         // write a mark down
-    () => highEnough || aimed || reached || bought,                     // push it out to the moon's height
-    () => aimed || reached || bought,                                   // slide it until the road finds the moon
-    () => reached || bought,                                            // warp into its gravity
-    () => bought || (atTarget && el && Number.isFinite(el.period)),      // brake until the path closes
-    () => bought || dockableAt(target),                                 // bring the high point inside docking range
-    () => bought,                                                       // buy the pebble
-    () => bought && !atTarget,                                          // climb back out
-    () => dockableAt(CONST.START_PORT),                                 // and get home
+  /* The first four cards are about the chart rather than the ship, and the
+     chart keeps no diary: a drag that is undone, or a moon that crosses the
+     frame and leaves it, would be gone by the time this is next read. So
+     those four are latched where they happen — see noteLook — and only read
+     back here.
+
+     Thirteen tests for fourteen cards, because the last card is not a step.
+     It is a goodbye, and the only thing that clears it is the button on it. */
+  const f = state.flags;
+  const raw = [
+    !!f.chartPanned,                                  // drag the sky about
+    !!f.sawTarget,                                    // zoom out until the moon is in the frame
+    !!f.lookedAtTarget,                               // tap it, and the chart follows it
+    !!f.lookedBack,                                   // and come back to the ship
+    state.nodes.length > 0,                           // write a mark down
+    highEnough,                                       // push it out to the moon's height
+    aimed,                                            // slide it until the road finds the moon
+    reached,                                          // warp into its gravity
+    atTarget && !!el && Number.isFinite(el.period),   // brake until the path closes
+    dockableAt(target),                               // bring the high point inside docking range
+    bought,                                           // buy the pebble
+    bought && !atTarget,                              // climb back out
+    dockableAt(CONST.START_PORT),                     // and get home
   ];
+  /* Every test has to be true of every state past its own card, not only of
+     the moment it is passed: a pilot standing in Slate's gravity has no burn
+     written down, and a lesson that read its tests one at a time would send
+     them back to card five to write one. So each carries the proof that comes
+     after it — reaching the moon proves the aiming, the pebble in the hold
+     proves everything up to buying it — which is one pass from the back of
+     the list rather than a disjunction written out by hand on every line. It
+     is also what makes undoing something walk the lesson back on its own. */
+  for(let i = raw.length - 2; i >= 0; i--) raw[i] = raw[i] || raw[i + 1];
+  return raw;
+}
+
+/* Whether the moon the lesson is about is somewhere a player can actually see
+   it: inside the frame, and not under the HUD or behind the panel. */
+function targetOnScreen(){
+  if(state.dockedAt) return false;
+  const b = world.get(FIRST_TARGET);
+  if(!b) return false;
+  const p = chart.toScreen(absState(world, FIRST_TARGET, state.t).r);
+  const i = chart.labelInsets ?? { top: 0, right: 0, bottom: 0, left: 0 };
+  return p[0] > i.left && p[0] < chart.width - i.right
+      && p[1] > i.top && p[1] < chart.height - i.bottom;
+}
+
+/* A card that is passed by a gesture rather than by a state of the ship is
+   noticed as the gesture happens, once, and then it is a fact about the trip
+   like any other. Zooming counts as looking around as much as dragging does:
+   the first card is teaching that the view moves, and somebody who scrolled
+   instead of dragged has learned it. */
+function noteLook(flag){
+  if(state.flags[flag] || state.flags.tutorialSkipped) return;
+  state.flags[flag] = true;
+  tutorialCheck();
+  save();
 }
 
 function tutorialCheck(){
   if(state.flags.tutorialSkipped){ $('tut').hidden = true; return; }
   const tests = tutorialTests();
   let step = 0;
-  while(step < tests.length && tests[step]()) step++;
+  while(step < tests.length && tests[step]) step++;
   state.flags.tutorial = step;
 
-  const finished = (state.quests ?? []).some(q => q.id === 'pebble' && q.done);
-  if(finished || step >= TUT.length){
-    $('tut').hidden = true;
-    if(finished && !state.flags.tutorialDone){
-      state.flags.tutorialDone = true;
-      toast(S.questById('pebble')?.done ?? 'Nellie has her pebble.', 'story', 9000);
-    }
-    return;
+  const s = TUT[Math.min(step, TUT.length - 1)];
+  if(!s){ $('tut').hidden = true; return; }
+  const last = step >= TUT.length - 1;
+  /* The pebble is home: Nellie gets her scene in a toast, Theo gets the last
+     card, and neither of them says it twice. The goodbye belongs to the trip
+     that has just been made, so a save that finished this errand before the
+     card existed — tutorialDone set, and no goodbye owed — gets neither: Theo
+     congratulating somebody on their first trade forty jobs later is worse
+     than saying nothing. */
+  if(last && !state.flags.tutorialDone){
+    state.flags.tutorialDone = true;
+    state.flags.tutorialGoodbye = true;
+    toast(S.questById('pebble')?.done ?? 'Nellie has her pebble.', 'story', 9000);
+    save();
   }
-  const s = TUT[step];
+  if(last && !state.flags.tutorialGoodbye){ $('tut').hidden = true; return; }
   $('tut').hidden = false;
-  $('tut-step').textContent = `${S.QUESTS[0]?.giver ?? 'Uncle Theo'} · ${step + 1} of ${TUT.length}`;
+  $('tut-step').textContent = `${S.QUESTS[0]?.giver ?? 'Uncle Theo'} · ${last ? 'that is the job' : `${step + 1} of ${TUT.length}`}`;
   $('tut-title').textContent = s.title;
-  $('tut-body').textContent = s.body;
+  /* Blank lines in the card are paragraphs: these are longer than they were,
+     and a wall of eight sentences is a card nobody reads to the end of. */
+  const body = $('tut-body');
+  body.textContent = '';
+  for(const para of s.body.split(/\n{2,}/)){
+    const el = document.createElement('p');
+    el.textContent = para;
+    body.appendChild(el);
+  }
+  /* Nothing is left to do on the last card, so the way out of it stops being
+     a way of shutting Theo up and becomes the end of the lesson. */
+  $('tut-skip').textContent = last ? 'Thanks, Theo' : 'Stop writing, Theo';
+  $('tut').classList.toggle('done', last);
   $('tut').classList.toggle('min', !!state.flags.tutorialFolded);
 }
 $('tut-skip').addEventListener('click', () => { state.flags.tutorialSkipped = true; $('tut').hidden = true; save(); });
