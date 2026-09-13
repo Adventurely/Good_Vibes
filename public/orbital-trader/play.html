@@ -1828,23 +1828,52 @@ function requestsTab(){
   return out;
 }
 
+/* What you are carrying, and then what you have carried.
+ *
+ * A finished job used to sit wherever it had been taken on, in the middle of
+ * the live ones with its steps all ticked — which read as though it were
+ * still taking up one of the three, and there was nothing on this tab to say
+ * otherwise. It never was: the rule counts what is still open. So the live
+ * jobs come first with the count above them, and the finished ones go
+ * underneath, newest first, as a record of the trip rather than a list of
+ * things to do. */
 function questsTab(){
   let out = '<h2>Quests</h2>';
-  const live = (state.quests ?? []).map(l => ({ l, q: S.questById(l.id) })).filter(x => x.q);
-  if(!live.length) return out + '<p class="say">Nobody has asked you for anything yet.</p>';
+  const held = (state.quests ?? []).map(l => ({ l, q: S.questById(l.id) })).filter(x => x.q);
+  if(!held.length) return out + '<p class="say">Nobody has asked you for anything yet.</p>';
+  const live = held.filter(x => !x.l.done);
+  const done = held.filter(x => x.l.done)
+    .sort((a, b) => (b.l.doneAt ?? b.l.takenAt ?? 0) - (a.l.doneAt ?? a.l.takenAt ?? 0));
+
+  out += `<p class="lock">${live.length} of ${S.MAX_ACTIVE_QUESTS} in hand${done.length ? ` · ${done.length} finished, which cost you nothing` : ''}.</p>`;
+  if(!live.length) out += '<p class="say">Nothing in hand. A port\'s Requests tab is where the next one comes from.</p>';
   for(const { l, q } of live){
-    out += `<div class="quest${l.done ? ' done' : ''}">`;
+    out += '<div class="quest">';
     out += `<h3>${esc(q.title)}</h3>`;
-    out += `<p class="lock">${esc(q.giver)}${l.done ? ' · done' : ''}</p>`;
-    out += `<p class="say">${esc(l.done && q.done ? q.done : q.blurb)}</p>`;
+    out += `<p class="lock">${esc(q.giver)}</p>`;
+    out += `<p class="say">${esc(q.blurb)}</p>`;
     out += '<ol class="steps">';
     S.questSteps(q).forEach((st, i) => {
-      const state_ = l.done || i < l.step ? 'ok' : i === l.step ? 'now' : '';
+      const state_ = i < l.step ? 'ok' : i === l.step ? 'now' : '';
       out += `<li class="${state_}">${esc(st.text)}</li>`;
     });
     out += '</ol>';
-    if(!l.done && q.pay) out += `<p class="lock">Pays ${S.fmtMoney(q.pay)} when it is finished.</p>`;
+    if(q.pay) out += `<p class="lock">Pays ${S.fmtMoney(q.pay)} when it is finished.</p>`;
     out += '</div>';
+  }
+  /* The finished cards keep the payoff line and drop the steps: a ticked list
+     of things you are no longer doing is the longest part of the tab and the
+     least worth reading, and there will be twenty of these by the end. */
+  if(done.length){
+    out += '<h3>Finished</h3>';
+    for(const { l, q } of done){
+      void l;
+      out += '<div class="quest done">';
+      out += `<h3>${esc(q.title)}</h3>`;
+      out += `<p class="lock">${esc(q.giver)} · done${q.pay ? ` · paid ${S.fmtMoney(q.pay)}` : ''}</p>`;
+      out += `<p class="say">${esc(q.done ?? q.blurb)}</p>`;
+      out += '</div>';
+    }
   }
   return out;
 }

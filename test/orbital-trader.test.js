@@ -847,6 +847,49 @@ function pushedToSlate(){
   return { g, ix, P };
 }
 
+test('a finished job gives its slot back, and sits under the live ones', () => {
+  /* Three at a time counts what is still open. It always did — what it looked
+     like was the trouble: a finished job sat in the Quests tab wherever it had
+     been taken on, among the live ones with its steps all ticked, and nothing
+     said it was no longer one of the three. */
+  const g = S.newGame(5);
+  const dockAt = id => {
+    const b = world.get(id); const st = O.circularState(b.mu, b.dockAlt, 0);
+    g.dockedAt = null; g.justLeft = null; g.justLeftAt = -1e9;
+    g.ship = { body: id, r: st.r, v: st.v };
+    return S.dock(g);
+  };
+  dockAt('tassel');
+  // The opening errand is already in hand, so two more fills the book.
+  assert.equal(S.activeQuests(g).length, 1);
+  assert.ok(S.acceptQuest(g, 'tasteofhome').ok);
+  assert.ok(S.acceptQuest(g, 'slatemessage').ok);
+  assert.equal(S.activeQuests(g).length, S.MAX_ACTIVE_QUESTS);
+  assert.equal(S.canAcceptQuest(g, S.questById('heavystuff')).ok, false, 'a fourth while three are live');
+
+  // Finish one by arriving where it asked.
+  g.t += 1.2; dockAt('slate');
+  const fin = g.quests.find(l => l.id === 'slatemessage');
+  assert.ok(fin.done, 'the message was delivered');
+  assert.ok(Number.isFinite(fin.doneAt), 'and the moment it was finished is written down');
+  assert.equal(S.activeQuests(g).length, S.MAX_ACTIVE_QUESTS - 1, 'a finished job is not one of the three');
+  assert.equal(S.canAcceptQuest(g, S.questById('heavystuff')).ok, true, 'so the slot is free');
+  assert.ok(S.acceptQuest(g, 'heavystuff').ok);
+  assert.equal(g.quests.filter(l => !l.done).length, S.MAX_ACTIVE_QUESTS);
+
+  /* And the tab reads live-then-finished rather than in the order they were
+     taken. The list itself keeps acceptance order — the sorting is the tab's
+     job — so this is checked where it lives. */
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  const tab = PLAY.slice(PLAY.indexOf('function questsTab()'), PLAY.indexOf('/* ------------------------------------------------------------- actions */'));
+  assert.ok(tab.length > 200, 'found the Quests tab');
+  assert.match(tab, /const live = held\.filter\(x => !x\.l\.done\)/, 'the tab no longer separates live from finished');
+  assert.ok(tab.indexOf('for(const { l, q } of live)') < tab.indexOf("out += '<h3>Finished</h3>'"),
+    'the finished ones are not under the live ones');
+  assert.match(tab, /of \$\{S\.MAX_ACTIVE_QUESTS\} in hand/, 'the tab does not say how many of the three are in hand');
+  assert.match(tab, /doneAt \?\? b\.l\.takenAt/, 'the finished ones are not newest first');
+});
+
 test('a burn that slows you down never reads as a number going up', () => {
   /* The note both playtesters wrote. The chart labelled a mark with the size
      of the burn — the fuel it will spend — and they were braking at Slate:

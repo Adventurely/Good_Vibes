@@ -736,6 +736,8 @@ export function questCheck(state, events = []){
     }
     if(live.step >= steps.length && !live.done){
       live.done = true;
+      // When, so the finished list can put the last thing you did at the top.
+      live.doneAt = state.t;
       if(q.pay) state.money += q.pay;
       if(q.rep && q.rep in state.rep) state.rep[q.rep] += 1;
       /* Some jobs pay in a person. The berth is filled with who they are and

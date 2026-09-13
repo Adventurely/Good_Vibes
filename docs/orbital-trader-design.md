@@ -627,6 +627,14 @@ of the Belt for something other than passing through.
 **Three at once, and no more.** Finished jobs do not count against the three;
 abandoning one gives the berth straight back.
 
+That was true from the start and did not look it: the Quests tab listed a
+finished job wherever it had been taken on, sitting among the live ones with
+its steps all ticked, and nothing on the tab said it was no longer one of the
+three. The tab now leads with **`N of 3 in hand`** and keeps the finished ones
+underneath their own heading, newest first, with their steps dropped — a
+record of the trip rather than a list of things to do. There will be twenty of
+them by the end, so they are compact on purpose.
+
 **A delivery is loaded when you accept it**, at the sender's expense, so you
 need the hold room before you can say yes — twelve units of ore is half a
 starter hold, and that is the job. A consignment is in the hold but it is not
