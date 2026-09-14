@@ -70,8 +70,8 @@ export const ECONOMY = {
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Cheap and light. Keeps forever. Sells anywhere dark.",
-   "nature": "Pressed from a fish that only rises on the dark of the moon. Burns clean, keeps forever, and smells so exactly of a working harbour that people a long way from one buy a jar to open in the room."
+   "blurb": "Clean-burning fish oil. Perfect for lamps, cooking or waterproofing.",
+   "nature": "Otters press it out of a fish that only surfaces on the dark of the moon, on Tassel's open water. It burns clean and keeps forever, which is most of why anybody carries it. It also smells so exactly of a harbour that homesick otters buy a jar simply to open it."
   },
   {
    "id": "coral",
@@ -93,8 +93,8 @@ export const ECONOMY = {
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Dear and light. Otters pay most.",
-   "nature": "Cut from living reef and finished with a thumb: a year of somebody's evenings. They are given rather than sold, so one that reaches a market has usually come out of a household that broke up."
+   "blurb": "Carved reef coral. Perfect for a gift, and otters give a great many gifts.",
+   "nature": "Otters cut it from the living reefs under Tassel and finish each piece with a thumb, which takes about a year of evenings. They are made to be given rather than sold. One that turns up in a market has usually come out of a household that broke up, and the buyers know it."
   },
   {
    "id": "pebble",
@@ -137,8 +137,8 @@ export const ECONOMY = {
     "scorch"
    ],
    "lovedBy": [],
-   "blurb": "Heavy and cheap. Smelters take all of it.",
-   "nature": "Nickel-iron, dug and sorted and nothing else done to it. Worthless until somebody with a furnace gets hold of it, and then worth whatever they make of it."
+   "blurb": "Heavy crates of nickel-iron. Perfect for anybody with a furnace.",
+   "nature": "Dug out of Slate and Scorch, sorted, and nothing else done to it at all. On its own it is worth almost nothing. Put it near a furnace and it becomes whatever the smith felt like making that week."
   },
   {
    "id": "masonry",
@@ -162,8 +162,8 @@ export const ECONOMY = {
     "haven",
     "croak"
    ],
-   "blurb": "Heavy and cheap. Only builders want it.",
-   "nature": "Cut stone carrying the old patterns. Nothing lighter will hold a terrace up, and a terrace is expected to outlast the argument that built it."
+   "blurb": "Heavy patterned stone. Perfect for terraces and anything built to last.",
+   "nature": "Quarried and carved on Slate, where the yards cut stone to the same tolerances they cut hulls. The old patterns go on every block, including the faces that will be buried. Nothing lighter will hold up a terrace, and a terrace is meant to outlast the argument that built it."
   },
   {
    "id": "herbs",
@@ -186,8 +186,8 @@ export const ECONOMY = {
     "scorch",
     "cinder"
    ],
-   "blurb": "Light. Worth most where nothing grows.",
-   "nature": "Cut green and bundled in the field. Half the remedies in the system start here, and a physician can tell a wet-cut bundle from a good one by the squeak."
+   "blurb": "Field-cut medicinal herbs. Perfect for a dispensary or a long voyage.",
+   "nature": "Cut green and bundled by hand on Moss, off terraces somebody's great-grandmother laid out. Half the remedies anyone takes anywhere start as this. A physician can tell a wet-cut bundle from a good one by the squeak, and will tell you so at length."
   },
   {
    "id": "starwine",
@@ -210,8 +210,8 @@ export const ECONOMY = {
    "lovedBy": [
     "veyra"
    ],
-   "blurb": "Light. Small runs, and the price swings.",
-   "nature": "Pale and faintly sharp, made in runs too small to matter to anyone except the people who cannot get any. Scarcity is most of the flavour and the growers know it."
+   "blurb": "Pale starfruit wine. Perfect for a celebration, or for showing off.",
+   "nature": "Grown and pressed on Moss in runs too small to go round, which is deliberate. It is pale, faintly sharp, and does not travel especially well. Scarcity is most of the flavour and the growers have understood that for six generations."
   },
   {
    "id": "glowmoss",
@@ -231,8 +231,8 @@ export const ECONOMY = {
     "haven"
    ],
    "lovedBy": [],
-   "blurb": "Cheap and light. Sells to anyone living underground.",
-   "nature": "A living lamp in a jar: needs nothing, never goes out, and does not mind being underground. Line a corridor with it and the corridor is faintly green forever."
+   "blurb": "Living lamp-moss in a jar. Perfect for tunnels, holds and dark corners.",
+   "nature": "Grown on Moss in sheds nobody is allowed to open in daylight. It wants no fuel, no air and no attention, and it never goes out. Anyone who lives underground ends up with green corridors and stops noticing."
   },
   {
    "id": "riverfish",
@@ -255,8 +255,8 @@ export const ECONOMY = {
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Needs temperature control. Cats pay most.",
-   "nature": "Silver, quick, and out of three rivers only. One that arrives still cold is worth a month of parts. One that does not is worth an apology.",
+   "blurb": "Rare silver riverfish. Needs a cold hold. Cats pay a great deal.",
+   "nature": "Out of three rivers on Moss and nowhere else, and quick enough that catching one is a story before it is a meal. Fresh, it is magnificent. Warm, it is an apology, which is why nobody ships it without a cold hold.",
    "needsTempControl": true
   },
   {
@@ -278,8 +278,8 @@ export const ECONOMY = {
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Heavy. Every dry dock is short of them.",
-   "nature": "Valves, seals and struts in oiled paper. Far from a dry dock, a crate of these is the difference between a ship and a wreck, which is why nobody far from a dry dock asks the price twice."
+   "blurb": "Heavy crates of engine spares. Perfect for a refit, or an emergency.",
+   "nature": "Valves, seals and struts, packed in oiled paper by the Cinder forges that made them. Nobody has ever bought a crate of these excited. Far from a dry dock they are the difference between a ship and a wreck, and out there nobody asks the price twice."
   },
   {
    "id": "weapons",
@@ -301,8 +301,8 @@ export const ECONOMY = {
    "lovedBy": [
     "emberkin"
    ],
-   "blurb": "Heavy and dear. Emberkin houses pay most.",
-   "nature": "Crated house arms, sealed with somebody's mark. There are feuds eleven years old that have never fired one and have never once stopped buying them."
+   "blurb": "Heavy crated house arms. Emberkin houses buy them constantly.",
+   "nature": "Made on Cinder, crated, and sealed with the mark of whoever ordered them. The Emberkin are proud, competitive and extremely well armed. There are feuds running eleven years that have never fired a shot and have never once stopped buying."
   },
   {
    "id": "plating",
@@ -323,8 +323,8 @@ export const ECONOMY = {
     "haven"
    ],
    "lovedBy": [],
-   "blurb": "Heavy. For hulls that go somewhere hot.",
-   "nature": "Sheet that will sit in a cloud top all day and come out grumbling. Half the shielded hulls in the sky are wearing it, including, if you have one, yours."
+   "blurb": "Heavy heat-resistant sheet. Perfect for hulls that go somewhere hot.",
+   "nature": "Rolled on Cinder, which has more experience of heat than anywhere else and mentions it often. It will sit in a cloud top all day and come out grumbling. Half the shielded hulls in the sky are wearing it, including, if you have one, yours."
   },
   {
    "id": "steel",
@@ -344,8 +344,8 @@ export const ECONOMY = {
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Heavy and dull. Always wanted.",
-   "nature": "Bar stock, graded and stamped. The dullest cargo in the system and the one everybody is short of, because nobody plans for it and everybody uses it."
+   "blurb": "Heavy graded bar stock. Perfect for absolutely anything.",
+   "nature": "Melted, rolled and stamped on Cinder, and the least interesting thing they make there. Every yard in the system is short of it, because nobody plans for steel and everybody uses steel. It is the dullest cargo you can carry and it always sells."
   },
   {
    "id": "coils",
@@ -392,8 +392,8 @@ export const ECONOMY = {
    "lovedBy": [
     "veyra"
    ],
-   "blurb": "Needs temperature control. Dear, and the price swings.",
-   "nature": "Grown in the vents and cut cold, and they have to stay cold or they let go of it all at once. Kept properly, one holds a light for a week after the sun comes off it — enough to light a room and call it modesty.",
+   "blurb": "Bright fire crystals. Needs a cold hold. Perfect for lighting a grand room.",
+   "nature": "Grown in the vents on Scorch and cut cold by miners paid by the stone. Kept cold, one holds a light for a week after the sun comes off it. Let one warm and it gives the whole week back at once, which is spectacular and expensive.",
    "needsTempControl": true
   },
   {
@@ -416,8 +416,8 @@ export const ECONOMY = {
     "haven"
    ],
    "lovedBy": [],
-   "blurb": "Heavy and cheap. Four ports take it.",
-   "nature": "Black glass off the flows, packed in ash. Cheap wherever there is nothing else to sell, and cheap everywhere else because everybody has worked out that it cuts."
+   "blurb": "Heavy sheets of black glass. Perfect for blades, windows or floors.",
+   "nature": "Cut off the lava flows on Scorch and packed in ash for the journey. It is cheap there because there is nothing else there. It is cheap everywhere else because everybody has already worked out that it cuts."
   },
   {
    "id": "emberstone",
@@ -440,8 +440,8 @@ export const ECONOMY = {
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Light and dear. The price swings.",
-   "nature": "Still warm to the hand a year out of the ground, and nobody has ever explained why. The official position where it is mined is that it came out warm and will go back in warm. People sleep with them."
+   "blurb": "Warm emberstone. Perfect for a hearth, or for sleeping beside.",
+   "nature": "Dug out of Scorch, and still warm to the hand a year later. Nobody has ever explained why, and the official Scorch position is that it came out of the ground warm and will go back in warm. Cats buy them to sleep on, which is the most sensible use anyone has found."
   },
   {
    "id": "embersilk",
@@ -464,8 +464,8 @@ export const ECONOMY = {
    "lovedBy": [
     "veyra"
    ],
-   "blurb": "This season's colour sells double. Last season's is worthless.",
-   "nature": "It comes off the loom the colour of ash and takes the dye only above ninety degrees, so it is woven in a heated room by people paid very well to sweat. The season's colour turns over four times a year, and the dyers know the next one first."
+   "blurb": "This season's ember silk. Sells for double until the colour turns.",
+   "nature": "Woven on Veyra in a heated room, because it leaves the loom the colour of ash and will not take dye below ninety degrees. The season's colour changes four times a year. The dyers know the next one before anybody else does, and dress accordingly."
   },
   {
    "id": "medals",
@@ -486,8 +486,8 @@ export const ECONOMY = {
     "haven"
    ],
    "lovedBy": [],
-   "blurb": "Light and dear. Sells to people who want the name.",
-   "nature": "The metal is worth nothing. The name struck into it settles an argument in public, which in some houses is the only way an argument is accepted as settled."
+   "blurb": "Struck faction medals. Perfect for settling a score in public.",
+   "nature": "Struck on Veyra in small numbers, for houses with something to prove and an audience to prove it to. The metal is worth very little. The name struck into it ends an argument in the only way some houses accept that an argument can be ended."
   },
   {
    "id": "clocks",
@@ -509,8 +509,8 @@ export const ECONOMY = {
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Otters pay most. A raft buys one together.",
-   "nature": "A second a month. On a world whose year runs fifty-six days that is the difference between a season and a mistake, and to a ship's navigator it is the difference between planning a launch window and guessing at one. Nobody else has the least use for it, which has never stopped anybody buying one."
+   "blurb": "Precision clocks. Otters buy them by the raft and then argue.",
+   "nature": "Built on Veyra to a second a month, which is the difference between planning a launch window and guessing at one. Only two sorts of person need that: a ship's navigator, and an Emberkin, whose year runs fifty-six days. No otter household will admit to owning one alone, so a raft buys one together and argues all season about whose shelf it sits on."
   },
   {
    "id": "perfume",
@@ -532,8 +532,8 @@ export const ECONOMY = {
     "croak"
    ],
    "lovedBy": [],
-   "blurb": "Light and dear. Four ports take it.",
-   "nature": "Distilled a drop at a time from flowers grown for nothing else, and cut with an oil that carries a scent without adding one of its own. A case holds twelve and weighs nothing. Most of what it costs is the four years it took to make the blend repeat."
+   "blurb": "Small bottles of perfume oil. Perfect for a gift, or an impression.",
+   "nature": "Distilled on Veyra a drop at a time, from flowers grown for nothing else. What costs money is not the scent but the sameness: it took four years to make the blend repeat. Half the system finds them ridiculous and buys them anyway."
   },
   {
    "id": "stormcrystals",
@@ -556,8 +556,8 @@ export const ECONOMY = {
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Very dear. One source only. Cats pay most.",
-   "nature": "Pulled off a cloud top on a line, still ticking. Nobody is certain what they are. People who are never quiet will hold one up to a lamp and go quiet."
+   "blurb": "Storm crystals, still ticking. Cats pay a great deal and go quiet.",
+   "nature": "Fished off Grumm's cloud tops on a line, out of weather that was running long before anyone arrived to watch it. They are still ticking when they reach you and nobody is certain what they are. Cats hold one up to a lamp and stop talking, which cats otherwise never do."
   },
   {
    "id": "filters",
@@ -579,8 +579,8 @@ export const ECONOMY = {
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Heavy. Every sealed habitat needs them.",
-   "nature": "Patient, fine, and better than anything the inner worlds can build. The makers will explain exactly how, at length, twice, and you will still not be able to do it."
+   "blurb": "Heavy frog-made air filters. Perfect anywhere people breathe indoors.",
+   "nature": "Built in the floating cities of Grumm, by people who have had a long time to think about air. They are better than anything the inner worlds can manage. The makers will explain exactly how, at length, twice, and you will still not be able to do it."
   },
   {
    "id": "cider",
@@ -604,8 +604,8 @@ export const ECONOMY = {
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Needs temperature control. Otters pay most.",
-   "nature": "Laid down in a balloon city ten thousand years ago, for drinkers who had not hatched yet. The cellar has been moved four times and never once opened in a hurry. People weep at it, and the makers consider weeping the correct response.",
+   "blurb": "Ten-thousand-year-old cider. Needs a cold hold. Otters pay most.",
+   "nature": "Laid down in a balloon city over Grumm some fifty frog generations ago, for drinkers who had not hatched. The cellar has been moved four times and never once opened in a hurry. Otters weep at it, and the frogs consider weeping the correct response.",
    "needsTempControl": true
   },
   {
@@ -627,8 +627,8 @@ export const ECONOMY = {
    "lovedBy": [
     "scorch"
    ],
-   "blurb": "Needs temperature control. Everybody buys it.",
-   "nature": "Cold, clear, and it will close a wound that nothing else will. Warm it once and it is soup, which has happened to enough pilots that there is a word for them.",
+   "blurb": "Medicinal gel. Needs a cold hold. Closes wounds nothing else will.",
+   "nature": "Brewed on the apothecary rafts at Brine, where the chemistry does things it will not do on a warm world. Cold, it will close a wound nothing else will touch. Warm it once and it is soup, which has happened to enough pilots that there is a word for them.",
    "needsTempControl": true
   },
   {
@@ -649,8 +649,8 @@ export const ECONOMY = {
     "haven"
    ],
    "lovedBy": [],
-   "blurb": "Dear and light. Only two ports take it.",
-   "nature": "Ammonia-sea amber with something inside it that is not a leaf: six arms, folded, and a seam down the middle that has been open and shut. Nothing in that sea has bones."
+   "blurb": "Brine amber with something inside it. Perfect for a collection.",
+   "nature": "Fished out of the ammonia sea at Brine with something set inside that is not a leaf: six arms, folded, and a seam down the middle that has been open and shut. Nothing in that sea has bones. Collectors pay for the pieces where you can see the seam."
   },
   {
    "id": "resin",
@@ -673,8 +673,8 @@ export const ECONOMY = {
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Cheap and light. Fixes anything, sells anywhere.",
-   "nature": "Sets hard in vacuum and stays a little soft forever. A crate of this will fix almost anything, and whoever is fixing it will do it in front of you, at some length."
+   "blurb": "Sea-foam resin. Perfect for repairs of very nearly any kind.",
+   "nature": "Skimmed off the foam at Brine and sold in tubs. It sets hard in vacuum and stays very slightly soft forever, so it holds where nothing rigid would. A crate of it will fix almost anything, and whoever does the fixing will do it in front of you, slowly, explaining."
   },
   {
    "id": "lenses",
@@ -696,8 +696,8 @@ export const ECONOMY = {
    "lovedBy": [
     "veyra"
    ],
-   "blurb": "Needs temperature control. Dear. Rich buyers only.",
-   "nature": "Ground from shell ice that has never once melted, and will not survive meeting anything that has. You can read a ship's name off one from further than you would believe.",
+   "blurb": "Ground ice lenses. Needs a cold hold. Perfect for charts or long looks.",
+   "nature": "Ground at Glass from shell ice that has never once melted, and will not survive meeting anything that has. You can read a ship's name off one from further than you would believe. The scholars who grind them are mildly embarrassed about what most buyers use them for.",
    "needsTempControl": true
   },
   {
@@ -718,8 +718,8 @@ export const ECONOMY = {
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Heavy bulk cryogenic fuel. Perfect for cold holds or smelters.",
-   "nature": "Frogs draw it from under the ice shell at Glass and ship it out in double-walled crates. Everything cold in the system runs on it. They think it is the dullest thing they make and are glad somebody wants it."
+   "blurb": "Heavy bulk cryogenic fuel. Perfect for refrigeration or smelting.",
+   "nature": "Frogs draw it from under the ice shell at Glass and ship it out in double-walled crates. Everything cold in the system runs on it. They think it is the dullest thing they make and are frankly glad somebody wants it."
   },
   {
    "id": "incense",
@@ -741,8 +741,8 @@ export const ECONOMY = {
    "lovedBy": [
     "haven"
    ],
-   "blurb": "Light. Festival worlds pay most.",
-   "nature": "Rolled in silence by people who chose to live somewhere expensive to reach. It burns slow, travels badly, and most of what it costs is the getting there."
+   "blurb": "Slow-burning moon incense. Perfect for a festival or a long think.",
+   "nature": "Rolled in silence on Croak, by people who chose to live somewhere expensive to reach. It burns slowly and travels badly. Most of what it costs is the getting there, which the ascetics find funny and will not lower the price over."
   },
   {
    "id": "beads",
@@ -765,8 +765,8 @@ export const ECONOMY = {
    "lovedBy": [
     "croak"
    ],
-   "blurb": "Cheap. Worth more after a round trip.",
-   "nature": "Strung one a day for a year. A pilgrim carries them out and carries them back, and the ones that have been somewhere cost more than the ones that have not — the only market in the system that prices distance honestly."
+   "blurb": "Strung pilgrim beads. Cheap, and worth more once they have travelled.",
+   "nature": "Strung one bead a day for a year on Croak, which is the whole of the making. A pilgrim carries a string out and carries it back again. The ones that have been somewhere cost more than the ones that have not, which is the only honest price anybody puts on distance."
   },
   {
    "id": "frogtea",
@@ -789,8 +789,8 @@ export const ECONOMY = {
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Very dear. Otters pay most.",
-   "nature": "Pressed into bricks longer ago than anybody was keeping records, by people who keep records. A brick is broken for a guest, and having one broken for you when you are only passing through is a considerable thing."
+   "blurb": "Ancient pressed tea. Otters pay most, and pay a great deal.",
+   "nature": "Pressed into bricks on Croak longer ago than the records go, and the frogs keep excellent records. A brick is broken for a guest and not otherwise. Having one broken for you when you are only passing through is a considerable thing, and you will not be allowed to refuse."
   },
   {
    "id": "lanterns",
@@ -812,8 +812,8 @@ export const ECONOMY = {
    "lovedBy": [
     "croak"
    ],
-   "blurb": "Cheap and light. Sells at the turn of the year.",
-   "nature": "Paper and wire, with a wish folded inside where nobody reads it. They go up all at once at the turn of the year, and the sky above is unusable for about an hour."
+   "blurb": "Paper prayer lanterns. Perfect for the turn of the year.",
+   "nature": "Folded on Haven from paper and wire, with a wish written inside where nobody reads it. They all go up at once at the year's turn. For about an hour the sky over the terraces is unusable, and every pilot within range knows to wait."
   },
   {
    "id": "dyes",
@@ -834,8 +834,8 @@ export const ECONOMY = {
     "veyra"
    ],
    "lovedBy": [],
-   "blurb": "Cheap and light. Three ports take them.",
-   "nature": "Ground pigment in twists of waxed cloth. Cheap where they are made for a festival, and dear where somebody has worked out what else they will colour."
+   "blurb": "Bright festival dyes. Perfect for cloth, banners or a very good party.",
+   "nature": "Ground on Haven into twists of waxed cloth, for a festival that has never once been cancelled. They cost almost nothing where they are made, because everyone has some. Somewhere else, somebody has worked out what else they will colour, and pays accordingly."
   },
   {
    "id": "instruments",
@@ -858,8 +858,8 @@ export const ECONOMY = {
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Heavy and very dear. Only three ports take them.",
-   "nature": "Built from wood that grows on one terrace and tuned over a lifetime — the maker's, and then whoever gets it next. People constitutionally unable to stop talking stop talking."
+   "blurb": "Heavy frogwood instruments. Perfect for a hall, or a very good raft.",
+   "nature": "Built on Haven from wood that grows on one terrace, and tuned over a lifetime — the maker's, and then whoever gets it next. They are heavy, slow to make, and worth what is asked for them. An otter who hears one played properly stops talking, which otters otherwise do not do."
   },
   {
    "id": "hullplate",
@@ -880,8 +880,8 @@ export const ECONOMY = {
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Heavy scrap. Any yard takes it.",
-   "nature": "Whatever came off last, straightened and stacked by thickness. Every sheet was somebody's hull, and the yards that sell it do not mention whose: manners, they say, rather than superstition."
+   "blurb": "Heavy salvaged hull plate. Perfect for a repair on a budget.",
+   "nature": "Cut off whatever came into Nail last, straightened, and stacked by thickness. Every sheet of it was somebody's ship. The cats who sell it do not mention whose, which they say is manners rather than superstition."
   },
   {
    "id": "thrusters",
@@ -904,8 +904,8 @@ export const ECONOMY = {
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Heavy and dear. Rebuilt sells close to new.",
-   "nature": "Stripped, cleaned, and put back together better than they were built, by somebody who mainly wanted to settle an argument about how they should have been built in the first place."
+   "blurb": "Heavy rebuilt thrusters. Perfect for a refit at half the price.",
+   "nature": "Stripped, cleaned and rebuilt at Nail by somebody who mainly wanted to settle an argument about how they ought to have been built. They generally come back better than they left the factory. The cat who did it will want to know how it flew, and will remember your answer for years."
   },
   {
    "id": "sensorsalvage",
@@ -928,8 +928,8 @@ export const ECONOMY = {
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Light. Cats pay most.",
-   "nature": "Working, mostly. The ones cut out of the ring see further than they are supposed to, and whoever pays for those is not pointing them at a shipping lane."
+   "blurb": "Salvaged sensor arrays. Working, mostly. Cats pay most.",
+   "nature": "Pulled out of wrecks and off the ring by the salvagers at Nail, and tested about as carefully as you would expect. Most of them work. The ones cut out of the ring see a great deal further than they are supposed to, and those do not go to just anybody."
   },
   {
    "id": "arcshard",
@@ -953,8 +953,8 @@ export const ECONOMY = {
     "veyra",
     "frog"
    ],
-   "blurb": "The dearest cargo there is. Frogs and rich houses both.",
-   "nature": "A hand's length of seamless metal with no join, no tooling mark, and no way to tell which way up it is meant to go. It hums when you tap it — and so does every other piece ever cut off the ring, at the same note."
+   "blurb": "A fragment of Builder metal. The dearest cargo there is. Frogs pay well.",
+   "nature": "Cut off the ring and brought in through Nail, where the cats have been quietly taking it apart for generations. It has no join, no tooling mark, and no way to tell which way up it is meant to go. Tap it and it hums — and so does every other piece ever cut off the ring, at exactly the same note."
   },
   {
    "id": "hotweapons",
@@ -976,8 +976,8 @@ export const ECONOMY = {
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Heavy and dear. Cats pay most.",
-   "nature": "House arms with the marks taken off badly; a thumb finds the filing. Selling them near where they came from means selling them back to the people they were taken from, at a markup."
+   "blurb": "Heavy crates of Emberkin arms, marks filed off. Cats pay most.",
+   "nature": "House arms that came through Whisker without paperwork, with the crest filed off by somebody in a hurry; a thumb still finds it. Nobody at Whisker asks where they came from and nobody expects to be told. Most of them go home again at a markup, bought back by the houses that lost them."
   },
   {
    "id": "fakemedals",
@@ -998,8 +998,8 @@ export const ECONOMY = {
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Cheap and light. Sells to the people it names.",
-   "nature": "Struck this morning and aged this afternoon. Good enough that the houses they name buy them, which is either very funny or the entire point, depending on which house you ask."
+   "blurb": "Counterfeit faction medals. Cheap, and extremely convincing.",
+   "nature": "Struck at Whisker this morning and aged this afternoon by a cat who takes real pride in the work. They are good enough that the houses named on them buy them. Whether that is funny or a little sad depends entirely on which house you ask."
   },
   {
    "id": "greymeds",
@@ -1022,8 +1022,8 @@ export const ECONOMY = {
    "lovedBy": [
     "scorch"
    ],
-   "blurb": "Needs temperature control. Worth most where the real thing is priced out.",
-   "nature": "The same crates as the legitimate ones, at half the price, going to the three places that were priced out of the real thing. The apothecaries who brewed it know exactly where it went.",
+   "blurb": "Unlabelled medicine. Needs a cold hold. Worth most where the real thing is priced out.",
+   "nature": "The same crates as the legitimate ones, routed through Whisker and sold at half of what they should cost. The apothecaries who brewed it know exactly where it ends up and have never once complained. Everybody involved regards this as a public service conducted slightly sideways.",
    "needsTempControl": true
   },
   {
@@ -1046,8 +1046,8 @@ export const ECONOMY = {
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Very dear. Cats pay most.",
-   "nature": "Hands, eyes and spine, packed in gel and labelled in a hand that is not a doctor's. Somebody who has lost something to vacuum will pay anything and ask nothing."
+   "blurb": "Replacement hands, eyes and spines. Cats pay most.",
+   "nature": "Made to order and sold through Whisker, because the inner worlds have strong opinions about who should be allowed to sell them. A cat who has lost something to vacuum would rather not discuss it with a licensing board. They cost a fortune, and nobody who needs one haggles."
   }
  ],
  "ports": {
