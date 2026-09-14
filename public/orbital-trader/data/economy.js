@@ -25,8 +25,8 @@ export const ECONOMY = {
    "lovedBy": [
     "veyra"
    ],
-   "blurb": "Light and dear. Rich buyers bid against each other.",
-   "nature": "Nacre laid down a layer a year, warm on the skin and impossible to hurry. Ceremony and old money are both paying for the waiting."
+   "blurb": "Beautiful deep-water pearls. Perfect for jewellery or a wedding gift.",
+   "nature": "Otters grow pearls in the shallow beds off their rafts and pick them by hand. A wedding needs three, so most of them never leave the water they grew in. Emberkin houses buy them thirty at a time."
   },
   {
    "id": "tideglass",
@@ -48,8 +48,8 @@ export const ECONOMY = {
    "lovedBy": [
     "brine"
    ],
-   "blurb": "Pressure-proof and it glows. Heat ruins it.",
-   "nature": "Blown thin and annealed slow, so it takes a pressure that would go through a porthole, and it holds a sea-green light for hours after the lamps are out. Heat undoes all of it. Leave a pane in the sun and it goes cloudy, and then it goes."
+   "blurb": "Beautiful sea glass. Perfect for decoration or pressure vessels.",
+   "nature": "Otters forge tideglass in volcanic trenches. It is perfect for the underwater cities in the cold ocean depths. Other species find it beautiful."
   },
   {
    "id": "moonfishoil",
@@ -115,8 +115,8 @@ export const ECONOMY = {
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Worth nothing except to an otter.",
-   "nature": "Off the one beach on a moon with no weather, polished by nothing but time. Worth nothing and given anyway, which is the whole of it."
+   "blurb": "Pretty grey moon pebbles. Perfect for a gift to an otter.",
+   "nature": "Otters gather them off the one beach on a moon that has no weather, where nothing has ever worn them smooth but time. They give them to each other and mean it. Nobody else can see why they cost anything at all."
   },
   {
    "id": "ironore",
@@ -368,8 +368,8 @@ export const ECONOMY = {
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Light and dear. Cats pay most.",
-   "nature": "Wound by hand over nine days, in an order that has never been written down anywhere. Nothing else will make a reactor behave, and a good mechanic will trade a ship for one."
+   "blurb": "Hand-wound reactor coils. Perfect for a refit or a failing reactor.",
+   "nature": "Emberkin smiths wind each coil by hand over nine days, in an order they have never written down. Nothing else will make a reactor behave. Cats will trade a whole ship for a crate of them."
   },
   {
    "id": "firecrystals",
@@ -718,8 +718,8 @@ export const ECONOMY = {
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Heavy and dull. Every cold world burns it.",
-   "nature": "Drawn from under an ice shell and shipped double-walled. Everything cold in the system runs on it, and the people who draw it consider it the least interesting thing they produce."
+   "blurb": "Heavy bulk cryogenic fuel. Perfect for cold holds or smelters.",
+   "nature": "Frogs draw it from under the ice and ship it in double-walled crates. Everything cold in the system runs on it. The frogs think it is the dullest thing they make and are glad somebody wants it."
   },
   {
    "id": "incense",

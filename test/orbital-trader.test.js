@@ -234,25 +234,23 @@ test('every port is a body with a port, and every reference resolves', () => {
   }
 });
 
-test("every good says what it is, without saying who wants it", () => {
-  /* The appraiser's berth is built on this line. A player without Wicket has
-     the thing in front of them and what it is made of, and has to reason from
-     pressure-resistant glass to the world at the bottom of an ocean; she is
-     the one who can simply say. A nature line that named a buyer would hand
-     over the answer and there would be nothing for her to know.
+test("every good says what it is and who makes it, without naming a world", () => {
+  /* A nature line says who makes the thing and what it is for, so it may name
+     a people: "otters forge tideglass in volcanic trenches" is the sentence
+     that explains the glass. What it may not name is a world. The appraiser's
+     berth is built on that half — knowing the makers is not knowing the
+     market, and a player still has to reason from pressure-proof glass to the
+     port at the bottom of an ocean, which is what Wicket can simply say.
+     A named world would hand that over and leave her nothing to know.
 
-     Checked against the peoples and the ports whose names are not also
-     ordinary words. Glass, Nail, Moss, Brine and the Arc are all things as
-     well as places, so "black glass off the flows" cannot be told from the
-     moon by a regular expression — those are on the writer. */
-  const peoples = ['otter', 'cat', 'frog', 'emberkin', 'builder'];
+     Checked against the ports whose names are not also ordinary words. Glass,
+     Nail, Moss, Brine and the Arc are all things as well as places, so "black
+     glass off the flows" cannot be told from the moon by a regular
+     expression — those are on the writer. */
   const namedPorts = ['Tassel', 'Slate', 'Cinder', 'Scorch', 'Veyra', 'Whisker', 'Grumm', 'Croak', 'Haven', 'Maw'];
   for(const g of GOODS){
     assert.ok(g.nature && g.nature.length > 20, `${g.id} has no nature line`);
     assert.match(g.nature, /[.!?]$/, `${g.id}: the nature line does not finish its sentence`);
-    for(const who of peoples){
-      assert.ok(!new RegExp(`\\b${who}s?\\b`, 'i').test(g.nature), `${g.id} names the ${who}s: "${g.nature}"`);
-    }
     for(const port of namedPorts){
       assert.ok(!new RegExp(`\\b${port}\\b`).test(g.nature), `${g.id} names ${port}: "${g.nature}"`);
     }
