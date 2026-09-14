@@ -806,6 +806,13 @@ let lockedTo = null;
 /* The one number the on-chart editor shows. Recomputed when the burn changes,
    not every frame: solving what a mark costs is not free. */
 let nodeLabel = null, nodeLabelKey = '', interceptLabel = null, insetLabel = null;
+/* The Astrolabe is the one tab that goes stale on its own: every other one
+   reads the ship, and this one reads the sky moving. It is also the most
+   expensive thing the panel draws — a Lambert sweep per world — so it is
+   redrawn on a real-time budget rather than every frame, and only while the
+   clock is actually running and the tab is actually up. */
+const WINDOWS_REDRAW_MS = 500;
+let windowsDrawnAt = -1e9;
 /* What every mark written down will take out of the tank, drawn on the gauge. */
 let plannedSpend = 0;
 /* What the selected mark says on the chart, and what the whole plan will
@@ -874,6 +881,10 @@ function frame(now){
     nodeLabel, interceptLabel, insetLabel,
     belt, nearPort: docking?.port ?? null, docking,
   });
+  if(dt > 0 && panelOpen && tab === 'windows' && now - windowsDrawnAt > WINDOWS_REDRAW_MS){
+    windowsDrawnAt = now;
+    renderTab();
+  }
   renderHud(docking);
   renderDockCard(docking);
   refreshRecentre();
@@ -1993,16 +2004,15 @@ function astrolabeTab(){
   let out = '<h2>Transfer windows</h2>';
   if(!state.keys?.astrolabe) return out + '<p class="say">No Astrolabe fitted.</p>';
   const rows = S.transferWindows(state);
-  const here = S.helioOf(state.dockedAt ?? state.ship.body);
-  out += `<p class="lock">From ${esc(here?.name ?? 'here')} · tank ${S.fmtKms(state.tank)}</p>`;
+  out += `<p class="lock">From ${esc(S.departureName(state) ?? 'here')} · tank ${S.fmtKms(state.tank)}</p>`;
   if(!rows.length) return out + '<p class="empty">Nothing else goes round the Lamp from here.</p>';
   for(const r of rows){
     /* No countdown where waiting cannot help: the crossing is past this tank
        at every phase, and a date would be a promise the ship cannot keep. */
-    const ever = r.best <= state.tank;
+    const ever = r.best <= state.tank && r.days != null;
     out += `<div class="win ${r.band}">`
       + `<div class="name"><b>${esc(r.name)}</b><small>${S.fmtKms(r.cost)} · ${S.fmtDays(r.tof)}</small></div>`
-      + `<div class="band">${BAND_WORD[r.band]}<small>${ever ? S.fmtDays(r.days ?? 0) : '—'}</small></div>`
+      + `<div class="band">${BAND_WORD[r.band]}<small>${ever ? S.fmtDays(r.days) : '—'}</small></div>`
       + '</div>';
   }
   return out;

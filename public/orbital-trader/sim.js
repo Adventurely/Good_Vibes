@@ -1741,12 +1741,24 @@ export const WINDOW_BANDS = { perfect: 1.05, good: 1.25 };
  * ship that arrives with it. A drifting haven has no well to climb: you match
  * its speed and that is the whole bill. */
 function wellOut(b, vinf){
-  if(!(b.mu > 0) || !b.dockAlt) return vinf;
+  if(!b || !(b.mu > 0) || !b.dockAlt) return vinf;
   return Math.sqrt(Math.max(0, vinf * vinf - 2 * b.mu / b.soi) + 2 * b.mu / b.dockAlt) - Math.sqrt(b.mu / b.dockAlt);
 }
 function wellIn(b, vinf){
-  if(!(b.mu > 0) || !b.dockAlt) return vinf;
+  if(!b || !(b.mu > 0) || !b.dockAlt) return vinf;
   return Math.max(0, Math.sqrt(Math.max(0, vinf * vinf - 2 * b.mu / b.soi) + 2 * b.mu / b.dockAlt) - Math.sqrt(b.mu / b.dockAlt));
+}
+
+/* Where a crossing starts. Tied up or in orbit round a world, it starts at
+ * that world's mooring and has its well to climb. Coasting between worlds it
+ * starts at the ship, which is already in the Lamp's frame with nothing to
+ * climb out of — and that is exactly when a pilot wants to read this, so the
+ * instrument going blank there was the whole of it being useless in flight. */
+function departure(state){
+  const here = helioOf(state.dockedAt ?? state.ship.body);
+  if(!here || here.id === world.root.id) return { body: null, r: shipAbsPos(state), v: shipAbsVel(state) };
+  const a = absState(world, here.id, state.t);
+  return { body: here, r: a.r, v: a.v };
 }
 
 /* The cheapest crossing that leaves now, found by asking Lambert for a spread
@@ -1755,12 +1767,13 @@ function wellIn(b, vinf){
  * the arrival lands where the target has got to — which is why this is a
  * search and not a formula. */
 export function crossingNow(state, targetId, samples = 140){
-  const from = helioOf(state.dockedAt ?? state.ship.body);
+  const from = departure(state);
   const to = world.get(targetId);
-  if(!from || !to || from.id === to.id || to.parent !== 'lamp') return null;
+  if(!to || from.body?.id === to.id || to.parent !== 'lamp') return null;
   const mu = CONST.MU_LAMP;
-  const a = absState(world, from.id, state.t);
+  const a = from;
   const r1 = norm(a.r), r2 = to.a;
+  if(!(r1 > 0)) return null;
   const ccw = cross(a.r, a.v) > 0;
   const tH = hohmann(mu, r1, r2).time;
   /* Half the Hohmann time up to half again as long. The genuinely cheapest
@@ -1775,7 +1788,7 @@ export function crossingNow(state, targetId, samples = 140){
     const tgt = absState(world, targetId, state.t + tof);
     const L = lambert(mu, a.r, tgt.r, tof, ccw);
     if(!L) continue;
-    const cost = wellOut(from, dist(L.v1, a.v)) + wellIn(to, dist(L.v2, tgt.v));
+    const cost = wellOut(from.body, dist(L.v1, a.v)) + wellIn(to, dist(L.v2, tgt.v));
     if(Number.isFinite(cost) && (!best || cost < best.cost)) best = { cost, tof };
   }
   return best;
@@ -1784,21 +1797,20 @@ export function crossingNow(state, targetId, samples = 140){
 /* And what the same crossing costs when the window is right: the plain
  * Hohmann between the two rails, through the same wells. */
 export function crossingBest(state, targetId){
-  const from = helioOf(state.dockedAt ?? state.ship.body);
+  const from = departure(state);
   const to = world.get(targetId);
-  if(!from || !to) return null;
-  const mu = CONST.MU_LAMP;
-  const r1 = norm(absState(world, from.id, state.t).r);
-  const h = hohmann(mu, r1, to.a);
-  return { cost: wellOut(from, h.dv1) + wellIn(to, h.dv2), tof: h.time };
+  if(!to) return null;
+  const r1 = norm(from.r);
+  if(!(r1 > 0)) return null;
+  const h = hohmann(CONST.MU_LAMP, r1, to.a);
+  return { cost: wellOut(from.body, h.dv1) + wellIn(to, h.dv2), tof: h.time };
 }
 
 export function transferWindows(state){
-  const from = helioOf(state.dockedAt ?? state.ship.body);
-  if(!from) return [];
+  const from = departure(state);
   const rows = [];
   for(const b of world.bodies){
-    if(b.parent !== 'lamp' || b.id === from.id) continue;
+    if(b.parent !== 'lamp' || b.id === from.body?.id) continue;
     const now = crossingNow(state, b.id);
     const best = crossingBest(state, b.id);
     const w = nextWindow(state, b.id);
@@ -1824,6 +1836,8 @@ export function transferWindows(state){
  * leaves the sky it was handed to you in needs the instrument that reads the
  * sky. No harbourmaster hands out interplanetary work to a ship that cannot
  * tell a window from a whim. */
+export const departureName = state => departure(state).body?.name ?? null;
+
 export function questLeavesSystem(q){
   if(!q) return false;
   const home = helioOf(q.from ?? '')?.id ?? null;

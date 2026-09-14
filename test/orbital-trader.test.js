@@ -1039,6 +1039,56 @@ test('the Astrolabe is a tab you do not have until you have bought one', () => {
   assert.match(css, /padding:\.5rem \.34rem/, 'the tab padding no longer fits six of them');
 });
 
+test('the Astrolabe reads while coasting, which is when it is wanted', () => {
+  /* It read nothing at all between worlds. Tied up, a crossing starts at the
+     mooring you are at; coasting, the ship is already in the Lamp's frame and
+     there is no world to start from — so the departure radius came out zero,
+     Lambert was handed a NaN flight time, and every row was dropped. Which is
+     the one place a pilot is actually looking at it. */
+  const g = S.newGame(5);
+  g.keys.astrolabe = true; g.quests = [];
+  const mu = world.get('lamp').mu;
+  const tas = O.absState(world, 'tassel', 0);
+  const f = O.propagate(mu, [...tas.r], O.scale(O.unit(tas.v), Math.sqrt(mu / O.norm(tas.r)) * 1.12), 12);
+  g.dockedAt = null; g.justLeft = null; g.justLeftAt = -1e9;
+  g.ship = { body: 'lamp', r: f.r, v: f.v }; g.t = 12;
+
+  assert.equal(S.departureName(g), null, 'coasting, there is no world to read from');
+  const rows = S.transferWindows(g);
+  assert.equal(rows.length, world.bodies.filter(b => b.parent === 'lamp').length,
+    'every world is reachable from open space, Tassel included');
+  assert.ok(rows.some(r => r.id === 'tassel'), 'the way home is a window too');
+  for(const r of rows){
+    assert.ok(r.cost > 0 && Number.isFinite(r.cost), `${r.id}: ${r.cost}`);
+    assert.ok(r.best > 0 && Number.isFinite(r.best), `${r.id}: no best`);
+  }
+  /* And out here there is no well to climb: the departure half of a crossing
+     is the bare heliocentric burn, with only the far end's gravity to pay
+     for. Worked out here the long way so the instrument cannot quietly start
+     charging a ship for leaving a world it is not at. */
+  const to = world.get('cinder');
+  const h = O.hohmann(mu, O.norm(f.r), to.a);
+  const capture = Math.max(0, Math.sqrt(Math.max(0, h.dv2 * h.dv2 - 2 * to.mu / to.soi) + 2 * to.mu / to.dockAlt)
+    - Math.sqrt(to.mu / to.dockAlt));
+  const want = h.dv1 + capture;
+  const got = S.crossingBest(g, 'cinder').cost;
+  assert.ok(Math.abs(got - want) < 1e-12, `from open space Cinder is ${S.fmtKms(got)}, not ${S.fmtKms(want)}`);
+});
+
+test('the Astrolabe is redrawn while the clock runs', () => {
+  /* Every other tab reads the ship; this one reads the sky moving, so it is
+     the only one that goes stale sitting still. It is also the dearest thing
+     the panel draws, so the redraw is on a real-time budget. */
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  const loop = PLAY.slice(PLAY.indexOf('function frame(now)'), PLAY.indexOf('function renderHud'));
+  /* Anchored on the whole condition, because `if(false && …)` still contains
+     every piece of it and a looser match let exactly that through. */
+  const redraw = /if\(dt > 0 && panelOpen && tab === 'windows' && now - windowsDrawnAt > WINDOWS_REDRAW_MS\)\{[\s\S]*?renderTab\(\);/;
+  assert.match(loop, redraw, 'the loop does not redraw the windows on a budget while the clock runs');
+  const ms = Number(PLAY.match(/const WINDOWS_REDRAW_MS = (\d+)/)?.[1]);
+  assert.ok(ms >= 200 && ms <= 2000, `a redraw every ${ms} ms is not a budget`);
+});
+
 test('a harbourmaster will not send a ship out of their sky without an Astrolabe', () => {
   // Which jobs leave the sky they are handed out in, and which stay home.
   assert.equal(S.questLeavesSystem(S.questById('heavystuff')), true, 'Slate to Cinder crosses');
