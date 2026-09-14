@@ -922,10 +922,17 @@ export function prestigeRefusal(state){
    can never disagree. */
 export const winters = state => state.prestiges;
 
-/* Which winter medals a replanting would win: what the confirmation can
-   promise. Pure, and reads the same table the award does. */
+/* The medal a given winter wins, or null if that winter is not one of the
+   rungs. The replant confirmation reads it so it can name what is about to be
+   won, and it reads the same table the award does rather than a copy.
+
+   The guard is not decoration: `find` on an undefined count matches the first
+   medal with no `prestiges` in its need at all, which is the one for tapping
+   the tree once — so a missing argument would have promised "First tap". */
 export const winterMedal = count =>
-  ACHIEVEMENTS.find(a => a.need.prestiges === count) || null;
+  Number.isInteger(count) && count > 0
+    ? ACHIEVEMENTS.find(a => a.need.prestiges === count) || null
+    : null;
 
 /* Give the lot back. Keeps the seeds, the medals, the lifetime record and the
  * sitting; everything else starts again. Returns how many seeds it paid.

@@ -326,6 +326,11 @@ test('there is a medal for every one of the first ten winters, and the ladder go
   assert.equal(winterMedal(1).id, 'first-seed', 'the first winter keeps its old id');
   assert.equal(winterMedal(5).id, 'five-seeds', 'and so does the fifth');
   assert.equal(winterMedal(11), null, 'the eleventh winter is not a medal');
+  // `find` on an undefined count matches the first medal with no prestige in
+  // its need at all, which is the one for tapping the tree once.
+  for(const nonsense of [undefined, null, 0, -3, 1.5, NaN, '5']){
+    assert.equal(winterMedal(nonsense), null, `winterMedal(${String(nonsense)}) must be nothing`);
+  }
   const counts = ladder.map(a => a.need.prestiges);
   assert.deepEqual(counts, [...counts].sort((a, b) => a - b), 'the ladder must be in order');
   assert.equal(new Set(counts).size, counts.length, 'no two medals for the same winter');

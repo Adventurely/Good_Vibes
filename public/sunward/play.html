@@ -481,14 +481,18 @@
         <section class="sheet" id="sheet-board" role="tabpanel" aria-labelledby="tab-board" hidden>
           <div class="boardbox">
             <p class="board-what"><b>The board.</b> Who has tapped the most, stood through the most winters,
-               earned the most and gone fastest. Only the name you type here leaves this device.</p>
+               earned the most and gone fastest. Joining sends the name you type and those four
+               numbers. The lot itself, and everything else on the record, stays on this device.</p>
             <form class="board-join" id="board-join">
               <label for="board-name">Your name on the board</label>
               <input id="board-name" maxlength="16" autocomplete="nickname" spellcheck="false"
                      placeholder="Two to sixteen characters">
               <button class="btn btn-go" id="board-send" type="submit">Put me on the board</button>
             </form>
-            <p class="board-line" id="board-line"></p>
+            <!-- Every answer the board gives — joined, refused, out of reach —
+                 lands here, so it is a live region: a refusal nobody is told
+                 about is a form that silently does nothing. -->
+            <p class="board-line" id="board-line" role="status"></p>
           </div>
           <div class="boards" id="boards"></div>
           <p class="empty" id="board-note">Fetching the board&hellip;</p>
@@ -1105,7 +1109,8 @@
           + ` on everything you plant from now on.\n`
           + `You keep every medal and the all-time record.\n`
           + `The energy, the growers and the upgrades on the lot start again from nothing.\n`
-          + `The tree stands through its ${ordinal(year)} winter and comes back bigger.`)) return;
+          + `The tree stands through its ${ordinal(year)} winter and comes back bigger`
+          + `${winterMedal(year) ? `, and wins ${winterMedal(year).name}` : ''}.`)) return;
         prestige(state);
         note(state, `Winter ${winters(state)}. Replanted the lot; ${state.seeds} seed${plural(state.seeds)} held.`);
         say(`${state.seeds} seed${plural(state.seeds)} held — everything you plant makes +${after}% now.`, 'Replanted');
@@ -1318,7 +1323,39 @@
             name: typeof data.name === 'string' ? data.name : '', joined: data.joined === true };
         } catch { return { id: null, name: '', joined: false }; }
       }
-      const board = { ...readBoard(), fetchedAt: -Infinity, sentAt: -Infinity, data: null };
+      const board = { ...readBoard(), fetchedAt: -Infinity, sentAt: -Infinity, data: null, applied: 0 };
+
+      /* Four places ask the board for a picture of itself — opening the tab,
+         the minute timer, joining, replanting — and they answer out of order.
+         A stamp per request, and a reply older than the one on screen is
+         dropped: without it the slow GET that was already in flight lands on
+         top of the POST that just put you on the board, and your row vanishes
+         a second after you joined it. */
+      let boardStamp = 0;
+      function boardTook(data, stamp){
+        if(stamp < board.applied) return false;
+        board.applied = stamp;
+        board.data = data;
+        board.fetchedAt = performance.now();
+        return true;
+      }
+
+      /* A v4 UUID. `crypto.randomUUID` is only there where the page is a
+         secure context, which the deployed site is and a laptop serving this
+         to a phone over the house network is not — and a board that throws on
+         the join button there is worse than one with a home-made id. */
+      function newId(){
+        try {
+          if(crypto.randomUUID) return crypto.randomUUID();
+          const bytes = crypto.getRandomValues(new Uint8Array(16));
+          bytes[6] = (bytes[6] & 0x0f) | 0x40;
+          bytes[8] = (bytes[8] & 0x3f) | 0x80;
+          const hex = [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
+          return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+        } catch {
+          return null;
+        }
+      }
       function writeBoard(){
         try { localStorage.setItem(BOARD_KEY, JSON.stringify({ id: board.id, name: board.name, joined: board.joined })); }
         catch { /* a private window; the row still goes up this sitting */ }
@@ -1334,6 +1371,9 @@
 
       function drawBoard(){
         const data = board.data;
+        // The note is what stands in for the tables before there are any: it
+        // said "Fetching the board…" under an error message for as long as the
+        // board was unreachable, which is two answers to one question.
         ui.boardNote.hidden = Boolean(data);
         if(!data) return;
         ui.boards.replaceChildren(...Object.keys(BOARD_LABELS).map(key => {
@@ -1376,22 +1416,35 @@
         }));
       }
 
+      const outOfReach = () => {
+        ui.boardLine.textContent = 'The board is out of reach right now.';
+        ui.boardNote.textContent = 'The board is out of reach right now.';
+      };
+
       async function fetchBoard(){
+        const stamp = ++boardStamp;
         board.fetchedAt = performance.now();
         try {
           const you = board.joined && board.id ? `?you=${encodeURIComponent(board.id)}` : '';
           const res = await fetch(BOARD_URL + you, { cache: 'no-store' });
           if(!res.ok) throw new Error(String(res.status));
-          board.data = await res.json();
+          const data = await res.json();
+          if(!boardTook(data, stamp)) return;
           if(board.joined) ui.boardLine.textContent = `On the board as ${board.name}.`;
         } catch {
-          ui.boardLine.textContent = 'The board is out of reach right now.';
+          outOfReach();
         }
         drawBoard();
       }
 
-      async function sendBoard(){
-        if(!board.joined || !board.id) return;
+      /* Put this device's row up. `joining` is the player pressing the button
+         rather than the timer coming round, which is the only case where the
+         answer is worth saying out loud — and the only case where a refusal
+         has to undo something, because a name the board would not take must
+         not be remembered as a name it took. */
+      async function sendBoard(joining = false){
+        if(!board.id || (!board.joined && !joining)) return;
+        const stamp = ++boardStamp;
         board.sentAt = performance.now();
         try {
           const res = await fetch(BOARD_URL, {
@@ -1400,21 +1453,28 @@
           });
           const data = await res.json().catch(() => null);
           if(res.ok && data){
-            board.data = data;
-            board.fetchedAt = performance.now();
-            ui.boardLine.textContent = `On the board as ${board.name}.`;
-          } else if(res.status !== 429){
-            // 429 is "too soon", which is the timer's problem and not the player's.
+            if(!board.joined){ board.joined = true; writeBoard(); }
+            if(boardTook(data, stamp)) ui.boardLine.textContent = `On the board as ${board.name}.`;
+          } else if(res.status === 429){
+            /* Too soon — fifteen seconds between rows from one device. The
+               timer can simply wait, but somebody who has just pressed the
+               button is owed both an answer and the row they asked for, so
+               the next send is brought forward to the moment the board says
+               it will listen again. */
+            const wait = Math.max(0, Math.min(60000, Number(data?.retryIn) || 0));
+            board.sentAt = performance.now() - BOARD_SEND_EVERY + wait + 250;
+            if(joining) ui.boardLine.textContent = `The board takes one score every few seconds. Yours goes up in ${Math.ceil(wait / 1000)}.`;
+          } else {
             ui.boardLine.textContent = data?.error || 'The board did not take that.';
           }
         } catch {
-          ui.boardLine.textContent = 'The board is out of reach right now.';
+          outOfReach();
         }
         drawBoard();
       }
 
       function openBoard(){
-        ui.boardName.value = board.name;
+        if(document.activeElement !== ui.boardName) ui.boardName.value = board.name;
         if(board.joined) ui.boardLine.textContent = `On the board as ${board.name}.`;
         if(performance.now() - board.fetchedAt > 10 * 1000) fetchBoard();
       }
@@ -1426,12 +1486,17 @@
           ui.boardLine.textContent = 'A name is two to sixteen characters.';
           return;
         }
-        if(!board.id) board.id = crypto.randomUUID();
+        if(!board.id) board.id = newId();
+        if(!board.id){
+          ui.boardLine.textContent = 'This browser will not make an id, so it cannot hold a place on the board.';
+          return;
+        }
         board.name = name;
-        board.joined = true;
+        // Not joined until the board says so: the name is checked there, and a
+        // row the server refused must not come back tomorrow as one it took.
         writeBoard();
         board.sentAt = -Infinity;
-        sendBoard();
+        sendBoard(true);
       });
 
       /* ---- boot ------------------------------------------------------------ */
