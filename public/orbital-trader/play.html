@@ -872,10 +872,20 @@ let nodeLabel = null, nodeLabelKey = '', interceptLabel = null, insetLabel = nul
 /* The Astrolabe is the one tab that goes stale on its own: every other one
    reads the ship, and this one reads the sky moving. It is also the most
    expensive thing the panel draws — a Lambert sweep per world — so it is
-   redrawn on a real-time budget rather than every frame, and only while the
-   clock is actually running and the tab is actually up. */
-const WINDOWS_REDRAW_MS = 500;
-let windowsDrawnAt = -1e9;
+   redrawn on a budget rather than every frame, and only while the clock is
+   actually running and the tab is actually up.
+
+   The budget is in *game* time, which is the thing it reads. It used to be
+   half a second of real time, and at ×1 that is four ten-thousandths of a day:
+   the sweep ran twice a second and produced the same characters every time,
+   because the coarsest figure on a row moves by one digit every forty-five
+   real minutes at that rate. Two Lambert sweeps a second to redraw nothing.
+   Budgeted on the sky instead, it recomputes when there is something to
+   recompute — rarely at ×1, smoothly under warp — and the real-time floor is
+   left in so that a fast skip cannot make it thrash. */
+const WINDOWS_REDRAW_MS = 250;
+const WINDOWS_STEP_DAYS = 0.05;      // the resolution of the coarsest figure shown
+let windowsDrawnAt = -1e9, windowsDrawnT = null;
 /* What every mark written down will take out of the tank, drawn on the gauge. */
 let plannedSpend = 0;
 /* What the selected mark says on the chart, and what the whole plan will
@@ -945,8 +955,11 @@ function frame(now){
     belt, nearPort: docking?.port ?? null, docking,
     hidden: S.unseen(state),
   });
-  if(dt > 0 && panelOpen && tab === 'windows' && now - windowsDrawnAt > WINDOWS_REDRAW_MS){
+  if(dt > 0 && panelOpen && tab === 'windows'
+     && now - windowsDrawnAt > WINDOWS_REDRAW_MS
+     && (windowsDrawnT == null || Math.abs(state.t - windowsDrawnT) >= WINDOWS_STEP_DAYS)){
     windowsDrawnAt = now;
+    windowsDrawnT = state.t;
     renderTab();
   }
   renderHud(docking);
@@ -2157,9 +2170,17 @@ function astrolabeTab(){
     /* No countdown where waiting cannot help: the crossing is past this tank
        at every phase, and a date would be a promise the ship cannot keep. */
     const ever = r.best <= S.usableTank(state) && r.days != null;
+    /* And a way to be there when it happens. The Astrolabe knew the date and
+       could do nothing about it, which is most of why it reads as dead: at ×1
+       the numbers are right and will not visibly move for the better part of
+       an hour. Everywhere else in the game you skip by pointing at the thing
+       you are waiting for, so you can point at a window too. */
+    const wait = ever && r.days > 0.05
+      ? ` <button class="btn sm" data-act="skipto|${state.t + r.days}|${esc(r.name)}'s window">Wait for it</button>`
+      : '';
     out += `<div class="win ${r.band}">`
       + `<div class="name"><b>${esc(r.name)}</b><small>${S.fmtKms(r.cost)} · ${S.fmtDays(r.tof)}</small></div>`
-      + `<div class="band">${BAND_WORD[r.band]}<small>${ever ? S.fmtDays(r.days) : '—'}</small></div>`
+      + `<div class="band">${BAND_WORD[r.band]}<small>${ever ? S.fmtDays(r.days) : '—'}</small>${wait}</div>`
       + '</div>';
   }
   return out;
@@ -2232,7 +2253,7 @@ const actions = {
   selnode(i){ selectedNode = selectedNode === Number(i) ? -1 : Number(i); replan(true); renderTab(); },
   delnode(i){ S.removeNode(state, Number(i)); selectedNode = -1; replan(true); renderTab(); save(); },
   warpnode(i){ const n = state.nodes[Number(i)]; if(n) askSkip(n.t - 0.05, `Burn ${Number(i) + 1}`); },
-  skipto(t){ askSkip(Number(t)); },
+  skipto(t, what){ askSkip(Number(t), typeof what === 'string' ? what : undefined); },
   push(i, k){ pushAxis(Number(i), k); },
   zeronode(i){ const n = state.nodes[Number(i)]; if(!n) return; n.prograde = 0; n.radial = 0; replan(true); renderTab(); save(); },
   shift(i, d){ const n = state.nodes[Number(i)]; n.t = Math.max(state.t + 1e-3, n.t + Number(d)); state.nodes.sort((a, b) => a.t - b.t); selectedNode = state.nodes.indexOf(n); replan(true); renderTab(); },

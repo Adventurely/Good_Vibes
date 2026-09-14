@@ -1135,18 +1135,38 @@ test('the Astrolabe reads while coasting, which is when it is wanted', () => {
   assert.ok(Math.abs(got - want) < 1e-12, `from open space Cinder is ${S.fmtKms(got)}, not ${S.fmtKms(want)}`);
 });
 
-test('the Astrolabe is redrawn while the clock runs', () => {
+test('the Astrolabe is redrawn when the sky has moved, not when the wall clock has', () => {
   /* Every other tab reads the ship; this one reads the sky moving, so it is
      the only one that goes stale sitting still. It is also the dearest thing
-     the panel draws, so the redraw is on a real-time budget. */
+     the panel draws, so the redraw is on a budget — and the budget is in game
+     days, because game days are what it reads. On a real-time budget alone it
+     swept every world twice a second to print the same characters, since at ×1
+     the coarsest figure on a row takes about forty-five real minutes to move
+     by one digit. */
   const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
   const loop = PLAY.slice(PLAY.indexOf('function frame(now)'), PLAY.indexOf('function renderHud'));
   /* Anchored on the whole condition, because `if(false && …)` still contains
      every piece of it and a looser match let exactly that through. */
-  const redraw = /if\(dt > 0 && panelOpen && tab === 'windows' && now - windowsDrawnAt > WINDOWS_REDRAW_MS\)\{[\s\S]*?renderTab\(\);/;
+  const redraw = /if\(dt > 0 && panelOpen && tab === 'windows'\s*&& now - windowsDrawnAt > WINDOWS_REDRAW_MS\s*&& \(windowsDrawnT == null \|\| Math\.abs\(state\.t - windowsDrawnT\) >= WINDOWS_STEP_DAYS\)\)\{[\s\S]*?renderTab\(\);/;
   assert.match(loop, redraw, 'the loop does not redraw the windows on a budget while the clock runs');
+  assert.match(loop, /windowsDrawnT = state\.t;/, 'the game-time budget is never advanced, so it would redraw once and stop');
   const ms = Number(PLAY.match(/const WINDOWS_REDRAW_MS = (\d+)/)?.[1]);
   assert.ok(ms >= 200 && ms <= 2000, `a redraw every ${ms} ms is not a budget`);
+  const days = Number(PLAY.match(/const WINDOWS_STEP_DAYS = ([\d.]+)/)?.[1]);
+  assert.ok(days > 0 && days <= 0.5, `a step of ${days} days is not a budget`);
+});
+
+test('a transfer window is something you can wait for', () => {
+  /* The instrument knew the date and could do nothing about it, which is most
+     of why it read as dead: at ×1 the figures are right and will not visibly
+     move for the better part of an hour. Everywhere else in the game you skip
+     by pointing at the thing you are waiting for. */
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  const tab = PLAY.slice(PLAY.indexOf('function astrolabeTab()'), PLAY.indexOf('/* ------------------------------------------------------------- actions */'));
+  assert.match(tab, /data-act="skipto\|\$\{state\.t \+ r\.days\}/, 'a window cannot be waited for');
+  assert.match(tab, /r\.days > 0\.05/, 'a window already open would still offer a wait');
+  // And the action takes the label, so the confirmation names what is being waited for.
+  assert.match(PLAY, /skipto\(t, what\)\{ askSkip\(Number\(t\), typeof what === 'string' \? what : undefined\); \}/);
 });
 
 test('a harbourmaster will not send a ship out of their sky without an Astrolabe', () => {
