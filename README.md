@@ -1875,6 +1875,16 @@ that mark, so the same press means the same thing round a moon and round the
 Lamp. Hold a button and it repeats. There is nothing to type and nothing to
 drag.
 
+**The axes are at right angles.** Out and in are square across the way you are
+going — the maneuver-node frame — rather than along the line out from the
+world. That is the same thing on a circle and a different one everywhere else:
+on a working eccentric orbit a press of Out used to put an eighth of itself
+into going faster, so a button sold as turning the path quietly resized it.
+Squared up, out and in add nothing along your track, the two numbers on a
+mark's card add up as a triangle so the card is what the tank is charged, and a
+ship falling dead straight at a world can be handed the one mark that saves it
+— braking a radial fall does not lift it, and only a push across the line does.
+
 The one search in the whole kernel is *when* a conic crosses a sphere of
 influence. It is done by conservative advancement: each step is bounded by the
 clearance to the nearest boundary divided by the fastest either side could
@@ -1888,7 +1898,7 @@ timestep anywhere, and nothing tunnels through a small moon at high warp.
 | Time | days (Tessel's year is 360 of them) |
 | Speed, Δv | au/day inside; 1 au/day shows as 1706 km/s, so Tessel's orbit reads 29.8 km/s |
 | Fuel | *is* the Δv budget. A burn subtracts its own size. No mass, no rocket equation |
-| Clock | ×1 is 0.0000347222222 days a second: ten real minutes to a lap of the 75 km orbit a new game opens in over Tessel, which takes 30 minutes of game time |
+| Clock | ×1 is 0.0000370182663 days a second: ten real minutes to a lap of the 100 km orbit a new game opens in over Tassel, which takes 32 minutes of game time. Ten minutes a lap is the rate's only job, so moving the opening orbit moves the rate |
 | Scale | KSP's, not ours: every body is a tenth of real size and many times denser. Tessel is 498 km across with 9.25 m/s² at the ground, air to 70 km, and a reach of 116,500 km |
 
 ### Aiming
@@ -1935,31 +1945,120 @@ node tools/orbital-trader/check-tuning.mjs        # check, and print the Δv tab
 node tools/orbital-trader/check-tuning.mjs --write  # and record it in tuning.json
 ```
 
-It asserts what the design document promises — Tessel's year is exactly 360
-days, no moon can leave its planet's reach, sibling moons never overlap, every
-harbour mouth fits inside a third of its world's reach, Grumm turns a Hohmann
-arrival through at least sixty degrees, Wanderwell reaches kissing distance
-about a year in — and it prints the Δv table the ladder is built on:
+It asserts what the design document promises — the calendar and the sky are
+the same thing, no moon can leave its planet's reach, sibling moons never
+overlap, every harbour mouth sits well inside its world's reach, every harbour
+sits inside its own mouth, Grumm turns a Hohmann arrival through at least
+sixty degrees, a lap of the opening orbit is ten real minutes at ×1 — and it
+prints the Δv table the ladder is built on:
 
 | Route | Δv | Time |
 | --- | --- | --- |
-| Bramble → Ledger, the second lesson | 0.9 km/s | 5 d |
-| Tessel dock → Bramble, the first | 2.2 km/s | 2 d |
-| Tessel → Wanderwell at its kiss | 6.6 km/s | 117 d |
-| Tessel → the Arc | 8.6 km/s | 364 d |
-| Tessel → Claw Rock | 10.0 km/s | 490 d |
-| Tessel → Grumm, loose capture | 7.6 km/s | 935 d |
-| Tessel → Lillimoor's height, circular | 10.7 km/s | 935 d |
-| Tessel → Cinder, docked | 15.9 km/s | 94 d |
-| Tessel → Chime, docked, no assist | 13.6 km/s | 2012 d |
-| Tessel → the Far Lantern | 12.6 km/s | 5271 d |
+| Slate → Moss, the moon hop | 0.15 km/s | 1.1 d |
+| Tassel dock → Slate, the first lesson | 0.18 km/s | 0.3 d |
+| Tassel → Cinder, loose capture | 4.8 km/s | 43 d |
+| Tassel → Cinder, docked | 6.5 km/s | 43 d |
+| Tassel → Nail, the Belt | 8.4 km/s | 119 d |
+| Tassel → the Arc | 10.2 km/s | 151 d |
+| Tassel → Grumm, loose capture | 12.1 km/s | 312 d |
+| Tassel → Haven's height, circular | 12.4 km/s | 312 d |
+| Tassel → the Maw | 15.1 km/s | 1757 d |
+| Tassel → Veyra, docked | 18.5 km/s | 31 d |
 
-The starter tank is 14 km/s, so that table *is* the map: the rafts, the
-festival at Wanderwell, the belt and Grumm are all open from the first hour,
-and Cinder and Chime wait for a bigger tank. **Falling inward is dearer than
-climbing out** — Cinder sits at 0.3 au and the arrival is most of the bill —
-which is real orbital mechanics and, happily, exactly what the Emberkin would
-tell you.
+The starter tank is 14 km/s, so that table *is* the map: the moons, Cinder,
+the Belt, the Arc and a loose capture at Grumm are all open from the first
+hour, and Veyra and the Maw wait for a bigger tank. **The errand comes before
+the expedition** — Cinder is the near Emberkin world and Veyra the far one, and
+the difference between them is most of a tank.
+
+### What a stall pays
+
+Two questions, four answers, and that is the whole of the selling side.
+
+| | same system | another region |
+| --- | --- | --- |
+| **they love it** | ×2.5 | **×5.5** |
+| **they want it** | ×1.5 | ×2.5 |
+| neither | ×0.6 | ×0.6 |
+
+Multiples of the good's base price, which is roughly what it costs at the stall
+that makes it. Space is hard and few merchants cross between peoples, so
+carrying a loved good to another people is the trade; the same run inside one
+system is worth a fraction of it. A producer never buys back its own stock —
+it pays the ×0.6, capped at three quarters of its asking price, or the dock
+would be a money pump you never have to leave.
+
+**Temperature control pays ×1.5 on top of all of it**, so a loved cold good
+carried across regions runs about ×8 what it cost. That is the best cargo in
+the game, and it is behind the Engineer and a 2,800-cowrie box.
+
+**Nothing else moves a price.** A stall does not remember what you sold it last
+month, and it does not charge more as its shelf empties. Both of those were
+supply-and-demand rules that asked a player to model a market they could not
+see, and the shelf does the job in plain sight: you cannot take what is not
+there. What is left is species character — Emberkin prices wobble ±15% on a
+slow wave, otter ports roll ±7% a day, frogs and cats neither.
+
+**The shelf is the limit, and how big it is says how big the market is.** Every
+good has a stock range; a stall rolls inside it and multiplies by the port's
+market size, so Tassel the capital keeps twice what the table says and Croak
+the hamlet keeps a third. Rolled again when you come back from somewhere else —
+waiting at a dock does nothing, trading elsewhere is the restock. It is also
+what decides whether a bigger hold is worth buying: filling ninety units out of
+Slate is worth about four times filling twenty-four, and out of Croak it is
+worth nothing at all, because there is nothing there to buy.
+
+**What a thing is, and what it is worth, are two different questions.** Every
+good carries a *nature* line — pressure-resistant, glows in the dark, warm a
+year out of the ground — on hover and behind the "i" beside its name, on the
+shelf and in the hold. That is free: it is written on the crate. Who pays over
+the odds for it is not. Until the frog appraiser is aboard, a port's **They
+love** and **They want** lists carry names and no prices, and no good will say
+which of the four frog moons is the one that loves it rather than merely taking
+it. Wicket puts the numbers on the lists and the names in the "i" — a shortcut
+through reasoning that was always available to anyone who carried a crate and
+watched what happened.
+
+**Nothing spoils.** Goods used to lose value in transit, down to a tenth, which
+made the six organic ones regional by force — Cinder is ninety-four days out
+and nothing with a shelf life survives that — and did it without warning,
+because the freshness bar only appeared once the cargo was already aboard. Time
+and hold room still limit a run. A crate no longer does.
+
+### The rack
+
+Two things you buy more of and four you buy once.
+
+**Tank and hold** are basics, fitted at any port with a fuel pump — everywhere
+but the Arc and the Maw, which sell nothing at all. Three sizes each above the
+one the ship came with: 14 → 22 → 30 → 40 km/s, and 24 → 40 → 64 → 90 units.
+The stock fitting is on no rack anywhere, because you own it before you have
+been anywhere.
+
+**The first size up is money. The second and third want the Engineer**, the
+berth quest #6 fills. A dock hand will bolt a bigger tank on for anybody, and
+will not cut into a hull for a captain with nobody aboard who could put it back
+together. It is the first and so far only thing crew do mechanically.
+
+The four keys name the bench they come off:
+
+| Key | Bought at | Wants | Does |
+| --- | --- | --- | --- |
+| Temperature control | Cinder | Engineer | Carries the six goods that will not keep at hold temperature — riverfish, fire crystals, ancient cider, ice lenses, medicinal gel, smuggled medicine. Not all of them are cold: fire crystals are a thing you keep *steady* |
+| Gravitational sensors | Nail | — | *Nothing yet* |
+| Heat shielding | Cinder | Engineer | *Nothing yet* |
+| Cryo hull cooling | Cinder | Engineer, heat shielding | *Nothing yet* |
+
+**Three of them are sold and wired to nothing, and each says so on its own
+row** — "not fitted to anything yet". Selling somebody a box that does nothing
+without telling them is a swindle; holding the box back until the mechanic
+lands means the mechanic arrives with nowhere to be bought.
+
+Aerobraking is the one that used to work, and is switched off: a risky skim and
+a safe one are two different manoeuvres, neither is built, so Grumm's clouds
+are lethal to everybody. The arithmetic is still in `effectiveNodes`, which
+takes a `skim` flag so a test can reach it rather than leaving it to rot behind
+a flag no caller can set.
 
 ### Forgiveness, as built
 

@@ -640,13 +640,34 @@ export function advance(world, ship, t, dt, nodes = [], opts = {}){
   return { ship: { body: body.id, r, v }, t: now, events, crashed: false };
 }
 
-/* A node's burn as a vector in the current frame. Prograde is along the
- * velocity, radial is away from the body. If the tank cannot cover it, the
- * burn is scaled down to what there is and flagged: the design says a short
- * tank costs time, never the save. */
+/* The frame a burn is written in: forward along the velocity, and out at right
+ * angles to it — whichever side of the perpendicular points away from the
+ * body, so "out" means out on a retrograde orbit as much as a prograde one.
+ *
+ * Out used to be true radial, along the position vector, which is at right
+ * angles to forward on a circle and nowhere else. Everywhere else the two
+ * axes leaned together and the game got three problems for it: "out" quietly
+ * added speed, the two numbers on a mark's card did not add up as a triangle
+ * so the tank had to be charged something the card did not show, and on a
+ * straight fall the axes lay on top of each other, where no pair of numbers
+ * could express a push across the line at all.
+ *
+ * At right angles they are an orthonormal basis. Every change of velocity has
+ * exactly one pair of numbers, "out" turns the path without adding speed along
+ * it, and what a mark costs is the hypotenuse — which is what a player would
+ * have assumed all along. */
+export function burnFrame(r, v){
+  const pro = unit(v);
+  const out = perp(pro);
+  return dot(out, r) < 0 ? { pro, out: scale(out, -1) } : { pro, out };
+}
+
+/* A node's burn as a vector in the current frame. If the tank cannot cover it,
+ * the burn is scaled down to what there is and flagged: the design says a
+ * short tank costs time, never the save. */
 export function burnVector(r, v, node, dvAvailable){
-  const pro = unit(v), rad = unit(r);
-  let dv = add(scale(pro, node.prograde || 0), scale(rad, node.radial || 0));
+  const { pro, out } = burnFrame(r, v);
+  let dv = add(scale(pro, node.prograde || 0), scale(out, node.radial || 0));
   let magnitude = norm(dv);
   let short = false;
   // A skim through a world's clouds is not bought from the tank, so an empty
@@ -661,35 +682,31 @@ export function burnVector(r, v, node, dvAvailable){
   return { dv, magnitude, short };
 }
 
-/* What a mark costs, given where the ship will be when it fires. Prograde and
- * radial are not at right angles, so the two numbers on the card do not add up
- * as a triangle — the only honest size of a burn is the length of the velocity
- * change it actually makes, which is what the tank is charged for. */
+/* What a mark costs, given where the ship will be when it fires: the length of
+ * the velocity change it actually makes, which is what the tank is charged.
+ * Since the two axes are at right angles this is the hypotenuse of the two
+ * numbers on the card, and it is computed the long way round anyway so that
+ * the charge comes from the same arithmetic that flies the burn. */
 export function nodeCost(r, v, node){
   return norm(burnVector(r, v, node).dv);
 }
-/* The same, without a state to hand: exact on a circle, an over-estimate
- * elsewhere. Only for rough bounds — never for what the player is told. */
+/* The same, without a state to hand. It used to be exact only on a circle and
+ * an over-estimate everywhere else; with the axes at right angles it is exact
+ * wherever the ship is, so a bound taken from it is the real number. */
 export const nodeMagnitude = node => Math.hypot(node.prograde || 0, node.radial || 0);
 
 /* The reverse of burnVector: the prograde and radial numbers that add up to a
- * wanted change of velocity.
+ * wanted change of velocity. On an orthonormal frame that is two dot products,
+ * and there is always exactly one answer — no leaning axes to invert, and no
+ * near-parallel case where the only pair of numbers that worked was two
+ * enormous opposing ones that cancelled.
  *
- * The two axes are at right angles only on a circle. Everywhere else they lean
- * together, and on a straight fall they lie on top of each other — at which
- * point there is no pair of numbers that adds up to a push across the line, and
- * the honest answer is to say so. The caller decides what to do about it; what
- * it must not do is hand back two enormous opposing numbers that happen to
- * cancel, because those are what the player would be charged for.
- */
+ * The one thing with no answer is a ship with no velocity, which has no
+ * forward to measure from. Callers still check. */
 export function nodeFromVector(r, v, dv){
-  const p = unit(v), rad = unit(r);
-  const det = p[0] * rad[1] - p[1] * rad[0];
-  if(Math.abs(det) < 0.02) return null;      // within about a degree of parallel
-  return {
-    prograde: (dv[0] * rad[1] - dv[1] * rad[0]) / det,
-    radial: (p[0] * dv[1] - p[1] * dv[0]) / det,
-  };
+  if(!(norm(v) > 0)) return null;
+  const { pro, out } = burnFrame(r, v);
+  return { prograde: dot(dv, pro), radial: dot(dv, out) };
 }
 
 /* ------------------------------------------------------------ prediction */

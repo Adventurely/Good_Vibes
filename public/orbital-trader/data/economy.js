@@ -14,8 +14,6 @@ export const ECONOMY = {
     3,
     12
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "tassel"
    ],
@@ -27,7 +25,8 @@ export const ECONOMY = {
    "lovedBy": [
     "veyra"
    ],
-   "blurb": "Grown in the shallow beds off the rafts and picked by hand. An otter wedding needs three; a Veyra house will pay for thirty."
+   "blurb": "Grown in the shallow beds off the rafts and picked by hand. An otter wedding needs three; a Veyra house will pay for thirty.",
+   "nature": "Nacre laid down a layer a year. Warm on the skin and impossible to hurry, which is what ceremony and old money both pay for."
   },
   {
    "id": "tideglass",
@@ -39,8 +38,6 @@ export const ECONOMY = {
     8,
     25
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "tassel"
    ],
@@ -51,7 +48,8 @@ export const ECONOMY = {
    "lovedBy": [
     "brine"
    ],
-   "blurb": "Otter glasswork that glows sea-green in the dark. The frogs hang it under the lily-terraces and sing to it."
+   "blurb": "Otter glasswork that glows sea-green in the dark. The frogs hang it under the lily-terraces and sing to it.",
+   "nature": "Glass that will not crack under pressure and glows sea-green in the dark. Deep water and long nights each have a use for it."
   },
   {
    "id": "moonfishoil",
@@ -63,8 +61,6 @@ export const ECONOMY = {
     8,
     20
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "tassel"
    ],
@@ -74,7 +70,8 @@ export const ECONOMY = {
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Pressed from a fish that only rises on the dark of the moon. Burns clean, keeps forever, smells like a harbour."
+   "blurb": "Pressed from a fish that only rises on the dark of the moon. Burns clean, keeps forever, smells like a harbour.",
+   "nature": "Burns clean, keeps forever, smells of harbour. Light and heat where neither comes easily."
   },
   {
    "id": "coral",
@@ -86,8 +83,6 @@ export const ECONOMY = {
     2,
     8
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "tassel"
    ],
@@ -98,7 +93,8 @@ export const ECONOMY = {
    "lovedBy": [
     "otter"
    ],
-   "blurb": "A year of somebody's evenings, cut from living reef and finished with a thumb. Otters give them and otters keep them."
+   "blurb": "A year of somebody's evenings, cut from living reef and finished with a thumb. Otters give them and otters keep them.",
+   "nature": "Living reef cut by hand and finished with a thumb. A year of somebody's evenings, small enough to hold."
   },
   {
    "id": "pebble",
@@ -110,8 +106,6 @@ export const ECONOMY = {
     10,
     40
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "slate"
    ],
@@ -121,7 +115,8 @@ export const ECONOMY = {
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Smooth grey pebbles off Slate's one beach, polished by a moon with no weather. Otters give them to each other and mean it."
+   "blurb": "Smooth grey pebbles off Slate's one beach, polished by a moon with no weather. Otters give them to each other and mean it.",
+   "nature": "Polished by a moon with no weather. Worth nothing and given anyway, which is the whole of it."
   },
   {
    "id": "ironore",
@@ -133,8 +128,6 @@ export const ECONOMY = {
     40,
     100
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "slate",
     "scorch"
@@ -144,7 +137,8 @@ export const ECONOMY = {
     "scorch"
    ],
    "lovedBy": [],
-   "blurb": "Crates of nickel-iron, dug and sorted and not much else. The engine smiths of Cinder melt it into things that go very fast."
+   "blurb": "Crates of nickel-iron, dug and sorted and not much else. The engine smiths of Cinder melt it into things that go very fast.",
+   "nature": "Nickel-iron, dug and sorted and nothing else. Worthless until somebody with a furnace gets hold of it."
   },
   {
    "id": "masonry",
@@ -156,8 +150,6 @@ export const ECONOMY = {
     30,
     80
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "slate"
    ],
@@ -170,20 +162,19 @@ export const ECONOMY = {
     "haven",
     "croak"
    ],
-   "blurb": "Cut stone with the old patterns on it. The frogs build their terraces out of it and will not be talked into anything lighter."
+   "blurb": "Cut stone with the old patterns on it. The frogs build their terraces out of it and will not be talked into anything lighter.",
+   "nature": "Cut stone carrying the old patterns. Heavy, permanent, and the only thing a terrace will stand on."
   },
   {
    "id": "herbs",
    "name": "Medicinal herbs",
-   "category": "perishable",
+   "category": "fresh",
    "basePrice": 40,
    "weight": "light",
    "stock": [
     10,
     30
    ],
-   "lifetimeDays": 45,
-   "needsRefrigeration": false,
    "producedAt": [
     "moss"
    ],
@@ -195,7 +186,8 @@ export const ECONOMY = {
     "scorch",
     "cinder"
    ],
-   "blurb": "Cut green and bundled in the field. Half the remedies in the system start here, and the good ones do not travel slowly."
+   "blurb": "Cut green and bundled in the field. Half the remedies in the system start here, and the good ones do not travel slowly.",
+   "nature": "Cut green and bundled in the field. Half the remedies in the sky start as this."
   },
   {
    "id": "starwine",
@@ -207,8 +199,6 @@ export const ECONOMY = {
     5,
     15
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "moss"
    ],
@@ -220,7 +210,8 @@ export const ECONOMY = {
    "lovedBy": [
     "veyra"
    ],
-   "blurb": "Pale and faintly sharp. Moss makes it in small runs and Veyra buys it in whole small runs."
+   "blurb": "Pale and faintly sharp. Moss makes it in small runs and Veyra buys it in whole small runs.",
+   "nature": "Pale and faintly sharp, made in runs too small to matter. Scarcity is most of the flavour."
   },
   {
    "id": "glowmoss",
@@ -232,8 +223,6 @@ export const ECONOMY = {
     8,
     20
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "moss"
    ],
@@ -242,20 +231,19 @@ export const ECONOMY = {
     "haven"
    ],
    "lovedBy": [],
-   "blurb": "A living lamp in a jar. Cats line their tunnels with it because it needs nothing and never goes out."
+   "blurb": "A living lamp in a jar. Cats line their tunnels with it because it needs nothing and never goes out.",
+   "nature": "A living lamp in a jar. Needs nothing, never goes out, and does not mind being underground."
   },
   {
    "id": "riverfish",
    "name": "Rare riverfish",
-   "category": "perishable",
+   "category": "fresh",
    "basePrice": 70,
    "weight": "light",
    "stock": [
     3,
     8
    ],
-   "lifetimeDays": 22,
-   "needsRefrigeration": true,
    "producedAt": [
     "moss"
    ],
@@ -267,7 +255,9 @@ export const ECONOMY = {
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Silver, quick, and only in three rivers. Worth a fortune fresh and worth an apology otherwise."
+   "blurb": "Silver, quick, and only in three rivers. Worth a fortune fresh and worth an apology otherwise.",
+   "nature": "Silver, quick, and out of three rivers only. Magnificent fresh and an apology otherwise.",
+   "needsTempControl": true
   },
   {
    "id": "engineparts",
@@ -279,8 +269,6 @@ export const ECONOMY = {
     10,
     30
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "cinder"
    ],
@@ -290,7 +278,8 @@ export const ECONOMY = {
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Valves, seals and struts in oiled paper. Far from any dry dock, a crate of these is the difference between a ship and a wreck."
+   "blurb": "Valves, seals and struts in oiled paper. Far from any dry dock, a crate of these is the difference between a ship and a wreck.",
+   "nature": "Valves, seals and struts in oiled paper. Far from a dry dock, the difference between a ship and a wreck."
   },
   {
    "id": "weapons",
@@ -302,8 +291,6 @@ export const ECONOMY = {
     5,
     15
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "cinder"
    ],
@@ -314,7 +301,8 @@ export const ECONOMY = {
    "lovedBy": [
     "emberkin"
    ],
-   "blurb": "Emberkin house arms, crated and sealed with somebody's mark. Nobody asks what they are for and everybody knows."
+   "blurb": "Emberkin house arms, crated and sealed with somebody's mark. Nobody asks what they are for and everybody knows.",
+   "nature": "Crated house arms, sealed with somebody's mark. Nobody asks what they are for."
   },
   {
    "id": "plating",
@@ -326,8 +314,6 @@ export const ECONOMY = {
     10,
     25
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "cinder"
    ],
@@ -337,7 +323,8 @@ export const ECONOMY = {
     "haven"
    ],
    "lovedBy": [],
-   "blurb": "Sheet that will sit in a cloud top all day and come out grumbling. Half the shielded hulls in the sky are wearing Cinder's."
+   "blurb": "Sheet that will sit in a cloud top all day and come out grumbling. Half the shielded hulls in the sky are wearing Cinder's.",
+   "nature": "Sheet that will sit in a cloud top all day and come out grumbling. Hulls that go somewhere hot are wearing it."
   },
   {
    "id": "steel",
@@ -349,8 +336,6 @@ export const ECONOMY = {
     30,
     80
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "cinder"
    ],
@@ -359,7 +344,8 @@ export const ECONOMY = {
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Bar stock, graded and stamped. The dullest cargo in the system and the one everybody is always short of."
+   "blurb": "Bar stock, graded and stamped. The dullest cargo in the system and the one everybody is always short of.",
+   "nature": "Bar stock, graded and stamped. The dullest cargo in the sky and the one everybody is short of."
   },
   {
    "id": "coils",
@@ -371,8 +357,6 @@ export const ECONOMY = {
     3,
     10
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "cinder"
    ],
@@ -384,7 +368,8 @@ export const ECONOMY = {
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Wound by hand over nine days by somebody who will not tell you the order. A cat mechanic will trade a ship for one."
+   "blurb": "Wound by hand over nine days by somebody who will not tell you the order. A cat mechanic will trade a ship for one.",
+   "nature": "Wound by hand over nine days, in an order nobody will tell you. Nothing else will make a reactor behave."
   },
   {
    "id": "firecrystals",
@@ -396,8 +381,6 @@ export const ECONOMY = {
     5,
     15
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "scorch"
    ],
@@ -409,7 +392,9 @@ export const ECONOMY = {
    "lovedBy": [
     "veyra"
    ],
-   "blurb": "Grown in the vents and cut cold. They hold a light for a week after you take them out of the sun."
+   "blurb": "Grown in the vents and cut cold. They hold a light for a week after you take them out of the sun.",
+   "nature": "Grown in the vents and cut cold. They hold a light for a week after the sun is off them.",
+   "needsTempControl": true
   },
   {
    "id": "volcanicglass",
@@ -421,8 +406,6 @@ export const ECONOMY = {
     15,
     40
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "scorch"
    ],
@@ -433,7 +416,8 @@ export const ECONOMY = {
     "haven"
    ],
    "lovedBy": [],
-   "blurb": "Sheets of black glass off the flows, packed in ash. Cheap on Scorch because there is nothing else on Scorch."
+   "blurb": "Sheets of black glass off the flows, packed in ash. Cheap on Scorch because there is nothing else on Scorch.",
+   "nature": "Black glass off the flows, packed in ash. Cheap where there is nothing else to sell."
   },
   {
    "id": "emberstone",
@@ -445,8 +429,6 @@ export const ECONOMY = {
     3,
     10
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "scorch"
    ],
@@ -458,7 +440,8 @@ export const ECONOMY = {
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Warm to the hand a year after it comes out of the ground, and nobody on Scorch has ever explained why."
+   "blurb": "Warm to the hand a year after it comes out of the ground, and nobody on Scorch has ever explained why.",
+   "nature": "Still warm to the hand a year out of the ground, and nobody has ever explained why."
   },
   {
    "id": "embersilk",
@@ -470,8 +453,6 @@ export const ECONOMY = {
     3,
     10
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "veyra"
    ],
@@ -483,7 +464,8 @@ export const ECONOMY = {
    "lovedBy": [
     "veyra"
    ],
-   "blurb": "Woven in a heated room by people who are paid not to talk about it. This season's colour is worth twice last season's."
+   "blurb": "Woven in a heated room by people who are paid not to talk about it. This season's colour is worth twice last season's.",
+   "nature": "Woven in a heated room by people paid not to discuss it. This season's colour is worth twice last season's."
   },
   {
    "id": "medals",
@@ -495,8 +477,6 @@ export const ECONOMY = {
     2,
     6
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "veyra"
    ],
@@ -506,7 +486,8 @@ export const ECONOMY = {
     "haven"
    ],
    "lovedBy": [],
-   "blurb": "Struck in small numbers for houses settling scores in public. The metal is worth nothing; the name on it is worth a great deal."
+   "blurb": "Struck in small numbers for houses settling scores in public. The metal is worth nothing; the name on it is worth a great deal.",
+   "nature": "The metal is worth nothing. The name struck into it settles an argument in public, which is worth a great deal."
   },
   {
    "id": "clocks",
@@ -518,8 +499,6 @@ export const ECONOMY = {
     5,
     15
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "veyra"
    ],
@@ -530,7 +509,8 @@ export const ECONOMY = {
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Good enough to navigate by and pretty enough to argue over. Otters buy them for the harbourmaster and then borrow them back."
+   "blurb": "Good enough to navigate by and pretty enough to argue over. Otters buy them for the harbourmaster and then borrow them back.",
+   "nature": "Good enough to navigate by and pretty enough to argue over. The two are rarely the same object."
   },
   {
    "id": "perfume",
@@ -542,8 +522,6 @@ export const ECONOMY = {
     5,
     15
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "veyra"
    ],
@@ -554,7 +532,8 @@ export const ECONOMY = {
     "croak"
    ],
    "lovedBy": [],
-   "blurb": "Small stoppered bottles in a padded case. Half the system finds them ridiculous and buys them anyway."
+   "blurb": "Small stoppered bottles in a padded case. Half the system finds them ridiculous and buys them anyway.",
+   "nature": "Small stoppered bottles in a padded case. Half the sky finds them ridiculous and buys them anyway."
   },
   {
    "id": "stormcrystals",
@@ -566,8 +545,6 @@ export const ECONOMY = {
     3,
     10
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "grumm"
    ],
@@ -579,7 +556,8 @@ export const ECONOMY = {
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Fished out of the cloud tops on a line, still ticking. A cat will hold one up to a lamp and go quiet."
+   "blurb": "Fished out of the cloud tops on a line, still ticking. A cat will hold one up to a lamp and go quiet.",
+   "nature": "Fished off a cloud top on a line, still ticking. Nobody is certain what they are."
   },
   {
    "id": "filters",
@@ -591,8 +569,6 @@ export const ECONOMY = {
     10,
     25
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "grumm"
    ],
@@ -603,7 +579,8 @@ export const ECONOMY = {
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Frog-made, patient, and better than anything the inner worlds can build. They will not say how and you will not work it out."
+   "blurb": "Frog-made, patient, and better than anything the inner worlds can build. They will not say how and you will not work it out.",
+   "nature": "Patient, fine, and better than anything the inner worlds can build. They will not say how."
   },
   {
    "id": "cider",
@@ -615,8 +592,6 @@ export const ECONOMY = {
     2,
     6
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "grumm"
    ],
@@ -629,20 +604,20 @@ export const ECONOMY = {
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Laid down in a balloon city before anyone alive was hatched. Otters weep at it; the frogs think that is the point."
+   "blurb": "Laid down in a balloon city before anyone alive was hatched. Otters weep at it; the frogs think that is the point.",
+   "nature": "Laid down in a balloon city before anyone alive was hatched. Age is the whole of it, and it cannot be hurried.",
+   "needsTempControl": true
   },
   {
    "id": "gel",
    "name": "Medicinal gel",
-   "category": "perishable",
+   "category": "fresh",
    "basePrice": 130,
    "weight": "light",
    "stock": [
     5,
     15
    ],
-   "lifetimeDays": 70,
-   "needsRefrigeration": true,
    "producedAt": [
     "brine"
    ],
@@ -652,7 +627,9 @@ export const ECONOMY = {
    "lovedBy": [
     "scorch"
    ],
-   "blurb": "Cold, clear, and it will close a wound that nothing else will. Scorch buys it by the crate and never haggles."
+   "blurb": "Cold, clear, and it will close a wound that nothing else will. Scorch buys it by the crate and never haggles.",
+   "nature": "Cold, clear, and it will close a wound that nothing else will.",
+   "needsTempControl": true
   },
   {
    "id": "amber",
@@ -664,8 +641,6 @@ export const ECONOMY = {
     3,
     10
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "brine"
    ],
@@ -674,7 +649,8 @@ export const ECONOMY = {
     "haven"
    ],
    "lovedBy": [],
-   "blurb": "Ammonia-sea amber with something inside it that is not quite a leaf. The frogs sell it without explaining."
+   "blurb": "Ammonia-sea amber with something inside it that is not quite a leaf. The frogs sell it without explaining.",
+   "nature": "Ammonia-sea amber with something inside it that is not quite a leaf."
   },
   {
    "id": "resin",
@@ -686,8 +662,6 @@ export const ECONOMY = {
     10,
     30
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "brine"
    ],
@@ -699,7 +673,8 @@ export const ECONOMY = {
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Sets hard in vacuum and stays a little soft forever. A cat with a crate of this can fix almost anything."
+   "blurb": "Sets hard in vacuum and stays a little soft forever. A cat with a crate of this can fix almost anything.",
+   "nature": "Sets hard in vacuum and stays a little soft forever. A crate of it will fix almost anything."
   },
   {
    "id": "lenses",
@@ -711,8 +686,6 @@ export const ECONOMY = {
     5,
     15
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "glass"
    ],
@@ -723,7 +696,9 @@ export const ECONOMY = {
    "lovedBy": [
     "veyra"
    ],
-   "blurb": "Ground from shell ice that has never melted. You can read a ship's name off it from further than you would believe."
+   "blurb": "Ground from shell ice that has never melted. You can read a ship's name off it from further than you would believe.",
+   "nature": "Ground from shell ice that has never once melted. You can read a ship's name off it from further than you would believe.",
+   "needsTempControl": true
   },
   {
    "id": "cryofuel",
@@ -735,8 +710,6 @@ export const ECONOMY = {
     10,
     25
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "glass"
    ],
@@ -745,7 +718,8 @@ export const ECONOMY = {
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Drawn from under the ice and shipped in double-walled crates. Heavy, dull, and the outer system runs on it."
+   "blurb": "Drawn from under the ice and shipped in double-walled crates. Heavy, dull, and the outer system runs on it.",
+   "nature": "Drawn from under the ice and shipped double-walled. Heavy, dull, and everything cold runs on it."
   },
   {
    "id": "incense",
@@ -757,8 +731,6 @@ export const ECONOMY = {
     5,
     12
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "croak"
    ],
@@ -769,7 +741,8 @@ export const ECONOMY = {
    "lovedBy": [
     "haven"
    ],
-   "blurb": "Rolled in silence by people who chose to live somewhere expensive to reach. Haven burns it by the armful at festival."
+   "blurb": "Rolled in silence by people who chose to live somewhere expensive to reach. Haven burns it by the armful at festival.",
+   "nature": "Rolled in silence, burns slow, and travels badly. That is most of what it costs."
   },
   {
    "id": "beads",
@@ -781,8 +754,6 @@ export const ECONOMY = {
     8,
     20
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "croak"
    ],
@@ -794,7 +765,8 @@ export const ECONOMY = {
    "lovedBy": [
     "croak"
    ],
-   "blurb": "Strung one a day for a year. A pilgrim carries them out and a pilgrim carries them back, and the ones that come back cost more."
+   "blurb": "Strung one a day for a year. A pilgrim carries them out and a pilgrim carries them back, and the ones that come back cost more.",
+   "nature": "Strung one a day for a year. The ones that have been somewhere and come back cost more."
   },
   {
    "id": "frogtea",
@@ -806,8 +778,6 @@ export const ECONOMY = {
     2,
     6
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "croak"
    ],
@@ -819,7 +789,8 @@ export const ECONOMY = {
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Pressed into bricks longer ago than the records go. Otters have started a fashion for it, which the ascetics find funny."
+   "blurb": "Pressed into bricks longer ago than the records go. Otters have started a fashion for it, which the ascetics find funny.",
+   "nature": "Pressed into bricks longer ago than the records go, and better for the keeping."
   },
   {
    "id": "lanterns",
@@ -831,8 +802,6 @@ export const ECONOMY = {
     8,
     20
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "haven"
    ],
@@ -843,7 +812,8 @@ export const ECONOMY = {
    "lovedBy": [
     "croak"
    ],
-   "blurb": "Paper, wire and a wish. They go up over the terraces at the turn of the year and Croak buys them all year round."
+   "blurb": "Paper, wire and a wish. They go up over the terraces at the turn of the year and Croak buys them all year round.",
+   "nature": "Paper, wire and a wish. They go up over water at the turn of the year."
   },
   {
    "id": "dyes",
@@ -855,8 +825,6 @@ export const ECONOMY = {
     10,
     30
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "haven"
    ],
@@ -866,7 +834,8 @@ export const ECONOMY = {
     "veyra"
    ],
    "lovedBy": [],
-   "blurb": "Ground pigment in twists of waxed cloth. Cheap here, and in the wrong month worth whatever you say it is."
+   "blurb": "Ground pigment in twists of waxed cloth. Cheap here, and in the wrong month worth whatever you say it is.",
+   "nature": "Ground pigment in twists of waxed cloth. Cheap here, and in the wrong month worth whatever you say it is."
   },
   {
    "id": "instruments",
@@ -878,8 +847,6 @@ export const ECONOMY = {
     3,
     10
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "haven"
    ],
@@ -891,7 +858,8 @@ export const ECONOMY = {
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Cut from a wood that only grows on one terrace, and tuned over a frog lifetime. An otter crew will fight over one."
+   "blurb": "Cut from a wood that only grows on one terrace, and tuned over a frog lifetime. An otter crew will fight over one.",
+   "nature": "Cut from a wood that grows on one terrace and tuned over a lifetime. Nothing else sounds like it."
   },
   {
    "id": "hullplate",
@@ -903,8 +871,6 @@ export const ECONOMY = {
     15,
     40
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "nail"
    ],
@@ -914,7 +880,8 @@ export const ECONOMY = {
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Cut off whatever came in last, straightened, and stacked by thickness. Nobody on Nail asks what it used to be."
+   "blurb": "Cut off whatever came in last, straightened, and stacked by thickness. Nobody on Nail asks what it used to be.",
+   "nature": "Cut off whatever came in last, straightened, and stacked by thickness."
   },
   {
    "id": "thrusters",
@@ -926,8 +893,6 @@ export const ECONOMY = {
     3,
     10
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "nail"
    ],
@@ -939,7 +904,8 @@ export const ECONOMY = {
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Stripped, cleaned and put back together better than new by somebody who did it for the argument."
+   "blurb": "Stripped, cleaned and put back together better than new by somebody who did it for the argument.",
+   "nature": "Stripped, cleaned and put back together better than new by somebody who did it for the argument."
   },
   {
    "id": "sensorsalvage",
@@ -951,8 +917,6 @@ export const ECONOMY = {
     5,
     15
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "nail"
    ],
@@ -964,7 +928,8 @@ export const ECONOMY = {
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Working, mostly. The ones that came off the Arc see further than they are supposed to and nobody sells those cheap."
+   "blurb": "Working, mostly. The ones that came off the Arc see further than they are supposed to and nobody sells those cheap.",
+   "nature": "Working, mostly. The good ones see rather further than they are supposed to."
   },
   {
    "id": "arcshard",
@@ -976,8 +941,6 @@ export const ECONOMY = {
     1,
     5
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "nail"
    ],
@@ -990,7 +953,8 @@ export const ECONOMY = {
     "veyra",
     "frog"
    ],
-   "blurb": "A hand's length of seamless Builder metal. It hums when you tap it, and the frogs will hear you coming."
+   "blurb": "A hand's length of seamless Builder metal. It hums when you tap it, and the frogs will hear you coming.",
+   "nature": "A hand's length of seamless metal that hums when you tap it, and nobody alive can read it."
   },
   {
    "id": "hotweapons",
@@ -1002,8 +966,6 @@ export const ECONOMY = {
     2,
     8
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "whisker"
    ],
@@ -1014,7 +976,8 @@ export const ECONOMY = {
    "lovedBy": [
     "cat"
    ],
-   "blurb": "House arms with the marks taken off badly. Worth a great deal to the wrong people and a great deal of trouble to the right ones."
+   "blurb": "House arms with the marks taken off badly. Worth a great deal to the wrong people and a great deal of trouble to the right ones.",
+   "nature": "House arms with the marks taken off badly. Trouble in both directions."
   },
   {
    "id": "fakemedals",
@@ -1026,8 +989,6 @@ export const ECONOMY = {
     5,
     20
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "whisker"
    ],
@@ -1037,7 +998,8 @@ export const ECONOMY = {
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Struck this morning, aged this afternoon. Good enough for a dock and not good enough for a house."
+   "blurb": "Struck this morning, aged this afternoon. Good enough for a dock and not good enough for a house.",
+   "nature": "Struck this morning and aged this afternoon. Good enough for a dock and not for a house."
   },
   {
    "id": "greymeds",
@@ -1049,8 +1011,6 @@ export const ECONOMY = {
     5,
     15
    ],
-   "lifetimeDays": 60,
-   "needsRefrigeration": true,
    "producedAt": [
     "whisker"
    ],
@@ -1062,7 +1022,9 @@ export const ECONOMY = {
    "lovedBy": [
     "scorch"
    ],
-   "blurb": "The same gel Brine makes, in the wrong crates, at half the price and twice the risk. Scorch does not care."
+   "blurb": "The same gel Brine makes, in the wrong crates, at half the price and twice the risk. Scorch does not care.",
+   "nature": "The same gel, in the wrong crates, at half the price and twice the risk.",
+   "needsTempControl": true
   },
   {
    "id": "cyberparts",
@@ -1074,8 +1036,6 @@ export const ECONOMY = {
     2,
     8
    ],
-   "lifetimeDays": null,
-   "needsRefrigeration": false,
    "producedAt": [
     "whisker"
    ],
@@ -1086,7 +1046,8 @@ export const ECONOMY = {
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Hands, eyes and a spine or two, packed in gel. Whisker will fit them as well as sell them and asks for cash."
+   "blurb": "Hands, eyes and a spine or two, packed in gel. Whisker will fit them as well as sell them and asks for cash.",
+   "nature": "Hands, eyes and a spine or two, packed in gel. Fitted as readily as sold."
   }
  ],
  "ports": {
@@ -1099,13 +1060,7 @@ export const ECONOMY = {
    "region": "inner",
    "marketSize": 1.5,
    "fuelPricePerKms": 6,
-   "shipyard": true,
-   "upgrades": [
-    "engine_1",
-    "engine_2",
-    "hold_1",
-    "heatshield"
-   ]
+   "shipyard": true
   },
   "scorch": {
    "name": "Scorch",
@@ -1116,8 +1071,7 @@ export const ECONOMY = {
    "region": "inner",
    "marketSize": 0.6,
    "fuelPricePerKms": 12,
-   "shipyard": false,
-   "upgrades": []
+   "shipyard": true
   },
   "veyra": {
    "name": "Veyra",
@@ -1128,8 +1082,7 @@ export const ECONOMY = {
    "region": "inner",
    "marketSize": 1.6,
    "fuelPricePerKms": 11,
-   "shipyard": false,
-   "upgrades": []
+   "shipyard": true
   },
   "tassel": {
    "name": "Tassel",
@@ -1140,8 +1093,7 @@ export const ECONOMY = {
    "region": "home",
    "marketSize": 2,
    "fuelPricePerKms": 10,
-   "shipyard": false,
-   "upgrades": []
+   "shipyard": true
   },
   "slate": {
    "name": "Slate",
@@ -1152,17 +1104,7 @@ export const ECONOMY = {
    "region": "home",
    "marketSize": 0.8,
    "fuelPricePerKms": 9,
-   "shipyard": true,
-   "upgrades": [
-    "tank_0",
-    "tank_1",
-    "tank_2",
-    "engine_0",
-    "hold_0",
-    "hold_1",
-    "hold_2",
-    "refrigeration"
-   ]
+   "shipyard": true
   },
   "moss": {
    "name": "Moss",
@@ -1173,8 +1115,7 @@ export const ECONOMY = {
    "region": "home",
    "marketSize": 1,
    "fuelPricePerKms": 12,
-   "shipyard": false,
-   "upgrades": []
+   "shipyard": true
   },
   "nail": {
    "name": "Nail",
@@ -1185,8 +1126,7 @@ export const ECONOMY = {
    "region": "belt",
    "marketSize": 0.8,
    "fuelPricePerKms": 20,
-   "shipyard": false,
-   "upgrades": []
+   "shipyard": true
   },
   "whisker": {
    "name": "Whisker",
@@ -1197,10 +1137,7 @@ export const ECONOMY = {
    "region": "belt",
    "marketSize": 0.7,
    "fuelPricePerKms": 26,
-   "shipyard": true,
-   "upgrades": [
-    "stealth"
-   ]
+   "shipyard": true
   },
   "arc": {
    "name": "The Arc",
@@ -1211,10 +1148,7 @@ export const ECONOMY = {
    "region": "belt",
    "marketSize": 0.6,
    "fuelPricePerKms": null,
-   "shipyard": false,
-   "upgrades": [
-    "sensors"
-   ]
+   "shipyard": false
   },
   "grumm": {
    "name": "Grumm",
@@ -1225,8 +1159,7 @@ export const ECONOMY = {
    "region": "outer",
    "marketSize": 1,
    "fuelPricePerKms": 24,
-   "shipyard": false,
-   "upgrades": []
+   "shipyard": true
   },
   "brine": {
    "name": "Brine",
@@ -1237,8 +1170,7 @@ export const ECONOMY = {
    "region": "outer",
    "marketSize": 0.8,
    "fuelPricePerKms": 26,
-   "shipyard": false,
-   "upgrades": []
+   "shipyard": true
   },
   "glass": {
    "name": "Glass",
@@ -1249,8 +1181,7 @@ export const ECONOMY = {
    "region": "outer",
    "marketSize": 0.7,
    "fuelPricePerKms": 26,
-   "shipyard": false,
-   "upgrades": []
+   "shipyard": true
   },
   "croak": {
    "name": "Croak",
@@ -1261,8 +1192,7 @@ export const ECONOMY = {
    "region": "outer",
    "marketSize": 0.3,
    "fuelPricePerKms": 34,
-   "shipyard": false,
-   "upgrades": [],
+   "shipyard": true,
    "retrograde": true
   },
   "haven": {
@@ -1275,10 +1205,6 @@ export const ECONOMY = {
    "marketSize": 1.4,
    "fuelPricePerKms": 22,
    "shipyard": true,
-   "upgrades": [
-    "tank_1",
-    "tank_2"
-   ],
    "gifts": {
     "perVisitValue": 40,
     "perRepPoint": 12,
@@ -1298,110 +1224,71 @@ export const ECONOMY = {
    "region": "deep",
    "marketSize": 0,
    "fuelPricePerKms": null,
-   "shipyard": false,
-   "upgrades": []
+   "shipyard": false
   }
  },
  "upgrades": [
   {
    "id": "tank_0",
-   "name": "Slack tank",
+   "name": "Stock tank",
    "kind": "tank",
    "tier": 0,
-   "price": 1200,
-   "soldAt": [
-    "slate"
-   ],
+   "price": null,
+   "soldAt": null,
    "starter": true,
-   "effect": "Starter Δv budget (size from tuning).",
-   "unlocks": "Tassel's moons and the slow road out to the Belt with a refuel."
+   "effect": "The tank the ship came with (size from tuning).",
+   "unlocks": "Tassel's moons, the Belt, and a loose capture at Grumm."
   },
   {
    "id": "tank_1",
    "name": "Long-haul tank",
    "kind": "tank",
    "tier": 1,
-   "price": 3600,
-   "soldAt": [
-    "slate",
-    "haven"
-   ],
+   "price": 3200,
+   "soldAt": "*",
    "effect": "Larger Δv budget (size from tuning).",
-   "unlocks": "A comfortable transfer to the Belt and the Arc; Grumm with careful routing."
+   "unlocks": "Cinder and the inward run, where the arrival is most of the bill."
   },
   {
    "id": "tank_2",
    "name": "Deep-sky tank",
    "kind": "tank",
    "tier": 2,
-   "price": 11500,
-   "soldAt": [
-    "slate",
-    "haven"
-   ],
+   "price": 8000,
+   "soldAt": "*",
+   "requiresCrew": "engineer",
+   "effect": "Larger Δv budget again (size from tuning).",
+   "unlocks": "Grumm and Haven without counting every metre; the Arc with room to come home."
+  },
+  {
+   "id": "tank_3",
+   "name": "Deep-dark tank",
+   "kind": "tank",
+   "tier": 3,
+   "price": 16000,
+   "soldAt": "*",
+   "requiresCrew": "engineer",
    "effect": "Largest Δv budget (size from tuning).",
-   "unlocks": "Direct Grumm runs, the Maw, and running hot with perishables."
-  },
-  {
-   "id": "engine_0",
-   "name": "Slate putter",
-   "kind": "engine",
-   "tier": 0,
-   "price": 900,
-   "soldAt": [
-    "slate"
-   ],
-   "starter": true,
-   "effect": "Starter fuel efficiency: km/s bought per cowrie at the pump (factor from tuning).",
-   "unlocks": "Nothing; it is what you came with."
-  },
-  {
-   "id": "engine_1",
-   "name": "Cinder fastburn",
-   "kind": "engine",
-   "tier": 1,
-   "price": 3000,
-   "soldAt": [
-    "cinder"
-   ],
-   "effect": "Better fuel efficiency: more km/s per cowrie when refuelling (factor from tuning).",
-   "unlocks": "Cheaper hot transfers; the Cinder run stops eating your margin."
-  },
-  {
-   "id": "engine_2",
-   "name": "Smiths' masterwork",
-   "kind": "engine",
-   "tier": 2,
-   "price": 9000,
-   "soldAt": [
-    "cinder"
-   ],
-   "effect": "Best fuel efficiency (factor from tuning).",
-   "unlocks": "Outer-system fuel prices stop mattering as much."
+   "unlocks": "The Maw, and running hot anywhere you like."
   },
   {
    "id": "hold_0",
-   "name": "Starter hold",
+   "name": "Stock hold",
    "kind": "hold",
    "tier": 0,
-   "price": 800,
-   "soldAt": [
-    "slate"
-   ],
+   "price": null,
+   "soldAt": null,
    "starter": true,
-   "effect": "Starter cargo capacity (units from tuning; the sim assumes 24).",
-   "unlocks": "Nothing; it is what you came with."
+   "effect": "The hold the ship came with (units from tuning; the sim assumes 24).",
+   "unlocks": "One consignment at a time, and not a large one."
   },
   {
    "id": "hold_1",
    "name": "Raft hold",
    "kind": "hold",
    "tier": 1,
-   "price": 2800,
-   "soldAt": [
-    "slate",
-    "cinder"
-   ],
+   "price": 2400,
+   "soldAt": "*",
    "effect": "Larger cargo capacity (units from tuning).",
    "unlocks": "Bulk runs that actually pay: ore and steel by the crate rather than the armful."
   },
@@ -1410,12 +1297,48 @@ export const ECONOMY = {
    "name": "Barge hold",
    "kind": "hold",
    "tier": 2,
-   "price": 8500,
-   "soldAt": [
-    "slate"
-   ],
+   "price": 6000,
+   "soldAt": "*",
+   "requiresCrew": "engineer",
+   "effect": "Larger cargo capacity again (units from tuning).",
+   "unlocks": "A delivery and a speculation in the same hold."
+  },
+  {
+   "id": "hold_3",
+   "name": "Barn hold",
+   "kind": "hold",
+   "tier": 3,
+   "price": 13000,
+   "soldAt": "*",
+   "requiresCrew": "engineer",
    "effect": "Largest cargo capacity (units from tuning).",
-   "unlocks": "Ore and masonry by the barge, and full frog gift-exchanges in one trip."
+   "unlocks": "Ore and masonry by the barge, and a full frog gift-exchange in one trip."
+  },
+  {
+   "id": "gravsensors",
+   "name": "Gravitational sensors",
+   "kind": "key",
+   "tier": 0,
+   "price": 3500,
+   "soldAt": [
+    "nail"
+   ],
+   "pending": true,
+   "effect": "See gravitational phenomena on the chart.",
+   "unlocks": "Nothing yet: the phenomena are not in the sky so far."
+  },
+  {
+   "id": "tempcontrol",
+   "name": "Temperature control",
+   "kind": "key",
+   "tier": 0,
+   "price": 2800,
+   "soldAt": [
+    "cinder"
+   ],
+   "requiresCrew": "engineer",
+   "effect": "The hold can carry goods that will not keep at hold temperature.",
+   "unlocks": "Rare riverfish, fire crystals, ancient cider, ice lenses, medicinal gel and smuggled medicine."
   },
   {
    "id": "astrolabe",
@@ -1445,65 +1368,37 @@ export const ECONOMY = {
   },
   {
    "id": "heatshield",
-   "name": "Ember heat shield",
+   "name": "Heat shielding",
    "kind": "key",
    "tier": 0,
    "price": 4600,
    "soldAt": [
     "cinder"
    ],
-   "effect": "Survive atmosphere skims; enables aerobraking at Grumm.",
-   "unlocks": "Free braking at Grumm (\"Skimming\"); the fast cheap road to Haven."
+   "requiresCrew": "engineer",
+   "pending": true,
+   "effect": "Survive an atmosphere skim, at a risk.",
+   "unlocks": "Nothing yet: risky aerobraking is not built."
   },
   {
-   "id": "refrigeration",
-   "name": "Cold hold",
+   "id": "cryocooling",
+   "name": "Cryo hull cooling",
    "kind": "key",
    "tier": 0,
-   "price": 2400,
+   "price": 9500,
    "soldAt": [
-    "slate"
+    "cinder"
    ],
-   "effect": "Hold can carry goods flagged needsRefrigeration.",
-   "unlocks": "Riverfish, medicinal gel and frog pilgrims."
-  },
-  {
-   "id": "sensors",
-   "name": "Long-range sensors",
-   "kind": "key",
-   "tier": 0,
-   "price": 3500,
-   "soldAt": [
-    "arc"
-   ],
-   "effect": "Shows Arc salvage sites and Belt traffic on the chart with intercept predictions.",
-   "unlocks": "Salvage work, quiet Belt crossings, and the long look outward."
-  },
-  {
-   "id": "stealth",
-   "name": "Whisker dampener",
-   "kind": "key",
-   "tier": 0,
-   "price": 5200,
-   "soldAt": [
-    "whisker"
-   ],
-   "effect": "Cat toll intercepts in the Belt no longer trigger unless you dock at Nail.",
-   "unlocks": "Toll-free Belt crossings."
+   "requiresCrew": "engineer",
+   "requiresUpgrade": "heatshield",
+   "pending": true,
+   "effect": "Carries the heat of a skim away, so the skim is safe.",
+   "unlocks": "Nothing yet: safe aerobraking is not built."
   }
  ],
  "formulas": {
   "price": {
-   "description": "You pay base * sells.priceMul * scarcity * (1 - repDiscount) * mood. A port pays base * (it is on the good's buyer list ? 1 : disinterestMul) * region * loved * saturation * mood * freshness. Nothing on the buying side depends on which species you are selling to except through the buyer and loved lists, which name ports and peoples alike."
-  },
-  "saturation": {
-   "description": "Each port remembers what you have landed on it lately, decaying with half-life halfLifeDays. The k-th item you sell fetches q0eff/(q0eff+recentSold) of the price, q0eff = q0 * port.marketSize.",
-   "halfLifeDays": 20,
-   "q0": 48
-  },
-  "perishable": {
-   "description": "Perishable value multiplier = floor + (1-floor)*max(0, 1 - ageDays/lifetimeDays); linear decay to the floor, shown in the UI as \"loses X% per day\".",
-   "floor": 0.1
+   "description": "You pay base * sells.priceMul * mood * (1 - repDiscount). A port pays base * demand * (needsTempControl ? tempControlMul : 1) * mood * (1 + repDiscount/2). Nothing else moves a price: what you have sold here before does not, and how picked-over a shelf is does not. The stall's stock is the only limit on how much of a thing you can move at once, and that is limit enough."
   },
   "reputation": {
    "description": "Reputation is 0..10 points per species. Purchases and fuel at that species' ports are discounted by min(maxDiscount, discountPerPoint*points). Frog gifts scale with frog reputation; cat tolls fall by the same fraction.",
@@ -1512,7 +1407,7 @@ export const ECONOMY = {
    "maxPoints": 10
   },
   "toll": {
-   "description": "A Belt toll intercept takes min(cap, fraction*cargoValue) in goods, chosen by the cats; nothing if cargoValue < minCargoValue (they never take everything and never harm a ship that yields). Stealth suppresses intercepts.",
+   "description": "A Belt toll intercept takes min(cap, fraction*cargoValue) in goods, chosen by the cats; nothing if cargoValue < minCargoValue (they never take everything and never harm a ship that yields). There is nothing to hide behind: the only let-off is the cooldown, so a captain is never asked twice inside a month.",
    "fraction": 0.15,
    "cap": 600,
    "minCargoValue": 200
@@ -1528,7 +1423,7 @@ export const ECONOMY = {
    "spread": 0.07
   },
   "volatility": {
-   "description": "Daily random-walk wobble on what a port pays, amplitude by species. Emberkin markets are the most volatile.",
+   "description": "Daily random-walk wobble on what a port pays, amplitude by species. Emberkin markets are the most volatile. This is species character, not supply and demand: it does not remember anything you did.",
    "bySpecies": {
     "emberkin": 0.15,
     "cat": 0.05,
@@ -1537,23 +1432,23 @@ export const ECONOMY = {
    }
   },
   "speciesRules": {
-   "otter": "Haggle spread on every price; refusing to haggle is rude (small rep loss).",
-   "emberkin": "Volatile prices; perishable luxuries that turn over by the season.",
+   "otter": "Haggle spread: every price at an otter port is rolled within +-spread, per good, per day. The roll is the whole of it — there is no haggling exchange behind it.",
+   "emberkin": "Volatile prices: what Cinder wants this week is not what it wanted last week.",
    "cat": "Tolls in the Belt under strict custom (never everything, never a ship that yields). Impress a captain and a gift may follow.",
    "frog": "No haggling. \"Prices\" are exchange rates: you are paid in trade credit at the stall plus goodwill (reputation), and every visit ends with a gift."
   },
-  "region": {
-   "description": "Where a good is worth carrying. A port in the same region as the good's nearest producer pays homeMul; a port anywhere else pays awayMul. Regions are named in the ports table: inner, home, belt, outer, deep.",
-   "homeMul": 1,
-   "awayMul": 1.6
-  },
-  "loved": {
-   "description": "A port named in a good's lovedBy list — by its own id or by its people — pays this on top of everything else. This is the big lever: a loved good in another region is worth three and a half times what it costs at the stall it came from.",
-   "mul": 2.2
-  },
   "stock": {
-   "description": "A stall's shelves hold a number rolled out of the good's own stock range, and they are rolled again when you come back from somewhere else. Staying at one dock and waiting does not restock it; going and trading elsewhere does. What you bought this visit is what is missing, and a thin shelf costs more (scarcity).",
-   "scarcityK": 0.5
+   "description": "A stall's shelves hold a number rolled out of the good's own stock range, and they are rolled again when you come back from somewhere else. Staying at one dock and waiting does not restock it; going and trading elsewhere does. What you bought this visit is what is missing, and the price does not move as the shelf empties: the shelf itself is the limit."
+  },
+  "demand": {
+   "description": "What a port pays for a good, as a multiple of its base price. Two questions: does this port want it (loved, on its buyer list, or neither), and is it out of the good's own region. Space is hard and there are few interspecies merchants, so carrying a loved good to another people is the trade the game is about; the same run inside one system is worth a fraction of it. Regions are named in the ports table: inner, home, belt, outer, deep.",
+   "lovedAway": 5.5,
+   "lovedSame": 2.5,
+   "likedAway": 2.5,
+   "likedSame": 1.5,
+   "unwanted": 0.6,
+   "tempControlMul": 1.5,
+   "resaleCap": 0.75
   }
  },
  "regions": {

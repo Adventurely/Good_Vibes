@@ -63,28 +63,30 @@ export function tiers(kind){ return UPGRADES.filter(u => u.kind === kind).sort((
 export function newGame(seed = 1){
   const start = CONST.START_PORT;
   const state = {
-    /* 5: the contract board is gone, and with it the passenger list a save
-       used to carry. Before that, 4 replaced every good in the sky and 3
-       replaced the sky itself. A save from any of them describes a game this
-       one is not playing, so they are refused rather than repaired: the page
-       catches it and opens a new game, which is the honest outcome when the
-       world under a ship has changed shape. */
-    version: 5,
+    /* 6: the rack was rebuilt — four sizes of tank and hold instead of three,
+       no engines to buy, and keys that are fitted rather than sold. Before
+       that, 5 took the contract board and the passenger list away, 4 replaced
+       every good in the sky and 3 replaced the sky itself. A save from any of
+       them describes a game this one is not playing, so they are refused
+       rather than repaired: the page catches it and opens a new game, which is
+       the honest outcome when the world under a ship has changed shape. */
+    version: 6,
     seed, rng: (seed * 2654435761) >>> 0 || 1,
     t: 0, warp: 1, paused: false,
     shipName: TEXT.shipNames[Math.abs(seed) % TEXT.shipNames.length],
     ship: { body: start, r: [0, 0], v: [0, 0] },
     dockedAt: start,
-    tiers: { tank: 0, engine: 0, hold: 0 },
-    keys: { heatShield: false, refrigeration: false, sensors: false, stealth: false, astrolabe: false },
+    tiers: { tank: 0, hold: 0 },
+    keys: { heatShield: false, tempControl: false, gravSensors: false, cryoCooling: false, astrolabe: false },
     tank: 0, dv: 0,
     money: CONST.START_MONEY, debt: 0,
     cargo: [],
-    /* markets holds, per port, what you have landed on it lately (`sold`),
-       what you have taken off its shelves this visit (`bought`), and which
-       visit that was (`visit`). marketEpoch turns over every time you tie up
-       somewhere other than where you last tied up, which is what makes a
-       stall find more stock while you were away. */
+    /* markets holds, per port, what you have taken off its shelves this visit
+       (`bought`) and which visit that was (`visit`). It used to also hold what
+       you had landed there lately, for a saturation rule that is gone.
+       marketEpoch turns over every time you tie up somewhere other than where
+       you last tied up, which is what makes a stall find more stock while you
+       were away. */
     markets: {},
     marketEpoch: 0,
     lastMarket: null,
@@ -134,7 +136,6 @@ export function newGame(seed = 1){
 }
 
 export function holdUnits(state){ return tiers('hold')[state.tiers.hold].value; }
-export function fuelPriceMul(state){ return tiers('engine')[state.tiers.engine].value; }
 export function usedUnits(state){
   return state.cargo.reduce((s, c) => s + c.qty * goodById(c.good).units, 0)
 
@@ -142,6 +143,8 @@ export function usedUnits(state){
 export function freeUnits(state){ return holdUnits(state) - usedUnits(state); }
 export const portName = id => world.get(id)?.name ?? id;
 export const portOf = id => PORTS[id];
+
+const aOrAn = w => `${/^[aeiou]/i.test(w) ? 'an' : 'a'} ${w.toLowerCase()}`;
 
 export function logLine(state, kind, template, vars = {}){
   const text = fill(template, vars);
@@ -398,14 +401,22 @@ export function skipPlan(state, t){
   return { t, days, rate, seconds: days / (rate * CONST.BASE_RATE_DAYS_PER_SEC), capped: ideal > MAX_WARP };
 }
 
+/* Whether a ship skims air rather than burning up in it. Nothing does, yet:
+ * heat shielding and cryo hull cooling are on the rack and wired to nothing,
+ * because the risky skim and the safe one are two different manoeuvres and
+ * neither is built (§2.8). The arithmetic below is what they will both be
+ * built out of, so it stays, and `skim` lets a test reach it directly rather
+ * than leaving it to rot behind a flag no caller can set. */
+export const skimsAir = () => false;
+
 /* The maneuvers the kernel should actually fly: the player's nodes plus any
- * aerobrake the heat shield will take at a periapsis inside an atmosphere.
+ * aerobrake a shielded ship will take at a periapsis inside an atmosphere.
  * Computed by predicting, finding such a periapsis, inserting a retrograde
  * pseudo-node there, and predicting again — so the drawn path and the flown
  * path both include the skim. */
-export function effectiveNodes(state, horizon){
+export function effectiveNodes(state, horizon, { skim = skimsAir(state) } = {}){
   const nodes = state.nodes.map(n => ({ ...n })).sort((a, b) => a.t - b.t);
-  if(!state.keys.heatShield) return nodes;
+  if(!skim) return nodes;
   let list = nodes;
   for(let pass = 0; pass < 3; pass++){
     const pred = predict(world, state.ship, state.t, list, horizon, { atmosphere: false, dvAvailable: state.dv });
@@ -461,11 +472,11 @@ export function tick(state, dtDays){
      written down before the dive begins, and the bottom of it can be months
      away — which is how a shielded ship sailed straight through Grumm's air
      without the shield ever being used. */
-  const inAir = world.get(state.ship.body).atmo && state.keys.heatShield;
+  const inAir = world.get(state.ship.body).atmo && skimsAir(state);
   const nodes = effectiveNodes(state, inAir ? Math.max(dtDays + 1, 150) : dtDays + 1);
   // Stop the step at the first change of reach or burn, so warp cannot skip
   // past an encounter the player was warping towards.
-  const opts = { atmosphere: !state.keys.heatShield, dvAvailable: state.dv, stopOnSoi: true, stopOnBurn: true };
+  const opts = { atmosphere: !skimsAir(state), dvAvailable: state.dv, stopOnSoi: true, stopOnBurn: true };
   const res = advance(world, state.ship, state.t, dtDays, nodes, opts);
   state.ship = res.ship;
   state.t = res.t;
@@ -685,11 +696,11 @@ export function canAcceptQuest(state, q){
   const load = questLoad(q);
   if(load > freeUnits(state)) return { ok: false, reason: 'No room in the hold for it.' };
   /* A consignment skips the market, so it also skips the market's one check:
-     nothing stops somebody handing you four cases of cold medicine and a warm
-     hold to put them in except this. */
-  if(q.type === 'delivery' && !state.keys.refrigeration
-     && (q.goods ?? []).some(g => goodById(g.good)?.needsRefrigeration)){
-    return { ok: false, reason: 'That wants a cold hold.' };
+     nothing stops somebody handing you four cases of cold medicine and a hold
+     that cannot hold a temperature except this. */
+  if(q.type === 'delivery' && !state.keys.tempControl
+     && (q.goods ?? []).some(g => goodById(g.good)?.needsTempControl)){
+    return { ok: false, reason: 'That wants temperature control.' };
   }
   return { ok: true, load };
 }
@@ -856,7 +867,7 @@ export function planCost(state, horizon){
 /* The plan as the solver reads it: as far ahead as it is asked for. */
 export function plan(state, horizon){
   const nodes = effectiveNodes(state, horizon);
-  return predict(world, state.ship, state.t, nodes, horizon, { atmosphere: !state.keys.heatShield, dvAvailable: state.dv });
+  return predict(world, state.ship, state.t, nodes, horizon, { atmosphere: !skimsAir(state), dvAvailable: state.dv });
 }
 
 /* ------------------------------------------------- the immediate orbit */
@@ -1119,7 +1130,18 @@ function seedFromLambert(state, targetId, node, scoreFn){
   const r2n = norm(sub(absState(world, target.id, state.t).r, frameNow.r));
   const hoh = period(frame.mu, (r1n + Math.max(r2n, target.a * (1 - (target.e ?? 0)))) / 2) / 2;
   const hohFor = hoh;
-  const offset = (target.zoneRadius ?? target.soi ?? 0) * 0.4;
+  /* Where to aim, off to one side of the target so the road passes it rather
+     than hits it: halfway between the top of its air and its harbour mouth.
+     A flat fraction of the mouth was enough while a mouth was ten radii, and
+     stopped being enough when it became five above the air — on a small world
+     that put the aim point barely two radii over the ground, and a hyperbola
+     drawn that close bends into it. Every seeded road to Cinder came back a
+     crash, and the aim fell back on a walk that never crossed its orbit. A
+     drifting haven has no ground to stand off from, so a fraction of its own
+     mouth is all there is to use there. */
+  const ground = Math.max(target.radius ?? 0, target.atmo ?? 0);
+  const reach = target.zoneRadius ?? target.soi ?? 0;
+  const offset = ground > 0 && reach > ground ? (ground + reach) / 2 : reach * 0.4;
   const sameFrame = frame.id === here.id;
   // Cheapest first, with anything the tank cannot pay for at the back.
   const rank = cost => (cost > state.dv ? 1e6 : 0) + cost;
@@ -1826,50 +1848,86 @@ export function supplierDistance(portId, goodId, t){
   return best;
 }
 
-/* Where a good is worth carrying, which is the whole of trade: a thing is
- * cheap where it is made and dear where it is not. The rule is regions rather
- * than distance, because a region is something a player can hold in their head
- * — inner, home, belt, outer — and "carry it out of the region it came from"
- * is an instruction, where "carry it 3.4 au" is a sum. */
-export function regionMul(portId, goodId){
-  const f = FORMULAS.region;
+/* Who wants a thing, in the words the goods table itself uses — sometimes a
+ * port, sometimes a whole people, once "everyone". Two lists: the ones who
+ * love it, and the ones who merely want it, which is the loved list taken out
+ * of the buyer list so nobody is named twice.
+ *
+ * This is Wicket's work. Until the appraiser's berth is filled a player has
+ * the thing in front of them and what it is made of, and has to reason from
+ * that to who would pay for it; she is the one who can simply say. Nothing
+ * here checks the berth — the page does, because the knowledge exists in the
+ * world whether or not anybody aboard has it.
+ */
+const wantName = id => id === 'everyone' ? 'everyone'
+  : SPECIES[id] ? SPECIES[id].plural.toLowerCase()
+  : portName(id);
+const wantWords = list => {
+  const said = list.map(wantName);
+  if(said.length <= 1) return said[0] ?? '';
+  return said.slice(0, -1).join(', ') + ' and ' + said[said.length - 1];
+};
+export function lovedByWords(goodId){
+  return wantWords(goodById(goodId).lovedBy ?? []);
+}
+/* Which ports a token means: itself, or everywhere its people live. */
+const portsNamed = token => token === 'everyone' ? Object.keys(PORTS)
+  : PORTS[token] ? [token]
+  : Object.keys(PORTS).filter(id => PORTS[id].species === token);
+export function wantedByWords(goodId){
   const g = goodById(goodId);
-  if(!g.producedAt.length || g.producedAt.includes(portId)) return f.homeMul;
+  /* Taken out by the ports they mean rather than by the word written down.
+     Cider is loved by the otters and its buyer list also names Tassel, which
+     is an otter port: listing Tassel as merely wanting it would be wrong. */
+  const loved = new Set((g.lovedBy ?? []).flatMap(portsNamed));
+  const rest = (g.buyers ?? []).filter(b => portsNamed(b).some(id => !loved.has(id)));
+  return wantWords(rest);
+}
+
+/* What a port pays for a thing, as a multiple of its base price, and the whole
+ * of the selling side in one lookup.
+ *
+ * Two questions and nothing else. Does this port want it — loved, merely on the
+ * buyer list, or neither — and is it out of the good's own region? Space is
+ * hard and there are few merchants who cross between peoples, so carrying a
+ * loved good to another people is the trade the game is about (×5.5), and the
+ * same run inside one system is worth a fraction of it (×2.5). A good nobody
+ * named is sold at a loss to whoever will take it.
+ *
+ * It used to be a product of a region multiplier and a love multiplier, which
+ * could not hit all four corners at once: making the in-system numbers right
+ * dragged the cross-region ones down with them. A table has no such trouble,
+ * and a player can be told it in one sentence.
+ *
+ * The producer is the exception: a stall does not buy back what it is selling
+ * two feet away. Those are priced as unwanted and then capped (see sellPrice).
+ */
+export function demandMul(portId, goodId){
+  const f = FORMULAS.demand;
+  const g = goodById(goodId);
+  if(g.producedAt.includes(portId)) return f.unwanted;
   const here = REGION_OF[portId];
-  return g.producedAt.some(p => REGION_OF[p] === here) ? f.homeMul : f.awayMul;
+  const away = g.producedAt.length && !g.producedAt.some(p => REGION_OF[p] === here);
+  if(lovesGood(portId, goodId)) return away ? f.lovedAway : f.lovedSame;
+  if(PORTS[portId].buys.some(b => b.good === goodId)) return away ? f.likedAway : f.likedSame;
+  return f.unwanted;
 }
 
-/* And the big lever. A port that loves a thing — by its own name or its
- * people's — pays over the odds for it, and loving it in another region is
- * what a trade route is made of: three and a half times the stall price. */
-export function lovedMul(portId, goodId){
-  return lovesGood(portId, goodId) ? FORMULAS.loved.mul : 1;
+/* Said in words, for the row a player actually reads. */
+export function demandWords(portId, goodId){
+  const g = goodById(goodId);
+  if(g.producedAt.includes(portId)) return 'they make it here';
+  if(lovesGood(portId, goodId)) return 'they love it';
+  if(PORTS[portId].buys.some(b => b.good === goodId)) return 'they want it';
+  return 'nobody here wants it';
 }
-
-function decayed(entry, t){
-  if(!entry) return 0;
-  return entry.q * Math.pow(0.5, (t - entry.t) / FORMULAS.saturation.halfLifeDays);
-}
-const q0For = portId => FORMULAS.saturation.q0 * (PORTS[portId].marketSize ?? 1);
 
 /* How much of a stall's shelf you have already taken this visit. Shelves do
- * not regrow on a clock any more — waiting at a dock gets you nothing — so
- * this is simply a count, cleared when the shelves are rolled again. */
+ * not regrow on a clock — waiting at a dock gets you nothing — so this is
+ * simply a count, cleared when the shelves are rolled again. It no longer
+ * moves the price: the shelf is the limit, and that is limit enough. */
 function shortfall(state, portId, goodId){
   return state.markets[portId]?.bought?.[goodId] ?? 0;
-}
-export function saturationMul(state, portId, goodId){
-  const m = state.markets[portId];
-  const q = decayed(m?.sold?.[goodId], state.t);
-  const q0 = q0For(portId);
-  return q0 / (q0 + q);
-}
-/* A picked-over shelf costs more, so buying a stall out is never free. */
-function scarcityMul(state, portId, goodId){
-  const full = stockFull(state, portId, goodId);
-  if(full <= 0) return 1;
-  const gone = Math.min(full, shortfall(state, portId, goodId));
-  return 1 + FORMULAS.stock.scarcityK * (gone / full);
 }
 
 /* Emberkin fashion: a slow wave per good, so what Cinder wants this week is
@@ -1880,7 +1938,7 @@ function speciesMood(portId, goodId, t){
   const g = goodById(goodId);
   const vol = FORMULAS.volatility.bySpecies[sp] ?? 0;
   let m = 1;
-  if(vol && (g.category === 'luxury' || g.category === 'perishable' || sp === 'cat')){
+  if(vol && (g.category === 'luxury' || g.category === 'fresh' || sp === 'cat')){
     // Two slow waves per good, so the wobble does not repeat every three weeks.
     m *= 1 + vol * (0.6 * Math.sin(TAU * t / 23 + hash(goodId) * TAU) + 0.4 * Math.sin(TAU * t / 61 + hash(goodId, 'b') * TAU));
   }
@@ -1903,42 +1961,28 @@ export function buyPrice(state, portId, goodId){
   const row = p.sells.find(s => s.good === goodId);
   if(!row) return null;
   const g = goodById(goodId);
-  let price = g.basePrice * row.priceMul * speciesMood(portId, goodId, state.t) * scarcityMul(state, portId, goodId);
+  let price = g.basePrice * row.priceMul * speciesMood(portId, goodId, state.t);
   price *= 1 - repDiscount(state, p.species);
   return Math.max(1, Math.round(price));
 }
 
-/* What the port pays for one unit, fresh. Everyone buys everything at some
- * price; the ones who want it pay for it. */
-export function sellPrice(state, portId, goodId, boughtAt = null){
+/* What the port pays for one unit. Everyone buys everything at some price; the
+ * ones who want it pay for it, and the ones who need a hold that holds a
+ * temperature pay half as much again on top — that is what the Engineer and
+ * her 2,800-cowrie box are for. */
+export function sellPrice(state, portId, goodId){
   const p = PORTS[portId];
   const g = goodById(goodId);
-  const row = p.buys.find(s => s.good === goodId);
-  const mul = row ? row.priceMul : FORMULAS.market.disinterestMul;
-  let price = g.basePrice * mul * regionMul(portId, goodId) * lovedMul(portId, goodId)
-    * saturationMul(state, portId, goodId) * speciesMood(portId, goodId, state.t);
+  let price = g.basePrice * demandMul(portId, goodId) * speciesMood(portId, goodId, state.t);
+  if(g.needsTempControl) price *= FORMULAS.demand.tempControlMul;
   price *= 1 + repDiscount(state, p.species) * 0.5;
-  if(boughtAt != null) price *= freshness(g, state.t - boughtAt);
   /* A port that sells this itself will never pay more than it asks. Otherwise
      a stall with a low price and no entry on its buying list is a money pump
      you never have to leave the dock to work. */
-  if(row == null && p.sells.some(x => x.good === goodId)){
-    price = Math.min(price, buyPrice(state, portId, goodId) * FORMULAS.market.resaleCap);
+  if(p.sells.some(x => x.good === goodId)){
+    price = Math.min(price, buyPrice(state, portId, goodId) * FORMULAS.demand.resaleCap);
   }
   return Math.max(1, Math.round(price));
-}
-
-export function saturationWords(mul){
-  return mul >= 0.95 ? 'they want more' : mul >= 0.8 ? 'they have some' : mul >= 0.6 ? 'they have plenty' : 'they are sick of it';
-}
-export function freshnessWords(g, ageDays){
-  if(!g.lifetimeDays) return '';
-  const f = 1 - ageDays / g.lifetimeDays;
-  return f <= 0 ? 'spoiled' : f < 0.25 ? 'spoiling' : f < 0.5 ? 'turning' : f < 0.75 ? 'ripe' : 'fresh';
-}
-export function freshness(g, ageDays){
-  if(!g.lifetimeDays) return 1;
-  return Math.max(FORMULAS.perishable.floor, 1 - ageDays / g.lifetimeDays);
 }
 
 /* What this stall had on the shelf when you walked in. A merchant keeps what
@@ -1951,10 +1995,19 @@ export function freshness(g, ageDays){
  * more; stand at the dock and wait and it will not. */
 export function stockFull(state, portId, goodId){
   const g = goodById(goodId);
-  if(!PORTS[portId]?.sells.some(r => r.good === goodId)) return 0;
+  const p = PORTS[portId];
+  if(!p?.sells.some(r => r.good === goodId)) return 0;
   const [lo, hi] = g.stock ?? [1, 1];
   const visit = state.markets[portId]?.visit ?? 0;
-  return lo + Math.floor(hash(portId, goodId, visit) * (hi - lo + 1));
+  const rolled = lo + Math.floor(hash(portId, goodId, visit) * (hi - lo + 1));
+  /* Scaled by how big a market this is. Tassel is the capital and keeps twice
+     what the table says; Croak is a hamlet and keeps a third of it. marketSize
+     used to do this work on the selling side, as the size of a port's appetite
+     before it tired of a good — when that rule went, the field described
+     something nothing read. The shelf is the better home for it: it is what a
+     market *being big* actually means to a trader, and it is what decides
+     whether a bigger hold is worth buying. */
+  return Math.max(1, Math.round(rolled * (p.marketSize ?? 1)));
 }
 export function stockAvailable(state, portId, goodId){
   return Math.max(0, stockFull(state, portId, goodId) - shortfall(state, portId, goodId));
@@ -1971,16 +2024,8 @@ export function openMarket(state, portId){
 }
 
 function market(state, portId){
-  return state.markets[portId] ??= { sold: {}, bought: {} };
+  return state.markets[portId] ??= { bought: {} };
 }
-/* The appetite book: how much has been sold into this market lately, fading
- * exponentially, which is what makes a good pay less the more of it you land. */
-function bump(book, goodId, qty, t){
-  const e = book[goodId];
-  const q = e ? decayed(e, t) : 0;
-  book[goodId] = { q: q + qty, t };
-}
-
 export function canBuy(state, goodId, qty){
   const port = state.dockedAt;
   if(!port) return { ok: false, reason: 'Not docked.' };
@@ -1989,7 +2034,7 @@ export function canBuy(state, goodId, qty){
   const g = goodById(goodId);
   const price = buyPrice(state, port, goodId);
   if(price == null) return { ok: false, reason: 'Not sold here.' };
-  if(g.needsRefrigeration && !state.keys.refrigeration) return { ok: false, reason: 'Needs refrigeration.' };
+  if(g.needsTempControl && !state.keys.tempControl) return { ok: false, reason: 'Needs temperature control.' };
   if(stockAvailable(state, port, goodId) < qty) return { ok: false, reason: 'Not enough in stock.' };
   if(freeUnits(state) < qty * g.units) return { ok: false, reason: 'No room in the hold.' };
   if(state.money < price * qty) return { ok: false, reason: 'Not enough coin.' };
@@ -2004,7 +2049,7 @@ export function buy(state, goodId, qty){
   state.money -= total;
   // What is missing off the shelf this visit, until the shelves are rolled again.
   market(state, port).bought[goodId] = shortfall(state, port, goodId) + qty;
-  // Stacks are split by purchase time, because freshness is per crate.
+  // Stacks are split by what was paid, so the hold remembers each buy.
   const stack = state.cargo.find(s => s.good === goodId && Math.abs(s.t - state.t) < 1e-9 && s.price === c.price);
   if(stack) stack.qty += qty; else state.cargo.push({ good: goodId, qty, t: state.t, price: c.price, from: port });
   state.stats.bought += qty;
@@ -2023,15 +2068,18 @@ export function sell(state, goodId, qty){
   const stacks = state.cargo.filter(s => s.good === goodId && !isConsigned(s)).sort((a, b) => a.t - b.t);
   const have = stacks.reduce((s, c) => s + c.qty, 0);
   if(have < qty) return { ok: false, reason: have ? 'The rest of those belong to somebody.' : 'Not that many aboard.' };
+  /* One price for the whole sale. It used to walk down as the crates came off
+     the ship, which is the last of the supply-and-demand rules and is gone with
+     the rest of them: what a stall pays is what a stall pays. The stacks are
+     still walked oldest first, because each one remembers what it cost and the
+     profit line is the difference. */
+  const unitPrice = sellPrice(state, port, goodId);
   let left = qty, total = 0, cost = 0;
   for(const s of stacks){
     if(left <= 0) break;
     const take = Math.min(left, s.qty);
-    const unitPrice = sellPrice(state, port, goodId, s.t);
     total += unitPrice * take; cost += s.price * take;
     s.qty -= take; left -= take;
-    // Saturation is applied as we go, so a big sale walks the price down.
-    bump(market(state, port).sold, goodId, take, state.t);
   }
   state.cargo = state.cargo.filter(s => s.qty > 0);
   state.money += total;
@@ -2049,7 +2097,7 @@ export function cargoValue(state, portId = null){
   // job with no way back.
   return state.cargo.filter(c => !isConsigned(c)).reduce((s, c) => {
     const g = goodById(c.good);
-    const unitPrice = portId ? sellPrice(state, portId, c.good, c.t) : g.basePrice * freshness(g, state.t - c.t);
+    const unitPrice = portId ? sellPrice(state, portId, c.good) : g.basePrice;
     return s + unitPrice * c.qty;
   }, 0);
 }
@@ -2060,7 +2108,7 @@ export function fuelPrice(state, portId = state.dockedAt){
   const p = PORTS[portId];
   if(!p || p.fuelPricePerKms == null) return null;
   if(!portOpen(portId, state.t)) return null;   // the pumps went with the colony
-  return p.fuelPricePerKms * fuelPriceMul(state) * (1 - repDiscount(state, p.species) * 0.5);
+  return p.fuelPricePerKms * (1 - repDiscount(state, p.species) * 0.5);
 }
 /* A ship with no fuel and no coin, tied up at a dock, is a ship that can never
  * leave — and the design document is clear that nothing may cost the save. So
@@ -2115,6 +2163,18 @@ export function canBuyUpgrade(state, id){
   if(!portOpen(port, state.t)) return { ok: false, reason: 'The yard is shut for the season.' };
   if(ownsUpgrade(state, u)) return { ok: false, reason: 'Already fitted.' };
   if(u.kind !== 'key' && state.tiers[u.kind] !== u.tier - 1) return { ok: false, reason: 'Needs the tier below first.' };
+  /* Money is not the only thing a yard wants. The second and third tank and
+     hold are fitted rather than sold: a dock hand will bolt on the first size
+     up for anyone with the coin, and will not cut into a hull for a captain
+     with nobody aboard who could put it back together. The rest of the rack
+     is the same rule for the same reason. */
+  if(u.requiresCrew && !state.crew?.[u.requiresCrew]){
+    const role = (TEXT.crew?.roles ?? []).find(r => r.id === u.requiresCrew)?.name ?? u.requiresCrew;
+    return { ok: false, reason: `That is work for ${aOrAn(role)}, and the berth is empty.` };
+  }
+  if(u.requiresUpgrade && !ownsUpgrade(state, upgradeById(u.requiresUpgrade))){
+    return { ok: false, reason: `Needs ${upgradeById(u.requiresUpgrade).name.toLowerCase()} first.` };
+  }
   if(u.minRep && (state.rep[u.minRep.species] ?? 0) < u.minRep.value) return { ok: false, reason: `${SPECIES[u.minRep.species].plural} do not know you well enough yet.` };
   const price = Math.round(u.price * (1 - repDiscount(state, PORTS[port].species)));
   if(state.money < price) return { ok: false, reason: 'Not enough coin.', price };
@@ -2141,9 +2201,9 @@ export function grantUpgrade(state, u){
 
 /* --------------------------------------------------------------- tolls */
 
-/* The Scatter: crossing into the belt in the Lamp's frame, without a stealth
- * system, brings a cat captain alongside. Once per crossing, and never twice
- * inside a month: the oath is a toll, not a tax. */
+/* The Scatter: crossing into the belt in the Lamp's frame brings a cat
+ * captain alongside. Once per crossing, and never twice inside a month: the
+ * oath is a toll, not a tax. */
 function tollCheck(state, events){
   const inLamp = state.ship.body === 'lamp';
   const r = inLamp ? norm(state.ship.r) : norm(shipAbsPos(state));
@@ -2153,11 +2213,6 @@ function tollCheck(state, events){
   if(!inBelt || was || !inLamp) return;
   if(state.t - state.toll.lastT < FORMULAS.toll.cooldownDays) return;
   state.toll.lastT = state.t;
-  if(state.keys.stealth){
-    logLine(state, 'story', TEXT.events.tollStealth);
-    events.push({ kind: 'story', name: 'tollStealth', text: TEXT.events.tollStealth });
-    return;
-  }
   const f = FORMULAS.toll;
   const value = cargoValue(state);
   const variant = TEXT.events.tollOffer[Math.floor(rnd(state) * TEXT.events.tollOffer.length)];
@@ -2404,7 +2459,7 @@ export function restore(json){
   const s = typeof json === 'string' ? JSON.parse(json) : json;
   const bad = why => { throw new Error(`Not a save this game understands: ${why}.`); };
   if(!s || typeof s !== 'object') bad('it is not an object');
-  if(s.version !== 5) bad(`it is version ${s.version}, and this sky is version 5`);
+  if(s.version !== 6) bad(`it is version ${s.version}, and this sky is version 6`);
   if(!s.ship || typeof s.ship !== 'object') bad('it has no ship');
   if(!world.get(s.ship.body)) bad(`its ship is at "${s.ship.body}", which is nowhere`);
   for(const k of ['r', 'v']){
@@ -2419,7 +2474,7 @@ export function restore(json){
     || (n.prograde != null && !Number.isFinite(n.prograde))
     || (n.radial != null && !Number.isFinite(n.radial)))) bad('its plan is not a list of marks');
   if(!Array.isArray(s.cargo) || s.cargo.some(c => !c || !goodById(c.good) || !Number.isFinite(c.qty))) bad('its hold holds something unknown');
-  if(!s.tiers || ['tank', 'engine', 'hold'].some(k => !tiers(k)[s.tiers[k]])) bad('it is fitted with something this game does not have');
+  if(!s.tiers || ['tank', 'hold'].some(k => !tiers(k)[s.tiers[k]])) bad('it is fitted with something this game does not have');
   // Everything below is either filled in or safely absent.
   s.keys ??= {}; s.markets ??= {}; s.log ??= [];
   s.rep = { emberkin: 0, otter: 0, cat: 0, frog: 0, ...(s.rep ?? {}) };
@@ -2463,4 +2518,4 @@ export function approachTo(state, prediction, targetId){
 }
 
 export { elementsFromState, propagate, absState, railState, predict, norm, sub, add, scale, unit, perp, dist, hohmann };
-export { wantsGood, lovesGood, REGION_OF };
+export { wantsGood, lovesGood, REGION_OF, FORMULAS };

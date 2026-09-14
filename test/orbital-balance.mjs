@@ -61,15 +61,16 @@ function slowRoad(state, from, to){
 }
 
 /* The best single cargo a player could buy here and sell there, at today's
- * prices, per unit of hold. Ignores freshness decay in transit, which makes it
- * a slightly optimistic reading — deliberately, since that is the bound. */
+ * prices, per unit of hold. Nothing spoils on the way any more, so what it is
+ * worth on arrival is what it is worth on the dock — give or take the day's
+ * haggle roll at an otter port. */
 function bestRun(state, from){
   const room = S.freeUnits(state);
   let best = null;
   for(const to of reachable(state, from)){
     for(const row of PORTS[from].sells){
       const g = S.goodById(row.good);
-      if(g.needsRefrigeration && !state.keys.refrigeration) continue;
+      if(g.needsTempControl && !state.keys.tempControl) continue;
       const buy = S.buyPrice(state, from, g.id);
       const sell = S.sellPrice(state, to, g.id);
       const stock = S.stockAvailable(state, from, g.id);
@@ -82,13 +83,7 @@ function bestRun(state, from){
          cannot reach is not a destination. */
       const road = slowRoad(state, from, to);
       if(road.dv > S.kms(state.dv) * 0.7) continue;
-      /* What it will be worth when it gets there, not what it is worth on the
-         dock: a crate of Bramble fruit sold at the far end of a sixty-day
-         crossing is a crate of compost, and the freshness bar says so before
-         you buy it. */
-      const keeps = S.freshness(g, road.days);
-      const landed = (sell * keeps - buy) * qty;
-      if(landed <= 0) continue;
+      const landed = gain;
       const perDay = landed / road.days;
       if(!best || perDay > best.perDay) best = { to, good: g.id, qty, gain: landed, perDay, days: road.days, dv: road.dv, buy, sell };
     }
@@ -124,6 +119,19 @@ function fly(state, to, budgetDays){
 }
 
 const state = S.newGame(SEED);
+/* A new ship is in orbit over Tassel, not tied up at it — the game has no
+   landing and never starts at a mooring. This probe is about the price list
+   rather than about flying, so it tows itself to the first dock rather than
+   opening with a rendezvous: undock() puts the ship back in the harbour it
+   just left, so one line here is the whole of it. Without it the loop below
+   read `state.dockedAt` as null on its first pass and stopped before it
+   started, which is why this file has been reporting nought runs.  */
+state.dockedAt = CONST.START_PORT;
+/* And with the opening errand behind it. A new purse is twelve cowries, which
+   is one moon pebble and nothing else — the tutorial is what turns that into a
+   working float, and a probe that starts before it has no trade to measure and
+   waits at the dock for two years. */
+state.money += S.questById('pebble')?.pay ?? 0;
 const log = [];
 let laps = 0, tows0 = 0;
 const firsts = {};
@@ -138,7 +146,7 @@ while(state.t < DAYS && laps < 400){
     S.refuel(state, Math.min(S.kms(state.tank - state.dv), Math.max(4, (state.money * 0.35) / fp)));
   }
   // Buy what a bigger ship would want, when it is affordable.
-  for(const kind of ['hold', 'tank', 'engine']){
+  for(const kind of ['hold', 'tank']){
     const next = S.tiers(kind)[state.tiers[kind] + 1];
     if(next && next.soldAt?.includes(from) && state.money > next.price * 1.8){
       S.buyUpgrade(state, next.id);
@@ -200,7 +208,7 @@ console.log(`  profit per day        median ${fmt(median)}, best ${fmt(top)}  ${
 console.log(`  fuel burned           ${S.fmtKms(state.stats.dvSpent)} over ${state.stats.burns} burns`);
 console.log(`  tows                  ${state.stats.tows}`);
 console.log(`  ports visited         ${state.visited.length} of ${Object.keys(PORTS).length}: ${state.visited.map(S.portName).join(', ')}`);
-console.log(`  fitted                ${['tank', 'engine', 'hold'].map(k => `${k} ${state.tiers[k]}`).join(', ')}; keys: ${Object.entries(state.keys).filter(([, v]) => v).map(([k]) => k).join(', ') || 'none'}`);
+console.log(`  fitted                ${['tank', 'hold'].map(k => `${k} ${state.tiers[k]}`).join(', ')}; keys: ${Object.entries(state.keys).filter(([, v]) => v).map(([k]) => k).join(', ') || 'none'}`);
 console.log('\n  first time...');
 for(const [what, at] of Object.entries(firsts)) console.log(`    ${what.padEnd(22)} ${S.calendar(at.t).text}`);
 const unseen = Object.keys(PORTS).filter(p => !state.visited.includes(p));

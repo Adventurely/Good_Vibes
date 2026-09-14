@@ -13,7 +13,7 @@
   {
    "term": "forward, back, out, in",
    "plain": "prograde, retrograde, radial",
-   "tip": "The four ways to push. Forward and back are along the way you are already going, and move the far end of your path. Out and in shove it sideways, turning the path without much changing its size."
+   "tip": "The four ways to push. Forward and back are along the way you are already going, and move the far end of your path. Out and in are square across it: they turn the path without adding anything to your speed along it."
   },
   {
    "term": "a transfer",
@@ -43,7 +43,7 @@
   {
    "term": "docking range",
    "plain": "docking zone",
-   "tip": "Get into a steady orbit whose high point is inside this and a port will take your lines. Generous, on purpose."
+   "tip": "Get into a steady orbit whose high point is inside this and you can dock. Generous, on purpose."
   }
  ],
  "ports": {
@@ -393,7 +393,6 @@
   ],
   "tollPaidCoin": "You hand over {amount}. {captain} counts it once, calls it fair, and tells you where the rocks are thin this year.",
   "tollPaidCargo": "They take {cargo} and leave the rest lashed down properly, which was not required of them. {captain} salutes on the way out.",
-  "tollStealth": "Something aboard swallows your wake, and the Belt lets you through without a hail. It feels like cheating, because it is.",
   "tollGiftLater": "A crate arrives at the dock with no sender and no note, worth {amount}. A cat captain, somewhere, is telling this story better than you could.",
   "tollWaved": "{captain} looks over an empty hold, laughs, and waves you through with something close to sympathy.",
   "towDry": [
@@ -548,7 +547,7 @@
      "qty": 1
     }
    ],
-   "pay": 420,
+   "pay": 630,
    "rep": "otter",
    "blurb": "Nellie's birthday is coming and Theo has left it late, as Theo does. There is a beach on Slate — the only one — and the pebbles off it are worth going for. He has put what he has in your purse. It is enough for one.",
    "steps": [
@@ -561,7 +560,7 @@
      "text": "Bring it home to Tassel"
     }
    ],
-   "done": "Nellie turns the pebble over twice, says nothing, and puts it in her pocket. Theo settles up, and looks like a man who has got away with something."
+   "done": "Nellie takes one look and shrieks. She holds it up to the light, and announces she is wearing it as a necklace to the Full Moons Festival, and tells three more people so before you have got your coat off. Theo settles up, looking pleased."
   },
   {
    "id": "tasteofhome",
@@ -576,7 +575,7 @@
      "qty": 4
     }
    ],
-   "pay": 180,
+   "pay": 270,
    "rep": "otter",
    "blurb": "Four jars of moonfish oil for a farm on Moss that has not smelled the sea in two generations. Wren has already had them carried aboard; she says they will not ask what it cost and you are not to tell them.",
    "done": "They open one jar on the step and stand there with it. Nobody says anything for a while, which on Moss is a compliment."
@@ -594,7 +593,7 @@
      "qty": 6
     }
    ],
-   "pay": 320,
+   "pay": 510,
    "rep": "otter",
    "blurb": "The Tassel rafts are short of cut herbs and the physician is short of patience. Moss has them by the bundle. Buy six and get them back before they are hay.",
    "done": "She checks one bundle, smells it, and looks at you with something like respect. The rest goes straight into the dispensary."
@@ -607,7 +606,7 @@
    "from": "tassel",
    "to": "slate",
    "goods": [],
-   "pay": 150,
+   "pay": 230,
    "rep": "otter",
    "blurb": "A sealed note for the yard foreman on Slate. Theo will not say what is in it and has gone slightly pink about the ears. It weighs nothing and it is not to be opened.",
    "done": "The foreman reads it twice, laughs once, and writes something on the back. She does not offer to show you."
@@ -625,7 +624,7 @@
      "qty": 4
     }
    ],
-   "pay": 600,
+   "pay": 900,
    "rep": "emberkin",
    "blurb": "Four crates of ore for the engine smiths, loaded before you agreed to it. It is heavy and it is dull and the Emberkin are waiting on it, which is the whole job.",
    "done": "A smith signs for it without looking up, then looks up, then asks where you learned to fly an approach like that."
@@ -643,7 +642,7 @@
      "qty": 3
     }
    ],
-   "pay": 700,
+   "pay": 1050,
    "rep": "emberkin",
    "crew": "engineer",
    "blurb": "Three crates of spare parts for the Slate yards, and Brikka wants to ride along and see them fitted. She has been at the Ninth Forge eleven years and has run out of things there she has not already taken apart.",
@@ -657,7 +656,7 @@
    "from": "cinder",
    "to": "scorch",
    "goods": [],
-   "pay": 200,
+   "pay": 300,
    "rep": "emberkin",
    "blurb": "A sealed note for somebody on Scorch, from a smith who will not say who they are to her. She has written the name in a hand that took a long time. It weighs nothing, and she would like it to go quickly.",
    "done": "The woman on the dock reads it standing up, puts it inside her coat, and asks you to say that she is well. She is not well, and you both know you will say it anyway."
@@ -675,7 +674,7 @@
      "qty": 3
     }
    ],
-   "pay": 1300,
+   "pay": 2250,
    "rep": "emberkin",
    "blurb": "Three fire crystals, cut cold on Scorch, wanted on Veyra before the month turns. The agent does not say which house wants them and looks faintly pained when you ask.",
    "done": "The three go under a lamp and hold the light for a long moment. The agent settles up without haggling, which on Veyra is nearly a compliment."
@@ -701,7 +700,7 @@
      "qty": 1
     }
    ],
-   "pay": 2400,
+   "pay": 3600,
    "rep": "emberkin",
    "blurb": "A list, not a cargo: one string of Tassel pearls, one coral carving, one precision clock. House Ahl wants all three on the table at once and does not care where you get them. The clock is made on Veyra, which they appear to find funny.",
    "done": "The three go on a velvet board in that order and a steward writes the sum out longhand. You are not told what it is for."
@@ -714,7 +713,7 @@
    "from": "veyra",
    "to": "cinder",
    "goods": [],
-   "pay": 400,
+   "pay": 600,
    "rep": "emberkin",
    "blurb": "Confidential, the steward says, twice. It goes to a name on Cinder and into that person's hand and nobody else's. You are being paid for the part where you do not ask.",
    "done": "The hand it goes into belongs to somebody who was clearly expecting it and clearly hoping not to get it. Nobody explains anything. The money is already arranged."
@@ -732,7 +731,7 @@
      "qty": 2
     }
    ],
-   "pay": 1200,
+   "pay": 3400,
    "rep": "cat",
    "blurb": "Two reactor coils for the cats at Nail, crated and aboard before the paperwork was finished. The Forge would like it known that these are a favour and not a precedent.",
    "done": "Half the rock comes out to watch the crates open. Somebody says a word in cat that Ashgrin declines to translate, and you are bought drinks for the rest of the evening."
@@ -750,7 +749,7 @@
      "qty": 2
     }
    ],
-   "pay": 650,
+   "pay": 1050,
    "rep": "cat",
    "blurb": "Two sets of salvaged sensors off Nail, for a client on Veyra who wants to see further than they are supposed to. Buy them honestly. The agent is very keen that you buy them honestly.",
    "done": "They are unpacked, powered up, and pointed at something outside. Whatever the client sees, they do not mention it, and you are paid on the spot."
@@ -768,7 +767,7 @@
     "arc"
    ],
    "goods": [],
-   "pay": 900,
+   "pay": 1350,
    "rep": "cat",
    "crew": "navigator",
    "blurb": "Ashgrin wants you to go and be seen. Nail, then Whisker, then the Arc, in that order, and come back and tell her who was where. She will not say why, and it is rude to ask a cat twice.",
@@ -787,7 +786,7 @@
      "qty": 4
     }
    ],
-   "pay": 1400,
+   "pay": 2100,
    "rep": "frog",
    "blurb": "Four cases of medicine that came through Whisker and did not come with paperwork. Ashgrin wants them on Brine, cold, and soon. The apothecaries there will know exactly what they are and will not say so.",
    "done": "A frog with very old hands checks each case, says nothing about where it came from, and gives you a jar of something for the journey home."
@@ -805,7 +804,7 @@
      "qty": 2
     }
    ],
-   "pay": 850,
+   "pay": 1350,
    "rep": "emberkin",
    "blurb": "Two pieces of brine amber, the kind with something inside that is not quite a leaf. Veyra has a collector and the collector has an opinion about which two.",
    "done": "The collector turns each piece for a long time without speaking. Then they thank you, precisely, and you are shown out of a room you were never really in."
@@ -818,7 +817,7 @@
    "from": "brine",
    "to": "glass",
    "goods": [],
-   "pay": 350,
+   "pay": 530,
    "rep": "frog",
    "blurb": "A question for the scholars under the ice on Glass. It is one sentence long and the apothecary has been working on it for eleven years. She would like an answer, eventually, and is in no hurry.",
    "done": "A scholar reads it, sits down, and reads it again. She says the answer will take some time. She seems delighted about that."
@@ -844,7 +843,7 @@
      "qty": 1
     }
    ],
-   "pay": 3200,
+   "pay": 4800,
    "rep": "frog",
    "crew": "appraiser",
    "blurb": "Wicket would like to look at three things at once: a piece of the Arc off Nail, a storm crystal fished out of Grumm's cloud tops, and one of Cinder's reactor coils. She is not buying them. She wants them on the same table under the same lamp, and she has wanted that for some while.",

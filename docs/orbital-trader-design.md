@@ -44,7 +44,9 @@ Because the ship follows a single conic inside each SOI, trajectories can be sol
 
 **Tap your road.** One gesture on the drawn path is the only way in. It offers two things at that moment — write a burn down here, or run the clock to here — and says how far off the moment is either way.
 
-**Two axes, four buttons.** A burn is set with **Forward**, **Back**, **Out** and **In**: prograde and retrograde along the way you are already going, radial out and in across it. Each is one large button with an arrow and a word. There is no typing, no unit to choose, no handle to drag to the right number, and no third axis to discover.
+**Two axes, four buttons.** A burn is set with **Forward**, **Back**, **Out** and **In**: prograde and retrograde along the way you are already going, and out and in across it. Each is one large button with an arrow and a word. There is no typing, no unit to choose, no handle to drag to the right number, and no third axis to discover.
+
+**The two axes are at right angles**, which is to say out and in are perpendicular to the way you are going rather than along the line from the world — the maneuver-node frame, not true radial. They coincide on a circle and part company everywhere else, and the difference is not academic: on a working eccentric orbit a press of **Out** used to put an eighth of itself into going *faster*, so a button sold as turning the path quietly resized it. Three things follow from squaring them up. Out and in add nothing along the way you are going. The two numbers on a mark's card add up as a triangle, so what the card shows is what the tank is charged. And a ship falling dead straight at a world — where the old axes lay on top of each other and no pair of numbers could express a push across the line — can now be given the one mark that saves it, since braking a radial fall does not lift it and only crossing the line does.
 
 **One press is one step, sized to the orbit.** A press is a fixed fraction (0.5%) of how fast the ship is actually going at the mark, rounded to a number a person would say out loud. The same press is a small change whether you are creeping round a moon at 200 m/s or falling past the Lamp at 30 km/s. Holding a button repeats, and then hurries.
 
@@ -68,15 +70,15 @@ Burns are **instantaneous impulses**. What you plan is exactly what you get, whi
 
 **How wide a harbour mouth is, is not a design number.** Like a world's reach, it comes out of the world:
 
-> `r_dock = 10 × radius + (atmosphere height)`
+> `r_dock = (top of the air) + 5 × radius`
 
-Ten times the ground, plus however much air stands over it. A big world earns a big harbour and a pebble earns a small one, so widening a world widens its approach and no table can quietly disagree with the sky it is describing. Grumm's approach is enormous because Grumm is enormous and carries sixty thousand kilometres of cloud on top of that, not because somebody typed a number.
+Five of the world's own radii above its weather — above the ground, on a world with no air worth the name. A big world earns a big harbour and a pebble earns a small one, so widening a world widens its approach and no table can quietly disagree with the sky it is describing. Grumm's approach is enormous because Grumm is enormous and carries fourteen hundred kilometres of cloud on top of that, not because somebody typed a number.
 
-Two consequences are worth stating plainly, because the formula means different things at different sizes. On a planet the mouth is a small target — Grumm's is 2% of its sphere of influence and Cinder's 4%, so arriving in a planet's gravity and tying up at it are two separate pieces of flying. On a small moon it is most of the well — Glass's mouth is 90% of Glass's reach, Brine's 79%, Slate's 64% — so crossing into a little moon's gravity is very nearly arriving. That is the shape ten radii has: it scales with the ground, and a moon's reach does not.
+Two consequences are worth stating plainly, because the formula means different things at different sizes. On a planet the mouth is a small target — Grumm's is 1% of its sphere of influence and Cinder's 2%, so arriving in a planet's gravity and tying up at it are two separate pieces of flying. On a small moon it is a good part of the well — Glass's mouth is 54% of Glass's reach, Brine's 47%, Slate's 39% — so crossing into a little moon's gravity is most of the way to arriving. That is the shape five radii has: it scales with the ground, and a moon's reach does not.
 
 On the chart the mouth is a dashed ring with **a small anchor hung at the top of it**, green where they will take your lines and amber where they will not yet. The anchor is there because a dashed circle round a world is the same shape as three other things the chart draws — a sphere of influence, an atmosphere, a hollow rock — and this is the only one you can tie up inside.
 
-The **drifting havens keep their authored mouths.** Nail, Whisker and the Maw have no surface to be ten times of and no air over it; their radius is a dot on a chart rather than a ground. A pilot arrives at those by matching speeds, and the size of that rendezvous is a design choice with nothing physical to derive it from.
+The **drifting havens keep their authored mouths.** Nail, Whisker and the Maw have no surface to stand five radii off and no air over it; their radius is a dot on a chart rather than a ground. A pilot arrives at those by matching speeds, and the size of that rendezvous is a design choice with nothing physical to derive it from.
 
 This is a scope decision as much as a fictional one. Landing would need a second control scheme, a second set of physics, and a second art problem, and it would buy nothing the orbital game does not already have. The fiction absorbs it easily: Tassel is an ocean of floating harbour cities that meet ships in orbit, the cats cannot survive a heavy world at all, and the frogs' balloon villages have no ground under them either.
 
@@ -132,7 +134,7 @@ Moons kept their distance from their planets, Scorch included: it had to move in
 | **Veyra** | 0.1 au | 18.5 km/s | 31 d | 24 d | 20 d |
 | **Cinder** | 0.2 au | 6.5 km/s | 43 d | 104 d | 56 d |
 
-**The sky is built at KSP's scale.** Every body is a tenth of the size a real one would be and many times denser, which is the trick that makes a world a place rather than a backdrop: Tassel is 498 km across, has 9.25 m/s² at the ground, air to 70 km, and a reach of 116,500 km — a Kerbin. A new game opens at 75 km, five above the air, on an orbit that takes thirty minutes of game time. Local flying is correspondingly cheap: the first lesson is a quarter of a km/s. Interplanetary flying is *not*, because a small world gives almost no gravity assist on departure or arrival, and that trade is deliberate.
+**The sky is built at KSP's scale.** Every body is a tenth of the size a real one would be and many times denser, which is the trick that makes a world a place rather than a backdrop: Tassel is 498 km across, has 9.25 m/s² at the ground, air to 70 km, and a reach of 116,500 km — a Kerbin. A new game opens at 100 km, thirty above the air, on an orbit that takes thirty-two minutes of game time. Local flying is correspondingly cheap: the first lesson is a quarter of a km/s. Interplanetary flying is *not*, because a small world gives almost no gravity assist on departure or arrival, and that trade is deliberate.
 
 **The clock is slow on purpose.** At ×1, one lap of that opening orbit takes **ten real minutes**. That is the fastest thing in the sky and everything else is slower still, so at ×1 almost nothing else appears to move. That is the intended reading: an orbit is a place you are, not an animation you watch. Watching the sky turn is what skipping is for.
 
@@ -221,10 +223,10 @@ Trade is built around one central tension: **time versus fuel.**
 
 | Cargo type | Examples | Behavior |
 |---|---|---|
-| Bulk | Iron ore, refined steel, cryo fuel | Cheap, durable, low margin. The slow road is fine. |
+| Bulk | Iron ore, refined steel, cryo fuel | Cheap, durable, low margin. Three units of hold a crate, so a hold runs out long before a shelf does. |
 | Craft | Engine parts, tide glass, prayer lanterns | The working middle of the price list. |
-| Perishables | Riverfish, medicinal herbs and gel | Value decays in transit. Rewards fast routes. |
-| Climate-sensitive | Riverfish, medicinal gel, smuggled medicine | Require refrigeration (a gate-key upgrade). |
+| Fresh | Riverfish, medicinal herbs and gel | Organic, and priced as fashion is: they move with a market's mood. They no longer rot — see below. |
+| Climate-sensitive | Riverfish, fire crystals, ancient cider, ice lenses, medicinal gel, smuggled medicine | Require temperature control (a gate-key upgrade), and **pay ×1.5** for it. Not all of them are cold: fire crystals are a thing you keep *steady*. |
 | Luxuries | Ember silk, frog tea, frogwood instruments | High value, and the things a people loves. |
 | Contraband | Stolen arms, forged medals, cybernetics | Whisker's whole shelf. |
 | Relics | Arc fragments, reactor coils, storm crystals | Rare, often tied to story and upgrades. |
@@ -236,39 +238,131 @@ sells what its port produces and buys what the goods table says it wants; no
 port carries a hand-written price list. Loving a thing is wanting it: a people
 who love a good are on its buyer list whether or not the table says so twice.
 
-**Prices are a region rule and a love rule.** The sky is five regions — inner,
-home, belt, outer, deep — and a good is worth what it costs at the stall in its
-own region and **×1.6 anywhere else**. A port that loves it pays **×2.2** on top.
-So the trade is: buy at the source, carry it out of its region, and sell it to
-the people who care. Tide glass bought on Tassel for 60 sells on Brine, who love
-it and live most of the system away, for over 200.
+**What a port pays is a table with four corners.** Two questions — does this
+port want it, and is it out of the good's own region — and the answer is the
+multiple of base price they pay:
+
+| | same system | another region |
+|---|---|---|
+| **loves it** | ×2.5 | **×5.5** |
+| **wants it** | ×1.5 | ×2.5 |
+| neither | ×0.6 | ×0.6 |
+
+Space is hard and there are few merchants who cross between peoples, so
+**carrying a loved good to another people is the trade the game is about**, and
+the same run inside one system is worth a fraction of it. A good nobody named
+goes at a loss to whoever will take it, and a stall never buys back what it is
+selling two feet away — a producer pays the ×0.6, capped at three quarters of
+its own asking price, or the dock would be a money pump.
+
+It used to be a region multiplier times a love multiplier, which could not hit
+all four corners at once: making the in-system numbers right dragged the
+cross-region ones down with them. A table has no such trouble, and it can be
+told to a player in one sentence.
+
+**Temperature control pays ×1.5 on top**, so a loved cold good carried across
+regions runs about ×8 what it cost. That is the best cargo in the game and it
+sits behind an Engineer and a 2,800-cowrie box (§2.8), which is the point.
 
 **Shelves are what a merchant keeps, not what a factory makes.** Every good has
-a stock range, a stall's shelf is rolled inside it, and the shelf is rolled
-again when you come back from somewhere else. Waiting at a dock does nothing;
-trading elsewhere is the restock. A picked-over shelf also costs more, so buying
-a stall out is never free.
+a stock range, a stall's shelf is rolled inside it and scaled by the port's
+`marketSize` — Tassel is the capital and keeps twice the table, Croak is a
+hamlet and keeps a third — and the shelf is rolled again when you come back
+from somewhere else. Waiting at a dock does nothing; trading elsewhere is the
+restock. **The shelf is the only limit on how much you can move at once**, and
+it is limit enough: the price does not rise as you empty it.
 
-**Market saturation** still applies on the selling side: landing the same good
-in the same market repeatedly walks the price down, and the market forgets over
-about three weeks, which is what stops one loop being the whole game.
+**There is no supply and demand.** A stall's prices do not remember what you
+sold it last month and do not move as its shelf empties. Both rules existed to
+stop one loop being the whole game, and the stock limit does that better and
+without asking a player to model a market they cannot see. What is left that
+moves a price is species character, not economics: Emberkin markets wobble
+±15% on a slow wave per good, otter ports roll ±7% per good per day, frogs and
+cats do neither.
+
+**Nothing spoils.** Goods used to lose value in transit, down to a tenth. It
+made the six organic goods regional by force — Cinder is ninety-four days from
+Tassel and nothing with a shelf life survives the crossing — and it did it
+without warning anybody, because a freshness bar only appeared once the cargo
+was already aboard. Time and hold room are still what limit a run. A crate is
+no longer one of them.
+
+**What the table says, and who can read it.** Every good carries a *nature*
+line — what the thing physically is, and never who wants it. Pressure-resistant
+glass that glows in the dark. Stone that is heavy, permanent, and the only
+thing a terrace will stand on. Metal still warm a year out of the ground. It is
+on hover and behind the "i" beside every good's name, on the shelf and in the
+hold alike, and it is free to everyone, because it is written on the crate.
+
+The rest is the appraiser's (§7.2). Until Wicket is aboard, a port's **They
+love** and **They want** lists are two lists of names with no prices on them,
+and no good will tell you which of a people's moons is the one that loves it.
+A captain closes that gap by carrying some and finding out. Wicket closes it by
+looking: prices appear on the lists, and every good's "i" gains *loved by* and
+*wanted by* in the same words the table uses — sometimes a port, sometimes a
+whole people. She is a shortcut through reasoning that was always possible,
+which is the only kind of knowledge worth selling a journey for.
+
+**Jobs are priced against this table**, not against a number somebody liked:
+fetching work pays more than selling the same goods on the open market at the
+same destination would, and a test holds that line as prices move (§5.1.1).
 
 Money is treated as a **key** (to upgrades, access, and relationships) rather than a scoreboard.
 
 ### 2.8 Upgrades
 
-Upgrades fall into two categories.
+**Built, and this is the whole rack.** Two categories, as before.
 
-**Soft gates** raise the ceiling of what's comfortably reachable. These include larger fuel tanks, more efficient engines, and larger cargo holds. Skilled play can bypass them.
+**Soft gates** raise the ceiling of what is comfortably reachable: the fuel
+tank and the cargo hold. Three buyable sizes each, over the stock fitting the
+ship arrives with — four rungs in all, and the stock one is on no rack
+anywhere, because you own it before you have been anywhere.
 
-**Gate keys** unlock new techniques, cargo, or places. Each one gives experimenters a new toy rather than removing challenge.
+| | Stock | 1st | 2nd | 3rd |
+|---|---|---|---|---|
+| Tank | 14 km/s | Long-haul, 22 | Deep-sky, 30 | Deep-dark, 40 |
+| Hold | 24 units | Raft, 40 | Barge, 64 | Barn, 90 |
 
-| Upgrade | Unlocks | Likely source |
-|---|---|---|
-| Heat shield | Aerobraking at Grumm | Emberkin engine smiths, Cinder |
-| Refrigeration | Cold-chain cargo | Otter shipwrights, Slate |
-| Stealth system | Slipping past cat tolls in the Belt | A Builder dampener, fitted on Whisker |
-| Long-range sensors | Arc salvage sites, quiet Belt work | Cat salvagers, the Arc |
+They are **basics: fitted anywhere with a fuel pump**, which is every port but
+the Arc and the Maw, where nobody sells anything at all. The first size up is
+coin and nothing else. **The second and third want the Engineer aboard** — the
+berth quest #6 fills — on the rule that a dock hand will bolt a bigger tank on
+for anybody, and will not cut into a hull for a captain with nobody aboard who
+could put it back together. That is the first thing crew have ever done
+mechanically (§7.2).
+
+The tank ladder is the map: 22 is what opens Cinder, whose arrival is most of
+its bill; 40 is what makes the Maw a journey you come back from. The checker
+asserts both, and that each rung is larger than the one below it.
+
+**Gate keys** unlock techniques, cargo or places. Each names the bench it comes
+off, because where you buy a thing is half of what it is.
+
+| Upgrade | Bought at | Wants | Does |
+|---|---|---|---|
+| Temperature control | Cinder | Engineer | Carries the six goods that will not keep at hold temperature |
+| Gravitational sensors | Nail | — | *Nothing yet.* Will show gravitational phenomena on the chart |
+| Heat shielding | Cinder | Engineer | *Nothing yet.* Will allow risky aerobraking |
+| Cryo hull cooling | Cinder | Engineer, heat shielding | *Nothing yet.* Will make that aerobraking safe |
+
+**Three of the four are sold and wired to nothing.** That is deliberate and it
+is said out loud: each row on the rack carries "not fitted to anything yet",
+because selling a captain a box that does nothing without saying so is a
+swindle, and because the alternative — holding the upgrade back until the
+mechanic lands — means the mechanic arrives with no place to be bought.
+
+Aerobraking is the one that used to work. A shielded ship could skim Grumm's
+air and be captured by it, free. That is switched off: risky and safe skims are
+two different manoeuvres, neither is built, and until they are, the clouds are
+lethal to everybody. The arithmetic survives in `effectiveNodes`, which takes a
+`skim` flag so a test can still reach it rather than leaving it to rot behind a
+flag no caller can set.
+
+**What went.** Engine tiers are gone — fuel cost the same everywhere the moment
+they were removed, which is one fewer axis and one fewer thing to price. The
+Whisker dampener is gone with them, so there is nothing to hide behind in the
+Belt: the only let-off on a cat toll is the cooldown, and a captain is never
+asked twice inside a month.
 
 The guiding principle is that upgrades should **expand options, not erase challenge.**
 
@@ -290,7 +384,7 @@ The design leans on Self-Determination Theory, which holds that people stay enga
 
 ### 3.2 Guardrails
 
-**Avoid the overjustification trap.** Strong external rewards can smother intrinsic fun. If profit becomes the goal, players will grind the optimal loop even while bored. Market saturation, shifting alignments, and money-as-key all counter this.
+**Avoid the overjustification trap.** Strong external rewards can smother intrinsic fun. If profit becomes the goal, players will grind the optimal loop even while bored. Market saturation was the first answer to that and has been withdrawn (§2.7): it asked a player to model something they could not see, and the stall's own stock does the same job in plain sight. Shifting alignments and money-as-key still counter it, and what actually stops one loop being the whole game is that the loop is small — a shelf holds what it holds.
 
 **Losses sting roughly twice as hard as equal gains.** Use them sparingly, and make them recoverable and story-generating.
 
@@ -544,8 +638,9 @@ au to 2.0–2.5 so the Arc could ride just outside it.
 
 *(Every distance in this section is from before the sky was squeezed by three — see 2.6. Divide by three for where things actually are.)*
 
-**What moved with them.** The dampener used to be lying about at Hush and is
-now fitted, for money and no questions, on Whisker. The tow debt used to be
+**What moved with them.** The dampener used to be lying about at Hush, was
+fitted for money and no questions on Whisker, and is now off the rack
+altogether (§2.8). The tow debt used to be
 owed to Ledger and is now owed to the harbour bank on Tassel. Goods whose
 producer was dropped were re-sourced rather than deleted, so the price list is
 the length it always was.
@@ -714,7 +809,8 @@ settled, and the settlements are written into the quests.
   medicine, routed through Nail — the first quest that asks a player to do
   something the market would not. A delivery hands you the goods, so Nail
   never needed to stock them and Brine never needed to buy them. It is also
-  the one quest that needs a cold hold before anybody can hand it to you.
+  the one quest that needs temperature control before anybody can hand it to
+  you.
 
 Everything else lines up with the table as shipped: iron ore to Cinder, engine
 parts to Slate, fire crystals to Veyra (who love them), reactor coils to Nail
@@ -754,11 +850,30 @@ berth fills with a name, a species, a portrait and a line:
 | Appraiser | Wicket | Frogs | #19 Appraisal |
 
 `state.crew` carries a slot per berth, null until earned and then `{ role,
-from, joinedAt }` — who they are, which job brought them, and when. That is
-deliberately all of it: **a crew member does nothing yet.** No bonus, no
-discount, no change to flight. The berth is a record of a journey taken, and
-whatever crew eventually do can be added to the slot without touching how they
-arrive.
+from, joinedAt }` — who they are, which job brought them, and when.
+
+**Two of the three berths now do something**, and both do it the same way: a
+thing the world already contains is refused to a ship with nobody aboard who
+can reach it. No bonuses, no discounts, no numbers folded quietly into a burn.
+
+**The Engineer** gates the rack. The second and third size of tank and hold,
+and every gate key but the cat sensors, are refused while her berth is empty
+(§2.8).
+
+**The Appraiser** gates *knowing what a thing is worth*, which is a different
+claim from knowing what it is (§2.7). Every good carries a nature line —
+pressure-resistant, glows in the dark, warm a year out of the ground — readable
+by anybody, on hover or behind the "i" beside its name. That much is written on
+the crate. What no captain can see until Wicket is aboard is which of a
+people's four moons is the one that *loves* a thing rather than merely taking
+it, and what any of them would pay: a stall's wants are a list of names until
+she is there to put numbers on them. The reasoning is the game in the gap —
+glass that will not crack under pressure, and a world at the bottom of an
+ocean — and she is the shortcut, bought with a journey.
+
+The Navigator still does nothing. Two effects in, the pattern is clear enough
+to say what hers should be: something the sky already knows and a ship cannot
+read without her.
 
 The captain is drawn as an otter. §7.1 still has that down as a proposal, but
 the shipped fiction already leans that way — the game opens among otters, and
@@ -768,9 +883,12 @@ five portraits — captain, the three crew, and the empty chair — are 24×24
 character grids in `sprites.js` sharing one ink legend, drawn to a cached data
 URL by `portraitURL(id)`.
 
-What is still open is everything the berths are for: whether crew have
-mechanical effects or are purely narrative, whether anybody can be recruited
-outside the quest line, and whether three is the number.
+What is still open is most of what the berths are for: whether the other two
+get effects of their own, whether anybody can be recruited outside the quest
+line, and whether three is the number. Note what the Engineer's gate does to
+the line's ordering — quest #6 now sits in front of the whole upper rack, and
+in front of fire crystals at #8, so the errand that was a story beat is load
+bearing.
 
 Crew reacting to the player's burns is a desired feature, working as characterization, soft tutorial, and feedback on skill. Early flavor notes per species: Emberkin crew cheer big burns and complain through long coasts. Otter crew are chatty, point out sights, and grow anxious when the radio goes quiet. Cat crew love tight slingshots, mock safe routes, and are secretly terrified of landing. Frog crew hum during coasts, dislike high-g burns, and never complain about the slow road.
 

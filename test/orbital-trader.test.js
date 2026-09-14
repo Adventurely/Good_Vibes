@@ -9,7 +9,7 @@ import {
 } from '../public/orbital-trader/content.js';
 import * as S from '../public/orbital-trader/sim.js';
 import { createChart, railCrossings, railLead, locateOnPrediction, PALETTE } from '../public/orbital-trader/render.js';
-import { DURATION, BREACH, BEATS, beatAt, ascent, skyAt, ROCKET } from '../public/orbital-trader/intro.js';
+import { DURATION, BREACH, BEATS, CAPTION_AT, beatAt, ascent, skyAt, ROCKET } from '../public/orbital-trader/intro.js';
 
 /* Orbital Trader has no server: everything it knows is in public/ and is
  * imported here as the browser imports it. These tests are the gate that a
@@ -135,13 +135,17 @@ test('every body has what the kernel and the chart read', () => {
   for(const id of ['lamp', 'cinder', 'scorch', 'veyra', 'tassel', 'slate', 'moss', 'nail', 'whisker', 'arc', 'grumm', 'brine', 'glass', 'croak', 'haven', 'maw']){
     assert.ok(ids.has(id), `the design document's ${id} is in the sky`);
   }
-  /* The mouth is not authored: it is ten times the ground plus the air over
-     it, so that making a world bigger widens its harbour and no table can
-     quietly disagree. The drifting havens have no ground and keep theirs. */
+  /* The mouth is not authored: it is five of the world's own radii above the
+     top of its air, so that making a world bigger widens its harbour and no
+     table can quietly disagree. The drifting havens have no ground and keep
+     theirs. */
   for(const b of BODIES){
     if(!(b.mu > 0) || !(b.radius > 0)) continue;
-    const want = 10 * b.radius + Math.max(0, (b.atmo ?? b.radius) - b.radius);
-    assert.ok(Math.abs(b.zoneRadius - want) < 1e-15, `${b.id}: mouth is ${b.zoneRadius}, ten radii plus air is ${want}`);
+    const want = Math.max(b.radius, b.atmo ?? b.radius) + 5 * b.radius;
+    assert.ok(Math.abs(b.zoneRadius - want) < 1e-15, `${b.id}: mouth is ${b.zoneRadius}, five radii over the air is ${want}`);
+    // And every harbour is inside the mouth it belongs to, or a ship undocks
+    // outside its own docking range.
+    if(b.dockAlt) assert.ok(b.dockAlt < b.zoneRadius, `${b.id}: the harbour at ${b.dockAlt} is outside its own mouth ${b.zoneRadius}`);
   }
   for(const id of ['nail', 'whisker', 'maw']){
     assert.ok(world.get(id).zoneRadius >= 1e-3, `${id} is a rendezvous, not a world; its mouth stays the one it was given`);
@@ -225,29 +229,131 @@ test('every port is a body with a port, and every reference resolves', () => {
     const [lo, hi] = g.stock;
     assert.ok(Number.isInteger(lo) && Number.isInteger(hi) && lo >= 1 && hi >= lo, `${g.id}: stock range ${g.stock}`);
     assert.ok(['light', 'heavy'].includes(g.weight), `${g.id}: weight ${g.weight}`);
-    if(g.lifetimeDays != null) assert.ok(g.lifetimeDays > 0);
     // Somebody, somewhere, has to want it, or it is a crate that cannot be sold.
     assert.ok(Object.keys(PORTS).some(id => S.wantsGood(id, g.id)), `${g.id} has no buyer anywhere`);
   }
 });
 
-test('upgrades come in complete ladders with a starter at the bottom', () => {
-  for(const kind of ['tank', 'engine', 'hold']){
-    const ladder = S.tiers(kind);
-    assert.deepEqual(ladder.map(u => u.tier), [0, 1, 2], `${kind} ladder`);
-    for(const u of ladder){ assert.ok(Number.isFinite(u.value) && u.value > 0, `${u.id} has a value`); }
-    assert.ok(ladder[2].value !== ladder[0].value, `${kind}: the top tier differs from the starter`);
+test("every good says what it is, without saying who wants it", () => {
+  /* The appraiser's berth is built on this line. A player without Wicket has
+     the thing in front of them and what it is made of, and has to reason from
+     pressure-resistant glass to the world at the bottom of an ocean; she is
+     the one who can simply say. A nature line that named a buyer would hand
+     over the answer and there would be nothing for her to know.
+
+     Checked against the peoples and the ports whose names are not also
+     ordinary words. Glass, Nail, Moss, Brine and the Arc are all things as
+     well as places, so "black glass off the flows" cannot be told from the
+     moon by a regular expression — those are on the writer. */
+  const peoples = ['otter', 'cat', 'frog', 'emberkin', 'builder'];
+  const namedPorts = ['Tassel', 'Slate', 'Cinder', 'Scorch', 'Veyra', 'Whisker', 'Grumm', 'Croak', 'Haven', 'Maw'];
+  for(const g of GOODS){
+    assert.ok(g.nature && g.nature.length > 20, `${g.id} has no nature line`);
+    assert.match(g.nature, /[.!?]$/, `${g.id}: the nature line does not finish its sentence`);
+    for(const who of peoples){
+      assert.ok(!new RegExp(`\\b${who}s?\\b`, 'i').test(g.nature), `${g.id} names the ${who}s: "${g.nature}"`);
+    }
+    for(const port of namedPorts){
+      assert.ok(!new RegExp(`\\b${port}\\b`).test(g.nature), `${g.id} names ${port}: "${g.nature}"`);
+    }
   }
-  for(const key of ['heatShield', 'refrigeration', 'sensors', 'stealth']) assert.ok(UPGRADES.some(u => u.key === key), `a ${key} upgrade exists`);
+});
+
+test('who loves a thing and who merely wants it are two lists, and nobody is on both', () => {
+  /* What Wicket knows, in the words the goods table uses: sometimes a port,
+     sometimes a whole people. The second list is the first taken out of the
+     buyer list — by the ports each word *means*, not by the word itself.
+     Cider is loved by the otters and its buyer list also names Tassel, which
+     is an otter port: saying Tassel merely wants it would be wrong. */
+  assert.equal(S.lovedByWords('tideglass'), 'Brine');
+  assert.equal(S.wantedByWords('tideglass'), 'the frogs');
+  assert.equal(S.lovedByWords('cider'), 'the otters');
+  assert.ok(!/Tassel/.test(S.wantedByWords('cider')), `Tassel loves cider and is listed as merely wanting it: ${S.wantedByWords('cider')}`);
+  assert.equal(S.lovedByWords('ironore'), '', 'nobody loves iron ore, and the line should be empty rather than awkward');
+  assert.ok(S.wantedByWords('ironore').length > 0);
+  for(const g of GOODS){
+    const loved = S.lovedByWords(g.id), wanted = S.wantedByWords(g.id);
+    for(const word of wanted.split(/,| and /).map(w => w.trim()).filter(Boolean)){
+      assert.ok(!loved.split(/,| and /).map(w => w.trim()).includes(word), `${g.id}: ${word} is on both lists`);
+    }
+  }
+});
+
+test('the appraisal is the appraiser\'s, and the menu says so until she is aboard', () => {
+  /* A page check, because the trading menu lives in the page. Two things turn
+     on the berth and both have to keep turning on it: what a stall would pay
+     for the goods it wants, and which of a people's ports is the one that
+     loves a thing. What a thing *is* turns on nothing — that is written on the
+     crate and anybody can read it. */
+  const html = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.match(html, /const priced = !!state\.crew\?\.appraiser/, 'the bottom lists no longer price on the berth');
+  assert.match(html, /priced \? ` <span class="\$\{cls\}">\$\{S\.fmtMoney\(r\.price\)\}/, 'the prices are not behind `priced`');
+  const appraisal = html.match(/function showAppraisal\(gid\)\{([\s\S]*?)\n\}/);
+  assert.ok(appraisal, 'the appraisal popup is gone');
+  assert.match(appraisal[1], /state\.crew\?\.appraiser/, 'the appraisal does not check the berth');
+  assert.match(appraisal[1], /g\.nature/, 'the appraisal does not say what the thing is');
+  // And the nature is offered on hover as well as on a press.
+  assert.match(html, /title="\$\{esc\(g\.nature \?\? ''\)\}"/, 'the "i" has no hover text');
+});
+
+test('upgrades come in complete ladders with a stock fitting at the bottom', () => {
+  /* Three buyable sizes each, over the one the ship came with. The stock
+     fitting is tier 0 and is on no rack anywhere: you own it before you have
+     been anywhere, so there is nothing to sell you. */
+  for(const kind of ['tank', 'hold']){
+    const ladder = S.tiers(kind);
+    assert.deepEqual(ladder.map(u => u.tier), [0, 1, 2, 3], `${kind} ladder`);
+    for(const u of ladder){ assert.ok(Number.isFinite(u.value) && u.value > 0, `${u.id} has a value`); }
+    for(let i = 1; i < ladder.length; i++) assert.ok(ladder[i].value > ladder[i - 1].value, `${kind}: tier ${i} is bigger than the one below`);
+    assert.equal(ladder[0].soldAt, null, `${kind}: the stock fitting is not for sale`);
+    assert.ok(ladder[0].starter, `${kind}: the stock fitting says it is the starter`);
+  }
+  assert.equal(S.tiers('engine').length, 0, 'there is no engine to buy any more');
+  for(const key of ['heatShield', 'tempControl', 'gravSensors', 'cryoCooling']) assert.ok(UPGRADES.some(u => u.key === key), `a ${key} upgrade exists`);
   for(const u of UPGRADES){
     if(u.soldAt) for(const p of u.soldAt) assert.ok(PORTS[p], `${u.id} sold at unknown ${p}`);
-    if(u.price != null) assert.ok(u.price > 0);
+    if(u.tier > 0 || u.kind === 'key') assert.ok(u.price > 0, `${u.id} is bought, so it has a price`);
   }
-  /* The dampener used to be lying about at Hush, which is not in the sky any
-     more. Somebody on Whisker will now fit you one, for money and no talk. */
-  const stealth = UPGRADES.find(u => u.key === 'stealth');
-  assert.deepEqual(stealth.soldAt, ['whisker'], 'the dampener is fitted at Whisker');
-  assert.ok(stealth.price > 0, 'and it is bought, so it has a price');
+  /* Tanks and holds are basics: anywhere with a pump will fit one. The rest
+     name their bench, and the one that is not Emberkin work says so. */
+  const yards = Object.keys(PORTS).filter(p => PORTS[p].fuelPricePerKms != null).sort();
+  for(const id of ['tank_1', 'tank_2', 'tank_3', 'hold_1', 'hold_2', 'hold_3']){
+    assert.deepEqual([...UPGRADES.find(x => x.id === id).soldAt].sort(), yards, `${id} is on every rack`);
+  }
+  assert.deepEqual(UPGRADES.find(u => u.id === 'gravsensors').soldAt, ['nail'], 'the cats sell the sensors');
+  for(const id of ['tempcontrol', 'heatshield', 'cryocooling']){
+    assert.deepEqual(UPGRADES.find(u => u.id === id).soldAt, ['cinder'], `${id} comes off an Emberkin bench`);
+  }
+});
+
+test('the second and third size of anything is engineer\'s work', () => {
+  /* Coin buys the first step up. After that a yard wants somebody aboard who
+     can put the hull back together, and that is the berth quest #6 fills. */
+  const s = newDocked(3, 'slate');
+  s.money = 500000;
+  for(const id of ['tank_1', 'hold_1']) assert.ok(S.canBuyUpgrade(s, id).ok, `${id} needs no crew`);
+  S.buyUpgrade(s, 'tank_1'); S.buyUpgrade(s, 'hold_1');
+  for(const id of ['tank_2', 'hold_2']){
+    const no = S.canBuyUpgrade(s, id);
+    assert.equal(no.ok, false, `${id} is refused with an empty berth`);
+    assert.match(no.reason, /engineer/i);
+  }
+  s.crew.engineer = { role: 'engineer', from: 'enginetrouble', joinedAt: 0 };
+  for(const id of ['tank_2', 'hold_2']) assert.ok(S.canBuyUpgrade(s, id).ok, `${id} opens once the berth is filled`);
+  S.buyUpgrade(s, 'tank_2'); S.buyUpgrade(s, 'hold_2');
+  assert.ok(S.canBuyUpgrade(s, 'tank_3').ok && S.canBuyUpgrade(s, 'hold_3').ok, 'and the third size after it');
+  assert.ok(Math.abs(S.kms(s.tank) - S.tiers('tank')[2].value) < 1e-9, 'the tank that was fitted is the tank that is aboard');
+});
+
+test('cryo hull cooling goes on over heat shielding, not instead of it', () => {
+  const s = newDocked(3, 'cinder');
+  s.money = 500000;
+  s.crew.engineer = { role: 'engineer', from: 'enginetrouble', joinedAt: 0 };
+  const no = S.canBuyUpgrade(s, 'cryocooling');
+  assert.equal(no.ok, false);
+  assert.match(no.reason, /heat shielding/i);
+  assert.ok(S.buyUpgrade(s, 'heatshield').ok);
+  assert.ok(S.canBuyUpgrade(s, 'cryocooling').ok, 'and then it will go on');
 });
 
 test('the text has every line the game asks for', () => {
@@ -265,7 +371,7 @@ test('the text has every line the game asks for', () => {
     const sp = TEXT.species[s];
     assert.ok(sp && sp.onGift && sp.greeting, `species text for ${s}`);
   }
-  for(const k of ['tollOffer', 'tollPaidCoin', 'tollPaidCargo', 'tollStealth', 'tollGiftLater', 'towDry', 'towCrash', 'towAtmosphere', 'bankDebt', 'firstTransfer', 'firstAssist', 'firstAerobrake', 'mawArrival']){
+  for(const k of ['tollOffer', 'tollPaidCoin', 'tollPaidCargo', 'tollGiftLater', 'towDry', 'towCrash', 'towAtmosphere', 'bankDebt', 'firstTransfer', 'firstAssist', 'firstAerobrake', 'mawArrival']){
     assert.ok(TEXT.events[k], `event text ${k}`);
   }
   assert.ok(TEXT.events.tollOffer.length >= 3 && TEXT.events.tollOffer.every(v => v.captain && v.line));
@@ -322,9 +428,14 @@ test('the opening film is over in five to seven seconds, beats and all', () => {
     assert.ok(BEATS[i].at > BEATS[i - 1].at, `beat ${BEATS[i].name} does not come after ${BEATS[i - 1].name}`);
     assert.ok(BEATS[i].at < DURATION, `beat ${BEATS[i].name} is after the end of the film`);
   }
-  // And the page hangs its closing line on this one.
   assert.ok(BEATS.some(b => b.name === 'space'), 'no beat called space');
   for(const b of BEATS) assert.equal(beatAt(b.at), b.name, `${b.name} is not what is playing at its own mark`);
+  /* The page's caption is hung on its own time rather than on a beat, so it
+     can sit where it reads best rather than where something happens to happen.
+     It needs the whole of its 1.2s reveal inside the film, and then a moment
+     to be read, or it arrives to be dissolved. */
+  assert.ok(CAPTION_AT > BREACH, 'the caption comes up before the ship is out of the water');
+  assert.ok(CAPTION_AT + 1.2 < DURATION - 0.5, `the caption cannot finish appearing: ${CAPTION_AT} of ${DURATION}`);
   assert.equal(beatAt(-1), BEATS[0].name, 'before the beginning is the first beat');
   assert.equal(beatAt(DURATION * 2), BEATS[BEATS.length - 1].name, 'and after the end is the last');
 });
@@ -408,7 +519,7 @@ test('three jobs pay in a person, and finishing one fills that berth', () => {
   // Flying one to the end puts somebody in the berth, and only that one.
   for(const q of paying){
     const s = S.newGame(11);
-    s.quests = []; s.money = 300000; s.keys.refrigeration = true; s.keys.astrolabe = true;
+    s.quests = []; s.money = 300000; s.keys.tempControl = true; s.keys.astrolabe = true;
     s.dockedAt = q.from; s.justLeft = null;
     assert.ok(S.acceptQuest(s, q.id).ok, q.id);
     const live = s.quests.find(l => l.id === q.id);
@@ -632,23 +743,33 @@ test('the lesson allows one mark on the path at a time, and says nothing about i
   assert.doesNotMatch(html, /No room for another burn on this path/);
 });
 
-test('the lesson cannot finish itself in the orbit it started in', () => {
-  /* A text check, because the lesson's tests live inside the page's module
-     and there is no canvas or DOM here to run them against. It is worth the
-     awkwardness: the last card used to be a bare "docked at Tassel", which is
-     true two minutes into a new game — the opening orbit sits inside Tassel's
-     own harbour mouth and the quiet window expires on its own — and because
-     the list is folded cumulative from the back, that one true card made all
-     fourteen true. A brand new ship finished the whole lesson without moving,
-     and Nellie got her scene before anybody had been to Slate. */
+test('the lesson ends when the pebble is in Nellie\'s hand, and not a moment before', () => {
+  /* A text check, because the lesson's tests live inside the page's module and
+     there is no canvas or DOM here to run them against. It is worth the
+     awkwardness, because the last card has been wrong twice in two different
+     ways and the list is folded cumulative from the back, so whatever the last
+     card accepts the whole lesson accepts.
+
+     First it was a bare "docked at Tassel", which is true two minutes into a
+     new game — the opening orbit sits inside Tassel's own harbour mouth and
+     the quiet window expires on its own — so a brand new ship finished the
+     whole lesson without moving. Then it was "Tassel would take your lines",
+     which is true while the ship is still in the air with the pebble in the
+     hold: being able to dock is not docking, and the handover is what finishes
+     the job. It asks the quest now, which is the only thing that cannot be
+     true early. */
   const html = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
   const list = html.match(/const raw = \[([\s\S]*?)\n  \];/);
   assert.ok(list, 'the lesson no longer keeps its cards in one list; check this still holds');
   const lines = list[1].split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('/*') && !l.startsWith('*') && !l.startsWith('//'));
   const last = lines[lines.length - 1];
-  assert.match(last, /bought/, `the last card of the lesson is "${last}", which does not ask for the pebble`);
+  assert.match(last, /delivered/, `the last card of the lesson is "${last}", which does not ask for the pebble`);
+  assert.ok(!/dockable/i.test(last), `the last card is "${last}": being able to dock is not docking`);
+  // And "delivered" means the errand is finished, not that it is nearly finished.
+  assert.match(html, /const delivered = [^\n]*q\.id === 'pebble' && q\.done/,
+    'the lesson\'s last card no longer reads the quest it is about');
 
-  // And the fold really is from the back, which is what makes that matter.
+  // The fold really is from the back, which is what makes all of that matter.
   assert.match(html, /raw\[i\] = raw\[i\] \|\| raw\[i \+ 1\]/);
 });
 
@@ -664,22 +785,19 @@ test('every button the page draws for itself has something listening to it', () 
   assert.match(html, /\$\('dock-go'\)\.addEventListener\('click'/, 'the dock button is not wired');
 });
 
-/* The title screen is one fixed screen with no scrolling, because the chart is
- * behind it — so anything that does not fit is simply not there. It stopped
- * fitting on a phone in a way nothing here could see: `main` is a grid whose
- * single column was auto-sized, so it took its width from its own max-content,
- * and the card grid's `repeat(auto-fit, minmax(150px, 1fr))` asks for four
- * columns when it has no width to fit itself to. The page laid itself out in a
- * 629px box inside a 390px window and clipped the rest. A definite column is
- * the fix, and this is the guard on it. */
-test('the title screen tells its grid how wide the column is', () => {
+/* The title screen is one fixed screen laid over the chart, and the body is
+ * overflow:hidden for the chart's sake — so anything that does not fit is not
+ * merely below the fold, it is unreachable. That is how a phone once lost the
+ * back link, and the net under it is that `main` scrolls when it has to. The
+ * column is told its width for the same reason: an auto one takes its size
+ * from its contents. */
+test('the title screen can always be got out of', () => {
   const html = readFileSync(new URL('../public/orbital-trader/index.html', import.meta.url), 'utf8');
   const main = html.match(/\n {2}main\{([\s\S]*?)\n {2}\}/)?.[1];
   assert.ok(main, 'the title screen no longer has a main rule to check');
-  assert.match(main, /grid-template-columns/, 'main is a grid with an auto-sized column again');
   assert.match(main, /overflow-y:\s*auto/, 'a title screen that does not fit has no way to reach its own back link');
-  // And the cards are still the thing that needs the width to be definite.
-  assert.match(html, /repeat\(auto-fit, minmax\(150px, 1fr\)\)/);
+  assert.match(main, /grid-template-columns/, 'main is a grid with an auto-sized column again');
+  assert.match(html, /class="back"/, 'there is no way back to the other games');
 });
 
 /* The four cards at the front of the lesson are passed with the chart rather
@@ -1631,8 +1749,7 @@ test('every quest in the catalogue can be flown from its giver to its end', () =
     const s = S.newGame(11);
     s.dockedAt = q.from; s.justLeft = null;
     s.money = 200000;
-    s.keys.refrigeration = true;
-  s.keys.astrolabe = true;
+    s.keys.tempControl = true;
     s.keys.astrolabe = true;          // the harbourmaster's rule, not the flying
     s.quests = [];                              // one job at a time, to keep the three free
     const got = S.acceptQuest(s, q.id);
@@ -1660,16 +1777,15 @@ test('every quest in the catalogue can be flown from its giver to its end', () =
   }
 });
 
-test('a cold consignment needs a cold hold before anybody can hand it to you', () => {
-  /* A delivery skips the market, so it skips the market's refrigeration
-     check. Four cases of smuggled medicine and a warm hold is the case. */
+test('a cold consignment needs temperature control before anybody can hand it to you', () => {
+  /* A delivery skips the market, so it skips the market's temperature check.
+     Four cases of smuggled medicine and a plain hold is the case. */
   const s = newDocked(5, 'nail');
-  assert.equal(S.goodById('greymeds').needsRefrigeration, true);
+  assert.equal(S.goodById('greymeds').needsTempControl, true);
   const no = S.acceptQuest(s, 'medicinerun');
   assert.equal(no.ok, false);
-  assert.match(no.reason, /cold hold/);
-  s.keys.refrigeration = true;
-  s.keys.astrolabe = true;
+  assert.match(no.reason, /temperature control/);
+  s.keys.tempControl = true;
   assert.ok(S.acceptQuest(s, 'medicinerun').ok);
   assert.equal(S.usedUnits(s), 4);
 });
@@ -1793,7 +1909,7 @@ test("the opening errand: Theo's purse buys exactly one pebble, and Nellie pays 
   assert.ok(s.money > 400 && s.rep.otter >= 1, 'Theo settles up and the otters remember');
 });
 
-test('markets: buying costs, selling elsewhere pays, and selling a lot walks the price down', () => {
+test('markets: buying costs, selling elsewhere pays, and nothing else moves a price', () => {
   const s = newDocked(21);
   /* The game now opens with twelve cowries, which is exactly one moon pebble
      and the whole point of the opening. A test about a market needs a purse. */
@@ -1810,14 +1926,13 @@ test('markets: buying costs, selling elsewhere pays, and selling a lot walks the
   if(wanter){
     const [wid] = wanter;
     const p1 = S.sellPrice(s, wid, good);
-    s.markets[wid] = { sold: { [good]: { q: 200, t: s.t } }, bought: {} };
-    const p2 = S.sellPrice(s, wid, good);
-    assert.ok(p2 < p1 * 0.6, `saturation bites: ${p2} vs ${p1}`);
-    // And it forgets. Compared on the multiplier alone, because a price also
-    // moves with the sky and with whatever the Emberkin decided was fashionable.
-    assert.ok(S.saturationMul(s, wid, good) < 0.6);
-    s.t += FORMULAS.saturation.halfLifeDays * 6;
-    assert.ok(S.saturationMul(s, wid, good) > 0.9, 'and recovers');
+    assert.ok(p1 > S.sellPrice(s, 'maw', good), 'somebody who wants it pays over the odds');
+    /* What you have landed here before does not move the price any more, and
+       neither does how picked-over the shelf is. The stall's stock is the only
+       limit on how much you can move at once, and that is limit enough. */
+    s.markets[wid] = { sold: { [good]: { q: 500, t: s.t } }, bought: { [good]: 500 } };
+    assert.equal(S.sellPrice(s, wid, good), p1, 'selling a lot here changed what they pay');
+    assert.equal(S.buyPrice(s, port, good), price, 'emptying the shelf changed what it costs');
   }
   // Nobody makes money round-tripping in one port.
   for(const [id, p] of Object.entries(PORTS)){
@@ -1837,11 +1952,26 @@ test('a good is worth more out of its region, and much more where it is loved', 
   const loved = S.sellPrice(s, 'brine', 'tideglass');      // outer, and loves it
   assert.ok(away > home * 1.4, `carrying it out of its region is worth it: ${home} -> ${away}`);
   assert.ok(loved > away * 1.8, `and the ones who love it pay much more: ${away} -> ${loved}`);
-  assert.ok(loved > S.buyPrice(s, 'tassel', 'tideglass') * 2.5, 'a loved good abroad is a trade route');
+  assert.ok(loved > S.buyPrice(s, 'tassel', 'tideglass') * 4.5, 'a loved good abroad is the trade route');
+
+  /* The four corners of the table, which is the whole of the selling side.
+     Space is hard and few merchants cross between peoples, so the run that
+     matters is a loved good carried out of its own region. */
+  const F = FORMULAS.demand;
+  assert.ok(F.lovedAway >= 5 && F.lovedAway <= 6, 'a loved good abroad is five or six times the stall price');
+  assert.ok(F.likedAway > F.likedSame && F.lovedSame > F.likedSame);
+  assert.ok(F.lovedAway > F.lovedSame * 2, 'the same run inside one system is worth a fraction of it');
+  assert.ok(F.unwanted < 1, 'and a good nobody named goes at a loss');
+  assert.equal(S.demandMul('brine', 'tideglass'), F.lovedAway, 'Brine loves it and lives four au away');
+  assert.equal(S.demandMul('haven', 'tideglass'), F.likedAway, 'Haven merely wants it, and is also far');
+  assert.equal(S.demandMul('slate', 'pearls'), F.likedSame, 'Slate wants pearls off its own planet');
+  assert.equal(S.demandMul('slate', 'coral'), F.lovedSame, 'otters love coral, and Slate is an otter port in its own region');
+  assert.equal(S.demandMul('slate', 'tideglass'), F.unwanted, 'nobody on Slate asked for tide glass');
+  assert.equal(S.demandMul('tassel', 'tideglass'), F.unwanted, 'a stall does not buy back its own stock');
 
   // Region is a region, not a distance: a sibling port pays the home rate.
-  assert.equal(S.regionMul('slate', 'tideglass'), S.regionMul('moss', 'tideglass'));
-  assert.ok(S.regionMul('cinder', 'tideglass') > S.regionMul('slate', 'tideglass'));
+  assert.equal(S.demandMul('slate', 'pearls'), S.demandMul('moss', 'pearls'));
+  assert.ok(S.demandMul('cinder', 'pearls') > S.demandMul('slate', 'pearls'));
   // Loving something names a port or a whole people; both count.
   assert.ok(S.lovesGood('brine', 'tideglass'), 'Brine loves tide glass by name');
   assert.ok(S.lovesGood('tassel', 'frogtea') && S.lovesGood('moss', 'frogtea'), 'otters love frog tea as a people');
@@ -1882,10 +2012,10 @@ test('a stall keeps what it keeps, and finds more only while you are away', () =
   assert.ok(again >= lo && again <= hi, `the new shelf of ${again} is outside ${lo}-${hi}`);
   assert.equal(again, S.stockFull(s, 'slate', 'pebble'), 'and it is a whole shelf, not the picked-over one');
 
-  /* A thin shelf costs more than a full one, so buying a stall out is not
-     free. Pebbles, because they are light: a hold is twenty-four units and an
-     ore crate is three of them, so a heavy good runs out of ship long before
-     it runs out of shelf. */
+  /* The last crate on a shelf costs what the first one did. A picked-over
+     stall used to charge more, which was the buying half of a supply-and-demand
+     rule the stock limit already does better: you cannot take what is not
+     there, and that is the whole of the limit. */
   const t = S.newGame(9);
   t.dockedAt = null; t.justLeft = null; parkAt(t, 'slate'); S.dock(t);
   t.money = 100000;
@@ -1893,15 +2023,38 @@ test('a stall keeps what it keeps, and finds more only while you are away', () =
   const room = Math.min(S.stockAvailable(t, 'slate', 'pebble') - 1, S.freeUnits(t));
   assert.ok(room >= 4, `nothing to buy: ${room} crates of room`);
   assert.ok(S.buy(t, 'pebble', room).ok);
-  assert.ok(S.buyPrice(t, 'slate', 'pebble') > first, 'the last crates on the shelf cost no more than the first');
+  assert.equal(S.buyPrice(t, 'slate', 'pebble'), first, 'the last crates on the shelf cost more than the first');
 });
 
-test('perishables lose value with age, down to a floor', () => {
-  const g = GOODS.find(g => g.lifetimeDays);
-  assert.ok(g);
-  assert.equal(S.freshness(g, 0), 1);
-  assert.ok(S.freshness(g, g.lifetimeDays / 2) < 0.6);
-  assert.equal(S.freshness(g, g.lifetimeDays * 5), FORMULAS.perishable.floor);
+test('nothing spoils: a crate is worth what it is worth whenever it lands', () => {
+  /* Decay is gone. Time and hold room are still what limit a run — the clock
+     and the tank — but a cargo bought on Moss is the same cargo when it
+     reaches Cinder ninety-four days later, which is what the inner system
+     being ninety-four days away was quietly making impossible. */
+  const s = newDocked(5, 'moss');
+  s.money = 100000;
+  s.keys.tempControl = true;                     // riverfish is one of the six
+  assert.ok(S.buy(s, 'riverfish', 4).ok);
+  const now = S.cargoValue(s, 'tassel');
+  /* Age the crates rather than the clock: what is being pinned is that the
+     hold does not remember when something came aboard. Moving the clock would
+     also move the otter haggle roll, which is species character and stays. */
+  for(const c of s.cargo) c.t -= 2000;
+  assert.equal(S.cargoValue(s, 'tassel'), now, 'two thousand days cost the hold nothing');
+  assert.equal(S.sellPrice.length, 3, 'sellPrice takes a state, a port and a good — and no age');
+  for(const g of GOODS) assert.equal(g.lifetimeDays, undefined, `${g.id} still carries a shelf life`);
+});
+
+test('temperature control is what the good cargo is behind', () => {
+  const s = S.newGame(5);
+  const F = FORMULAS.demand;
+  assert.ok(F.tempControlMul > 1, 'the goods that need a held temperature pay more');
+  /* Ice lenses are made on Glass and loved on Veyra, two regions apart, and
+     they need the Engineer's box: the best kind of cargo in the game, which is
+     the point of a 2,800-cowrie upgrade behind a quest. */
+  const ratio = S.sellPrice(s, 'veyra', 'lenses') / S.buyPrice(s, 'glass', 'lenses');
+  assert.ok(ratio > F.lovedAway, `a loved cold good abroad beats a loved warm one: ${ratio}`);
+  assert.ok(S.goodById('lenses').needsTempControl);
 });
 
 test('fuel: the tank is a hard ceiling and coin a hard floor', () => {
@@ -1924,7 +2077,7 @@ test('a tow moves the ship to the nearest port and costs money and days, never t
   assert.equal(s.stats.tows, 1);
 });
 
-test('crossing the Belt without stealth brings a toll that never takes everything', () => {
+test('crossing the Belt brings a toll that never takes everything', () => {
   const s = S.newGame(13);
   S.undock(s);
   // Put the ship on a heliocentric orbit that climbs into the belt, with a hold worth taking a share of.
@@ -1941,22 +2094,25 @@ test('crossing the Belt without stealth brings a toll that never takes everythin
   assert.ok(r.ok && s.cargo.reduce((a, c) => a + c.qty, 0) >= 6, 'they left most of the hold');
   assert.equal(s.pending, null);
   assert.ok(s.rep.cat > 0);
-  // With stealth, the same crossing is quiet.
-  const s2 = S.newGame(13); S.undock(s2); s2.keys.stealth = true;
-  const st2 = O.circularState(MU, CONST.BELT.inner - 0.1, 1.0);
-  s2.ship = { body: 'lamp', r: st2.r, v: O.scale(st2.v, 1.12) };
-  s2.cargo = [{ good: 'tideglass', qty: 10, t: s2.t, price: 80, from: 'tassel' }];
-  guard = 0; while(!s2.toll.inBelt && guard++ < 1200) S.tick(s2, 0.5);
-  assert.ok(s2.toll.inBelt, 'the quiet ship did cross the belt');
-  assert.equal(s2.pending, null, 'and was never hailed');
+  /* The dampener that used to buy a quiet crossing is off the rack, so the
+     only thing keeping a captain from being hailed is the cooldown. Out of the
+     belt and back into it the same week is the case: the oath is a toll, not a
+     tax, and it is not asked twice inside a month. */
+  assert.ok(s.t - s.toll.lastT < FORMULAS.toll.cooldownDays, 'the hail was just now');
+  s.toll.inBelt = false;
+  S.tick(s, 0.5);
+  assert.ok(s.toll.inBelt, 'the ship is in the belt again');
+  assert.equal(s.pending, null, 'and was let alone, because it was asked this week');
 });
 
-test('aerobraking: Grumm\'s clouds are a crash without a shield and a brake with one', () => {
+test("Grumm's clouds are a crash, shield or no shield: nothing skims yet", () => {
+  /* Heat shielding and cryo hull cooling are on the rack and wired to nothing
+     (§2.8): the risky skim and the safe one are two different manoeuvres and
+     neither is built. So the air is lethal to everybody, and buying the shield
+     does not change that — which is the behaviour this pins, so that whoever
+     builds the skim has to come back here and say so. */
   const g = world.get('grumm');
-  const dive = (shield) => {
-    const s = S.newGame(17);
-    S.undock(s);
-    s.keys.heatShield = shield;
+  const entry = () => {
     // A hyperbolic approach whose periapsis sits inside the atmosphere band.
     const rp = (g.atmo + g.radius) / 2;
     /* A fifth of the circular speed at the cloud tops, rather than a number in
@@ -1978,40 +2134,48 @@ test('aerobraking: Grumm\'s clouds are a crash without a shield and a brake with
       const mid = (lo + hi) / 2;
       if(O.norm(O.propagate(g.mu, pe.r, pe.v, mid).r) > g.soi * 0.85) hi = mid; else lo = mid;
     }
-    st = O.propagate(g.mu, pe.r, pe.v, hi);
-    s.ship = { body: 'grumm', r: st.r, v: st.v };
-    const start = { r: st.r, v: st.v };
-    const events = [];
-    let guard = 0;
-    let after = null;
-    while(guard++ < 3000 && !s.pending && s.ship.body === 'grumm'){
-      const got = S.tick(s, 0.2);
-      events.push(...got);
-      // The state just after the dive, before the ship goes wandering.
-      if(!after && s.flags.firstAerobrake) after = { r: s.ship.r, v: s.ship.v };
-      /* Once the skim is on the books and the ship is back out of the clouds,
-         this test has its answer. Flying on until the ship happens to blunder
-         into one of Grumm's moons is a different world's arithmetic, and in a
-         sky where it never does it is thousands of needless predictions — a
-         shielded ship in Grumm's air looks a hundred and fifty days ahead on
-         every step, and down there a lap is under a tenth of a day. */
-      if(after && O.norm(s.ship.r) > g.atmo) break;
-    }
-    return { s, events, start, after: after ?? { r: s.ship.r, v: s.ship.v } };
+    return O.propagate(g.mu, pe.r, pe.v, hi);
   };
-  const bare = dive(false);
-  assert.ok(bare.s.pending && bare.s.pending.kind === 'crash', 'no shield: the clouds take the ship');
-  const shielded = dive(true);
-  assert.equal(shielded.s.pending, null, 'with a shield the ship survives, pass after pass');
-  assert.ok(shielded.s.flags.firstAerobrake, 'the skim was noted');
-  assert.equal(shielded.s.dv, shielded.s.tank, 'and it cost no fuel at all');
-  /* What a skim is for: the ship arrived on an escape trajectory and Grumm's
-     air alone put it into orbit. Measured in Grumm's frame at the moment the
-     dive is done — where it wanders afterwards, past the frog moons, is the
-     pilot's business and another world's arithmetic. */
-  const before = O.elementsFromState(g.mu, shielded.start.r, shielded.start.v);
+  const dive = (shield) => {
+    const s = S.newGame(17);
+    S.undock(s);
+    s.keys.heatShield = shield;
+    const st = entry();
+    s.ship = { body: 'grumm', r: st.r, v: st.v };
+    let guard = 0;
+    while(guard++ < 3000 && !s.pending && s.ship.body === 'grumm') S.tick(s, 0.2);
+    return s;
+  };
+  for(const shield of [false, true]){
+    const s = dive(shield);
+    assert.ok(s.pending && s.pending.kind === 'crash', `shield ${shield}: the clouds take the ship`);
+    assert.ok(!s.flags.firstAerobrake, `shield ${shield}: and nothing was skimmed`);
+  }
+  assert.equal(S.skimsAir({ keys: { heatShield: true, cryoCooling: true } }), false, 'no fitting skims air yet');
+
+  /* The arithmetic a skim will be built out of is still here and still right,
+     so it is checked directly rather than left to rot behind a flag no caller
+     can set. Ask effectiveNodes for a skim and it inserts one retrograde mark
+     at the bottom of the dive, free of fuel, and the air alone turns an escape
+     trajectory into an orbit that never digs into the planet. */
+  const s = S.newGame(17);
+  S.undock(s);
+  const st = entry();
+  s.ship = { body: 'grumm', r: st.r, v: st.v };
+  const nodes = S.effectiveNodes(s, 400, { skim: true });
+  /* One per dive, and a long horizon sees more than one dive: what matters is
+     that every mark it writes is a free retrograde push at the bottom. */
+  assert.ok(nodes.length >= 1, 'a skim was written down');
+  for(const n of nodes) assert.ok(n.aero && n.free && n.prograde < 0, 'every skim is a free retrograde mark');
+  const before = O.elementsFromState(g.mu, st.r, st.v);
   assert.ok(before.e > 1, 'the setup was not an escape trajectory to begin with');
-  const after = O.elementsFromState(g.mu, shielded.after.r, shielded.after.v);
+  let ship = s.ship, t = s.t, guard = 0;
+  while(guard++ < 3000){
+    const res = O.advance(world, ship, t, 0.2, nodes, { atmosphere: false, dvAvailable: s.dv, stopOnBurn: true });
+    ship = res.ship; t = res.t;
+    if(t > nodes[0].t && O.norm(ship.r) > g.atmo) break;
+  }
+  const after = O.elementsFromState(g.mu, ship.r, ship.v);
   assert.ok(after.e < 1, `the clouds did not catch it: e ${after.e}`);
   assert.ok(after.rp > g.radius, 'and never dug it into the planet');
 });
@@ -2175,24 +2339,34 @@ test('a kiss dug into a moon can always be lifted back out of it', () => {
   assert.ok(after.distance > b.radius * 2, `kiss only reached ${after.distance}`);
   assert.ok(s.dv < s.tank, 'it cost something');
 
-  /* A ship falling dead straight at a world is a different matter: forward and
-     outward are the same line for it, so there is no pair of numbers on a mark
-     that adds up to a push across, and the game says nothing rather than
-     offering two enormous opposing ones that cancel. It is still told what is
-     about to happen, and a crash is a tow, not an ending. */
+  /* A ship falling dead straight at a world used to be beyond help: forward
+     and outward were the same line for it, so no pair of numbers on a mark
+     added up to a push across, and the game said nothing. With the axes at
+     right angles it can say something — and it has to, because braking a
+     radial fall does not lift it. A dead-straight drop has no angular momentum
+     and therefore no periapsis to raise; the only way to miss is to push
+     across the line, which is exactly the mark there was no way to write. */
   const straight = S.newGame(5);
   S.undock(straight);
   straight.ship = { body: 'moss', r: [b.soi * 0.95, 0], v: [-speed, 0] };
   const k = S.kiss(straight);
   assert.ok(k && k.crashes, 'a straight drop is not even reported');
-  assert.equal(S.brakeAtKiss(straight), -1, 'a mark was offered that cannot be expressed');
+  const jx = S.brakeAtKiss(straight);
+  assert.ok(jx >= 0, 'nothing was offered to a ship falling straight in');
+  assert.ok(Math.abs(straight.nodes[jx].radial) > 0, 'what was offered does not push across the fall');
+  guard = 0;
+  while(straight.nodes.length && guard++ < 40000) S.tick(straight, 0.002);
+  assert.equal(straight.pending, null, 'the ship flew into the moon anyway');
+  assert.ok(!S.kiss(straight)?.crashes, 'the straight drop still digs in');
 });
 
-test('what a mark costs is what the tank is charged, on any orbit', () => {
-  /* Prograde and radial only sit at right angles on a circle. Adding the two
-     numbers on a mark's card as a triangle overstates a burn badly on an
-     eccentric orbit — and the tank is charged the real thing, so the two must
-     agree or the plan lies about what it can afford. */
+test('what a mark costs is the triangle on its card, on any orbit', () => {
+  /* The two axes are at right angles everywhere now — forward along the
+     velocity, out perpendicular to it — so the two numbers on a mark's card
+     really do add up as a triangle, and that triangle is what the tank is
+     charged. Out used to be true radial, which leans into forward on anything
+     but a circle: the card and the tank then disagreed, badly, on an eccentric
+     orbit. */
   const s = S.newGame(5);
   S.undock(s);
   const b = world.get('tassel');
@@ -2212,9 +2386,16 @@ test('what a mark costs is what the tank is charged, on any orbit', () => {
      million of Kepler arithmetic. The claim is that the card does not lie
      about what it can afford, and five millionths of a burn does not. */
   assert.ok(Math.abs(charged - shown) <= shown * 1e-4, `told ${S.fmtKms(shown)}, charged ${S.fmtKms(charged)}`);
-  // And the naive triangle really is different, so this test has something to say.
-  const naive = Math.hypot(S.auDay(0.4), S.auDay(-0.3));
-  assert.ok(Math.abs(naive - charged) > charged * 0.05, 'the two axes were at right angles after all');
+  /* And the triangle is the answer, on an orbit chosen to be as far from a
+     circle as this sky allows — which is the whole of the change. */
+  const triangle = Math.hypot(S.auDay(0.4), S.auDay(-0.3));
+  assert.ok(Math.abs(triangle - shown) <= shown * 1e-12, `card says ${triangle}, plan says ${shown}`);
+  assert.ok(Math.abs(triangle - charged) <= charged * 1e-4, 'the triangle is not what the tank was charged');
+  // Because the frame really is orthonormal, wherever the ship is.
+  const fr = O.burnFrame(s.ship.r, s.ship.v);
+  assert.ok(Math.abs(O.dot(fr.pro, fr.out)) < 1e-12, 'forward and out are not at right angles');
+  assert.ok(Math.abs(O.norm(fr.pro) - 1) < 1e-12 && Math.abs(O.norm(fr.out) - 1) < 1e-12, 'the frame is not unit length');
+  assert.ok(O.dot(fr.out, s.ship.r) > 0, '"out" does not point away from the world');
 });
 
 test('a dry ship with an empty purse can still leave the dock', () => {
@@ -2304,15 +2485,17 @@ test('a save is refused at the door rather than halfway through a frame', () => 
     'a tank that does not exist': s => { s.tiers.tank = 9; },
     /* Version 1 is the sky before the rescale, version 2 the map before the
        setting was rewritten, version 3 the price list before every good in it
-       was replaced, and version 4 the game that still had a contract board and
-       a passenger list. A ship's position, a port name, a hold full of crates
-       or a list of people waiting to be somewhere: none of it means anything
+       was replaced, version 4 the game that still had a contract board and a
+       passenger list, and version 5 the ship that was fitted with an engine
+       and a dampener. A ship's position, a port name, a hold full of crates or
+       a list of people waiting to be somewhere: none of it means anything
        here, so those saves are refused rather than repaired. */
     'a version this sky is not': s => { s.version = 1; },
     'the map before the setting changed': s => { s.version = 2; },
     'the price list before the goods changed': s => { s.version = 3; },
     'the contract board before it was taken away': s => { s.version = 4; },
-    'a version from the future': s => { s.version = 6; },
+    'the rack before it was rebuilt': s => { s.version = 5; },
+    'a version from the future': s => { s.version = 7; },
   };
   for(const [what, wreck] of Object.entries(broken)){
     const s = JSON.parse(good);

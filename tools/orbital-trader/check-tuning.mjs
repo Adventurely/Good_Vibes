@@ -20,9 +20,9 @@ const TAU = Math.PI * 2;
 const period = (mu, a) => TAU * Math.sqrt(a ** 3 / mu);
 /* The reach a mass earns, mirrored from content.js: no body carries one. */
 const soiOf = b => (b.mu > 0 && b.a > 0 && by[b.parent]?.mu > 0) ? b.a * Math.pow(b.mu / by[b.parent].mu, 2 / 5) : null;
-/* And the mouth a size earns, mirrored the same way: ten radii plus the air
-   over the ground. A drifting haven has neither, and keeps its authored one. */
-const mouthOf = b => b.mu > 0 && b.radius > 0 ? 10 * b.radius + Math.max(0, (b.atmo ?? b.radius) - b.radius) : b.zoneRadius;
+/* And the mouth a size earns, mirrored the same way: five radii above the top
+   of the air. A drifting haven has neither, and keeps its authored one. */
+const mouthOf = b => b.mu > 0 && b.radius > 0 ? Math.max(b.radius, b.atmo ?? b.radius) + 5 * b.radius : b.zoneRadius;
 for(const b of T.bodies){ b.soi = soiOf(b); b.zoneRadius = mouthOf(b); }
 const km = v => (v * KMS);
 let fails = 0;
@@ -182,7 +182,7 @@ for(const group of [['slate', 'moss'], ['brine', 'glass', 'croak', 'haven'], ['n
 }
 
 // --- the delta-v table and the tank gating
-const starter = T.ship.tanks[0].dv_kms, longhaul = T.ship.tanks[1].dv_kms, deep = T.ship.tanks[T.ship.tanks.length - 1].dv_kms;
+const starter = T.ship.tanks[0].dv_kms, longhaul = T.ship.tanks[1].dv_kms, deepsky = T.ship.tanks[2].dv_kms, deep = T.ship.tanks[T.ship.tanks.length - 1].dv_kms;
 const table = [
   { route: 'Slate -> Moss (moon hop)', dv_kms: +km(hop.dv1 + hop.dv2).toFixed(2), days: +hop.time.toFixed(1) },
   { route: 'Tassel dock -> Slate (first lesson)', dv_kms: +km(first.dv1 + Math.max(0, first.dv2 - by.slate.dockSpeed)).toFixed(2), days: +first.time.toFixed(1) },
@@ -217,6 +217,12 @@ const near = dv('Tassel -> Cinder (dock)'), far = dv('Tassel -> Veyra');
 check('C7 the errand comes before the expedition', near <= starter && far > starter,
   `Cinder ${near} within ${starter}, Veyra ${far} past it`);
 check('C7 the far Emberkin world is a long haul, not a wall', far <= longhaul, `${far}: within ${longhaul}`);
+/* Four rungs now — the one the ship comes with and three that are bought — so
+   each has to be worth its price, and the rung above the one that barely
+   reaches the expedition has to make it comfortable rather than exact. */
+check('C7 the tanks climb', T.ship.tanks.every((t, i) => !i || t.dv_kms > T.ship.tanks[i - 1].dv_kms), T.ship.tanks.map(t => t.dv_kms).join(' < '));
+check('C7 the holds climb', T.ship.holds.every((h, i) => !i || h.units > T.ship.holds[i - 1].units), T.ship.holds.map(h => h.units).join(' < '));
+check('C7 the deep-sky tank makes the expedition comfortable rather than exact', far <= 0.8 * deepsky, `${far} of ${deepsky}`);
 /* The Maw is cheap and slow: years of coasting. The deep tank is what makes it
    a journey you come back from. */
 check('C7 the deep tank reaches the Maw with 20% spare', dv('Tassel -> the Maw') <= 0.8 * deep, `${dv('Tassel -> the Maw')} of ${deep}`);

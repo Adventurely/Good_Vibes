@@ -107,7 +107,13 @@
   #view button{
     width:40px; height:40px; border-radius:10px; border:1px solid var(--line);
     background:var(--glass); color:var(--dim); cursor:pointer; backdrop-filter:blur(8px); font-size:1.05rem;
+    /* An inline <svg> sits on the text baseline, which left the ship and the
+       harbour drawn low and a little left in their boxes while the ◎ next to
+       them — a glyph, centred by the button itself — sat true. Centring the
+       box's content puts all three on the same middle. */
+    display:flex; align-items:center; justify-content:center; padding:0; line-height:1;
   }
+  #view button svg{ display:block; }
   #view button:hover{ color:var(--ink); border-color:var(--line-2); }
   #view button[aria-pressed="true"]{ color:var(--gold-ink); border-color:var(--gold-2); }
   /* Dragged off the thing the chart is locked to. The button that brings you
@@ -155,9 +161,15 @@
   .row .price small{ display:block; color:var(--dim); font-size:.74rem; }
   .row .btns{ grid-column:1 / -1; justify-content:flex-end; margin-top:.2rem; }
   .up{ color:var(--leaf); } .down{ color:var(--rose); } .flat{ color:var(--dim); }
-  .fresh{ display:inline-block; width:46px; height:4px; background:var(--gv-sunk); border-radius:2px; vertical-align:middle; overflow:hidden; }
-  .fresh i{ display:block; height:100%; background:var(--leaf); }
-  .fresh i.mid{ background:var(--gold); } .fresh i.low{ background:var(--rose); }
+  /* The "i" beside a good: small, quiet, and the same size as the text it
+     sits in, so a row of them does not read as a row of buttons. */
+  .inspect{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:1.15em; height:1.15em; margin-left:.35em; padding:0; vertical-align:baseline;
+    border:1px solid var(--line-2); border-radius:50%; background:transparent;
+    color:var(--dim); font-size:.72rem; font-style:italic; line-height:1; cursor:pointer;
+  }
+  .inspect:hover, .inspect:focus-visible{ color:var(--gold-ink); border-color:var(--gold-2); }
   .btns{ display:flex; gap:.3rem; flex-wrap:wrap; }
   .btn{
     min-height:32px; padding:.25rem .6rem; border-radius:8px; border:1px solid var(--line-2);
@@ -282,7 +294,16 @@
      stable orbit close in around a harbour makes it possible, and is not
      there the rest of the time. It replaced a card across the bottom of the
      sky that spent most of its life telling you what you had not done yet. */
-  #dock-go{ color:var(--gold); border-color:var(--gold-2); }
+  #dock-go{ color:var(--gold); border-color:var(--gold-2); animation:dockflash 2.8s ease-in-out infinite; }
+  /* Slow on purpose. It is the one control that appears out of nowhere, and it
+     has to catch an eye that is on the chart without becoming a strobe next to
+     two buttons that are always there — so it breathes rather than blinks, and
+     it stops the moment the pointer is on it. */
+  @keyframes dockflash{
+    0%, 100%{ opacity:.62; box-shadow:0 0 0 0 transparent; }
+    50%{ opacity:1; box-shadow:0 0 10px -1px var(--gold-2); }
+  }
+  #dock-go:hover, #dock-go:focus-visible{ animation:none; opacity:1; }
   #dock-go svg, #m-ship svg, #m-dock svg{ width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
   #dock-go:hover{ background:var(--gold); color:#1a1310; }
   #dock-go[hidden], #m-dock[hidden]{ display:none; }
@@ -327,9 +348,15 @@
   .row .price small{ display:block; color:var(--dim); font-size:.74rem; }
   .row .btns{ grid-column:1 / -1; justify-content:flex-end; margin-top:.2rem; }
   .up{ color:var(--leaf); } .down{ color:var(--rose); } .flat{ color:var(--dim); }
-  .fresh{ display:inline-block; width:46px; height:4px; background:var(--gv-sunk); border-radius:2px; vertical-align:middle; overflow:hidden; }
-  .fresh i{ display:block; height:100%; background:var(--leaf); }
-  .fresh i.mid{ background:var(--gold); } .fresh i.low{ background:var(--rose); }
+  /* The "i" beside a good: small, quiet, and the same size as the text it
+     sits in, so a row of them does not read as a row of buttons. */
+  .inspect{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:1.15em; height:1.15em; margin-left:.35em; padding:0; vertical-align:baseline;
+    border:1px solid var(--line-2); border-radius:50%; background:transparent;
+    color:var(--dim); font-size:.72rem; font-style:italic; line-height:1; cursor:pointer;
+  }
+  .inspect:hover, .inspect:focus-visible{ color:var(--gold-ink); border-color:var(--gold-2); }
   .btns{ display:flex; gap:.3rem; flex-wrap:wrap; }
   .btn{
     min-height:32px; padding:.25rem .6rem; border-radius:8px; border:1px solid var(--line-2);
@@ -572,6 +599,9 @@
     /* It never plays under this, but if it is asked for by hand it does not
        also slide and fade. */
     #intro, #intro.say #intro-cap{ transition:none; animation:none; }
+    /* The mooring ring still has to be noticed, so it keeps the brightness the
+       flash was carrying it to and drops the breathing. */
+    #dock-go{ animation:none; opacity:1; }
   }
 </style>
 </head>
@@ -619,7 +649,7 @@
      a new ship starts, and gone for good once it has played or been skipped. -->
 <div id="intro" hidden>
   <canvas id="intro-art" role="img" aria-label="A lighter lifts out of Tassel's ocean at dawn, climbs through the clouds, and reaches orbit."></canvas>
-  <p id="intro-cap"><small>Tassel</small>Out of the water, through the weather, and aboard by breakfast.</p>
+  <p id="intro-cap"><small>Tassel</small>Out of the waves, above the clouds, and into the stars…</p>
   <button id="intro-skip" title="Skip the opening (any key)">Skip &#9656;</button>
 </div>
 
@@ -887,6 +917,11 @@ function handleEvents(events){
     if(e.kind === 'crash'){ stopSkip(); showCrash(e.body); }
     if(e.kind === 'dry'){ stopSkip(); toast(`${TEXT.captainLines.onStranded[1] ?? 'The tank is dry.'} Burns has the distress call.`, 'bad', 9000); if(tab === 'plan') renderTab(); }
     if(e.kind === 'missed'){ toast(e.count > 1 ? `${e.count} burns went by unspent.` : 'That burn went by unspent.', 'bad'); if(tab === 'plan') renderTab(); }
+    /* A handover takes the crates out of the hold and puts the pay in the
+       purse, and both of those are on the panel. Without this the Ship card
+       went on listing Nellie's pebble after Nellie had it — the HUD said the
+       hold was empty and the panel underneath disagreed, in the same frame. */
+    if(e.kind === 'questStep' || e.kind === 'questDone'){ renderTab(); save(); }
   }
 }
 
@@ -922,11 +957,23 @@ function renderHud(docking){
   $('clock-stat').hidden = clockWord == null;
   if(clockWord != null) $('h-warp').textContent = clockWord;
   const b = world.get(state.ship.body);
-  $('h-where').textContent = state.dockedAt ? `Docked at ${S.portName(state.dockedAt)}` : `In ${b.name}'s gravity`;
+  /* Where you are, in the three states a ship is ever in: tied up, going round
+     something, or on your way through its gravity and not coming back. It used
+     to say "In Slate's gravity" for both of the last two, which is true of a
+     ship in a neat circle and of one falling past at four km/s, and those are
+     not the same news. A closed path is one with a period. */
+  const el = state.dockedAt ? null : elementsFromState(b.mu, state.ship.r, state.ship.v);
+  $('h-where').textContent = state.dockedAt ? `Docked at ${S.portName(state.dockedAt)}`
+    : Number.isFinite(el.period) ? `In orbit around ${b.name}`
+    : `Passing through ${b.name}'s gravity`;
   const hint = $('dockhint');
   if(!docking){ hint.textContent = ''; return; }
   const pb = world.get(docking.port);
-  if(docking.ok){ hint.textContent = ` · ${pb.name} will take your lines`; hint.className = ''; return; }
+  /* The hint is a button as much as a label, so when the answer is yes it says
+     what pressing it does. It used to say the harbour "will take your lines",
+     which is a rope nobody in this game has ever thrown: there is no landing
+     and no mooring, only an orbit you match. */
+  if(docking.ok){ hint.textContent = ` · dock at ${pb.name}`; hint.className = ''; return; }
   hint.className = 'far';
   if(docking.kind === 'orbit'){
     hint.textContent = !docking.bound ? ` · ${pb.name}: not in orbit`
@@ -1461,11 +1508,24 @@ function wire(root){
 }
 
 const trend = (price, base) => price > base * 1.12 ? '<span class="up">▲</span>' : price < base * 0.88 ? '<span class="down">▼</span>' : '<span class="flat">•</span>';
-const plenty = (state, port, good) => { const m = S.saturationMul(state, port, good); return m >= 0.95 ? '' : ' · ' + S.saturationWords(m); };
-/* Whether this crate has left the region it was made in, which is most of what
-   it is worth. Said in words rather than as a multiplier, because "a long way
-   from home" is the thing a trader knows and 1.6 is not. */
-const away = (port, good) => S.regionMul(port, good) > 1 ? ' · <span class="up">a long way from home</span>' : '';
+/* What this stall pays, said the way a trader says it rather than as a number:
+   who wants it, and whether the crate has left the region it was made in,
+   which between them are the whole of what it is worth. "They love it, a long
+   way from home" is a thing somebody can act on; ×5.5 is a sum. */
+/* The little "i" beside a good. Hovering it gives what the thing is; pressing
+   it opens the appraisal, which is the same line plus who pays for it once
+   there is somebody aboard who can say. */
+const inspect = gid => {
+  const g = S.goodById(gid);
+  return ` <button class="inspect" data-act="look|${gid}" title="${esc(g.nature ?? '')}" aria-label="What is ${esc(g.name)}?">i</button>`;
+};
+
+const demand = (port, good) => {
+  const words = S.demandWords(port, good);
+  const far = S.demandMul(port, good) >= S.FORMULAS.demand.likedAway;
+  const cls = far || words === 'they love it' ? 'up' : words === 'nobody here wants it' ? 'down' : '';
+  return ` · <span class="${cls}">${words}</span>${far ? ' · <span class="up">a long way from home</span>' : ''}`;
+};
 
 function market(){
   const port = state.dockedAt;
@@ -1486,9 +1546,9 @@ function market(){
     const price = S.buyPrice(state, port, gid);
     const stock = S.stockAvailable(state, port, gid);
     const c1 = S.canBuy(state, gid, 1);
-    const lock = g.needsRefrigeration && !state.keys.refrigeration ? '<span class="lock">needs refrigeration</span>' : '';
+    const lock = g.needsTempControl && !state.keys.tempControl ? '<span class="lock">needs temperature control</span>' : '';
     /* How many you could actually take. It has to start from canBuy rather
-       than from the arithmetic: a cold-chain good with no cold hold priced out
+       than from the arithmetic: a good that needs a held temperature and no way to hold one priced out
        the +1 button and left +10 and "all" lit, which is a button that exists
        to tell you no. If one is impossible, ten is impossible. */
     const maxQ = c1.ok ? Math.min(stock, Math.floor(state.money / price), Math.floor(S.freeUnits(state) / g.units)) : 0;
@@ -1496,7 +1556,7 @@ function market(){
        you are away, so the only way to see a full stall again is to have gone
        and traded somewhere else. */
     const restock = stock === 0 ? ' · <span class="down">picked clean; they will have found more once you have been elsewhere</span>' : '';
-    out += `<div class="row"><div class="name"><b>${esc(g.name)}</b><small>${esc(g.blurb ?? g.category)} · ${stock} in stock${restock} · ${g.units} unit${g.units > 1 ? 's' : ''} each ${lock}</small></div>
+    out += `<div class="row"><div class="name"><b>${esc(g.name)}${inspect(gid)}</b><small>${esc(g.blurb ?? g.category)} · ${stock} in stock${restock} · ${g.units} unit${g.units > 1 ? 's' : ''} each ${lock}</small></div>
       <div class="price">${S.fmtMoney(price)}<small>${trend(price, g.basePrice)} base ${S.fmtMoney(g.basePrice)}</small></div>
       <div class="btns"><button class="btn sm" data-act="buy|${gid}|1" ${c1.ok ? '' : 'disabled title="' + esc(c1.reason) + '"'}>+1</button><button class="btn sm" data-act="buy|${gid}|10" ${maxQ >= 10 ? '' : 'disabled'}>+10</button><button class="btn sm" data-act="buy|${gid}|${maxQ}" ${maxQ > 1 ? '' : 'disabled'}>all</button></div></div>`;
   }
@@ -1507,36 +1567,41 @@ function market(){
      Ship tab lists it, which is where a pilot looks to see what is aboard. */
   for(const c of state.cargo){
     if(c.questId != null) continue;
-    const e = aboard.get(c.good) ?? { qty: 0, oldest: c.t, paid: 0 }; e.qty += c.qty; e.oldest = Math.min(e.oldest, c.t); e.paid += c.price * c.qty; aboard.set(c.good, e);
+    const e = aboard.get(c.good) ?? { qty: 0, paid: 0 }; e.qty += c.qty; e.paid += c.price * c.qty; aboard.set(c.good, e);
   }
   if(!aboard.size) out += '<p class="empty">The hold is empty.</p>';
   for(const [gid, e] of aboard){
     const g = S.goodById(gid);
-    const price = S.sellPrice(state, port, gid, e.oldest);
-    const loved = S.lovesGood(port, gid);
-    const wants = p.buys.some(b => b.good === gid);
-    const fr = S.freshness(g, state.t - e.oldest);
-    const fresh = g.lifetimeDays ? `<span class="fresh" title="freshness"><i class="${fr > 0.66 ? '' : fr > 0.33 ? 'mid' : 'low'}" style="width:${Math.round(fr * 100)}%"></i></span> ${esc(S.freshnessWords(g, state.t - e.oldest))}` : '';
+    const price = S.sellPrice(state, port, gid);
+    const cold = g.needsTempControl ? ' · <span class="up">temperature control pays</span>' : '';
     const avg = e.paid / e.qty;
-    out += `<div class="row"><div class="name"><b>${esc(g.name)}</b><small>${e.qty} aboard · paid ${S.fmtMoney(avg)} each ${fresh}${loved ? ' · <span class="up">they love this here</span>' : wants ? ' · <span class="up">wanted here</span>' : ''}${away(port, gid)}${plenty(state, port, gid)}</small></div>
+    out += `<div class="row"><div class="name"><b>${esc(g.name)}${inspect(gid)}</b><small>${e.qty} aboard · paid ${S.fmtMoney(avg)} each${demand(port, gid)}${cold}</small></div>
       <div class="price">${S.fmtMoney(price)}<small>${price > avg ? '<span class="up">' : '<span class="down">'}${price >= avg ? '+' : ''}${S.fmtMoney(price - avg)}</span></small></div>
       <div class="btns"><button class="btn sm" data-act="sell|${gid}|1">−1</button><button class="btn sm" data-act="sell|${gid}|10" ${e.qty >= 10 ? '' : 'disabled'}>−10</button><button class="btn sm primary" data-act="sell|${gid}|${e.qty}">all</button></div></div>`;
   }
   /* What to bring back here, worth most first, because that is the question a
      trader is actually asking the board. The ones they love are called out:
      those are the routes, and a player should be able to see one from the
-     stall rather than work it out with a notebook. */
+     stall rather than work it out with a notebook.
+
+     What a stall will *pay*, though, is the appraiser's to say. Until Wicket
+     is aboard these are two lists of names — this port wants that, and wants
+     it badly — and a captain has to find out what badly is worth by carrying
+     some and seeing. She puts the numbers on them. */
+  const priced = !!state.crew?.appraiser;
   const shopping = p.buys.map(b => S.goodById(b.good)).filter(g => !aboard.has(g.id))
     .map(g => ({ g, price: S.sellPrice(state, port, g.id), loved: S.lovesGood(port, g.id) }))
     .sort((a, b) => b.price - a.price);
+  const listed = (r, cls) => esc(r.g.name) + (priced ? ` <span class="${cls}">${S.fmtMoney(r.price)}</span>` : '');
   const loves = shopping.filter(r => r.loved);
   if(loves.length){
-    out += '<h3>They love</h3><p>' + loves.map(r => `${esc(r.g.name)} <span class="up">${S.fmtMoney(r.price)}</span>`).join(' · ') + '</p>';
+    out += '<h3>They love</h3><p>' + loves.map(r => listed(r, 'up')).join(' · ') + '</p>';
   }
   const rest = shopping.filter(r => !r.loved);
   if(rest.length){
-    out += '<h3>They want</h3><p>' + rest.map(r => `${esc(r.g.name)} <span class="lock">${S.fmtMoney(r.price)}</span>`).join(' · ') + '</p>';
+    out += '<h3>They want</h3><p>' + rest.map(r => listed(r, 'lock')).join(' · ') + '</p>';
   }
+  if(!priced) out += '<p class="lock">What they would pay is a matter of opinion, and there is nobody aboard whose opinion is worth having.</p>';
   return out;
 }
 
@@ -1565,7 +1630,10 @@ function shipyardTab(){
   for(const u of ups){
     const c = S.canBuyUpgrade(state, u.id);
     const owned = S.ownsUpgrade(state, u);
-    out += `<div class="row"><div class="name"><b>${esc(u.name)}</b><small>${esc(u.effect)}${u.unlocks ? ' · ' + esc(u.unlocks) : ''}</small></div><div class="price">${owned ? '<span class="lock">fitted</span>' : S.fmtMoney(c.price ?? u.price)}</div>
+    /* Three of the keys are sold and wired to nothing yet. Saying so on the
+       row is the difference between a promise and a swindle. */
+    const soon = u.pending ? '<small class="lock">not fitted to anything yet</small>' : '';
+    out += `<div class="row"><div class="name"><b>${esc(u.name)}</b><small>${esc(u.effect)}${u.unlocks ? ' · ' + esc(u.unlocks) : ''}</small>${soon}</div><div class="price">${owned ? '<span class="lock">fitted</span>' : S.fmtMoney(c.price ?? u.price)}</div>
       <div class="btns">${owned ? '' : `<button class="btn sm primary" data-act="upgrade|${u.id}" ${c.ok ? '' : 'disabled title="' + esc(c.reason) + '"'}>Fit</button>`}</div></div>`;
     if(!owned && !c.ok && c.reason !== 'Not enough coin.') out += `<p class="lock">${esc(c.reason)}</p>`;
   }
@@ -1779,17 +1847,19 @@ function shipTab(){
 
   out += '<h3>Fitted</h3>';
   const t = state.tiers;
+  /* The fitted list reads the rack rather than naming the keys itself, so a
+     new one appears here the moment it exists in the tables. */
+  const fittedKeys = UPGRADES.filter(u => u.kind === 'key' && state.keys[u.key]);
   out += `<dl class="kv"><dt>Tank</dt><dd>${esc(S.tiers('tank')[t.tank].name)} · ${S.fmtKms(state.dv)} of ${S.fmtKms(state.tank)}</dd>
-    <dt>Engine</dt><dd>${esc(S.tiers('engine')[t.engine].name)}</dd>
     <dt>Hold</dt><dd>${esc(S.tiers('hold')[t.hold].name)} · ${S.usedUnits(state)} of ${S.holdUnits(state)} units</dd>
-    <dt>Keys</dt><dd>${['heatShield', 'refrigeration', 'sensors', 'stealth'].filter(k => state.keys[k]).map(k => esc(UPGRADES.find(u => u.key === k)?.name ?? k)).join(', ') || '<span class="lock">none yet</span>'}</dd></dl>`;
+    <dt>Systems</dt><dd>${fittedKeys.map(u => esc(u.name)).join(', ') || '<span class="lock">nothing yet</span>'}</dd></dl>`;
 
   out += '<h3>Hold</h3>';
   if(!state.cargo.length) out += '<p class="empty">Empty.</p>';
   for(const c of state.cargo){
     const g = S.goodById(c.good);
     const forWhom = c.questId != null ? ` · <span class="up">for ${esc(S.questById(c.questId)?.title ?? 'a job')}</span>` : '';
-    out += `<p>${c.qty} × ${esc(g.name)} <span class="lock">from ${esc(S.portName(c.from))}${g.lifetimeDays ? ` · ${Math.round(S.freshness(g, state.t - c.t) * 100)}% fresh` : ''}</span>${forWhom}</p>`;
+    out += `<p>${c.qty} × ${esc(g.name)} <span class="lock">from ${esc(S.portName(c.from))} · paid ${S.fmtMoney(c.price)} each</span>${forWhom}</p>`;
   }
 
   out += '<h3>Record</h3>';
@@ -1962,6 +2032,7 @@ const actions = {
     if(!state.target) state.target = S.questTarget(r.quest);
     renderTab(); save(); tutorialCheck();
   },
+  look(gid){ showAppraisal(gid); },
   fuel(k){ const r = S.refuel(state, Number(k)); if(!r.ok) toast(r.reason, 'bad'); renderTab(); save(); },
   upgrade(id){ const r = S.buyUpgrade(state, id); if(!r.ok) toast(r.reason, 'bad'); else toast(`${S.upgradeById(id).name} fitted.`); renderTab(); save(); },
   wait(d){ const days = Number(d); S.wait(state, days); toast(`${S.fmtDays(days)} pass. ${S.calendar(state.t).text}.`); renderTab(); save(); },
@@ -2014,8 +2085,7 @@ function doDock(){
    it appeared beside the other view buttons without ever being wired to
    anything, so it lit up the moment a harbour would take you and then did
    nothing when you pressed it. The HUD hint docks too, because it is the thing
-   that says the harbour will take your lines, and `d` because a keyboard is a
-   keyboard. */
+   that says you can, and `d` because a keyboard is a keyboard. */
 const dockIfWeCan = () => { const d = S.dockingStatus(state); if(d?.ok) doDock(); };
 $('dock-go').addEventListener('click', dockIfWeCan);
 $('dockhint').addEventListener('click', dockIfWeCan);
@@ -2104,6 +2174,26 @@ function showStory(name, text){
   const paras = String(text).split(/\n+/).map(p => `<p class="say">${esc(p)}</p>`).join('');
   openModal(`<h2>${esc(storyTitle(name))}</h2>${paras}<div class="btns"><button class="btn primary" id="m-ok">Close</button></div>`, m => m.querySelector('#m-ok').addEventListener('click', closeModal));
 }
+/* What a thing is, and — if there is anybody aboard who can tell you — who
+   pays for it. The split is the whole of the appraiser's berth: the nature of
+   a good is written on the crate and readable by anyone, while knowing which
+   of four frog moons will pay over the odds for it is a trade, and Wicket is
+   the trade. */
+function showAppraisal(gid){
+  const g = S.goodById(gid);
+  const loved = S.lovedByWords(gid), wanted = S.wantedByWords(gid);
+  let body = `<p class="say">${esc(g.nature ?? g.blurb ?? '')}</p>`;
+  if(state.crew?.appraiser){
+    const who = TEXT.crew.roles.find(r => r.id === 'appraiser')?.person?.name ?? 'The appraiser';
+    body += `<dl class="kv"><dt>Loved by</dt><dd>${loved ? esc(loved) : '<span class="lock">nobody, anywhere</span>'}</dd>
+      <dt>Wanted by</dt><dd>${wanted ? esc(wanted) : '<span class="lock">nobody else</span>'}</dd></dl>
+      <p class="lock">${esc(who)} says so, and has not been wrong yet.</p>`;
+  }else{
+    body += `<p class="lock">Who pays over the odds for this, and who merely takes it, is a thing you would have to find out by carrying some. An appraiser would already know.</p>`;
+  }
+  openModal(`<h2>${esc(g.name)}</h2>${body}<div class="btns"><button class="btn primary" id="m-ok">Close</button></div>`,
+    m => m.querySelector('#m-ok').addEventListener('click', closeModal));
+}
 function storyTitle(name){ return { mawArrival: 'The Maw', tollGiftLater: 'A parcel from the Belt' }[name] ?? 'A note in the log'; }
 function confirmNew(){
   openModal(`<h2>Start over?</h2><p>This save is replaced by a fresh ship at Tassel. There is one save slot.</p><div class="btns"><button class="btn" id="m-no">Keep playing</button><button class="btn danger" id="m-yes">New game</button></div>`, m => {
@@ -2114,8 +2204,13 @@ function confirmNew(){
 
 /* ------------------------------------------------------------- toasts */
 
+/* A toast stays up for as long as it takes to read, never less than the time
+   the caller asked for. Nellie's scene at the end of the lesson is sixty words
+   and used to be pulled off the screen in nine seconds, which is halfway
+   through it: a story beat somebody only sees once should not be a race. */
 function toast(text, kind = '', ms = 4200){
   if(!text) return;
+  ms = Math.max(ms, 1200 + text.split(/\s+/).length * 280);
   const el = document.createElement('div');
   el.className = `toast ${kind}`; el.textContent = text;
   $('toasts').appendChild(el);
@@ -2153,6 +2248,9 @@ function tutorialTests(){
   if(state.ship.body === target) state.flags.reachedTarget = true;
   const reached = !!state.flags.reachedTarget;
   const bought = (state.quests ?? []).some(q => q.id === 'pebble' && (q.step >= 1 || q.done));
+  /* Handed over, not merely carried home. dock() runs the handover itself, so
+     this turns true in the same breath as tying up. */
+  const delivered = (state.quests ?? []).some(q => q.id === 'pebble' && q.done);
   const atTarget = state.ship.body === target;
   /* Aimed means the road reaches the moon *and misses the ground*. "Put Slate
      in the way" was being read literally: a road through the middle of the
@@ -2185,14 +2283,17 @@ function tutorialTests(){
     dockableAt(target),                               // bring the high point inside docking range
     bought,                                           // buy the pebble
     bought && !atTarget,                              // climb back out
-    /* Home *with the pebble*. "Docked at Tassel" on its own is true two
-       minutes into a new game — the opening orbit sits inside Tassel's own
-       harbour mouth, and the quiet window after casting off expires on its
-       own — and because the list is made cumulative from the back, one true
-       card at the end made all fourteen true. The lesson finished itself in
-       the orbit it started in, and Nellie got her scene before anybody had
-       been to Slate. */
-    bought && dockableAt(CONST.START_PORT),           // and get home
+    /* The pebble in Nellie's hand, which is the errand and therefore the
+       lesson. Asking whether Tassel *would* take you ran the last card — and
+       Nellie's scene with it — while the ship was still in the air with the
+       pebble in the hold: being able to dock is not docking, and the handover
+       is what finishes the job. Asking whether the quest is done also settles
+       an older trap, that "docked at Tassel" is true two minutes into a new
+       game, because the opening orbit sits inside Tassel's own harbour mouth
+       and the list is cumulative from the back: one true card at the end made
+       all fourteen true, and the lesson finished itself in the orbit it
+       started in. Neither is possible to reach without the pebble. */
+    delivered,                                        // and put it in her hand
   ];
   /* Every test has to be true of every state past its own card, not only of
      the moment it is passed: a pilot standing in Slate's gravity has no burn
@@ -2320,7 +2421,7 @@ function rollFilm(begin = () => {}){
   const wasPaused = state.paused;
   setPaused(true);
   const f = film = playIntro($('intro-art'), {
-    onBeat: name => { if(name === 'space') host.classList.add('say'); },
+    onCaption: () => host.classList.add('say'),
   });
   /* While it runs the keyboard is the film's: caught on the way down, so that
      space does not pause a game nobody can see yet. */

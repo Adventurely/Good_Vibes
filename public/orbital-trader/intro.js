@@ -37,7 +37,15 @@ export const DURATION = 6.4;    // the film itself
 export const FADE = 0.45;       // and the dissolve into the chart, done in CSS
 export const BREACH = 0.78;     // the moment the water breaks
 
-/* What is happening, and when. The page hangs its closing line on 'space'. */
+/* When the page's caption comes up over the film. It is not a beat: nothing
+ * happens in the picture at 3.55s, the ship is simply most of the way up
+ * through the cloud deck, and overloading a beat with it would have `beatAt`
+ * answer "caption" when asked what is playing. It lives here rather than in
+ * the page because it is a time in this film, and re-cutting the film should
+ * find every one of those in the same place. */
+export const CAPTION_AT = 3.55;
+
+/* What is happening, and when. */
 export const BEATS = [
   { at: 0.00,   name: 'sea' },       // a dark ocean at dawn, and a light under it
   { at: BREACH, name: 'breach' },    // out of the water
@@ -207,10 +215,15 @@ function paintGrid(grid, tint){
  *   film.done.then(start);            // played out, or skipped
  *   film.skip();                      // a click, a key, a change of mind
  *
- * `onBeat` is called once per beat with its name, in order.
+ * `onBeat` is called once per beat with its name, in order, and `onCaption`
+ * once when the film reaches CAPTION_AT. Both run off the film's own clock,
+ * so a dropped frame moves them together with the picture and neither can
+ * fire after the film is over.
  */
 export function playIntro(canvas, opts = {}){
   const onBeat = opts.onBeat ?? (() => {});
+  const onCaption = opts.onCaption ?? (() => {});
+  let said = false;
   const ctx = canvas.getContext('2d');
 
   let W = 0, H = 0, scale = 1, buf = null, b = null;
@@ -767,6 +780,7 @@ export function playIntro(canvas, opts = {}){
     const t = Math.min(DURATION, (now - start) / 1000);
     const name = beatAt(t);
     if(name !== beat){ beat = name; try{ onBeat(name); }catch(e){ console.warn(e); } }
+    if(!said && t >= CAPTION_AT){ said = true; try{ onCaption(); }catch(e){ console.warn(e); } }
     try{
       draw(t);
     }catch(e){

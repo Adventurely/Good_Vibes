@@ -87,25 +87,25 @@ export function soiRadius(mu, a, parentMu){
   return a * Math.pow(mu / parentMu, 2 / 5);
 }
 
-/* How wide a harbour mouth is: ten times the world's own radius, and then
- * however much air stands above that surface.
+/* How wide a harbour mouth is: five of the world's own radii above the top of
+ * its air — or above the ground, on a world with no air to speak of.
  *
- *     r_dock = 10 · radius + (atmo − radius)
+ *     r_dock = atmo + 5 · radius
  *
  * Derived here for the same reason the sphere of influence is: size is the
  * knob, and a table of hand-written mouths can quietly disagree with the
  * worlds it is describing. A big world earns a big harbour, a pebble earns a
  * small one, and a world with weather earns the room its weather takes up —
- * Grumm's approach is wide because Grumm is wide and has sixty thousand
+ * Grumm's approach is wide because Grumm is wide and has fourteen hundred
  * kilometres of cloud on top of that, not because somebody typed a number.
  *
  * The drifting havens keep theirs. Nail, Whisker and the Maw have no surface
- * to be ten times of and no air over it — their radius is a dot on a chart,
- * not a ground — so "ten times the radius" has nothing to act on and the
- * authored mouth stands. */
+ * to be five times of and no air over it — their radius is a dot on a chart,
+ * not a ground — so the formula has nothing to act on and the authored mouth
+ * stands. */
 export function dockRange(radius, atmo){
   if(!(radius > 0)) return null;
-  return 10 * radius + Math.max(0, (atmo ?? radius) - radius);
+  return Math.max(radius, atmo ?? radius) + 5 * radius;
 }
 
 const rawMu = Object.fromEntries(TUNING.bodies.map(b => [b.id, b.mu ?? 0]));
@@ -169,8 +169,7 @@ const UNITS = { light: 1, heavy: 3 };
 export const GOODS = ECONOMY.goods.map(g => ({
   ...g,
   units: UNITS[g.weight] ?? 1,
-  lifetimeDays: g.lifetimeDays ?? null,
-  needsRefrigeration: !!g.needsRefrigeration,
+  needsTempControl: !!g.needsTempControl,
   producedAt: g.producedAt ?? [],
   stock: g.stock ?? [1, 1],
   buyers: g.buyers ?? [],
@@ -219,7 +218,6 @@ export const PORTS = Object.fromEntries(Object.entries(ECONOMY.ports).map(([id, 
     marketSize: p.marketSize ?? 1,
     fuelPricePerKms: p.fuelPricePerKms ?? null,
     shipyard: !!p.shipyard,
-    upgrades: p.upgrades ?? [],
     region: p.region ?? null,
     /* The shelves are not written down per port any more: a stall sells what
        the place produces and buys what the goods table says it wants, so one
@@ -235,16 +233,21 @@ export const PORTS = Object.fromEntries(Object.entries(ECONOMY.ports).map(([id, 
 
 /* ------------------------------------------------------------- upgrades */
 
-const KEY_NAMES = { heatshield: 'heatShield', refrigeration: 'refrigeration', sensors: 'sensors', stealth: 'stealth' };
+const KEY_NAMES = {
+  heatshield: 'heatShield', tempcontrol: 'tempControl',
+  gravsensors: 'gravSensors', cryocooling: 'cryoCooling',
+};
+/* Tanks and holds are fitted anywhere there is a pump, so their shelf is
+   written as "*" rather than as thirteen port ids that would have to be kept
+   in step with the sky. Everything else names its port, because where you buy
+   it is half of what it is: gravitational sensors are a cat instrument, and
+   the rest come off an Emberkin bench. */
+const EVERY_YARD = Object.keys(PORTS).filter(id => PORTS[id].fuelPricePerKms != null);
 export const UPGRADES = ECONOMY.upgrades.map(u => {
-  const out = { ...u, soldAt: u.soldAt ?? null };
-  if(u.kind === 'tank') out.value = TUNING.ship.tanks[u.tier].dv_kms;
-  if(u.kind === 'engine') out.value = TUNING.ship.engines[u.tier].fuelPriceMul;
-  if(u.kind === 'hold') out.value = TUNING.ship.holds[u.tier].units;
+  const out = { ...u, soldAt: u.soldAt === '*' ? EVERY_YARD : (u.soldAt ?? null) };
+  if(u.kind === 'tank'){ out.value = TUNING.ship.tanks[u.tier].dv_kms; out.effect = `Holds ${out.value} km/s.`; }
+  if(u.kind === 'hold'){ out.value = TUNING.ship.holds[u.tier].units; out.effect = `${out.value} units of cargo.`; }
   if(u.kind === 'key') out.key = KEY_NAMES[u.id] ?? u.id;
-  if(u.kind === 'tank') out.effect = `Holds ${out.value} km/s.`;
-  if(u.kind === 'hold') out.effect = `${out.value} units of cargo.`;
-  if(u.kind === 'engine') out.effect = out.value < 1 ? `Fuel costs ${Math.round((1 - out.value) * 100)}% less to buy.` : 'The engine you came with.';
   return out;
 });
 
@@ -252,15 +255,11 @@ export const UPGRADES = ECONOMY.upgrades.map(u => {
 
 const F = ECONOMY.formulas;
 export const FORMULAS = {
-  region: F.region,
-  loved: F.loved,
   stock: F.stock,
-  saturation: F.saturation,
-  perishable: F.perishable,
+  demand: F.demand,
   reputation: F.reputation,
   haggle: F.haggle ?? { spread: 0.07 },
   volatility: F.volatility ?? { bySpecies: {} },
-  market: { disinterestMul: 0.6, resaleCap: 0.75 },
   /* Aerobraking. The shed is a fraction of the speed at the bottom of the
      dive, scaled by how deep into the air the dive goes — and the fraction has
      to be small, because the design sells skimming as *free braking*, not as a
