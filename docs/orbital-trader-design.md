@@ -437,6 +437,20 @@ Four living species, one extinct. Each has one thing it is better at than anybod
 - Slow-moving but deeply knowledgeable
 - **Strength: Knowledge**
 
+**Naming.** Each people names from its own well, so a name says where somebody
+is from before anything else does. The wells are:
+
+| People | Scheme | In the game |
+|---|---|---|
+| Otters | Short, soft, one or two syllables, from small birds, weather and water | Finn, Wren, Theo, Nellie |
+| Emberkin | Indian given names, and an institution rather than a family — `Name of the Ninth Forge`, `House Rathore`. The institution is the important half | Kiran, Devika, House Rathore |
+| Cats | Japanese given names | Tsuki, Kaede, Haru, Rin |
+| Frogs | Two syllables, always | Wicket |
+
+The rule that matters is that these are wells, not costumes: a new quest giver
+is named by picking from the right one, and a name that does not fit its people
+is a bug in the fiction the same way a wrong price is a bug in the market.
+
 **The Builders — Extinct**
 
 - Unknown species, unknown name
@@ -754,7 +768,7 @@ nowhere to press. That is the last piece.
 ### 5.2 What the Line Needs That the Game Does Not Have
 
 1. ~~**Crew as a reward.**~~ Done, as far as the line needs. Three of the
-   twenty hand over a person — Brikka the Emberkin engineer at #6, Celia the cat
+   twenty hand over a person — Kiran the Emberkin engineer at #6, Tsuki the cat
    navigator at #13, Wicket the frog appraiser at #19 — one each from the three
    peoples whose region the player has just finished crossing. Finishing one
    of those quests fills that berth and the Crew menu shows who is in it. What
@@ -826,9 +840,9 @@ berth fills with a name, a species, a portrait and a line:
 
 | Berth | Who | People | From |
 |---|---|---|---|
-| Engineer | Brikka | Emberkin | #6 Engine Trouble |
-| Navigator | Celia | Cats | #13 A Cat's Request |
-| Appraiser | Wicket | Frogs | #19 Appraisal |
+| Engineer | Kiran (he) | Emberkin | #6 Engine Trouble |
+| Navigator | Tsuki (she) | Cats | #13 A Cat's Request |
+| Appraiser | Wicket (he) | Frogs | #19 Appraisal |
 
 `state.crew` carries a slot per berth, null until earned and then `{ role,
 from, joinedAt }` — who they are, which job brought them, and when.

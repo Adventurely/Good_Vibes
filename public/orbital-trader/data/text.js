@@ -352,8 +352,8 @@ export const NARRATIVE = {
     "species": "emberkin",
     "does": "Keeps the burn honest and the tank from lying to you.",
     "person": {
-     "name": "Brikka",
-     "line": "Eleven years at the Ninth Forge and nothing left there she has not taken apart. She has opinions about your tank and will share them."
+     "name": "Kiran",
+     "line": "Eleven years at the Ninth Forge and nothing left there he has not taken apart. He has opinions about your tank and will share them."
     }
    },
    {
@@ -362,7 +362,7 @@ export const NARRATIVE = {
     "species": "cat",
     "does": "Reads a rock an au off and tells you which way it is going.",
     "person": {
-     "name": "Celia",
+     "name": "Tsuki",
      "line": "Can read a rock an au off and tell you which way it is going. Says almost nothing and is always already looking at the thing you are about to point at."
     }
    },
@@ -381,15 +381,15 @@ export const NARRATIVE = {
  "events": {
   "tollOffer": [
    {
-    "captain": "Captain Sixstring",
+    "captain": "Captain Haru",
     "line": "Easy now. The belt is ours and the rate is the rate. Coin or crates, your choice, and you keep the rest."
    },
    {
-    "captain": "Captain Ashgrin",
+    "captain": "Captain Kaede",
     "line": "Nicely flown. That costs you nothing. Crossing our belt does. Pick what you would rather lose."
    },
    {
-    "captain": "Captain Weft",
+    "captain": "Captain Rin",
     "line": "We take a share, never the hold. Yield and nobody has a bad day, least of all you."
    }
   ],
@@ -634,7 +634,7 @@ export const NARRATIVE = {
   {
    "id": "enginetrouble",
    "title": "Engine Trouble",
-   "giver": "Brikka of the Ninth Forge",
+   "giver": "Kiran of the Ninth Forge",
    "type": "retrieval",
    "from": "cinder",
    "to": "slate",
@@ -647,13 +647,13 @@ export const NARRATIVE = {
    "pay": 1050,
    "rep": "emberkin",
    "crew": "engineer",
-   "blurb": "Three crates of spare parts for the Slate yards, and Brikka wants to ride along and see them fitted. She has been at the Ninth Forge eleven years and has run out of things there she has not already taken apart.",
-   "done": "She watches the Slate shipwrights work for about four minutes, says one sentence nobody enjoys, and fixes it herself. Then she asks what your tank is rated at, and does not get off the ship."
+   "blurb": "Three crates of spare parts for the Slate yards, and Kiran wants to ride along and see them fitted. He has been at the Ninth Forge eleven years and has run out of things there he has not already taken apart.",
+   "done": "He watches the Slate shipwrights work for about four minutes, says one sentence nobody enjoys, and fixes it himself. Then he asks what your tank is rated at, and does not get off the ship."
   },
   {
    "id": "engineerfavour",
    "title": "A Favor for an Engineer",
-   "giver": "Sath of the Ninth Forge",
+   "giver": "Devika of the Ninth Forge",
    "type": "message",
    "from": "cinder",
    "to": "scorch",
@@ -684,7 +684,7 @@ export const NARRATIVE = {
   {
    "id": "collector",
    "title": "The Collector",
-   "giver": "House Ahl of Veyra",
+   "giver": "House Rathore of Veyra",
    "type": "shopping",
    "from": "veyra",
    "to": "veyra",
@@ -704,13 +704,13 @@ export const NARRATIVE = {
    ],
    "pay": 3600,
    "rep": "emberkin",
-   "blurb": "A list, not a cargo: one string of Tassel pearls, one coral carving, one precision clock. House Ahl wants all three on the table at once and does not care where you get them. The clock is made on Veyra, which they appear to find funny.",
+   "blurb": "A list, not a cargo: one string of Tassel pearls, one coral carving, one precision clock. House Rathore wants all three on the table at once and does not care where you get them. The clock is made on Veyra, which they appear to find funny.",
    "done": "The three go on a velvet board in that order and a steward writes the sum out longhand. You are not told what it is for."
   },
   {
    "id": "factionbusiness",
    "title": "Faction Business",
-   "giver": "A steward of House Ahl",
+   "giver": "A steward of House Rathore",
    "type": "message",
    "from": "veyra",
    "to": "cinder",
@@ -736,7 +736,7 @@ export const NARRATIVE = {
    "pay": 3400,
    "rep": "cat",
    "blurb": "Two reactor coils for the cats at Nail, crated and aboard before the paperwork was finished. The Forge would like it known that these are a favour and not a precedent.",
-   "done": "Half the rock comes out to watch the crates open. Somebody says a word in cat that Ashgrin declines to translate, and you are bought drinks for the rest of the evening."
+   "done": "Half the rock comes out to watch the crates open. Somebody says a word in cat that Kaede declines to translate, and you are bought drinks for the rest of the evening."
   },
   {
    "id": "somethingshiny",
@@ -759,7 +759,7 @@ export const NARRATIVE = {
   {
    "id": "catsrequest",
    "title": "A Cat's Request",
-   "giver": "Captain Ashgrin",
+   "giver": "Captain Kaede",
    "type": "chain",
    "from": "nail",
    "to": "nail",
@@ -772,13 +772,13 @@ export const NARRATIVE = {
    "pay": 1350,
    "rep": "cat",
    "crew": "navigator",
-   "blurb": "Ashgrin wants you to go and be seen. Nail, then Whisker, then the Arc, in that order, and come back and tell her who was where. She will not say why, and it is rude to ask a cat twice.",
-   "done": "She hears you out, nods once, and introduces you to Celia, who has been sitting behind you the entire time and who apparently already knows what your ship is called."
+   "blurb": "Kaede wants you to go and be seen. Nail, then Whisker, then the Arc, in that order, and come back and tell her who was where. She will not say why, and it is rude to ask a cat twice.",
+   "done": "She hears you out, nods once, and introduces you to Tsuki, who has been sitting behind you the entire time and who apparently already knows what your ship is called."
   },
   {
    "id": "medicinerun",
    "title": "Medicine Run",
-   "giver": "Captain Ashgrin",
+   "giver": "Captain Kaede",
    "type": "delivery",
    "from": "nail",
    "to": "brine",
@@ -790,7 +790,7 @@ export const NARRATIVE = {
    ],
    "pay": 2100,
    "rep": "frog",
-   "blurb": "Four cases of medicine that came through Whisker and did not come with paperwork. Ashgrin wants them on Brine, cold, and soon. The apothecaries there will know exactly what they are and will not say so.",
+   "blurb": "Four cases of medicine that came through Whisker and did not come with paperwork. Kaede wants them on Brine, cold, and soon. The apothecaries there will know exactly what they are and will not say so.",
    "done": "A frog with very old hands checks each case, says nothing about where it came from, and gives you a jar of something for the journey home."
   },
   {
@@ -848,8 +848,8 @@ export const NARRATIVE = {
    "pay": 4800,
    "rep": "frog",
    "crew": "appraiser",
-   "blurb": "Wicket would like to look at three things at once: a piece of the Arc off Nail, a storm crystal fished out of Grumm's cloud tops, and one of Cinder's reactor coils. She is not buying them. She wants them on the same table under the same lamp, and she has wanted that for some while.",
-   "done": "She puts all three under the same lamp, is quiet for a long time, and then says something that is not an answer. Then she asks where you are going next, and starts packing."
+   "blurb": "Wicket would like to look at three things at once: a piece of the Arc off Nail, a storm crystal fished out of Grumm's cloud tops, and one of Cinder's reactor coils. He is not buying them. He wants them on the same table under the same lamp, and he has wanted that for some while.",
+   "done": "He puts all three under the same lamp, is quiet for a long time, and then says something that is not an answer. Then he asks where you are going next, and starts packing."
   }
  ]
 };

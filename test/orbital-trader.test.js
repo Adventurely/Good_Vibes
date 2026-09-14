@@ -670,7 +670,32 @@ test('the crew menu has a captain to show and three berths to leave empty', () =
      reach the page through a build step, so this is also what notices a
      text.js that was not rebuilt after the fiction changed. */
   assert.equal(c.captain.name, 'Finn');
-  assert.deepEqual(c.roles.map(r => r.person?.name), ['Brikka', 'Celia', 'Wicket']);
+  assert.deepEqual(c.roles.map(r => r.person?.name), ['Kiran', 'Tsuki', 'Wicket']);
+
+  /* And everybody aboard is the gender they are, in every line written about
+     them. Pronouns are what prose edits break: the scene where somebody joins
+     the ship lives in a quest, their blurb lives in the crew table, and the two
+     are edited months apart. Checked only where a person is the subject of the
+     text — the cat's scene belongs to Captain Kaede, who is not the one being
+     hired, so it is not read here. */
+  const he = { yes: /\b(he|him|his|himself)\b/i, no: /\b(she|her|hers|herself)\b/i };
+  const she = { yes: /\b(she|her|hers|herself)\b/i, no: /\b(he|him|his|himself)\b/i };
+  const cast = [
+    ['Kiran', he, ['enginetrouble']],
+    ['Wicket', he, ['appraisal']],
+    ['Tsuki', she, []],
+  ];
+  for(const [name, want, questIds] of cast){
+    const role = c.roles.find(r => r.person.name === name);
+    const texts = [role.person.line, ...questIds.flatMap(id => {
+      const q = S.questById(id);
+      return [q.blurb, q.done];
+    })];
+    for(const t of texts){
+      assert.ok(!want.no.test(t), `${name} is written with the wrong pronoun: "${t}"`);
+    }
+    if(questIds.length) assert.ok(texts.some(t => want.yes.test(t)), `${name} is never given a pronoun at all`);
+  }
   for(const r of c.roles) assert.ok(r.person?.line, `${r.id} has nobody in it to say anything`);
 
   // And a new ship carries a berth for each of them, with nobody in it.
