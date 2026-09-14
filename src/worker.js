@@ -2,9 +2,9 @@
  *
  * Two jobs, and deliberately nothing else. Static files come out of
  * Cloudflare's asset store without this code running at all — the Worker is
- * only invoked for paths that do not match a file — so the one thing left to
- * route is the socket. Everything the game knows lives behind that socket, in
- * a Durable Object per room code.
+ * only invoked for paths that do not match a file — so the things left to
+ * route are the sockets, and one board. Everything a game knows lives behind
+ * its socket, in a Durable Object per room code.
  *
  * There is no sign-in, by choice. The room code is the secret: whoever has it
  * can take a seat, which is how you hand a game to four friends in a message
@@ -14,11 +14,13 @@
 
 import { GameRoom } from './room-do.js';
 import { SolariumRoom } from './solarium-do.js';
+import { SunwardBoard } from './board-do.js';
 
-export { GameRoom, SolariumRoom };
+export { GameRoom, SolariumRoom, SunwardBoard };
 
 const WS_PATH = '/api/good-vibes/ws';
 const SOLARIUM_WS = '/api/solarium/ws';
+const BOARD_PATH = '/api/sunward/board';
 const CODE_RE = /^[A-Z0-9]{4,6}$/;
 
 // Where the root used to be a single game, before there were two of them.
@@ -63,6 +65,23 @@ export default {
 
       const id = env.SOLARIUM.idFromName(`${code}`);
       return env.SOLARIUM.get(id).fetch(new Request(url.toString(), request));
+    }
+
+    /* Sunward's leaderboard: the first route here that is not a socket, and
+       the first time that game has touched the Worker at all. It is still one
+       player and a save file — the board is a thing the save can be posted to,
+       not a thing the game needs in order to run, and a failed deploy here
+       loses a leaderboard and not a game. Plain HTTP because nothing about a
+       leaderboard is live: it is read when the record opens and written once
+       every fifteen seconds at most, and holding a socket open for that would
+       be an idle connection per player for the sake of nothing.
+
+       One object, named for the game rather than for a code. A leaderboard is
+       everyone in one place by definition, so there is nothing to shard by,
+       and one object is what makes "the top ten" one answer rather than a
+       merge of several that each saw a different set of players. */
+    if(url.pathname === BOARD_PATH){
+      return env.BOARD.get(env.BOARD.idFromName('sunward')).fetch(request);
     }
 
     /* The game used to be the whole site, so its pages sat at the root. Anyone

@@ -31,6 +31,7 @@
         --line: var(--gv-line);
         --text: var(--gv-text);
         --muted: var(--gv-muted);
+        --faint: var(--gv-faint);
         --accent: var(--gv-leaf);
         --sun: var(--gv-sun);
         --bad: var(--gv-bad);
@@ -204,8 +205,8 @@
       }
       .tabs { display: flex; border-bottom: 2px solid var(--line); }
       .tabs button {
-        flex: 1; font: inherit; font-size: 0.92rem; font-weight: 600;
-        padding: 0.55rem 0.25rem;
+        flex: 1; font: inherit; font-size: 0.86rem; font-weight: 600; white-space: nowrap;
+        padding: 0.55rem 0.2rem;
         background: var(--sunk); border: 0; border-right: 1px solid var(--line);
         color: var(--muted); cursor: pointer;
       }
@@ -215,6 +216,27 @@
       .tabs .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%;
         background: var(--sun); margin-left: 0.25rem; vertical-align: 0.1em; }
       .tabs .dot[hidden] { display: none; }
+      /* Five tabs across a phone: "Upgrades" with its dot is the one that
+         decides the size, and at the desktop size it wrapped. */
+      @media (max-width: 30rem){ .tabs button { font-size: 0.8rem; padding-inline: 0.15rem; } }
+
+      /* The board. A form to join it, then four short tables. */
+      .boardbox { padding: 0.6rem 0.5rem 0.3rem; border-bottom: 1px solid var(--line); }
+      .board-what { margin: 0 0 0.5rem; font-size: 0.86rem; color: var(--text); }
+      .board-what b { color: var(--accent); }
+      .board-join { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+      .board-join label { flex: 1 0 100%; margin: 0; font-size: 0.64rem; letter-spacing: 0.05em;
+        font-weight: 600; text-transform: uppercase; color: var(--muted); }
+      .board-join input { flex: 1 1 9rem; min-width: 0; font: inherit; padding: 0.45rem 0.6rem;
+        border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--text); }
+      .board-join .btn-go { padding: 0.5rem 0.8rem; }
+      .board-line { margin: 0.45rem 0 0; font-size: 0.8rem; color: var(--muted); }
+      .boards { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0 1rem; padding: 0 0.5rem 0.6rem; }
+      .board td:first-child { width: 2rem; color: var(--muted); }
+      .board td:nth-child(2) { text-align: left; }
+      .board td:last-child { text-align: right; overflow-wrap: anywhere; }
+      .board table { table-layout: fixed; }
+      .board tr.you td { background: #eef7e9; font-weight: 700; }
 
       .sheet { padding: 0.5rem; overflow-y: auto; max-height: 40rem; }
       @media (max-width: 61rem) { .sheet { max-height: none; } }
@@ -242,6 +264,11 @@
       .row canvas { width: 48px; height: 48px; image-rendering: pixelated; }
       .row .name { font-weight: 700; font-size: 0.96rem; }
       .row .note { display: block; font-size: 0.8rem; color: var(--muted); }
+      /* The description stays on the row for good. It used to give way to the
+         figures the moment you owned one of a kind, which meant a player only
+         ever saw it while they had none — and never again once it was a thing
+         they actually owned. */
+      .row .what { display: block; font-size: 0.76rem; color: var(--faint); margin-top: 0.1rem; }
       .row .cost { text-align: right; font-size: 0.9rem; font-weight: 700; color: var(--sun);
                    font-variant-numeric: tabular-nums; }
       .row .cost small { display: block; font-weight: 500; color: var(--muted); font-size: 0.72rem; }
@@ -316,7 +343,7 @@
       .toast b { color: #ffd34e; }
       @keyframes pop { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
-      .saved { color: var(--faint, var(--muted)); font-size: 0.72rem; margin: 0.8rem 0 0; }
+      .saved { color: var(--faint); font-size: 0.72rem; margin: 0.8rem 0 0; }
 
       @media (prefers-reduced-motion: reduce) {
         .toast { animation: none; }
@@ -384,6 +411,7 @@
             Seeds<span class="dot" id="seeds-dot" hidden></span>
           </button>
           <button role="tab" id="tab-record" aria-controls="sheet-record" aria-selected="false" type="button">Record</button>
+          <button role="tab" id="tab-board" aria-controls="sheet-board" aria-selected="false" type="button">Board</button>
         </div>
 
         <section class="sheet" id="sheet-grow" role="tabpanel" aria-labelledby="tab-grow">
@@ -411,8 +439,10 @@
         <div class="seedbox">
           <div class="grow">
             <p class="seed-what"><b>Seeds.</b> Replant the lot from scratch and keep your seeds.
-               Every seed you hold makes everything you plant <b>+2%, for good</b>.</p>
+               Every seed you hold makes everything you plant <b>+2%, for good</b>.
+               Each replanting is a winter the tree has stood through, and it comes back bigger.</p>
             <dl class="seed-facts">
+              <div><dt>Winters</dt><dd id="seed-winters">0</dd></div>
               <div><dt>Seeds held</dt><dd id="seed-held">0</dd></div>
               <div><dt>Ready to bank</dt><dd id="seed-pending">0</dd></div>
               <div><dt>Next seed at</dt><dd id="seed-next">1.00M</dd></div>
@@ -450,6 +480,30 @@
           <ul class="log" id="log"></ul>
           <p class="saved" id="saved">saving&hellip;</p>
         </section>
+
+        <!-- The board is opt-in and the name is the only thing that leaves the
+             device. The id that goes with it is made here at random and kept
+             under its own key, not in the save, so starting the lot over does
+             not orphan the row. -->
+        <section class="sheet" id="sheet-board" role="tabpanel" aria-labelledby="tab-board" hidden>
+          <div class="boardbox">
+            <p class="board-what"><b>The board.</b> Who has tapped the most, stood through the most winters,
+               earned the most and gone fastest. Joining sends the name you type and those four
+               numbers. The lot itself, and everything else on the record, stays on this device.</p>
+            <form class="board-join" id="board-join">
+              <label for="board-name">Your name on the board</label>
+              <input id="board-name" maxlength="16" autocomplete="nickname" spellcheck="false"
+                     placeholder="Two to sixteen characters">
+              <button class="btn btn-go" id="board-send" type="submit">Put me on the board</button>
+            </form>
+            <!-- Every answer the board gives — joined, refused, out of reach —
+                 lands here, so it is a live region: a refusal nobody is told
+                 about is a form that silently does nothing. -->
+            <p class="board-line" id="board-line" role="status"></p>
+          </div>
+          <div class="boards" id="boards"></div>
+          <p class="empty" id="board-note">Fetching the board&hellip;</p>
+        </section>
       </div>
 
     </div>
@@ -458,7 +512,8 @@
 
     <noscript>
       <p style="max-width:40rem;margin:2rem auto">Sunward runs in the browser and needs JavaScript.
-      There is no server: the lot is saved on this device and nowhere else.</p>
+      The lot is saved on this device. Nothing leaves it unless you join the board, and then only
+      your name and the four figures it ranks.</p>
     </noscript>
 
     <script type="module">
@@ -473,6 +528,7 @@
       import {
         newGame, fromSave, toSave, tick, tap, plant, plantRefusal, study, studyRefusal,
         prestige, prestigeRefusal, pendingSeeds, energyForSeeds, seedBonus, MAX_TICK,
+        winters,
         catchUp, OFFLINE_CAP, GROWERS, GROWER_BY_ID, GROWER_IDS,
         bulkCost, affordable, bonuses, totalRate, steadyRate, averageFactor,
         tapValue, momentum, isWindfall, STREAK_CAP, WINDFALL_EVERY,
@@ -481,7 +537,7 @@
         STAT_KEYS, STAT_LABELS, STAT_SHORT, formatEnergy, formatTime, formatStat,
         ACHIEVEMENTS, UPGRADE_BY_ID,
       } from './content.js';
-      import { createLot, growthFor, treeBounds, PROP_ART, drawProp, drawBurst, SCENE_W, SCENE_H, hex }
+      import { createLot, growthFor, treeBounds, PROP_ART, drawProp, drawBurst, GLOW_MS, SCENE_W, SCENE_H, hex }
         from './art.js';
       import { drawText, textWidth, fitCanvas } from '../good-vibes/pixel.js';
 
@@ -499,6 +555,9 @@
         seedLine: els('seed-line'), seedMeter: els('seed-meter'), reset: els('reset'),
         seedHeld: els('seed-held'), seedPending: els('seed-pending'), seedNext: els('seed-next'),
         studyDot: els('study-dot'), seedsDot: els('seeds-dot'), wipe: els('wipe'),
+        seedWinters: els('seed-winters'),
+        boards: els('boards'), boardNote: els('board-note'), boardLine: els('board-line'),
+        boardJoin: els('board-join'), boardName: els('board-name'),
       };
 
       /* ---- the save file ------------------------------------------------ */
@@ -541,7 +600,10 @@
       const still = matchMedia('(prefers-reduced-motion: reduce)');
       const taps = [];          // when each tap happened, for the rate window
       const floaters = [];      // the numbers that drift off the tree
-      let shake = 0;            // how hard the tree is still ringing
+      /* The light of every tap still spreading. A tap is energy going out of a
+         finger and into the tree, so what it leaves behind is light spreading
+         from where the finger landed, not the tree flinching sideways. */
+      const glows = [];
       let bulk = 1;             // 1, 10, 100 or 'max'
 
       const paintLot = createLot();
@@ -628,14 +690,18 @@
            the point of the tap, and the canopy swelling. The first cut had a
            five-pixel number and a one-pixel wobble, which on a phone was a tap
            you could not see land. */
-        /* The tenth tap is the windfall, and it has to look like one: twice
-           the leaves thrown twice as far, the number a size up again, and the
-           canopy given the whole swell at once. A tap that paid ten times and
-           looked like the other nine would read as a counter glitch. */
-        bursts.push({ x, y, born: performance.now(), size: big ? 2 : 1 });
-        while(bursts.length > 8) bursts.shift();
+        glows.push({ x, y, born: performance.now(), size: big ? 1.8 : 1, age: 0 });
+        while(glows.length > 8) glows.shift();
+        /* The tenth tap is the windfall, and it has to look like one: a wider
+           light, the number a size up again, the canopy given the whole swell
+           at once, and the only leaves the tree throws all game. A tap that
+           paid ten times and looked like the other nine would read as a
+           counter glitch. */
+        if(big){
+          bursts.push({ x, y, born: performance.now(), size: 2 });
+          while(bursts.length > 4) bursts.shift();
+        }
         pulse = Math.min(1, pulse + (big ? 1 : 0.55));
-        shake = Math.min(4, shake + (big ? 3.2 : 1.8));
         logMilestones();
       }
 
@@ -662,7 +728,7 @@
         // that pays per tap.
         if(event.repeat) return;
         event.preventDefault();
-        const bounds = treeBounds(growthFor(growers()));
+        const bounds = treeBounds(growthFor(growers()), winters(state));
         doTap(bounds.x + bounds.w / 2, bounds.y + bounds.h * 0.4);
       });
 
@@ -746,7 +812,9 @@
           row.append(iconFor(g.id));
           const mid = document.createElement('span');
           mid.innerHTML = `<span class="name">${g.name}`
-            + `<span class="when">${WHEN[g.phase]}</span></span><span class="note"></span>`;
+            + `<span class="when">${WHEN[g.phase]}</span></span><span class="note"></span>`
+            + `<span class="what"></span>`;
+          mid.querySelector('.what').textContent = g.flavour;
           const cost = document.createElement('span');
           cost.className = 'cost';
           row.append(mid, cost);
@@ -829,9 +897,11 @@
           // upgrade that did nothing.
           const each = g.rate * bonus.grower[g.id] * bonus.allMult * bonus.seedMult
             * averageFactor(g.phase, bonus.lift, bonus.swing);
+          // The figures when there are figures, and the description under
+          // them either way.
           note.textContent = owned
             ? `${owned} planted · ${formatEnergy(each * owned)}/s`
-            : g.flavour;
+            : 'None planted yet';
           cost.innerHTML = `${formatEnergy(price)}<small>${count > 1 ? '&times;' + count + ' · ' : ''}`
             + `+${formatEnergy(each * count)}/s</small>`;
         }
@@ -1026,6 +1096,7 @@
         const want = energyForSeeds(earnedSeeds + 1);
         const bonusNow = Math.round((seedBonus(held) - 1) * 100);
         const after = Math.round((seedBonus(earnedSeeds) - 1) * 100);
+        ui.seedWinters.textContent = String(winters(state));
         ui.seedHeld.textContent = `${held} · +${bonusNow}%`;
         ui.seedPending.textContent = pending ? `${pending} · +${after - bonusNow}% more` : '0';
         ui.seedNext.textContent = `${formatEnergy(want)} all told`;
@@ -1055,13 +1126,15 @@
           + `You bank ${pending} seed${pending === 1 ? '' : 's'} — ${state.seeds + pending} in all, worth +${after}%`
           + ` on everything you plant from now on.\n`
           + `You keep every medal and the all-time record.\n`
-          + `The energy, the growers and the upgrades on the lot start again from nothing.`)) return;
+          + `The energy, the growers and the upgrades on the lot start again from nothing.\n`
+          + `The tree stands tall through another winter!`)) return;
         prestige(state);
-        note(state, `Replanted the lot. ${state.seeds} seed${plural(state.seeds)} held.`);
+        note(state, `Winter ${winters(state)}. Replanted the lot; ${state.seeds} seed${plural(state.seeds)} held.`);
         say(`${state.seeds} seed${plural(state.seeds)} held — everything you plant makes +${after}% now.`, 'Replanted');
         shopKey = null;
         drawShop();
         writeSave();
+        sendBoard();
       });
 
       ui.wipe.addEventListener('click', () => {
@@ -1082,6 +1155,7 @@
         }
         if(id === 'record') drawRecord();
         if(id === 'seeds') drawSeeds();
+        if(id === 'board') openBoard();
       }
       for(const tab of tabs){
         tab.addEventListener('click', () => showTab(tab.id.replace('tab-', '')));
@@ -1172,6 +1246,10 @@
         }
         if(document.body.dataset.tab === 'record' && sinceRecord >= 0.5){ sinceRecord = 0; drawRecord(); }
         if(sinceSave >= 10){ sinceSave = 0; writeSave(); }
+        // The board is refreshed only while it is being looked at, and a
+        // joined player's row is sent along every few minutes while they play.
+        if(document.body.dataset.tab === 'board' && now - board.fetchedAt > BOARD_REFRESH) fetchBoard();
+        if(board.joined && now - board.sentAt > BOARD_SEND_EVERY) sendBoard();
 
         paint(now);
         requestAnimationFrame(frame);
@@ -1182,16 +1260,27 @@
         const planted = growers();
         const sway = still.matches ? 0 : Math.sin(now / 1400) * 0.05 + Math.sin(now / 620) * 0.015;
 
-        shake = Math.max(0, shake - 0.16);
         pulse = Math.max(0, pulse - 0.06);
+
+        /* Aged here rather than while drawing, because the light is painted
+           into the tree's own buffer and has to be handed over with it. Under
+           reduced motion it is held at the moment it is widest and brightest
+           enough to see, rather than spreading: a light that grows is motion,
+           and one that sits there for half a second is not. */
+        for(let i = glows.length - 1; i >= 0; i--){
+          const age = (now - glows[i].born) / GLOW_MS;
+          if(age >= 1){ glows.splice(i, 1); continue; }
+          glows[i].age = still.matches ? 0.3 : age;
+        }
         paintLot(lotCtx, {
           phase,
           growth: growthFor(planted),
+          age: winters(state),
           owned: state.owned,
           growers: planted,
           now: still.matches ? 0 : now,
           sway,
-          shake: still.matches ? 0 : Math.sin(now / 40) * shake,
+          glows,
           // Under reduced motion the canopy still swells — it is a single
           // ease, not a repeated motion — and the burst is a still shape.
           pulse,
@@ -1227,6 +1316,229 @@
           drawText(lotCtx, f.text, left, Math.round(y), key, scale);
         }
       }
+
+      /* ---- the board ------------------------------------------------------ */
+
+      /* A public board, opt-in. Four lists — taps, winters, energy earned all
+         told, best taps a second — and the name typed here is the only thing
+         that leaves the device. The id that goes with it is random and made
+         here; whoever holds it can update the row and nobody else can, which
+         is as much of an account as a clicker wants. It lives under its own
+         key so that starting over on the lot does not orphan the row.
+
+         The scores are self-reported, and the server's answer to that is
+         plausibility caps and a rate limit, not proof. It is a board for a
+         hobby site, and it says so on the page. */
+      const BOARD_KEY = 'sunward:board';
+      const BOARD_URL = '/api/sunward/board';
+      const BOARD_REFRESH = 60 * 1000;          // while the tab is open
+      const BOARD_SEND_EVERY = 5 * 60 * 1000;   // while joined and playing
+      const BOARD_LABELS = {
+        taps: 'Most taps', winters: 'Most winters', earned: 'Most energy, all told', peakTaps: 'Fastest hands',
+      };
+      const ordinal = n => {
+        const tail = n % 100;
+        const end = tail >= 11 && tail <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th';
+        return `${n}${end}`;
+      };
+
+      function readBoard(){
+        try {
+          const raw = localStorage.getItem(BOARD_KEY);
+          const data = raw ? JSON.parse(raw) : {};
+          return { id: typeof data.id === 'string' ? data.id : null,
+            name: typeof data.name === 'string' ? data.name : '', joined: data.joined === true };
+        } catch { return { id: null, name: '', joined: false }; }
+      }
+      const board = { ...readBoard(), fetchedAt: -Infinity, sentAt: -Infinity, data: null, applied: 0 };
+
+      /* Four places ask the board for a picture of itself — opening the tab,
+         the minute timer, joining, replanting — and they answer out of order.
+         A stamp per request, and a reply older than the one on screen is
+         dropped: without it the slow GET that was already in flight lands on
+         top of the POST that just put you on the board, and your row vanishes
+         a second after you joined it. */
+      let boardStamp = 0;
+      function boardTook(data, stamp){
+        if(stamp < board.applied) return false;
+        board.applied = stamp;
+        board.data = data;
+        board.fetchedAt = performance.now();
+        return true;
+      }
+
+      /* A v4 UUID. `crypto.randomUUID` is only there where the page is a
+         secure context, which the deployed site is and a laptop serving this
+         to a phone over the house network is not — and a board that throws on
+         the join button there is worse than one with a home-made id. */
+      function newId(){
+        try {
+          if(crypto.randomUUID) return crypto.randomUUID();
+          const bytes = crypto.getRandomValues(new Uint8Array(16));
+          bytes[6] = (bytes[6] & 0x0f) | 0x40;
+          bytes[8] = (bytes[8] & 0x3f) | 0x80;
+          const hex = [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
+          return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+        } catch {
+          return null;
+        }
+      }
+      function writeBoard(){
+        try { localStorage.setItem(BOARD_KEY, JSON.stringify({ id: board.id, name: board.name, joined: board.joined })); }
+        catch { /* a private window; the row still goes up this sitting */ }
+      }
+      const boardStats = () => ({
+        taps: Math.floor(state.life.taps), winters: winters(state),
+        earned: state.life.earned, peakTaps: state.life.peakTaps,
+      });
+      /* The board takes any figure a browser can hold, so the row has to be able
+         to draw one. A count in full stops being readable long before it stops
+         being possible — nine quadrillion taps is twenty-one characters of
+         commas — and a rate written out in full is worse, so past the point
+         where the exact figure stops meaning anything both fall back to the
+         short form the rest of the game counts in. Real play never reaches
+         either threshold, so a real row is unchanged. */
+      const READABLE = 1e9;
+      const boardValue = (key, value) => {
+        const n = Number(value) || 0;
+        if(key === 'earned') return formatEnergy(n);
+        if(key === 'peakTaps'){
+          return `${n < READABLE ? (Math.round(n * 10) / 10).toFixed(1) : formatEnergy(n)} a second`;
+        }
+        if(n >= READABLE) return formatEnergy(n);
+        return key === 'taps' ? Math.floor(n).toLocaleString('en-US') : String(n);
+      };
+
+      function drawBoard(){
+        const data = board.data;
+        // The note is what stands in for the tables before there are any: it
+        // said "Fetching the board…" under an error message for as long as the
+        // board was unreachable, which is two answers to one question.
+        ui.boardNote.hidden = Boolean(data);
+        if(!data) return;
+        ui.boards.replaceChildren(...Object.keys(BOARD_LABELS).map(key => {
+          const box = document.createElement('div');
+          box.className = 'board';
+          const rows = Array.isArray(data.boards?.[key]) ? data.boards[key] : [];
+          const mine = data.you?.[key] || null;
+          const h2 = document.createElement('h2');
+          h2.textContent = BOARD_LABELS[key];
+          box.append(h2);
+          if(!rows.length){
+            const p = document.createElement('p');
+            p.className = 'empty';
+            p.textContent = 'Nobody yet.';
+            box.append(p);
+            return box;
+          }
+          const table = document.createElement('table');
+          const body = document.createElement('tbody');
+          rows.forEach((row, i) => {
+            const tr = document.createElement('tr');
+            if(mine === i + 1) tr.className = 'you';
+            // Names are typed by strangers: textContent, never markup.
+            for(const text of [String(i + 1), String(row.name ?? ''), boardValue(key, Number(row.value) || 0)]){
+              const td = document.createElement('td');
+              td.textContent = text;
+              tr.append(td);
+            }
+            body.append(tr);
+          });
+          table.append(body);
+          box.append(table);
+          if(mine && mine > rows.length){
+            const p = document.createElement('p');
+            p.className = 'empty';
+            p.textContent = `You are ${ordinal(mine)} of ${data.players}.`;
+            box.append(p);
+          }
+          return box;
+        }));
+      }
+
+      const outOfReach = () => {
+        ui.boardLine.textContent = 'The board is out of reach right now.';
+        ui.boardNote.textContent = 'The board is out of reach right now.';
+      };
+
+      async function fetchBoard(){
+        const stamp = ++boardStamp;
+        board.fetchedAt = performance.now();
+        try {
+          const you = board.joined && board.id ? `?you=${encodeURIComponent(board.id)}` : '';
+          const res = await fetch(BOARD_URL + you, { cache: 'no-store' });
+          if(!res.ok) throw new Error(String(res.status));
+          const data = await res.json();
+          if(!boardTook(data, stamp)) return;
+          if(board.joined) ui.boardLine.textContent = `On the board as ${board.name}.`;
+        } catch {
+          outOfReach();
+        }
+        drawBoard();
+      }
+
+      /* Put this device's row up. `joining` is the player pressing the button
+         rather than the timer coming round, which is the only case where the
+         answer is worth saying out loud — and the only case where a refusal
+         has to undo something, because a name the board would not take must
+         not be remembered as a name it took. */
+      async function sendBoard(joining = false){
+        if(!board.id || (!board.joined && !joining)) return;
+        const stamp = ++boardStamp;
+        board.sentAt = performance.now();
+        try {
+          const res = await fetch(BOARD_URL, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: board.id, name: board.name, stats: boardStats() }),
+          });
+          const data = await res.json().catch(() => null);
+          if(res.ok && data){
+            if(!board.joined){ board.joined = true; writeBoard(); }
+            if(boardTook(data, stamp)) ui.boardLine.textContent = `On the board as ${board.name}.`;
+          } else if(res.status === 429){
+            /* Too soon — fifteen seconds between rows from one device. The
+               timer can simply wait, but somebody who has just pressed the
+               button is owed both an answer and the row they asked for, so
+               the next send is brought forward to the moment the board says
+               it will listen again. */
+            const wait = Math.max(0, Math.min(60000, Number(data?.retryIn) || 0));
+            board.sentAt = performance.now() - BOARD_SEND_EVERY + wait + 250;
+            if(joining) ui.boardLine.textContent = `Just a moment — your score goes up in ${Math.ceil(wait / 1000)} seconds.`;
+          } else {
+            ui.boardLine.textContent = data?.error
+              || 'Something went wrong putting you on the board. Try again in a moment.';
+          }
+        } catch {
+          outOfReach();
+        }
+        drawBoard();
+      }
+
+      function openBoard(){
+        if(document.activeElement !== ui.boardName) ui.boardName.value = board.name;
+        if(board.joined) ui.boardLine.textContent = `On the board as ${board.name}.`;
+        if(performance.now() - board.fetchedAt > 10 * 1000) fetchBoard();
+      }
+
+      ui.boardJoin.addEventListener('submit', event => {
+        event.preventDefault();
+        const name = ui.boardName.value.trim().replace(/\s+/g, ' ');
+        if(name.length < 2 || name.length > 16){
+          ui.boardLine.textContent = 'A name is two to sixteen characters.';
+          return;
+        }
+        if(!board.id) board.id = newId();
+        if(!board.id){
+          ui.boardLine.textContent = 'This browser will not make an id, so it cannot hold a place on the board.';
+          return;
+        }
+        board.name = name;
+        // Not joined until the board says so: the name is checked there, and a
+        // row the server refused must not come back tomorrow as one it took.
+        writeBoard();
+        board.sentAt = -Infinity;
+        sendBoard(true);
+      });
 
       /* ---- boot ------------------------------------------------------------ */
 
@@ -1306,6 +1618,15 @@
       // nine seconds after a purchase should not lose the purchase.
       addEventListener('visibilitychange', () => { if(document.hidden) writeSave(); });
       addEventListener('pagehide', writeSave);
+      // A joined player's row goes up on the way out too, if it has been a
+      // while: the sendBeacon survives the page closing where a fetch would not.
+      addEventListener('pagehide', () => {
+        if(!board.joined || !board.id || performance.now() - board.sentAt < 20 * 1000) return;
+        try {
+          navigator.sendBeacon(BOARD_URL, new Blob(
+            [JSON.stringify({ id: board.id, name: board.name, stats: boardStats() })], { type: 'application/json' }));
+        } catch { /* nothing lost; the next sitting sends it */ }
+      });
 
       requestAnimationFrame(frame);
     </script>

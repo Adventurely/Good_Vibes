@@ -104,7 +104,14 @@
      out of it: they used to sit underneath it, where a press meant to zoom in
      landed on whatever the market had in that spot. */
   body.panel-open #view{ right: calc(.8rem + var(--panel-w) + .8rem); }
-  #view button{
+  /* The one button that does something to the ship rather than to the view,
+     so it lives on its own away from the two that open menus: top left, under
+     the fuel gauge and the way back to the title. */
+  #act{
+    position:fixed; left:.8rem; top:calc(70px + env(safe-area-inset-top)); z-index:7;
+    display:flex; flex-direction:column; gap:.35rem;
+  }
+  #view button, #act button{
     width:40px; height:40px; border-radius:10px; border:1px solid var(--line);
     background:var(--glass); color:var(--dim); cursor:pointer; backdrop-filter:blur(8px); font-size:1.05rem;
     /* An inline <svg> sits on the text baseline, which left the ship and the
@@ -113,8 +120,12 @@
        box's content puts all three on the same middle. */
     display:flex; align-items:center; justify-content:center; padding:0; line-height:1;
   }
-  #view button svg{ display:block; }
-  #view button:hover{ color:var(--ink); border-color:var(--line-2); }
+  #view button svg, #act button svg{ display:block; }
+  /* `display:block` above beats the browser's own rule for the hidden
+     attribute, so the anchor and the liftoff arrow were drawn side by side in
+     a button stretched to hold both. */
+  #view button svg[hidden], #act button svg[hidden]{ display:none; }
+  #view button:hover, #act button:hover{ color:var(--ink); border-color:var(--line-2); }
   #view button[aria-pressed="true"]{ color:var(--gold-ink); border-color:var(--gold-2); }
   /* Dragged off the thing the chart is locked to. The button that brings you
      back is the one that lights up, so "where am I" and "get me back" are the
@@ -297,6 +308,11 @@
      there the rest of the time. It replaced a card across the bottom of the
      sky that spent most of its life telling you what you had not done yet. */
   #dock-go{ color:var(--gold); border-color:var(--gold-2); animation:dockflash 2.8s ease-in-out infinite; }
+  /* Tied up, the same button is how you leave, and it is there the whole time
+     you are moored — so it stops breathing and stops being gold. Nothing that
+     is always on the screen should pulse. */
+  #dock-go.lift{ color:var(--dim); border-color:var(--line); animation:none; opacity:1; }
+  #dock-go.lift:hover{ color:var(--ink); border-color:var(--line-2); background:var(--glass); }
   /* Slow on purpose. It is the one control that appears out of nowhere, and it
      has to catch an eye that is on the chart without becoming a strobe next to
      two buttons that are always there — so it breathes rather than blinks, and
@@ -306,7 +322,7 @@
     50%{ opacity:1; box-shadow:0 0 10px -1px var(--gold-2); }
   }
   #dock-go:hover, #dock-go:focus-visible{ animation:none; opacity:1; }
-  #dock-go svg, #m-ship svg, #m-dock svg{ width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  #act button svg, #m-ship svg, #m-dock svg{ width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
   #dock-go:hover{ background:var(--gold); color:#1a1310; }
   #dock-go[hidden], #m-dock[hidden]{ display:none; }
 
@@ -539,7 +555,10 @@
       top:calc(74px + env(safe-area-inset-top)); bottom:auto; right:.4rem;
       flex-direction:column; gap:.25rem;
     }
-    #view button{ width:32px; height:30px; border-radius:8px; font-size:.95rem; }
+    /* The other corner of the same strip. The back link is gone on a phone, so
+       there is nothing under the two HUD rows for this to land on. */
+    #act{ top:calc(74px + env(safe-area-inset-top)); left:.4rem; gap:.25rem; }
+    #view button, #act button{ width:32px; height:30px; border-radius:8px; font-size:.95rem; }
     /* Only the panel toggle stays on top; the rest tuck under it in a column
        that the chart can still be seen around. */
     #view button:not(#m-ship):not(#m-dock){ opacity:.85; }
@@ -653,8 +672,14 @@
 </header>
 <a id="back" href="./">&larr; title</a>
 
+<div id="act">
+  <button id="dock-go" hidden title="Dock (d)" aria-label="Dock here">
+    <svg class="i-dock" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="3.4"/><path d="M12 10.4 V20"/><path d="M8 13.5 H16"/><path d="M5 15.5 a7 7 0 0 0 14 0"/></svg>
+    <svg class="i-lift" viewBox="0 0 24 24" aria-hidden="true" hidden><path d="M12 4 V16"/><path d="M8 8 L12 4 L16 8"/><path d="M6 20 H18"/></svg>
+  </button>
+</div>
+
 <div id="view">
-  <button id="dock-go" hidden title="Dock (d)" aria-label="Dock here"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="3.4"/><path d="M12 10.4 V20"/><path d="M8 13.5 H16"/><path d="M5 15.5 a7 7 0 0 0 14 0"/></svg></button>
   <button id="v-fit" title="Back to your ship, and frame it (f)">&#9678;</button>
   <!-- Only a ship with a navigator aboard has this at all: it is what she does. -->
   <button id="v-far" hidden title="Show the path past the next flyby (v)" aria-pressed="true" aria-label="Show the path past the next flyby"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 17 c5 0 7-10 12-10 c4 0 6 3 8 5"/><circle cx="14" cy="7" r="1.6"/><path d="M18.5 10.5 L22 12 L20.5 8.4"/></svg></button>
@@ -844,6 +869,13 @@ let lockedTo = null;
 /* The one number the on-chart editor shows. Recomputed when the burn changes,
    not every frame: solving what a mark costs is not free. */
 let nodeLabel = null, nodeLabelKey = '', interceptLabel = null, insetLabel = null;
+/* The Astrolabe is the one tab that goes stale on its own: every other one
+   reads the ship, and this one reads the sky moving. It is also the most
+   expensive thing the panel draws — a Lambert sweep per world — so it is
+   redrawn on a real-time budget rather than every frame, and only while the
+   clock is actually running and the tab is actually up. */
+const WINDOWS_REDRAW_MS = 500;
+let windowsDrawnAt = -1e9;
 /* What every mark written down will take out of the tank, drawn on the gauge. */
 let plannedSpend = 0;
 /* What the selected mark says on the chart, and what the whole plan will
@@ -913,6 +945,10 @@ function frame(now){
     belt, nearPort: docking?.port ?? null, docking,
     hidden: S.unseen(state),
   });
+  if(dt > 0 && panelOpen && tab === 'windows' && now - windowsDrawnAt > WINDOWS_REDRAW_MS){
+    windowsDrawnAt = now;
+    renderTab();
+  }
   renderHud(docking);
   renderDockCard(docking);
   refreshRecentre();
@@ -1050,11 +1086,25 @@ function renderHud(docking){
   }
 }
 
-/* Tie up. The icon is there when a stable orbit close in makes it possible
-   and gone otherwise, so it is a thing you have earned rather than a card
-   that follows you round the sky listing what you have not done. */
+/* The one button that acts on the ship: tie up, or cast off.
+ *
+ * Adrift it is a mooring ring, and only when a stable orbit close in has
+ * earned it — a thing you have done rather than a card following you round
+ * the sky listing what you have not. Tied up it is the way out again, which
+ * is the only thing a moored ship ever wants from the chart, and it is the
+ * same button because they are the same question answered twice. */
 function renderDockCard(docking){
-  $('dock-go').hidden = !(docking && docking.ok && !state.dockedAt);
+  const b = $('dock-go');
+  const moored = !!state.dockedAt;
+  b.hidden = !(moored || (docking && docking.ok));
+  b.classList.toggle('lift', moored);
+  /* toggleAttribute, not `.hidden`: that property belongs to HTMLElement and
+     these are SVG elements, so assigning it set a JS expando nobody reads and
+     left the anchor showing on a moored ship. */
+  b.querySelector('.i-dock').toggleAttribute('hidden', moored);
+  b.querySelector('.i-lift').toggleAttribute('hidden', !moored);
+  b.title = moored ? `Lift off from ${S.portName(state.dockedAt)}` : 'Dock (d)';
+  b.setAttribute('aria-label', moored ? 'Lift off' : 'Dock here');
 }
 
 /* ------------------------------------------------------------- time */
@@ -2101,16 +2151,15 @@ function astrolabeTab(){
   let out = '<h2>Transfer windows</h2>';
   if(!state.keys?.astrolabe) return out + '<p class="say">No Astrolabe fitted.</p>';
   const rows = S.transferWindows(state);
-  const here = S.helioOf(state.dockedAt ?? state.ship.body);
-  out += `<p class="lock">From ${esc(here?.name ?? 'here')} · tank ${S.fmtKms(S.usableTank(state))}</p>`;
+  out += `<p class="lock">From ${esc(S.departureName(state) ?? 'here')} · tank ${S.fmtKms(S.usableTank(state))}</p>`;
   if(!rows.length) return out + '<p class="empty">Nothing else goes round the Lamp from here.</p>';
   for(const r of rows){
     /* No countdown where waiting cannot help: the crossing is past this tank
        at every phase, and a date would be a promise the ship cannot keep. */
-    const ever = r.best <= S.usableTank(state);
+    const ever = r.best <= S.usableTank(state) && r.days != null;
     out += `<div class="win ${r.band}">`
       + `<div class="name"><b>${esc(r.name)}</b><small>${S.fmtKms(r.cost)} · ${S.fmtDays(r.tof)}</small></div>`
-      + `<div class="band">${BAND_WORD[r.band]}<small>${ever ? S.fmtDays(r.days ?? 0) : '—'}</small></div>`
+      + `<div class="band">${BAND_WORD[r.band]}<small>${ever ? S.fmtDays(r.days) : '—'}</small></div>`
       + '</div>';
   }
   return out;
@@ -2224,7 +2273,7 @@ function doDock(){
    nothing when you pressed it. The HUD hint docks too, because it is the thing
    that says you can, and `d` because a keyboard is a keyboard. */
 const dockIfWeCan = () => { const d = S.dockingStatus(state); if(d?.ok) doDock(); };
-$('dock-go').addEventListener('click', dockIfWeCan);
+$('dock-go').addEventListener('click', () => { if(state.dockedAt) actions.undock(); else dockIfWeCan(); });
 $('dockhint').addEventListener('click', dockIfWeCan);
 $('dockhint').style.cursor = 'pointer';
 addEventListener('keydown', e => {

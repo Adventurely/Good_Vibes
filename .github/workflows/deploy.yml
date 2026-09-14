@@ -1,10 +1,10 @@
 # Deploy the Worker to Cloudflare on every push to `main`.
 #
 # This is the live site: good-vibe-games.com. `wrangler deploy` uploads
-# `src/worker.js`, both room classes (`GameRoom` and `SolariumRoom`) and the
-# whole of `public/` in one shot, so a client and the server it talks to always
-# move together — the split-brain where the page is newer than the socket
-# cannot happen from here.
+# `src/worker.js`, its three object classes (`GameRoom`, `SolariumRoom` and
+# `SunwardBoard`) and the whole of `public/` in one shot, so a client and the
+# server it talks to always move together — the split-brain where the page is
+# newer than the socket cannot happen from here.
 #
 # This replaces Cloudflare's own Workers Builds. Do not run both: two services
 # watching the same branch means two deploys per push, racing to be last.

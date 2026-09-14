@@ -199,11 +199,15 @@ const GROWERS_ON_LOT = Object.values(OWNED).reduce((a, b) => a + b, 0);
 
 /* If there is a save here already, say so — a returning player should not have
    to click through to find out the lot is still there. Read through the game's
-   own loader so a save it would refuse is a save this does not boast about. */
+   own loader so a save it would refuse is a save this does not boast about.
+   The tree on the plate is their tree too: it is drawn at the age of the save,
+   so a player who has replanted four times comes back to the tree that has. */
+let winters = 0;
 try {
   const raw = localStorage.getItem('sunward:save');
   if(raw){
     const state = fromSave(JSON.parse(raw));
+    winters = state.prestiges || 0;
     const planted = GROWERS.reduce((n, g) => n + (state.owned[g.id] || 0), 0);
     if(planted > 0 || state.life.earned > 0){
       document.getElementById('enter').textContent = 'Back to the lot';
@@ -225,6 +229,7 @@ function frame(now){
     growers: GROWERS_ON_LOT,
     now,
     sway: still ? 0 : Math.sin(now / 1400) * 0.05,
+    age: winters,
   });
   if(!still) requestAnimationFrame(frame);
 }

@@ -182,13 +182,59 @@ One Worker on **good-vibe-games.com** serves the shelf and every game on it.
       ├── /orbital-trader/     Orbital Trader   — no socket either
       ├── /greener-thumbs/     Greener Thumbs   — nor that
       ├── /api/good-vibes/ws   src/worker.js → GameRoom,     one per room code
-      └── /api/solarium/ws     src/worker.js → SolariumRoom, one per room code
+      ├── /api/solarium/ws     src/worker.js → SolariumRoom, one per room code
+      └── /api/sunward/board   src/worker.js → SunwardBoard, one for the whole game
+                               GET reads it, POST puts a row up, DELETE takes
+                               one off — the id in the body is the authority
+                               for both of the last two
 
-**Two of the four never touch the Worker.** Sunward and Greener Thumbs are one
-player and a save file, so they are files in `public/` and nothing else — no
-route, no Durable Object, no binding, and nothing to go down. A single-player
-game that needs a server to be played is a single-player game that stops
-working when somebody else's deploy fails.
+**Three of the five play without the Worker.** Sunward, Orbital Trader and
+Greener Thumbs are one player and a save file, so the games are files in
+`public/` and nothing else — no socket, no room, and nothing to go down. A
+single-player game that needs a server to be played is a single-player game
+that stops working when somebody else's deploy fails. Sunward has one route
+now, for its leaderboard, and it is built to that rule: the game never waits on
+it and plays the same with it gone.
+
+**Sunward's board is one Durable Object, named for the game.**
+`/api/sunward/board` is the first route here that is not a socket. A
+leaderboard is read when the record is opened and written at most once every
+fifteen seconds, and nothing about that is live enough to hold a connection
+open for, so it is plain HTTP: a GET for the boards, a POST for your row.
+There is one object, `SunwardBoard`, reached by `idFromName('sunward')`,
+because a leaderboard is everyone in one place by definition — there is
+nothing to shard by, and one object is what makes the top ten one answer
+rather than a merge. The rules are `src/sunward-board.js`, pure and clockless
+like the rest of that game, and `src/board-do.js` and the route in
+`src/app.js` are each a few lines around it, the way the rooms are.
+
+Opting in is typing a name. The id that lets a player update their own row is
+a UUID the browser makes once and keeps; whoever holds it holds the row, and
+nobody else can touch it — the room-code idea again, and no accounts for the
+same reason. Nothing but that id, the typed name and four numbers ever leaves
+the device, and the board never hands the id back to anyone. The numbers are
+self-reported and there is no way to verify one, so this is honest about what
+it is: a board for people who want to be on one. What defends it is a
+fifteen-second gap between accepted posts from one id, a record that only ever
+goes up, and a ceiling of five thousand rows with the ones nobody has heard
+from in longest pruned first. The same id takes a row off again — a board you
+can join but never leave is not one anybody should type a real name into, and
+since the id already decides who may write the row, letting it decide who may
+remove the row costs nothing and needs no account. Somebody who wants to sit at the top with a
+number nobody could reach can.
+
+There was a plausibility cap on each figure too — thirty taps a second, fifty
+million taps — and it lasted one evening. The first person to play the
+finished game was refused by it: eight fingers drumming on a tablet is fifty
+taps a second without trying, and the figure being judged is a ten-second
+average rather than a burst. Guessing what a game can produce and then calling
+a real player a liar for exceeding the guess is the worst thing a leaderboard
+can do, and it is not a close trade against one silly row. The only ceiling
+left is the machine's: the two counts stop at `Number.MAX_SAFE_INTEGER`,
+because past it whole numbers are not exact and "a record only goes up" stops
+meaning anything, and the two measures stop at `Number.MAX_VALUE`. What is
+still refused is a figure that is broken rather than big — not a number, not
+finite, negative, or a count with a fraction in it.
 
 `public/` ships verbatim, no build step. The Worker is not invoked for files at
 all — assets are matched first — so the clients cost zero Worker calls and each
@@ -235,15 +281,16 @@ hand a game to four friends in a message instead of in an onboarding flow, and
 the cost is that a short code is a guessable code. The answer to that is a
 longer code, not an account.
 
-**`npm start` serves all of it** — the shelf, both games, and both sockets.
-Rooms live in a Map locally and in a Durable Object in production; the rules
-module is the same either way.
+**`npm start` serves all of it** — the shelf, every game, both sockets and the
+board. Rooms live in a Map locally and in a Durable Object in production, and
+the board is an object in memory that forgets on restart; the rules modules are
+the same either way.
 
 **Deploys are GitHub Actions**, not Cloudflare's Workers Builds:
 `.github/workflows/deploy.yml` runs the tests, builds the Worker with
 `wrangler deploy --dry-run`, and — only then, and only on `main` — uploads it.
-One `wrangler deploy` ships the Worker, both room classes and the whole of
-`public/` together, so a client and the socket it talks to can never be
+One `wrangler deploy` ships the Worker, its three object classes and the whole
+of `public/` together, so a client and the socket it talks to can never be
 different ages.
 
 Keeping it here rather than in the dashboard buys two things: a pull request
@@ -326,6 +373,7 @@ PORT=8080 HOST=127.0.0.1 npm start
 | ---------- | --------------------------------- |
 | `/`        | The title screen                  |
 | `/healthz` | `{"status":"ok"}`                 |
+| `/api/sunward/board` | Sunward's leaderboard: `GET` reads it, `POST` a score to it |
 | anything else | `404 Not Found`                |
 
 ## Tests
@@ -362,6 +410,11 @@ src/solarium.js     Save Solarium's rules engine: pure functions over a state
 src/worker.js       the deployed front door: assets, and both socket routes
 src/room-do.js      one Durable Object per Good Vibes room code
 src/solarium-do.js  one Durable Object per Save Solarium room code
+src/sunward-board.js  Sunward's leaderboard as rules: what a name may be, what
+                    a figure may be, the rate limit, the ranking, and the whole
+                    HTTP answer — pure, with the clock and the store handed in
+src/board-do.js     the one Durable Object the board lives in, named for the
+                    game rather than for a code
 public/theme.css    the one look every page shares: paper, ink, the rounded
                     face, and the sun and the leaf for what you can press
 public/index.html   the shelf: every game, thumbnails painted by their own
@@ -379,6 +432,8 @@ public/greener-thumbs/  Greener Thumbs, three.js and a greenhouse
 test/sunward.test.js  Sunward's tables and the balance of them: that no tier is
                     a dead row, that a save full of rubbish still loads, and
                     that asking a question does not change the answer
+test/sunward-board.test.js  the board's rules: what a name may be, what a
+                    figure may be, who is too soon, and who is pruned
 public/orbital-trader/  Orbital Trader: kernel, rules, chart, pages. No server
                     side at all — see "Orbital Trader" below
 tools/orbital-trader/   its design tables, the module generator, and the
@@ -1483,8 +1538,9 @@ animation or no sound.
 
 ## Sunward
 
-A clicker, and the second game here with no server in it — Greener Thumbs got
-there first. Every tap is energy for the tree; you spend the energy on things
+A clicker, and the second game here that plays with no server — Greener
+Thumbs got there first; the one thing on the Worker for it is an opt-in
+leaderboard, below. Every tap is energy for the tree; you spend the energy on things
 that make their own, and the lot fills in around you. It was called light for
 the first week, and the game's name still points at the sun — but the sun in
 the sky is weather here, and what the tree runs on is what you give it. `public/sunward/content.js` is the
@@ -1501,7 +1557,26 @@ than an error anybody would see.
 marked `day`, `night` or `any`, and a marked one makes half again as much at its
 best hour and half as much at its worst — so a lot of nothing but solar panels
 watches its income halve every two minutes, and the fix is to own some
-mushrooms.
+mushrooms. Four of the nine are unmarked and simply tick.
+
+One of those four got there by argument rather than by design. The Glasshouse
+was marked `day`, and its description — written by the owner, who writes all
+of them — said it shields the tree day or night. Of the two ways to settle a
+description that contradicts the row above it, changing the game was the
+better one here: a glasshouse is the one building on this lot that obviously
+does keep working after dark. Its rated figure went from 44,000 to 51,000 at
+the same time, and not to make it better. `rate` is already the average over a
+whole day, so changing the mark alone leaves the average alone — but Night
+bloom lifts the trough of marked growers only, worth `SWING / pi` on them and
+nothing on an unmarked one, and anybody who owns a glasshouse bought Night
+bloom three tiers earlier. Left at 44,000 the simulation lost a fifth of a
+day's income at the top; multiplied back in, it lands within a few percent of
+where it was.
+
+**Every grower carries its description for good.** It used to give way to
+"5 planted · 12/s" the moment you owned one of a kind, which meant the only
+players who ever read it were the ones who had not bought the thing yet. The
+figures and the description both show now, on their own lines.
 
 **One upgrade lifts the trough**, and it lifts it without touching the peak.
 That asymmetry is the whole value of it, and it was not there at first: the
@@ -1615,6 +1690,35 @@ the growers and the upgrades on the lot). The first cut was one sentence that
 changed shape with the state — sometimes a count, sometimes a percentage,
 sometimes a threshold — and a player could not tell which of the three they
 were being told.
+
+**The tree ages with each winter.** A replanting is a winter the tree has
+stood through: the lot goes back to bare ground, the seeds stay, and the tree
+comes back a year older — and drawn bigger and grander, with a design of its
+own for each of the first seven winters (stouter, with its roots showing;
+forked low; a knot hole and moss; broad, with a swing; buttress roots and
+blossom; lanterns and a bench; twin trunks and vines, with the crown clipping
+the top of the picture) and a slow swelling after that. `TREE_STAGES` in `art.js` is the table; the
+age is the save's replant count, read through `winters` in `content.js`, and
+the tap target grows with it. Each of the first ten winters is its own medal,
+and the ladder goes on to a hundred. The word on the page is "winter" and
+never "reset", because a reset is a thing that makes the lot smaller and this
+is the one thing on it that a replanting makes bigger.
+
+**The board is opt-in, and joining sends a name and four numbers.** Nothing
+else leaves the device. Four lists — most taps, most winters, most energy
+earned all told, fastest hands — behind one Durable Object and one HTTP route,
+the first on this site that is not a socket. The id that goes with a name is random and
+made in the browser; whoever holds it can update the row and nobody else can,
+which is as much of an account as a clicker wants, and it lives under its own
+key so that starting over on the lot does not orphan the row. The scores are
+self-reported. The server's answer to that is a fifteen-second rate limit and
+a record that only goes up, not proof, and the page says as much; the figures
+themselves are capped only where JavaScript stops holding them exactly, after
+a cap pitched at what the game "could" produce turned away the first real
+player on the first evening. The board is
+fetched only while its tab is open, and a joined player's row goes up every
+few minutes while they play, after a replanting, and on the way out by
+`sendBeacon`.
 
 **Upgrades unlock on the run, medals on all time.** Upgrades are spent at a
 reset, so their unlocks reset with them — measured against a lifetime total, a

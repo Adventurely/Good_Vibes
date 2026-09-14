@@ -7,10 +7,11 @@
  * Node without a browser anywhere near it.
  *
  * The other two games keep their rules here because a Durable Object imports
- * them. Sunward has no server and never will — a clicker is one player and a
- * save file — but the split earns its keep anyway: the balance of the game is
- * in one file that a test can read, rather than smeared through the page that
- * draws it.
+ * them. Sunward plays with no server — a clicker is one player and a save
+ * file, and the only thing on the Worker for it is a leaderboard the save can
+ * be posted to, with its own rules in src/sunward-board.js — but the split
+ * earns its keep anyway: the balance of the game is in one file that a test
+ * can read, rather than smeared through the page that draws it.
  *
  * --- The shape of a state -------------------------------------------------
  *
@@ -106,23 +107,38 @@ export function phaseName(phase){
  */
 export const GROWERS = [
   { id: 'moss', name: 'Moss bed', cost: 12, rate: 0.1, phase: 'any', art: 'moss',
-    flavour: 'It was here before you. It only needed the rubble taken off it.' },
+    flavour: 'Forms a symbiotic relationship with your tree. It helps the soil retain moisture, while providing the moss shade.' },
   { id: 'fern', name: 'Fern bank', cost: 130, rate: 0.65, phase: 'night', art: 'fern',
-    flavour: 'Unrolls after dark and holds the damp until morning.' },
+    flavour: 'A bank of ferns that unfurl at night. Helps prevent night-time evaporation.' },
   { id: 'panel', name: 'Leaf panel', cost: 1500, rate: 4, phase: 'day', art: 'panel',
-    flavour: 'Photovoltaic, and shaped like the thing it is copying.' },
+    flavour: 'A breakthrough in solar technology. It provides extra food for your tree by using its own form of photosynthesis.' },
   { id: 'hive', name: 'Beehive', cost: 17000, rate: 26, phase: 'day', art: 'hive',
-    flavour: 'Pays in pollination. The honey is a side effect.' },
+    flavour: 'A hive of busy bees. Aids in the fertilization of the tree, but only works in the day.' },
   { id: 'mushroom', name: 'Mushroom vault', cost: 190000, rate: 170, phase: 'night', art: 'mushroom',
-    flavour: 'A cellar of small lamps that eat the dark and give it back.' },
+    flavour: 'A cellar of pale glowing mushrooms. Feeds the roots of the tree, but only works at night.' },
   { id: 'orchard', name: 'Orchard row', cost: 2.1e6, rate: 1100, phase: 'day', art: 'orchard',
-    flavour: 'Twelve trees and a ladder somebody left against the last one.' },
+    flavour: 'Twelve fruit trees sharing one root network. They pass surplus sugar along to your tree, but only while the sun is up.' },
   { id: 'turbine', name: 'Wind turbine', cost: 2.4e7, rate: 6900, phase: 'any', art: 'turbine',
-    flavour: 'Turns whether or not anybody is watching it.' },
-  { id: 'glasshouse', name: 'Glasshouse', cost: 2.7e8, rate: 44000, phase: 'day', art: 'glasshouse',
-    flavour: 'Keeps one summer going all the way through a winter.' },
+    flavour: 'A tall turbine on the ridge. It runs on weather rather than sunlight, so it feeds your tree at any hour.' },
+  /* The one tier that was moved off the sun after it was written. Its
+     description says it shields the tree day or night, which was not true of
+     a grower marked `day` — and of the two ways to settle that, changing the
+     game was the better one: a glasshouse is the one building on this lot that
+     obviously does keep working after dark.
+
+     The rate moved with it, from 44,000 to 51,000, and the reason is Night
+     bloom. `rate` is already the average over a whole day — a day grower
+     earns half again at noon and half as much at midnight and averages
+     exactly this — so simply changing the mark would have left the average
+     alone. But Night bloom lifts the trough of MARKED growers only, worth
+     SWING/pi on them and nothing on an `any` grower, and anybody who owns a
+     glasshouse bought Night bloom three tiers ago. Left at 44,000 the tier
+     quietly lost that sixteen percent: the simulation had a day's play down
+     from 7.11M a second to 6.38M. Multiplied back in, it is where it was. */
+  { id: 'glasshouse', name: 'Glasshouse', cost: 2.7e8, rate: 51000, phase: 'any', art: 'glasshouse',
+    flavour: 'A mega greenhouse environment. Shields your tree day or night against predators.' },
   { id: 'canopy', name: 'Canopy tower', cost: 3.0e9, rate: 280000, phase: 'any', art: 'canopy',
-    flavour: 'A building with a forest on it, or the other way round.' },
+    flavour: 'A tower with its own forest ecosystem. Surplus energy is delivered straight to your tree.' },
 ];
 
 export const GROWER_IDS = GROWERS.map(g => g.id);
@@ -482,10 +498,43 @@ export const ACHIEVEMENTS = [
   { id: 'every-upgrade', name: 'The whole shelf', need: { upgrades: UPGRADES.length },
     blurb: 'Every upgrade there is, in one run.' },
 
-  { id: 'first-seed', name: 'Let it seed', need: { prestiges: 1 },
-    blurb: 'Replant the lot once.' },
-  { id: 'five-seeds', name: 'Crop rotation', need: { prestiges: 5 },
-    blurb: 'Replant the lot five times.' },
+  /* One medal per winter. A replanting is a winter the tree has stood
+     through — the lot goes back to bare ground and the tree comes back a
+     year older and drawn bigger — so each of the first ten gets its own
+     medal, named for the year and saying what the tree gained that year,
+     and the ladder goes on in steps after that. The first and fifth keep
+     the ids they had when they were the only two, because those ids are in
+     every save that has ever replanted. */
+  { id: 'first-seed', name: 'First winter', need: { prestiges: 1 },
+    blurb: 'Replant the lot once. The tree comes back stouter, with its roots showing.' },
+  { id: 'second-winter', name: 'Second winter', need: { prestiges: 2 },
+    blurb: 'Replant twice. The trunk forks low.' },
+  { id: 'third-winter', name: 'Third winter', need: { prestiges: 3 },
+    blurb: 'Three winters. A knot hole, and moss on the shaded side.' },
+  { id: 'fourth-winter', name: 'Fourth winter', need: { prestiges: 4 },
+    blurb: 'Four winters. The crown spreads wider than it is tall, and somebody has hung a swing.' },
+  { id: 'five-seeds', name: 'Fifth winter', need: { prestiges: 5 },
+    blurb: 'Five winters. Buttress roots, and blossom in the canopy.' },
+  { id: 'sixth-winter', name: 'Sixth winter', need: { prestiges: 6 },
+    blurb: 'Six winters. Lanterns in the low branches, and a bench underneath.' },
+  { id: 'seventh-winter', name: 'Seventh winter', need: { prestiges: 7 },
+    blurb: 'Seven winters. The trunk splits in two and the crown reaches the top of the picture.' },
+  { id: 'eighth-winter', name: 'Eighth winter', need: { prestiges: 8 },
+    blurb: 'Eight winters. The trunk grows broader.' },
+  { id: 'ninth-winter', name: 'Ninth winter', need: { prestiges: 9 },
+    blurb: 'Nine winters. Another season, another ring of growth!' },
+  { id: 'tenth-winter', name: 'Tenth winter', need: { prestiges: 10 },
+    blurb: 'Ten winters stood through.' },
+  { id: 'fifteen-winters', name: 'Fifteen winters', need: { prestiges: 15 },
+    blurb: 'Fifteen winters stood through.' },
+  { id: 'twenty-winters', name: 'Twenty winters', need: { prestiges: 20 },
+    blurb: 'Twenty winters stood through.' },
+  { id: 'thirty-winters', name: 'Thirty winters', need: { prestiges: 30 },
+    blurb: 'Thirty winters stood through.' },
+  { id: 'fifty-winters', name: 'Fifty winters', need: { prestiges: 50 },
+    blurb: 'Half a century of winters.' },
+  { id: 'hundred-winters', name: 'A hundred winters', need: { prestiges: 100 },
+    blurb: 'A tree older than most humans. It\'s truly a marvel.' },
   { id: 'hundred-seeds', name: 'Seed bank', need: { seeds: 100 },
     blurb: 'Hold a hundred seeds.' },
 
@@ -881,8 +930,33 @@ export function prestigeRefusal(state){
   return null;
 }
 
+/* How many winters the tree has stood through, which is how many times the
+   lot has been replanted. The art reads this to decide how old a tree to
+   draw, and the medals read it under the older name. One name for the page
+   and the picture, so that "winters" on the Seeds tab and the tree on the lot
+   can never disagree. */
+export const winters = state => state.prestiges;
+
+/* The medal a given winter wins, or null if that winter is not one of the
+   rungs. One lookup into the ladder, so that whatever wants to know what a
+   winter is worth — the test that the first ten have no gap in them, anything
+   later that wants to name one — reads the table the award reads rather than
+   a copy of it.
+
+   The guard is not decoration: `find` on an undefined count matches the first
+   medal with no `prestiges` in its need at all, which is the one for tapping
+   the tree once — so a missing argument would have promised "First tap". */
+export const winterMedal = count =>
+  Number.isInteger(count) && count > 0
+    ? ACHIEVEMENTS.find(a => a.need.prestiges === count) || null
+    : null;
+
 /* Give the lot back. Keeps the seeds, the medals, the lifetime record and the
  * sitting; everything else starts again. Returns how many seeds it paid.
+ *
+ * This is a winter. The tree stands through it and comes back a year older,
+ * which is the one thing on the lot that a replanting makes bigger rather
+ * than smaller, and the reason the word for it on the page is not "reset".
  */
 export function prestige(state){
   if(prestigeRefusal(state)) return null;
