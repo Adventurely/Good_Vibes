@@ -78,7 +78,11 @@ Two consequences are worth stating plainly, because the formula means different 
 
 On the chart the mouth is a dashed ring with **a small anchor hung at the top of it**, green where they will take your lines and amber where they will not yet. The anchor is there because a dashed circle round a world is the same shape as three other things the chart draws — a sphere of influence, an atmosphere, a hollow rock — and this is the only one you can tie up inside.
 
-The **drifting havens keep their authored mouths.** Nail, Whisker and the Maw have no surface to stand five radii off and no air over it; their radius is a dot on a chart rather than a ground. A pilot arrives at those by matching speeds, and the size of that rendezvous is a design choice with nothing physical to derive it from.
+**Two kinds of harbour.** At most worlds, tying up means being in orbit: the mouth is a circle your whole orbit has to fit inside, gravity holds you there, and getting captured is the manoeuvre. A **rendezvous** is the other kind — no orbit to wait in, so the harbour asks the two questions it always asked instead: near enough, and slow enough beside it. Whisker and the Maw are rendezvous because they have no mass at all; their radius is a dot on a chart rather than a ground, so they keep the authored mouths the five-radii formula has nothing to act on.
+
+**Nail is the interesting case, and it is authored rather than derived.** It is a four-hundred-kilometre rock with real weight — three millimetres a second squared at the ground, fifty metres a second of escape, a hard jump — so it has a reach, a harbour mouth five radii over the ground like everybody else's, and a parking orbit you can genuinely sit in. But nobody waits in an orbit that slow, and its yards are bolted to the rock rather than riding above it, so its harbour is a rendezvous. That is a fact about the place, not a consequence of the mass, which is why it is a field in the table (`harbour: "rendezvous"`) and not a threshold somebody picked.
+
+The change matters more than the numbers suggest. Nail used to be a three-hundred-thousand-kilometre bubble in the Belt: aim vaguely at the Belt and you were docked. Its mouth is 2400 km now, which makes reaching it a real approach — and because there is nothing to fall into, **the intercept mark is the instrument you fly it on**. See §2.6.1.
 
 This is a scope decision as much as a fictional one. Landing would need a second control scheme, a second set of physics, and a second art problem, and it would buy nothing the orbital game does not already have. The fiction absorbs it easily: Tassel is an ocean of floating harbour cities that meet ships in orbit, the cats cannot survive a heavy world at all, and the frogs' balloon villages have no ground under them either.
 
@@ -187,6 +191,16 @@ marks in the dark with nothing to be against. And the pair is left unjoined
 on purpose: a dashed line between them was the obvious thing to draw and the
 wrong one, because a straight line across a chart of curves reads as a path
 you could fly.
+
+**Where the road comes nearest a world, the chart puts a crosshair, and the panel puts a number beside it.** One per world, at the *first* close pass and never the second — a road that cuts the same rail three laps running earns one mark, the same refusal the road itself makes. The line reads *closest approach to Nail: 1,250 km at 4.75 km/s, in 146 days*, and it is two numbers rather than one on purpose.
+
+This is the whole instrument at a place with no gravity worth the name. At a planet you aim roughly, get captured, and tidy up afterwards; the well does most of the work and being a few thousand kilometres out is forgiven. At a rendezvous nothing catches you, so arriving means putting the ship in the same place *and* at the same speed, and the only way to see whether a burn is doing that is a mark that says how close and how fast. A readout that said "inside docking range" on distance alone would send a pilot 146 days down a road to discover on arrival that they were going four times too fast to tie up, so where the pass is inside a rendezvous mouth but over its speed limit, the line says so and says what to match it to.
+
+A rendezvous also gets a wider band to be marked in than its mouth would give it. Nail's mouth is 2400 km and a road that will eventually arrive there starts out half a million kilometres wide; a band cut to the mouth would leave the pilot tuning that burn with no number anywhere on the screen. A hundredth of its own orbit picks the road up while it is still crooked, and still misses a road that was never aimed — Nail moves its own band's width in under a day.
+
+**The panel beside the chart does not repeat it.** Flying, the ship menu is three tabs — Ship, Quests, Crew — and the Astrolabe when it is fitted; the port menu replaces them while you are tied up. It used to carry two more while flying, and both were deleted: *Orbit* recited the low point, high point, height, speed and lap of an orbit the chart was already drawing and labelling, and *Burns* listed the marks you set and move **on the chart** without being able to edit one. A panel of numbers about a picture, beside the picture, is a worse place to work than the picture.
+
+Three things in them were load-bearing and moved rather than went. **Ahead** — what the road runs into next, the crossings, the air brakes, the intercept lines above — is now the first thing on the Ship tab while flying, above everything the ship is made of, because it is the only thing in the panel the chart cannot say better. The **tow** and the **distress call** went with it: an empty tank is the one hole a tow cannot always dig you out of, since a tow has a price and a purse can be empty, so the floor under it has to live somewhere a stranded pilot can find without being told.
 
 ### 2.2.1 The Astrolabe
 
@@ -860,7 +874,7 @@ parts to Slate, fire crystals to Veyra (who love them), reactor coils to Nail
 
 ## 6. Technical Notes
 
-**Decided since the first draft.** Reaches are computed from mass and harbour mouths from size rather than written down (2.1, 2.3), and the invariant checker proves the promises a hand-tuned table used to make. The Belt is decorative — a field of drawn rocks — and the two cat havens inside it are massless rendezvous zones with a harbour mouth rather than bodies with a well, as are the Arc and the Maw: a pilot arrives at those by matching speeds, not by falling in.
+**Decided since the first draft.** Reaches are computed from mass and harbour mouths from size rather than written down (2.1, 2.3), and the invariant checker proves the promises a hand-tuned table used to make. The Belt is decorative — a field of drawn rocks — but Nail is not one of them: it is a body with a well, a reach and a mouth like any other, and only its *harbour* is a rendezvous. Whisker and the Maw are still massless zones with an authored mouth, and the Arc is a small body you orbit.
 
 **Still to tune.** Gravity-assist approaches at Grumm, and the Δv ladder between the tanks now that the map has been respaced.
 

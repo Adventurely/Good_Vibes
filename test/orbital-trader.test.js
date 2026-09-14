@@ -115,7 +115,7 @@ test('every body has what the kernel and the chart read', () => {
     const w = `body "${b.id}"`;
     assert.match(b.id, /^[a-z][a-z0-9]*$/, `${w}: id`);
     assert.equal(typeof b.name, 'string', `${w}: name`);
-    assert.ok(['star', 'planet', 'moon', 'station', 'zone', 'hole'].includes(b.kind), `${w}: kind ${b.kind}`);
+    assert.ok(['star', 'planet', 'moon', 'rock', 'station', 'zone', 'hole'].includes(b.kind), `${w}: kind ${b.kind}`);
     if(b.parent == null){ assert.equal(b.kind, 'star'); assert.equal(b.soi, null); continue; }
     assert.ok(ids.has(b.parent), `${w}: parent ${b.parent} exists`);
     for(const k of ['a', 'e', 'omega', 'M0', 'mu', 'radius']) assert.ok(Number.isFinite(b[k]), `${w}: ${k} is a number`);
@@ -129,6 +129,9 @@ test('every body has what the kernel and the chart read', () => {
          a planet — Glass's harbour is most of Glass's gravity — so the ceiling
          is the physical one rather than a fraction somebody chose. */
       if(b.mu > 0) assert.ok(b.radius < b.dockAlt && b.dockAlt < b.zoneRadius && b.zoneRadius <= b.soi * 0.92, `${w}: ground < parking < mouth < reach`);
+      /* A rendezvous asks for speed rather than for an orbit, so it needs a
+         speed to ask for; a world holds you and does not. */
+      assert.equal(!!b.rendezvous, b.harbour === 'rendezvous' || !(b.mu > 0), `${w}: rendezvous`);
     }
     if(b.retrograde) assert.equal(b.id, 'croak', 'only Croak runs backwards');
   }
@@ -147,8 +150,12 @@ test('every body has what the kernel and the chart read', () => {
     // outside its own docking range.
     if(b.dockAlt) assert.ok(b.dockAlt < b.zoneRadius, `${b.id}: the harbour at ${b.dockAlt} is outside its own mouth ${b.zoneRadius}`);
   }
-  for(const id of ['nail', 'whisker', 'maw']){
-    assert.ok(world.get(id).zoneRadius >= 1e-3, `${id} is a rendezvous, not a world; its mouth stays the one it was given`);
+  /* The two with no ground at all keep the mouth they were authored with:
+     there is no radius to take five of. Nail has ground now, so its mouth is
+     five radii over it like everybody's — which is the whole of the change
+     that turned it from a region of the Belt into a rock you have to hit. */
+  for(const id of ['whisker', 'maw']){
+    assert.ok(world.get(id).zoneRadius >= 1e-3, `${id} has no ground; its mouth stays the one it was given`);
   }
   /* Seventeen: the sixteen the setting names, and the Knot, which it does
      not — a micro black hole the cats have never mentioned. It is in the sky
@@ -1329,13 +1336,35 @@ test('a burn that slows you down never reads as a number going up', () => {
   for(const word of ['Forward', 'Back', 'Out', 'In']) assert.ok(axes.includes(`'${word}'`), `the pad has no ${word} button`);
 });
 
+test('the ship menu is the only one flying, and nothing load-bearing went with the two that left', () => {
+  /* Orbit recited an orbit the chart was already drawing; Burns listed marks
+     the chart already draws and could not edit one. Both are gone. Three
+     things in them were not spare, though, and losing any of them silently
+     would strand somebody: what the road runs into next, the tow, and the
+     distress call that is the floor under an empty tank. */
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.doesNotMatch(PLAY, /\['orbit', 'Orbit'\]|\['plan', 'Burns'\]/, 'the two tabs are still in the tab bar');
+  assert.doesNotMatch(PLAY, /orbit: orbitTab|[^a-zA-Z]talk, plan,/, 'the panel still dispatches to them');
+  const ship = PLAY.slice(PLAY.indexOf('function shipTab()'), PLAY.indexOf('function questsTab'));
+  assert.ok(ship.includes('aheadList()'), 'Ahead has nowhere to be shown');
+  assert.ok(ship.includes('strandedBlock()'), 'the tow and the distress call have nowhere to be reached');
+  assert.match(PLAY, /data-act="distress"/, 'the distress call went with the tab');
+  assert.match(PLAY, /data-act="tow"/, 'the tow went with the tab');
+  /* And the tab the panel opens on is one that exists, tied up or adrift. */
+  assert.match(PLAY, /const TABS_SHIP = \[\['ship', 'Ship'\]/, 'Ship is no longer the first tab of the ship menu');
+});
+
 test('the cost of a burn is shown against the fuel, not against the burn', () => {
   const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
   assert.match(PLAY, /nodeLabel = n \? `\$\{S\.burnWords\(n\)\}/, 'the mark is labelled with a length of engine again');
   assert.doesNotMatch(PLAY, /nodeLabel = `\$\{S\.fmtKms/, 'the old bare-magnitude label is back');
   assert.match(PLAY, /planned`/, 'the gauge does not say what the plan will spend');
   assert.match(PLAY, /id="h-dvplan"/, 'the gauge has no planned-spend segment');
-  assert.match(PLAY, /uses \$\{S\.fmtKms\(marks\[i\]\?\.cost \?\? 0\)\} of fuel/, 'the Burns tab does not call the cost fuel');
+  /* The Burns tab said it a third time, in a list beside the chart that drew
+     the same marks. The tab is gone; the two places that are left are the
+     gauge and the label on the mark itself. */
+  assert.doesNotMatch(PLAY, /function plan\(\)/, 'the Burns tab is back');
+  assert.doesNotMatch(PLAY, /function orbitTab\(/, 'the Orbit tab is back');
 });
 
 test('dragging a mark a little earlier never throws it laps into the future', () => {
@@ -1497,10 +1526,15 @@ test('every world the road passes is marked once, at the first pass', () => {
   const pred = S.planImmediate(s, true, { farSight: true });
   const byBody = new Map((pred.intercepts ?? []).map(ic => [ic.body, ic]));
 
-  // The one that was missing: a haven with no reach to cross into.
+  /* The one that was missing: a rendezvous, which has no reach to cross into.
+     Nail's mouth is 2400 km and this road is still half a million wide of it,
+     which is exactly the case the mark exists for — a pilot closing that gap
+     is steering by this number and nothing else. So it has to be here while
+     the road is still crooked, and it has to say how far off it is. */
   const nail = byBody.get('nail');
   assert.ok(nail, 'the Belt haven the road is aimed at is not marked');
-  assert.ok(nail.inMouth, 'the road was aimed into its harbour mouth and the mark disagrees');
+  assert.ok(nail.distance > world.get('nail').zoneRadius, 'this road has not arrived yet');
+  assert.ok(nail.speed > 0, 'and the mark says what speed the pass is at, which is the other half of a rendezvous');
 
   // And the moons it goes past on the way out, which were never marked either.
   assert.ok(byBody.has('slate') && byBody.has('moss'), 'the moons the road passes are not marked');
@@ -2352,9 +2386,23 @@ test('a harbour takes you when you are in a stable orbit close in, and not befor
 });
 
 test('the belt havens and the Maw are rendezvous zones you match speeds with', () => {
-  /* No mass, so no reach and nothing to fall towards: you arrive by being in
-     the same place going the same way, which is what a harbour mouth is for. */
-  for(const id of ['nail', 'whisker', 'maw']){ const b = world.get(id); assert.equal(b.mu, 0); assert.equal(b.soi, null); assert.ok(b.port); assert.ok(b.zoneRadius > 0); }
+  /* Nothing to fall towards, or so little it makes no difference: you arrive
+     by being in the same place going the same way, which is what a harbour
+     mouth is for. Whisker and the Maw have no mass at all. Nail has a little —
+     it is a four-hundred-kilometre rock — but fifty metres a second of escape
+     is not an orbit anybody waits in, so its harbour asks the same two
+     questions theirs do. */
+  for(const id of ['whisker', 'maw']){ const b = world.get(id); assert.equal(b.mu, 0); assert.equal(b.soi, null); }
+  for(const id of ['nail', 'whisker', 'maw']){
+    const b = world.get(id);
+    assert.ok(b.rendezvous, `${id} should be a rendezvous`);
+    assert.ok(b.port); assert.ok(b.zoneRadius > 0);
+  }
+  /* And every other port is the other kind, or the orbit rule has quietly
+     stopped applying to the worlds it was written for. */
+  for(const id of ['tassel', 'slate', 'moss', 'cinder', 'veyra', 'grumm', 'haven', 'arc']){
+    assert.equal(world.get(id).rendezvous, false, `${id} should be tied up at in orbit`);
+  }
   const s = S.newGame(2);
   S.undock(s);
   s.t = 1000;
@@ -2367,6 +2415,52 @@ test('the belt havens and the Maw are rendezvous zones you match speeds with', (
   parkAt(far, 'maw');
   const r = S.dock(far);
   assert.ok(r.ok && far.flags.mawArrival, 'the Maw had nothing to say');
+});
+
+test('Nail is a rock you match speeds with, and the road to it is flown on the mark', () => {
+  /* Nail used to be a three-hundred-thousand-kilometre bubble in the Belt: fly
+     roughly at the Belt and you were docked. It is a four-hundred-kilometre
+     rock now with a harbour mouth like everybody else's, so getting there is a
+     real approach — and with three millimetres a second of gravity at the
+     ground there is nothing to fall into, so the approach is a rendezvous:
+     match the position and match the speed. */
+  const n = world.get('nail');
+  const KM = 1.496e8;
+  assert.ok(n.mu > 0, 'it has weight now');
+  assert.ok(Math.abs(n.radius * KM - 400) < 1, `400 km of rock, not ${(n.radius * KM).toFixed(0)}`);
+  const vEsc = Math.sqrt(2 * n.mu / n.radius) * S.KMS * 1000;
+  assert.ok(vEsc > 20 && vEsc < 90, `escape is a hard jump, not an orbit (${vEsc.toFixed(0)} m/s)`);
+  assert.ok(n.soi > n.zoneRadius, 'its reach still contains its own harbour');
+  assert.ok(n.zoneRadius * KM < 5000, `the mouth is a harbour mouth now (${(n.zoneRadius * KM).toFixed(0)} km)`);
+
+  /* The two-step the mouth forces, and the reason the mark matters. Out of a
+     Tassel parking orbit the helper can only set the road up — one mark inside
+     a planet's reach cannot also thread a 2400 km window most of an AU away —
+     and what the pilot has to steer by in between is the crosshair. Once the
+     ship is out in the Lamp's frame the same helper closes it. */
+  const s = S.newGame(7);
+  s.dockedAt = 'tassel'; S.undock(s);
+  s.dv = s.tank = S.auDay(60);
+  assert.ok(S.trimToTarget(s, 'nail', 6000).ok, 'could not set the road up at all');
+  const rough = (S.planImmediate(s, true, { farSight: true }).intercepts ?? []).find(i => i.body === 'nail');
+  assert.ok(rough, 'the road is aimed at Nail and the chart says nothing about it');
+
+  let guard = 0;
+  while(s.ship.body !== 'lamp' && guard++ < 40000){ S.tick(s, 0.05); if(s.pending) break; }
+  assert.equal(s.ship.body, 'lamp', 'the ship never got out of Tassel\'s reach');
+  const close = S.trimToTarget(s, 'nail', 6000);
+  assert.ok(close.ok && close.distance <= n.zoneRadius,
+    `the second aim should arrive: ${(close.distance * KM).toFixed(0)} km of a ${(n.zoneRadius * KM).toFixed(0)} km mouth`);
+  assert.ok(close.cost < S.auDay(0.5), `and cost a nudge, not a transfer (${S.fmtKms(close.cost)})`);
+
+  /* And arriving is tying up: no orbit to capture into, just the two numbers. */
+  const park = S.newGame(7);
+  S.undock(park); park.t = 1000;
+  park.ship = { body: 'nail', r: [n.zoneRadius * 0.5, 0, 0], v: [0, 0, 0] };
+  const st = S.dockingStatus(park);
+  assert.equal(st?.port, 'nail');
+  assert.equal(st.kind, 'zone', 'Nail is come alongside, not orbited');
+  assert.ok(S.dock(park).ok, 'matching speeds with Nail is docking at it');
 });
 
 test('aiming turns a rough plan into an arrival, everywhere in Tassel\'s system', () => {

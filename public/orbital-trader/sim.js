@@ -228,17 +228,45 @@ function placeDocked(state, portId){
  * were flying, and which let a ship on a wild ellipse tie up because it
  * happened to be slow at the top of it.
  *
- * Things with no gravity — the Arc, Claw Rock, the comet — have no orbit to
- * be in, so those keep the distance-and-speed test they always had.
+ * A rendezvous harbour is the other kind, and keeps the distance-and-speed
+ * test: the belt havens and the Maw have no gravity to be held by, and Nail
+ * has so little that an orbit round it is not somewhere anybody waits. You
+ * come alongside instead. Which places are which is decided in content.js,
+ * not here.
  */
+/* Coming alongside: near enough to the rock and slow enough beside it. Used
+ * for a haven in the frame the ship is flying in, and for the rock itself
+ * once the ship is inside its reach — the same two numbers either way, so
+ * crossing that boundary does not change what the harbour asks of you. */
+function rendezvousStatus(state, c, r, v){
+  const distance = norm(r), relSpeed = norm(v);
+  const inZone = distance <= c.zoneRadius;
+  const slow = relSpeed <= c.dockSpeed;
+  return {
+    port: c.id, kind: 'zone', distance, relSpeed,
+    mouth: c.zoneRadius, dockSpeed: c.dockSpeed,
+    inZone, slow, ok: inZone && slow,
+    over: Math.max(0, relSpeed - c.dockSpeed),
+    score: distance / c.zoneRadius,
+    open: portOpen(c.id, state.t),
+  };
+}
 export function dockingStatus(state){
   if(state.dockedAt) return null;
   const here = world.get(state.ship.body);
   let best = null;
   const take = st => { if(!best || st.score < best.score) best = st; };
 
+  /* The rock we are inside the reach of, when that rock is one you come
+     alongside. Ship coordinates are already in its frame, so the two numbers
+     are simply where we are and how fast. Without this a ship that crossed
+     into Nail's reach found no harbour at all: Nail is not its own child, and
+     the orbit test below would have asked it to orbit a thing it cannot. */
+  if(here.port && here.rendezvous && here.mu > 0 && state.justLeft !== here.id){
+    take(rendezvousStatus(state, here, state.ship.r, state.ship.v));
+  }
   // The world we are going round.
-  if(here.port && here.mu > 0 && state.justLeft !== here.id){
+  if(here.port && here.mu > 0 && !here.rendezvous && state.justLeft !== here.id){
     const el = elementsFromState(here.mu, state.ship.r, state.ship.v);
     const floor = Math.max(here.radius ?? 0, here.atmo ?? 0);
     const mouth = here.zoneRadius ?? Infinity;
@@ -255,22 +283,11 @@ export function dockingStatus(state){
       open: portOpen(here.id, state.t),
     });
   }
-  // Gravity-less ports in this frame: near enough, slow enough.
+  // Rendezvous ports in this frame: near enough, slow enough.
   for(const c of world.children(here.id)){
-    if(!c.port || c.mu > 0 || state.justLeft === c.id) continue;
-    const s = railState(c, here.mu, state.t);
-    const distance = dist(state.ship.r, s.r);
-    const relSpeed = norm(sub(state.ship.v, s.v));
-    const inZone = distance <= c.zoneRadius;
-    const slow = relSpeed <= c.dockSpeed;
-    take({
-      port: c.id, kind: 'zone', distance, relSpeed,
-      mouth: c.zoneRadius, dockSpeed: c.dockSpeed,
-      inZone, slow, ok: inZone && slow,
-      over: Math.max(0, relSpeed - c.dockSpeed),
-      score: distance / c.zoneRadius,
-      open: portOpen(c.id, state.t),
-    });
+    if(!c.port || !c.rendezvous || state.justLeft === c.id) continue;
+    const st = railState(c, here.mu, state.t);
+    take(rendezvousStatus(state, c, sub(state.ship.r, st.r), sub(state.ship.v, st.v)));
   }
   if(!best) return null;
   // Nowhere near: do not clutter the HUD with a port you are nothing like at.
@@ -1145,9 +1162,19 @@ function interceptOf(segments, crossed){
  * A world's own reach is the honest answer where there is one — inside it you
  * are having an encounter whether you meant to or not — and twice that, so a
  * near miss is called before it is a miss. The havens and the Maw have no
- * reach at all, so they are measured in harbour mouths instead. */
+ * reach at all, so they are measured in harbour mouths instead.
+ *
+ * A rendezvous gets a band lent to it on top of that, because the mouth alone
+ * is no use at one. Nail's is 2400 km across, and a road that will eventually
+ * arrive there starts out half a million kilometres wide: a band cut to the
+ * mouth would leave a pilot tuning the burn that closes that gap with no
+ * number anywhere on the screen, which is the one number they are tuning it
+ * against. A hundredth of its own orbit picks the road up while it is still
+ * crooked and still misses a road that was never aimed — Nail moves its own
+ * band's width in under a day. */
 function markWithin(b){
-  return Math.max((b.soi ?? 0) * 2, (b.zoneRadius ?? 0) * 8, (b.radius ?? 0) * 20);
+  const lent = b.rendezvous && b.a > 0 ? b.a * 0.01 : 0;
+  return Math.max((b.soi ?? 0) * 2, (b.zoneRadius ?? 0) * 8, (b.radius ?? 0) * 20, lent);
 }
 
 /* Where the road comes nearest each world, once per world, and the *first*

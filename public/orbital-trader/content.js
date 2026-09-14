@@ -108,6 +108,20 @@ export function dockRange(radius, atmo){
   return Math.max(radius, atmo ?? radius) + 5 * radius;
 }
 
+/* Two kinds of harbour, and which one a place has is about the place rather
+ * than about its mass. Most worlds pull hard enough that tying up means being
+ * in orbit round them: the mouth is a circle your whole orbit has to fit
+ * inside, and gravity holds you there while you trade.
+ *
+ * A rendezvous is the other kind. The belt havens and the Maw have no weight
+ * at all, and Nail has so little — fifty metres a second of escape, which is
+ * a hard jump — that an orbit round it is not a thing anybody waits in. You
+ * come alongside instead: near enough, slow enough, and somebody throws you a
+ * line. This is authored rather than derived because it is a fact about the
+ * yards, not a consequence of the mass: Nail's berths are bolted to the rock,
+ * and Slate's ride above it. */
+export const isRendezvous = b => b?.harbour === 'rendezvous' || !((b?.mu ?? 0) > 0);
+
 const rawMu = Object.fromEntries(TUNING.bodies.map(b => [b.id, b.mu ?? 0]));
 export const BODIES = TUNING.bodies.map(b => ({
   ...b,
@@ -117,6 +131,7 @@ export const BODIES = TUNING.bodies.map(b => ({
   soi: soiRadius(b.mu ?? 0, b.a ?? 0, rawMu[b.parent] ?? 0),
   // A world's mouth comes from its size; a drifting haven keeps the one it was given.
   zoneRadius: (b.mu ?? 0) > 0 ? dockRange(b.radius ?? 0, b.atmo) : b.zoneRadius,
+  rendezvous: isRendezvous(b),
   colour: BODY_COLOURS[b.id] ?? null,
 }));
 
