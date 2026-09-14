@@ -2636,6 +2636,112 @@ function milestonesOnDock(state, port, events){
 
 /* ------------------------------------------------------------ persist */
 
+/* ------------------------------------------------------------- the slots
+ *
+ * Three saves per browser, one legacy key, and a string you can carry between
+ * machines. All of it lives here rather than in either page, because the title
+ * screen and the game both read and write these and a second copy of the rules
+ * is how the two come to disagree about what a save is.
+ *
+ * The store is a parameter so the tests can run it without a browser, and so a
+ * page with no localStorage at all (a private window, blocked site data) gets
+ * `null` back rather than an exception in the middle of drawing.
+ */
+export const LEGACY_KEY = 'ot:save:v1';
+export const SLOTS = [1, 2, 3];
+export const slotKey = n => `${LEGACY_KEY}:${n}`;
+export const ACTIVE_KEY = `${LEGACY_KEY}:active`;
+export const isSlot = n => SLOTS.includes(Number(n));
+
+function store(given){
+  if(given) return given;
+  try{ return globalThis.localStorage ?? null; }catch{ return null; }   // blocked site data throws on access
+}
+const read = (key, st) => { try{ return store(st)?.getItem(key) ?? null; }catch{ return null; } };
+const write = (key, value, st) => { try{ store(st)?.setItem(key, value); return true; }catch{ return false; } };
+const drop = (key, st) => { try{ store(st)?.removeItem(key); return true; }catch{ return false; } };
+
+/* ---------------------------------------------------------------- hex */
+
+/* A save as something a person can paste into a message. Hex rather than
+ * base64 on purpose: it survives being word-wrapped, retyped in the wrong
+ * case, or mangled by a chat client that thinks + and / are worth escaping,
+ * and a bad character is obvious rather than silently decoding to rubbish. */
+export function toHex(text){
+  const bytes = new TextEncoder().encode(String(text));
+  let out = '';
+  for(const b of bytes) out += b.toString(16).padStart(2, '0');
+  return out;
+}
+export function fromHex(hex){
+  /* Whatever the paste picked up on the way: spaces, newlines, the tabs a
+     code block adds. What is left has to be hex and has to be whole. */
+  const clean = String(hex).replace(/\s+/g, '').toLowerCase();
+  if(!clean) throw new Error('There is nothing there to read.');
+  if(!/^[0-9a-f]+$/.test(clean)) throw new Error('That is not a save: it has characters a save never has.');
+  if(clean.length % 2) throw new Error('That save is cut short — it ends in the middle of a character.');
+  const bytes = new Uint8Array(clean.length / 2);
+  for(let i = 0; i < bytes.length; i++) bytes[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
+  try{ return new TextDecoder('utf-8', { fatal: true }).decode(bytes); }
+  catch{ throw new Error('That save is damaged: what is in it is not text.'); }
+}
+export const exportSave = state => toHex(serialize(state));
+/* Imported saves go through the same door as saved ones — version gate and
+ * all — so a hand-edited string cannot get a shape the game cannot fly. */
+export const importSave = hex => restore(fromHex(hex));
+
+/* --------------------------------------------------------------- slots */
+
+export function readSlot(n, st){
+  if(!isSlot(n)) return null;
+  const raw = read(slotKey(n), st);
+  if(!raw) return null;
+  try{ return restore(raw); }catch{ return null; }   // an unreadable slot reads as an empty one
+}
+export function writeSlot(n, state, st){
+  if(!isSlot(n) || !state) return false;
+  return write(slotKey(n), serialize(state), st);
+}
+export function clearSlot(n, st){
+  if(!isSlot(n)) return false;
+  return drop(slotKey(n), st);
+}
+export function activeSlot(st){
+  const n = Number(read(ACTIVE_KEY, st));
+  return isSlot(n) ? n : 1;
+}
+export const setActiveSlot = (n, st) => isSlot(n) ? write(ACTIVE_KEY, String(n), st) : false;
+
+/* What a slot says about itself on the title screen, without the caller
+ * having to know how a ship's whereabouts are spelled. */
+export function slotSummary(state){
+  if(!state) return null;
+  const { year, day } = calendar(state.t);
+  return {
+    shipName: state.shipName ?? 'Your ship',
+    year, day,
+    where: state.dockedAt ? portName(state.dockedAt) : null,
+    money: state.money,
+    text: `${state.shipName ?? 'Your ship'} · year ${year}, day ${day} · ${state.dockedAt ? 'docked at ' + portName(state.dockedAt) : 'under way'}`,
+  };
+}
+
+/* The one-time move. A save written before there were slots becomes slot one,
+ * and only if slot one is free — a player who has already started a game there
+ * is not going to have it replaced by something older. The legacy key is only
+ * dropped once the copy has been read back, so a write that silently failed
+ * leaves the original where it was. */
+export function migrateLegacy(st){
+  const raw = read(LEGACY_KEY, st);
+  if(!raw) return 'none';
+  if(read(slotKey(1), st)) return 'kept';       // slot one is spoken for
+  try{ restore(raw); }catch{ return 'unreadable'; }
+  if(!write(slotKey(1), raw, st)) return 'failed';
+  if(read(slotKey(1), st) !== raw) return 'failed';
+  drop(LEGACY_KEY, st);
+  return 'moved';
+}
+
 export function serialize(state){ return JSON.stringify(state); }
 /* What a save must carry to be playable, and what it may simply be missing.
  * Anything that gets read while drawing a frame has to be right before the

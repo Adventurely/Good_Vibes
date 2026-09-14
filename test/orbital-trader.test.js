@@ -2793,3 +2793,108 @@ test('only a navigator can see past a flyby, and the button can turn it off', ()
   green.farSight = true;
   assert.equal(S.seesPast(green), false, 'and it cannot be switched on without her');
 });
+
+/* ------------------------------------------------------------- the slots */
+
+/* A localStorage that lives in a variable, including the two ways a real one
+   misbehaves: throwing on write when the quota is gone, and throwing on read
+   when site data is blocked. */
+function fakeStore(init = {}){
+  const map = new Map(Object.entries(init));
+  return {
+    map,
+    failWrites: false,
+    failReads: false,
+    getItem(k){ if(this.failReads) throw new Error('blocked'); return map.has(k) ? map.get(k) : null; },
+    setItem(k, v){ if(this.failWrites) throw new Error('quota'); map.set(k, String(v)); },
+    removeItem(k){ map.delete(k); },
+  };
+}
+
+test('a save survives the trip out to a hex string and back', () => {
+  const s = S.newGame(7);
+  S.undock(s);
+  for(let i = 0; i < 10; i++) S.tick(s, 1);
+  const hex = S.exportSave(s);
+  assert.match(hex, /^[0-9a-f]+$/, 'hex and nothing else');
+  assert.equal(hex.length % 2, 0);
+  assert.equal(S.serialize(S.importSave(hex)), S.serialize(s), 'byte for byte the same game');
+  /* Whatever the paste picked up on the way. */
+  const messy = hex.toUpperCase().replace(/(.{40})/g, '$1\n  ');
+  assert.equal(S.serialize(S.importSave(messy)), S.serialize(s), 'case and line breaks do not matter');
+});
+
+test('a damaged hex string is refused with a reason, never half-loaded', () => {
+  const good = S.exportSave(S.newGame(1));
+  for(const [bad, why] of [['', 'empty'], ['zzzz', 'not hex'], ['abc', 'odd length'], ['ffff', 'not text']]){
+    assert.throws(() => S.importSave(bad), /.+/, `${why} should be refused`);
+  }
+  /* A save from a sky this game is not flying is refused by the same gate a
+     stored one goes through, rather than loading into a broken world. */
+  const old = S.toHex(JSON.stringify({ ...JSON.parse(S.serialize(S.newGame(1))), version: 5 }));
+  assert.throws(() => S.importSave(old), /version 5/);
+  assert.ok(S.importSave(good), 'and a good one still loads');
+});
+
+test('three slots, kept apart', () => {
+  const st = fakeStore();
+  assert.equal(S.readSlot(1, st), null, 'they start empty');
+  const a = S.newGame(1), b = S.newGame(2);
+  a.money = 111; b.money = 222;
+  S.writeSlot(1, a, st); S.writeSlot(3, b, st);
+  assert.equal(S.readSlot(1, st).money, 111);
+  assert.equal(S.readSlot(2, st), null, 'the middle one is still free');
+  assert.equal(S.readSlot(3, st).money, 222);
+  S.clearSlot(1, st);
+  assert.equal(S.readSlot(1, st), null, 'and one can be emptied without touching the others');
+  assert.equal(S.readSlot(3, st).money, 222);
+  /* Nothing outside one, two, three is a slot. */
+  for(const n of [0, 4, -1, '2x', null]) assert.equal(S.writeSlot(n, a, st), false, `${n} is not a slot`);
+});
+
+test('an old save becomes slot one, and is only let go once the copy is there', () => {
+  const legacy = S.serialize(S.newGame(5));
+  const st = fakeStore({ [S.LEGACY_KEY]: legacy });
+  assert.equal(S.migrateLegacy(st), 'moved');
+  assert.equal(st.map.get(S.slotKey(1)), legacy, 'the save is in slot one');
+  assert.equal(st.map.has(S.LEGACY_KEY), false, 'and the old key is gone');
+  assert.equal(S.migrateLegacy(st), 'none', 'running it again does nothing');
+
+  /* A player who already has a game in slot one keeps it. */
+  const busy = fakeStore({ [S.LEGACY_KEY]: legacy, [S.slotKey(1)]: S.serialize(S.newGame(9)) });
+  assert.equal(S.migrateLegacy(busy), 'kept');
+  assert.equal(busy.map.get(S.LEGACY_KEY), legacy, 'and the old save is not thrown away');
+
+  /* If the copy cannot be written, the original stays where it is. */
+  const full = fakeStore({ [S.LEGACY_KEY]: legacy });
+  full.failWrites = true;
+  assert.equal(S.migrateLegacy(full), 'failed');
+  assert.equal(full.map.get(S.LEGACY_KEY), legacy, 'nothing is lost to a failed write');
+});
+
+test('storage that throws is the same as storage that is empty', () => {
+  /* A private window, or site data blocked: the pages must render and the
+     game must play. Nothing here may throw into a draw. */
+  const st = fakeStore({ [S.slotKey(1)]: S.serialize(S.newGame(1)) });
+  st.failReads = true;
+  assert.equal(S.readSlot(1, st), null);
+  assert.equal(S.migrateLegacy(st), 'none');
+  assert.equal(S.activeSlot(st), 1, 'and the active slot falls back to the first');
+  st.failReads = false; st.failWrites = true;
+  assert.equal(S.writeSlot(2, S.newGame(1), st), false, 'a write that cannot happen says so');
+});
+
+test('a slot describes itself for the title screen', () => {
+  const s = S.newGame(3);
+  const sum = S.slotSummary(s);
+  assert.ok(sum.shipName && sum.year >= 1 && sum.day >= 1);
+  assert.match(sum.text, /year \d+, day \d+/);
+  /* A new game opens in orbit above Tassel rather than tied up, so there is
+     no port to name and the line says so instead. */
+  assert.equal(sum.where, null);
+  assert.match(sum.text, /under way$/);
+  const docked = S.newGame(3); docked.dockedAt = 'tassel';
+  assert.equal(S.slotSummary(docked).where, S.portName('tassel'));
+  assert.match(S.slotSummary(docked).text, /docked at /);
+  assert.equal(S.slotSummary(null), null);
+});

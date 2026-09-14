@@ -622,6 +622,15 @@
     @keyframes hazpulse{ 0%,100%{ opacity:1 } 50%{ opacity:.55 } }
   }
   @media (max-width: 560px){ #hud .warn b{ display:none; } }
+  /* A save written out. Monospace so a mistyped character is findable, and
+     breaking anywhere because it is one very long word. */
+  .hexbox{
+    width:100%; margin-top:.5rem;
+    font:12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+    background:var(--sunk, rgba(0,0,0,.35)); color:inherit;
+    border:1px solid var(--line); border-radius:.4rem; padding:.5rem;
+    word-break:break-all; resize:vertical;
+  }
 </style>
 </head>
 <body>
@@ -692,22 +701,21 @@ import { playIntro } from './intro.js';
 const world = S.world;
 const $ = id => document.getElementById(id);
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const SAVE_KEY = 'ot:save:v1';
-
 /* ------------------------------------------------------------- state */
 
 const params = new URLSearchParams(location.search);
+/* Which of the three this window is playing. The title screen puts it in the
+   address; opening play.html directly picks up wherever the player was last,
+   and an old save from before there were slots becomes slot one on the way. */
+S.migrateLegacy();
+const SLOT = S.isSlot(params.get('slot')) ? Number(params.get('slot')) : S.activeSlot();
+S.setActiveSlot(SLOT);
+
 let state = null;
-function loadSave(){
-  try{
-    const raw = localStorage.getItem(SAVE_KEY);
-    if(raw) return S.restore(raw);
-  }catch(e){ console.warn('Save could not be read:', e); }
-  return null;
-}
+const loadSave = () => S.readSlot(SLOT);
 function save(){
   if(!state) return;
-  try{ localStorage.setItem(SAVE_KEY, S.serialize(state)); }catch{ /* private window, full disk: play on */ }
+  S.writeSlot(SLOT, state);   // a private window or a full disk simply does not stick
 }
 /* A seed can be named in the address. It decides the ship's name and every
    roll the game will ever make, so two people with the same seed see the same
@@ -1964,6 +1972,11 @@ function shipTab(){
     const line = TEXT.captainLines.onLongCoast[Math.floor(S.hash(Math.floor(state.t / 20)) * TEXT.captainLines.onLongCoast.length)];
     out += `<p class="say">${esc(line)}</p>`;
   }
+  /* Which of the three this is, and the two ways a game leaves the browser it
+     was played in. The title screen has the same pair; both go through sim.js
+     so there is one idea of what a save is. */
+  out += `<h3>This game</h3><p class="lock">Saved in slot ${SLOT}. It saves itself as you play.</p>`;
+  out += `<div class="btns"><button class="btn sm" data-act="exportsave">Copy this game out</button><button class="btn sm" data-act="importsave">Paste a game in</button></div>`;
   out += `<div class="btns"><button class="btn sm danger" data-act="newgame">New game</button><a class="btn sm" href="./">&larr; Title screen</a></div>`;
   return out;
 }
@@ -2106,6 +2119,41 @@ function astrolabeTab(){
 /* ------------------------------------------------------------- actions */
 
 const actions = {
+  exportsave(){
+    const hex = S.exportSave(state);
+    openModal(`<h2>This game, written out</h2>
+      <p>Keep this anywhere. Pasting it into a slot on any machine brings this ship back exactly as it is — same day, same hold, same purse.</p>
+      <textarea id="m-hex" class="hexbox" rows="5" readonly spellcheck="false" aria-label="The save, written out">${esc(hex)}</textarea>
+      <div class="btns"><button class="btn" id="m-copy">Copy</button><button class="btn primary" id="m-ok">Done</button></div>`, m => {
+      const box = m.querySelector('#m-hex');
+      box.addEventListener('focus', () => box.select());
+      m.querySelector('#m-copy').addEventListener('click', async () => {
+        box.select();
+        try{ await navigator.clipboard.writeText(hex); toast('Copied.'); }
+        catch{ toast('Press Ctrl or Cmd and C to copy.', 'bad', 5000); }
+      });
+      m.querySelector('#m-ok').addEventListener('click', closeModal);
+    });
+  },
+  importsave(){
+    openModal(`<h2>Paste a game in</h2>
+      <p>This replaces the ship you are flying with the one in the save. Spaces and line breaks do not matter.</p>
+      <textarea id="m-hex" class="hexbox" rows="5" spellcheck="false" autocomplete="off" aria-label="Paste a save here"></textarea>
+      <div class="btns"><button class="btn" id="m-no">Not now</button><button class="btn primary" id="m-go">Load it</button></div>`, m => {
+      m.querySelector('#m-no').addEventListener('click', closeModal);
+      m.querySelector('#m-go').addEventListener('click', () => {
+        let loaded;
+        try{ loaded = S.importSave(m.querySelector('#m-hex').value); }
+        catch(err){ toast(err.message, 'bad', 6000); return; }
+        if(!confirm('Replace the ship you are flying with the one in that save?')) return;
+        closeModal();
+        state = loaded;
+        selectedNode = -1; lastDockedMode = null;
+        replan(true); renderTabs(); renderHud(); backToShip(true); save();
+        toast('Loaded.', 'story', 5000);
+      });
+    });
+  },
   repair(what){
     const r = S.repair(state, what);
     if(!r.ok){ toast(r.reason, 'bad'); return; }
