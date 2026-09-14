@@ -188,6 +188,23 @@ on purpose: a dashed line between them was the obvious thing to draw and the
 wrong one, because a straight line across a chart of curves reads as a path
 you could fly.
 
+### 2.2.1 The Astrolabe
+
+**A transfer is won or lost before the burn.** Thirty degrees off the window, Cinder to Tassel costs **+2.6 to +3.8 km/s** on top of a perfect 6.5 — 47% of a starter tank becomes 65–74% — and sixty degrees off makes it 13.8 of 14, which is to say impossible. None of that was visible anywhere. The chart draws the road and the rail; the orange diamonds say how far out of phase you are; nothing turned that into fuel.
+
+The Astrolabe is the instrument that does. It is a key upgrade, and its tab appears in the ship's menu when it is fitted and not before. One line for each world that goes round the Lamp — **moons are not on it**, because a moon is reached from the world it belongs to, which is a manoeuvre rather than a window — and each line carries:
+
+| | |
+|---|---|
+| **Perfect** | within 5% of what this crossing costs at its best. Go now. |
+| **Good** | within 25%. |
+| **Bad** | dearer than that, but the tank can still pay it. |
+| **Impossible** | more than the tank holds. |
+
+Each row is a name, a verdict, the cost and flight time of leaving today, and **the days until the next window** — a dash where no window helps, because the crossing is past this tank at every phase. Waiting is nearly always the answer: thirty degrees is about nine days at Cinder, and nine days are free. The four words do the explaining; the rows do not.
+
+The cost comes from Lambert, searched over flight times from half the Hohmann time to half again as long. The cheapest conic at a bad phase is a very slow one — a two-year crawl out to Grumm, priced as though it were a bargain — and an instrument that recommends that is lying by omission, so the search only offers roads a person would actually fly.
+
 **Tapping a world's rail asks the clock to wait until that world gets there.**
 The other half of the same question. Everything else on the chart answers
 "where will I be"; until this, nothing answered "when is anybody else
@@ -732,6 +749,8 @@ It needs new *flight*, not just new bookkeeping, and it is the first real use
 of the Belt for something other than passing through.
 
 ### 5.1.1 Taking a Job On
+
+**An Astrolabe, or you stay in this sky.** A job whose route leaves the system it was handed out in cannot be taken without one. Every crossing in the line is gated on it — the first is job five, Slate to Cinder — and it is on every rack in the game at 900 cowries, the cheapest key there is, because a ship that cannot leave the sky it is in cannot go and fetch the thing that lets it leave.
 
 **Three at once, and no more.** Finished jobs do not count against the three;
 abandoning one gives the berth straight back.

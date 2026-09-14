@@ -165,6 +165,25 @@ export const TUNING = {
    "zoneRadius": 0.000011999999999999999
   },
   {
+   "id": "knot",
+   "name": "The Knot",
+   "kind": "hole",
+   "parent": "lamp",
+   "a": 0.5,
+   "e": 0.02,
+   "omega": 0.8,
+   "M0": 2.4,
+   "retrograde": false,
+   "mu": 1.2e-9,
+   "radius": 5e-9,
+   "zoneRadius": 0.0004276412779571304,
+   "port": false,
+   "species": null,
+   "climate": "none",
+   "notes": "A micro black hole on a quiet orbit between Tassel and the Belt. Grumm’s pull in something a kilometre across, so a pass can be flown close enough to turn a ship most of the way round for nothing. The cats have known for generations and have not mentioned it.",
+   "soi": 0.0053455159744641295
+  },
+  {
    "id": "nail",
    "name": "Nail",
    "kind": "zone",

@@ -104,7 +104,14 @@
      out of it: they used to sit underneath it, where a press meant to zoom in
      landed on whatever the market had in that spot. */
   body.panel-open #view{ right: calc(.8rem + var(--panel-w) + .8rem); }
-  #view button{
+  /* The one button that does something to the ship rather than to the view,
+     so it lives on its own away from the two that open menus: top left, under
+     the fuel gauge and the way back to the title. */
+  #act{
+    position:fixed; left:.8rem; top:calc(70px + env(safe-area-inset-top)); z-index:7;
+    display:flex; flex-direction:column; gap:.35rem;
+  }
+  #view button, #act button{
     width:40px; height:40px; border-radius:10px; border:1px solid var(--line);
     background:var(--glass); color:var(--dim); cursor:pointer; backdrop-filter:blur(8px); font-size:1.05rem;
     /* An inline <svg> sits on the text baseline, which left the ship and the
@@ -113,13 +120,19 @@
        box's content puts all three on the same middle. */
     display:flex; align-items:center; justify-content:center; padding:0; line-height:1;
   }
-  #view button svg{ display:block; }
-  #view button:hover{ color:var(--ink); border-color:var(--line-2); }
+  #view button svg, #act button svg{ display:block; }
+  /* `display:block` above beats the browser's own rule for the hidden
+     attribute, so the anchor and the liftoff arrow were drawn side by side in
+     a button stretched to hold both. */
+  #view button svg[hidden], #act button svg[hidden]{ display:none; }
+  #view button:hover, #act button:hover{ color:var(--ink); border-color:var(--line-2); }
   #view button[aria-pressed="true"]{ color:var(--gold-ink); border-color:var(--gold-2); }
   /* Dragged off the thing the chart is locked to. The button that brings you
      back is the one that lights up, so "where am I" and "get me back" are the
      same place on the screen. */
   #v-fit.off{ color:var(--gold-ink); border-color:var(--gold-2); }
+  #v-far[hidden]{ display:none; }
+  #v-far.off{ opacity:.55; }
 
   /* ---- The panel: right column on wide screens, a sheet on narrow ---- */
   #panel{
@@ -132,10 +145,12 @@
   #panel.closed{ transform:translateX(calc(100% + 1rem)); opacity:0; pointer-events:none; }
   #tabs{ display:flex; gap:2px; padding:.4rem .4rem 0; border-bottom:1px solid var(--line); overflow-x:auto; scrollbar-width:none; }
   .tab{
-    /* Six tabs is the widest the docked row ever gets and it overran by five
-       pixels at .55rem a side. Tabs are short words; they do not need the
-       room. */
-    flex:1 0 auto; padding:.5rem .45rem; border:0; border-bottom:2px solid transparent; background:none;
+    /* Six tabs is the widest this row ever gets — the flight row once the
+       Astrolabe is fitted — and it overran the panel by thirteen pixels at
+       .45rem a side. Tabs are short words and they do not need the room, and
+       `flex:1 0 auto` hands the slack back whenever there are fewer of them,
+       so a narrower tab is only narrower when it has to be. */
+    flex:1 0 auto; padding:.5rem .34rem; border:0; border-bottom:2px solid transparent; background:none;
     color:var(--dim); cursor:pointer; font-size:.82rem; letter-spacing:.04em; white-space:nowrap;
   }
   .tab[aria-selected="true"]{ color:var(--gold-ink); border-bottom-color:var(--gold-2); }
@@ -199,6 +214,18 @@
   .crew .who b{ display:block; }
   .crew .who small{ display:block; color:var(--faint); }
   .crew .who p{ margin:.25rem 0 0; font-size:.84rem; }
+  /* The Astrolabe's rows: a world, what it costs today, and one word for
+     whether today is the day. */
+  .win{ display:flex; align-items:baseline; gap:.6rem; border-top:1px solid var(--line); padding-top:.4rem; margin-top:.4rem; }
+  .win:first-of-type{ border-top:0; }
+  .win .name{ flex:1 1 auto; min-width:0; }
+  .win .name small{ display:block; color:var(--faint); font-size:.8rem; }
+  .win .band{ flex:0 0 auto; text-align:right; font-size:.78rem; letter-spacing:.04em; text-transform:uppercase; }
+  .win .band small{ display:block; color:var(--faint); letter-spacing:0; text-transform:none; }
+  .win.perfect .band{ color:var(--leaf); }
+  .win.good .band{ color:var(--mint); }
+  .win.bad .band{ color:var(--gold); }
+  .win.impossible .band{ color:var(--rose); }
   .quest{ border-top:1px solid var(--line); padding-top:.6rem; margin-top:.6rem; }
   .quest:first-of-type{ border-top:0; padding-top:0; margin-top:0; }
   .quest h3{ margin:0 0 .1rem; }
@@ -281,6 +308,11 @@
      there the rest of the time. It replaced a card across the bottom of the
      sky that spent most of its life telling you what you had not done yet. */
   #dock-go{ color:var(--gold); border-color:var(--gold-2); animation:dockflash 2.8s ease-in-out infinite; }
+  /* Tied up, the same button is how you leave, and it is there the whole time
+     you are moored — so it stops breathing and stops being gold. Nothing that
+     is always on the screen should pulse. */
+  #dock-go.lift{ color:var(--dim); border-color:var(--line); animation:none; opacity:1; }
+  #dock-go.lift:hover{ color:var(--ink); border-color:var(--line-2); background:var(--glass); }
   /* Slow on purpose. It is the one control that appears out of nowhere, and it
      has to catch an eye that is on the chart without becoming a strobe next to
      two buttons that are always there — so it breathes rather than blinks, and
@@ -290,7 +322,7 @@
     50%{ opacity:1; box-shadow:0 0 10px -1px var(--gold-2); }
   }
   #dock-go:hover, #dock-go:focus-visible{ animation:none; opacity:1; }
-  #dock-go svg, #m-ship svg, #m-dock svg{ width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  #act button svg, #m-ship svg, #m-dock svg{ width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
   #dock-go:hover{ background:var(--gold); color:#1a1310; }
   #dock-go[hidden], #m-dock[hidden]{ display:none; }
 
@@ -305,10 +337,12 @@
   #panel.closed{ transform:translateX(calc(100% + 1rem)); opacity:0; pointer-events:none; }
   #tabs{ display:flex; gap:2px; padding:.4rem .4rem 0; border-bottom:1px solid var(--line); overflow-x:auto; scrollbar-width:none; }
   .tab{
-    /* Six tabs is the widest the docked row ever gets and it overran by five
-       pixels at .55rem a side. Tabs are short words; they do not need the
-       room. */
-    flex:1 0 auto; padding:.5rem .45rem; border:0; border-bottom:2px solid transparent; background:none;
+    /* Six tabs is the widest this row ever gets — the flight row once the
+       Astrolabe is fitted — and it overran the panel by thirteen pixels at
+       .45rem a side. Tabs are short words and they do not need the room, and
+       `flex:1 0 auto` hands the slack back whenever there are fewer of them,
+       so a narrower tab is only narrower when it has to be. */
+    flex:1 0 auto; padding:.5rem .34rem; border:0; border-bottom:2px solid transparent; background:none;
     color:var(--dim); cursor:pointer; font-size:.82rem; letter-spacing:.04em; white-space:nowrap;
   }
   .tab[aria-selected="true"]{ color:var(--gold-ink); border-bottom-color:var(--gold-2); }
@@ -372,6 +406,18 @@
   .crew .who b{ display:block; }
   .crew .who small{ display:block; color:var(--faint); }
   .crew .who p{ margin:.25rem 0 0; font-size:.84rem; }
+  /* The Astrolabe's rows: a world, what it costs today, and one word for
+     whether today is the day. */
+  .win{ display:flex; align-items:baseline; gap:.6rem; border-top:1px solid var(--line); padding-top:.4rem; margin-top:.4rem; }
+  .win:first-of-type{ border-top:0; }
+  .win .name{ flex:1 1 auto; min-width:0; }
+  .win .name small{ display:block; color:var(--faint); font-size:.8rem; }
+  .win .band{ flex:0 0 auto; text-align:right; font-size:.78rem; letter-spacing:.04em; text-transform:uppercase; }
+  .win .band small{ display:block; color:var(--faint); letter-spacing:0; text-transform:none; }
+  .win.perfect .band{ color:var(--leaf); }
+  .win.good .band{ color:var(--mint); }
+  .win.bad .band{ color:var(--gold); }
+  .win.impossible .band{ color:var(--rose); }
   .quest{ border-top:1px solid var(--line); padding-top:.6rem; margin-top:.6rem; }
   .quest:first-of-type{ border-top:0; padding-top:0; margin-top:0; }
   .quest h3{ margin:0 0 .1rem; }
@@ -509,7 +555,10 @@
       top:calc(74px + env(safe-area-inset-top)); bottom:auto; right:.4rem;
       flex-direction:column; gap:.25rem;
     }
-    #view button{ width:32px; height:30px; border-radius:8px; font-size:.95rem; }
+    /* The other corner of the same strip. The back link is gone on a phone, so
+       there is nothing under the two HUD rows for this to land on. */
+    #act{ top:calc(74px + env(safe-area-inset-top)); left:.4rem; gap:.25rem; }
+    #view button, #act button{ width:32px; height:30px; border-radius:8px; font-size:.95rem; }
     /* Only the panel toggle stays on top; the rest tuck under it in a column
        that the chart can still be seen around. */
     #view button:not(#m-ship):not(#m-dock){ opacity:.85; }
@@ -575,6 +624,32 @@
        flash was carrying it to and drops the breathing. */
     #dock-go{ animation:none; opacity:1; }
   }
+  /* The hazard marks. Amber is "this will happen and it will hurt a bit";
+     red is the colour the chart already uses for ground, so the corner and
+     the cross on the road say the same thing in the same voice. */
+  #hud .warn{
+    display:flex; align-items:center; gap:.4rem;
+    padding:.3rem .6rem; border-radius:.5rem;
+    border:1px solid currentColor; background:rgba(0,0,0,.35);
+    color:var(--gold-deep); font-size:.82rem; font-weight:600;
+  }
+  #hud .warn.bad{ color:var(--gv-bad); }
+  #hud .warn svg{ width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  #hud .warn[hidden]{ display:none; }
+  @media (prefers-reduced-motion: no-preference){
+    #hud .warn.bad{ animation:hazpulse 1.6s ease-in-out infinite; }
+    @keyframes hazpulse{ 0%,100%{ opacity:1 } 50%{ opacity:.55 } }
+  }
+  @media (max-width: 560px){ #hud .warn b{ display:none; } }
+  /* A save written out. Monospace so a mistyped character is findable, and
+     breaking anywhere because it is one very long word. */
+  .hexbox{
+    width:100%; margin-top:.5rem;
+    font:12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+    background:var(--sunk, rgba(0,0,0,.35)); color:inherit;
+    border:1px solid var(--line); border-radius:.4rem; padding:.5rem;
+    word-break:break-all; resize:vertical;
+  }
 </style>
 </head>
 <body>
@@ -582,6 +657,13 @@
 <canvas id="chart" aria-label="The navigation chart: the Lamp, its worlds, and your ship's predicted path." role="img"></canvas>
 
 <header id="hud" aria-live="off">
+  <!-- Two different pictures because they want two different answers: a skim
+       is "brace and let it happen", the ground is "move the burn". -->
+  <div class="warn" id="h-hazard" hidden role="status">
+    <svg id="haz-skim" viewBox="0 0 24 24" aria-hidden="true" hidden><path d="M3 15 h18"/><path d="M5 18.5 h14"/><path d="M12 3.5 c2.6 3 3.6 6 3.6 8.4 L12 14.4 8.4 11.9 C8.4 9.5 9.4 6.5 12 3.5z"/></svg>
+    <svg id="haz-crash" viewBox="0 0 24 24" aria-hidden="true" hidden><path d="M12 3.2 L22 20.5 H2 z"/><path d="M12 9.5 V14"/><path d="M12 17 v.4"/></svg>
+    <b id="haz-text">—</b>
+  </div>
   <div class="stat" id="h-dv-wrap"><small>Fuel</small><b id="h-dv">—</b><div id="dvbar"><i id="h-dvfill"></i><i id="h-dvplan"></i></div></div>
   <div class="stat"><small>Coin</small><b id="h-money">—</b></div>
   <div class="stat"><small>Hold</small><b id="h-hold">—</b></div>
@@ -590,9 +672,17 @@
 </header>
 <a id="back" href="./">&larr; title</a>
 
+<div id="act">
+  <button id="dock-go" hidden title="Dock (d)" aria-label="Dock here">
+    <svg class="i-dock" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="3.4"/><path d="M12 10.4 V20"/><path d="M8 13.5 H16"/><path d="M5 15.5 a7 7 0 0 0 14 0"/></svg>
+    <svg class="i-lift" viewBox="0 0 24 24" aria-hidden="true" hidden><path d="M12 4 V16"/><path d="M8 8 L12 4 L16 8"/><path d="M6 20 H18"/></svg>
+  </button>
+</div>
+
 <div id="view">
-  <button id="dock-go" hidden title="Dock (d)" aria-label="Dock here"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="3.4"/><path d="M12 10.4 V20"/><path d="M8 13.5 H16"/><path d="M5 15.5 a7 7 0 0 0 14 0"/></svg></button>
   <button id="v-fit" title="Back to your ship, and frame it (f)">&#9678;</button>
+  <!-- Only a ship with a navigator aboard has this at all: it is what she does. -->
+  <button id="v-far" hidden title="Show the path past the next flyby (v)" aria-pressed="true" aria-label="Show the path past the next flyby"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 17 c5 0 7-10 12-10 c4 0 6 3 8 5"/><circle cx="14" cy="7" r="1.6"/><path d="M18.5 10.5 L22 12 L20.5 8.4"/></svg></button>
   <button id="m-dock" hidden title="The port (p)" aria-label="Open the port menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20 h16"/><path d="M8 20 V5"/><path d="M8 5 h10"/><path d="M15 5 V9"/><path d="M13 9 h4 v4 h-4 z"/></svg></button>
   <button id="m-ship" title="Your ship (p)" aria-pressed="true" aria-label="Open the ship menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 c3 3.4 4.2 7 4.2 10.2 L12 16.5 7.8 13.2 C7.8 10 9 6.4 12 3z"/><path d="M7.8 12 L4.8 16.4 7.8 15.2"/><path d="M16.2 12 L19.2 16.4 16.2 15.2"/><circle cx="12" cy="9.4" r="1.7"/></svg></button>
 </div>
@@ -636,22 +726,21 @@ import { playIntro } from './intro.js';
 const world = S.world;
 const $ = id => document.getElementById(id);
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const SAVE_KEY = 'ot:save:v1';
-
 /* ------------------------------------------------------------- state */
 
 const params = new URLSearchParams(location.search);
+/* Which of the three this window is playing. The title screen puts it in the
+   address; opening play.html directly picks up wherever the player was last,
+   and an old save from before there were slots becomes slot one on the way. */
+S.migrateLegacy();
+const SLOT = S.isSlot(params.get('slot')) ? Number(params.get('slot')) : S.activeSlot();
+S.setActiveSlot(SLOT);
+
 let state = null;
-function loadSave(){
-  try{
-    const raw = localStorage.getItem(SAVE_KEY);
-    if(raw) return S.restore(raw);
-  }catch(e){ console.warn('Save could not be read:', e); }
-  return null;
-}
+const loadSave = () => S.readSlot(SLOT);
 function save(){
   if(!state) return;
-  try{ localStorage.setItem(SAVE_KEY, S.serialize(state)); }catch{ /* private window, full disk: play on */ }
+  S.writeSlot(SLOT, state);   // a private window or a full disk simply does not stick
 }
 /* A seed can be named in the address. It decides the ship's name and every
    roll the game will ever make, so two people with the same seed see the same
@@ -694,6 +783,7 @@ const belt = { inner: CONST.BELT.inner, outer: CONST.BELT.outer, rocks: BELT_ROC
 addEventListener('resize', () => chart.resize());
 
 let prediction = null, nodePositions = [], apses = [], crossedRails = [], predictedAt = -1, predictedReal = -1e9;
+let hazard = { skim: null, crash: null };
 /* The moment on the road that was just tapped, while the card about it is
    up: drawn as a breathing ring so the player can see which line they hit
    before choosing what to do with it. Gone when the card closes. */
@@ -717,7 +807,7 @@ function horizonFor(){
 }
 
 function replan(force = false){
-  if(state.dockedAt){ prediction = null; nodePositions = []; apses = []; crossedRails = []; return; }
+  if(state.dockedAt){ prediction = null; nodePositions = []; apses = []; crossedRails = []; hazard = { skim: null, crash: null }; return; }
   /* Re-solving the whole road is the most expensive thing this page does, so
      it happens on a real-time budget rather than a game-time one: at most a few
      times a second, whatever the warp. Measuring it in game days got it wrong
@@ -733,7 +823,8 @@ function replan(force = false){
      the white road runs up to it and the yellow road carries on from it. With
      nothing written down at all there is one road, a whole lap of the orbit
      the ship is actually on. */
-  prediction = S.planImmediate(state);
+  prediction = S.planImmediate(state, true, { farSight: S.seesPast(state) });
+  hazard = S.hazards(state);
   if(!prediction){ nodePositions = []; apses = []; crossedRails = []; return; }
   nodePositions = state.nodes.map(n => locateOnPrediction(world, prediction, n.t));
   /* The low point and the high point of every closed leg on the drawn road.
@@ -778,6 +869,13 @@ let lockedTo = null;
 /* The one number the on-chart editor shows. Recomputed when the burn changes,
    not every frame: solving what a mark costs is not free. */
 let nodeLabel = null, nodeLabelKey = '', interceptLabel = null, insetLabel = null;
+/* The Astrolabe is the one tab that goes stale on its own: every other one
+   reads the ship, and this one reads the sky moving. It is also the most
+   expensive thing the panel draws — a Lambert sweep per world — so it is
+   redrawn on a real-time budget rather than every frame, and only while the
+   clock is actually running and the tab is actually up. */
+const WINDOWS_REDRAW_MS = 500;
+let windowsDrawnAt = -1e9;
 /* What every mark written down will take out of the tank, drawn on the gauge. */
 let plannedSpend = 0;
 /* What the selected mark says on the chart, and what the whole plan will
@@ -845,7 +943,12 @@ function frame(now){
     shipLocalV: state.dockedAt ? null : state.ship.v,
     nodeLabel, interceptLabel, insetLabel,
     belt, nearPort: docking?.port ?? null, docking,
+    hidden: S.unseen(state),
   });
+  if(dt > 0 && panelOpen && tab === 'windows' && now - windowsDrawnAt > WINDOWS_REDRAW_MS){
+    windowsDrawnAt = now;
+    renderTab();
+  }
   renderHud(docking);
   renderDockCard(docking);
   refreshRecentre();
@@ -899,21 +1002,46 @@ function handleEvents(events){
 
 /* ------------------------------------------------------------- HUD */
 
+function showHazard(){
+  const box = $('h-hazard'), skim = $('haz-skim'), crash = $('haz-crash');
+  const ground = hazard.crash, air = hazard.skim;
+  /* Ground beats air for the corner. Both can be true — a dive that sheds too
+     little still ends on the rocks — and of the two, only one of them is worth
+     interrupting the player for. */
+  box.hidden = !(ground || air);
+  if(box.hidden) return;
+  box.classList.toggle('bad', !!ground);
+  crash.hidden = !ground;
+  skim.hidden = !!ground;
+  if(ground){
+    box.setAttribute('aria-label', `Warning: this path meets ${S.portName(ground.body)}`);
+    $('haz-text').textContent = `Hits ${S.portName(ground.body)}`;
+  }else{
+    const risky = air.risk > 0;
+    box.setAttribute('aria-label', `Air braking at ${S.portName(air.body)} ahead`);
+    $('haz-text').textContent = `Air brake · ${S.fmtKms(air.dv)}`
+      + (risky ? ` · ${Math.round(air.risk * 100)}% risk` : ' · safe');
+  }
+}
+
 function renderHud(docking){
+  showHazard();
+  refreshFarButton();
   /* The tank, and what the plan will take out of it. The cost of a burn is
      shown here and nowhere near the burn itself: it is a length of fuel, and
      next to a mark it read as a speed — which made pressing Back to slow down
      look like it was speeding the ship up. */
   const spend = Math.min(plannedSpend, state.dv);
-  $('h-dv').textContent = `${S.fmtKms(state.dv)} / ${S.fmtKms(state.tank)}`
+  $('h-dv').textContent = `${S.fmtKms(state.dv)} / ${S.fmtKms(S.usableTank(state))}`
     + (plannedSpend > 1e-12 ? ` · ${S.fmtKms(plannedSpend)} planned` : '');
   const fill = $('h-dvfill');
-  const frac = state.tank > 0 ? state.dv / state.tank : 0;
+  const cap = S.usableTank(state);
+  const frac = cap > 0 ? state.dv / cap : 0;
   fill.style.width = `${Math.round(frac * 100)}%`;
   fill.classList.toggle('low', frac < 0.15);
   const planBar = $('h-dvplan');
   planBar.style.right = `${Math.round((1 - frac) * 100)}%`;
-  planBar.style.width = `${Math.round((state.tank > 0 ? spend / state.tank : 0) * 100)}%`;
+  planBar.style.width = `${Math.round((cap > 0 ? spend / cap : 0) * 100)}%`;
   $('h-dv-wrap').classList.toggle('warn', frac < 0.15);
   $('h-money').textContent = S.fmtMoney(state.money) + (state.debt > 0 ? ` (owe ${S.fmtMoney(state.debt)})` : '');
   $('h-hold').textContent = `${S.usedUnits(state)} / ${S.holdUnits(state)}`;
@@ -958,11 +1086,25 @@ function renderHud(docking){
   }
 }
 
-/* Tie up. The icon is there when a stable orbit close in makes it possible
-   and gone otherwise, so it is a thing you have earned rather than a card
-   that follows you round the sky listing what you have not done. */
+/* The one button that acts on the ship: tie up, or cast off.
+ *
+ * Adrift it is a mooring ring, and only when a stable orbit close in has
+ * earned it — a thing you have done rather than a card following you round
+ * the sky listing what you have not. Tied up it is the way out again, which
+ * is the only thing a moored ship ever wants from the chart, and it is the
+ * same button because they are the same question answered twice. */
 function renderDockCard(docking){
-  $('dock-go').hidden = !(docking && docking.ok && !state.dockedAt);
+  const b = $('dock-go');
+  const moored = !!state.dockedAt;
+  b.hidden = !(moored || (docking && docking.ok));
+  b.classList.toggle('lift', moored);
+  /* toggleAttribute, not `.hidden`: that property belongs to HTMLElement and
+     these are SVG elements, so assigning it set a JS expando nobody reads and
+     left the anchor showing on a moored ship. */
+  b.querySelector('.i-dock').toggleAttribute('hidden', moored);
+  b.querySelector('.i-lift').toggleAttribute('hidden', !moored);
+  b.title = moored ? `Lift off from ${S.portName(state.dockedAt)}` : 'Dock (d)';
+  b.setAttribute('aria-label', moored ? 'Lift off' : 'Dock here');
 }
 
 /* ------------------------------------------------------------- time */
@@ -1080,6 +1222,24 @@ function askAtPath(t){
 /* ------------------------------------------------------------- view */
 
 $('v-fit').addEventListener('click', () => backToShip(true));
+function setFarSight(on){
+  state.farSight = on;
+  const b = $('v-far');
+  b.setAttribute('aria-pressed', String(on));
+  b.classList.toggle('off', !on);
+  b.title = on ? 'Showing the path past the next flyby (v)' : 'Show the path past the next flyby (v)';
+  replan(true); draw(); save();
+}
+$('v-far').addEventListener('click', () => setFarSight(state.farSight === false));
+function refreshFarButton(){
+  const can = S.canSeePast(state);
+  $('v-far').hidden = !can;
+  if(can){
+    const on = state.farSight !== false;
+    $('v-far').setAttribute('aria-pressed', String(on));
+    $('v-far').classList.toggle('off', !on);
+  }
+}
 $('m-ship').addEventListener('click', () => openMenu('ship'));
 $('m-dock').addEventListener('click', () => openMenu('dock'));
 /* The view is locked; there is nothing to keep in sync but the panel. */
@@ -1267,6 +1427,7 @@ addEventListener('keydown', e => {
     case '+': case '=': chart.zoomBy(1.4); noteLook('chartPanned'); break;
     case '-': case '_': chart.zoomBy(1 / 1.4); noteLook('chartPanned'); break;
     case 'f': backToShip(); break;
+    case 'v': if(S.canSeePast(state)) setFarSight(state.farSight === false); break;
     /* One key for both: it opens the ship, and at a port it steps on to the
        dock and then shuts, which is the whole cycle in one thumb. */
     case 'p': openMenu(state.dockedAt && panelOpen && panelMenu === 'ship' ? 'dock' : 'ship'); break;
@@ -1395,9 +1556,17 @@ const TABS_SHIP_DOCKED = [['ship', 'Ship'], ['quests', 'Quests'], ['crew', 'Crew
 const TABS_DOCK = [['shipyard', 'Shipyard'], ['market', 'Trading'], ['requests', 'Requests'], ['talk', 'Talk']];
 let panelMenu = 'ship';
 let lastTabsKey = null;
+/* The Astrolabe is a tab because it is an instrument: it is not on the ship
+   until it is bought, and then it is. Slotted next to Burns, which is the
+   thing it is for. */
 function tabsFor(){
   if(panelMenu === 'dock' && state.dockedAt) return TABS_DOCK;
-  return state.dockedAt ? TABS_SHIP_DOCKED : TABS_SHIP_FLIGHT;
+  const base = state.dockedAt ? TABS_SHIP_DOCKED : TABS_SHIP_FLIGHT;
+  if(!state.keys?.astrolabe) return base;
+  const at = base.findIndex(([id]) => id === 'plan');
+  const out = [...base];
+  out.splice(at < 0 ? 1 : at + 1, 0, ['windows', 'Windows']);
+  return out;
 }
 /* Open one of the two, or shut the panel if it is already showing that one. */
 function openMenu(which){
@@ -1417,7 +1586,7 @@ function renderTabs(){
   // Casting off takes the port menu with it; there is nothing left in it.
   if(panelMenu === 'dock' && !state.dockedAt) panelMenu = 'ship';
   const tabs = tabsFor();
-  const key = panelMenu + (state.dockedAt ? ':docked' : ':flight');
+  const key = panelMenu + (state.dockedAt ? ':docked' : ':flight') + (state.keys?.astrolabe ? ':astro' : '');
   if(key === lastTabsKey){ refreshMenuButtons(); return; }
   lastTabsKey = key;
   const bar = $('tabs'); bar.innerHTML = '';
@@ -1447,7 +1616,7 @@ function renderTab(){
      was and put it back. */
   const active = document.activeElement;
   const was = body.contains(active) ? (active.dataset?.act ?? active.id ?? null) : null;
-  const fn = { market, shipyard: shipyardTab, requests: requestsTab, talk, plan, quests: questsTab, crew: crewTab, orbit: orbitTab, ship: shipTab }[tab];
+  const fn = { market, shipyard: shipyardTab, requests: requestsTab, talk, plan, quests: questsTab, crew: crewTab, orbit: orbitTab, ship: shipTab, windows: astrolabeTab }[tab];
   body.innerHTML = fn ? fn() : '';
   wire(body);
   if(was){
@@ -1565,7 +1734,7 @@ function market(){
   if(rest.length){
     out += '<h3>They want</h3><p>' + rest.map(r => listed(r, 'lock')).join(' · ') + '</p>';
   }
-  if(!priced) out += '<p class="lock">What they would pay is a matter of opinion, and there is nobody aboard whose opinion is worth having.</p>';
+  if(!priced) out += '<p class="lock">No appraiser aboard, so these are worth whatever they turn out to be worth. Sign one on and you will see the price before you sell.</p>';
   return out;
 }
 
@@ -1580,7 +1749,7 @@ function shipyardTab(){
   let out = `<h2>${esc(S.portName(port))} <small class="lock">${p.shipyard ? 'shipyard' : 'dock'}</small></h2>`;
   out += '<h3>Fuel</h3>';
   const fp = S.fuelPrice(state);
-  const room = S.kms(state.tank - state.dv);
+  const room = S.kms(S.usableTank(state) - state.dv);
   if(fp == null) out += '<p class="empty">No fuel sold here.</p>';
   else{
     out += `<p>${S.fmtMoney(fp)} per km/s · ${room.toFixed(1)} km/s of room.</p><div class="btns">
@@ -1589,6 +1758,26 @@ function shipyardTab(){
       <button class="btn primary" data-act="fuel|999" ${room >= 0.05 && state.money >= fp ? '' : 'disabled'}>Fill (${S.fmtMoney(Math.min(room, state.money / fp) * fp)})</button></div>`;
   }
   const ups = S.upgradesFor(port);
+  /* The repair bay. It only exists when there is something to repair, so a
+     sound ship never reads a row telling it that it is sound. Neither repair
+     is compulsory and neither blocks undocking: a battered ship that cannot
+     pay must still be able to leave and go and earn it. */
+  const hull = S.hullLevel(state), cell = S.hasFuelCellFault(state);
+  if(hull > 0 || cell){
+    out += '<h3>Repairs</h3>';
+    if(hull > 0){
+      const c = S.canRepair(state, 'hull'), cost = S.repairCost(state, 'hull');
+      out += `<div class="row"><div class="name"><b>${esc(S.hullWord(state))}</b><small>The frame wants straightening before it wants anything else.</small></div>
+        <div class="price">${S.fmtMoney(cost)}</div>
+        <div class="btns"><button class="btn sm primary" data-act="repair|hull" ${c.ok ? '' : 'disabled title="' + esc(c.reason) + '"'}>Mend</button></div></div>`;
+    }
+    if(cell){
+      const c = S.canRepair(state, 'fuelCell'), cost = S.repairCost(state, 'fuelCell');
+      out += `<div class="row"><div class="name"><b>Burnt fuel cell</b><small>The tank fills to ${Math.round(S.FUEL_CELL_CAP * 100)}% and stops. A new cell is a morning's work.</small></div>
+        <div class="price">${S.fmtMoney(cost)}</div>
+        <div class="btns"><button class="btn sm primary" data-act="repair|fuelCell" ${c.ok ? '' : 'disabled title="' + esc(c.reason) + '"'}>Replace</button></div></div>`;
+    }
+  }
   out += '<h3>On offer</h3>';
   if(!ups.length) out += `<p class="empty">${p.shipyard ? 'Nothing on the rack today.' : 'Nobody fits anything here.'}</p>`;
   for(const u of ups){
@@ -1814,7 +2003,7 @@ function shipTab(){
   /* The fitted list reads the rack rather than naming the keys itself, so a
      new one appears here the moment it exists in the tables. */
   const fittedKeys = UPGRADES.filter(u => u.kind === 'key' && state.keys[u.key]);
-  out += `<dl class="kv"><dt>Tank</dt><dd>${esc(S.tiers('tank')[t.tank].name)} · ${S.fmtKms(state.dv)} of ${S.fmtKms(state.tank)}</dd>
+  out += `<dl class="kv"><dt>Tank</dt><dd>${esc(S.tiers('tank')[t.tank].name)} · ${S.fmtKms(state.dv)} of ${S.fmtKms(S.usableTank(state))}</dd>
     <dt>Hold</dt><dd>${esc(S.tiers('hold')[t.hold].name)} · ${S.usedUnits(state)} of ${S.holdUnits(state)} units</dd>
     <dt>Systems</dt><dd>${fittedKeys.map(u => esc(u.name)).join(', ') || '<span class="lock">nothing yet</span>'}</dd></dl>`;
 
@@ -1833,6 +2022,11 @@ function shipTab(){
     const line = TEXT.captainLines.onLongCoast[Math.floor(S.hash(Math.floor(state.t / 20)) * TEXT.captainLines.onLongCoast.length)];
     out += `<p class="say">${esc(line)}</p>`;
   }
+  /* Which of the three this is, and the two ways a game leaves the browser it
+     was played in. The title screen has the same pair; both go through sim.js
+     so there is one idea of what a save is. */
+  out += `<h3>This game</h3><p class="lock">Saved in slot ${SLOT}. It saves itself as you play.</p>`;
+  out += `<div class="btns"><button class="btn sm" data-act="exportsave">Copy this game out</button><button class="btn sm" data-act="importsave">Paste a game in</button></div>`;
   out += `<div class="btns"><button class="btn sm danger" data-act="newgame">New game</button><a class="btn sm" href="./">&larr; Title screen</a></div>`;
   return out;
 }
@@ -1948,9 +2142,73 @@ function questsTab(){
   return out;
 }
 
+/* The Astrolabe. One line per world that goes round the Lamp — no moons, which
+   are reached from the world they belong to rather than through a window.
+   Name, verdict, what it costs to leave today, and how long until it is
+   cheap. The four words do the explaining. */
+const BAND_WORD = { perfect: 'Perfect', good: 'Good', bad: 'Bad', impossible: 'Impossible' };
+function astrolabeTab(){
+  let out = '<h2>Transfer windows</h2>';
+  if(!state.keys?.astrolabe) return out + '<p class="say">No Astrolabe fitted.</p>';
+  const rows = S.transferWindows(state);
+  out += `<p class="lock">From ${esc(S.departureName(state) ?? 'here')} · tank ${S.fmtKms(S.usableTank(state))}</p>`;
+  if(!rows.length) return out + '<p class="empty">Nothing else goes round the Lamp from here.</p>';
+  for(const r of rows){
+    /* No countdown where waiting cannot help: the crossing is past this tank
+       at every phase, and a date would be a promise the ship cannot keep. */
+    const ever = r.best <= S.usableTank(state) && r.days != null;
+    out += `<div class="win ${r.band}">`
+      + `<div class="name"><b>${esc(r.name)}</b><small>${S.fmtKms(r.cost)} · ${S.fmtDays(r.tof)}</small></div>`
+      + `<div class="band">${BAND_WORD[r.band]}<small>${ever ? S.fmtDays(r.days) : '—'}</small></div>`
+      + '</div>';
+  }
+  return out;
+}
+
 /* ------------------------------------------------------------- actions */
 
 const actions = {
+  exportsave(){
+    const hex = S.exportSave(state);
+    openModal(`<h2>This game, written out</h2>
+      <p>Keep this anywhere. Pasting it into a slot on any machine brings this ship back exactly as it is — same day, same hold, same purse.</p>
+      <textarea id="m-hex" class="hexbox" rows="5" readonly spellcheck="false" aria-label="The save, written out">${esc(hex)}</textarea>
+      <div class="btns"><button class="btn" id="m-copy">Copy</button><button class="btn primary" id="m-ok">Done</button></div>`, m => {
+      const box = m.querySelector('#m-hex');
+      box.addEventListener('focus', () => box.select());
+      m.querySelector('#m-copy').addEventListener('click', async () => {
+        box.select();
+        try{ await navigator.clipboard.writeText(hex); toast('Copied.'); }
+        catch{ toast('Press Ctrl or Cmd and C to copy.', 'bad', 5000); }
+      });
+      m.querySelector('#m-ok').addEventListener('click', closeModal);
+    });
+  },
+  importsave(){
+    openModal(`<h2>Paste a game in</h2>
+      <p>This replaces the ship you are flying with the one in the save. Spaces and line breaks do not matter.</p>
+      <textarea id="m-hex" class="hexbox" rows="5" spellcheck="false" autocomplete="off" aria-label="Paste a save here"></textarea>
+      <div class="btns"><button class="btn" id="m-no">Not now</button><button class="btn primary" id="m-go">Load it</button></div>`, m => {
+      m.querySelector('#m-no').addEventListener('click', closeModal);
+      m.querySelector('#m-go').addEventListener('click', () => {
+        let loaded;
+        try{ loaded = S.importSave(m.querySelector('#m-hex').value); }
+        catch(err){ toast(err.message, 'bad', 6000); return; }
+        if(!confirm('Replace the ship you are flying with the one in that save?')) return;
+        closeModal();
+        state = loaded;
+        selectedNode = -1; lastDockedMode = null;
+        replan(true); renderTabs(); renderHud(); backToShip(true); save();
+        toast('Loaded.', 'story', 5000);
+      });
+    });
+  },
+  repair(what){
+    const r = S.repair(state, what);
+    if(!r.ok){ toast(r.reason, 'bad'); return; }
+    toast(what === 'fuelCell' ? 'New cell fitted.' : 'Hull made good.', 'story', 5000);
+    renderTab(); renderHud(); save();
+  },
   buy(gid, q){ const r = S.buy(state, gid, Number(q)); if(!r.ok) toast(r.reason, 'bad'); renderTab(); save(); },
   sell(gid, q){ const r = S.sell(state, gid, Number(q)); if(!r.ok) toast(r.reason, 'bad'); else toast(`Sold for ${S.fmtMoney(r.total)} (${r.profit >= 0 ? '+' : ''}${S.fmtMoney(r.profit)}).`); renderTab(); save(); },
   takequest(id){
@@ -2015,7 +2273,7 @@ function doDock(){
    nothing when you pressed it. The HUD hint docks too, because it is the thing
    that says you can, and `d` because a keyboard is a keyboard. */
 const dockIfWeCan = () => { const d = S.dockingStatus(state); if(d?.ok) doDock(); };
-$('dock-go').addEventListener('click', dockIfWeCan);
+$('dock-go').addEventListener('click', () => { if(state.dockedAt) actions.undock(); else dockIfWeCan(); });
 $('dockhint').addEventListener('click', dockIfWeCan);
 $('dockhint').style.cursor = 'pointer';
 addEventListener('keydown', e => {
@@ -2050,9 +2308,10 @@ function showToll(p){
 function showCrash(bodyId){
   const b = world.get(bodyId);
   const atmo = state.pending?.atmosphere;
+  const wrecked = state.pending?.wrecked;
   const q = S.towQuote(state);
-  openModal(`<h2>${atmo ? 'Too deep' : 'Hard landing'}</h2><p class="say">${esc(atmo ? TEXT.events.towAtmosphere : TEXT.events.towCrash[0])}</p>
-    <p>${atmo ? `${esc(b.name)}'s clouds took the ship without a heat shield.` : `The ship met ${esc(b.name)} faster than it should have.`} A tow to ${esc(S.portName(q.port))} will cost ${S.fmtMoney(Math.round(q.cost * 1.5))} and ${S.fmtDays(q.days)}. The cargo rides along.</p>
+  openModal(`<h2>${wrecked ? 'The hull gives out' : atmo ? 'Too deep' : 'Hard landing'}</h2><p class="say">${esc(wrecked ? TEXT.events.skimWrecked : atmo ? TEXT.events.towAtmosphere : TEXT.events.towCrash[0])}</p>
+    <p>${wrecked ? `The shield did its job for longer than the frame under it did.` : atmo ? `${esc(b.name)}'s clouds took the ship without a heat shield.` : `The ship met ${esc(b.name)} faster than it should have.`} A tow to ${esc(S.portName(q.port))} will cost ${S.fmtMoney(Math.round(q.cost * 1.5))} and ${S.fmtDays(q.days)}. The cargo rides along.</p>
     <div class="btns"><button class="btn primary" id="m-tow">Call for a tow</button></div>`, m => {
     m.querySelector('#m-tow').addEventListener('click', () => { const r = S.callTow(state, atmo ? 'atmosphere' : 'crash'); closeModal(); afterTow(r); });
   });

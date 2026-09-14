@@ -26,14 +26,19 @@
   },
 
   // One object per room code. SQLite-backed because that is what the free plan
-  // supports; the game only uses the key-value storage API, one key.
+  // supports; the games only use the key-value storage API, one key each.
   // One class per game. Separate on purpose: two games sharing an object class
   // would put a Good Vibes party and a Solarium party in the same room whenever
   // they picked the same four letters, and memorable codes invite exactly that.
+  //
+  // BOARD is the odd one out: not a room but Sunward's leaderboard, and there
+  // is exactly one of it — the Worker always asks for the object named for the
+  // game, so the class only ever has a single instance.
   "durable_objects": {
     "bindings": [
       { "name": "ROOM", "class_name": "GameRoom" },
-      { "name": "SOLARIUM", "class_name": "SolariumRoom" }
+      { "name": "SOLARIUM", "class_name": "SolariumRoom" },
+      { "name": "BOARD", "class_name": "SunwardBoard" }
     ]
   },
 
@@ -42,7 +47,8 @@
   // exist, and those objects are somebody's game in progress.
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["GameRoom"] },
-    { "tag": "v2", "new_sqlite_classes": ["SolariumRoom"] }
+    { "tag": "v2", "new_sqlite_classes": ["SolariumRoom"] },
+    { "tag": "v3", "new_sqlite_classes": ["SunwardBoard"] }
   ],
 
   "observability": {

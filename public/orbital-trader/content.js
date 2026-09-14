@@ -268,7 +268,14 @@ export const FORMULAS = {
      out of than capturing would have cost in the first place. A few per cent a
      pass lets a pilot walk an orbit down over several passes and stop where
      they want to be, which is the technique the design is describing. */
-  aerobrake: { k: 0.04, maxFraction: 0.12, floorApo: 1.25 },
+  /* Thicker air since: k went to 0.25 so a middling dive reaches the cap
+     rather than never touching it — at 0.04 the cap above was unreachable at
+     any depth, so every pass was on the linear slope and depth had to be
+     exact. Saturating early is what makes a band of depths all come out the
+     same, which is the forgiveness. maxFraction stays where it was: that is
+     the number the paragraph above was bought with. The risk and repair
+     figures live beside them in the design table. */
+  aerobrake: { k: 0.04, maxFraction: 0.12, floorApo: 1.25, ...(F.aerobrake ?? {}) },
   toll: { ...F.toll, cooldownDays: 30, maxCargoFraction: 0.4, giftRep: 3, giftChance: 0.35 },
   tow: { ...F.tow, minDays: 3, crashMul: 1.5 },
 };

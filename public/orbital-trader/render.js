@@ -269,6 +269,10 @@ function makeStars(seed){
 
 function draw(chart, view){
   const { ctx, world, camera } = chart;
+  /* What this ship has not been told about. The sky is the same either way —
+     the kernel never reads this — but a body nobody has mentioned draws no
+     dot, no rail, no reach and no label, and cannot be tapped. */
+  chart.hidden = view.hidden instanceof Set ? view.hidden : EMPTY_HIDDEN;
   const W = chart.width, H = chart.height;
   const t = view.t;
   chart.hits = { bodies: [], nodes: [], handles: [], pathSegs: [], rails: [], inset: chart.hits?.inset ?? null };
@@ -388,12 +392,15 @@ function ellipsePath(ctx, chart, centreAbs, el){
   ctx.ellipse(c[0], c[1], a * z, b * z, -rot, 0, Math.PI * 2);
 }
 
+const EMPTY_HIDDEN = new Set();
+
 function drawOrbits(chart, pos, t){
   const { ctx, world, camera } = chart;
   void t;
   const diag = Math.hypot(chart.width, chart.height);
   for(const b of world.bodies){
     if(b.parent == null) continue;
+    if(chart.hidden.has(b.id)) continue;
     const px = b.a * camera.zoom;
     // Too small to be a shape, or so large that all you see of it is a line
     // drawn across the whole chart. Neither is worth the ink.
@@ -461,6 +468,7 @@ function drawSoiRings(chart, pos){
   const { ctx, world, camera } = chart;
   for(const b of world.bodies){
     if(b.soi == null || b.mu <= 0) continue;
+    if(chart.hidden.has(b.id)) continue;
     const px = b.soi * camera.zoom;
     if(px < 10 || px > 6000) continue;
     const p = chart.toScreen(pos.get(b.id).r);
@@ -481,6 +489,7 @@ function drawBodies(chart, view, pos, t){
   const placed = [];   // label boxes already used, for collision avoidance
   const bodies = [...world.bodies].sort((x, y) => (y.radius ?? 0) - (x.radius ?? 0));
   for(const b of bodies){
+    if(chart.hidden.has(b.id)) continue;
     const p = chart.toScreen(pos.get(b.id).r);
     if(p[0] < -60 || p[1] < -60 || p[0] > chart.width + 60 || p[1] > chart.height + 60) continue;
     const real = (b.radius ?? 0) * zoom;
@@ -540,6 +549,23 @@ function drawBodies(chart, view, pos, t){
        a low orbit visibly inside the ground it was clearing. The clip also
        keeps rings and sparks off the sky around the body. */
     let drew = false;
+    if(b.kind === 'hole'){
+      /* Nothing is the point. A disc of the background with a lensed ring
+         round it reads as a hole at every zoom, where a black dot on black
+         reads as nothing at all — and a hole is what it is. */
+      const r = Math.max(3.5, rpx);
+      ctx.beginPath(); ctx.arc(p[0], p[1], r, 0, Math.PI * 2);
+      ctx.fillStyle = PALETTE.space; ctx.fill();
+      const halo = ctx.createRadialGradient(p[0], p[1], r, p[0], p[1], r * 3.2);
+      halo.addColorStop(0, 'rgba(255,210,63,.80)');
+      halo.addColorStop(0.35, 'rgba(245,154,46,.30)');
+      halo.addColorStop(1, 'rgba(245,154,46,0)');
+      ctx.fillStyle = halo;
+      ctx.beginPath(); ctx.arc(p[0], p[1], r * 3.2, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,225,140,.95)'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.arc(p[0], p[1], r * 1.5, 0, Math.PI * 2); ctx.stroke();
+      drew = true;
+    }
     if(rpx >= 3.5){
       ctx.save();
       ctx.beginPath(); ctx.arc(p[0], p[1], rpx, 0, Math.PI * 2); ctx.clip();
@@ -557,7 +583,7 @@ function drawBodies(chart, view, pos, t){
       if(b.kind === 'star'){ ctx.fillStyle = PALETTE.starCore; ctx.beginPath(); ctx.arc(p[0], p[1], rpx * 0.55, 0, Math.PI * 2); ctx.fill(); }
       ctx.globalAlpha = 1;
     }
-    if((b.kind === 'zone' || b.mu === 0) && !drew){
+    if((b.kind === 'zone' || b.mu === 0) && !drew && b.kind !== 'hole'){
       // Gravity-less things are hollow: the belt havens and the Maw.
       ctx.strokeStyle = colour; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(p[0], p[1], rpx + 3, 0, Math.PI * 2); ctx.stroke();
@@ -572,7 +598,7 @@ function drawBodies(chart, view, pos, t){
 
     // Labels: planets always; moons when their orbit is drawn; zones when
     // they are more than a dot. Never over another label.
-    const wantLabel = b.kind === 'star' || b.kind === 'planet' || camera.follow === b.id
+    const wantLabel = b.kind === 'star' || b.kind === 'planet' || b.kind === 'hole' || camera.follow === b.id
       || (b.parent && b.a * zoom > 28);
     if(!wantLabel) continue;
     const text = labelFor(b);
