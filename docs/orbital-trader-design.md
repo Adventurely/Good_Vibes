@@ -199,9 +199,9 @@ The Astrolabe is the instrument that does. It is a key upgrade, and its tab appe
 | **Perfect** | within 5% of what this crossing costs at its best. Go now. |
 | **Good** | within 25%. |
 | **Bad** | dearer than that, but the tank can still pay it. |
-| **Impossible** | more than the tank holds, whether because today is a bad day or because the crossing is beyond this ship at any time — the line says which. |
+| **Impossible** | more than the tank holds. |
 
-…with what it costs today, what it costs at its best, how long the crossing takes, and **how many days until the next window**. Waiting is nearly always the answer: thirty degrees is about nine days at Cinder, and nine days are free.
+Each row is a name, a verdict, the cost and flight time of leaving today, and **the days until the next window** — a dash where no window helps, because the crossing is past this tank at every phase. Waiting is nearly always the answer: thirty degrees is about nine days at Cinder, and nine days are free. The four words do the explaining; the rows do not.
 
 The cost comes from Lambert, searched over flight times from half the Hohmann time to half again as long. The cheapest conic at a bad phase is a very slow one — a two-year crawl out to Grumm, priced as though it were a bargain — and an instrument that recommends that is lying by omission, so the search only offers roads a person would actually fly.
 
