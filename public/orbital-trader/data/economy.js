@@ -25,7 +25,7 @@ export const ECONOMY = {
    "lovedBy": [
     "veyra"
    ],
-   "blurb": "Veyra pays over the odds. An otter wedding needs three.",
+   "blurb": "Light, dear, and the inner houses bid each other up for them.",
    "nature": "Nacre laid down a layer a year, warm on the skin and impossible to hurry. Ceremony and old money are both paying for the waiting."
   },
   {
@@ -48,7 +48,7 @@ export const ECONOMY = {
    "lovedBy": [
     "brine"
    ],
-   "blurb": "Frog money, and Brine pays the most of it.",
+   "blurb": "Cheap and light. Wanted where the water is deep and the light is not.",
    "nature": "Blown thin and annealed slow, so it will not crack under pressure, and it holds a sea-green light for hours after the room goes dark. It is supposed to sound different depending on what is sung at it."
   },
   {
@@ -70,7 +70,7 @@ export const ECONOMY = {
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Cheap and light. Sells anywhere cold or dark.",
+   "blurb": "Cheap and light, and it sells anywhere cold or dark.",
    "nature": "Pressed from a fish that only rises on the dark of the moon. Burns clean, keeps forever, and smells so exactly of a working harbour that people a long way from one buy a jar to open in the room."
   },
   {
@@ -93,7 +93,7 @@ export const ECONOMY = {
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Otters pay most, because otters know what it took.",
+   "blurb": "Dear and light. Otters pay most, because otters know what it cost.",
    "nature": "Cut from living reef and finished with a thumb: a year of somebody's evenings. They are given rather than sold, so one that reaches a market has usually come out of a household that broke up."
   },
   {
@@ -137,7 +137,7 @@ export const ECONOMY = {
     "scorch"
    ],
    "lovedBy": [],
-   "blurb": "Heavy and cheap. Cinder takes all of it.",
+   "blurb": "Heavy and cheap. Anywhere with a furnace takes all of it.",
    "nature": "Nickel-iron, dug and sorted and nothing else done to it. Worthless until somebody with a furnace gets hold of it, and then worth whatever they make of it."
   },
   {
@@ -162,7 +162,7 @@ export const ECONOMY = {
     "haven",
     "croak"
    ],
-   "blurb": "Heavy. Haven and Croak pay for it anyway.",
+   "blurb": "Heavy. Worth the room only where they build to last.",
    "nature": "Cut stone carrying the old patterns. Nothing lighter will hold a terrace up, and a terrace is expected to outlast the argument that built it."
   },
   {
@@ -186,7 +186,7 @@ export const ECONOMY = {
     "scorch",
     "cinder"
    ],
-   "blurb": "Scorch and Cinder pay over the odds for it.",
+   "blurb": "Light, and worth most where nothing green grows.",
    "nature": "Cut green and bundled in the field. Half the remedies in the system start here, and a physician can tell a wet-cut bundle from a good one by the squeak."
   },
   {
@@ -210,7 +210,7 @@ export const ECONOMY = {
    "lovedBy": [
     "veyra"
    ],
-   "blurb": "Veyra pays over the odds, and the runs are small.",
+   "blurb": "Dear and light, and the price swings. Made in runs too small to go round.",
    "nature": "Pale and faintly sharp, made in runs too small to matter to anyone except the people who cannot get any. Scarcity is most of the flavour and the growers know it."
   },
   {
@@ -231,7 +231,7 @@ export const ECONOMY = {
     "haven"
    ],
    "lovedBy": [],
-   "blurb": "Cats buy it by the crate. Cheap and light.",
+   "blurb": "Cheap and light. Wanted wherever people live underground.",
    "nature": "A living lamp in a jar: needs nothing, never goes out, and does not mind being underground. Line a corridor with it and the corridor is faintly green forever."
   },
   {
@@ -255,7 +255,7 @@ export const ECONOMY = {
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Cats pay most. Needs temperature control.",
+   "blurb": "Needs temperature control. Cats pay most for one that arrives cold.",
    "nature": "Silver, quick, and out of three rivers only. One that arrives still cold is worth a month of parts. One that does not is worth an apology.",
    "needsTempControl": true
   },
@@ -278,7 +278,7 @@ export const ECONOMY = {
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Heavy. Slate and the cats are always short.",
+   "blurb": "Heavy. Wanted at every yard and every repair cradle.",
    "nature": "Valves, seals and struts in oiled paper. Far from a dry dock, a crate of these is the difference between a ship and a wreck, which is why nobody far from a dry dock asks the price twice."
   },
   {
@@ -301,7 +301,7 @@ export const ECONOMY = {
    "lovedBy": [
     "emberkin"
    ],
-   "blurb": "Heavy. The Emberkin houses pay over the odds.",
+   "blurb": "Heavy. The Emberkin houses pay most.",
    "nature": "Crated house arms, sealed with somebody's mark. There are feuds eleven years old that have never fired one and have never once stopped buying them."
   },
   {
@@ -323,7 +323,7 @@ export const ECONOMY = {
     "haven"
    ],
    "lovedBy": [],
-   "blurb": "Heavy. Anywhere that flies somewhere hot will take it.",
+   "blurb": "Heavy. Wanted anywhere that flies somewhere hot.",
    "nature": "Sheet that will sit in a cloud top all day and come out grumbling. Half the shielded hulls in the sky are wearing it, including, if you have one, yours."
   },
   {
@@ -344,7 +344,7 @@ export const ECONOMY = {
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Heavy, dull, and wanted at every yard.",
+   "blurb": "Heavy, dull, and every yard is short of it.",
    "nature": "Bar stock, graded and stamped. The dullest cargo in the system and the one everybody is short of, because nobody plans for it and everybody uses it."
   },
   {
@@ -368,7 +368,7 @@ export const ECONOMY = {
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Cats pay most, and pay on the spot.",
+   "blurb": "Light and very dear. Cats pay most, and pay on the spot.",
    "nature": "Wound by hand over nine days, in an order that has never been written down anywhere. Nothing else will make a reactor behave, and a good mechanic will trade a ship for one."
   },
   {
@@ -392,7 +392,7 @@ export const ECONOMY = {
    "lovedBy": [
     "veyra"
    ],
-   "blurb": "Veyra pays over the odds. Needs temperature control.",
+   "blurb": "Needs temperature control. Dear, and the price swings.",
    "nature": "Grown in the vents and cut cold, and they have to stay cold or they let go of it all at once. Kept properly, one holds a light for a week after the sun comes off it — enough to light a room and call it modesty.",
    "needsTempControl": true
   },
@@ -440,7 +440,7 @@ export const ECONOMY = {
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Cats pay most for it.",
+   "blurb": "Light and dear, and the price swings with the season.",
    "nature": "Still warm to the hand a year out of the ground, and nobody has ever explained why. The official position where it is mined is that it came out warm and will go back in warm. People sleep with them."
   },
   {
@@ -486,7 +486,7 @@ export const ECONOMY = {
     "haven"
    ],
    "lovedBy": [],
-   "blurb": "Sells into Emberkin space, where the name on it counts.",
+   "blurb": "Light and dear. Sells where a name in metal settles an argument.",
    "nature": "The metal is worth nothing. The name struck into it settles an argument in public, which in some houses is the only way an argument is accepted as settled."
   },
   {
@@ -509,8 +509,8 @@ export const ECONOMY = {
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Otters pay most. Tassel first.",
-   "nature": "A second a month, which is the difference between planning a launch window and guessing at one. No household will admit to owning one alone: they are bought together, argued over, and settled by moving the thing every season."
+   "blurb": "Otters pay most: a raft buys one together and argues after.",
+   "nature": "A second a month. On a world whose year runs fifty-six days that is the difference between a season and a mistake, and to a ship's navigator it is the difference between planning a launch window and guessing at one. Nobody else has the least use for it, which has never stopped anybody buying one."
   },
   {
    "id": "perfume",
@@ -532,8 +532,8 @@ export const ECONOMY = {
     "croak"
    ],
    "lovedBy": [],
-   "blurb": "Light, and four ports will take it.",
-   "nature": "Small stoppered bottles in a padded case. Half the system finds them ridiculous and buys them anyway, including several places that have publicly renounced wanting things."
+   "blurb": "Light, dear, and four ports will take it.",
+   "nature": "Distilled a drop at a time from flowers grown for nothing else, and cut with an oil that carries a scent without adding one of its own. A case holds twelve and weighs nothing. Most of what it costs is the four years it took to make the blend repeat."
   },
   {
    "id": "stormcrystals",
@@ -556,7 +556,7 @@ export const ECONOMY = {
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Cats pay most. Only Grumm has them.",
+   "blurb": "Very dear, and only one world has them. Cats pay most.",
    "nature": "Pulled off a cloud top on a line, still ticking. Nobody is certain what they are. People who are never quiet will hold one up to a lamp and go quiet."
   },
   {
@@ -579,7 +579,7 @@ export const ECONOMY = {
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Heavy, and wanted anywhere people breathe.",
+   "blurb": "Heavy, and wanted anywhere people breathe indoors.",
    "nature": "Patient, fine, and better than anything the inner worlds can build. The makers will explain exactly how, at length, twice, and you will still not be able to do it."
   },
   {
@@ -604,7 +604,7 @@ export const ECONOMY = {
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Otters pay most. Needs temperature control.",
+   "blurb": "Needs temperature control. Otters pay most, and pay weeping.",
    "nature": "Laid down in a balloon city ten thousand years ago, for drinkers who had not hatched yet. The cellar has been moved four times and never once opened in a hurry. People weep at it, and the makers consider weeping the correct response.",
    "needsTempControl": true
   },
@@ -627,7 +627,7 @@ export const ECONOMY = {
    "lovedBy": [
     "scorch"
    ],
-   "blurb": "Everybody buys it. Scorch never haggles. Needs temperature control.",
+   "blurb": "Needs temperature control. Everybody buys it; the hot worlds never haggle.",
    "nature": "Cold, clear, and it will close a wound that nothing else will. Warm it once and it is soup, which has happened to enough pilots that there is a word for them.",
    "needsTempControl": true
   },
@@ -649,7 +649,7 @@ export const ECONOMY = {
     "haven"
    ],
    "lovedBy": [],
-   "blurb": "Veyra and Haven, and nowhere else.",
+   "blurb": "Dear and light, but only two ports will take it.",
    "nature": "Ammonia-sea amber with something inside it that is not a leaf: six arms, folded, and a seam down the middle that has been open and shut. Nothing in that sea has bones."
   },
   {
@@ -673,7 +673,7 @@ export const ECONOMY = {
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Cheap and light. Cats will always take it.",
+   "blurb": "Cheap and light, and it sells anywhere something needs fixing.",
    "nature": "Sets hard in vacuum and stays a little soft forever. A crate of this will fix almost anything, and whoever is fixing it will do it in front of you, at some length."
   },
   {
@@ -696,7 +696,7 @@ export const ECONOMY = {
    "lovedBy": [
     "veyra"
    ],
-   "blurb": "Veyra pays over the odds. Needs temperature control.",
+   "blurb": "Needs temperature control. Dear, and the wealthy pay over the odds.",
    "nature": "Ground from shell ice that has never once melted, and will not survive meeting anything that has. You can read a ship's name off one from further than you would believe.",
    "needsTempControl": true
   },
@@ -718,7 +718,7 @@ export const ECONOMY = {
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Heavy and dull. Cinder and the cats burn it.",
+   "blurb": "Heavy and dull, and everything cold in the sky runs on it.",
    "nature": "Drawn from under an ice shell and shipped double-walled. Everything cold in the system runs on it, and the people who draw it consider it the least interesting thing they produce."
   },
   {
@@ -741,7 +741,7 @@ export const ECONOMY = {
    "lovedBy": [
     "haven"
    ],
-   "blurb": "Haven pays over the odds and burns it by the armful.",
+   "blurb": "Light. Worth most where they hold festivals.",
    "nature": "Rolled in silence by people who chose to live somewhere expensive to reach. It burns slow, travels badly, and most of what it costs is the getting there."
   },
   {
@@ -765,7 +765,7 @@ export const ECONOMY = {
    "lovedBy": [
     "croak"
    ],
-   "blurb": "Cheap. Croak pays most for the ones that went out.",
+   "blurb": "Cheap, and worth more once they have been somewhere.",
    "nature": "Strung one a day for a year. A pilgrim carries them out and carries them back, and the ones that have been somewhere cost more than the ones that have not — the only market in the system that prices distance honestly."
   },
   {
@@ -812,7 +812,7 @@ export const ECONOMY = {
    "lovedBy": [
     "croak"
    ],
-   "blurb": "Croak pays over the odds. Tassel takes the rest.",
+   "blurb": "Cheap and light, and wanted where they mark the turn of the year.",
    "nature": "Paper and wire, with a wish folded inside where nobody reads it. They go up all at once at the turn of the year, and the sky above is unusable for about an hour."
   },
   {
@@ -858,7 +858,7 @@ export const ECONOMY = {
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Heavy, and worth it. Otters pay most.",
+   "blurb": "Heavy, and the dearest thing any workshop makes.",
    "nature": "Built from wood that grows on one terrace and tuned over a lifetime — the maker's, and then whoever gets it next. People constitutionally unable to stop talking stop talking."
   },
   {
@@ -880,7 +880,7 @@ export const ECONOMY = {
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Heavy scrap. Slate turns it back into ships.",
+   "blurb": "Heavy scrap. Any yard will turn it back into ships.",
    "nature": "Whatever came off last, straightened and stacked by thickness. Every sheet was somebody's hull, and the yards that sell it do not mention whose: manners, they say, rather than superstition."
   },
   {
@@ -904,7 +904,7 @@ export const ECONOMY = {
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Heavy. Otters pay most.",
+   "blurb": "Heavy, and worth the room: rebuilt sells for close to new.",
    "nature": "Stripped, cleaned, and put back together better than they were built, by somebody who mainly wanted to settle an argument about how they should have been built in the first place."
   },
   {
@@ -928,7 +928,7 @@ export const ECONOMY = {
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Cats pay most. Veyra pays quietly.",
+   "blurb": "Cats pay most, and the wealthy pay quietly.",
    "nature": "Working, mostly. The ones cut out of the ring see further than they are supposed to, and whoever pays for those is not pointing them at a shipping lane."
   },
   {
@@ -953,7 +953,7 @@ export const ECONOMY = {
     "veyra",
     "frog"
    ],
-   "blurb": "The best money in the sky. Veyra and the frogs both.",
+   "blurb": "The best money in the sky. The frogs pay as well as the houses.",
    "nature": "A hand's length of seamless metal with no join, no tooling mark, and no way to tell which way up it is meant to go. It hums when you tap it — and so does every other piece ever cut off the ring, at the same note."
   },
   {
@@ -976,7 +976,7 @@ export const ECONOMY = {
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Heavy. Cats pay most, Emberkin pay more.",
+   "blurb": "Heavy. Cats pay most; the houses they came from pay more.",
    "nature": "House arms with the marks taken off badly; a thumb finds the filing. Selling them near where they came from means selling them back to the people they were taken from, at a markup."
   },
   {
@@ -998,7 +998,7 @@ export const ECONOMY = {
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Cheap. Veyra buys them anyway.",
+   "blurb": "Cheap and light, and they sell to the people they name.",
    "nature": "Struck this morning and aged this afternoon. Good enough that the houses they name buy them, which is either very funny or the entire point, depending on which house you ask."
   },
   {
@@ -1022,7 +1022,7 @@ export const ECONOMY = {
    "lovedBy": [
     "scorch"
    ],
-   "blurb": "Scorch pays over the odds. Needs temperature control.",
+   "blurb": "Needs temperature control. Worth most where medicine is priced out of reach.",
    "nature": "The same crates as the legitimate ones, at half the price, going to the three places that were priced out of the real thing. The apothecaries who brewed it know exactly where it went.",
    "needsTempControl": true
   },
@@ -1046,7 +1046,7 @@ export const ECONOMY = {
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Cats pay most. The dearest thing Whisker sells.",
+   "blurb": "The dearest thing in any grey market. Cats pay most.",
    "nature": "Hands, eyes and spine, packed in gel and labelled in a hand that is not a doctor's. Somebody who has lost something to vacuum will pay anything and ask nothing."
   }
  ],
