@@ -261,21 +261,19 @@ export const FORMULAS = {
   haggle: F.haggle ?? { spread: 0.07 },
   volatility: F.volatility ?? { bySpecies: {} },
   /* Aerobraking. The shed is a fraction of the speed at the bottom of the
-     dive, scaled by how deep into the air the dive goes — and the fraction has
-     to be small, because the design sells skimming as *free braking*, not as a
-     free crash landing. At half the periapsis speed a single pass dumped the
-     ship into a circle just above the cloud tops, which costs more to climb
-     out of than capturing would have cost in the first place. A few per cent a
-     pass lets a pilot walk an orbit down over several passes and stop where
-     they want to be, which is the technique the design is describing. */
-  /* Thicker air since: k went to 0.25 so a middling dive reaches the cap
-     rather than never touching it — at 0.04 the cap above was unreachable at
-     any depth, so every pass was on the linear slope and depth had to be
-     exact. Saturating early is what makes a band of depths all come out the
-     same, which is the forgiveness. maxFraction stays where it was: that is
-     the number the paragraph above was bought with. The risk and repair
-     figures live beside them in the design table. */
-  aerobrake: { k: 0.04, maxFraction: 0.12, floorApo: 1.25, ...(F.aerobrake ?? {}) },
+     dive, and the fraction goes with the square of how deep the dive goes, so
+     the band of air is not one thing but two. The top of it is a feather: a
+     graze takes a per cent or two, costs nothing, and a pilot can walk an
+     orbit down over as many laps as they have days for. The bottom of it is a
+     wall: aim a few kilometres over the ground and the planet takes nearly
+     everything in a single lap, which is the maneuver a heat shield is for.
+     What stops that from being a crash is the floor below — the pass will
+     never leave the far end of the orbit inside the air — so the worst a deep
+     dive does is park you low, in an orbit you must burn to climb out of, with
+     a hull that probably felt it. That is the trade: fuel and risk against
+     days. The risk and repair figures live beside these in the design table,
+     and they are what makes the deep line cost something. */
+  aerobrake: { k: 1.4, depthPower: 2, maxFraction: 0.9, floorApo: 1.25, ...(F.aerobrake ?? {}) },
   toll: { ...F.toll, cooldownDays: 30, maxCargoFraction: 0.4, giftRep: 3, giftChance: 0.35 },
   tow: { ...F.tow, minDays: 3, crashMul: 1.5 },
 };

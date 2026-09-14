@@ -2884,6 +2884,44 @@ test('a graze is free and a dive is not', () => {
   assert.ok(dive.risk > 0.2, `and is genuinely dangerous (${(dive.risk * 100).toFixed(0)}%)`);
 });
 
+test('a tight pass captures an arriving ship in one lap', () => {
+  /* The promise the heat shield is sold on: aim a few kilometres over the
+     ground and the planet keeps you. Before the shed went with the square of
+     the depth, a hard dive at Tassel took a tenth of the speed off an arrival
+     and the ship sailed straight back out of the system, which is not a brake
+     so much as a rumour of one. The floor is the other half of it: however
+     hard the pass bites, the far end of the orbit still clears the air, so the
+     worst case is a low orbit rather than a hole in the ground. */
+  const b = S.world.get('tassel');
+  const dive = (altKm, vinfKms) => {
+    const s = S.newGame(2); s.keys.heatShield = true; S.undock(s); s.nodes = [];
+    const rp = b.radius + altKm / 1.496e8, r0 = b.zoneRadius * 0.95;
+    const vinf = vinfKms / S.KMS, vp = Math.sqrt(vinf * vinf + 2 * b.mu / rp);
+    const h = rp * vp, v0 = Math.sqrt(vinf * vinf + 2 * b.mu / r0), vt = h / r0;
+    s.ship = { body: 'tassel', r: [r0, 0, 0], v: [-Math.sqrt(Math.max(0, v0 * v0 - vt * vt)), vt, 0] };
+    const n = S.effectiveNodes(s, 300).find(x => x.aero);
+    const shed = n ? Math.abs(n.prograde) : 0, after = vp - shed;
+    const e = after * after / 2 - b.mu / rp;
+    return { shed, risk: S.skimRisk(s, shed), captured: e < 0, apo: e < 0 ? (2 * (-b.mu / (2 * e)) - rp) / b.atmo : Infinity };
+  };
+  for(const vinf of [1, 2, 3]){
+    const hard = dive(7, vinf);
+    assert.ok(hard.captured, `v∞ ${vinf} km/s: a pass at 7 km should end in orbit`);
+    assert.ok(hard.apo <= S.FORMULAS.aerobrake.floorApo + 1e-6,
+      `v∞ ${vinf} km/s: and no higher than the floor (${hard.apo.toFixed(2)} atmo)`);
+    assert.ok(hard.risk > 0.1, `v∞ ${vinf} km/s: a pass that hard is not free (${(hard.risk * 100).toFixed(0)}%)`);
+  }
+  /* And the top of the air is still the feather it always was, or there would
+     be no such thing as flying carefully. */
+  const soft = dive(60, 1);
+  assert.equal(soft.risk, 0, 'a graze at the cloud tops costs nothing');
+  assert.ok(soft.shed * S.KMS < 0.2, `and takes only a nibble (${S.fmtKms(soft.shed)})`);
+  assert.equal(soft.captured, false, 'one graze does not stop an arrival');
+  /* Cryo cooling is the whole difference between the two lines. */
+  const cooled = S.newGame(2); cooled.keys.cryoCooling = true;
+  assert.equal(S.skimRisk(cooled, dive(7, 3).shed), 0, 'with cryo cooling the hard line is free');
+});
+
 /* -------------------------------------------------------------- the Knot */
 
 test('the Knot is in the sky for everybody and on the chart only for some', () => {

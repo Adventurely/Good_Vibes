@@ -341,22 +341,48 @@ off, because where you buy a thing is half of what it is.
 | Upgrade | Bought at | Wants | Does |
 |---|---|---|---|
 | Temperature control | Cinder | Engineer | Carries the six goods that will not keep at hold temperature |
-| Gravitational sensors | Nail | — | *Nothing yet.* Will show gravitational phenomena on the chart |
-| Heat shielding | Cinder | Engineer | *Nothing yet.* Will allow risky aerobraking |
-| Cryo hull cooling | Cinder | Engineer, heat shielding | *Nothing yet.* Will make that aerobraking safe |
+| Gravitational sensors | Nail | — | Puts the Knot on the chart for a crew with no navigator to have told them |
+| Heat shielding | Cinder | Engineer | Lets the ship fly through air instead of into it — aerobraking, at a price |
+| Cryo hull cooling | Cinder | Engineer, heat shielding | Takes the price off: the same passes, no risk |
 
-**Three of the four are sold and wired to nothing.** That is deliberate and it
-is said out loud: each row on the rack carries "not fitted to anything yet",
-because selling a captain a box that does nothing without saying so is a
-swindle, and because the alternative — holding the upgrade back until the
-mechanic lands — means the mechanic arrives with no place to be bought.
+**All four do something now.** They were not always: the rack carries a "not
+fitted to anything yet" line for any row that is ahead of its mechanic, because
+selling a captain a box that does nothing without saying so is a swindle, and
+because the alternative — holding the upgrade back until the mechanic lands —
+means the mechanic arrives with no place to be bought. Nothing wears that line
+today.
 
-Aerobraking is the one that used to work. A shielded ship could skim Grumm's
-air and be captured by it, free. That is switched off: risky and safe skims are
-two different manoeuvres, neither is built, and until they are, the clouds are
-lethal to everybody. The arithmetic survives in `effectiveNodes`, which takes a
-`skim` flag so a test can still reach it rather than leaving it to rot behind a
-flag no caller can set.
+**Aerobraking.** Without a heat shield the air is a wall and the hull meets it.
+With one, a periapsis inside the air inserts a free retrograde node at the
+bottom of the dive, and how much it takes goes with the *square* of how deep
+the dive goes:
+
+    shed = min(maxFraction, k · depth²) · v_periapsis      k 1.4, cap 0.9
+
+so the band of air is two different places. The top of it is a feather — a
+graze a few kilometres under the cloud tops takes two or three per cent, costs
+nothing, and a patient pilot can walk an orbit down over as many laps as they
+have days for. The bottom of it is a wall: aim a few kilometres over the ground
+and the planet takes an arrival's whole excess in one lap. A ship falling into
+Tassel at 1 km/s of excess leaves a 7 km pass in a closed orbit, having spent
+no fuel.
+
+What stops that from being a crash is the floor. However hard a pass bites, the
+node is clipped so the far end of the resulting orbit still clears the air
+(`floorApo`, 1.25 × the cloud tops), and once a ship is sitting on that floor
+further passes shed nothing. The worst a deep dive can do is park you low, in
+an orbit you must burn to climb out of.
+
+The price is the hull. `skimRisk` is convex — the first 350 m/s of a pass is
+free and the rest grows with the square, capped at 85% — so splitting a hard
+brake across four shallow laps is genuinely safer rather than the same risk
+spread thinner, and the pilot who takes the days is playing better rather than
+just slower. The measured shape at Tassel: a 60 km graze is free, a 40 km pass
+sheds a quarter of the speed at about one chance in ten of damage, a 7 km pass
+captures outright at one in six against a slow arrival and near-certainly hurts
+against a fast one. Cryo cooling sets that to zero at any depth, which is the
+whole of the difference between the two boxes on the rack: the heat shield buys
+the manoeuvre, the cooling buys it cheap.
 
 **What went.** Engine tiers are gone — fuel cost the same everywhere the moment
 they were removed, which is one fewer axis and one fewer thing to price. The

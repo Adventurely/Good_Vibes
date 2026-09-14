@@ -506,12 +506,19 @@ export function effectiveNodes(state, horizon, { skim = skimsAir(state) } = {}){
       if(norm(at.r) > b.atmo * 1.001) continue;
       const vp = el.vmax;
       const depth = Math.max(0, Math.min(1, (b.atmo - el.rp) / (b.atmo - b.radius)));
-      const wanted = Math.min(FORMULAS.aerobrake.maxFraction, FORMULAS.aerobrake.k * depth) * vp;
+      /* How much of the speed the air takes, from how deep the dive goes. The
+         curve is steep rather than straight: the thin stuff at the top of the
+         band barely touches you, and the bottom of it is a wall. That is what
+         makes a tight pass a real maneuver — aim deep and the planet catches
+         you in one lap — while a graze stays the gentle, repeatable thing a
+         pilot can walk an orbit down with. */
+      const f = FORMULAS.aerobrake;
+      const wanted = Math.min(f.maxFraction, f.k * Math.pow(depth, f.depthPower ?? 1)) * vp;
       /* The floor: an orbit whose far end still clears the clouds. Skimming can
          circularise you around a world; it must never quietly bury you in it.
          Pass after pass the shed shrinks to nothing, and the ship is left on a
          low orbit for the pilot to raise out of the air themselves. */
-      const aTarget = (el.rp + FORMULAS.aerobrake.floorApo * b.atmo) / 2;
+      const aTarget = (el.rp + f.floorApo * b.atmo) / 2;
       const vFloor = Math.sqrt(Math.max(0, b.mu * (2 / el.rp - 1 / aTarget)));
       const shed = Math.max(0, Math.min(wanted, vp - vFloor));
       if(shed < vp * 1e-3) break;   // nothing left to give: stop inserting skims

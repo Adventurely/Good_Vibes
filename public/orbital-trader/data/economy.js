@@ -1323,9 +1323,8 @@ export const ECONOMY = {
    "soldAt": [
     "nail"
    ],
-   "pending": true,
    "effect": "See gravitational phenomena on the chart.",
-   "unlocks": "Nothing yet. Sold honestly: there is nothing in the sky for it to find."
+   "unlocks": "Finds what bends a course and does not shine. There is one such thing out past Tassel."
   },
   {
    "id": "tempcontrol",
@@ -1449,8 +1448,9 @@ export const ECONOMY = {
    "resaleCap": 0.75
   },
   "aerobrake": {
-   "k": 0.25,
-   "maxFraction": 0.12,
+   "k": 1.4,
+   "depthPower": 2,
+   "maxFraction": 0.9,
    "floorApo": 1.25,
    "freeKms": 0.35,
    "riskPerKms2": 0.5,
