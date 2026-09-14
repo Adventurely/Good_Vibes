@@ -104,6 +104,7 @@ export function newGame(seed = 1){
     pending: null,
     hull: 0,
     faults: {},
+    farSight: true,
     justLeft: null, justLeftAt: -1e9,
     stats: { burns: 0, dvSpent: 0, docks: 0, sold: 0, bought: 0, tows: 0, tolls: 0, rescues: 0, farthest: 0 },
     visited: [start],
@@ -408,6 +409,27 @@ export function skipPlan(state, t){
  * what `atmosphere: true` in the predictor means. Cryo cooling does not change
  * whether you may skim, only whether it costs you anything (see skimRisk). */
 export const skimsAir = state => !!state?.keys?.heatshield;
+
+/* The Knot is out there whether or not anybody has told you. What the cat
+ * navigator brings is knowing where — the cats have had it for generations and
+ * have never seen a reason to mention it. Gravitational sensors find it the
+ * other way, by looking, which is the phenomenon that key was always sold to
+ * see. Either one puts it on the chart; neither changes the sky. */
+export const knowsKnot = state => !!(state?.crew?.navigator || state?.keys?.gravsensors);
+/* Bodies the chart should not draw for this player. Physics never consults
+ * this: a thing nobody has told you about still has hold of you. */
+export function unseen(state){
+  const hide = new Set();
+  if(!knowsKnot(state)) hide.add('knot');
+  return hide;
+}
+/* Seeing past the encounter. The road normally stops one crossing out — see
+ * the note on fullLap — because a road that chases every encounter it can find
+ * is a road nobody reads. A navigator aboard is exactly the person who reads
+ * it, so with one the chart will draw the crossing after the crossing, and the
+ * button in the corner turns that off again. */
+export const canSeePast = state => !!state?.crew?.navigator;
+export const seesPast = state => canSeePast(state) && state.farSight !== false;
 
 /* The chance a single pass hurts the hull, from the speed it sheds.
  *
@@ -1112,10 +1134,11 @@ function interceptOf(segments, crossed){
   return best;
 }
 
-export function planImmediate(state, flown = true){
+export function planImmediate(state, flown = true, opts = {}){
   if(state.dockedAt) return null;
+  const far = opts.farSight ?? seesPast(state);
   const bare = flown ? state : { ...state, nodes: [] };
-  if(!flown) return planImmediate(bare, true);
+  if(!flown) return planImmediate(bare, true, opts);
   const b = world.get(state.ship.body);
   const el = elementsFromState(b.mu, state.ship.r, state.ship.v);
   const lastNode = state.nodes.length ? state.nodes[state.nodes.length - 1].t : state.t;
@@ -1126,7 +1149,7 @@ export function planImmediate(state, flown = true){
      last burn) actually leaves us on. */
   let horizon = Math.min(IMMEDIATE_CAP, lead + lapOf(el) * 1.02);
   let pred = plan(state, horizon);
-  for(let pass = 0; pass < 3 && !settled(pred); pass++){
+  for(let pass = 0; pass < (far ? 5 : 3) && !settled(pred); pass++){
       const fin = finalLeg(pred);
     if(!fin) break;
     /* A leg that already ends at a boundary is as long as it is going to be;
@@ -1139,8 +1162,36 @@ export function planImmediate(state, flown = true){
     horizon = want;
     pred = plan(state, horizon);
   }
+  /* With a navigator aboard, look one encounter further. The loop above stops
+     the moment the road ends at a door — right for the ordinary chart, and
+     exactly what hides the thing she is there to show. Grow the horizon by a
+     lap of whatever the crossing leaves us on and solve again, at most twice,
+     and only until a second door turns up. */
+  if(far){
+    for(let pass = 0; pass < 2; pass++){
+      const now = pred.segments;
+      const doors = now.filter(sg => sg.reason === 'exit' || sg.reason === 'enter').length;
+      if(doors >= 2) break;
+      const fin = now[now.length - 1];
+      if(!fin) break;
+      const lap = lapOf(fin.elements);
+      if(!Number.isFinite(lap) || lap <= 0) break;
+      const want = Math.min(IMMEDIATE_CAP, (fin.t1 - state.t) + lap * 1.02);
+      if(want <= horizon * 1.001) break;
+      horizon = want;
+      pred = plan(state, horizon);
+    }
+  }
   const segs = pred.segments;
-  const crossed = segs.findIndex(sg => sg.reason === 'exit' || sg.reason === 'enter');
+  const firstCross = segs.findIndex(sg => sg.reason === 'exit' || sg.reason === 'enter');
+  /* One crossing, or two with somebody aboard who can hold the second in their
+     head. Everything downstream keys off `crossed`, so moving it is the whole
+     of the change: the trim, the full lap and the marks all follow it. */
+  let crossed = firstCross;
+  if(far && firstCross >= 0){
+    const second = segs.findIndex((sg, i) => i > firstCross && (sg.reason === 'exit' || sg.reason === 'enter'));
+    if(second >= 0) crossed = second;
+  }
   /* Everything up to the crossing, then the road inside the new reach up to
      whatever ends it. A burn written down inside that reach — the brake that
      turns a flyby into an arrival — splits it into more than one leg, and
@@ -2616,7 +2667,7 @@ export function restore(json){
   s.pending ??= null; s.flags ??= {}; s.stats ??= {}; s.visited ??= [s.dockedAt].filter(Boolean);
   s.toll ??= { lastT: -1e9, inBelt: false };
   s.quests ??= QUESTS.map(q => ({ id: q.id, step: 0, done: false }));
-  s.debt ??= 0; s.hull ??= 0; s.faults ??= {}; s.target ??= null; s.justLeft ??= null; s.justLeftAt ??= -1e9;
+  s.debt ??= 0; s.hull ??= 0; s.faults ??= {}; s.farSight ??= true; s.target ??= null; s.justLeft ??= null; s.justLeftAt ??= -1e9;
   /* A save written before anybody could call for help knows where it is tied
      up but not where it was last tied up. Those are the same thing at a
      mooring, and the first port is a fair guess in flight. */

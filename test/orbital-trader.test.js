@@ -115,7 +115,7 @@ test('every body has what the kernel and the chart read', () => {
     const w = `body "${b.id}"`;
     assert.match(b.id, /^[a-z][a-z0-9]*$/, `${w}: id`);
     assert.equal(typeof b.name, 'string', `${w}: name`);
-    assert.ok(['star', 'planet', 'moon', 'station', 'zone'].includes(b.kind), `${w}: kind ${b.kind}`);
+    assert.ok(['star', 'planet', 'moon', 'station', 'zone', 'hole'].includes(b.kind), `${w}: kind ${b.kind}`);
     if(b.parent == null){ assert.equal(b.kind, 'star'); assert.equal(b.soi, null); continue; }
     assert.ok(ids.has(b.parent), `${w}: parent ${b.parent} exists`);
     for(const k of ['a', 'e', 'omega', 'M0', 'mu', 'radius']) assert.ok(Number.isFinite(b[k]), `${w}: ${k} is a number`);
@@ -150,7 +150,10 @@ test('every body has what the kernel and the chart read', () => {
   for(const id of ['nail', 'whisker', 'maw']){
     assert.ok(world.get(id).zoneRadius >= 1e-3, `${id} is a rendezvous, not a world; its mouth stays the one it was given`);
   }
-  assert.equal(BODIES.length, 16, 'the sky is the sixteen bodies the setting names');
+  /* Seventeen: the sixteen the setting names, and the Knot, which it does
+     not — a micro black hole the cats have never mentioned. It is in the sky
+     for everybody; it is only on the chart for a ship that knows. */
+  assert.equal(BODIES.length, 17, 'the sixteen named bodies, and the one that is not');
   assert.ok(world.get('croak').retrograde, 'Croak is retrograde');
 });
 
@@ -2724,4 +2727,69 @@ test('a graze is free and a dive is not', () => {
   assert.equal(graze.risk, 0, 'and costs nothing: "the air will slow you for nothing"');
   assert.ok(dive.shed > graze.shed * 3, `a dive sheds much more (${S.fmtKms(dive.shed)} vs ${S.fmtKms(graze.shed)})`);
   assert.ok(dive.risk > 0.2, `and is genuinely dangerous (${(dive.risk * 100).toFixed(0)}%)`);
+});
+
+/* -------------------------------------------------------------- the Knot */
+
+test('the Knot is in the sky for everybody and on the chart only for some', () => {
+  const k = BODIES.find(b => b.id === 'knot');
+  assert.ok(k, 'the Knot exists');
+  assert.equal(k.kind, 'hole');
+  assert.ok(k.a > BODIES.find(b => b.id === 'tassel').a, 'outside Tassel');
+  assert.ok(k.a < CONST.BELT.inner, 'and inside the Belt');
+  assert.ok(k.mu > 0 && k.soi > 0, 'it has real pull');
+  /* The point of it: a horizon small enough that a ship can pass very close
+     without meeting anything. Everything else in the sky is at least a
+     hundred times wider. */
+  const smallest = Math.min(...BODIES.filter(b => b.id !== 'knot').map(b => b.radius));
+  assert.ok(k.radius * 100 < smallest, `${k.radius} should be far under ${smallest}`);
+
+  const green = S.newGame(1);
+  assert.equal(S.knowsKnot(green), false);
+  assert.ok(S.unseen(green).has('knot'), 'a green crew does not see it');
+  const nav = S.newGame(1); nav.crew.navigator = { name: 'Celia' };
+  assert.equal(S.knowsKnot(nav), true);
+  assert.equal(S.unseen(nav).has('knot'), false, 'the navigator knows where it is');
+  /* The other way in, and the phenomenon that key was always sold to find. */
+  const sensors = S.newGame(1); sensors.keys.gravsensors = true;
+  assert.equal(S.knowsKnot(sensors), true, 'gravitational sensors find it by looking');
+});
+
+test('a close pass at the Knot is worth real speed and stays finite', () => {
+  const k = S.world.get('knot');
+  const run = rpKm => {
+    const s = S.newGame(1); s.crew.navigator = { name: 'Celia' }; S.undock(s);
+    const rp = rpKm / 1.496e8, r0 = k.soi * 0.9, vinf = 0.004;
+    const vp = Math.sqrt(vinf * vinf + 2 * k.mu / rp), h = rp * vp;
+    const v0 = Math.sqrt(vinf * vinf + 2 * k.mu / r0), vt = h / r0;
+    s.ship = { body: 'knot', r: [r0, 0, 0], v: [-Math.sqrt(Math.max(0, v0 * v0 - vt * vt)), vt, 0] };
+    s.nodes = [];
+    const before = S.norm(S.shipAbsVel(s));
+    const fuel = s.dv;
+    for(let i = 0; i < 4000; i++){ S.tick(s, 0.05); if(s.pending || s.ship.body !== 'knot') break; }
+    return { before, after: S.norm(S.shipAbsVel(s)), pending: s.pending, fuel, dv: s.dv, body: s.ship.body };
+  };
+  for(const rpKm of [3740, 374, 37]){
+    const r = run(rpKm);
+    assert.equal(r.pending, null, `a pass at ${rpKm} km should not end in a crash`);
+    assert.ok(Number.isFinite(r.after), `${rpKm} km: the kernel stays finite at these speeds`);
+    assert.ok(Math.abs(r.after - r.before) * S.KMS > 1, `${rpKm} km: worth at least a km/s`);
+    assert.equal(r.dv, r.fuel, `${rpKm} km: and it costs no fuel`);
+  }
+});
+
+test('only a navigator can see past a flyby, and the button can turn it off', () => {
+  const green = S.newGame(1);
+  assert.equal(S.canSeePast(green), false, 'no navigator, no button');
+  assert.equal(S.seesPast(green), false);
+  const nav = S.newGame(1); nav.crew.navigator = { name: 'Celia' };
+  assert.equal(S.canSeePast(nav), true);
+  assert.equal(S.seesPast(nav), true, 'on by default once she is aboard');
+  nav.farSight = false;
+  assert.equal(S.canSeePast(nav), true, 'she is still aboard');
+  assert.equal(S.seesPast(nav), false, 'but the chart is back to one crossing');
+  /* The far view costs solves, so it must never run for a ship that has
+     nobody to read it. */
+  green.farSight = true;
+  assert.equal(S.seesPast(green), false, 'and it cannot be switched on without her');
 });

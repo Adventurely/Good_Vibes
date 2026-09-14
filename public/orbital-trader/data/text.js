@@ -363,7 +363,7 @@ export const NARRATIVE = {
     "does": "Reads a rock an au off and tells you which way it is going.",
     "person": {
      "name": "Celia",
-     "line": "Can read a rock an au off and tell you which way it is going. Says almost nothing and is always already looking at the thing you are about to point at."
+     "line": "Can read a rock an au off and tell you which way it is going. Says almost nothing, and is always already looking at the thing you are about to point at. On her second day aboard she marks a point of empty sky between Tassel and the Belt and says: go round that one, not past it."
     }
    },
    {
@@ -426,7 +426,9 @@ export const NARRATIVE = {
   "skimWrecked": "The hull comes apart at the seam it has been threatening to come apart at. The air goes, the lights go, and the clouds have you. Somebody is already on their way out — the frogs watch that band of air precisely because people do this.",
   "skimFuelCell": "A cell cooks off in the heat and takes itself out of the circuit. The tank still fills; it stops filling sooner than it should, and there is nothing aboard that will persuade it otherwise.",
   "repairHull": "They put the ship on a cradle, walk round it twice, and tell you what it will cost before they tell you what is wrong. Then they fix it properly, which takes longer and is the reason you came here.",
-  "repairFuelCell": "The cell comes out in one piece, which surprises everybody, and the new one goes in while you wait. The gauge goes back to telling the truth."
+  "repairFuelCell": "The cell comes out in one piece, which surprises everybody, and the new one goes in while you wait. The gauge goes back to telling the truth.",
+  "knotRevealed": "Celia puts a finger on a stretch of chart with nothing in it and waits for you to stop arguing. There is something there a kilometre across with Grumm's pull in it, and the cats have known for nine generations. Fly close enough and it will turn you most of the way round for nothing. She does not say why nobody mentions it, and from the way she says nothing, it is not a secret so much as a courtesy.",
+  "firstKnotPass": "You go round the outside of nothing at all and come out pointed somewhere else entirely, faster, with the tank exactly as full as it was. Behind you the Knot goes on not being there."
  },
  "opening": {
   "title": "A crate for your Aunt Nellie",
