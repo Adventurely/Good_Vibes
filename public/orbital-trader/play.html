@@ -126,10 +126,12 @@
   #panel.closed{ transform:translateX(calc(100% + 1rem)); opacity:0; pointer-events:none; }
   #tabs{ display:flex; gap:2px; padding:.4rem .4rem 0; border-bottom:1px solid var(--line); overflow-x:auto; scrollbar-width:none; }
   .tab{
-    /* Six tabs is the widest the docked row ever gets and it overran by five
-       pixels at .55rem a side. Tabs are short words; they do not need the
-       room. */
-    flex:1 0 auto; padding:.5rem .45rem; border:0; border-bottom:2px solid transparent; background:none;
+    /* Six tabs is the widest this row ever gets — the flight row once the
+       Astrolabe is fitted — and it overran the panel by thirteen pixels at
+       .45rem a side. Tabs are short words and they do not need the room, and
+       `flex:1 0 auto` hands the slack back whenever there are fewer of them,
+       so a narrower tab is only narrower when it has to be. */
+    flex:1 0 auto; padding:.5rem .34rem; border:0; border-bottom:2px solid transparent; background:none;
     color:var(--dim); cursor:pointer; font-size:.82rem; letter-spacing:.04em; white-space:nowrap;
   }
   .tab[aria-selected="true"]{ color:var(--gold-ink); border-bottom-color:var(--gold-2); }
@@ -187,6 +189,18 @@
   .crew .who b{ display:block; }
   .crew .who small{ display:block; color:var(--faint); }
   .crew .who p{ margin:.25rem 0 0; font-size:.84rem; }
+  /* The Astrolabe's rows: a world, what it costs today, and one word for
+     whether today is the day. */
+  .win{ display:flex; align-items:baseline; gap:.6rem; border-top:1px solid var(--line); padding-top:.5rem; margin-top:.5rem; }
+  .win:first-of-type{ border-top:0; }
+  .win .name{ flex:1 1 auto; min-width:0; }
+  .win .name small{ display:block; color:var(--faint); font-size:.8rem; }
+  .win .band{ flex:0 0 auto; font-size:.78rem; letter-spacing:.04em; text-transform:uppercase; }
+  .win.perfect .band{ color:var(--leaf); }
+  .win.good .band{ color:var(--mint); }
+  .win.bad .band{ color:var(--gold); }
+  .win.impossible .band{ color:var(--rose); }
+  .win-note{ margin:.15rem 0 0; font-size:.8rem; }
   .quest{ border-top:1px solid var(--line); padding-top:.6rem; margin-top:.6rem; }
   .quest:first-of-type{ border-top:0; padding-top:0; margin-top:0; }
   .quest h3{ margin:0 0 .1rem; }
@@ -284,10 +298,12 @@
   #panel.closed{ transform:translateX(calc(100% + 1rem)); opacity:0; pointer-events:none; }
   #tabs{ display:flex; gap:2px; padding:.4rem .4rem 0; border-bottom:1px solid var(--line); overflow-x:auto; scrollbar-width:none; }
   .tab{
-    /* Six tabs is the widest the docked row ever gets and it overran by five
-       pixels at .55rem a side. Tabs are short words; they do not need the
-       room. */
-    flex:1 0 auto; padding:.5rem .45rem; border:0; border-bottom:2px solid transparent; background:none;
+    /* Six tabs is the widest this row ever gets — the flight row once the
+       Astrolabe is fitted — and it overran the panel by thirteen pixels at
+       .45rem a side. Tabs are short words and they do not need the room, and
+       `flex:1 0 auto` hands the slack back whenever there are fewer of them,
+       so a narrower tab is only narrower when it has to be. */
+    flex:1 0 auto; padding:.5rem .34rem; border:0; border-bottom:2px solid transparent; background:none;
     color:var(--dim); cursor:pointer; font-size:.82rem; letter-spacing:.04em; white-space:nowrap;
   }
   .tab[aria-selected="true"]{ color:var(--gold-ink); border-bottom-color:var(--gold-2); }
@@ -345,6 +361,18 @@
   .crew .who b{ display:block; }
   .crew .who small{ display:block; color:var(--faint); }
   .crew .who p{ margin:.25rem 0 0; font-size:.84rem; }
+  /* The Astrolabe's rows: a world, what it costs today, and one word for
+     whether today is the day. */
+  .win{ display:flex; align-items:baseline; gap:.6rem; border-top:1px solid var(--line); padding-top:.5rem; margin-top:.5rem; }
+  .win:first-of-type{ border-top:0; }
+  .win .name{ flex:1 1 auto; min-width:0; }
+  .win .name small{ display:block; color:var(--faint); font-size:.8rem; }
+  .win .band{ flex:0 0 auto; font-size:.78rem; letter-spacing:.04em; text-transform:uppercase; }
+  .win.perfect .band{ color:var(--leaf); }
+  .win.good .band{ color:var(--mint); }
+  .win.bad .band{ color:var(--gold); }
+  .win.impossible .band{ color:var(--rose); }
+  .win-note{ margin:.15rem 0 0; font-size:.8rem; }
   .quest{ border-top:1px solid var(--line); padding-top:.6rem; margin-top:.6rem; }
   .quest:first-of-type{ border-top:0; padding-top:0; margin-top:0; }
   .quest h3{ margin:0 0 .1rem; }
@@ -1348,9 +1376,17 @@ const TABS_SHIP_DOCKED = [['ship', 'Ship'], ['quests', 'Quests'], ['crew', 'Crew
 const TABS_DOCK = [['shipyard', 'Shipyard'], ['market', 'Trading'], ['requests', 'Requests'], ['talk', 'Talk']];
 let panelMenu = 'ship';
 let lastTabsKey = null;
+/* The Astrolabe is a tab because it is an instrument: it is not on the ship
+   until it is bought, and then it is. Slotted next to Burns, which is the
+   thing it is for. */
 function tabsFor(){
   if(panelMenu === 'dock' && state.dockedAt) return TABS_DOCK;
-  return state.dockedAt ? TABS_SHIP_DOCKED : TABS_SHIP_FLIGHT;
+  const base = state.dockedAt ? TABS_SHIP_DOCKED : TABS_SHIP_FLIGHT;
+  if(!state.keys?.astrolabe) return base;
+  const at = base.findIndex(([id]) => id === 'plan');
+  const out = [...base];
+  out.splice(at < 0 ? 1 : at + 1, 0, ['windows', 'Windows']);
+  return out;
 }
 /* Open one of the two, or shut the panel if it is already showing that one. */
 function openMenu(which){
@@ -1370,7 +1406,7 @@ function renderTabs(){
   // Casting off takes the port menu with it; there is nothing left in it.
   if(panelMenu === 'dock' && !state.dockedAt) panelMenu = 'ship';
   const tabs = tabsFor();
-  const key = panelMenu + (state.dockedAt ? ':docked' : ':flight');
+  const key = panelMenu + (state.dockedAt ? ':docked' : ':flight') + (state.keys?.astrolabe ? ':astro' : '');
   if(key === lastTabsKey){ refreshMenuButtons(); return; }
   lastTabsKey = key;
   const bar = $('tabs'); bar.innerHTML = '';
@@ -1400,7 +1436,7 @@ function renderTab(){
      was and put it back. */
   const active = document.activeElement;
   const was = body.contains(active) ? (active.dataset?.act ?? active.id ?? null) : null;
-  const fn = { market, shipyard: shipyardTab, requests: requestsTab, talk, plan, quests: questsTab, crew: crewTab, orbit: orbitTab, ship: shipTab }[tab];
+  const fn = { market, shipyard: shipyardTab, requests: requestsTab, talk, plan, quests: questsTab, crew: crewTab, orbit: orbitTab, ship: shipTab, windows: astrolabeTab }[tab];
   body.innerHTML = fn ? fn() : '';
   wire(body);
   if(was){
@@ -1874,6 +1910,42 @@ function questsTab(){
       out += `<p class="say">${esc(q.done ?? q.blurb)}</p>`;
       out += '</div>';
     }
+  }
+  return out;
+}
+
+/* The Astrolabe. One line per world that goes round the Lamp — moons are not
+   on it, because a moon is a manoeuvre rather than a window — saying what a
+   crossing would cost if you left today, what it costs when the window is
+   right, and how long until that comes round.
+
+   The four words are the whole instrument. Thirty degrees off the window is
+   two and a half to four extra km/s on a fourteen km/s tank, and nothing on
+   the chart could ever say so: a road drawn past a world says nothing about
+   whether the world will be there, and the orange diamonds say how far out
+   you are without saying what that costs. */
+const BAND_WORD = {
+  perfect: 'Perfect', good: 'Good', bad: 'Bad', impossible: 'Impossible',
+};
+function astrolabeTab(){
+  let out = '<h2>Transfer windows</h2>';
+  if(!state.keys?.astrolabe) return out + '<p class="say">No Astrolabe fitted.</p>';
+  const rows = S.transferWindows(state);
+  const here = S.helioOf(state.dockedAt ?? state.ship.body);
+  out += `<p class="lock">Read from ${esc(here?.name ?? 'here')}, for a tank of ${S.fmtKms(state.tank)}. Moons are not windows; they are manoeuvres.</p>`;
+  if(!rows.length) return out + '<p class="empty">Nothing else goes round the Lamp from here.</p>';
+  for(const r of rows){
+    const beyond = r.band === 'impossible' && r.best > state.tank;
+    out += `<div class="win ${r.band}">`
+      + `<div class="name"><b>${esc(r.name)}</b><small>${S.fmtKms(r.cost)} today · ${S.fmtKms(r.best)} at its best · ${S.fmtDays(r.tof)} in flight</small></div>`
+      + `<div class="band">${BAND_WORD[r.band]}</div>`
+      + '</div>';
+    out += `<p class="lock win-note">${
+      beyond ? 'Beyond this tank however well you time it.'
+      : r.band === 'impossible' ? `Too dear today. Cheap again in ${S.fmtDays(r.days ?? 0)}.`
+      : r.band === 'perfect' ? 'Go now.'
+      : `Next window in ${S.fmtDays(r.days ?? 0)}${r.every ? `, and every ${S.fmtDays(r.every)}` : ''}.`
+    }</p>`;
   }
   return out;
 }

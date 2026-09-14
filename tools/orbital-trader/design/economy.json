@@ -1431,6 +1431,32 @@
    "unlocks": "Ore and masonry by the barge, and full frog gift-exchanges in one trip."
   },
   {
+   "id": "astrolabe",
+   "name": "The Astrolabe",
+   "kind": "key",
+   "tier": 0,
+   "price": 900,
+   "soldAt": [
+    "cinder",
+    "scorch",
+    "veyra",
+    "tassel",
+    "slate",
+    "moss",
+    "nail",
+    "whisker",
+    "arc",
+    "grumm",
+    "brine",
+    "glass",
+    "croak",
+    "haven",
+    "maw"
+   ],
+   "effect": "Reads the transfer window to every world that goes round the Lamp: what a crossing would cost today, and how many days until it is cheap.",
+   "unlocks": "Interplanetary work. No harbourmaster will hand you a job that leaves their own sky without one."
+  },
+  {
    "id": "heatshield",
    "name": "Ember heat shield",
    "kind": "key",

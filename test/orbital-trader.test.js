@@ -408,7 +408,7 @@ test('three jobs pay in a person, and finishing one fills that berth', () => {
   // Flying one to the end puts somebody in the berth, and only that one.
   for(const q of paying){
     const s = S.newGame(11);
-    s.quests = []; s.money = 300000; s.keys.refrigeration = true;
+    s.quests = []; s.money = 300000; s.keys.refrigeration = true; s.keys.astrolabe = true;
     s.dockedAt = q.from; s.justLeft = null;
     assert.ok(S.acceptQuest(s, q.id).ok, q.id);
     const live = s.quests.find(l => l.id === q.id);
@@ -865,6 +865,98 @@ function pushedToSlate(){
   return { g, ix, P };
 }
 
+test('the Astrolabe reads every world that goes round the Lamp, and no moon', () => {
+  const s = newDocked(5, 'tassel');
+  const rows = S.transferWindows(s);
+  const named = rows.map(r => r.id).sort();
+  /* Everything on a heliocentric rail except the world you are reading from.
+     A moon is reached from the world it belongs to, which is a manoeuvre and
+     not a window, so none of them is on the instrument. */
+  const want = world.bodies.filter(b => b.parent === 'lamp' && b.id !== 'tassel').map(b => b.id).sort();
+  assert.deepEqual(named, want);
+  for(const id of ['slate', 'moss', 'scorch', 'brine', 'glass', 'croak', 'haven']){
+    assert.ok(!named.includes(id), `${id} is a moon and should not be a window`);
+  }
+
+  for(const r of rows){
+    assert.ok(['perfect', 'good', 'bad', 'impossible'].includes(r.band), `${r.id}: band ${r.band}`);
+    assert.ok(r.cost >= r.best - 1e-9, `${r.id}: leaving today cannot beat the perfect window`);
+    assert.ok(Number.isFinite(r.days) && r.days >= 0, `${r.id}: no countdown`);
+    /* The bands say what they mean. Impossible is measured against the tank;
+       the rest against what this crossing costs when the window is right. */
+    if(r.band === 'impossible') assert.ok(r.cost > s.tank, `${r.id}: impossible but ${S.fmtKms(r.cost)} of ${S.fmtKms(s.tank)}`);
+    else{
+      assert.ok(r.cost <= s.tank, `${r.id}: ${r.band} but beyond the tank`);
+      const ratio = r.cost / r.best;
+      if(r.band === 'perfect') assert.ok(ratio <= S.WINDOW_BANDS.perfect);
+      else if(r.band === 'good') assert.ok(ratio > S.WINDOW_BANDS.perfect && ratio <= S.WINDOW_BANDS.good);
+      else assert.ok(ratio > S.WINDOW_BANDS.good);
+    }
+  }
+
+  /* The number the whole instrument exists for: what a perfect window costs,
+     against the delta-v table's 6.5 for the same crossing. Not to the tenth —
+     the table idealises both orbits as circles and the instrument reads the
+     rail the ship is actually on, and Cinder's is eccentric enough to move
+     this a few per cent either way through its year. */
+  const c = newDocked(5, 'cinder');
+  const best = S.crossingBest(c, 'tassel');
+  assert.ok(Math.abs(S.kms(best.cost) - 6.5) < 0.5, `Cinder to Tassel at its best is ${S.fmtKms(best.cost)}, not near the table's 6.5`);
+  /* And leaving at the wrong moment is dearer than leaving at the right one —
+     the whole reason a player would look at this rather than just going. */
+  const now = S.crossingNow(c, 'tassel');
+  assert.ok(now.cost >= best.cost - 1e-9);
+});
+
+test('the Astrolabe is a tab you do not have until you have bought one', () => {
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  const fn = PLAY.slice(PLAY.indexOf('function tabsFor()'), PLAY.indexOf('function openMenu'));
+  assert.match(fn, /state\.keys\?\.astrolabe/, 'the tab row does not ask whether the instrument is fitted');
+  assert.match(fn, /\['windows', 'Windows'\]/, 'there is no Windows tab to add');
+  assert.match(PLAY, /windows: astrolabeTab/, 'the tab is never rendered');
+  /* Six is the most this row ever holds, and it fits. Widening a tab or
+     lengthening a word here pushes Crew off the end of the panel, which is
+     how this was found. */
+  const css = PLAY.slice(PLAY.indexOf('  .tab{'), PLAY.indexOf('.tab[aria-selected'));
+  assert.match(css, /padding:\.5rem \.34rem/, 'the tab padding no longer fits six of them');
+});
+
+test('a harbourmaster will not send a ship out of their sky without an Astrolabe', () => {
+  // Which jobs leave the sky they are handed out in, and which stay home.
+  assert.equal(S.questLeavesSystem(S.questById('heavystuff')), true, 'Slate to Cinder crosses');
+  assert.equal(S.questLeavesSystem(S.questById('catsrequest')), true, 'a chain through Whisker and the Arc crosses');
+  assert.equal(S.questLeavesSystem(S.questById('slatemessage')), false, 'Tassel to its own moon does not');
+  assert.equal(S.questLeavesSystem(S.questById('pebble')), false);
+  assert.equal(S.questLeavesSystem(S.questById('appraisal')), false, 'Brine to Brine stays in Grumm\'s sky');
+
+  const bare = newDocked(5, 'slate', { astrolabe: false });
+  bare.quests = [];
+  const no = S.canAcceptQuest(bare, S.questById('heavystuff'));
+  assert.equal(no.ok, false);
+  assert.match(no.reason, /Astrolabe/);
+  // The jobs that stay in this sky are still yours to take.
+  const home = newDocked(5, 'tassel', { astrolabe: false });
+  home.quests = [];
+  assert.equal(S.canAcceptQuest(home, S.questById('slatemessage')).ok, true);
+  // Fit one and the crossing opens.
+  bare.keys.astrolabe = true;
+  assert.equal(S.canAcceptQuest(bare, S.questById('heavystuff')).ok, true);
+});
+
+test('the Astrolabe is on every rack, and is the cheapest key there is', () => {
+  const a = UPGRADES.find(u => u.id === 'astrolabe');
+  assert.ok(a, 'no Astrolabe on the racks');
+  assert.equal(a.kind, 'key');
+  assert.equal(a.key, 'astrolabe', 'the rack and the ship disagree about what it is called');
+  /* Bought anywhere, because a ship that cannot leave the sky it is in cannot
+     go and fetch the thing that lets it leave. */
+  assert.deepEqual([...a.soldAt].sort(), Object.keys(PORTS).sort());
+  const keys = UPGRADES.filter(u => u.kind === 'key');
+  assert.equal(Math.min(...keys.map(u => u.price)), a.price, 'something is cheaper than the one the quest line needs');
+  // And a new ship has the slot, empty.
+  assert.equal(S.newGame(3).keys.astrolabe, false);
+});
+
 test('a finished job gives its slot back, and sits under the live ones', () => {
   /* Three at a time counts what is still open. It always did — what it looked
      like was the trouble: a finished job sat in the Quests tab wherever it had
@@ -880,6 +972,7 @@ test('a finished job gives its slot back, and sits under the live ones', () => {
   dockAt('tassel');
   // The opening errand is already in hand, so two more fills the book.
   assert.equal(S.activeQuests(g).length, 1);
+  g.keys.astrolabe = true;      // heavystuff leaves Tassel's sky
   assert.ok(S.acceptQuest(g, 'tasteofhome').ok);
   assert.ok(S.acceptQuest(g, 'slatemessage').ok);
   assert.equal(S.activeQuests(g).length, S.MAX_ACTIVE_QUESTS);
@@ -1298,12 +1391,17 @@ function undockedAt(seed, port = 'tassel'){
   return s;
 }
 
-function newDocked(seed, port = 'tassel'){
+function newDocked(seed, port = 'tassel', opts = {}){
   const s = S.newGame(seed);
   if(port !== 'tassel'){ s.dockedAt = port; S.undock(s); }
   s.justLeft = null;
   const r = S.dock(s);
   assert.ok(r.ok, `could not tie up at ${port}: ${r.reason}`);
+  /* Fitted by default. No harbourmaster hands out a job that leaves their own
+     sky to a ship with no Astrolabe, and most of these tests are about what a
+     job *does* rather than about who is allowed to take one — the rule itself
+     has its own test, which asks for a ship without one. */
+  s.keys.astrolabe = opts.astrolabe !== false;
   return s;
 }
 
@@ -1534,6 +1632,8 @@ test('every quest in the catalogue can be flown from its giver to its end', () =
     s.dockedAt = q.from; s.justLeft = null;
     s.money = 200000;
     s.keys.refrigeration = true;
+  s.keys.astrolabe = true;
+    s.keys.astrolabe = true;          // the harbourmaster's rule, not the flying
     s.quests = [];                              // one job at a time, to keep the three free
     const got = S.acceptQuest(s, q.id);
     assert.ok(got.ok, `${q.id} could not be taken at ${q.from}: ${got.reason}`);
@@ -1569,6 +1669,7 @@ test('a cold consignment needs a cold hold before anybody can hand it to you', (
   assert.equal(no.ok, false);
   assert.match(no.reason, /cold hold/);
   s.keys.refrigeration = true;
+  s.keys.astrolabe = true;
   assert.ok(S.acceptQuest(s, 'medicinerun').ok);
   assert.equal(S.usedUnits(s), 4);
 });

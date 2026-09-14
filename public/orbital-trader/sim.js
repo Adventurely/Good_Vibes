@@ -76,7 +76,7 @@ export function newGame(seed = 1){
     ship: { body: start, r: [0, 0], v: [0, 0] },
     dockedAt: start,
     tiers: { tank: 0, engine: 0, hold: 0 },
-    keys: { heatShield: false, refrigeration: false, sensors: false, stealth: false },
+    keys: { heatShield: false, refrigeration: false, sensors: false, stealth: false, astrolabe: false },
     tank: 0, dv: 0,
     money: CONST.START_MONEY, debt: 0,
     cargo: [],
@@ -679,6 +679,9 @@ export function canAcceptQuest(state, q){
   const live = (state.quests ?? []).find(l => l.id === q.id);
   if(live) return { ok: false, reason: live.done ? 'Already done.' : 'Already taken.' };
   if(activeQuests(state).length >= MAX_ACTIVE_QUESTS) return { ok: false, reason: `Three jobs is all anybody can hold in their head.` };
+  if(questLeavesSystem(q) && !state.keys.astrolabe){
+    return { ok: false, reason: 'That one leaves this sky. You would need an Astrolabe.' };
+  }
   const load = questLoad(q);
   if(load > freeUnits(state)) return { ok: false, reason: 'No room in the hold for it.' };
   /* A consignment skips the market, so it also skips the market's one check:
@@ -1694,6 +1697,117 @@ export function nextWindow(state, targetId){
   const wrap = x => ((x % TAU) + TAU) % TAU;
   const dt = rate > 0 ? wrap(phi - lead) / rate : wrap(lead - phi) / -rate;
   return { days: dt, t: state.t + dt, hohmann: hh, target: T.id, synodic: TAU / Math.abs(rate) };
+}
+
+/* ------------------------------------------------------- the Astrolabe */
+
+/* What the sky is offering today, one line for every world that goes round
+ * the Lamp. Moons are not on it: a moon is reached from the world it belongs
+ * to, and that is a manoeuvre rather than a window.
+ *
+ * The instrument answers the question a transfer actually turns on, which the
+ * chart has never been able to put a number on. A road drawn past a world
+ * says nothing about whether the world will be there; the orange diamonds say
+ * how far out you are; this says what that costs. Thirty degrees off the
+ * window is two and a half to four extra km/s on a fourteen km/s tank — the
+ * difference between half a tank and three quarters of it — and the honest
+ * answer is almost always to wait nine days rather than pay it.
+ */
+export const WINDOW_BANDS = { perfect: 1.05, good: 1.25 };
+
+/* Leaving a well from its parking orbit with `vinf` to spare, and catching a
+ * ship that arrives with it. A drifting haven has no well to climb: you match
+ * its speed and that is the whole bill. */
+function wellOut(b, vinf){
+  if(!(b.mu > 0) || !b.dockAlt) return vinf;
+  return Math.sqrt(Math.max(0, vinf * vinf - 2 * b.mu / b.soi) + 2 * b.mu / b.dockAlt) - Math.sqrt(b.mu / b.dockAlt);
+}
+function wellIn(b, vinf){
+  if(!(b.mu > 0) || !b.dockAlt) return vinf;
+  return Math.max(0, Math.sqrt(Math.max(0, vinf * vinf - 2 * b.mu / b.soi) + 2 * b.mu / b.dockAlt) - Math.sqrt(b.mu / b.dockAlt));
+}
+
+/* The cheapest crossing that leaves now, found by asking Lambert for a spread
+ * of flight times and keeping the best. Departing at the wrong phase is not a
+ * worse Hohmann, it is a different conic entirely — faster or slower, so that
+ * the arrival lands where the target has got to — which is why this is a
+ * search and not a formula. */
+export function crossingNow(state, targetId, samples = 140){
+  const from = helioOf(state.dockedAt ?? state.ship.body);
+  const to = world.get(targetId);
+  if(!from || !to || from.id === to.id || to.parent !== 'lamp') return null;
+  const mu = CONST.MU_LAMP;
+  const a = absState(world, from.id, state.t);
+  const r1 = norm(a.r), r2 = to.a;
+  const ccw = cross(a.r, a.v) > 0;
+  const tH = hohmann(mu, r1, r2).time;
+  /* Half the Hohmann time up to half again as long. The genuinely cheapest
+     conic at a bad phase is a very slow one — a crawl out to Grumm two years
+     long, quoted at a price that looks reasonable and is not a road anybody
+     would fly. An instrument that recommends that is lying by omission, so
+     the search only offers crossings a person would actually take, and a
+     phase that has no good road in that window reads as dear, which it is. */
+  let best = null;
+  for(let i = 0; i <= samples; i++){
+    const tof = tH * (0.5 + (1.1 * i) / samples);
+    const tgt = absState(world, targetId, state.t + tof);
+    const L = lambert(mu, a.r, tgt.r, tof, ccw);
+    if(!L) continue;
+    const cost = wellOut(from, dist(L.v1, a.v)) + wellIn(to, dist(L.v2, tgt.v));
+    if(Number.isFinite(cost) && (!best || cost < best.cost)) best = { cost, tof };
+  }
+  return best;
+}
+
+/* And what the same crossing costs when the window is right: the plain
+ * Hohmann between the two rails, through the same wells. */
+export function crossingBest(state, targetId){
+  const from = helioOf(state.dockedAt ?? state.ship.body);
+  const to = world.get(targetId);
+  if(!from || !to) return null;
+  const mu = CONST.MU_LAMP;
+  const r1 = norm(absState(world, from.id, state.t).r);
+  const h = hohmann(mu, r1, to.a);
+  return { cost: wellOut(from, h.dv1) + wellIn(to, h.dv2), tof: h.time };
+}
+
+export function transferWindows(state){
+  const from = helioOf(state.dockedAt ?? state.ship.body);
+  if(!from) return [];
+  const rows = [];
+  for(const b of world.bodies){
+    if(b.parent !== 'lamp' || b.id === from.id) continue;
+    const now = crossingNow(state, b.id);
+    const best = crossingBest(state, b.id);
+    const w = nextWindow(state, b.id);
+    if(!now || !best) continue;
+    /* Impossible is measured against the tank rather than against what is in
+       it: this is a fact about the sky and the ship, not about whether you
+       happen to be running low at a pump. */
+    const ratio = best.cost > 0 ? now.cost / best.cost : Infinity;
+    const band = now.cost > state.tank ? 'impossible'
+      : ratio <= WINDOW_BANDS.perfect ? 'perfect'
+      : ratio <= WINDOW_BANDS.good ? 'good'
+      : 'bad';
+    rows.push({
+      id: b.id, name: b.name, band,
+      cost: now.cost, best: best.cost, tof: now.tof,
+      days: w?.days ?? null, every: w?.synodic ?? null,
+    });
+  }
+  return rows.sort((a, b) => a.cost - b.cost);
+}
+
+/* A crossing is a crossing whatever the paperwork says: a job whose route
+ * leaves the sky it was handed to you in needs the instrument that reads the
+ * sky. No harbourmaster hands out interplanetary work to a ship that cannot
+ * tell a window from a whim. */
+export function questLeavesSystem(q){
+  if(!q) return false;
+  const home = helioOf(q.from ?? '')?.id ?? null;
+  if(!home) return false;
+  const ports = [q.from, q.to, ...(q.stops ?? []), ...questSteps(q).map(st => st.port)].filter(Boolean);
+  return ports.some(p => helioOf(p)?.id !== home);
 }
 
 /* ------------------------------------------------------------ markets */
