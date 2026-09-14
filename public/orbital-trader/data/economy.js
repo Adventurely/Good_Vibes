@@ -26,7 +26,7 @@ export const ECONOMY = {
     "veyra"
    ],
    "blurb": "Beautiful deep-water pearls. Perfect for jewellery or a wedding gift.",
-   "nature": "Otters grow pearls in the shallow beds off their rafts and pick them by hand. A wedding needs three, so most of them never leave the water they grew in. Emberkin houses buy them thirty at a time."
+   "nature": "Otters grow pearls in the shallow beds off Tassel's rafts and pick them by hand. A wedding needs three, so most of them never leave the water they grew in. Emberkin houses buy them thirty at a time."
   },
   {
    "id": "tideglass",
@@ -49,7 +49,7 @@ export const ECONOMY = {
     "brine"
    ],
    "blurb": "Beautiful sea glass. Perfect for decoration or pressure vessels.",
-   "nature": "Otters forge tideglass in volcanic trenches. It is perfect for the underwater cities in the cold ocean depths. Other species find it beautiful."
+   "nature": "Otters forge tideglass in the volcanic trenches beneath Tassel's ocean. It is perfect for the underwater cities down in the cold depths. Other species simply find it beautiful."
   },
   {
    "id": "moonfishoil",
@@ -115,8 +115,8 @@ export const ECONOMY = {
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Pretty grey moon pebbles. Perfect for a gift to an otter.",
-   "nature": "Otters gather them off the one beach on a moon that has no weather, where nothing has ever worn them smooth but time. They give them to each other and mean it. Nobody else can see why they cost anything at all."
+   "blurb": "Smooth grey moon rocks. No otter can walk past one.",
+   "nature": "Otters have been picking up shiny rocks since long before they had ships, and leaving the water has not cured it. These are offcuts, tumbled smooth in the Slate yards and swept off the floor by the crate. Every otter who buys one knows that, and buys one anyway."
   },
   {
    "id": "ironore",
@@ -369,7 +369,7 @@ export const ECONOMY = {
     "cat"
    ],
    "blurb": "Hand-wound reactor coils. Perfect for a refit or a failing reactor.",
-   "nature": "Emberkin smiths wind each coil by hand over nine days, in an order they have never written down. Nothing else will make a reactor behave. Cats will trade a whole ship for a crate of them."
+   "nature": "Emberkin smiths on Cinder wind each coil by hand over nine days, in an order they have never written down. Nothing else will make a reactor behave. Cats will trade a whole ship for a crate of them."
   },
   {
    "id": "firecrystals",
@@ -719,7 +719,7 @@ export const ECONOMY = {
    ],
    "lovedBy": [],
    "blurb": "Heavy bulk cryogenic fuel. Perfect for cold holds or smelters.",
-   "nature": "Frogs draw it from under the ice and ship it in double-walled crates. Everything cold in the system runs on it. The frogs think it is the dullest thing they make and are glad somebody wants it."
+   "nature": "Frogs draw it from under the ice shell at Glass and ship it out in double-walled crates. Everything cold in the system runs on it. They think it is the dullest thing they make and are glad somebody wants it."
   },
   {
    "id": "incense",

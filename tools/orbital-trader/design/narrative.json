@@ -476,7 +476,7 @@
   {
    "step": "buy",
    "title": "One pebble, mind the price",
-   "body": "The Market has beach pebbles on the shelf — the cheapest thing here. Theo left you just enough for one.\n\nBuy it."
+   "body": "The Market has moon pebbles on the shelf — the cheapest thing here. Theo left you just enough for one.\n\nBuy it."
   },
   {
    "step": "leave",
@@ -549,7 +549,7 @@
    ],
    "pay": 630,
    "rep": "otter",
-   "blurb": "Nellie's birthday is coming and Theo has left it late, as Theo does. There is a beach on Slate — the only one — and the pebbles off it are worth going for. He has put what he has in your purse. It is enough for one.",
+   "blurb": "Nellie's birthday is coming and Theo has left it late, as Theo does. The Slate yards tumble their offcuts smooth and sell them in jars by the gate, and no otter alive can walk past them. He has put what he has in your purse. It is enough for one.",
    "steps": [
     {
      "id": "buy",

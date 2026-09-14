@@ -234,25 +234,34 @@ test('every port is a body with a port, and every reference resolves', () => {
   }
 });
 
-test("every good says what it is and who makes it, without naming a world", () => {
-  /* A nature line says who makes the thing and what it is for, so it may name
-     a people: "otters forge tideglass in volcanic trenches" is the sentence
-     that explains the glass. What it may not name is a world. The appraiser's
-     berth is built on that half — knowing the makers is not knowing the
-     market, and a player still has to reason from pressure-proof glass to the
-     port at the bottom of an ocean, which is what Wicket can simply say.
-     A named world would hand that over and leave her nothing to know.
+test("a good may name where it comes from, never a world that buys it", () => {
+  /* Where a thing comes from is colour, and may be named: "otters forge
+     tideglass in the volcanic trenches beneath Tassel's ocean" is the
+     sentence that explains the glass. Where a thing is *wanted* is the game.
+     Print that on the label and the run stops being a trade and becomes an
+     errand — fly to the named moon, sell, repeat — so a good never names a
+     world that buys it. Finding the market is the play.
 
-     Checked against the ports whose names are not also ordinary words. Glass,
-     Nail, Moss, Brine and the Arc are all things as well as places, so "black
-     glass off the flows" cannot be told from the moon by a regular
-     expression — those are on the writer. */
-  const namedPorts = ['Tassel', 'Slate', 'Cinder', 'Scorch', 'Veyra', 'Whisker', 'Grumm', 'Croak', 'Haven', 'Maw'];
+     Checked per good against its own tables, so the same word can be legal on
+     one row and not on the next: Scorch both digs iron ore and buys it, and
+     may be named on that row as the producer. Matching is case-sensitive
+     because Glass, Nail, Moss, Brine and the Arc are all things as well as
+     places — "black glass off the flows" is not the moon. */
+  const allPorts = ['Tassel', 'Slate', 'Cinder', 'Scorch', 'Veyra', 'Whisker', 'Grumm', 'Croak', 'Haven', 'Maw', 'Glass', 'Nail', 'Moss', 'Brine', 'Arc'];
+  const portName = { tassel: 'Tassel', slate: 'Slate', cinder: 'Cinder', scorch: 'Scorch', veyra: 'Veyra', whisker: 'Whisker', grumm: 'Grumm', croak: 'Croak', haven: 'Haven', maw: 'Maw', glass: 'Glass', nail: 'Nail', moss: 'Moss', brine: 'Brine', arc: 'Arc' };
   for(const g of GOODS){
     assert.ok(g.nature && g.nature.length > 20, `${g.id} has no nature line`);
     assert.match(g.nature, /[.!?]$/, `${g.id}: the nature line does not finish its sentence`);
-    for(const port of namedPorts){
-      assert.ok(!new RegExp(`\\b${port}\\b`).test(g.nature), `${g.id} names ${port}: "${g.nature}"`);
+    /* Producers may be named on their own row; buyers never. */
+    const makers = new Set((g.producedAt ?? []).map(id => portName[id]));
+    const sells = new Set([...(g.buyers ?? []), ...(g.lovedBy ?? [])].map(id => portName[id]).filter(Boolean));
+    for(const port of allPorts){
+      if(makers.has(port)) continue;
+      const named = new RegExp(`\\b${port}\\b`);
+      assert.ok(!named.test(g.nature) || !sells.has(port),
+        `${g.id} names ${port}, which buys it: "${g.nature}"`);
+      assert.ok(!named.test(g.blurb) || !sells.has(port),
+        `${g.id}'s hint names ${port}, which buys it: "${g.blurb}"`);
     }
   }
 });
