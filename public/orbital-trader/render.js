@@ -21,7 +21,7 @@
  *    SOI rings, docking zones) are in au and grow with the zoom.
  */
 
-import { absState, railState, meanMotion, unit, norm, add, sub, scale, perp, dist, propagate } from './orbit.js';
+import { absState, railState, meanMotion, unit, norm, add, sub, scale, perp, dist, propagate, burnFrame } from './orbit.js';
 import { drawSprite } from './sprites.js';
 
 /* The palette: a star chart drawn on paper. The same paper as every page on
@@ -965,9 +965,16 @@ function drawNodes(chart, view, pos){
     chart.hits.nodes.push({ index: i, x: p[0], y: p[1], r: 18 });
     if(!selected) continue;
 
-    const vdir = unit(where.v);
-    const pro = [vdir[0], -vdir[1]];            // screen y is down
-    const rad = unit(where.r); const radS = [rad[0], -rad[1]];
+    /* The same frame the burn is actually flown in — forward along the
+       velocity, out square across it — rather than forward along the velocity
+       and out along the position vector, which is where these arrows used to
+       point. Those two agree on a circle and nowhere else, so the legend drew
+       a right angle at Tassel's docking orbit and an obviously wrong one the
+       moment a ship arrived on anything eccentric. A legend that disagrees
+       with the buttons it is a legend for is worse than no legend. */
+    const { pro: proW, out: outW } = burnFrame(where.r, where.v);
+    const pro = [proW[0], -proW[1]];            // screen y is down
+    const radS = [outW[0], -outW[1]];
     const arrows = [
       ['pro',   pro,                   PALETTE.prograde,   n.prograde],
       ['retro', [-pro[0], -pro[1]],    PALETTE.retrograde, -n.prograde],

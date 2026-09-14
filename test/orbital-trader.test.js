@@ -1156,6 +1156,38 @@ test('the Astrolabe is redrawn when the sky has moved, not when the wall clock h
   assert.ok(days > 0 && days <= 0.5, `a step of ${days} days is not a budget`);
 });
 
+test('the arrows round a mark point where the burn actually goes', () => {
+  /* The chart draws a legend of four arrows round the selected mark. It has to
+     be drawn in the frame the burn is flown in — forward along the velocity,
+     out square across it — and it was drawn with out along the *position*
+     vector instead. Those agree on a circle and nowhere else, so the legend
+     showed a right angle in Tassel's docking orbit and an obviously wrong one
+     the moment a ship arrived on anything eccentric.
+
+     A source check, because the drawing needs a canvas. What it pins is that
+     the directions come out of burnFrame rather than being rebuilt by hand,
+     which is the only way the legend and the burn cannot drift apart again. */
+  const SRC = readFileSync(new URL('../public/orbital-trader/render.js', import.meta.url), 'utf8');
+  const draw = SRC.slice(SRC.indexOf('function drawNodes'), SRC.indexOf('function drawNodes') + 3000);
+  assert.match(draw, /burnFrame\(where\.r, where\.v\)/, 'the mark legend does not use the burn frame');
+  assert.ok(!/unit\(where\.r\)/.test(draw), 'the legend still builds an axis out of the position vector');
+  assert.match(SRC, /import \{[^}]*\bburnFrame\b[^}]*\} from '\.\/orbit\.js'/, 'burnFrame is not imported');
+
+  /* And the frame it reads really is square, at a place where position and
+     velocity are nowhere near square: an eccentric orbit, which is what
+     arriving in a world's gravity puts you on. */
+  const b = world.get('tassel');
+  const r = [b.dockAlt, 0];
+  const v = [Math.sqrt(b.mu / b.dockAlt) * 0.5, Math.sqrt(b.mu / b.dockAlt) * 1.1];
+  const f = O.burnFrame(r, v);
+  assert.ok(Math.abs(O.dot(f.pro, f.out)) < 1e-12, 'forward and out are not square');
+  assert.ok(Math.abs(O.dot(O.unit(r), O.unit(v))) > 0.2, 'this orbit is too round to prove anything');
+  /* The screen flips y, which mirrors the plane. A mirror keeps angles, so
+     what is square in the sky is square on the chart. */
+  const flip = a => [a[0], -a[1]];
+  assert.ok(Math.abs(O.dot(flip(f.pro), flip(f.out))) < 1e-12, 'the flip to screen space broke the right angle');
+});
+
 test('a transfer window is something you can wait for', () => {
   /* The instrument knew the date and could do nothing about it, which is most
      of why it read as dead: at ×1 the figures are right and will not visibly
