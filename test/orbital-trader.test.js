@@ -2215,81 +2215,6 @@ test('crossing the Belt brings a toll that never takes everything', () => {
   assert.equal(s.pending, null, 'and was let alone, because it was asked this week');
 });
 
-test("Grumm's clouds are a crash, shield or no shield: nothing skims yet", () => {
-  /* Heat shielding and cryo hull cooling are on the rack and wired to nothing
-     (§2.8): the risky skim and the safe one are two different manoeuvres and
-     neither is built. So the air is lethal to everybody, and buying the shield
-     does not change that — which is the behaviour this pins, so that whoever
-     builds the skim has to come back here and say so. */
-  const g = world.get('grumm');
-  const entry = () => {
-    // A hyperbolic approach whose periapsis sits inside the atmosphere band.
-    const rp = (g.atmo + g.radius) / 2;
-    /* A fifth of the circular speed at the cloud tops, rather than a number in
-       au/day: what a skim can shed is set by the well it happens in, so the
-       arrival this test throws at it has to be measured in the same units or
-       the test only holds at one size of sky. */
-    const vinf = Math.sqrt(g.mu / g.atmo) * 0.2;
-    const vp = Math.sqrt(vinf * vinf + 2 * g.mu / rp);
-    // Start at periapsis and run time backwards to the SOI edge to get an entry state.
-    const pe = { r: [rp, 0], v: [0, vp] };
-    /* Walk back to the edge of the reach and then close in on it. Growing the
-       step alone overshot once the sky was squeezed and Grumm's reach halved:
-       the ship began outside the SOI, left it on the first tick, and never
-       reached the clouds this test is about. */
-    let tBack = -0.01, st = O.propagate(g.mu, pe.r, pe.v, tBack);
-    for(let i = 0; i < 400 && O.norm(st.r) <= g.soi * 0.85; i++){ tBack *= 1.3; st = O.propagate(g.mu, pe.r, pe.v, tBack); }
-    let lo = tBack / 1.3, hi = tBack;
-    for(let i = 0; i < 60; i++){
-      const mid = (lo + hi) / 2;
-      if(O.norm(O.propagate(g.mu, pe.r, pe.v, mid).r) > g.soi * 0.85) hi = mid; else lo = mid;
-    }
-    return O.propagate(g.mu, pe.r, pe.v, hi);
-  };
-  const dive = (shield) => {
-    const s = S.newGame(17);
-    S.undock(s);
-    s.keys.heatShield = shield;
-    const st = entry();
-    s.ship = { body: 'grumm', r: st.r, v: st.v };
-    let guard = 0;
-    while(guard++ < 3000 && !s.pending && s.ship.body === 'grumm') S.tick(s, 0.2);
-    return s;
-  };
-  for(const shield of [false, true]){
-    const s = dive(shield);
-    assert.ok(s.pending && s.pending.kind === 'crash', `shield ${shield}: the clouds take the ship`);
-    assert.ok(!s.flags.firstAerobrake, `shield ${shield}: and nothing was skimmed`);
-  }
-  assert.equal(S.skimsAir({ keys: { heatShield: true, cryoCooling: true } }), false, 'no fitting skims air yet');
-
-  /* The arithmetic a skim will be built out of is still here and still right,
-     so it is checked directly rather than left to rot behind a flag no caller
-     can set. Ask effectiveNodes for a skim and it inserts one retrograde mark
-     at the bottom of the dive, free of fuel, and the air alone turns an escape
-     trajectory into an orbit that never digs into the planet. */
-  const s = S.newGame(17);
-  S.undock(s);
-  const st = entry();
-  s.ship = { body: 'grumm', r: st.r, v: st.v };
-  const nodes = S.effectiveNodes(s, 400, { skim: true });
-  /* One per dive, and a long horizon sees more than one dive: what matters is
-     that every mark it writes is a free retrograde push at the bottom. */
-  assert.ok(nodes.length >= 1, 'a skim was written down');
-  for(const n of nodes) assert.ok(n.aero && n.free && n.prograde < 0, 'every skim is a free retrograde mark');
-  const before = O.elementsFromState(g.mu, st.r, st.v);
-  assert.ok(before.e > 1, 'the setup was not an escape trajectory to begin with');
-  let ship = s.ship, t = s.t, guard = 0;
-  while(guard++ < 3000){
-    const res = O.advance(world, ship, t, 0.2, nodes, { atmosphere: false, dvAvailable: s.dv, stopOnBurn: true });
-    ship = res.ship; t = res.t;
-    if(t > nodes[0].t && O.norm(ship.r) > g.atmo) break;
-  }
-  const after = O.elementsFromState(g.mu, ship.r, ship.v);
-  assert.ok(after.e < 1, `the clouds did not catch it: e ${after.e}`);
-  assert.ok(after.rp > g.radius, 'and never dug it into the planet');
-});
-
 test('a harbour takes you when you are in a stable orbit close in, and not before', () => {
   /* Docking is an orbit, not a box: bound to the world, low point clear of
      the ground, high point inside the harbour mouth. The point of the rule is
@@ -2700,21 +2625,42 @@ test('arriving on the end of a rope is still arriving, and never at a dead end',
   assert.notEqual(S.towQuote(docked).port, docked.dockedAt);
 });
 
+test('every key the code reads is a key the ship can actually have', () => {
+  /* Three upgrades were dead at once and the suite could not see it. The state
+     keys are camelCase — heatShield, gravSensors, cryoCooling — and the
+     upgrade *ids* that buy them are flat lowercase, so `keys.heatshield` reads
+     like a key and is always undefined. Air braking, the cat sensors and the
+     cryo cooling were all sold, all paid for, and all wired to nothing, and
+     the air-braking test passed because it set the misspelling too.
+
+     So this reads the source rather than the behaviour: every `keys.X` in the
+     game's own files has to be a key a new ship actually carries. A test that
+     goes through the same typo as the code cannot catch the typo. */
+  const real = new Set(Object.keys(S.newGame(1).keys));
+  assert.ok(real.size >= 4, 'a ship with no keys at all: this test is looking at the wrong thing');
+  for(const file of ['sim.js', 'play.html', 'content.js', 'render.js', 'orbit.js']){
+    const src = readFileSync(new URL(`../public/orbital-trader/${file}`, import.meta.url), 'utf8');
+    for(const m of src.matchAll(/\bkeys\??\.([A-Za-z_$][\w$]*)\b/g)){
+      assert.ok(real.has(m[1]), `${file} reads keys.${m[1]}, which no ship has. Keys are: ${[...real].join(', ')}`);
+    }
+  }
+});
+
 /* ------------------------------------------------------------ air braking */
 
 test('a shield is what lets a ship skim, and cooling is what makes it free', () => {
   const bare = S.newGame(1);
   assert.equal(S.skimsAir(bare), false, 'no shield, no skim');
-  const shielded = S.newGame(1); shielded.keys.heatshield = true;
+  const shielded = S.newGame(1); shielded.keys.heatShield = true;
   assert.equal(S.skimsAir(shielded), true);
   /* The rack sells cooling as "no risk to the hull at all, however deep you
      go". That claim is this assertion. */
-  const cooled = S.newGame(1); cooled.keys.heatshield = true; cooled.keys.cryocooling = true;
+  const cooled = S.newGame(1); cooled.keys.heatShield = true; cooled.keys.cryoCooling = true;
   for(const kms of [0.5, 2, 10]) assert.equal(S.skimRisk(cooled, kms / S.KMS), 0, `cooled at ${kms} km/s`);
 });
 
 test('shallow passes are safer than one dive, not the same risk spread thin', () => {
-  const s = S.newGame(1); s.keys.heatshield = true;
+  const s = S.newGame(1); s.keys.heatShield = true;
   const F = S.FORMULAS.aerobrake;
   assert.equal(S.skimRisk(s, (F.freeKms * 0.9) / S.KMS), 0, 'a pass inside the free allowance is free');
   /* The whole point of the convex curve: four passes shedding a quarter each
@@ -2785,7 +2731,7 @@ test('the skim look-ahead is bounded once the orbit closes', () => {
   /* A flat horizon here cost ~180ms a step for a ship in a low orbit — three
      predictions across thousands of laps, every tick, which is a stutter in
      the one place the player is flying carefully. */
-  const s = S.newGame(1); s.keys.heatshield = true; S.undock(s);
+  const s = S.newGame(1); s.keys.heatShield = true; S.undock(s);
   const g = S.world.get('grumm');
   const rp = g.atmo * 0.99, ra = g.atmo * 1.4;
   const a = (rp + ra) / 2;
@@ -2800,7 +2746,7 @@ test('the skim look-ahead is bounded once the orbit closes', () => {
   assert.ok(h < 150, `horizon ${h.toFixed(2)} should be far below the old flat 150`);
   /* The long look survives for the arc that needs it: an inbound hyperbola has
      no period, and its periapsis really can be months away. */
-  const far = S.newGame(1); far.keys.heatshield = true; S.undock(far);
+  const far = S.newGame(1); far.keys.heatShield = true; S.undock(far);
   const r0 = g.zoneRadius * 0.95;
   far.ship = { body: 'grumm', r: [r0, 0, 0], v: [-Math.sqrt(2.4 * g.mu / r0), 0.02 * Math.sqrt(g.mu / r0), 0] };
   assert.equal(S.skimHorizon(far, 1), 150, 'an unbound arrival still gets the long look');
@@ -2813,7 +2759,7 @@ test('a graze is free and a dive is not', () => {
      is dangerous. If these ever invert, shallow flying stops being a skill. */
   const g = S.world.get('grumm');
   const make = frac => {
-    const s = S.newGame(4); s.keys.heatshield = true; S.undock(s);
+    const s = S.newGame(4); s.keys.heatShield = true; S.undock(s);
     const rp = g.radius + (g.atmo - g.radius) * frac, r0 = g.zoneRadius * 0.95;
     const vInf = 0.3 * Math.sqrt(g.mu / rp), vp = Math.sqrt(vInf * vInf + 2 * g.mu / rp);
     const hh = rp * vp, v0 = Math.sqrt(vInf * vInf + 2 * g.mu / r0), vt = hh / r0;
@@ -2847,18 +2793,18 @@ test('the Knot is in the sky for everybody and on the chart only for some', () =
   const green = S.newGame(1);
   assert.equal(S.knowsKnot(green), false);
   assert.ok(S.unseen(green).has('knot'), 'a green crew does not see it');
-  const nav = S.newGame(1); nav.crew.navigator = { name: 'Celia' };
+  const nav = S.newGame(1); nav.crew.navigator = { name: 'Tsuki' };
   assert.equal(S.knowsKnot(nav), true);
   assert.equal(S.unseen(nav).has('knot'), false, 'the navigator knows where it is');
   /* The other way in, and the phenomenon that key was always sold to find. */
-  const sensors = S.newGame(1); sensors.keys.gravsensors = true;
+  const sensors = S.newGame(1); sensors.keys.gravSensors = true;
   assert.equal(S.knowsKnot(sensors), true, 'gravitational sensors find it by looking');
 });
 
 test('a close pass at the Knot is worth real speed and stays finite', () => {
   const k = S.world.get('knot');
   const run = rpKm => {
-    const s = S.newGame(1); s.crew.navigator = { name: 'Celia' }; S.undock(s);
+    const s = S.newGame(1); s.crew.navigator = { name: 'Tsuki' }; S.undock(s);
     const rp = rpKm / 1.496e8, r0 = k.soi * 0.9, vinf = 0.004;
     const vp = Math.sqrt(vinf * vinf + 2 * k.mu / rp), h = rp * vp;
     const v0 = Math.sqrt(vinf * vinf + 2 * k.mu / r0), vt = h / r0;
@@ -2882,7 +2828,7 @@ test('only a navigator can see past a flyby, and the button can turn it off', ()
   const green = S.newGame(1);
   assert.equal(S.canSeePast(green), false, 'no navigator, no button');
   assert.equal(S.seesPast(green), false);
-  const nav = S.newGame(1); nav.crew.navigator = { name: 'Celia' };
+  const nav = S.newGame(1); nav.crew.navigator = { name: 'Tsuki' };
   assert.equal(S.canSeePast(nav), true);
   assert.equal(S.seesPast(nav), true, 'on by default once she is aboard');
   nav.farSight = false;

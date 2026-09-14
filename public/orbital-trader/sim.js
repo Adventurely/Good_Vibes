@@ -408,14 +408,14 @@ export function skipPlan(state, t){
  * whole of it: without one the air is a wall and the hull meets it, which is
  * what `atmosphere: true` in the predictor means. Cryo cooling does not change
  * whether you may skim, only whether it costs you anything (see skimRisk). */
-export const skimsAir = state => !!state?.keys?.heatshield;
+export const skimsAir = state => !!state?.keys?.heatShield;
 
 /* The Knot is out there whether or not anybody has told you. What the cat
  * navigator brings is knowing where — the cats have had it for generations and
  * have never seen a reason to mention it. Gravitational sensors find it the
  * other way, by looking, which is the phenomenon that key was always sold to
  * see. Either one puts it on the chart; neither changes the sky. */
-export const knowsKnot = state => !!(state?.crew?.navigator || state?.keys?.gravsensors);
+export const knowsKnot = state => !!(state?.crew?.navigator || state?.keys?.gravSensors);
 /* Bodies the chart should not draw for this player. Physics never consults
  * this: a thing nobody has told you about still has hold of you. */
 export function unseen(state){
@@ -440,7 +440,7 @@ export const seesPast = state => canSeePast(state) && state.farSight !== false;
  * days instead. Cryo cooling takes it to nothing at any depth, which is what
  * the rack has always claimed it does. */
 export function skimRisk(state, shedAuDay){
-  if(state?.keys?.cryocooling) return 0;
+  if(state?.keys?.cryoCooling) return 0;
   const f = FORMULAS.aerobrake;
   const over = Math.max(0, kms(shedAuDay) - f.freeKms);
   if(over <= 0) return 0;
