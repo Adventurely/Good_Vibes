@@ -104,7 +104,14 @@
      out of it: they used to sit underneath it, where a press meant to zoom in
      landed on whatever the market had in that spot. */
   body.panel-open #view{ right: calc(.8rem + var(--panel-w) + .8rem); }
-  #view button{
+  /* The one button that does something to the ship rather than to the view,
+     so it lives on its own away from the two that open menus: top left, under
+     the fuel gauge and the way back to the title. */
+  #act{
+    position:fixed; left:.8rem; top:calc(70px + env(safe-area-inset-top)); z-index:7;
+    display:flex; flex-direction:column; gap:.35rem;
+  }
+  #view button, #act button{
     width:40px; height:40px; border-radius:10px; border:1px solid var(--line);
     background:var(--glass); color:var(--dim); cursor:pointer; backdrop-filter:blur(8px); font-size:1.05rem;
     /* An inline <svg> sits on the text baseline, which left the ship and the
@@ -113,8 +120,12 @@
        box's content puts all three on the same middle. */
     display:flex; align-items:center; justify-content:center; padding:0; line-height:1;
   }
-  #view button svg{ display:block; }
-  #view button:hover{ color:var(--ink); border-color:var(--line-2); }
+  #view button svg, #act button svg{ display:block; }
+  /* `display:block` above beats the browser's own rule for the hidden
+     attribute, so the anchor and the liftoff arrow were drawn side by side in
+     a button stretched to hold both. */
+  #view button svg[hidden], #act button svg[hidden]{ display:none; }
+  #view button:hover, #act button:hover{ color:var(--ink); border-color:var(--line-2); }
   #view button[aria-pressed="true"]{ color:var(--gold-ink); border-color:var(--gold-2); }
   /* Dragged off the thing the chart is locked to. The button that brings you
      back is the one that lights up, so "where am I" and "get me back" are the
@@ -295,6 +306,11 @@
      there the rest of the time. It replaced a card across the bottom of the
      sky that spent most of its life telling you what you had not done yet. */
   #dock-go{ color:var(--gold); border-color:var(--gold-2); animation:dockflash 2.8s ease-in-out infinite; }
+  /* Tied up, the same button is how you leave, and it is there the whole time
+     you are moored — so it stops breathing and stops being gold. Nothing that
+     is always on the screen should pulse. */
+  #dock-go.lift{ color:var(--dim); border-color:var(--line); animation:none; opacity:1; }
+  #dock-go.lift:hover{ color:var(--ink); border-color:var(--line-2); background:var(--glass); }
   /* Slow on purpose. It is the one control that appears out of nowhere, and it
      has to catch an eye that is on the chart without becoming a strobe next to
      two buttons that are always there — so it breathes rather than blinks, and
@@ -304,7 +320,7 @@
     50%{ opacity:1; box-shadow:0 0 10px -1px var(--gold-2); }
   }
   #dock-go:hover, #dock-go:focus-visible{ animation:none; opacity:1; }
-  #dock-go svg, #m-ship svg, #m-dock svg{ width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  #act button svg, #m-ship svg, #m-dock svg{ width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
   #dock-go:hover{ background:var(--gold); color:#1a1310; }
   #dock-go[hidden], #m-dock[hidden]{ display:none; }
 
@@ -537,7 +553,10 @@
       top:calc(74px + env(safe-area-inset-top)); bottom:auto; right:.4rem;
       flex-direction:column; gap:.25rem;
     }
-    #view button{ width:32px; height:30px; border-radius:8px; font-size:.95rem; }
+    /* The other corner of the same strip. The back link is gone on a phone, so
+       there is nothing under the two HUD rows for this to land on. */
+    #act{ top:calc(74px + env(safe-area-inset-top)); left:.4rem; gap:.25rem; }
+    #view button, #act button{ width:32px; height:30px; border-radius:8px; font-size:.95rem; }
     /* Only the panel toggle stays on top; the rest tuck under it in a column
        that the chart can still be seen around. */
     #view button:not(#m-ship):not(#m-dock){ opacity:.85; }
@@ -618,8 +637,14 @@
 </header>
 <a id="back" href="./">&larr; title</a>
 
+<div id="act">
+  <button id="dock-go" hidden title="Dock (d)" aria-label="Dock here">
+    <svg class="i-dock" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="3.4"/><path d="M12 10.4 V20"/><path d="M8 13.5 H16"/><path d="M5 15.5 a7 7 0 0 0 14 0"/></svg>
+    <svg class="i-lift" viewBox="0 0 24 24" aria-hidden="true" hidden><path d="M12 4 V16"/><path d="M8 8 L12 4 L16 8"/><path d="M6 20 H18"/></svg>
+  </button>
+</div>
+
 <div id="view">
-  <button id="dock-go" hidden title="Dock (d)" aria-label="Dock here"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="3.4"/><path d="M12 10.4 V20"/><path d="M8 13.5 H16"/><path d="M5 15.5 a7 7 0 0 0 14 0"/></svg></button>
   <button id="v-fit" title="Back to your ship, and frame it (f)">&#9678;</button>
   <button id="m-dock" hidden title="The port (p)" aria-label="Open the port menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20 h16"/><path d="M8 20 V5"/><path d="M8 5 h10"/><path d="M15 5 V9"/><path d="M13 9 h4 v4 h-4 z"/></svg></button>
   <button id="m-ship" title="Your ship (p)" aria-pressed="true" aria-label="Open the ship menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 c3 3.4 4.2 7 4.2 10.2 L12 16.5 7.8 13.2 C7.8 10 9 6.4 12 3z"/><path d="M7.8 12 L4.8 16.4 7.8 15.2"/><path d="M16.2 12 L19.2 16.4 16.2 15.2"/><circle cx="12" cy="9.4" r="1.7"/></svg></button>
@@ -997,11 +1022,25 @@ function renderHud(docking){
   }
 }
 
-/* Tie up. The icon is there when a stable orbit close in makes it possible
-   and gone otherwise, so it is a thing you have earned rather than a card
-   that follows you round the sky listing what you have not done. */
+/* The one button that acts on the ship: tie up, or cast off.
+ *
+ * Adrift it is a mooring ring, and only when a stable orbit close in has
+ * earned it — a thing you have done rather than a card following you round
+ * the sky listing what you have not. Tied up it is the way out again, which
+ * is the only thing a moored ship ever wants from the chart, and it is the
+ * same button because they are the same question answered twice. */
 function renderDockCard(docking){
-  $('dock-go').hidden = !(docking && docking.ok && !state.dockedAt);
+  const b = $('dock-go');
+  const moored = !!state.dockedAt;
+  b.hidden = !(moored || (docking && docking.ok));
+  b.classList.toggle('lift', moored);
+  /* toggleAttribute, not `.hidden`: that property belongs to HTMLElement and
+     these are SVG elements, so assigning it set a JS expando nobody reads and
+     left the anchor showing on a moored ship. */
+  b.querySelector('.i-dock').toggleAttribute('hidden', moored);
+  b.querySelector('.i-lift').toggleAttribute('hidden', !moored);
+  b.title = moored ? `Lift off from ${S.portName(state.dockedAt)}` : 'Dock (d)';
+  b.setAttribute('aria-label', moored ? 'Lift off' : 'Dock here');
 }
 
 /* ------------------------------------------------------------- time */
@@ -2085,7 +2124,7 @@ function doDock(){
    nothing when you pressed it. The HUD hint docks too, because it is the thing
    that says you can, and `d` because a keyboard is a keyboard. */
 const dockIfWeCan = () => { const d = S.dockingStatus(state); if(d?.ok) doDock(); };
-$('dock-go').addEventListener('click', dockIfWeCan);
+$('dock-go').addEventListener('click', () => { if(state.dockedAt) actions.undock(); else dockIfWeCan(); });
 $('dockhint').addEventListener('click', dockIfWeCan);
 $('dockhint').style.cursor = 'pointer';
 addEventListener('keydown', e => {

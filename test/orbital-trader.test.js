@@ -1039,6 +1039,31 @@ test('the Astrolabe is a tab you do not have until you have bought one', () => {
   assert.match(css, /padding:\.5rem \.34rem/, 'the tab padding no longer fits six of them');
 });
 
+test('one button in the corner ties up and casts off, and it is not on the right', () => {
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  /* The two menu buttons stay in the right-hand stack; the one that acts on
+     the ship has its own corner. */
+  const view = PLAY.slice(PLAY.indexOf('<div id="view">'), PLAY.indexOf('</div>', PLAY.indexOf('<div id="view">')));
+  assert.ok(view.includes('id="m-ship"') && view.includes('id="m-dock"'), 'the menu buttons left the right-hand stack');
+  assert.ok(!view.includes('id="dock-go"'), 'the mooring button is still in the right-hand stack');
+  const act = PLAY.slice(PLAY.indexOf('<div id="act">'), PLAY.indexOf('</div>', PLAY.indexOf('<div id="act">')));
+  assert.ok(act.includes('id="dock-go"'), 'nothing in the corner');
+  assert.match(PLAY, /#act\{[\s\S]*?left:\.8rem/, '#act is not on the left');
+
+  /* One button, two jobs, and the icon follows. `.hidden` is an HTMLElement
+     property and these are SVG elements, so assigning it sets an expando the
+     browser never reads — which drew the anchor on a moored ship. */
+  const render = PLAY.slice(PLAY.indexOf('function renderDockCard'), PLAY.indexOf('/* ---------', PLAY.indexOf('function renderDockCard')));
+  assert.match(render, /toggleAttribute\('hidden', moored\)/, 'the anchor is hidden by a property SVG does not have');
+  assert.match(render, /toggleAttribute\('hidden', !moored\)/);
+  assert.doesNotMatch(render, /\.hidden = moored/, 'back to setting .hidden on an SVG');
+  assert.match(render, /b\.hidden = !\(moored \|\| \(docking && docking\.ok\)\)/, 'the button is not shown while moored');
+  assert.match(PLAY, /if\(state\.dockedAt\) actions\.undock\(\); else dockIfWeCan\(\);/, 'the button does not cast off');
+  /* And `display:block` on the icons beats the browser's rule for [hidden],
+     so the attribute needs saying out loud or both icons draw at once. */
+  assert.match(PLAY, /#act button svg\[hidden\]\{ display:none; \}/, 'a hidden icon still draws');
+});
+
 test('the Astrolabe reads while coasting, which is when it is wanted', () => {
   /* It read nothing at all between worlds. Tied up, a crossing starts at the
      mooring you are at; coasting, the ship is already in the Lamp's frame and
