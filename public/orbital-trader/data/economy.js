@@ -25,7 +25,8 @@ export const ECONOMY = {
    "lovedBy": [
     "veyra"
    ],
-   "blurb": "Grown in the shallow beds off the rafts and picked by hand. An otter wedding needs three; a Veyra house will pay for thirty."
+   "blurb": "Grown in the shallow beds off the rafts and picked by hand. An otter wedding needs three; a Veyra house will pay for thirty.",
+   "nature": "Nacre laid down a layer a year. Warm on the skin and impossible to hurry, which is what ceremony and old money both pay for."
   },
   {
    "id": "tideglass",
@@ -47,7 +48,8 @@ export const ECONOMY = {
    "lovedBy": [
     "brine"
    ],
-   "blurb": "Otter glasswork that glows sea-green in the dark. The frogs hang it under the lily-terraces and sing to it."
+   "blurb": "Otter glasswork that glows sea-green in the dark. The frogs hang it under the lily-terraces and sing to it.",
+   "nature": "Glass that will not crack under pressure and glows sea-green in the dark. Deep water and long nights each have a use for it."
   },
   {
    "id": "moonfishoil",
@@ -68,7 +70,8 @@ export const ECONOMY = {
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Pressed from a fish that only rises on the dark of the moon. Burns clean, keeps forever, smells like a harbour."
+   "blurb": "Pressed from a fish that only rises on the dark of the moon. Burns clean, keeps forever, smells like a harbour.",
+   "nature": "Burns clean, keeps forever, smells of harbour. Light and heat where neither comes easily."
   },
   {
    "id": "coral",
@@ -90,7 +93,8 @@ export const ECONOMY = {
    "lovedBy": [
     "otter"
    ],
-   "blurb": "A year of somebody's evenings, cut from living reef and finished with a thumb. Otters give them and otters keep them."
+   "blurb": "A year of somebody's evenings, cut from living reef and finished with a thumb. Otters give them and otters keep them.",
+   "nature": "Living reef cut by hand and finished with a thumb. A year of somebody's evenings, small enough to hold."
   },
   {
    "id": "pebble",
@@ -111,7 +115,8 @@ export const ECONOMY = {
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Smooth grey pebbles off Slate's one beach, polished by a moon with no weather. Otters give them to each other and mean it."
+   "blurb": "Smooth grey pebbles off Slate's one beach, polished by a moon with no weather. Otters give them to each other and mean it.",
+   "nature": "Polished by a moon with no weather. Worth nothing and given anyway, which is the whole of it."
   },
   {
    "id": "ironore",
@@ -132,7 +137,8 @@ export const ECONOMY = {
     "scorch"
    ],
    "lovedBy": [],
-   "blurb": "Crates of nickel-iron, dug and sorted and not much else. The engine smiths of Cinder melt it into things that go very fast."
+   "blurb": "Crates of nickel-iron, dug and sorted and not much else. The engine smiths of Cinder melt it into things that go very fast.",
+   "nature": "Nickel-iron, dug and sorted and nothing else. Worthless until somebody with a furnace gets hold of it."
   },
   {
    "id": "masonry",
@@ -156,7 +162,8 @@ export const ECONOMY = {
     "haven",
     "croak"
    ],
-   "blurb": "Cut stone with the old patterns on it. The frogs build their terraces out of it and will not be talked into anything lighter."
+   "blurb": "Cut stone with the old patterns on it. The frogs build their terraces out of it and will not be talked into anything lighter.",
+   "nature": "Cut stone carrying the old patterns. Heavy, permanent, and the only thing a terrace will stand on."
   },
   {
    "id": "herbs",
@@ -179,7 +186,8 @@ export const ECONOMY = {
     "scorch",
     "cinder"
    ],
-   "blurb": "Cut green and bundled in the field. Half the remedies in the system start here, and the good ones do not travel slowly."
+   "blurb": "Cut green and bundled in the field. Half the remedies in the system start here, and the good ones do not travel slowly.",
+   "nature": "Cut green and bundled in the field. Half the remedies in the sky start as this."
   },
   {
    "id": "starwine",
@@ -202,7 +210,8 @@ export const ECONOMY = {
    "lovedBy": [
     "veyra"
    ],
-   "blurb": "Pale and faintly sharp. Moss makes it in small runs and Veyra buys it in whole small runs."
+   "blurb": "Pale and faintly sharp. Moss makes it in small runs and Veyra buys it in whole small runs.",
+   "nature": "Pale and faintly sharp, made in runs too small to matter. Scarcity is most of the flavour."
   },
   {
    "id": "glowmoss",
@@ -222,7 +231,8 @@ export const ECONOMY = {
     "haven"
    ],
    "lovedBy": [],
-   "blurb": "A living lamp in a jar. Cats line their tunnels with it because it needs nothing and never goes out."
+   "blurb": "A living lamp in a jar. Cats line their tunnels with it because it needs nothing and never goes out.",
+   "nature": "A living lamp in a jar. Needs nothing, never goes out, and does not mind being underground."
   },
   {
    "id": "riverfish",
@@ -246,6 +256,7 @@ export const ECONOMY = {
     "cat"
    ],
    "blurb": "Silver, quick, and only in three rivers. Worth a fortune fresh and worth an apology otherwise.",
+   "nature": "Silver, quick, and out of three rivers only. Magnificent fresh and an apology otherwise.",
    "needsTempControl": true
   },
   {
@@ -267,7 +278,8 @@ export const ECONOMY = {
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Valves, seals and struts in oiled paper. Far from any dry dock, a crate of these is the difference between a ship and a wreck."
+   "blurb": "Valves, seals and struts in oiled paper. Far from any dry dock, a crate of these is the difference between a ship and a wreck.",
+   "nature": "Valves, seals and struts in oiled paper. Far from a dry dock, the difference between a ship and a wreck."
   },
   {
    "id": "weapons",
@@ -289,7 +301,8 @@ export const ECONOMY = {
    "lovedBy": [
     "emberkin"
    ],
-   "blurb": "Emberkin house arms, crated and sealed with somebody's mark. Nobody asks what they are for and everybody knows."
+   "blurb": "Emberkin house arms, crated and sealed with somebody's mark. Nobody asks what they are for and everybody knows.",
+   "nature": "Crated house arms, sealed with somebody's mark. Nobody asks what they are for."
   },
   {
    "id": "plating",
@@ -310,7 +323,8 @@ export const ECONOMY = {
     "haven"
    ],
    "lovedBy": [],
-   "blurb": "Sheet that will sit in a cloud top all day and come out grumbling. Half the shielded hulls in the sky are wearing Cinder's."
+   "blurb": "Sheet that will sit in a cloud top all day and come out grumbling. Half the shielded hulls in the sky are wearing Cinder's.",
+   "nature": "Sheet that will sit in a cloud top all day and come out grumbling. Hulls that go somewhere hot are wearing it."
   },
   {
    "id": "steel",
@@ -330,7 +344,8 @@ export const ECONOMY = {
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Bar stock, graded and stamped. The dullest cargo in the system and the one everybody is always short of."
+   "blurb": "Bar stock, graded and stamped. The dullest cargo in the system and the one everybody is always short of.",
+   "nature": "Bar stock, graded and stamped. The dullest cargo in the sky and the one everybody is short of."
   },
   {
    "id": "coils",
@@ -353,7 +368,8 @@ export const ECONOMY = {
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Wound by hand over nine days by somebody who will not tell you the order. A cat mechanic will trade a ship for one."
+   "blurb": "Wound by hand over nine days by somebody who will not tell you the order. A cat mechanic will trade a ship for one.",
+   "nature": "Wound by hand over nine days, in an order nobody will tell you. Nothing else will make a reactor behave."
   },
   {
    "id": "firecrystals",
@@ -377,6 +393,7 @@ export const ECONOMY = {
     "veyra"
    ],
    "blurb": "Grown in the vents and cut cold. They hold a light for a week after you take them out of the sun.",
+   "nature": "Grown in the vents and cut cold. They hold a light for a week after the sun is off them.",
    "needsTempControl": true
   },
   {
@@ -399,7 +416,8 @@ export const ECONOMY = {
     "haven"
    ],
    "lovedBy": [],
-   "blurb": "Sheets of black glass off the flows, packed in ash. Cheap on Scorch because there is nothing else on Scorch."
+   "blurb": "Sheets of black glass off the flows, packed in ash. Cheap on Scorch because there is nothing else on Scorch.",
+   "nature": "Black glass off the flows, packed in ash. Cheap where there is nothing else to sell."
   },
   {
    "id": "emberstone",
@@ -422,7 +440,8 @@ export const ECONOMY = {
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Warm to the hand a year after it comes out of the ground, and nobody on Scorch has ever explained why."
+   "blurb": "Warm to the hand a year after it comes out of the ground, and nobody on Scorch has ever explained why.",
+   "nature": "Still warm to the hand a year out of the ground, and nobody has ever explained why."
   },
   {
    "id": "embersilk",
@@ -445,7 +464,8 @@ export const ECONOMY = {
    "lovedBy": [
     "veyra"
    ],
-   "blurb": "Woven in a heated room by people who are paid not to talk about it. This season's colour is worth twice last season's."
+   "blurb": "Woven in a heated room by people who are paid not to talk about it. This season's colour is worth twice last season's.",
+   "nature": "Woven in a heated room by people paid not to discuss it. This season's colour is worth twice last season's."
   },
   {
    "id": "medals",
@@ -466,7 +486,8 @@ export const ECONOMY = {
     "haven"
    ],
    "lovedBy": [],
-   "blurb": "Struck in small numbers for houses settling scores in public. The metal is worth nothing; the name on it is worth a great deal."
+   "blurb": "Struck in small numbers for houses settling scores in public. The metal is worth nothing; the name on it is worth a great deal.",
+   "nature": "The metal is worth nothing. The name struck into it settles an argument in public, which is worth a great deal."
   },
   {
    "id": "clocks",
@@ -488,7 +509,8 @@ export const ECONOMY = {
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Good enough to navigate by and pretty enough to argue over. Otters buy them for the harbourmaster and then borrow them back."
+   "blurb": "Good enough to navigate by and pretty enough to argue over. Otters buy them for the harbourmaster and then borrow them back.",
+   "nature": "Good enough to navigate by and pretty enough to argue over. The two are rarely the same object."
   },
   {
    "id": "perfume",
@@ -510,7 +532,8 @@ export const ECONOMY = {
     "croak"
    ],
    "lovedBy": [],
-   "blurb": "Small stoppered bottles in a padded case. Half the system finds them ridiculous and buys them anyway."
+   "blurb": "Small stoppered bottles in a padded case. Half the system finds them ridiculous and buys them anyway.",
+   "nature": "Small stoppered bottles in a padded case. Half the sky finds them ridiculous and buys them anyway."
   },
   {
    "id": "stormcrystals",
@@ -533,7 +556,8 @@ export const ECONOMY = {
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Fished out of the cloud tops on a line, still ticking. A cat will hold one up to a lamp and go quiet."
+   "blurb": "Fished out of the cloud tops on a line, still ticking. A cat will hold one up to a lamp and go quiet.",
+   "nature": "Fished off a cloud top on a line, still ticking. Nobody is certain what they are."
   },
   {
    "id": "filters",
@@ -555,7 +579,8 @@ export const ECONOMY = {
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Frog-made, patient, and better than anything the inner worlds can build. They will not say how and you will not work it out."
+   "blurb": "Frog-made, patient, and better than anything the inner worlds can build. They will not say how and you will not work it out.",
+   "nature": "Patient, fine, and better than anything the inner worlds can build. They will not say how."
   },
   {
    "id": "cider",
@@ -580,6 +605,7 @@ export const ECONOMY = {
     "otter"
    ],
    "blurb": "Laid down in a balloon city before anyone alive was hatched. Otters weep at it; the frogs think that is the point.",
+   "nature": "Laid down in a balloon city before anyone alive was hatched. Age is the whole of it, and it cannot be hurried.",
    "needsTempControl": true
   },
   {
@@ -602,6 +628,7 @@ export const ECONOMY = {
     "scorch"
    ],
    "blurb": "Cold, clear, and it will close a wound that nothing else will. Scorch buys it by the crate and never haggles.",
+   "nature": "Cold, clear, and it will close a wound that nothing else will.",
    "needsTempControl": true
   },
   {
@@ -622,7 +649,8 @@ export const ECONOMY = {
     "haven"
    ],
    "lovedBy": [],
-   "blurb": "Ammonia-sea amber with something inside it that is not quite a leaf. The frogs sell it without explaining."
+   "blurb": "Ammonia-sea amber with something inside it that is not quite a leaf. The frogs sell it without explaining.",
+   "nature": "Ammonia-sea amber with something inside it that is not quite a leaf."
   },
   {
    "id": "resin",
@@ -645,7 +673,8 @@ export const ECONOMY = {
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Sets hard in vacuum and stays a little soft forever. A cat with a crate of this can fix almost anything."
+   "blurb": "Sets hard in vacuum and stays a little soft forever. A cat with a crate of this can fix almost anything.",
+   "nature": "Sets hard in vacuum and stays a little soft forever. A crate of it will fix almost anything."
   },
   {
    "id": "lenses",
@@ -668,6 +697,7 @@ export const ECONOMY = {
     "veyra"
    ],
    "blurb": "Ground from shell ice that has never melted. You can read a ship's name off it from further than you would believe.",
+   "nature": "Ground from shell ice that has never once melted. You can read a ship's name off it from further than you would believe.",
    "needsTempControl": true
   },
   {
@@ -688,7 +718,8 @@ export const ECONOMY = {
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Drawn from under the ice and shipped in double-walled crates. Heavy, dull, and the outer system runs on it."
+   "blurb": "Drawn from under the ice and shipped in double-walled crates. Heavy, dull, and the outer system runs on it.",
+   "nature": "Drawn from under the ice and shipped double-walled. Heavy, dull, and everything cold runs on it."
   },
   {
    "id": "incense",
@@ -710,7 +741,8 @@ export const ECONOMY = {
    "lovedBy": [
     "haven"
    ],
-   "blurb": "Rolled in silence by people who chose to live somewhere expensive to reach. Haven burns it by the armful at festival."
+   "blurb": "Rolled in silence by people who chose to live somewhere expensive to reach. Haven burns it by the armful at festival.",
+   "nature": "Rolled in silence, burns slow, and travels badly. That is most of what it costs."
   },
   {
    "id": "beads",
@@ -733,7 +765,8 @@ export const ECONOMY = {
    "lovedBy": [
     "croak"
    ],
-   "blurb": "Strung one a day for a year. A pilgrim carries them out and a pilgrim carries them back, and the ones that come back cost more."
+   "blurb": "Strung one a day for a year. A pilgrim carries them out and a pilgrim carries them back, and the ones that come back cost more.",
+   "nature": "Strung one a day for a year. The ones that have been somewhere and come back cost more."
   },
   {
    "id": "frogtea",
@@ -756,7 +789,8 @@ export const ECONOMY = {
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Pressed into bricks longer ago than the records go. Otters have started a fashion for it, which the ascetics find funny."
+   "blurb": "Pressed into bricks longer ago than the records go. Otters have started a fashion for it, which the ascetics find funny.",
+   "nature": "Pressed into bricks longer ago than the records go, and better for the keeping."
   },
   {
    "id": "lanterns",
@@ -778,7 +812,8 @@ export const ECONOMY = {
    "lovedBy": [
     "croak"
    ],
-   "blurb": "Paper, wire and a wish. They go up over the terraces at the turn of the year and Croak buys them all year round."
+   "blurb": "Paper, wire and a wish. They go up over the terraces at the turn of the year and Croak buys them all year round.",
+   "nature": "Paper, wire and a wish. They go up over water at the turn of the year."
   },
   {
    "id": "dyes",
@@ -799,7 +834,8 @@ export const ECONOMY = {
     "veyra"
    ],
    "lovedBy": [],
-   "blurb": "Ground pigment in twists of waxed cloth. Cheap here, and in the wrong month worth whatever you say it is."
+   "blurb": "Ground pigment in twists of waxed cloth. Cheap here, and in the wrong month worth whatever you say it is.",
+   "nature": "Ground pigment in twists of waxed cloth. Cheap here, and in the wrong month worth whatever you say it is."
   },
   {
    "id": "instruments",
@@ -822,7 +858,8 @@ export const ECONOMY = {
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Cut from a wood that only grows on one terrace, and tuned over a frog lifetime. An otter crew will fight over one."
+   "blurb": "Cut from a wood that only grows on one terrace, and tuned over a frog lifetime. An otter crew will fight over one.",
+   "nature": "Cut from a wood that grows on one terrace and tuned over a lifetime. Nothing else sounds like it."
   },
   {
    "id": "hullplate",
@@ -843,7 +880,8 @@ export const ECONOMY = {
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Cut off whatever came in last, straightened, and stacked by thickness. Nobody on Nail asks what it used to be."
+   "blurb": "Cut off whatever came in last, straightened, and stacked by thickness. Nobody on Nail asks what it used to be.",
+   "nature": "Cut off whatever came in last, straightened, and stacked by thickness."
   },
   {
    "id": "thrusters",
@@ -866,7 +904,8 @@ export const ECONOMY = {
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Stripped, cleaned and put back together better than new by somebody who did it for the argument."
+   "blurb": "Stripped, cleaned and put back together better than new by somebody who did it for the argument.",
+   "nature": "Stripped, cleaned and put back together better than new by somebody who did it for the argument."
   },
   {
    "id": "sensorsalvage",
@@ -889,7 +928,8 @@ export const ECONOMY = {
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Working, mostly. The ones that came off the Arc see further than they are supposed to and nobody sells those cheap."
+   "blurb": "Working, mostly. The ones that came off the Arc see further than they are supposed to and nobody sells those cheap.",
+   "nature": "Working, mostly. The good ones see rather further than they are supposed to."
   },
   {
    "id": "arcshard",
@@ -913,7 +953,8 @@ export const ECONOMY = {
     "veyra",
     "frog"
    ],
-   "blurb": "A hand's length of seamless Builder metal. It hums when you tap it, and the frogs will hear you coming."
+   "blurb": "A hand's length of seamless Builder metal. It hums when you tap it, and the frogs will hear you coming.",
+   "nature": "A hand's length of seamless metal that hums when you tap it, and nobody alive can read it."
   },
   {
    "id": "hotweapons",
@@ -935,7 +976,8 @@ export const ECONOMY = {
    "lovedBy": [
     "cat"
    ],
-   "blurb": "House arms with the marks taken off badly. Worth a great deal to the wrong people and a great deal of trouble to the right ones."
+   "blurb": "House arms with the marks taken off badly. Worth a great deal to the wrong people and a great deal of trouble to the right ones.",
+   "nature": "House arms with the marks taken off badly. Trouble in both directions."
   },
   {
    "id": "fakemedals",
@@ -956,7 +998,8 @@ export const ECONOMY = {
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Struck this morning, aged this afternoon. Good enough for a dock and not good enough for a house."
+   "blurb": "Struck this morning, aged this afternoon. Good enough for a dock and not good enough for a house.",
+   "nature": "Struck this morning and aged this afternoon. Good enough for a dock and not for a house."
   },
   {
    "id": "greymeds",
@@ -980,6 +1023,7 @@ export const ECONOMY = {
     "scorch"
    ],
    "blurb": "The same gel Brine makes, in the wrong crates, at half the price and twice the risk. Scorch does not care.",
+   "nature": "The same gel, in the wrong crates, at half the price and twice the risk.",
    "needsTempControl": true
   },
   {
@@ -1002,7 +1046,8 @@ export const ECONOMY = {
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Hands, eyes and a spine or two, packed in gel. Whisker will fit them as well as sell them and asks for cash."
+   "blurb": "Hands, eyes and a spine or two, packed in gel. Whisker will fit them as well as sell them and asks for cash.",
+   "nature": "Hands, eyes and a spine or two, packed in gel. Fitted as readily as sold."
   }
  ],
  "ports": {

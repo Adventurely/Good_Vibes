@@ -159,6 +159,15 @@
   .row .price small{ display:block; color:var(--dim); font-size:.74rem; }
   .row .btns{ grid-column:1 / -1; justify-content:flex-end; margin-top:.2rem; }
   .up{ color:var(--leaf); } .down{ color:var(--rose); } .flat{ color:var(--dim); }
+  /* The "i" beside a good: small, quiet, and the same size as the text it
+     sits in, so a row of them does not read as a row of buttons. */
+  .inspect{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:1.15em; height:1.15em; margin-left:.35em; padding:0; vertical-align:baseline;
+    border:1px solid var(--line-2); border-radius:50%; background:transparent;
+    color:var(--dim); font-size:.72rem; font-style:italic; line-height:1; cursor:pointer;
+  }
+  .inspect:hover, .inspect:focus-visible{ color:var(--gold-ink); border-color:var(--gold-2); }
   .btns{ display:flex; gap:.3rem; flex-wrap:wrap; }
   .btn{
     min-height:32px; padding:.25rem .6rem; border-radius:8px; border:1px solid var(--line-2);
@@ -323,6 +332,15 @@
   .row .price small{ display:block; color:var(--dim); font-size:.74rem; }
   .row .btns{ grid-column:1 / -1; justify-content:flex-end; margin-top:.2rem; }
   .up{ color:var(--leaf); } .down{ color:var(--rose); } .flat{ color:var(--dim); }
+  /* The "i" beside a good: small, quiet, and the same size as the text it
+     sits in, so a row of them does not read as a row of buttons. */
+  .inspect{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:1.15em; height:1.15em; margin-left:.35em; padding:0; vertical-align:baseline;
+    border:1px solid var(--line-2); border-radius:50%; background:transparent;
+    color:var(--dim); font-size:.72rem; font-style:italic; line-height:1; cursor:pointer;
+  }
+  .inspect:hover, .inspect:focus-visible{ color:var(--gold-ink); border-color:var(--gold-2); }
   .btns{ display:flex; gap:.3rem; flex-wrap:wrap; }
   .btn{
     min-height:32px; padding:.25rem .6rem; border-radius:8px; border:1px solid var(--line-2);
@@ -1458,6 +1476,14 @@ const trend = (price, base) => price > base * 1.12 ? '<span class="up">▲</span
    who wants it, and whether the crate has left the region it was made in,
    which between them are the whole of what it is worth. "They love it, a long
    way from home" is a thing somebody can act on; ×5.5 is a sum. */
+/* The little "i" beside a good. Hovering it gives what the thing is; pressing
+   it opens the appraisal, which is the same line plus who pays for it once
+   there is somebody aboard who can say. */
+const inspect = gid => {
+  const g = S.goodById(gid);
+  return ` <button class="inspect" data-act="look|${gid}" title="${esc(g.nature ?? '')}" aria-label="What is ${esc(g.name)}?">i</button>`;
+};
+
 const demand = (port, good) => {
   const words = S.demandWords(port, good);
   const far = S.demandMul(port, good) >= S.FORMULAS.demand.likedAway;
@@ -1494,7 +1520,7 @@ function market(){
        you are away, so the only way to see a full stall again is to have gone
        and traded somewhere else. */
     const restock = stock === 0 ? ' · <span class="down">picked clean; they will have found more once you have been elsewhere</span>' : '';
-    out += `<div class="row"><div class="name"><b>${esc(g.name)}</b><small>${esc(g.blurb ?? g.category)} · ${stock} in stock${restock} · ${g.units} unit${g.units > 1 ? 's' : ''} each ${lock}</small></div>
+    out += `<div class="row"><div class="name"><b>${esc(g.name)}${inspect(gid)}</b><small>${esc(g.blurb ?? g.category)} · ${stock} in stock${restock} · ${g.units} unit${g.units > 1 ? 's' : ''} each ${lock}</small></div>
       <div class="price">${S.fmtMoney(price)}<small>${trend(price, g.basePrice)} base ${S.fmtMoney(g.basePrice)}</small></div>
       <div class="btns"><button class="btn sm" data-act="buy|${gid}|1" ${c1.ok ? '' : 'disabled title="' + esc(c1.reason) + '"'}>+1</button><button class="btn sm" data-act="buy|${gid}|10" ${maxQ >= 10 ? '' : 'disabled'}>+10</button><button class="btn sm" data-act="buy|${gid}|${maxQ}" ${maxQ > 1 ? '' : 'disabled'}>all</button></div></div>`;
   }
@@ -1513,25 +1539,33 @@ function market(){
     const price = S.sellPrice(state, port, gid);
     const cold = g.needsTempControl ? ' · <span class="up">temperature control pays</span>' : '';
     const avg = e.paid / e.qty;
-    out += `<div class="row"><div class="name"><b>${esc(g.name)}</b><small>${e.qty} aboard · paid ${S.fmtMoney(avg)} each${demand(port, gid)}${cold}</small></div>
+    out += `<div class="row"><div class="name"><b>${esc(g.name)}${inspect(gid)}</b><small>${e.qty} aboard · paid ${S.fmtMoney(avg)} each${demand(port, gid)}${cold}</small></div>
       <div class="price">${S.fmtMoney(price)}<small>${price > avg ? '<span class="up">' : '<span class="down">'}${price >= avg ? '+' : ''}${S.fmtMoney(price - avg)}</span></small></div>
       <div class="btns"><button class="btn sm" data-act="sell|${gid}|1">−1</button><button class="btn sm" data-act="sell|${gid}|10" ${e.qty >= 10 ? '' : 'disabled'}>−10</button><button class="btn sm primary" data-act="sell|${gid}|${e.qty}">all</button></div></div>`;
   }
   /* What to bring back here, worth most first, because that is the question a
      trader is actually asking the board. The ones they love are called out:
      those are the routes, and a player should be able to see one from the
-     stall rather than work it out with a notebook. */
+     stall rather than work it out with a notebook.
+
+     What a stall will *pay*, though, is the appraiser's to say. Until Wicket
+     is aboard these are two lists of names — this port wants that, and wants
+     it badly — and a captain has to find out what badly is worth by carrying
+     some and seeing. She puts the numbers on them. */
+  const priced = !!state.crew?.appraiser;
   const shopping = p.buys.map(b => S.goodById(b.good)).filter(g => !aboard.has(g.id))
     .map(g => ({ g, price: S.sellPrice(state, port, g.id), loved: S.lovesGood(port, g.id) }))
     .sort((a, b) => b.price - a.price);
+  const listed = (r, cls) => esc(r.g.name) + (priced ? ` <span class="${cls}">${S.fmtMoney(r.price)}</span>` : '');
   const loves = shopping.filter(r => r.loved);
   if(loves.length){
-    out += '<h3>They love</h3><p>' + loves.map(r => `${esc(r.g.name)} <span class="up">${S.fmtMoney(r.price)}</span>`).join(' · ') + '</p>';
+    out += '<h3>They love</h3><p>' + loves.map(r => listed(r, 'up')).join(' · ') + '</p>';
   }
   const rest = shopping.filter(r => !r.loved);
   if(rest.length){
-    out += '<h3>They want</h3><p>' + rest.map(r => `${esc(r.g.name)} <span class="lock">${S.fmtMoney(r.price)}</span>`).join(' · ') + '</p>';
+    out += '<h3>They want</h3><p>' + rest.map(r => listed(r, 'lock')).join(' · ') + '</p>';
   }
+  if(!priced) out += '<p class="lock">What they would pay is a matter of opinion, and there is nobody aboard whose opinion is worth having.</p>';
   return out;
 }
 
@@ -1926,6 +1960,7 @@ const actions = {
     if(!state.target) state.target = S.questTarget(r.quest);
     renderTab(); save(); tutorialCheck();
   },
+  look(gid){ showAppraisal(gid); },
   fuel(k){ const r = S.refuel(state, Number(k)); if(!r.ok) toast(r.reason, 'bad'); renderTab(); save(); },
   upgrade(id){ const r = S.buyUpgrade(state, id); if(!r.ok) toast(r.reason, 'bad'); else toast(`${S.upgradeById(id).name} fitted.`); renderTab(); save(); },
   wait(d){ const days = Number(d); S.wait(state, days); toast(`${S.fmtDays(days)} pass. ${S.calendar(state.t).text}.`); renderTab(); save(); },
@@ -2066,6 +2101,26 @@ function afterDistress(r){
 function showStory(name, text){
   const paras = String(text).split(/\n+/).map(p => `<p class="say">${esc(p)}</p>`).join('');
   openModal(`<h2>${esc(storyTitle(name))}</h2>${paras}<div class="btns"><button class="btn primary" id="m-ok">Close</button></div>`, m => m.querySelector('#m-ok').addEventListener('click', closeModal));
+}
+/* What a thing is, and — if there is anybody aboard who can tell you — who
+   pays for it. The split is the whole of the appraiser's berth: the nature of
+   a good is written on the crate and readable by anyone, while knowing which
+   of four frog moons will pay over the odds for it is a trade, and Wicket is
+   the trade. */
+function showAppraisal(gid){
+  const g = S.goodById(gid);
+  const loved = S.lovedByWords(gid), wanted = S.wantedByWords(gid);
+  let body = `<p class="say">${esc(g.nature ?? g.blurb ?? '')}</p>`;
+  if(state.crew?.appraiser){
+    const who = TEXT.crew.roles.find(r => r.id === 'appraiser')?.person?.name ?? 'The appraiser';
+    body += `<dl class="kv"><dt>Loved by</dt><dd>${loved ? esc(loved) : '<span class="lock">nobody, anywhere</span>'}</dd>
+      <dt>Wanted by</dt><dd>${wanted ? esc(wanted) : '<span class="lock">nobody else</span>'}</dd></dl>
+      <p class="lock">${esc(who)} says so, and has not been wrong yet.</p>`;
+  }else{
+    body += `<p class="lock">Who pays over the odds for this, and who merely takes it, is a thing you would have to find out by carrying some. An appraiser would already know.</p>`;
+  }
+  openModal(`<h2>${esc(g.name)}</h2>${body}<div class="btns"><button class="btn primary" id="m-ok">Close</button></div>`,
+    m => m.querySelector('#m-ok').addEventListener('click', closeModal));
 }
 function storyTitle(name){ return { mawArrival: 'The Maw', tollGiftLater: 'A parcel from the Belt' }[name] ?? 'A note in the log'; }
 function confirmNew(){

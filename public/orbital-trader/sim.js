@@ -1734,6 +1734,42 @@ export function supplierDistance(portId, goodId, t){
   return best;
 }
 
+/* Who wants a thing, in the words the goods table itself uses — sometimes a
+ * port, sometimes a whole people, once "everyone". Two lists: the ones who
+ * love it, and the ones who merely want it, which is the loved list taken out
+ * of the buyer list so nobody is named twice.
+ *
+ * This is Wicket's work. Until the appraiser's berth is filled a player has
+ * the thing in front of them and what it is made of, and has to reason from
+ * that to who would pay for it; she is the one who can simply say. Nothing
+ * here checks the berth — the page does, because the knowledge exists in the
+ * world whether or not anybody aboard has it.
+ */
+const wantName = id => id === 'everyone' ? 'everyone'
+  : SPECIES[id] ? SPECIES[id].plural.toLowerCase()
+  : portName(id);
+const wantWords = list => {
+  const said = list.map(wantName);
+  if(said.length <= 1) return said[0] ?? '';
+  return said.slice(0, -1).join(', ') + ' and ' + said[said.length - 1];
+};
+export function lovedByWords(goodId){
+  return wantWords(goodById(goodId).lovedBy ?? []);
+}
+/* Which ports a token means: itself, or everywhere its people live. */
+const portsNamed = token => token === 'everyone' ? Object.keys(PORTS)
+  : PORTS[token] ? [token]
+  : Object.keys(PORTS).filter(id => PORTS[id].species === token);
+export function wantedByWords(goodId){
+  const g = goodById(goodId);
+  /* Taken out by the ports they mean rather than by the word written down.
+     Cider is loved by the otters and its buyer list also names Tassel, which
+     is an otter port: listing Tassel as merely wanting it would be wrong. */
+  const loved = new Set((g.lovedBy ?? []).flatMap(portsNamed));
+  const rest = (g.buyers ?? []).filter(b => portsNamed(b).some(id => !loved.has(id)));
+  return wantWords(rest);
+}
+
 /* What a port pays for a thing, as a multiple of its base price, and the whole
  * of the selling side in one lookup.
  *

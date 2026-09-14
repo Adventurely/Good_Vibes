@@ -234,6 +234,68 @@ test('every port is a body with a port, and every reference resolves', () => {
   }
 });
 
+test("every good says what it is, without saying who wants it", () => {
+  /* The appraiser's berth is built on this line. A player without Wicket has
+     the thing in front of them and what it is made of, and has to reason from
+     pressure-resistant glass to the world at the bottom of an ocean; she is
+     the one who can simply say. A nature line that named a buyer would hand
+     over the answer and there would be nothing for her to know.
+
+     Checked against the peoples and the ports whose names are not also
+     ordinary words. Glass, Nail, Moss, Brine and the Arc are all things as
+     well as places, so "black glass off the flows" cannot be told from the
+     moon by a regular expression — those are on the writer. */
+  const peoples = ['otter', 'cat', 'frog', 'emberkin', 'builder'];
+  const namedPorts = ['Tassel', 'Slate', 'Cinder', 'Scorch', 'Veyra', 'Whisker', 'Grumm', 'Croak', 'Haven', 'Maw'];
+  for(const g of GOODS){
+    assert.ok(g.nature && g.nature.length > 20, `${g.id} has no nature line`);
+    assert.match(g.nature, /[.!?]$/, `${g.id}: the nature line does not finish its sentence`);
+    for(const who of peoples){
+      assert.ok(!new RegExp(`\\b${who}s?\\b`, 'i').test(g.nature), `${g.id} names the ${who}s: "${g.nature}"`);
+    }
+    for(const port of namedPorts){
+      assert.ok(!new RegExp(`\\b${port}\\b`).test(g.nature), `${g.id} names ${port}: "${g.nature}"`);
+    }
+  }
+});
+
+test('who loves a thing and who merely wants it are two lists, and nobody is on both', () => {
+  /* What Wicket knows, in the words the goods table uses: sometimes a port,
+     sometimes a whole people. The second list is the first taken out of the
+     buyer list — by the ports each word *means*, not by the word itself.
+     Cider is loved by the otters and its buyer list also names Tassel, which
+     is an otter port: saying Tassel merely wants it would be wrong. */
+  assert.equal(S.lovedByWords('tideglass'), 'Brine');
+  assert.equal(S.wantedByWords('tideglass'), 'the frogs');
+  assert.equal(S.lovedByWords('cider'), 'the otters');
+  assert.ok(!/Tassel/.test(S.wantedByWords('cider')), `Tassel loves cider and is listed as merely wanting it: ${S.wantedByWords('cider')}`);
+  assert.equal(S.lovedByWords('ironore'), '', 'nobody loves iron ore, and the line should be empty rather than awkward');
+  assert.ok(S.wantedByWords('ironore').length > 0);
+  for(const g of GOODS){
+    const loved = S.lovedByWords(g.id), wanted = S.wantedByWords(g.id);
+    for(const word of wanted.split(/,| and /).map(w => w.trim()).filter(Boolean)){
+      assert.ok(!loved.split(/,| and /).map(w => w.trim()).includes(word), `${g.id}: ${word} is on both lists`);
+    }
+  }
+});
+
+test('the appraisal is the appraiser\'s, and the menu says so until she is aboard', () => {
+  /* A page check, because the trading menu lives in the page. Two things turn
+     on the berth and both have to keep turning on it: what a stall would pay
+     for the goods it wants, and which of a people's ports is the one that
+     loves a thing. What a thing *is* turns on nothing — that is written on the
+     crate and anybody can read it. */
+  const html = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.match(html, /const priced = !!state\.crew\?\.appraiser/, 'the bottom lists no longer price on the berth');
+  assert.match(html, /priced \? ` <span class="\$\{cls\}">\$\{S\.fmtMoney\(r\.price\)\}/, 'the prices are not behind `priced`');
+  const appraisal = html.match(/function showAppraisal\(gid\)\{([\s\S]*?)\n\}/);
+  assert.ok(appraisal, 'the appraisal popup is gone');
+  assert.match(appraisal[1], /state\.crew\?\.appraiser/, 'the appraisal does not check the berth');
+  assert.match(appraisal[1], /g\.nature/, 'the appraisal does not say what the thing is');
+  // And the nature is offered on hover as well as on a press.
+  assert.match(html, /title="\$\{esc\(g\.nature \?\? ''\)\}"/, 'the "i" has no hover text');
+});
+
 test('upgrades come in complete ladders with a stock fitting at the bottom', () => {
   /* Three buyable sizes each, over the one the ship came with. The stock
      fitting is tier 0 and is on no rack anywhere: you own it before you have

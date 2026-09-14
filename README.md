@@ -2008,6 +2008,17 @@ what decides whether a bigger hold is worth buying: filling ninety units out of
 Slate is worth about four times filling twenty-four, and out of Croak it is
 worth nothing at all, because there is nothing there to buy.
 
+**What a thing is, and what it is worth, are two different questions.** Every
+good carries a *nature* line — pressure-resistant, glows in the dark, warm a
+year out of the ground — on hover and behind the "i" beside its name, on the
+shelf and in the hold. That is free: it is written on the crate. Who pays over
+the odds for it is not. Until the frog appraiser is aboard, a port's **They
+love** and **They want** lists carry names and no prices, and no good will say
+which of the four frog moons is the one that loves it rather than merely taking
+it. Wicket puts the numbers on the lists and the names in the "i" — a shortcut
+through reasoning that was always available to anyone who carried a crate and
+watched what happened.
+
 **Nothing spoils.** Goods used to lose value in transit, down to a tenth, which
 made the six organic ones regional by force — Cinder is ninety-four days out
 and nothing with a shelf life survives that — and did it without warning,

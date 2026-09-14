@@ -270,6 +270,22 @@ without warning anybody, because a freshness bar only appeared once the cargo
 was already aboard. Time and hold room are still what limit a run. A crate is
 no longer one of them.
 
+**What the table says, and who can read it.** Every good carries a *nature*
+line — what the thing physically is, and never who wants it. Pressure-resistant
+glass that glows in the dark. Stone that is heavy, permanent, and the only
+thing a terrace will stand on. Metal still warm a year out of the ground. It is
+on hover and behind the "i" beside every good's name, on the shelf and in the
+hold alike, and it is free to everyone, because it is written on the crate.
+
+The rest is the appraiser's (§7.2). Until Wicket is aboard, a port's **They
+love** and **They want** lists are two lists of names with no prices on them,
+and no good will tell you which of a people's moons is the one that loves it.
+A captain closes that gap by carrying some and finding out. Wicket closes it by
+looking: prices appear on the lists, and every good's "i" gains *loved by* and
+*wanted by* in the same words the table uses — sometimes a port, sometimes a
+whole people. She is a shortcut through reasoning that was always possible,
+which is the only kind of knowledge worth selling a journey for.
+
 **Jobs are priced against this table**, not against a number somebody liked:
 fetching work pays more than selling the same goods on the open market at the
 same destination would, and a test holds that line as prices move (§5.1.1).
@@ -817,13 +833,28 @@ berth fills with a name, a species, a portrait and a line:
 `state.crew` carries a slot per berth, null until earned and then `{ role,
 from, joinedAt }` — who they are, which job brought them, and when.
 
-**The Engineer now does something**, and is the only one who does. The second
-and third size of tank and hold, and every gate key but the cat sensors, are
-refused to a ship with an empty engineer's berth (§2.8). No bonus, no discount,
-no change to flight — a gate, which is the cheapest kind of effect to add and
-the easiest to take back. The navigator and the appraiser still do nothing, and
-the shape of that first effect is the argument for what they might: something a
-yard or a market checks, rather than a number quietly folded into a burn.
+**Two of the three berths now do something**, and both do it the same way: a
+thing the world already contains is refused to a ship with nobody aboard who
+can reach it. No bonuses, no discounts, no numbers folded quietly into a burn.
+
+**The Engineer** gates the rack. The second and third size of tank and hold,
+and every gate key but the cat sensors, are refused while her berth is empty
+(§2.8).
+
+**The Appraiser** gates *knowing what a thing is worth*, which is a different
+claim from knowing what it is (§2.7). Every good carries a nature line —
+pressure-resistant, glows in the dark, warm a year out of the ground — readable
+by anybody, on hover or behind the "i" beside its name. That much is written on
+the crate. What no captain can see until Wicket is aboard is which of a
+people's four moons is the one that *loves* a thing rather than merely taking
+it, and what any of them would pay: a stall's wants are a list of names until
+she is there to put numbers on them. The reasoning is the game in the gap —
+glass that will not crack under pressure, and a world at the bottom of an
+ocean — and she is the shortcut, bought with a journey.
+
+The Navigator still does nothing. Two effects in, the pattern is clear enough
+to say what hers should be: something the sky already knows and a ship cannot
+read without her.
 
 The captain is drawn as an otter. §7.1 still has that down as a proposal, but
 the shipped fiction already leans that way — the game opens among otters, and
