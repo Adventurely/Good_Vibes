@@ -50,6 +50,53 @@ test('the four boards and their caps are the ones the client was written against
   assert.equal(typeof BAD_JSON.body.error, 'string');
 });
 
+test('a player can take their own row off, and the id is the authority', () => {
+  /* Putting a name on a public board is easy to regret, and a board you can
+     join but never leave is not a board anybody should type a real name into.
+     The id does the same work here it does for writing: whoever holds it holds
+     the row. */
+  const store = { players: {} };
+  const row = (n, name) => ({ id: id(n), name, stats: { taps: 100 * n, winters: n, earned: 0, peakTaps: 0 } });
+  serve(store, 'POST', row(1, 'Finn'), {}, 1000);
+  serve(store, 'POST', row(2, 'Brikka'), {}, 1000);
+  assert.equal(Object.keys(store.players).length, 2);
+
+  const gone = serve(store, 'DELETE', { id: id(1) }, {}, 2000);
+  assert.equal(gone.status, 200);
+  assert.equal(gone.body.removed, true, 'it should say it removed something');
+  assert.deepEqual(Object.keys(store.players), [id(2)], 'and only that row');
+  assert.deepEqual(gone.body.boards.taps.map(r => r.name), ['Brikka'],
+    'the board that comes back must not still list them');
+
+  // Whoever still holds their own id can still write.
+  serve(store, 'POST', row(2, 'Brikka'), {}, 100000);
+  assert.equal(store.players[id(2)].name, 'Brikka');
+
+  // Asking for a row that is not there is not an error: it is gone either way.
+  const twice = serve(store, 'DELETE', { id: id(1) }, {}, 3000);
+  assert.equal(twice.status, 200);
+  assert.equal(twice.body.removed, false);
+
+  // An id that is not an id is refused, in the same words a bad id always gets.
+  for(const bad of [undefined, null, '', 'everyone', 7, {}]){
+    const v = serve(store, 'DELETE', { id: bad }, {}, 4000);
+    assert.equal(v.status, 400, `DELETE with id ${JSON.stringify(bad)} accepted`);
+    assert.match(v.body.error, /board id/);
+  }
+  // And a missing body is a bad id, not a crash.
+  assert.equal(serve(store, 'DELETE', null, {}, 4000).status, 400);
+  assert.equal(Object.keys(store.players).length, 1, 'none of that may have removed anything');
+});
+
+test('the board still answers nothing but the three methods it names', () => {
+  const store = { players: {} };
+  for(const method of ['PUT', 'PATCH', 'HEAD', 'OPTIONS', 'TRACE']){
+    const v = serve(store, method, null, {}, 0);
+    assert.equal(v.status, 405, `${method} was answered`);
+    assert.match(v.body.error, /GET, POST and DELETE/);
+  }
+});
+
 test('ID_RE takes a UUID in either case and nothing that is not one', () => {
   assert.match('3f2a9c1e-7b4d-4e8a-9f0c-1a2b3c4d5e6f', ID_RE);
   assert.match('3F2A9C1E-7B4D-4E8A-9F0C-1A2B3C4D5E6F', ID_RE);
@@ -446,11 +493,16 @@ test('serve answers 400, 429 and 405 in the shapes the client reads', () => {
   assert.deepEqual(soon.body, { error: 'Too soon.', retryIn: MIN_INTERVAL - 5000 });
   assert.equal(store.players[id(1)].stats.taps, 1);
 
-  for(const method of ['PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS']){
+  for(const method of ['PUT', 'PATCH', 'HEAD', 'OPTIONS']){
     const r = serve(store, method, null, {}, 0);
     assert.equal(r.status, 405, `${method} should be refused`);
     assert.deepEqual(Object.keys(r.body), ['error']);
   }
+  // DELETE is answered, but a delete with no id in it is a bad id and not a
+  // method the board does not know.
+  const noId = serve(store, 'DELETE', null, {}, 0);
+  assert.equal(noId.status, 400);
+  assert.deepEqual(Object.keys(noId.body), ['error']);
 });
 
 test('serve makes the store its own if handed an empty one', () => {

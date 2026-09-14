@@ -184,6 +184,9 @@ One Worker on **good-vibe-games.com** serves the shelf and every game on it.
       ├── /api/good-vibes/ws   src/worker.js → GameRoom,     one per room code
       ├── /api/solarium/ws     src/worker.js → SolariumRoom, one per room code
       └── /api/sunward/board   src/worker.js → SunwardBoard, one for the whole game
+                               GET reads it, POST puts a row up, DELETE takes
+                               one off — the id in the body is the authority
+                               for both of the last two
 
 **Three of the five play without the Worker.** Sunward, Orbital Trader and
 Greener Thumbs are one player and a save file, so the games are files in
@@ -214,7 +217,10 @@ self-reported and there is no way to verify one, so this is honest about what
 it is: a board for people who want to be on one. What defends it is a
 fifteen-second gap between accepted posts from one id, a record that only ever
 goes up, and a ceiling of five thousand rows with the ones nobody has heard
-from in longest pruned first. Somebody who wants to sit at the top with a
+from in longest pruned first. The same id takes a row off again — a board you
+can join but never leave is not one anybody should type a real name into, and
+since the id already decides who may write the row, letting it decide who may
+remove the row costs nothing and needs no account. Somebody who wants to sit at the top with a
 number nobody could reach can.
 
 There was a plausibility cap on each figure too — thirty taps a second, fifty

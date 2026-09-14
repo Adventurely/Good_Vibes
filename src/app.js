@@ -95,21 +95,21 @@ function readBody(req, cap) {
 async function handleBoard(req, res, url) {
   const query = Object.fromEntries(url.searchParams);
   let reply;
-  if (req.method === 'POST') {
+  if (req.method === 'POST' || req.method === 'DELETE') {
     const raw = await readBody(req, MAX_BODY);
     if (raw === null) {
       reply = TOO_LARGE;
     } else {
       let body;
       try { body = JSON.parse(raw.toString('utf8')); } catch { reply = BAD_JSON; }
-      if (!reply) reply = serve(board, 'POST', body, query, Date.now());
+      if (!reply) reply = serve(board, req.method, body, query, Date.now());
     }
   } else {
     reply = serve(board, req.method, null, query, Date.now());
   }
 
   const headers = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' };
-  if (reply.status === 405) headers.Allow = 'GET, POST';
+  if (reply.status === 405) headers.Allow = 'GET, POST, DELETE';
   if (reply.status === 429) headers['Retry-After'] = String(Math.ceil(reply.body.retryIn / 1000));
   res.writeHead(reply.status, headers);
   res.end(JSON.stringify(reply.body));
@@ -122,7 +122,7 @@ async function handleBoard(req, res, url) {
  * GET /<dir>/    -> that directory's index.html
  * GET /<file>    -> that file from public/
  * GET /healthz -> {"status":"ok"}
- * GET|POST /api/sunward/board -> the leaderboard, in memory
+ * GET|POST|DELETE /api/sunward/board -> the leaderboard, in memory
  * anything else -> 404
  *
  * In production the same files come out of Cloudflare's asset store without the

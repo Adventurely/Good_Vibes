@@ -54,7 +54,7 @@ export class SunwardBoard extends DurableObject {
     const query = Object.fromEntries(url.searchParams);
     let reply;
 
-    if(request.method === 'POST'){
+    if(request.method === 'POST' || request.method === 'DELETE'){
       const raw = await readCapped(request, MAX_BODY);
       if(raw === null){
         reply = TOO_LARGE;
@@ -62,7 +62,7 @@ export class SunwardBoard extends DurableObject {
         let body;
         try{ body = JSON.parse(raw); }catch{ reply = BAD_JSON; }
         if(!reply){
-          reply = serve(this.store, 'POST', body, query, Date.now());
+          reply = serve(this.store, request.method, body, query, Date.now());
           // Only a 200 changed anything; a refusal has nothing to save.
           if(reply.status === 200) await this.ctx.storage.put('players', this.store.players);
         }
@@ -72,7 +72,7 @@ export class SunwardBoard extends DurableObject {
     }
 
     const headers = { ...JSON_HEADERS };
-    if(reply.status === 405) headers.Allow = 'GET, POST';
+    if(reply.status === 405) headers.Allow = 'GET, POST, DELETE';
     if(reply.status === 429) headers['Retry-After'] = String(Math.ceil(reply.body.retryIn / 1000));
     return new Response(JSON.stringify(reply.body), { status: reply.status, headers });
   }
