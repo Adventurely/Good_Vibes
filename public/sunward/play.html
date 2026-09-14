@@ -233,7 +233,8 @@
       .boards { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0 1rem; padding: 0 0.5rem 0.6rem; }
       .board td:first-child { width: 2rem; color: var(--muted); }
       .board td:nth-child(2) { text-align: left; }
-      .board td:last-child { text-align: right; }
+      .board td:last-child { text-align: right; overflow-wrap: anywhere; }
+      .board table { table-layout: fixed; }
       .board tr.you td { background: #eef7e9; font-weight: 700; }
 
       .sheet { padding: 0.5rem; overflow-y: auto; max-height: 40rem; }
@@ -1363,10 +1364,23 @@
         taps: Math.floor(state.life.taps), winters: winters(state),
         earned: state.life.earned, peakTaps: state.life.peakTaps,
       });
-      const boardValue = (key, value) => key === 'taps' ? Math.floor(value).toLocaleString('en-US')
-        : key === 'winters' ? String(value)
-        : key === 'earned' ? formatEnergy(value)
-        : `${(Math.round(value * 10) / 10).toFixed(1)} a second`;
+      /* The board takes any figure a browser can hold, so the row has to be able
+         to draw one. A count in full stops being readable long before it stops
+         being possible — nine quadrillion taps is twenty-one characters of
+         commas — and a rate written out in full is worse, so past the point
+         where the exact figure stops meaning anything both fall back to the
+         short form the rest of the game counts in. Real play never reaches
+         either threshold, so a real row is unchanged. */
+      const READABLE = 1e9;
+      const boardValue = (key, value) => {
+        const n = Number(value) || 0;
+        if(key === 'earned') return formatEnergy(n);
+        if(key === 'peakTaps'){
+          return `${n < READABLE ? (Math.round(n * 10) / 10).toFixed(1) : formatEnergy(n)} a second`;
+        }
+        if(n >= READABLE) return formatEnergy(n);
+        return key === 'taps' ? Math.floor(n).toLocaleString('en-US') : String(n);
+      };
 
       function drawBoard(){
         const data = board.data;

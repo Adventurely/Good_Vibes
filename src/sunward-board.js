@@ -14,9 +14,11 @@
  * There is no sign-in on this site by choice, so there is no account to hang a
  * reputation on either. What there is instead:
  *
- *   - a plausibility cap on each figure (LIMITS) — a number past what the game
- *     could have produced is refused, not clamped, so an honest client that
- *     has a bug hears about it;
+ *   - a ceiling on each figure (LIMITS), which is the machine's own: a figure
+ *     too big for JavaScript to hold exactly is refused, not clamped, so an
+ *     honest client that has a bug hears about it. It is deliberately not a
+ *     guess at what the game can produce — that guess was wrong, and it turned
+ *     away the first real player;
  *   - a floor of fifteen seconds between accepted posts from one id, which is
  *     a rate limit and not a defence, and is described as one;
  *   - a record that only ever goes up, per figure, so a stale tab cannot walk
@@ -24,9 +26,9 @@
  *   - a cap on how many rows are kept at all, with the ones nobody would ever
  *     see pruned first.
  *
- * Somebody who wants to sit at the top with fifty million taps can. The board
- * is for people who want to be on one, and the README says so in as many
- * words.
+ * Somebody who wants to sit at the top with a number nobody could reach can,
+ * and the board will show it. This is a leaderboard for a hobby site: it is
+ * for people who want to be on one, and the README says so in as many words.
  *
  * --- Identity -----------------------------------------------------------------
  *
@@ -53,16 +55,38 @@ export const LABELS = {
   peakTaps: 'Best taps per second',
 };
 
-/* Past these the board does not believe you, whatever the client says.
+/* The ceiling on each figure, and it is the machine's rather than a guess at
+ * the game's.
  *
- * Taps: fifty million is thirty a second, every second, for nineteen days.
- * Winters: ten thousand replants is one a minute for a week — the game's own
- * curve cannot get there, but the figure is a cap on the absurd, not a
- * target. Earned: the economy reaches 1e30 in a long life and the cap is a
- * million times that, so nothing honest ever meets it. Peak taps a second:
- * thirty is the rate a tapping game can register on a phone screen at all,
- * and the client's own window measures under it. */
-export const LIMITS = { taps: 5e7, winters: 10000, earned: 1e36, peakTaps: 30 };
+ * These were plausibility caps once — thirty taps a second, fifty million taps
+ * — and the first person to play the finished game was refused by them on the
+ * first evening. Eight fingers drumming on a tablet is fifty a second without
+ * trying, and the figure the board was judging is a ten-second average, not a
+ * burst. A cap pitched at what somebody guessed the game could do is a cap
+ * that turns away the player it was built for, and the cost of guessing too
+ * low is a real person told their real score is a lie, where the cost of
+ * guessing too high is one silly row on a hobby leaderboard. That is not a
+ * close trade.
+ *
+ * So the only ceiling left is the one JavaScript itself imposes:
+ *
+ *   the two counts stop at Number.MAX_SAFE_INTEGER, because past it whole
+ *   numbers are no longer exact — 2^53 and 2^53 + 1 are the same number, so
+ *   "a record only ever goes up" quietly stops meaning anything, and
+ *   `Number.isInteger` starts agreeing with figures that arrived as 1e21;
+ *
+ *   the two measures stop at Number.MAX_VALUE, which is to say they stop only
+ *   where a float stops being a float at all. Anything finite and not negative
+ *   is taken.
+ *
+ * What still gets refused is a figure that is broken rather than big: not a
+ * number, not finite, below zero, or a count with a fraction in it. */
+export const LIMITS = {
+  taps: Number.MAX_SAFE_INTEGER,
+  winters: Number.MAX_SAFE_INTEGER,
+  earned: Number.MAX_VALUE,
+  peakTaps: Number.MAX_VALUE,
+};
 
 /* Which of the four are counts. A count with a fraction in it is a client
    that has gone wrong, and the honest answer to that is a refusal it can read

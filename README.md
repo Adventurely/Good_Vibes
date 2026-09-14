@@ -212,11 +212,23 @@ same reason. Nothing but that id, the typed name and four numbers ever leaves
 the device, and the board never hands the id back to anyone. The numbers are
 self-reported and there is no way to verify one, so this is honest about what
 it is: a board for people who want to be on one. What defends it is a
-plausibility cap on each figure, a fifteen-second gap between accepted posts
-from one id, a record that only ever goes up, and a ceiling of five thousand
-rows with the ones nobody has heard from in longest pruned first. Somebody who
-wants to sit at the top with fifty million taps can, and the cap is the number
-they will sit at.
+fifteen-second gap between accepted posts from one id, a record that only ever
+goes up, and a ceiling of five thousand rows with the ones nobody has heard
+from in longest pruned first. Somebody who wants to sit at the top with a
+number nobody could reach can.
+
+There was a plausibility cap on each figure too — thirty taps a second, fifty
+million taps — and it lasted one evening. The first person to play the
+finished game was refused by it: eight fingers drumming on a tablet is fifty
+taps a second without trying, and the figure being judged is a ten-second
+average rather than a burst. Guessing what a game can produce and then calling
+a real player a liar for exceeding the guess is the worst thing a leaderboard
+can do, and it is not a close trade against one silly row. The only ceiling
+left is the machine's: the two counts stop at `Number.MAX_SAFE_INTEGER`,
+because past it whole numbers are not exact and "a record only goes up" stops
+meaning anything, and the two measures stop at `Number.MAX_VALUE`. What is
+still refused is a figure that is broken rather than big — not a number, not
+finite, negative, or a count with a fraction in it.
 
 `public/` ships verbatim, no build step. The Worker is not invoked for files at
 all — assets are matched first — so the clients cost zero Worker calls and each
@@ -1667,15 +1679,18 @@ and the ladder goes on to a hundred. The word on the page is "winter" and
 never "reset", because a reset is a thing that makes the lot smaller and this
 is the one thing on it that a replanting makes bigger.
 
-**The board is opt-in, and the name is the only thing that leaves the
-device.** Four lists — most taps, most winters, most energy earned all told,
-fastest hands — behind one Durable Object and one HTTP route, the first on
-this site that is not a socket. The id that goes with a name is random and
+**The board is opt-in, and joining sends a name and four numbers.** Nothing
+else leaves the device. Four lists — most taps, most winters, most energy
+earned all told, fastest hands — behind one Durable Object and one HTTP route,
+the first on this site that is not a socket. The id that goes with a name is random and
 made in the browser; whoever holds it can update the row and nobody else can,
 which is as much of an account as a clicker wants, and it lives under its own
 key so that starting over on the lot does not orphan the row. The scores are
-self-reported. The server's answer to that is plausibility caps and a
-fifteen-second rate limit, not proof, and the page says as much. The board is
+self-reported. The server's answer to that is a fifteen-second rate limit and
+a record that only goes up, not proof, and the page says as much; the figures
+themselves are capped only where JavaScript stops holding them exactly, after
+a cap pitched at what the game "could" produce turned away the first real
+player on the first evening. The board is
 fetched only while its tab is open, and a joined player's row goes up every
 few minutes while they play, after a replanting, and on the way out by
 `sendBeacon`.

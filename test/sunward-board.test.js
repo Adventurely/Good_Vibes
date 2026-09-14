@@ -31,7 +31,10 @@ const entry = (n, stats = {}, name = `Player ${n}`) => ({
 
 test('the four boards and their caps are the ones the client was written against', () => {
   assert.deepEqual(BOARD_KEYS, ['taps', 'winters', 'earned', 'peakTaps']);
-  assert.deepEqual(LIMITS, { taps: 5e7, winters: 10000, earned: 1e36, peakTaps: 30 });
+  assert.deepEqual(LIMITS, {
+    taps: Number.MAX_SAFE_INTEGER, winters: Number.MAX_SAFE_INTEGER,
+    earned: Number.MAX_VALUE, peakTaps: Number.MAX_VALUE,
+  });
   assert.deepEqual(INTEGER_KEYS, ['taps', 'winters']);
   for(const key of BOARD_KEYS) assert.equal(typeof LABELS[key], 'string', `no label for ${key}`);
   assert.equal(NAME_MIN, 2);
@@ -155,7 +158,36 @@ test('validate refuses a missing or unfit name, in words about names', () => {
   }
 });
 
-test('validate refuses figures above what the board takes', () => {
+test('the ceiling on a figure is the machine\'s, not a guess at the game', () => {
+  /* The caps were once a guess at what the game could produce — thirty taps a
+     second — and the first person to play the finished game was refused by
+     that guess on the first evening. What is left is only where JavaScript
+     itself gives out: counts stop being exact past 2^53, and a measure stops
+     at the largest float there is. */
+  const tryStats = stats => validate({ id: id(1), name: 'Finn', stats });
+
+  assert.equal(tryStats({ peakTaps: 33.4 }).ok, true, 'eight fingers on a tablet is a real score');
+  assert.equal(tryStats({ peakTaps: 250 }).ok, true);
+  assert.equal(tryStats({ taps: 5e7 + 1 }).ok, true, 'the old fifty-million cap must be gone');
+
+  for(const key of ['taps', 'winters']){
+    assert.equal(LIMITS[key], Number.MAX_SAFE_INTEGER, `${key} is a count, so it stops where counting does`);
+    // Number.isInteger says yes to 1e16, and 1e16 + 1 is 1e16, so a record
+    // that "only goes up" would stop being able to.
+    const over = tryStats({ [key]: 1e16 });
+    assert.equal(over.ok, false, `${key} past exact counting accepted`);
+    assert.match(over.error, /above the highest figure this board takes/);
+  }
+  for(const key of ['earned', 'peakTaps']){
+    assert.equal(LIMITS[key], Number.MAX_VALUE, `${key} is a measure, so it stops where floats do`);
+    assert.equal(tryStats({ [key]: 1e300 }).ok, true, `${key}: anything finite is taken`);
+    // Past MAX_VALUE there is no number left to refuse — only Infinity, which
+    // is refused for not being finite rather than for being too big.
+    assert.match(tryStats({ [key]: Infinity }).error, /must be a number, zero or more/);
+  }
+});
+
+test('validate refuses figures that are broken rather than big', () => {
   const tryStats = stats => validate({ id: id(1), name: 'Finn', stats });
   for(const key of BOARD_KEYS){
     for(const bad of [-1, Infinity, -Infinity, NaN, 'lots', true, {}, []]){
@@ -163,11 +195,8 @@ test('validate refuses figures above what the board takes', () => {
       assert.equal(v.ok, false, `${key}=${String(bad)} accepted`);
       assert.match(v.error, new RegExp(LABELS[key]), `${key}: the reason should name the figure`);
     }
-    const over = tryStats({ [key]: LIMITS[key] * 1.01 });
-    assert.equal(over.ok, false, `${key} over its cap accepted`);
-    assert.match(over.error, /above the highest figure this board takes/);
     const at = tryStats({ [key]: LIMITS[key] });
-    assert.equal(at.ok, true, `${key} at exactly its cap refused`);
+    assert.equal(at.ok, true, `${key} at exactly its ceiling refused`);
   }
 });
 
