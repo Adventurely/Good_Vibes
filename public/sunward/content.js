@@ -505,9 +505,9 @@ export const ACHIEVEMENTS = [
   { id: 'seventh-winter', name: 'Seventh winter', need: { prestiges: 7 },
     blurb: 'Seven winters. The trunk splits in two and the crown reaches the top of the picture.' },
   { id: 'eighth-winter', name: 'Eighth winter', need: { prestiges: 8 },
-    blurb: 'Eight winters. Older, and bigger again.' },
+    blurb: 'Eight winters. The trunk grows broader.' },
   { id: 'ninth-winter', name: 'Ninth winter', need: { prestiges: 9 },
-    blurb: 'Nine winters.' },
+    blurb: 'Nine winters. Another season, another ring of growth!' },
   { id: 'tenth-winter', name: 'Tenth winter', need: { prestiges: 10 },
     blurb: 'Ten winters stood through.' },
   { id: 'fifteen-winters', name: 'Fifteen winters', need: { prestiges: 15 },
@@ -519,7 +519,7 @@ export const ACHIEVEMENTS = [
   { id: 'fifty-winters', name: 'Fifty winters', need: { prestiges: 50 },
     blurb: 'Half a century of winters.' },
   { id: 'hundred-winters', name: 'A hundred winters', need: { prestiges: 100 },
-    blurb: 'A hundred winters. The tree was here before you.' },
+    blurb: 'A tree older than most humans. It\'s truly a marvel.' },
   { id: 'hundred-seeds', name: 'Seed bank', need: { seeds: 100 },
     blurb: 'Hold a hundred seeds.' },
 
@@ -923,8 +923,10 @@ export function prestigeRefusal(state){
 export const winters = state => state.prestiges;
 
 /* The medal a given winter wins, or null if that winter is not one of the
-   rungs. The replant confirmation reads it so it can name what is about to be
-   won, and it reads the same table the award does rather than a copy.
+   rungs. One lookup into the ladder, so that whatever wants to know what a
+   winter is worth — the test that the first ten have no gap in them, anything
+   later that wants to name one — reads the table the award reads rather than
+   a copy of it.
 
    The guard is not decoration: `find` on an undefined count matches the first
    medal with no `prestiges` in its need at all, which is the one for tapping

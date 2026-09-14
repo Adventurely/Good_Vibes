@@ -521,7 +521,7 @@
       import {
         newGame, fromSave, toSave, tick, tap, plant, plantRefusal, study, studyRefusal,
         prestige, prestigeRefusal, pendingSeeds, energyForSeeds, seedBonus, MAX_TICK,
-        winters, winterMedal,
+        winters,
         catchUp, OFFLINE_CAP, GROWERS, GROWER_BY_ID, GROWER_IDS,
         bulkCost, affordable, bonuses, totalRate, steadyRate, averageFactor,
         tapValue, momentum, isWindfall, STREAK_CAP, WINDFALL_EVERY,
@@ -1104,14 +1104,12 @@
         const refusal = prestigeRefusal(state);
         if(refusal) return say(refusal);
         const after = Math.round((seedBonus(state.seeds + pending) - 1) * 100);
-        const year = winters(state) + 1;
         if(!confirm(`Replant the lot?\n\n`
           + `You bank ${pending} seed${pending === 1 ? '' : 's'} — ${state.seeds + pending} in all, worth +${after}%`
           + ` on everything you plant from now on.\n`
           + `You keep every medal and the all-time record.\n`
           + `The energy, the growers and the upgrades on the lot start again from nothing.\n`
-          + `The tree stands through its ${ordinal(year)} winter and comes back bigger`
-          + `${winterMedal(year) ? `, and wins ${winterMedal(year).name}` : ''}.`)) return;
+          + `The tree stands tall through another winter!`)) return;
         prestige(state);
         note(state, `Winter ${winters(state)}. Replanted the lot; ${state.seeds} seed${plural(state.seeds)} held.`);
         say(`${state.seeds} seed${plural(state.seeds)} held — everything you plant makes +${after}% now.`, 'Replanted');
@@ -1464,9 +1462,10 @@
                it will listen again. */
             const wait = Math.max(0, Math.min(60000, Number(data?.retryIn) || 0));
             board.sentAt = performance.now() - BOARD_SEND_EVERY + wait + 250;
-            if(joining) ui.boardLine.textContent = `The board takes one score every few seconds. Yours goes up in ${Math.ceil(wait / 1000)}.`;
+            if(joining) ui.boardLine.textContent = `Just a moment — your score goes up in ${Math.ceil(wait / 1000)} seconds.`;
           } else {
-            ui.boardLine.textContent = data?.error || 'The board did not take that.';
+            ui.boardLine.textContent = data?.error
+              || 'Something went wrong putting you on the board. Try again in a moment.';
           }
         } catch {
           outOfReach();

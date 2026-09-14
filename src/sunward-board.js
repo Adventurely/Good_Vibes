@@ -192,7 +192,7 @@ export function validate(body){
       return { ok: false, error: `${LABELS[key]} must be a whole number.` };
     }
     if(value > LIMITS[key]){
-      return { ok: false, error: `${LABELS[key]} is more than this board will believe.` };
+      return { ok: false, error: `${LABELS[key]} is above the highest figure this board takes.` };
     }
     stats[key] = value;
   }

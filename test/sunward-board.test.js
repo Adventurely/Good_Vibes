@@ -155,7 +155,7 @@ test('validate refuses a missing or unfit name, in words about names', () => {
   }
 });
 
-test('validate refuses figures the board cannot believe', () => {
+test('validate refuses figures above what the board takes', () => {
   const tryStats = stats => validate({ id: id(1), name: 'Finn', stats });
   for(const key of BOARD_KEYS){
     for(const bad of [-1, Infinity, -Infinity, NaN, 'lots', true, {}, []]){
@@ -165,7 +165,7 @@ test('validate refuses figures the board cannot believe', () => {
     }
     const over = tryStats({ [key]: LIMITS[key] * 1.01 });
     assert.equal(over.ok, false, `${key} over its cap accepted`);
-    assert.match(over.error, /more than this board will believe/);
+    assert.match(over.error, /above the highest figure this board takes/);
     const at = tryStats({ [key]: LIMITS[key] });
     assert.equal(at.ok, true, `${key} at exactly its cap refused`);
   }
