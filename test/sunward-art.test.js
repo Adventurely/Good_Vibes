@@ -14,9 +14,10 @@ import { test } from 'node:test';
 
 import {
   TREE_STAGES, stageFor, agedScale, AGED_STEP, AGED_CAP,
-  drawTree, treeBounds, paintLot, createLot,
+  drawTree, drawTreeWithRects, paintTree, Raster, PACKED, treeBounds, paintLot, createLot,
   SCENE_W, SCENE_H, TREE_X, TREE_Y, hex,
 } from '../public/sunward/art.js';
+import { PALETTE } from '../public/good-vibes/pixel.js';
 
 /* A canvas context that remembers every fill instead of painting it. The
    fill's colour is recorded with it, so two call lists are the same picture
@@ -276,4 +277,91 @@ test('both lot painters take an age and hand it to the tree', () => {
   } finally {
     globalThis.document = before;
   }
+});
+
+/* ------------------------------------------------------------- the raster */
+
+/* The browser draws the tree into a pixel buffer and stamps it down in one
+ * call, because thirty thousand fillRects a frame is eleven frames a second on
+ * a phone. That is only allowed if the buffer paints exactly what the canvas
+ * calls would have painted, and "exactly" has to mean every pixel: an
+ * off-by-one in the buffer's rounding would move a branch by a pixel, which
+ * nobody would notice until the tree looked subtly wrong and nothing said why.
+ *
+ * So the same tree is drawn both ways and compared. The canvas calls are
+ * replayed into a second buffer with no rounding of their own — the coordinates
+ * a fillRect receives are already whole — and the two buffers must match.
+ */
+
+const BY_HEX = Object.fromEntries(Object.keys(PALETTE).map(key => [hex(key), PACKED[key]]));
+
+/* What a canvas would have left in its pixels, given the calls it was made. */
+function replay(calls){
+  const buffer = new Uint32Array(SCENE_W * SCENE_H);
+  for(const [style, x, y, w, h] of calls){
+    const colour = BY_HEX[style];
+    assert.ok(colour !== undefined, `the tree painted "${style}", which is not in the palette`);
+    for(let row = y; row < y + h; row++){
+      if(row < 0 || row >= SCENE_H) continue;
+      const a = Math.max(0, x), b = Math.min(SCENE_W, x + w);
+      if(b > a) buffer.fill(colour, row * SCENE_W + a, row * SCENE_W + b);
+    }
+  }
+  return buffer;
+}
+
+test('the buffered tree and the canvas tree are the same picture, pixel for pixel', () => {
+  let checked = 0;
+  for(const age of [0, 1, 2, 3, 4, 5, 6, 7, 9, 14]){
+    for(const growth of [0, 0.3, 0.62, 1]){
+      for(const [light, sunSide] of [[1, -1], [-0.8, 1], [0.04, -1]]){
+        for(const [sway, pulse, shake] of [[0, 0, 0], [0.05, 0.4, 1.7], [-0.043, 1, -2.2]]){
+          const opts = { age, light, sunSide, sway, pulse, shake };
+          const recorder = new Recorder();
+          drawTreeWithRects(recorder, growth, opts);
+
+          const raster = new Raster();
+          paintTree(raster, growth, opts);
+
+          const wanted = replay(recorder.calls);
+          const where = `age ${age}, growth ${growth}, light ${light}, sway ${sway}, pulse ${pulse}`;
+          let differing = 0, first = -1;
+          for(let i = 0; i < wanted.length; i++){
+            if(wanted[i] !== raster.data[i]){ differing++; if(first < 0) first = i; }
+          }
+          assert.equal(differing, 0, differing
+            ? `${where}: ${differing} pixels differ, first at ${first % SCENE_W},${Math.floor(first / SCENE_W)}`
+            : '');
+          checked++;
+        }
+      }
+    }
+  }
+  assert.ok(checked >= 300, `only ${checked} trees compared`);
+});
+
+test('the buffer clears what it drew, and knows what it has touched', () => {
+  const raster = new Raster();
+  assert.equal(raster.dirty, null, 'a fresh buffer has touched nothing');
+
+  raster.fill('g', 1, 10, 20, 4, 3);
+  assert.deepEqual(raster.dirty, { x: 10, y: 20, w: 4, h: 3 });
+  assert.equal(raster.data[20 * SCENE_W + 10], PACKED.g);
+
+  raster.clear();
+  assert.equal(raster.dirty, null, 'and after a clear it has touched nothing again');
+  assert.equal(raster.data[20 * SCENE_W + 10], 0, 'the pixels it wrote are blank again');
+
+  // Nothing outside the scene, and nothing that would wrap onto the next row.
+  raster.run('g', 1, -40, 5, 20);
+  assert.equal(raster.dirty, null, 'a run entirely off the left edge draws nothing');
+  raster.run('g', 1, SCENE_W - 2, 5, 20);
+  assert.deepEqual(raster.dirty, { x: SCENE_W - 2, y: 5, w: 2, h: 1 }, 'and one off the right is clipped');
+  assert.equal(raster.data[5 * SCENE_W + SCENE_W - 1], PACKED.g);
+  assert.equal(raster.data[6 * SCENE_W], 0, 'it must not wrap onto the row below');
+
+  raster.clear();
+  raster.run('g', 1, 3, -1, 8);
+  raster.run('g', 1, 3, SCENE_H, 8);
+  assert.equal(raster.dirty, null, 'and a row above or below the scene draws nothing');
 });

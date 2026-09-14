@@ -577,7 +577,118 @@ export const agedScale = age => {
    the same place on every frame: fallen leaves, blossom, vines. */
 const scatter = i => Math.imul(i + 11, 2654435761) >>> 0;
 
-function leafBlob(ctx, cx, cy, r, o){
+/* ---------------------------------------------------------------- raster */
+
+/* The tree is painted into a pixel buffer, not onto the canvas.
+ *
+ * Everything below draws through two verbs, `run` and `fill`, and a
+ * full-grown tree is seven thousand of them a frame — thirty thousand once it
+ * has stood through a few winters. On the canvas each one is a fillRect: a
+ * call across into the browser's painter, a fill style parsed from a hex
+ * string, a rectangle clipped and composited. Measured in Chromium that is
+ * five milliseconds a frame for a first-year tree and nineteen for an old one;
+ * on a phone's processor, four times that, which is eleven frames a second for
+ * the one thing on this page that has to move.
+ *
+ * Writing the same pixels into a Uint32Array is a loop over a typed array,
+ * which is the cheapest thing JavaScript does. The buffer goes onto an
+ * offscreen canvas in one call and onto the lot in a second, so a frame costs
+ * two canvas calls whatever the tree looks like. The picture is the same to
+ * the pixel: the buffer's `run` rounds exactly as the canvas one does and
+ * then clips where the canvas would have, and a test draws the same tree both
+ * ways and compares every pixel.
+ *
+ * Where there is no ImageData — Node, and the tests — the tree draws through
+ * the canvas calls it always did. Nothing about the shape of the tree lives in
+ * the target; the target only decides where the pixels land.
+ */
+
+/* Each palette key as one packed pixel, in whichever byte order this machine's
+   ImageData wants. Worked out once: a hex string parsed per pixel is the very
+   cost the buffer is here to avoid. */
+const LITTLE_ENDIAN = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
+const packed = key => {
+  const h = hex(key);
+  const r = parseInt(h.slice(1, 3), 16), g = parseInt(h.slice(3, 5), 16), b = parseInt(h.slice(5, 7), 16);
+  return (LITTLE_ENDIAN ? (255 << 24) | (b << 16) | (g << 8) | r : (r << 24) | (g << 16) | (b << 8) | 255) >>> 0;
+};
+export const PACKED = Object.fromEntries(Object.keys(PALETTE).map(key => [key, packed(key)]));
+
+/* A scene-sized pixel buffer with the same two verbs the canvas path has, and
+   a record of the box it has been written in — so only that box is ever
+   cleared, uploaded or drawn, and an empty sky costs nothing. */
+export class Raster {
+  constructor(w = SCENE_W, h = SCENE_H){
+    this.w = w;
+    this.h = h;
+    this.data = new Uint32Array(w * h);
+    this.x0 = w; this.y0 = h; this.x1 = 0; this.y1 = 0;
+  }
+
+  /* Blank what the last frame wrote, and nothing more. */
+  clear(){
+    if(this.x1 > this.x0){
+      for(let y = this.y0; y < this.y1; y++) this.data.fill(0, y * this.w + this.x0, y * this.w + this.x1);
+    }
+    this.x0 = this.w; this.y0 = this.h; this.x1 = 0; this.y1 = 0;
+  }
+
+  /* The same rounding the canvas `run` does, and then the clip the canvas
+     would have applied at the edge of the scene. */
+  run(key, light, x, y, w){
+    x = Math.round(x); y = Math.round(y); w = Math.round(w);
+    if(w <= 0 || y < 0 || y >= this.h) return;
+    const a = x > 0 ? x : 0;
+    const b = x + w < this.w ? x + w : this.w;
+    if(b <= a) return;
+    this.data.fill(PACKED[shade(key, light)], y * this.w + a, y * this.w + b);
+    if(a < this.x0) this.x0 = a;
+    if(b > this.x1) this.x1 = b;
+    if(y < this.y0) this.y0 = y;
+    if(y >= this.y1) this.y1 = y + 1;
+  }
+
+  fill(key, light, x, y, w = 1, h = 1){
+    x = x | 0; y = y | 0;
+    for(let i = 0; i < h; i++) this.run(key, light, x, y + i, w);
+  }
+
+  /* The box written since the last clear, or null if nothing was. */
+  get dirty(){
+    return this.x1 > this.x0 ? { x: this.x0, y: this.y0, w: this.x1 - this.x0, h: this.y1 - this.y0 } : null;
+  }
+}
+
+/* The canvas path, for where there is no buffer to blit: the same two verbs,
+   bound to a context. This is exactly what every call in the tree used to be. */
+const rectTarget = ctx => ({
+  run: (key, light, x, y, w) => run(ctx, key, light, x, y, w),
+  fill: (key, light, x, y, w, h) => fill(ctx, key, light, x, y, w, h),
+});
+
+/* The one buffer and the offscreen canvas it is stamped through. Made on first
+   use, and `false` once it is known there is nothing to make it from. */
+let layer = null;
+function treeLayer(){
+  if(layer !== null) return layer || null;
+  try {
+    if(typeof ImageData !== 'function') throw new Error('no ImageData');
+    const canvas = typeof OffscreenCanvas === 'function'
+      ? new OffscreenCanvas(SCENE_W, SCENE_H)
+      : Object.assign(document.createElement('canvas'), { width: SCENE_W, height: SCENE_H });
+    const ctx = canvas.getContext('2d');
+    if(!ctx || typeof ctx.putImageData !== 'function') throw new Error('no 2d context');
+    const raster = new Raster();
+    // The ImageData looks at the same bytes the buffer writes: there is no copy.
+    const image = new ImageData(new Uint8ClampedArray(raster.data.buffer), SCENE_W, SCENE_H);
+    layer = { raster, image, canvas, ctx };
+  } catch {
+    layer = false;
+  }
+  return layer || null;
+}
+
+function leafBlob(dst, cx, cy, r, o){
   const R = Math.max(1, Math.round(r));
   for(let dy = -R; dy <= R; dy++){
     const half = Math.floor(Math.sqrt(Math.max(0, R * R - dy * dy + 0.5)));
@@ -588,8 +699,8 @@ function leafBlob(ctx, cx, cy, r, o){
     // dark on the lower ones. Two spans a row rather than a per-pixel dither,
     // which at this radius is a tenth of the work and reads the same.
     const split = Math.max(0, Math.min(w, Math.round(w * (dy < 0 ? 0.7 : 0.34))));
-    run(ctx, 'g', o.light, x0, Math.round(cy) + dy, split);
-    run(ctx, 'G', o.light, x0 + split, Math.round(cy) + dy, w - split);
+    dst.run('g', o.light, x0, Math.round(cy) + dy, split);
+    dst.run('G', o.light, x0 + split, Math.round(cy) + dy, w - split);
   }
 
   /* Blossom, from the fifth winter: five specks of rose and skin in one blob
@@ -602,7 +713,7 @@ function leafBlob(ctx, cx, cy, r, o){
         const bits = h >>> (4 + k * 5);
         const dx = (bits % (R + 1)) - (R >> 1);
         const dy = ((bits >>> 3) % (R + 1)) - (R >> 1);
-        fill(ctx, k & 1 ? 'n' : 'r', o.light, Math.round(cx) + dx, Math.round(cy) + dy);
+        dst.fill(k & 1 ? 'n' : 'r', o.light, Math.round(cx) + dx, Math.round(cy) + dy);
       }
     }
   }
@@ -612,18 +723,18 @@ function leafBlob(ctx, cx, cy, r, o){
    side and shadowed on the other. Every limb is one of these; so is the low
    bough and the stub under the twin trunks, which is why it is its own
    function rather than the top of limb(). */
-function bough(ctx, x, y, x2, y2, width, o){
+function bough(dst, x, y, x2, y2, width, o){
   const w = Math.max(1, Math.round(width));
   const steps = Math.max(1, Math.ceil(Math.hypot(x2 - x, y2 - y)));
   for(let i = 0; i <= steps; i++){
     const t = i / steps;
     const px = x + (x2 - x) * t - w / 2;
     const py = y + (y2 - y) * t;
-    run(ctx, 'N', o.light, px, py, w);
+    dst.run('N', o.light, px, py, w);
     if(w > 2){
       // A highlight on whichever side the sun is, and a shadow on the other.
-      run(ctx, 'n', o.light, o.sunSide < 0 ? px : px + w - 1, py, 1);
-      run(ctx, 'v', o.light, o.sunSide < 0 ? px + w - 1 : px, py, 1);
+      dst.run('n', o.light, o.sunSide < 0 ? px : px + w - 1, py, 1);
+      dst.run('v', o.light, o.sunSide < 0 ? px + w - 1 : px, py, 1);
     }
   }
 }
@@ -632,21 +743,21 @@ function bough(ctx, x, y, x2, y2, width, o){
    tip. Only from tips that point sideways or down — the ones on the outside
    and underside of the canopy — because a vine off a tip at the top of the
    crown hangs inside the leaves where nobody can see it. One tip in five. */
-function vine(ctx, x, y, a, o){
+function vine(dst, x, y, a, o){
   const h = scatter(o.tips++);
   if(Math.sin(a) < -0.35 || h % 5) return;
   const drop = 6 + (h >>> 4) % 7;
   const vx = Math.round(x) + ((h >>> 8) % 3) - 1;
   const vy = Math.round(y) + Math.max(1, Math.round(o.leaf)) - 1;
-  fill(ctx, 'G', o.light, vx, vy, 1, drop);
-  fill(ctx, 'g', o.light, vx, vy + drop);
+  dst.fill('G', o.light, vx, vy, 1, drop);
+  dst.fill('g', o.light, vx, vy + drop);
 }
 
 /* A lantern hung from the middle of a limb's lower side: an ink hook and a
    two-by-three body with the flame in the middle row. Drawn unshaded, as the
    fireflies are, because it is a light; at night it gets a pixel of gold at
    each compass point, which at this size is what a glow is. */
-function lantern(ctx, x, y, x2, y2, width, o){
+function lantern(dst, x, y, x2, y2, width, o){
   const dx = x2 - x, dy = y2 - y;
   const L = Math.hypot(dx, dy) || 1;
   // The perpendicular that points down — or, on a near-vertical limb,
@@ -656,29 +767,29 @@ function lantern(ctx, x, y, x2, y2, width, o){
   const off = Math.max(1, Math.round(width)) / 2 + 1;
   const hx = Math.round((x + x2) / 2 + nx * off);
   const hy = Math.round((y + y2) / 2 + ny * off);
-  fill(ctx, 'k', o.light, hx, hy);
-  fill(ctx, 'o', 1, hx, hy + 1, 2, 1);
-  fill(ctx, 'y', 1, hx, hy + 2, 2, 1);
-  fill(ctx, 'o', 1, hx, hy + 3, 2, 1);
+  dst.fill('k', o.light, hx, hy);
+  dst.fill('o', 1, hx, hy + 1, 2, 1);
+  dst.fill('y', 1, hx, hy + 2, 2, 1);
+  dst.fill('o', 1, hx, hy + 3, 2, 1);
   if(o.light < 0){
-    fill(ctx, 'y', 1, hx - 1, hy + 2);
-    fill(ctx, 'y', 1, hx + 2, hy + 2);
-    fill(ctx, 'y', 1, hx + 1, hy);
-    fill(ctx, 'y', 1, hx, hy + 4);
+    dst.fill('y', 1, hx - 1, hy + 2);
+    dst.fill('y', 1, hx + 2, hy + 2);
+    dst.fill('y', 1, hx + 1, hy);
+    dst.fill('y', 1, hx, hy + 4);
   }
 }
 
-function limb(ctx, x, y, angle, len, width, depth, o){
+function limb(dst, x, y, angle, len, width, depth, o){
   // The sway is applied more to the thin ends than to the trunk, which is what
   // a tree in wind actually does and what stops the whole thing sliding.
   const a = angle + o.sway * (o.depth - depth + 1) * 0.35;
   const x2 = x + Math.cos(a) * len;
   const y2 = y + Math.sin(a) * len;
-  bough(ctx, x, y, x2, y2, width, o);
+  bough(dst, x, y, x2, y2, width, o);
 
   if(depth <= 0){
-    leafBlob(ctx, x2, y2, o.leaf, o);
-    if(o.vines) vine(ctx, x2, y2, a, o);
+    leafBlob(dst, x2, y2, o.leaf, o);
+    if(o.vines) vine(dst, x2, y2, a, o);
     return;
   }
   /* A broad stage widens the two forks nearest the trunk and leaves the twigs
@@ -686,8 +797,8 @@ function limb(ctx, x, y, angle, len, width, depth, o){
      add up, and widening every level by the same number curled the crown down
      to the grass either side: a weeping willow, not a broad oak. */
   const spread = (0.26 + depth * 0.042) * (depth >= o.depth - 1 ? o.spread : 1);
-  limb(ctx, x2, y2, a - spread, len * 0.74, width * 0.66, depth - 1, o);
-  limb(ctx, x2, y2, a + spread * 0.88, len * 0.7, width * 0.66, depth - 1, o);
+  limb(dst, x2, y2, a - spread, len * 0.74, width * 0.66, depth - 1, o);
+  limb(dst, x2, y2, a + spread * 0.88, len * 0.7, width * 0.66, depth - 1, o);
 
   /* A leader carrying straight on out of the first fork, so the crown is not
      a perfect binary Y. Two branches and nothing else is the shape of a
@@ -695,31 +806,31 @@ function limb(ctx, x, y, angle, len, width, depth, o){
      read as a diagram of a tree rather than as a tree. `leaderAt` is the root
      of the tree, except on twin trunks, where each trunk gets its own. */
   if(depth === o.leaderAt && o.depth >= 3){
-    limb(ctx, x2, y2, a + 0.05, len * 0.82, width * 0.62, depth - 1, o);
+    limb(dst, x2, y2, a + 0.05, len * 0.82, width * 0.62, depth - 1, o);
   }
 
   /* And a smaller blob at the last fork as well as at the tips. The gaps
      between eight tip blobs are bigger than the blobs at this size, and a
      canopy you can see the sky through in eight places is a canopy that reads
      as being under construction. */
-  if(depth === 1) leafBlob(ctx, x2, y2, o.leaf * 0.62, o);
-  if(depth === 2 && o.depth >= 5) leafBlob(ctx, x2, y2, o.leaf * 0.5, o);
+  if(depth === 1) leafBlob(dst, x2, y2, o.leaf * 0.62, o);
+  if(depth === 2 && o.depth >= 5) leafBlob(dst, x2, y2, o.leaf * 0.5, o);
 
   // Lanterns hang from the first limbs out of the trunk, which are the low
   // ones, and are drawn after the limb's own crown so nothing paints over them.
-  if(o.lanterns && depth === o.depth - 1) lantern(ctx, x, y, x2, y2, width, o);
+  if(o.lanterns && depth === o.depth - 1) lantern(dst, x, y, x2, y2, width, o);
 }
 
 /* ---- what stands at the foot of an older tree --------------------------- */
 
 /* One row of roots either side of the trunk, `ext` pixels out, lit on the sun
    side and shadowed on the other like the wood above it. */
-function rootRow(ctx, left, right, y, ext, o){
+function rootRow(dst, left, right, y, ext, o){
   if(ext <= 0) return;
-  run(ctx, 'N', o.light, left - ext, y, ext);
-  run(ctx, 'N', o.light, right, y, ext);
-  run(ctx, o.sunSide < 0 ? 'n' : 'v', o.light, left - ext, y, 1);
-  run(ctx, o.sunSide < 0 ? 'v' : 'n', o.light, right + ext - 1, y, 1);
+  dst.run('N', o.light, left - ext, y, ext);
+  dst.run('N', o.light, right, y, ext);
+  dst.run(o.sunSide < 0 ? 'n' : 'v', o.light, left - ext, y, 1);
+  dst.run(o.sunSide < 0 ? 'v' : 'n', o.light, right + ext - 1, y, 1);
 }
 
 /* The root flare — two splayed runs each side at the ground line — and, from
@@ -727,37 +838,37 @@ function rootRow(ctx, left, right, y, ext, o){
    about fourteen pixels out on a full-grown tree and stepping in as they
    climb, so they taper. Both are sized off the trunk, so a sapling that has
    stood through five winters has roots in proportion and not a plinth. */
-function roots(ctx, cx, trunk, o){
+function roots(dst, cx, trunk, o){
   const w = Math.max(1, Math.round(trunk));
   const left = Math.round(cx - w / 2);
   const right = left + w;
   const flare = 1 + Math.round(w * 0.25);
-  rootRow(ctx, left, right, TREE_Y - 1, flare, o);
-  rootRow(ctx, left, right, TREE_Y, flare * 2, o);
+  rootRow(dst, left, right, TREE_Y - 1, flare, o);
+  rootRow(dst, left, right, TREE_Y, flare * 2, o);
   if(!o.buttress) return;
   const reach = 4 + Math.round(w * 0.6);
-  rootRow(ctx, left, right, TREE_Y - 2, Math.round(reach * 0.25), o);
-  rootRow(ctx, left, right, TREE_Y - 1, Math.round(reach * 0.5), o);
-  rootRow(ctx, left, right, TREE_Y, Math.round(reach * 0.75), o);
+  rootRow(dst, left, right, TREE_Y - 2, Math.round(reach * 0.25), o);
+  rootRow(dst, left, right, TREE_Y - 1, Math.round(reach * 0.5), o);
+  rootRow(dst, left, right, TREE_Y, Math.round(reach * 0.75), o);
   // The lowest row runs under the trunk as well, so the tree stands on its
   // roots rather than on a line of grass between them.
-  run(ctx, 'N', o.light, left - reach, TREE_Y + 1, w + reach * 2);
-  run(ctx, o.sunSide < 0 ? 'n' : 'v', o.light, left - reach, TREE_Y + 1, 2);
-  run(ctx, o.sunSide < 0 ? 'v' : 'n', o.light, right + reach - 2, TREE_Y + 1, 2);
+  dst.run('N', o.light, left - reach, TREE_Y + 1, w + reach * 2);
+  dst.run(o.sunSide < 0 ? 'n' : 'v', o.light, left - reach, TREE_Y + 1, 2);
+  dst.run(o.sunSide < 0 ? 'v' : 'n', o.light, right + reach - 2, TREE_Y + 1, 2);
 }
 
 /* Fallen leaves round the base: ten of them, ember and gold, at places hashed
    off their index and kept clear of the trunk so none lands on the wood. Two
    pixels wide, not one — one pixel of ember on a dithered lawn is a tuft that
    has gone wrong, and two is a leaf. */
-function fallenLeaves(ctx, cx, trunk, o){
+function fallenLeaves(dst, cx, trunk, o){
   const half = Math.max(1, Math.round(trunk)) / 2;
   for(let i = 0; i < 10; i++){
     const h = scatter(i + 200);
     const side = h & 1 ? 1 : -1;
     const x = Math.round(cx + side * (half + 2 + (h >>> 3) % 24));
     const y = TREE_Y - 1 + (h >>> 9) % 8;
-    fill(ctx, (h >>> 13) & 1 ? 'o' : 'y', o.light, x, y, 2, 1);
+    dst.fill((h >>> 13) & 1 ? 'o' : 'y', o.light, x, y, 2, 1);
   }
 }
 
@@ -767,7 +878,7 @@ function fallenLeaves(ctx, cx, trunk, o){
    above, and the top of a hole is the part you can see into. From the fifth
    winter it glows gold at night, and the glow is drawn unshaded, like the
    lanterns, because it is the light and not a thing lit. */
-function knot(ctx, cx, cy, trunk, o){
+function knot(dst, cx, cy, trunk, o){
   const kw = Math.max(2, Math.min(5, Math.round(trunk * 0.38)));
   const kh = (kw + 2) | 1;
   const half = kh >> 1;
@@ -778,13 +889,13 @@ function knot(ctx, cx, cy, trunk, o){
     const y = y0 + dy;
     if(Math.abs(dy) === half){
       const w = Math.max(1, kw - 2);
-      run(ctx, 'v', o.light, x0 + ((kw - w) >> 1), y, w);
+      dst.run('v', o.light, x0 + ((kw - w) >> 1), y, w);
       continue;
     }
-    fill(ctx, 'v', o.light, x0, y);
-    if(kw > 2) fill(ctx, 'v', o.light, x0 + kw - 1, y);
-    if(glow) fill(ctx, 'y', 1, x0 + 1, y, Math.max(1, kw - 2), 1);
-    else fill(ctx, dy < 0 ? 'd' : 'k', o.light, x0 + 1, y, Math.max(1, kw - 2), 1);
+    dst.fill('v', o.light, x0, y);
+    if(kw > 2) dst.fill('v', o.light, x0 + kw - 1, y);
+    if(glow) dst.fill('y', 1, x0 + 1, y, Math.max(1, kw - 2), 1);
+    else dst.fill(dy < 0 ? 'd' : 'k', o.light, x0 + 1, y, Math.max(1, kw - 2), 1);
   }
 }
 
@@ -793,13 +904,13 @@ function knot(ctx, cx, cy, trunk, o){
    pixel in from the edge, on the wood — on the edge itself, grass green
    against the grass behind it read as a notch out of the trunk. */
 const MOSS_AT = [0.06, 0.13, 0.22, 0.31, 0.44];
-function moss(ctx, cx, len, trunk, o){
+function moss(dst, cx, len, trunk, o){
   const w = Math.max(1, Math.round(trunk));
   if(w < 4) return;
   const left = Math.round(cx - w / 2);
   for(let i = 0; i < MOSS_AT.length; i++){
     const mw = 1 + (i & 1);
-    run(ctx, 'g', o.light, o.sunSide < 0 ? left + w - 1 - mw : left + 1, TREE_Y - len * MOSS_AT[i], mw);
+    dst.run('g', o.light, o.sunSide < 0 ? left + w - 1 - mw : left + 1, TREE_Y - len * MOSS_AT[i], mw);
   }
 }
 
@@ -807,45 +918,45 @@ function moss(ctx, cx, len, trunk, o){
    The ropes are as long as they need to be rather than a fixed fourteen,
    because the bough is lower on a tree that has just been replanted, and a
    fixed rope would put the seat in the soil. */
-function swing(ctx, hx, hy, o){
+function swing(dst, hx, hy, o){
   const seat = TREE_Y - 6;
   const x0 = Math.round(hx) - 3;
   const top = Math.round(hy) + 1;
   const drop = seat - top;
   if(drop < 3) return;
-  fill(ctx, 'w', o.light, x0, top, 1, drop);
-  fill(ctx, 'w', o.light, x0 + 7, top, 1, drop);
-  fill(ctx, 'N', o.light, x0, seat, 8, 1);
-  fill(ctx, 'v', o.light, x0, seat + 1, 8, 1);
-  fill(ctx, 'n', o.light, o.sunSide < 0 ? x0 : x0 + 7, seat);
+  dst.fill('w', o.light, x0, top, 1, drop);
+  dst.fill('w', o.light, x0 + 7, top, 1, drop);
+  dst.fill('N', o.light, x0, seat, 8, 1);
+  dst.fill('v', o.light, x0, seat + 1, 8, 1);
+  dst.fill('n', o.light, o.sunSide < 0 ? x0 : x0 + 7, seat);
 }
 
 /* A bench to the left of the trunk, under the bough the swing hangs from: a
    plank of oak with its shadow under it, on two short legs. Left because that
    is the side of the lot with nothing standing on it at that height. */
-function bench(ctx, cx, o){
+function bench(dst, cx, o){
   const x = Math.round(cx) - 46, y = TREE_Y + 3;
-  fill(ctx, 'N', o.light, x, y, 12, 1);
-  fill(ctx, 'n', o.light, o.sunSide < 0 ? x : x + 11, y);
-  fill(ctx, 'v', o.light, x, y + 1, 12, 1);
-  fill(ctx, 'v', o.light, x + 1, y + 2, 1, 2);
-  fill(ctx, 'v', o.light, x + 10, y + 2, 1, 2);
+  dst.fill('N', o.light, x, y, 12, 1);
+  dst.fill('n', o.light, o.sunSide < 0 ? x : x + 11, y);
+  dst.fill('v', o.light, x, y + 1, 12, 1);
+  dst.fill('v', o.light, x + 1, y + 2, 1, 2);
+  dst.fill('v', o.light, x + 10, y + 2, 1, 2);
 }
 
 /* A ring of small mushrooms round the base — rose caps on skin stalks, two
    pixels by two — three a side, at fixed offsets from the trunk edge. */
 const MUSHROOM_AT = [[4, 2], [10, 5], [16, 3]];
-function mushrooms(ctx, cx, trunk, o){
+function mushrooms(dst, cx, trunk, o){
   const w = Math.max(1, Math.round(trunk));
   const left = Math.round(cx - w / 2);
   const right = left + w;
   for(let i = 0; i < MUSHROOM_AT.length; i++){
     const [out, down] = MUSHROOM_AT[i];
     const y = TREE_Y + down;
-    fill(ctx, 'r', o.light, left - out - 2, y, 2, 1);
-    fill(ctx, 'n', o.light, left - out - 1, y + 1);
-    fill(ctx, 'r', o.light, right + out, y, 2, 1);
-    fill(ctx, 'n', o.light, right + out, y + 1);
+    dst.fill('r', o.light, left - out - 2, y, 2, 1);
+    dst.fill('n', o.light, left - out - 1, y + 1);
+    dst.fill('r', o.light, right + out, y, 2, 1);
+    dst.fill('n', o.light, right + out, y + 1);
   }
 }
 
@@ -853,7 +964,7 @@ function mushrooms(ctx, cx, trunk, o){
    canopy swells by up to a third of its blob radius and settles. It is the
    tap's own animation, and it is on the tree rather than on the number that
    floats away, because the tree is what you tapped. */
-export function drawTree(ctx, growth, { sway = 0, light = 1, sunSide = -1, shake = 0, pulse = 0, age = 0 } = {}){
+export function paintTree(dst, growth, { sway = 0, light = 1, sunSide = -1, shake = 0, pulse = 0, age = 0 } = {}){
   const g = Math.max(0, Math.min(1, growth));
   const stage = stageFor(age);
   const has = stage.has;
@@ -885,10 +996,10 @@ export function drawTree(ctx, growth, { sway = 0, light = 1, sunSide = -1, shake
 
   // What lies on the ground goes down first, so the trunk stands on its roots
   // and not the other way round.
-  if(has.flare) roots(ctx, cx, trunk, o);
-  if(has.leaves) fallenLeaves(ctx, cx, trunk, o);
-  if(has.mushrooms) mushrooms(ctx, cx, trunk, o);
-  if(has.bench) bench(ctx, cx, o);
+  if(has.flare) roots(dst, cx, trunk, o);
+  if(has.leaves) fallenLeaves(dst, cx, trunk, o);
+  if(has.mushrooms) mushrooms(dst, cx, trunk, o);
+  if(has.bench) bench(dst, cx, o);
 
   // The trunk's own lean — the same sway term limb() applies at the root — so
   // the fork and the knot stay on the wood when the tree moves.
@@ -908,13 +1019,13 @@ export function drawTree(ctx, growth, { sway = 0, light = 1, sunSide = -1, shake
     const af = -Math.PI / 2 - stage.fork + sway * 0.7;
     const fl = len * 0.8;
     const ex = fx + Math.cos(af) * fl, ey = fy + Math.sin(af) * fl;
-    bough(ctx, fx, fy, ex, ey, trunk * 0.6, o);
+    bough(dst, fx, fy, ex, ey, trunk * 0.6, o);
     // The bough's crown is drawn at the plain spread whatever the stage: it
     // starts out leaning, and widening it as well hung it down beside the
     // bough like a lobe of wet washing.
     const spread = o.spread;
     o.spread = 1;
-    limb(ctx, ex, ey, -Math.PI / 2 - 0.3, len * 0.7, trunk * 0.4, depth - 1, o);
+    limb(dst, ex, ey, -Math.PI / 2 - 0.3, len * 0.7, trunk * 0.4, depth - 1, o);
     o.spread = spread;
     hangX = fx + (ex - fx) * 0.72;
     hangY = fy + (ey - fy) * 0.72 + Math.round(trunk * 0.6) / 2;
@@ -927,21 +1038,43 @@ export function drawTree(ctx, growth, { sway = 0, light = 1, sunSide = -1, shake
        draw for being twice the tree. */
     const sl = len * 0.4;
     const sx = cx + Math.cos(lean) * sl, sy = TREE_Y + Math.sin(lean) * sl;
-    bough(ctx, cx, TREE_Y, sx, sy, trunk, o);
+    bough(dst, cx, TREE_Y, sx, sy, trunk, o);
     o.leaderAt = depth - 1;
-    limb(ctx, sx, sy, -Math.PI / 2 - 0.26, len * 0.98, trunk * 0.7, depth - 1, o);
-    limb(ctx, sx, sy, -Math.PI / 2 + 0.22, len * 0.94, trunk * 0.7, depth - 1, o);
+    limb(dst, sx, sy, -Math.PI / 2 - 0.26, len * 0.98, trunk * 0.7, depth - 1, o);
+    limb(dst, sx, sy, -Math.PI / 2 + 0.22, len * 0.94, trunk * 0.7, depth - 1, o);
   } else {
-    limb(ctx, cx, TREE_Y, -Math.PI / 2, len, trunk, depth, o);
+    limb(dst, cx, TREE_Y, -Math.PI / 2, len, trunk, depth, o);
   }
 
   // On the trunk, after the trunk. The knot sits lower on twin trunks, where
   // forty percent of the way up is the crotch.
   const knotAt = has.twins ? 0.22 : 0.4;
-  if(has.knot) knot(ctx, cx + Math.cos(lean) * len * knotAt, TREE_Y + Math.sin(lean) * len * knotAt, trunk, o);
-  if(has.moss) moss(ctx, cx, len, trunk, o);
-  if(has.swing) swing(ctx, hangX, hangY, o);
+  if(has.knot) knot(dst, cx + Math.cos(lean) * len * knotAt, TREE_Y + Math.sin(lean) * len * knotAt, trunk, o);
+  if(has.moss) moss(dst, cx, len, trunk, o);
+  if(has.swing) swing(dst, hangX, hangY, o);
 }
+
+
+/* Paint the tree onto `ctx`: through the buffer where there is one, and
+   through the canvas calls where there is not. */
+export function drawTree(ctx, growth, opts = {}){
+  const via = treeLayer();
+  if(!via){
+    paintTree(rectTarget(ctx), growth, opts);
+    return;
+  }
+  const raster = via.raster;
+  raster.clear();
+  paintTree(raster, growth, opts);
+  const box = raster.dirty;
+  if(!box) return;
+  via.ctx.putImageData(via.image, 0, 0, box.x, box.y, box.w, box.h);
+  ctx.drawImage(via.canvas, box.x, box.y, box.w, box.h, box.x, box.y, box.w, box.h);
+}
+
+/* The canvas path on demand, whatever the browser has. It exists so the two
+   paths can be drawn side by side and compared to the pixel. */
+export const drawTreeWithRects = (ctx, growth, opts = {}) => paintTree(rectTarget(ctx), growth, opts);
 
 /* A burst at the point of a tap: a dozen pixels flung outward and falling
  * back, in the tree's own greens with a spark of gold. `age` runs 0 to 1 over
