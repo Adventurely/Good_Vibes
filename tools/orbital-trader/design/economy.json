@@ -23,8 +23,8 @@
    "lovedBy": [
     "veyra"
    ],
-   "blurb": "Grown in the shallow beds off the rafts and picked by hand. An otter wedding needs three; a Veyra house will pay for thirty.",
-   "nature": "Nacre laid down a layer a year. Warm on the skin and impossible to hurry, which is what ceremony and old money both pay for."
+   "blurb": "Veyra pays over the odds. An otter wedding needs three.",
+   "nature": "Nacre laid down a layer a year, warm on the skin and impossible to hurry. Ceremony and old money are both paying for the waiting."
   },
   {
    "id": "tideglass",
@@ -46,8 +46,8 @@
    "lovedBy": [
     "brine"
    ],
-   "blurb": "Otter glasswork that glows sea-green in the dark. The frogs hang it under the lily-terraces and sing to it.",
-   "nature": "Glass that will not crack under pressure and glows sea-green in the dark. Deep water and long nights each have a use for it."
+   "blurb": "Frog money, and Brine pays the most of it.",
+   "nature": "Blown thin and annealed slow, so it will not crack under pressure, and it holds a sea-green light for hours after the room goes dark. It is supposed to sound different depending on what is sung at it."
   },
   {
    "id": "moonfishoil",
@@ -68,8 +68,8 @@
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Pressed from a fish that only rises on the dark of the moon. Burns clean, keeps forever, smells like a harbour.",
-   "nature": "Burns clean, keeps forever, smells of harbour. Light and heat where neither comes easily."
+   "blurb": "Cheap and light. Sells anywhere cold or dark.",
+   "nature": "Pressed from a fish that only rises on the dark of the moon. Burns clean, keeps forever, and smells so exactly of a working harbour that people a long way from one buy a jar to open in the room."
   },
   {
    "id": "coral",
@@ -91,8 +91,8 @@
    "lovedBy": [
     "otter"
    ],
-   "blurb": "A year of somebody's evenings, cut from living reef and finished with a thumb. Otters give them and otters keep them.",
-   "nature": "Living reef cut by hand and finished with a thumb. A year of somebody's evenings, small enough to hold."
+   "blurb": "Otters pay most, because otters know what it took.",
+   "nature": "Cut from living reef and finished with a thumb: a year of somebody's evenings. They are given rather than sold, so one that reaches a market has usually come out of a household that broke up."
   },
   {
    "id": "pebble",
@@ -113,8 +113,8 @@
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Smooth grey pebbles off Slate's one beach, polished by a moon with no weather. Otters give them to each other and mean it.",
-   "nature": "Polished by a moon with no weather. Worth nothing and given anyway, which is the whole of it."
+   "blurb": "Worth nothing to anybody but an otter.",
+   "nature": "Off the one beach on a moon with no weather, polished by nothing but time. Worth nothing and given anyway, which is the whole of it."
   },
   {
    "id": "ironore",
@@ -135,8 +135,8 @@
     "scorch"
    ],
    "lovedBy": [],
-   "blurb": "Crates of nickel-iron, dug and sorted and not much else. The engine smiths of Cinder melt it into things that go very fast.",
-   "nature": "Nickel-iron, dug and sorted and nothing else. Worthless until somebody with a furnace gets hold of it."
+   "blurb": "Heavy and cheap. Cinder takes all of it.",
+   "nature": "Nickel-iron, dug and sorted and nothing else done to it. Worthless until somebody with a furnace gets hold of it, and then worth whatever they make of it."
   },
   {
    "id": "masonry",
@@ -160,8 +160,8 @@
     "haven",
     "croak"
    ],
-   "blurb": "Cut stone with the old patterns on it. The frogs build their terraces out of it and will not be talked into anything lighter.",
-   "nature": "Cut stone carrying the old patterns. Heavy, permanent, and the only thing a terrace will stand on."
+   "blurb": "Heavy. Haven and Croak pay for it anyway.",
+   "nature": "Cut stone carrying the old patterns. Nothing lighter will hold a terrace up, and a terrace is expected to outlast the argument that built it."
   },
   {
    "id": "herbs",
@@ -184,8 +184,8 @@
     "scorch",
     "cinder"
    ],
-   "blurb": "Cut green and bundled in the field. Half the remedies in the system start here, and the good ones do not travel slowly.",
-   "nature": "Cut green and bundled in the field. Half the remedies in the sky start as this."
+   "blurb": "Scorch and Cinder pay over the odds for it.",
+   "nature": "Cut green and bundled in the field. Half the remedies in the system start here, and a physician can tell a wet-cut bundle from a good one by the squeak."
   },
   {
    "id": "starwine",
@@ -208,8 +208,8 @@
    "lovedBy": [
     "veyra"
    ],
-   "blurb": "Pale and faintly sharp. Moss makes it in small runs and Veyra buys it in whole small runs.",
-   "nature": "Pale and faintly sharp, made in runs too small to matter. Scarcity is most of the flavour."
+   "blurb": "Veyra pays over the odds, and the runs are small.",
+   "nature": "Pale and faintly sharp, made in runs too small to matter to anyone except the people who cannot get any. Scarcity is most of the flavour and the growers know it."
   },
   {
    "id": "glowmoss",
@@ -229,8 +229,8 @@
     "haven"
    ],
    "lovedBy": [],
-   "blurb": "A living lamp in a jar. Cats line their tunnels with it because it needs nothing and never goes out.",
-   "nature": "A living lamp in a jar. Needs nothing, never goes out, and does not mind being underground."
+   "blurb": "Cats buy it by the crate. Cheap and light.",
+   "nature": "A living lamp in a jar: needs nothing, never goes out, and does not mind being underground. Line a corridor with it and the corridor is faintly green forever."
   },
   {
    "id": "riverfish",
@@ -253,8 +253,8 @@
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Silver, quick, and only in three rivers. Worth a fortune fresh and worth an apology otherwise.",
-   "nature": "Silver, quick, and out of three rivers only. Magnificent fresh and an apology otherwise.",
+   "blurb": "Cats pay most. Needs temperature control.",
+   "nature": "Silver, quick, and out of three rivers only. One that arrives still cold is worth a month of parts. One that does not is worth an apology.",
    "needsTempControl": true
   },
   {
@@ -276,8 +276,8 @@
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Valves, seals and struts in oiled paper. Far from any dry dock, a crate of these is the difference between a ship and a wreck.",
-   "nature": "Valves, seals and struts in oiled paper. Far from a dry dock, the difference between a ship and a wreck."
+   "blurb": "Heavy. Slate and the cats are always short.",
+   "nature": "Valves, seals and struts in oiled paper. Far from a dry dock, a crate of these is the difference between a ship and a wreck, which is why nobody far from a dry dock asks the price twice."
   },
   {
    "id": "weapons",
@@ -299,8 +299,8 @@
    "lovedBy": [
     "emberkin"
    ],
-   "blurb": "Emberkin house arms, crated and sealed with somebody's mark. Nobody asks what they are for and everybody knows.",
-   "nature": "Crated house arms, sealed with somebody's mark. Nobody asks what they are for."
+   "blurb": "Heavy. The Emberkin houses pay over the odds.",
+   "nature": "Crated house arms, sealed with somebody's mark. There are feuds eleven years old that have never fired one and have never once stopped buying them."
   },
   {
    "id": "plating",
@@ -321,8 +321,8 @@
     "haven"
    ],
    "lovedBy": [],
-   "blurb": "Sheet that will sit in a cloud top all day and come out grumbling. Half the shielded hulls in the sky are wearing Cinder's.",
-   "nature": "Sheet that will sit in a cloud top all day and come out grumbling. Hulls that go somewhere hot are wearing it."
+   "blurb": "Heavy. Anywhere that flies somewhere hot will take it.",
+   "nature": "Sheet that will sit in a cloud top all day and come out grumbling. Half the shielded hulls in the sky are wearing it, including, if you have one, yours."
   },
   {
    "id": "steel",
@@ -342,8 +342,8 @@
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Bar stock, graded and stamped. The dullest cargo in the system and the one everybody is always short of.",
-   "nature": "Bar stock, graded and stamped. The dullest cargo in the sky and the one everybody is short of."
+   "blurb": "Heavy, dull, and wanted at every yard.",
+   "nature": "Bar stock, graded and stamped. The dullest cargo in the system and the one everybody is short of, because nobody plans for it and everybody uses it."
   },
   {
    "id": "coils",
@@ -366,8 +366,8 @@
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Wound by hand over nine days by somebody who will not tell you the order. A cat mechanic will trade a ship for one.",
-   "nature": "Wound by hand over nine days, in an order nobody will tell you. Nothing else will make a reactor behave."
+   "blurb": "Cats pay most, and pay on the spot.",
+   "nature": "Wound by hand over nine days, in an order that has never been written down anywhere. Nothing else will make a reactor behave, and a good mechanic will trade a ship for one."
   },
   {
    "id": "firecrystals",
@@ -390,8 +390,8 @@
    "lovedBy": [
     "veyra"
    ],
-   "blurb": "Grown in the vents and cut cold. They hold a light for a week after you take them out of the sun.",
-   "nature": "Grown in the vents and cut cold. They hold a light for a week after the sun is off them.",
+   "blurb": "Veyra pays over the odds. Needs temperature control.",
+   "nature": "Grown in the vents and cut cold, and they have to stay cold or they let go of it all at once. Kept properly, one holds a light for a week after the sun comes off it — enough to light a room and call it modesty.",
    "needsTempControl": true
   },
   {
@@ -414,8 +414,8 @@
     "haven"
    ],
    "lovedBy": [],
-   "blurb": "Sheets of black glass off the flows, packed in ash. Cheap on Scorch because there is nothing else on Scorch.",
-   "nature": "Black glass off the flows, packed in ash. Cheap where there is nothing else to sell."
+   "blurb": "Heavy and cheap, but four ports will take it.",
+   "nature": "Black glass off the flows, packed in ash. Cheap wherever there is nothing else to sell, and cheap everywhere else because everybody has worked out that it cuts."
   },
   {
    "id": "emberstone",
@@ -438,8 +438,8 @@
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Warm to the hand a year after it comes out of the ground, and nobody on Scorch has ever explained why.",
-   "nature": "Still warm to the hand a year out of the ground, and nobody has ever explained why."
+   "blurb": "Cats pay most for it.",
+   "nature": "Still warm to the hand a year out of the ground, and nobody has ever explained why. The official position where it is mined is that it came out warm and will go back in warm. People sleep with them."
   },
   {
    "id": "embersilk",
@@ -462,8 +462,8 @@
    "lovedBy": [
     "veyra"
    ],
-   "blurb": "Woven in a heated room because it comes off the loom the colour of ash and will not take the dye below ninety degrees. Cinder changes the season's colour four times a year, and the dyers know the next one before anybody else does.",
-   "nature": "The dye bonds only in heat, which is why it has never been made anywhere cold, and it fades three shades in a year of daylight. Worn indoors, at night, and once."
+   "blurb": "This season's colour sells double. Last season's is worthless.",
+   "nature": "It comes off the loom the colour of ash and takes the dye only above ninety degrees, so it is woven in a heated room by people paid very well to sweat. The season's colour turns over four times a year, and the dyers know the next one first."
   },
   {
    "id": "medals",
@@ -484,8 +484,8 @@
     "haven"
    ],
    "lovedBy": [],
-   "blurb": "Struck in small numbers for houses settling scores in public. The metal is worth nothing; the name on it is worth a great deal.",
-   "nature": "The metal is worth nothing. The name struck into it settles an argument in public, which is worth a great deal."
+   "blurb": "Sells into Emberkin space, where the name on it counts.",
+   "nature": "The metal is worth nothing. The name struck into it settles an argument in public, which in some houses is the only way an argument is accepted as settled."
   },
   {
    "id": "clocks",
@@ -507,8 +507,8 @@
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Good enough to navigate by, and pretty enough that no otter household will admit to owning one alone. A raft buys a clock together, argues about whose shelf it sits on, and settles it by moving it every season.",
-   "nature": "A spring wound in a house kept at one temperature for two hundred years. A second a month, which is the difference between planning a launch window and guessing at one."
+   "blurb": "Otters pay most. Tassel first.",
+   "nature": "A second a month, which is the difference between planning a launch window and guessing at one. No household will admit to owning one alone: they are bought together, argued over, and settled by moving the thing every season."
   },
   {
    "id": "perfume",
@@ -530,8 +530,8 @@
     "croak"
    ],
    "lovedBy": [],
-   "blurb": "Small stoppered bottles in a padded case. Half the system finds them ridiculous and buys them anyway.",
-   "nature": "Small stoppered bottles in a padded case. Half the sky finds them ridiculous and buys them anyway."
+   "blurb": "Light, and four ports will take it.",
+   "nature": "Small stoppered bottles in a padded case. Half the system finds them ridiculous and buys them anyway, including several places that have publicly renounced wanting things."
   },
   {
    "id": "stormcrystals",
@@ -554,8 +554,8 @@
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Fished out of the cloud tops on a line, still ticking. A cat will hold one up to a lamp and go quiet.",
-   "nature": "Fished off a cloud top on a line, still ticking. Nobody is certain what they are."
+   "blurb": "Cats pay most. Only Grumm has them.",
+   "nature": "Pulled off a cloud top on a line, still ticking. Nobody is certain what they are. People who are never quiet will hold one up to a lamp and go quiet."
   },
   {
    "id": "filters",
@@ -577,8 +577,8 @@
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Frog-made, patient, and better than anything the inner worlds can build. They will not say how and you will not work it out.",
-   "nature": "Patient, fine, and better than anything the inner worlds can build. They will not say how."
+   "blurb": "Heavy, and wanted anywhere people breathe.",
+   "nature": "Patient, fine, and better than anything the inner worlds can build. The makers will explain exactly how, at length, twice, and you will still not be able to do it."
   },
   {
    "id": "cider",
@@ -602,8 +602,8 @@
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Laid down in a balloon city ten thousand years ago, by frogs, for frogs who had not hatched yet. The cellar has been moved four times and never once opened in a hurry. Otters weep at it; the frogs consider weeping the correct response.",
-   "nature": "Ten thousand years in a cellar nobody has ever rushed. What it tastes of is mostly time, and there is no method for making more of that.",
+   "blurb": "Otters pay most. Needs temperature control.",
+   "nature": "Laid down in a balloon city ten thousand years ago, for drinkers who had not hatched yet. The cellar has been moved four times and never once opened in a hurry. People weep at it, and the makers consider weeping the correct response.",
    "needsTempControl": true
   },
   {
@@ -625,8 +625,8 @@
    "lovedBy": [
     "scorch"
    ],
-   "blurb": "Cold, clear, and it will close a wound that nothing else will. Scorch buys it by the crate and never haggles.",
-   "nature": "Cold, clear, and it will close a wound that nothing else will.",
+   "blurb": "Everybody buys it. Scorch never haggles. Needs temperature control.",
+   "nature": "Cold, clear, and it will close a wound that nothing else will. Warm it once and it is soup, which has happened to enough pilots that there is a word for them.",
    "needsTempControl": true
   },
   {
@@ -647,8 +647,8 @@
     "haven"
    ],
    "lovedBy": [],
-   "blurb": "Ammonia-sea amber with something inside it that is not quite a leaf. The frogs sell it without explaining.",
-   "nature": "Ammonia-sea amber with something inside it that is not quite a leaf."
+   "blurb": "Veyra and Haven, and nowhere else.",
+   "nature": "Ammonia-sea amber with something inside it that is not a leaf: six arms, folded, and a seam down the middle that has been open and shut. Nothing in that sea has bones."
   },
   {
    "id": "resin",
@@ -671,8 +671,8 @@
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Sets hard in vacuum and stays a little soft forever. A cat with a crate of this can fix almost anything.",
-   "nature": "Sets hard in vacuum and stays a little soft forever. A crate of it will fix almost anything."
+   "blurb": "Cheap and light. Cats will always take it.",
+   "nature": "Sets hard in vacuum and stays a little soft forever. A crate of this will fix almost anything, and whoever is fixing it will do it in front of you, at some length."
   },
   {
    "id": "lenses",
@@ -694,8 +694,8 @@
    "lovedBy": [
     "veyra"
    ],
-   "blurb": "Ground from shell ice that has never melted. You can read a ship's name off it from further than you would believe.",
-   "nature": "Ground from shell ice that has never once melted. You can read a ship's name off it from further than you would believe.",
+   "blurb": "Veyra pays over the odds. Needs temperature control.",
+   "nature": "Ground from shell ice that has never once melted, and will not survive meeting anything that has. You can read a ship's name off one from further than you would believe.",
    "needsTempControl": true
   },
   {
@@ -716,8 +716,8 @@
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Drawn from under the ice and shipped in double-walled crates. Heavy, dull, and the outer system runs on it.",
-   "nature": "Drawn from under the ice and shipped double-walled. Heavy, dull, and everything cold runs on it."
+   "blurb": "Heavy and dull. Cinder and the cats burn it.",
+   "nature": "Drawn from under an ice shell and shipped double-walled. Everything cold in the system runs on it, and the people who draw it consider it the least interesting thing they produce."
   },
   {
    "id": "incense",
@@ -739,8 +739,8 @@
    "lovedBy": [
     "haven"
    ],
-   "blurb": "Rolled in silence by people who chose to live somewhere expensive to reach. Haven burns it by the armful at festival.",
-   "nature": "Rolled in silence, burns slow, and travels badly. That is most of what it costs."
+   "blurb": "Haven pays over the odds and burns it by the armful.",
+   "nature": "Rolled in silence by people who chose to live somewhere expensive to reach. It burns slow, travels badly, and most of what it costs is the getting there."
   },
   {
    "id": "beads",
@@ -763,8 +763,8 @@
    "lovedBy": [
     "croak"
    ],
-   "blurb": "Strung one a day for a year. A pilgrim carries them out and a pilgrim carries them back, and the ones that come back cost more.",
-   "nature": "Strung one a day for a year. The ones that have been somewhere and come back cost more."
+   "blurb": "Cheap. Croak pays most for the ones that went out.",
+   "nature": "Strung one a day for a year. A pilgrim carries them out and carries them back, and the ones that have been somewhere cost more than the ones that have not — the only market in the system that prices distance honestly."
   },
   {
    "id": "frogtea",
@@ -787,8 +787,8 @@
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Pressed into bricks longer ago than the records go. Otters have started a fashion for it, which the ascetics find funny.",
-   "nature": "Pressed into bricks longer ago than the records go, and better for the keeping."
+   "blurb": "The dearest thing in the sky. Otters pay most.",
+   "nature": "Pressed into bricks longer ago than anybody was keeping records, by people who keep records. A brick is broken for a guest, and having one broken for you when you are only passing through is a considerable thing."
   },
   {
    "id": "lanterns",
@@ -810,8 +810,8 @@
    "lovedBy": [
     "croak"
    ],
-   "blurb": "Paper, wire and a wish. They go up over the terraces at the turn of the year and Croak buys them all year round.",
-   "nature": "Paper, wire and a wish. They go up over water at the turn of the year."
+   "blurb": "Croak pays over the odds. Tassel takes the rest.",
+   "nature": "Paper and wire, with a wish folded inside where nobody reads it. They go up all at once at the turn of the year, and the sky above is unusable for about an hour."
   },
   {
    "id": "dyes",
@@ -832,8 +832,8 @@
     "veyra"
    ],
    "lovedBy": [],
-   "blurb": "Ground pigment in twists of waxed cloth. Cheap here, and in the wrong month worth whatever you say it is.",
-   "nature": "Ground pigment in twists of waxed cloth. Cheap here, and in the wrong month worth whatever you say it is."
+   "blurb": "Cheap and light. Three ports will take them.",
+   "nature": "Ground pigment in twists of waxed cloth. Cheap where they are made for a festival, and dear where somebody has worked out what else they will colour."
   },
   {
    "id": "instruments",
@@ -856,8 +856,8 @@
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Cut from a wood that only grows on one terrace, and tuned over a frog lifetime. An otter crew will fight over one.",
-   "nature": "Cut from a wood that grows on one terrace and tuned over a lifetime. Nothing else sounds like it."
+   "blurb": "Heavy, and worth it. Otters pay most.",
+   "nature": "Built from wood that grows on one terrace and tuned over a lifetime — the maker's, and then whoever gets it next. People constitutionally unable to stop talking stop talking."
   },
   {
    "id": "hullplate",
@@ -878,8 +878,8 @@
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Cut off whatever came in last, straightened, and stacked by thickness. Nobody on Nail asks what it used to be.",
-   "nature": "Cut off whatever came in last, straightened, and stacked by thickness."
+   "blurb": "Heavy scrap. Slate turns it back into ships.",
+   "nature": "Whatever came off last, straightened and stacked by thickness. Every sheet was somebody's hull, and the yards that sell it do not mention whose: manners, they say, rather than superstition."
   },
   {
    "id": "thrusters",
@@ -902,8 +902,8 @@
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Stripped, cleaned and put back together better than new by somebody who did it for the argument.",
-   "nature": "Stripped, cleaned and put back together better than new by somebody who did it for the argument."
+   "blurb": "Heavy. Otters pay most.",
+   "nature": "Stripped, cleaned, and put back together better than they were built, by somebody who mainly wanted to settle an argument about how they should have been built in the first place."
   },
   {
    "id": "sensorsalvage",
@@ -926,8 +926,8 @@
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Working, mostly. The ones that came off the Arc see further than they are supposed to and nobody sells those cheap.",
-   "nature": "Working, mostly. The good ones see rather further than they are supposed to."
+   "blurb": "Cats pay most. Veyra pays quietly.",
+   "nature": "Working, mostly. The ones cut out of the ring see further than they are supposed to, and whoever pays for those is not pointing them at a shipping lane."
   },
   {
    "id": "arcshard",
@@ -951,8 +951,8 @@
     "veyra",
     "frog"
    ],
-   "blurb": "A hand's length of seamless Builder metal. It hums when you tap it, and the frogs will hear you coming.",
-   "nature": "A hand's length of seamless metal that hums when you tap it, and nobody alive can read it."
+   "blurb": "The best money in the sky. Veyra and the frogs both.",
+   "nature": "A hand's length of seamless metal with no join, no tooling mark, and no way to tell which way up it is meant to go. It hums when you tap it — and so does every other piece ever cut off the ring, at the same note."
   },
   {
    "id": "hotweapons",
@@ -974,8 +974,8 @@
    "lovedBy": [
     "cat"
    ],
-   "blurb": "House arms with the marks taken off badly. Worth a great deal to the wrong people and a great deal of trouble to the right ones.",
-   "nature": "House arms with the marks taken off badly. Trouble in both directions."
+   "blurb": "Heavy. Cats pay most, Emberkin pay more.",
+   "nature": "House arms with the marks taken off badly; a thumb finds the filing. Selling them near where they came from means selling them back to the people they were taken from, at a markup."
   },
   {
    "id": "fakemedals",
@@ -996,8 +996,8 @@
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Struck this morning, aged this afternoon. Good enough for a dock and not good enough for a house.",
-   "nature": "Struck this morning and aged this afternoon. Good enough for a dock and not for a house."
+   "blurb": "Cheap. Veyra buys them anyway.",
+   "nature": "Struck this morning and aged this afternoon. Good enough that the houses they name buy them, which is either very funny or the entire point, depending on which house you ask."
   },
   {
    "id": "greymeds",
@@ -1020,8 +1020,8 @@
    "lovedBy": [
     "scorch"
    ],
-   "blurb": "The same gel Brine makes, in the wrong crates, at half the price and twice the risk. Scorch does not care.",
-   "nature": "The same gel, in the wrong crates, at half the price and twice the risk.",
+   "blurb": "Scorch pays over the odds. Needs temperature control.",
+   "nature": "The same crates as the legitimate ones, at half the price, going to the three places that were priced out of the real thing. The apothecaries who brewed it know exactly where it went.",
    "needsTempControl": true
   },
   {
@@ -1044,8 +1044,8 @@
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Hands, eyes and a spine or two, packed in gel. Whisker will fit them as well as sell them and asks for cash.",
-   "nature": "Hands, eyes and a spine or two, packed in gel. Fitted as readily as sold."
+   "blurb": "Cats pay most. The dearest thing Whisker sells.",
+   "nature": "Hands, eyes and spine, packed in gel and labelled in a hand that is not a doctor's. Somebody who has lost something to vacuum will pay anything and ask nothing."
   }
  ],
  "ports": {
