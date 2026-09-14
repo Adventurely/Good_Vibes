@@ -102,6 +102,8 @@ export function newGame(seed = 1){
     flags: { tutorial: 0 },
     toll: { lastT: -1e9, inBelt: false },
     pending: null,
+    hull: 0,
+    faults: {},
     justLeft: null, justLeftAt: -1e9,
     stats: { burns: 0, dvSpent: 0, docks: 0, sold: 0, bought: 0, tows: 0, tolls: 0, rescues: 0, farthest: 0 },
     visited: [start],
@@ -401,19 +403,61 @@ export function skipPlan(state, t){
   return { t, days, rate, seconds: days / (rate * CONST.BASE_RATE_DAYS_PER_SEC), capped: ideal > MAX_WARP };
 }
 
-/* Whether a ship skims air rather than burning up in it. Nothing does, yet:
- * heat shielding and cryo hull cooling are on the rack and wired to nothing,
- * because the risky skim and the safe one are two different manoeuvres and
- * neither is built (§2.8). The arithmetic below is what they will both be
- * built out of, so it stays, and `skim` lets a test reach it directly rather
- * than leaving it to rot behind a flag no caller can set. */
-export const skimsAir = () => false;
+/* Whether a ship skims air rather than burning up in it. A heat shield is the
+ * whole of it: without one the air is a wall and the hull meets it, which is
+ * what `atmosphere: true` in the predictor means. Cryo cooling does not change
+ * whether you may skim, only whether it costs you anything (see skimRisk). */
+export const skimsAir = state => !!state?.keys?.heatshield;
+
+/* The chance a single pass hurts the hull, from the speed it sheds.
+ *
+ * Convex on purpose. The first `freeKms` of a pass is free and the rest grows
+ * with the square, so splitting a hard brake into several shallow ones is
+ * genuinely safer rather than the same risk spread thinner — the pilot who
+ * takes four orbits over it is playing better, not just slower, and pays in
+ * days instead. Cryo cooling takes it to nothing at any depth, which is what
+ * the rack has always claimed it does. */
+export function skimRisk(state, shedAuDay){
+  if(state?.keys?.cryocooling) return 0;
+  const f = FORMULAS.aerobrake;
+  const over = Math.max(0, kms(shedAuDay) - f.freeKms);
+  if(over <= 0) return 0;
+  return Math.min(f.maxRisk, f.riskPerKms2 * over * over);
+}
+
+/* Hull: 0 sound, 1 knocked about, 2 buckled, 3 failing, 4 is not a hull any
+ * more. A fuel cell fault caps what the tank will hold until a yard sees it;
+ * it never empties the tank in flight, because a fault that bites where the
+ * player cannot answer it is a tax rather than a decision. */
+export const HULL_WRECKED = 4;
+export const hullLevel = state => state.hull ?? 0;
+export const hasFuelCellFault = state => !!state.faults?.fuelCell;
+/* What the tank will actually hold right now. Everything that fills, draws or
+ * draws a gauge goes through this rather than state.tank. */
+export function usableTank(state){
+  return hasFuelCellFault(state) ? state.tank * FORMULAS.aerobrake.fuelCellCap : state.tank;
+}
+export const FUEL_CELL_CAP = FORMULAS.aerobrake.fuelCellCap;
+const HULL_WORDS = ['Sound', 'Knocked about', 'Buckled', 'Failing', 'Not a hull any more'];
+export const hullWord = state => HULL_WORDS[hullLevel(state)] ?? HULL_WORDS[0];
+export function repairCost(state, what){
+  const f = FORMULAS.aerobrake.repair;
+  if(what === 'fuelCell') return hasFuelCellFault(state) ? f.fuelCell : 0;
+  return f[String(hullLevel(state))] ?? 0;
+}
 
 /* The maneuvers the kernel should actually fly: the player's nodes plus any
  * aerobrake a shielded ship will take at a periapsis inside an atmosphere.
  * Computed by predicting, finding such a periapsis, inserting a retrograde
  * pseudo-node there, and predicting again — so the drawn path and the flown
  * path both include the skim. */
+export function skimHorizon(state, dtDays){
+  const b = world.get(state.ship.body);
+  const el = elementsFromState(b.mu, state.ship.r, state.ship.v);
+  const laps = Number.isFinite(el.period) && el.period > 0 ? el.period * 2.5 : Infinity;
+  return Math.max(dtDays + 1, Math.min(150, laps));
+}
+
 export function effectiveNodes(state, horizon, { skim = skimsAir(state) } = {}){
   const nodes = state.nodes.map(n => ({ ...n })).sort((a, b) => a.t - b.t);
   if(!skim) return nodes;
@@ -473,7 +517,14 @@ export function tick(state, dtDays){
      away — which is how a shielded ship sailed straight through Grumm's air
      without the shield ever being used. */
   const inAir = world.get(state.ship.body).atmo && skimsAir(state);
-  const nodes = effectiveNodes(state, inAir ? Math.max(dtDays + 1, 150) : dtDays + 1);
+  /* How far to look for the coming dive. A flat 150 days was right for the
+     arrival it was written for — falling in from the edge of a reach, where
+     the bottom really is months away — and ruinous afterwards: a ship that has
+     just braked into a low orbit has a period of hours, so 150 days is
+     thousands of laps predicted every step, three times over. Bound it to a
+     few laps once the orbit is closed, and keep the long look only for the arc
+     that needs it. */
+  const nodes = effectiveNodes(state, inAir ? skimHorizon(state, dtDays) : dtDays + 1);
   // Stop the step at the first change of reach or burn, so warp cannot skip
   // past an encounter the player was warping towards.
   const opts = { atmosphere: !skimsAir(state), dvAvailable: state.dv, stopOnSoi: true, stopOnBurn: true };
@@ -485,6 +536,32 @@ export function tick(state, dtDays){
       if(e.node.aero){
         logLine(state, 'burn', TEXT.logTemplates.aerobrake ?? 'Air braked at {body}: {dv} shed to the clouds.', { body: portName(e.node.body), dv: fmtKms(e.magnitude) });
         flag(state, 'firstAerobrake', events);
+        state.stats.skims = (state.stats.skims ?? 0) + 1;
+        const risk = skimRisk(state, e.magnitude);
+        if(risk > 0 && rnd(state) < risk){
+          /* One fault per pass, never two: a pass that goes wrong should be one
+             thing the player can name afterwards. The fuel cell is the smaller
+             share because it is the more interesting of the two. */
+          const f = FORMULAS.aerobrake;
+          if(!hasFuelCellFault(state) && rnd(state) < f.fuelCellShare){
+            state.faults = { ...(state.faults ?? {}), fuelCell: true };
+            state.dv = Math.min(state.dv, usableTank(state));
+            logLine(state, 'story', TEXT.events.skimFuelCell);
+            events.push({ kind: 'skimFault', fault: 'fuelCell' });
+          }else{
+            state.hull = Math.min(HULL_WRECKED, hullLevel(state) + 1);
+            const wrecked = hullLevel(state) >= HULL_WRECKED;
+            logLine(state, 'story', wrecked ? TEXT.events.skimWrecked : TEXT.events.skimDamage[hullLevel(state) - 1]);
+            events.push({ kind: 'skimFault', fault: 'hull', level: hullLevel(state) });
+            /* A hull that has stopped being one goes down the road the game
+               already has for a ship that cannot fly: a tow, a bill, and the
+               harbour bank behind it. Nothing here costs the save. */
+            if(wrecked){
+              state.pending = { kind: 'crash', body: e.node.body, atmosphere: true, wrecked: true };
+              events.push({ kind: 'crash', body: e.node.body, wrecked: true });
+            }
+          }
+        }
       }else{
         state.dv = Math.max(0, state.dv - e.magnitude);
         state.stats.burns++; state.stats.dvSpent += e.magnitude;
@@ -862,6 +939,32 @@ export function burnWords(node){
 export function planCost(state, horizon){
   if(!state.nodes.length) return 0;
   return markStates(state, horizon).reduce((s, m) => s + m.cost, 0);
+}
+
+/* What the drawn path is about to do to you, for the two marks in the corner
+ * of the chart. A skim is a warning; ground is a different warning, and they
+ * are different pictures because they want different answers — one is "brace",
+ * the other is "move the burn". Both read the same prediction the chart draws,
+ * so the corner and the road can never disagree. */
+export function hazards(state){
+  const none = { skim: null, crash: null };
+  if(!state || state.dockedAt || state.pending) return none;
+  const pred = planImmediate(state);
+  let crash = null;
+  for(const sg of pred?.segments ?? []){
+    if(sg.reason === 'crash'){ crash = { body: sg.body }; break; }
+  }
+  let skim = null;
+  if(skimsAir(state)){
+    const lead = state.nodes.length ? state.nodes[state.nodes.length - 1].t - state.t : 0;
+    const horizon = Math.max(lead + 1, 150);
+    const a = effectiveNodes(state, horizon).find(n => n.aero && n.t >= state.t);
+    if(a){
+      const shed = Math.abs(a.prograde);
+      skim = { body: a.body, t: a.t, dv: shed, risk: skimRisk(state, shed) };
+    }
+  }
+  return { skim, crash };
 }
 
 /* The plan as the solver reads it: as far ahead as it is asked for. */
@@ -1807,7 +1910,7 @@ export function transferWindows(state){
        it: this is a fact about the sky and the ship, not about whether you
        happen to be running low at a pump. */
     const ratio = best.cost > 0 ? now.cost / best.cost : Infinity;
-    const band = now.cost > state.tank ? 'impossible'
+    const band = now.cost > usableTank(state) ? 'impossible'
       : ratio <= WINDOW_BANDS.perfect ? 'perfect'
       : ratio <= WINDOW_BANDS.good ? 'good'
       : 'bad';
@@ -2126,10 +2229,36 @@ export function fuelCredit(state){
   return Math.max(0, short - canPay);
 }
 
+
+/* Putting it right. A yard will do hull and cell; neither can be done under
+ * way, and neither is ever compulsory — a battered ship still undocks, which
+ * is what keeps a broke one from being a stuck one. */
+export function canRepair(state, what){
+  if(!state.dockedAt) return { ok: false, reason: 'Only at a dock.' };
+  if(!PORTS[state.dockedAt]?.shipyard) return { ok: false, reason: 'No yard here.' };
+  const cost = repairCost(state, what);
+  if(cost <= 0) return { ok: false, reason: what === 'fuelCell' ? 'The cell is sound.' : 'The hull is sound.' };
+  if(state.money < cost) return { ok: false, reason: 'Not enough coin.', cost };
+  return { ok: true, cost };
+}
+export function repair(state, what){
+  const c = canRepair(state, what);
+  if(!c.ok) return c;
+  state.money -= c.cost;
+  if(what === 'fuelCell'){
+    state.faults = { ...(state.faults ?? {}), fuelCell: false };
+    logLine(state, 'story', TEXT.events.repairFuelCell);
+  }else{
+    state.hull = 0;
+    logLine(state, 'story', TEXT.events.repairHull);
+  }
+  return { ok: true, cost: c.cost };
+}
+
 export function refuel(state, kmsWanted){
   const price = fuelPrice(state);
   if(price == null) return { ok: false, reason: 'No fuel sold here.' };
-  const room = kms(state.tank - state.dv);
+  const room = kms(usableTank(state) - state.dv);
   let amount = Math.min(kmsWanted, room);
   if(amount <= 0) return { ok: false, reason: 'The tank is full.' };
   const credit = fuelCredit(state);
@@ -2140,7 +2269,7 @@ export function refuel(state, kmsWanted){
   const borrowed = Math.max(0, cost - state.money);
   state.money -= cost;
   if(state.money < 0){ state.debt += -state.money; state.money = 0; }
-  state.dv = Math.min(state.tank, state.dv + auDay(amount));
+  state.dv = Math.min(usableTank(state), state.dv + auDay(amount));
   logLine(state, 'refuelled', TEXT.logTemplates.refuelled, { amount: `${amount.toFixed(1)} km/s`, price: fmtMoney(cost), port: portName(state.dockedAt) });
   if(borrowed > 0) logLine(state, 'story', TEXT.events.bankDebt);
   return { ok: true, amount, cost, borrowed };
@@ -2196,6 +2325,7 @@ export function grantUpgrade(state, u){
     const newTank = auDay(u.value);
     state.dv += newTank - state.tank;   // a bigger tank comes full of what it cost
     state.tank = newTank;
+    state.dv = Math.min(state.dv, usableTank(state));   // a bad cell caps the new one too
   }
 }
 
@@ -2343,6 +2473,11 @@ export function callTow(state, reason = 'dry'){
   state.lastPort = q.port;
   placeDocked(state, q.port);
   state.stats.tows++;
+  /* The tow is what puts a wreck back together — "they pick the ship up in
+     pieces and put most of them back". Leaving the hull at wrecked would
+     strand the player at a level the yard has no price for, and re-wreck them
+     on the next pass. The crash multiplier on the bill is what it cost. */
+  if(reason === 'crash' || reason === 'atmosphere') state.hull = 0;
   const pool = reason === 'crash' ? TEXT.events.towCrash : TEXT.events.towDry;
   const story = reason === 'atmosphere' ? TEXT.events.towAtmosphere : pool[Math.floor(rnd(state) * pool.length)];
   if(!state.visited.includes(q.port)) state.visited.push(q.port);
@@ -2481,7 +2616,7 @@ export function restore(json){
   s.pending ??= null; s.flags ??= {}; s.stats ??= {}; s.visited ??= [s.dockedAt].filter(Boolean);
   s.toll ??= { lastT: -1e9, inBelt: false };
   s.quests ??= QUESTS.map(q => ({ id: q.id, step: 0, done: false }));
-  s.debt ??= 0; s.target ??= null; s.justLeft ??= null; s.justLeftAt ??= -1e9;
+  s.debt ??= 0; s.hull ??= 0; s.faults ??= {}; s.target ??= null; s.justLeft ??= null; s.justLeftAt ??= -1e9;
   /* A save written before anybody could call for help knows where it is tied
      up but not where it was last tied up. Those are the same thing at a
      mooring, and the first port is a fair guess in flight. */

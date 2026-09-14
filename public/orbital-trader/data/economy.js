@@ -1325,7 +1325,7 @@ export const ECONOMY = {
    ],
    "pending": true,
    "effect": "See gravitational phenomena on the chart.",
-   "unlocks": "Nothing yet: the phenomena are not in the sky so far."
+   "unlocks": "Nothing yet. Sold honestly: there is nothing in the sky for it to find."
   },
   {
    "id": "tempcontrol",
@@ -1376,9 +1376,8 @@ export const ECONOMY = {
     "cinder"
    ],
    "requiresCrew": "engineer",
-   "pending": true,
-   "effect": "Survive an atmosphere skim, at a risk.",
-   "unlocks": "Nothing yet: risky aerobraking is not built."
+   "effect": "Survive a skim through a world’s air, and let it slow you down.",
+   "unlocks": "Air braking at Tassel and Grumm. The deeper the pass, the more it shakes the hull."
   },
   {
    "id": "cryocooling",
@@ -1391,9 +1390,8 @@ export const ECONOMY = {
    ],
    "requiresCrew": "engineer",
    "requiresUpgrade": "heatshield",
-   "pending": true,
-   "effect": "Carries the heat of a skim away, so the skim is safe.",
-   "unlocks": "Nothing yet: safe aerobraking is not built."
+   "effect": "Carries the heat of a skim away as fast as the air makes it.",
+   "unlocks": "Air braking with no risk to the hull at all, however deep you go."
   }
  ],
  "formulas": {
@@ -1449,6 +1447,22 @@ export const ECONOMY = {
    "unwanted": 0.6,
    "tempControlMul": 1.5,
    "resaleCap": 0.75
+  },
+  "aerobrake": {
+   "k": 0.25,
+   "maxFraction": 0.12,
+   "floorApo": 1.25,
+   "freeKms": 0.35,
+   "riskPerKms2": 0.5,
+   "maxRisk": 0.85,
+   "fuelCellShare": 0.25,
+   "fuelCellCap": 0.8,
+   "repair": {
+    "1": 350,
+    "2": 1100,
+    "3": 2800,
+    "fuelCell": 800
+   }
   }
  },
  "regions": {

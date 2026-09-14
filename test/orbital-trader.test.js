@@ -2596,3 +2596,132 @@ test('arriving on the end of a rope is still arriving, and never at a dead end',
   docked.dv = 0;
   assert.notEqual(S.towQuote(docked).port, docked.dockedAt);
 });
+
+/* ------------------------------------------------------------ air braking */
+
+test('a shield is what lets a ship skim, and cooling is what makes it free', () => {
+  const bare = S.newGame(1);
+  assert.equal(S.skimsAir(bare), false, 'no shield, no skim');
+  const shielded = S.newGame(1); shielded.keys.heatshield = true;
+  assert.equal(S.skimsAir(shielded), true);
+  /* The rack sells cooling as "no risk to the hull at all, however deep you
+     go". That claim is this assertion. */
+  const cooled = S.newGame(1); cooled.keys.heatshield = true; cooled.keys.cryocooling = true;
+  for(const kms of [0.5, 2, 10]) assert.equal(S.skimRisk(cooled, kms / S.KMS), 0, `cooled at ${kms} km/s`);
+});
+
+test('shallow passes are safer than one dive, not the same risk spread thin', () => {
+  const s = S.newGame(1); s.keys.heatshield = true;
+  const F = S.FORMULAS.aerobrake;
+  assert.equal(S.skimRisk(s, (F.freeKms * 0.9) / S.KMS), 0, 'a pass inside the free allowance is free');
+  /* The whole point of the convex curve: four passes shedding a quarter each
+     must cost less total risk than one pass shedding the lot. A linear rule
+     would make these equal and the patient pilot a fool. */
+  const total = 2.0;
+  const one = S.skimRisk(s, total / S.KMS);
+  const four = 4 * S.skimRisk(s, (total / 4) / S.KMS);
+  assert.ok(four < one, `four shallow (${four.toFixed(3)}) should beat one deep (${one.toFixed(3)})`);
+  assert.ok(S.skimRisk(s, 99 / S.KMS) <= F.maxRisk, 'risk is capped');
+});
+
+test('a burnt fuel cell caps the tank and never empties it in flight', () => {
+  const s = S.newGame(1); s.dockedAt = null;
+  const full = s.dv;
+  s.faults = { fuelCell: true };
+  assert.ok(S.usableTank(s) < s.tank, 'the cap bites');
+  assert.equal(S.usableTank(s), s.tank * S.FUEL_CELL_CAP);
+  /* Harsh, but it must never stop a ship that is already flying: the fault is
+     felt at the pump, where there is something the player can do about it. */
+  assert.equal(s.dv, full, 'the fault does not take fuel out of the tank mid-flight');
+  assert.ok(S.usableTank(s) > S.CREDIT_KMS / S.KMS, 'a capped tank still clears the credit floor');
+});
+
+test('a wrecked hull is towed and rebuilt, never left at a level the yard cannot price', () => {
+  const s = S.newGame(1);
+  s.dockedAt = null; s.hull = S.HULL_WRECKED;
+  assert.equal(S.repairCost(s, 'hull'), 0, 'no yard price exists at wrecked');
+  const before = s.money;
+  S.callTow(s, 'crash');
+  assert.equal(S.hullLevel(s), 0, 'the tow puts the pieces back');
+  assert.ok(s.dockedAt, 'and it ends docked somewhere real');
+  assert.ok(s.money < before || s.debt > 0, 'and it costs, in coin or in debt');
+  assert.ok(s.money >= 0, 'money never goes negative');
+});
+
+test('repair clears the fault, costs coin, and is never required to undock', () => {
+  const s = S.newGame(1);
+  s.hull = 2; s.money = 100000;
+  const yard = Object.keys(PORTS).find(id => PORTS[id].shipyard);
+  s.dockedAt = yard;
+  const cost = S.repairCost(s, 'hull');
+  assert.ok(cost > 0);
+  const r = S.repair(s, 'hull');
+  assert.ok(r.ok && S.hullLevel(s) === 0 && s.money === 100000 - cost);
+  /* The soft-lock guard: a battered ship with nothing in the purse still flies,
+     so it can always go and earn the repair. */
+  const broke = S.newGame(1); broke.hull = 3; broke.money = 0; broke.dockedAt = yard;
+  assert.equal(S.canRepair(broke, 'hull').ok, false, 'cannot afford it');
+  assert.equal(S.undock(broke).ok !== false, true, 'but can still leave');
+});
+
+test('the chart warns before the air and before the ground, and differently', () => {
+  const docked = S.newGame(1);
+  assert.deepEqual(S.hazards(docked), { skim: null, crash: null }, 'nothing to warn about at a dock');
+  /* Ground: aim the ship at the world it is going round and the prediction
+     must say so, with or without a shield. */
+  const s = S.newGame(1);
+  S.undock(s);
+  const b = S.world.get(s.ship.body);
+  s.ship = { ...s.ship, v: [s.ship.v[0] * 0.05, s.ship.v[1] * 0.05, 0] };
+  const h = S.hazards(s);
+  assert.ok(h.crash, 'a path into the ground raises the ground mark');
+  assert.equal(h.crash.body, b.id);
+});
+
+test('the skim look-ahead is bounded once the orbit closes', () => {
+  /* A flat horizon here cost ~180ms a step for a ship in a low orbit — three
+     predictions across thousands of laps, every tick, which is a stutter in
+     the one place the player is flying carefully. */
+  const s = S.newGame(1); s.keys.heatshield = true; S.undock(s);
+  const g = S.world.get('grumm');
+  const rp = g.atmo * 0.99, ra = g.atmo * 1.4;
+  const a = (rp + ra) / 2;
+  s.ship = { body: 'grumm', r: [rp, 0, 0], v: [0, Math.sqrt(g.mu * (2 / rp - 1 / a)), 0] };
+  const el = S.elementsFromState(g.mu, s.ship.r, s.ship.v);
+  const h = S.skimHorizon(s, 1);
+  assert.ok(Number.isFinite(el.period), 'this orbit is closed');
+  /* The floor is the step itself — a horizon shorter than the tick would miss
+     marks inside it — so the bound is "a few laps, or the step, whichever is
+     larger", and nowhere near the flat 150 it used to be. */
+  assert.ok(h <= Math.max(2, el.period * 3), `horizon ${h.toFixed(2)} should be a few laps`);
+  assert.ok(h < 150, `horizon ${h.toFixed(2)} should be far below the old flat 150`);
+  /* The long look survives for the arc that needs it: an inbound hyperbola has
+     no period, and its periapsis really can be months away. */
+  const far = S.newGame(1); far.keys.heatshield = true; S.undock(far);
+  const r0 = g.zoneRadius * 0.95;
+  far.ship = { body: 'grumm', r: [r0, 0, 0], v: [-Math.sqrt(2.4 * g.mu / r0), 0.02 * Math.sqrt(g.mu / r0), 0] };
+  assert.equal(S.skimHorizon(far, 1), 150, 'an unbound arrival still gets the long look');
+});
+
+test('a graze is free and a dive is not', () => {
+  /* The shape the whole mechanic rests on, measured through the real node
+     builder rather than the risk formula alone: periapsis near the cloud tops
+     sheds little and costs nothing, periapsis down in the air sheds a lot and
+     is dangerous. If these ever invert, shallow flying stops being a skill. */
+  const g = S.world.get('grumm');
+  const make = frac => {
+    const s = S.newGame(4); s.keys.heatshield = true; S.undock(s);
+    const rp = g.radius + (g.atmo - g.radius) * frac, r0 = g.zoneRadius * 0.95;
+    const vInf = 0.3 * Math.sqrt(g.mu / rp), vp = Math.sqrt(vInf * vInf + 2 * g.mu / rp);
+    const hh = rp * vp, v0 = Math.sqrt(vInf * vInf + 2 * g.mu / r0), vt = hh / r0;
+    s.ship = { body: 'grumm', r: [r0, 0, 0], v: [-Math.sqrt(Math.max(0, v0 * v0 - vt * vt)), vt, 0] };
+    s.nodes = [];
+    const n = S.effectiveNodes(s, 300).find(x => x.aero);
+    return { shed: n ? Math.abs(n.prograde) : 0, risk: n ? S.skimRisk(s, Math.abs(n.prograde)) : 0 };
+  };
+  const graze = make(0.97), dive = make(0.35);
+  assert.ok(graze.shed > 0, 'a graze still sheds something');
+  assert.equal(graze.risk, 0, 'and costs nothing: "the air will slow you for nothing"');
+  assert.ok(dive.shed > graze.shed * 3, `a dive sheds much more (${S.fmtKms(dive.shed)} vs ${S.fmtKms(graze.shed)})`);
+  assert.ok(dive.risk > 0.2, `and is genuinely dangerous (${(dive.risk * 100).toFixed(0)}%)`);
+});

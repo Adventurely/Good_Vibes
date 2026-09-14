@@ -415,7 +415,16 @@
   "firstAssist": "You fell past Grumm and came out faster than you went in, with the tank untouched. The frogs call that a slingshot. Grumm has not noticed.",
   "firstAerobrake": "The shield takes the heat, the clouds take the speed, and you come out the other side slower for free.",
   "bankDebt": "The Tassel harbour bank covers what you could not, at interest, with a copy of the paperwork for your records.",
-  "mawArrival": "You have come as far as anyone goes. The ring of dust is there, exactly where the Builders pointed their station, and at the middle of it there is nothing at all — a hole the size of a hill with a system's worth of light bending round it.\nThe station keeps its distance and does not drift. Nothing is holding it. You check three times.\nThe Builders put a silent thing out here and aimed it at a hole in the sky. They left no doors, no stairs, no seats, and no explanation. Why does anyone build a place to watch from, if not to tell somebody what they saw?"
+  "mawArrival": "You have come as far as anyone goes. The ring of dust is there, exactly where the Builders pointed their station, and at the middle of it there is nothing at all — a hole the size of a hill with a system's worth of light bending round it.\nThe station keeps its distance and does not drift. Nothing is holding it. You check three times.\nThe Builders put a silent thing out here and aimed it at a hole in the sky. They left no doors, no stairs, no seats, and no explanation. Why does anyone build a place to watch from, if not to tell somebody what they saw?",
+  "skimDamage": [
+   "Something lets go aft with a sound you feel through the deck. The shield held. The frame under it did not, quite, and there is a seam that was not there this morning.",
+   "The second pass finds the seam and opens it. Nothing is venting and nothing is on fire, but the hull rings wrong when you knock on it now, and you will knock on it.",
+   "A whole plate goes. You spend an hour in the lock with resin and a lamp, and it holds, and you both know what it is holding. One more of those and there is nothing to patch."
+  ],
+  "skimWrecked": "The hull comes apart at the seam it has been threatening to come apart at. The air goes, the lights go, and the clouds have you. Somebody is already on their way out — the frogs watch that band of air precisely because people do this.",
+  "skimFuelCell": "A cell cooks off in the heat and takes itself out of the circuit. The tank still fills; it stops filling sooner than it should, and there is nothing aboard that will persuade it otherwise.",
+  "repairHull": "They put the ship on a cradle, walk round it twice, and tell you what it will cost before they tell you what is wrong. Then they fix it properly, which takes longer and is the reason you came here.",
+  "repairFuelCell": "The cell comes out in one piece, which surprises everybody, and the new one goes in while you wait. The gauge goes back to telling the truth."
  },
  "opening": {
   "title": "A crate for your Aunt Nellie",
@@ -531,7 +540,10 @@
   "refuelled": "Took on {amount} at {port} for {price}.",
   "upgraded": "Fitted {name} at {port}.",
   "questTaken": "Took on {title}.",
-  "questDone": "Finished {title}. Paid {pay}."
+  "questDone": "Finished {title}. Paid {pay}.",
+  "skimDamage": "Hull damaged air braking at {body}.",
+  "skimFuelCell": "Fuel cell lost air braking at {body}.",
+  "repaired": "Repaired at {port}: {cost}."
  },
  "quests": [
   {

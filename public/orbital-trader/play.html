@@ -603,6 +603,23 @@
        flash was carrying it to and drops the breathing. */
     #dock-go{ animation:none; opacity:1; }
   }
+  /* The hazard marks. Amber is "this will happen and it will hurt a bit";
+     red is the colour the chart already uses for ground, so the corner and
+     the cross on the road say the same thing in the same voice. */
+  #hud .warn{
+    display:flex; align-items:center; gap:.4rem;
+    padding:.3rem .6rem; border-radius:.5rem;
+    border:1px solid currentColor; background:rgba(0,0,0,.35);
+    color:var(--gold-deep); font-size:.82rem; font-weight:600;
+  }
+  #hud .warn.bad{ color:var(--gv-bad); }
+  #hud .warn svg{ width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  #hud .warn[hidden]{ display:none; }
+  @media (prefers-reduced-motion: no-preference){
+    #hud .warn.bad{ animation:hazpulse 1.6s ease-in-out infinite; }
+    @keyframes hazpulse{ 0%,100%{ opacity:1 } 50%{ opacity:.55 } }
+  }
+  @media (max-width: 560px){ #hud .warn b{ display:none; } }
 </style>
 </head>
 <body>
@@ -610,6 +627,13 @@
 <canvas id="chart" aria-label="The navigation chart: the Lamp, its worlds, and your ship's predicted path." role="img"></canvas>
 
 <header id="hud" aria-live="off">
+  <!-- Two different pictures because they want two different answers: a skim
+       is "brace and let it happen", the ground is "move the burn". -->
+  <div class="warn" id="h-hazard" hidden role="status">
+    <svg id="haz-skim" viewBox="0 0 24 24" aria-hidden="true" hidden><path d="M3 15 h18"/><path d="M5 18.5 h14"/><path d="M12 3.5 c2.6 3 3.6 6 3.6 8.4 L12 14.4 8.4 11.9 C8.4 9.5 9.4 6.5 12 3.5z"/></svg>
+    <svg id="haz-crash" viewBox="0 0 24 24" aria-hidden="true" hidden><path d="M12 3.2 L22 20.5 H2 z"/><path d="M12 9.5 V14"/><path d="M12 17 v.4"/></svg>
+    <b id="haz-text">—</b>
+  </div>
   <div class="stat" id="h-dv-wrap"><small>Fuel</small><b id="h-dv">—</b><div id="dvbar"><i id="h-dvfill"></i><i id="h-dvplan"></i></div></div>
   <div class="stat"><small>Coin</small><b id="h-money">—</b></div>
   <div class="stat"><small>Hold</small><b id="h-hold">—</b></div>
@@ -722,6 +746,7 @@ const belt = { inner: CONST.BELT.inner, outer: CONST.BELT.outer, rocks: BELT_ROC
 addEventListener('resize', () => chart.resize());
 
 let prediction = null, nodePositions = [], apses = [], crossedRails = [], predictedAt = -1, predictedReal = -1e9;
+let hazard = { skim: null, crash: null };
 /* The moment on the road that was just tapped, while the card about it is
    up: drawn as a breathing ring so the player can see which line they hit
    before choosing what to do with it. Gone when the card closes. */
@@ -745,7 +770,7 @@ function horizonFor(){
 }
 
 function replan(force = false){
-  if(state.dockedAt){ prediction = null; nodePositions = []; apses = []; crossedRails = []; return; }
+  if(state.dockedAt){ prediction = null; nodePositions = []; apses = []; crossedRails = []; hazard = { skim: null, crash: null }; return; }
   /* Re-solving the whole road is the most expensive thing this page does, so
      it happens on a real-time budget rather than a game-time one: at most a few
      times a second, whatever the warp. Measuring it in game days got it wrong
@@ -762,6 +787,7 @@ function replan(force = false){
      nothing written down at all there is one road, a whole lap of the orbit
      the ship is actually on. */
   prediction = S.planImmediate(state);
+  hazard = S.hazards(state);
   if(!prediction){ nodePositions = []; apses = []; crossedRails = []; return; }
   nodePositions = state.nodes.map(n => locateOnPrediction(world, prediction, n.t));
   /* The low point and the high point of every closed leg on the drawn road.
@@ -927,21 +953,45 @@ function handleEvents(events){
 
 /* ------------------------------------------------------------- HUD */
 
+function showHazard(){
+  const box = $('h-hazard'), skim = $('haz-skim'), crash = $('haz-crash');
+  const ground = hazard.crash, air = hazard.skim;
+  /* Ground beats air for the corner. Both can be true — a dive that sheds too
+     little still ends on the rocks — and of the two, only one of them is worth
+     interrupting the player for. */
+  box.hidden = !(ground || air);
+  if(box.hidden) return;
+  box.classList.toggle('bad', !!ground);
+  crash.hidden = !ground;
+  skim.hidden = !!ground;
+  if(ground){
+    box.setAttribute('aria-label', `Warning: this path meets ${S.portName(ground.body)}`);
+    $('haz-text').textContent = `Hits ${S.portName(ground.body)}`;
+  }else{
+    const risky = air.risk > 0;
+    box.setAttribute('aria-label', `Air braking at ${S.portName(air.body)} ahead`);
+    $('haz-text').textContent = `Air brake · ${S.fmtKms(air.dv)}`
+      + (risky ? ` · ${Math.round(air.risk * 100)}% risk` : ' · safe');
+  }
+}
+
 function renderHud(docking){
+  showHazard();
   /* The tank, and what the plan will take out of it. The cost of a burn is
      shown here and nowhere near the burn itself: it is a length of fuel, and
      next to a mark it read as a speed — which made pressing Back to slow down
      look like it was speeding the ship up. */
   const spend = Math.min(plannedSpend, state.dv);
-  $('h-dv').textContent = `${S.fmtKms(state.dv)} / ${S.fmtKms(state.tank)}`
+  $('h-dv').textContent = `${S.fmtKms(state.dv)} / ${S.fmtKms(S.usableTank(state))}`
     + (plannedSpend > 1e-12 ? ` · ${S.fmtKms(plannedSpend)} planned` : '');
   const fill = $('h-dvfill');
-  const frac = state.tank > 0 ? state.dv / state.tank : 0;
+  const cap = S.usableTank(state);
+  const frac = cap > 0 ? state.dv / cap : 0;
   fill.style.width = `${Math.round(frac * 100)}%`;
   fill.classList.toggle('low', frac < 0.15);
   const planBar = $('h-dvplan');
   planBar.style.right = `${Math.round((1 - frac) * 100)}%`;
-  planBar.style.width = `${Math.round((state.tank > 0 ? spend / state.tank : 0) * 100)}%`;
+  planBar.style.width = `${Math.round((cap > 0 ? spend / cap : 0) * 100)}%`;
   $('h-dv-wrap').classList.toggle('warn', frac < 0.15);
   $('h-money').textContent = S.fmtMoney(state.money) + (state.debt > 0 ? ` (owe ${S.fmtMoney(state.debt)})` : '');
   $('h-hold').textContent = `${S.usedUnits(state)} / ${S.holdUnits(state)}`;
@@ -1616,7 +1666,7 @@ function shipyardTab(){
   let out = `<h2>${esc(S.portName(port))} <small class="lock">${p.shipyard ? 'shipyard' : 'dock'}</small></h2>`;
   out += '<h3>Fuel</h3>';
   const fp = S.fuelPrice(state);
-  const room = S.kms(state.tank - state.dv);
+  const room = S.kms(S.usableTank(state) - state.dv);
   if(fp == null) out += '<p class="empty">No fuel sold here.</p>';
   else{
     out += `<p>${S.fmtMoney(fp)} per km/s · ${room.toFixed(1)} km/s of room.</p><div class="btns">
@@ -1625,6 +1675,26 @@ function shipyardTab(){
       <button class="btn primary" data-act="fuel|999" ${room >= 0.05 && state.money >= fp ? '' : 'disabled'}>Fill (${S.fmtMoney(Math.min(room, state.money / fp) * fp)})</button></div>`;
   }
   const ups = S.upgradesFor(port);
+  /* The repair bay. It only exists when there is something to repair, so a
+     sound ship never reads a row telling it that it is sound. Neither repair
+     is compulsory and neither blocks undocking: a battered ship that cannot
+     pay must still be able to leave and go and earn it. */
+  const hull = S.hullLevel(state), cell = S.hasFuelCellFault(state);
+  if(hull > 0 || cell){
+    out += '<h3>Repairs</h3>';
+    if(hull > 0){
+      const c = S.canRepair(state, 'hull'), cost = S.repairCost(state, 'hull');
+      out += `<div class="row"><div class="name"><b>${esc(S.hullWord(state))}</b><small>The frame wants straightening before it wants anything else.</small></div>
+        <div class="price">${S.fmtMoney(cost)}</div>
+        <div class="btns"><button class="btn sm primary" data-act="repair|hull" ${c.ok ? '' : 'disabled title="' + esc(c.reason) + '"'}>Mend</button></div></div>`;
+    }
+    if(cell){
+      const c = S.canRepair(state, 'fuelCell'), cost = S.repairCost(state, 'fuelCell');
+      out += `<div class="row"><div class="name"><b>Burnt fuel cell</b><small>The tank fills to ${Math.round(S.FUEL_CELL_CAP * 100)}% and stops. A new cell is a morning's work.</small></div>
+        <div class="price">${S.fmtMoney(cost)}</div>
+        <div class="btns"><button class="btn sm primary" data-act="repair|fuelCell" ${c.ok ? '' : 'disabled title="' + esc(c.reason) + '"'}>Replace</button></div></div>`;
+    }
+  }
   out += '<h3>On offer</h3>';
   if(!ups.length) out += `<p class="empty">${p.shipyard ? 'Nothing on the rack today.' : 'Nobody fits anything here.'}</p>`;
   for(const u of ups){
@@ -1850,7 +1920,7 @@ function shipTab(){
   /* The fitted list reads the rack rather than naming the keys itself, so a
      new one appears here the moment it exists in the tables. */
   const fittedKeys = UPGRADES.filter(u => u.kind === 'key' && state.keys[u.key]);
-  out += `<dl class="kv"><dt>Tank</dt><dd>${esc(S.tiers('tank')[t.tank].name)} · ${S.fmtKms(state.dv)} of ${S.fmtKms(state.tank)}</dd>
+  out += `<dl class="kv"><dt>Tank</dt><dd>${esc(S.tiers('tank')[t.tank].name)} · ${S.fmtKms(state.dv)} of ${S.fmtKms(S.usableTank(state))}</dd>
     <dt>Hold</dt><dd>${esc(S.tiers('hold')[t.hold].name)} · ${S.usedUnits(state)} of ${S.holdUnits(state)} units</dd>
     <dt>Systems</dt><dd>${fittedKeys.map(u => esc(u.name)).join(', ') || '<span class="lock">nothing yet</span>'}</dd></dl>`;
 
@@ -1994,12 +2064,12 @@ function astrolabeTab(){
   if(!state.keys?.astrolabe) return out + '<p class="say">No Astrolabe fitted.</p>';
   const rows = S.transferWindows(state);
   const here = S.helioOf(state.dockedAt ?? state.ship.body);
-  out += `<p class="lock">From ${esc(here?.name ?? 'here')} · tank ${S.fmtKms(state.tank)}</p>`;
+  out += `<p class="lock">From ${esc(here?.name ?? 'here')} · tank ${S.fmtKms(S.usableTank(state))}</p>`;
   if(!rows.length) return out + '<p class="empty">Nothing else goes round the Lamp from here.</p>';
   for(const r of rows){
     /* No countdown where waiting cannot help: the crossing is past this tank
        at every phase, and a date would be a promise the ship cannot keep. */
-    const ever = r.best <= state.tank;
+    const ever = r.best <= S.usableTank(state);
     out += `<div class="win ${r.band}">`
       + `<div class="name"><b>${esc(r.name)}</b><small>${S.fmtKms(r.cost)} · ${S.fmtDays(r.tof)}</small></div>`
       + `<div class="band">${BAND_WORD[r.band]}<small>${ever ? S.fmtDays(r.days ?? 0) : '—'}</small></div>`
@@ -2011,6 +2081,12 @@ function astrolabeTab(){
 /* ------------------------------------------------------------- actions */
 
 const actions = {
+  repair(what){
+    const r = S.repair(state, what);
+    if(!r.ok){ toast(r.reason, 'bad'); return; }
+    toast(what === 'fuelCell' ? 'New cell fitted.' : 'Hull made good.', 'story', 5000);
+    renderTab(); renderHud(); save();
+  },
   buy(gid, q){ const r = S.buy(state, gid, Number(q)); if(!r.ok) toast(r.reason, 'bad'); renderTab(); save(); },
   sell(gid, q){ const r = S.sell(state, gid, Number(q)); if(!r.ok) toast(r.reason, 'bad'); else toast(`Sold for ${S.fmtMoney(r.total)} (${r.profit >= 0 ? '+' : ''}${S.fmtMoney(r.profit)}).`); renderTab(); save(); },
   takequest(id){
@@ -2110,9 +2186,10 @@ function showToll(p){
 function showCrash(bodyId){
   const b = world.get(bodyId);
   const atmo = state.pending?.atmosphere;
+  const wrecked = state.pending?.wrecked;
   const q = S.towQuote(state);
-  openModal(`<h2>${atmo ? 'Too deep' : 'Hard landing'}</h2><p class="say">${esc(atmo ? TEXT.events.towAtmosphere : TEXT.events.towCrash[0])}</p>
-    <p>${atmo ? `${esc(b.name)}'s clouds took the ship without a heat shield.` : `The ship met ${esc(b.name)} faster than it should have.`} A tow to ${esc(S.portName(q.port))} will cost ${S.fmtMoney(Math.round(q.cost * 1.5))} and ${S.fmtDays(q.days)}. The cargo rides along.</p>
+  openModal(`<h2>${wrecked ? 'The hull gives out' : atmo ? 'Too deep' : 'Hard landing'}</h2><p class="say">${esc(wrecked ? TEXT.events.skimWrecked : atmo ? TEXT.events.towAtmosphere : TEXT.events.towCrash[0])}</p>
+    <p>${wrecked ? `The shield did its job for longer than the frame under it did.` : atmo ? `${esc(b.name)}'s clouds took the ship without a heat shield.` : `The ship met ${esc(b.name)} faster than it should have.`} A tow to ${esc(S.portName(q.port))} will cost ${S.fmtMoney(Math.round(q.cost * 1.5))} and ${S.fmtDays(q.days)}. The cargo rides along.</p>
     <div class="btns"><button class="btn primary" id="m-tow">Call for a tow</button></div>`, m => {
     m.querySelector('#m-tow').addEventListener('click', () => { const r = S.callTow(state, atmo ? 'atmosphere' : 'crash'); closeModal(); afterTow(r); });
   });
