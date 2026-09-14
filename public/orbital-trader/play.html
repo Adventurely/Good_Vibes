@@ -1966,10 +1966,12 @@ function aheadList(){
       lines.push({ t: e.t, html: `<p class="down">This path strikes ${esc(S.portName(e.body))} in ${S.fmtDays(e.t - state.t)}.</p>` });
     }
   }
-  const ic = prediction.intercept;
-  if(ic) lines.push({ t: ic.t, html: ic.grazes
-    ? `<p class="down">This path hits ${esc(S.portName(ic.body))} in ${S.fmtDays(ic.t - state.t)}.</p>`
-    : `<p class="${ic.inMouth ? 'up' : ''}">Closest approach to ${esc(S.portName(ic.body))}: ${fmtAu(ic.altitude)} at ${S.fmtKms(ic.speed)}, in ${S.fmtDays(ic.t - state.t)}.${ic.inMouth ? ' That is inside docking range.' : ''} ${skip(ic.t)}</p>` });
+  /* Every world the road passes, once each, in the order they happen. */
+  for(const ic of prediction.intercepts ?? []){
+    lines.push({ t: ic.t, html: ic.grazes
+      ? `<p class="down">This path hits ${esc(S.portName(ic.body))} in ${S.fmtDays(ic.t - state.t)}.</p>`
+      : `<p class="${ic.inMouth ? 'up' : ''}">Closest approach to ${esc(S.portName(ic.body))}: ${fmtAu(ic.altitude)} at ${S.fmtKms(ic.speed)}, in ${S.fmtDays(ic.t - state.t)}.${ic.inMouth ? ' That is inside docking range.' : ''} ${skip(ic.t)}</p>` });
+  }
   lines.sort((a, b) => a.t - b.t);
   return '<h3>Ahead</h3>' + (lines.length
     ? lines.map(l => l.html).join('')

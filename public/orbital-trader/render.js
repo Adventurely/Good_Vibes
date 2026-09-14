@@ -738,7 +738,7 @@ function drawPrediction(chart, view, pos){
   drawApses(chart, view, anchors, afterBurnAt);
   drawCrossings(chart, view, anchors, afterBurnAt);
   drawRailCrossings(chart, view, anchors);
-  drawIntercept(chart, view, anchors, afterBurnAt);
+  drawIntercepts(chart, view, anchors, afterBurnAt);
 }
 
 /* The marks on a road, each one a shape you can name without a legend:
@@ -759,7 +759,7 @@ function drawApses(chart, view, anchors, afterBurnAt){
     /* The leg the intercept is on already has a labelled crosshair at its low
        point; a second mark and a second number on the same pixel is a pile,
        not a chart. */
-    if(a.segIndex === view.prediction.intercept?.segIndex) continue;
+    if((view.prediction.intercepts ?? []).some(ic => ic.segIndex === a.segIndex)) continue;
     const afterBurn = afterBurnAt(a.segIndex);
     const p = chart.toScreen(add(anchor, a.r));
     if(p[0] < -60 || p[1] < -30 || p[0] > chart.width + 60 || p[1] > chart.height + 30) continue;
@@ -861,14 +861,20 @@ function drawRailCrossings(chart, view, anchors){
   }
 }
 
-/* The intercept: the nearest the road comes to the world it has just entered.
- * This is the question a pilot is actually asking while they push a burn
- * around — not "does this reach Slate" but "how close, and how fast" — so it is
- * marked wherever the chart is zoomed, even when the whole encounter is a few
- * pixels wide, and it carries its own numbers. */
-function drawIntercept(chart, view, anchors, afterBurnAt){
+/* The intercepts: the nearest the road comes to each world it passes, once
+ * per world and at the first pass. This is the question a pilot is actually
+ * asking while they push a burn around — not "does this reach Slate" but "how
+ * close, and how fast" — so they are marked wherever the chart is zoomed, even
+ * when the whole encounter is a few pixels wide.
+ *
+ * It used to draw exactly one, for the world whose reach the road crossed
+ * into. A road out of Tassel to the Belt goes past both of Tassel's moons and
+ * then meets a haven that has no reach at all, and none of that was marked. */
+function drawIntercepts(chart, view, anchors, afterBurnAt){
+  for(const ic of view.prediction?.intercepts ?? []) drawIntercept(chart, view, anchors, afterBurnAt, ic);
+}
+function drawIntercept(chart, view, anchors, afterBurnAt, ic){
   const { ctx } = chart;
-  const ic = view.prediction?.intercept;
   if(!ic) return;
   const seg = view.prediction.segments[ic.segIndex];
   const anchor = anchors[ic.segIndex];

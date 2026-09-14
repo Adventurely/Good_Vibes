@@ -1134,6 +1134,107 @@ function interceptOf(segments, crossed){
   return best;
 }
 
+/* How near the road has to come to a world before the pass is worth a mark.
+ * A world's own reach is the honest answer where there is one — inside it you
+ * are having an encounter whether you meant to or not — and twice that, so a
+ * near miss is called before it is a miss. The havens and the Maw have no
+ * reach at all, so they are measured in harbour mouths instead. */
+function markWithin(b){
+  return Math.max((b.soi ?? 0) * 2, (b.zoneRadius ?? 0) * 8, (b.radius ?? 0) * 20);
+}
+
+/* Where the road comes nearest each world, once per world, and the *first*
+ * time rather than the nearest time.
+ *
+ * The chart used to mark exactly one encounter: the world whose reach the road
+ * crossed into. That missed two things a pilot wants. Nail and Whisker have no
+ * reach to cross — they are rendezvous points, matched rather than fallen into
+ * — so flying straight at one was marked with nothing at all. And a road that
+ * goes past one world on its way to another is a thing that happens constantly
+ * out here, with only the far end of it marked.
+ *
+ * One mark per world, at the first close pass, and nothing after it: a road
+ * that cuts the same rail three laps running earns one crosshair, which is the
+ * same refusal the rest of this chart already makes. */
+function interceptsOf(segments, crossed){
+  const out = new Map();
+  /* The encounter the ship actually falls into keeps its exact numbers: inside
+     a reach the nearest point is that leg's periapsis, solved rather than
+     sampled. Everything else is found by walking the drawn road. */
+  const exact = interceptOf(segments, crossed);
+  if(exact) out.set(exact.body, exact);
+
+  /* The world the ship is going round right now is not an encounter with
+     anything. A parking orbit reaches its low point once a lap, which is a
+     real local minimum and completely uninteresting: it is where you already
+     are. It becomes interesting again only if the road leaves and comes back,
+     so it is ignored up to the moment the road quits that world's frame. */
+  const home = segments[0]?.body ?? null;
+  const leftHome = segments.find(sg => sg.body !== home)?.t0 ?? Infinity;
+
+  for(const b of world.bodies){
+    if(b.id === 'lamp' || out.has(b.id)) continue;
+    const bound = markWithin(b);
+    if(!(bound > 0)) continue;
+    const notBefore = b.id === home ? leftHome : -Infinity;
+    /* A pass has to be a pass: the road comes closer and then goes away again.
+       Anything else is not an encounter, and two things in particular are not.
+       A ship that has just cast off is sitting on its own harbour's doorstep,
+       so without this the world you are leaving marks itself at t = nought
+       under the ship. And a road still closing when it runs out of drawn
+       length has not passed anything yet — it is a crossing that may or may
+       not happen past the end of what is shown. */
+    let best = null, rising = 0, closed = false;
+    outer:
+    for(let si = 0; si < segments.length; si++){
+      const seg = segments[si];
+      const frame = world.get(seg.body);
+      const pts = seg.scan ?? seg.points, ts = seg.scanTimes ?? seg.times;
+      const own = seg.body === b.id, child = b.parent === seg.body;
+      for(let i = 0; i < pts.length; i++){
+        const t = ts[i];
+        const d = own ? norm(pts[i])
+          : child ? dist(pts[i], railState(b, frame.mu, t).r)
+          : dist(add(absState(world, seg.body, t).r, pts[i]), absState(world, b.id, t).r);
+        if(!best || d < best.d){
+          if(best) closed = true;                 // it got nearer than it was
+          best = { d, t, si, seg }; rising = 0;
+        }else if(++rising >= 2 && closed && best.d <= bound){
+          break outer;                            // approached, passed, done looking
+        }
+      }
+    }
+    if(!best || !closed || rising < 2 || best.d > bound || best.t < notBefore) continue;
+    /* The sample grid is coarse next to a crosshair, so the minimum is closed
+       in on the same way the aim solver does it. */
+    const seg = best.seg, frame = world.get(seg.body);
+    const at = tt => {
+      const local = propagate(frame.mu, seg.r0, seg.v0, tt - seg.t0);
+      const shipAbs = add(absState(world, seg.body, tt).r, local.r);
+      const tg = absState(world, b.id, tt);
+      return { d: dist(shipAbs, tg.r), rel: norm(sub(add(absState(world, seg.body, tt).v, local.v), tg.v)), local };
+    };
+    const span = (seg.t1 - seg.t0) / Math.max(1, (seg.scanTimes ?? seg.times).length - 1);
+    let lo = Math.max(seg.t0, best.t - span), hi = Math.min(seg.t1, best.t + span);
+    const phi = (Math.sqrt(5) - 1) / 2;
+    let x = hi - phi * (hi - lo), y = lo + phi * (hi - lo);
+    let fx = at(x).d, fy = at(y).d;
+    for(let i = 0; i < 40 && hi - lo > 1e-6; i++){
+      if(fx < fy){ hi = y; y = x; fy = fx; x = hi - phi * (hi - lo); fx = at(x).d; }
+      else{ lo = x; x = y; fx = fy; y = lo + phi * (hi - lo); fy = at(y).d; }
+    }
+    const t = (lo + hi) / 2, got = at(t);
+    out.set(b.id, {
+      segIndex: best.si, body: b.id, t, r: got.local.r,
+      distance: got.d, altitude: Math.max(0, got.d - (b.radius ?? 0)),
+      speed: got.rel, grazes: got.d <= (b.radius ?? 0),
+      inMouth: b.zoneRadius != null && got.d <= b.zoneRadius,
+      passing: true,
+    });
+  }
+  return [...out.values()].sort((a, c) => a.t - c.t);
+}
+
 export function planImmediate(state, flown = true, opts = {}){
   if(state.dockedAt) return null;
   const far = opts.farSight ?? seesPast(state);
@@ -1231,11 +1332,15 @@ export function planImmediate(state, flown = true, opts = {}){
       to: events.find(e => e.kind === 'soi' && Math.abs(e.t - sg.t1) < 1e-6)?.to ?? null,
     });
   });
+  const intercepts = interceptsOf(segments, crossed);
   return {
     ...pred, segments, events, end: endT, horizon,
     crossings,
     crossing: crossings[0] ?? null,
-    intercept: interceptOf(segments, crossed),
+    /* One per world, earliest first. `intercept` is the next one, which is
+       what the readouts and the encounter window have always wanted. */
+    intercepts,
+    intercept: intercepts[0] ?? null,
     /* From here on the road is drawn in the second colour: it is a different
        world's orbit, and it should not read as more of the same one. */
     afterFrom: crossed >= 0 ? crossed + 1 : segments.length,

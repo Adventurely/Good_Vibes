@@ -1483,13 +1483,70 @@ test('only the first crossing is marked, however many the road makes', () => {
   assert.equal(railCrossings(world, S.planImmediate(wide), wide.t, { minLead: S.MIN_LEAD }).length, 1);
 });
 
+test('every world the road passes is marked once, at the first pass', () => {
+  /* The chart marked exactly one encounter: the world whose reach the road
+     crossed into. Two things fell through that. Nail and Whisker have no reach
+     at all — they are rendezvous points, matched rather than fallen into — so
+     flying straight at one was marked with nothing whatever. And a road that
+     goes past one world on the way to another is ordinary out here, with only
+     the far end of it marked. */
+  const s = S.newGame(7);
+  s.dockedAt = 'tassel'; S.undock(s);
+  s.dv = s.tank = S.auDay(60);
+  assert.ok(S.trimToTarget(s, 'nail', 6000)?.ok, 'could not plot the road this test is about');
+  const pred = S.planImmediate(s, true, { farSight: true });
+  const byBody = new Map((pred.intercepts ?? []).map(ic => [ic.body, ic]));
+
+  // The one that was missing: a haven with no reach to cross into.
+  const nail = byBody.get('nail');
+  assert.ok(nail, 'the Belt haven the road is aimed at is not marked');
+  assert.ok(nail.inMouth, 'the road was aimed into its harbour mouth and the mark disagrees');
+
+  // And the moons it goes past on the way out, which were never marked either.
+  assert.ok(byBody.has('slate') && byBody.has('moss'), 'the moons the road passes are not marked');
+
+  // Once each, and in the order they happen.
+  const ids = (pred.intercepts ?? []).map(ic => ic.body);
+  assert.equal(new Set(ids).size, ids.length, `a world is marked twice: ${ids.join(', ')}`);
+  const times = pred.intercepts.map(ic => ic.t);
+  assert.deepEqual(times, [...times].sort((a, b) => a - b), 'the marks are not in the order they happen');
+  // The readouts take the next one, so it has to be the first.
+  assert.equal(pred.intercept, pred.intercepts[0]);
+});
+
+test('the world you are leaving is not an encounter with anything', () => {
+  /* A parking orbit reaches its low point once a lap, which is a real local
+     minimum and completely uninteresting: it is where you already are. Cast
+     off and the world you just left would mark itself, at nought days, under
+     the ship. And a ship going round in circles meets nothing at all. */
+  const idle = S.newGame(7);
+  S.undock(idle);
+  const pred = S.planImmediate(idle, true, { farSight: true });
+  assert.deepEqual(pred.intercepts ?? [], [], 'a parking orbit was called an encounter');
+
+  const s = S.newGame(7);
+  s.dockedAt = 'cinder'; S.undock(s);
+  s.dv = s.tank = S.auDay(60);
+  assert.ok(S.trimToTarget(s, 'veyra', 4000)?.ok);
+  const leaving = S.planImmediate(s, true, { farSight: true });
+  const own = (leaving.intercepts ?? []).find(ic => ic.body === 'cinder');
+  assert.ok(!own, `the world being left marked itself ${own ? 'at ' + (own.t - s.t).toFixed(2) + ' d' : ''}`);
+  // The world actually being flown to is still marked, with its exact numbers.
+  const veyra = (leaving.intercepts ?? []).find(ic => ic.body === 'veyra');
+  assert.ok(veyra, 'the destination is not marked');
+  assert.ok(!veyra.passing, 'an encounter inside a reach should carry the solved periapsis, not a sampled pass');
+});
+
 test('nothing is drawn joining the pair', () => {
   /* A dashed line between the two marks was the obvious thing to draw and the
      wrong one: a straight line across a chart of curves reads as a path you
      could fly. Checked at the source, because a line nobody can see in a
      screenshot is exactly the kind of thing that comes back. */
   const src = readFileSync(new URL('../public/orbital-trader/render.js', import.meta.url), 'utf8');
-  const fn = src.slice(src.indexOf('function drawRailCrossings'), src.indexOf('/* The intercept:'));
+  /* Bounded by the next function rather than by the comment above it: the
+     comment was reworded once and this slice quietly grew to cover the
+     intercept drawing, whose crosshairs are made of lineTo. */
+  const fn = src.slice(src.indexOf('function drawRailCrossings'), src.indexOf('function drawIntercepts'));
   assert.ok(fn.length > 200, 'found the drawing pass');
   /* `diamond` is a helper outside this function, so a lineTo in here is
      something else being drawn — which is the thing that was removed. */
