@@ -1557,7 +1557,26 @@ than an error anybody would see.
 marked `day`, `night` or `any`, and a marked one makes half again as much at its
 best hour and half as much at its worst — so a lot of nothing but solar panels
 watches its income halve every two minutes, and the fix is to own some
-mushrooms.
+mushrooms. Four of the nine are unmarked and simply tick.
+
+One of those four got there by argument rather than by design. The Glasshouse
+was marked `day`, and its description — written by the owner, who writes all
+of them — said it shields the tree day or night. Of the two ways to settle a
+description that contradicts the row above it, changing the game was the
+better one here: a glasshouse is the one building on this lot that obviously
+does keep working after dark. Its rated figure went from 44,000 to 51,000 at
+the same time, and not to make it better. `rate` is already the average over a
+whole day, so changing the mark alone leaves the average alone — but Night
+bloom lifts the trough of marked growers only, worth `SWING / pi` on them and
+nothing on an unmarked one, and anybody who owns a glasshouse bought Night
+bloom three tiers earlier. Left at 44,000 the simulation lost a fifth of a
+day's income at the top; multiplied back in, it lands within a few percent of
+where it was.
+
+**Every grower carries its description for good.** It used to give way to
+"5 planted · 12/s" the moment you owned one of a kind, which meant the only
+players who ever read it were the ones who had not bought the thing yet. The
+figures and the description both show now, on their own lines.
 
 **One upgrade lifts the trough**, and it lifts it without touching the peak.
 That asymmetry is the whole value of it, and it was not there at first: the

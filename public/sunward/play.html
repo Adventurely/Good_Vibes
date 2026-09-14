@@ -31,6 +31,7 @@
         --line: var(--gv-line);
         --text: var(--gv-text);
         --muted: var(--gv-muted);
+        --faint: var(--gv-faint);
         --accent: var(--gv-leaf);
         --sun: var(--gv-sun);
         --bad: var(--gv-bad);
@@ -263,6 +264,11 @@
       .row canvas { width: 48px; height: 48px; image-rendering: pixelated; }
       .row .name { font-weight: 700; font-size: 0.96rem; }
       .row .note { display: block; font-size: 0.8rem; color: var(--muted); }
+      /* The description stays on the row for good. It used to give way to the
+         figures the moment you owned one of a kind, which meant a player only
+         ever saw it while they had none — and never again once it was a thing
+         they actually owned. */
+      .row .what { display: block; font-size: 0.76rem; color: var(--faint); margin-top: 0.1rem; }
       .row .cost { text-align: right; font-size: 0.9rem; font-weight: 700; color: var(--sun);
                    font-variant-numeric: tabular-nums; }
       .row .cost small { display: block; font-weight: 500; color: var(--muted); font-size: 0.72rem; }
@@ -337,7 +343,7 @@
       .toast b { color: #ffd34e; }
       @keyframes pop { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
-      .saved { color: var(--faint, var(--muted)); font-size: 0.72rem; margin: 0.8rem 0 0; }
+      .saved { color: var(--faint); font-size: 0.72rem; margin: 0.8rem 0 0; }
 
       @media (prefers-reduced-motion: reduce) {
         .toast { animation: none; }
@@ -806,7 +812,9 @@
           row.append(iconFor(g.id));
           const mid = document.createElement('span');
           mid.innerHTML = `<span class="name">${g.name}`
-            + `<span class="when">${WHEN[g.phase]}</span></span><span class="note"></span>`;
+            + `<span class="when">${WHEN[g.phase]}</span></span><span class="note"></span>`
+            + `<span class="what"></span>`;
+          mid.querySelector('.what').textContent = g.flavour;
           const cost = document.createElement('span');
           cost.className = 'cost';
           row.append(mid, cost);
@@ -889,9 +897,11 @@
           // upgrade that did nothing.
           const each = g.rate * bonus.grower[g.id] * bonus.allMult * bonus.seedMult
             * averageFactor(g.phase, bonus.lift, bonus.swing);
+          // The figures when there are figures, and the description under
+          // them either way.
           note.textContent = owned
             ? `${owned} planted · ${formatEnergy(each * owned)}/s`
-            : g.flavour;
+            : 'None planted yet';
           cost.innerHTML = `${formatEnergy(price)}<small>${count > 1 ? '&times;' + count + ' · ' : ''}`
             + `+${formatEnergy(each * count)}/s</small>`;
         }

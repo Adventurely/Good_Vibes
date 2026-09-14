@@ -107,23 +107,38 @@ export function phaseName(phase){
  */
 export const GROWERS = [
   { id: 'moss', name: 'Moss bed', cost: 12, rate: 0.1, phase: 'any', art: 'moss',
-    flavour: 'It was here before you. It only needed the rubble taken off it.' },
+    flavour: 'Forms a symbiotic relationship with your tree. It helps the soil retain moisture, while providing the moss shade.' },
   { id: 'fern', name: 'Fern bank', cost: 130, rate: 0.65, phase: 'night', art: 'fern',
-    flavour: 'Unrolls after dark and holds the damp until morning.' },
+    flavour: 'A bank of ferns that unfurl at night. Helps prevent night-time evaporation.' },
   { id: 'panel', name: 'Leaf panel', cost: 1500, rate: 4, phase: 'day', art: 'panel',
-    flavour: 'Photovoltaic, and shaped like the thing it is copying.' },
+    flavour: 'A breakthrough in solar technology. It provides extra food for your tree by using its own form of photosynthesis.' },
   { id: 'hive', name: 'Beehive', cost: 17000, rate: 26, phase: 'day', art: 'hive',
-    flavour: 'Pays in pollination. The honey is a side effect.' },
+    flavour: 'A hive of busy bees. Aids in the fertilization of the tree, but only works in the day.' },
   { id: 'mushroom', name: 'Mushroom vault', cost: 190000, rate: 170, phase: 'night', art: 'mushroom',
-    flavour: 'A cellar of small lamps that eat the dark and give it back.' },
+    flavour: 'A cellar of pale glowing mushrooms. Feeds the roots of the tree, but only works at night.' },
   { id: 'orchard', name: 'Orchard row', cost: 2.1e6, rate: 1100, phase: 'day', art: 'orchard',
-    flavour: 'Twelve trees and a ladder somebody left against the last one.' },
+    flavour: 'Twelve fruit trees sharing one root network. They pass surplus sugar along to your tree, but only while the sun is up.' },
   { id: 'turbine', name: 'Wind turbine', cost: 2.4e7, rate: 6900, phase: 'any', art: 'turbine',
-    flavour: 'Turns whether or not anybody is watching it.' },
-  { id: 'glasshouse', name: 'Glasshouse', cost: 2.7e8, rate: 44000, phase: 'day', art: 'glasshouse',
-    flavour: 'Keeps one summer going all the way through a winter.' },
+    flavour: 'A tall turbine on the ridge. It runs on weather rather than sunlight, so it feeds your tree at any hour.' },
+  /* The one tier that was moved off the sun after it was written. Its
+     description says it shields the tree day or night, which was not true of
+     a grower marked `day` — and of the two ways to settle that, changing the
+     game was the better one: a glasshouse is the one building on this lot that
+     obviously does keep working after dark.
+
+     The rate moved with it, from 44,000 to 51,000, and the reason is Night
+     bloom. `rate` is already the average over a whole day — a day grower
+     earns half again at noon and half as much at midnight and averages
+     exactly this — so simply changing the mark would have left the average
+     alone. But Night bloom lifts the trough of MARKED growers only, worth
+     SWING/pi on them and nothing on an `any` grower, and anybody who owns a
+     glasshouse bought Night bloom three tiers ago. Left at 44,000 the tier
+     quietly lost that sixteen percent: the simulation had a day's play down
+     from 7.11M a second to 6.38M. Multiplied back in, it is where it was. */
+  { id: 'glasshouse', name: 'Glasshouse', cost: 2.7e8, rate: 51000, phase: 'any', art: 'glasshouse',
+    flavour: 'A mega greenhouse environment. Shields your tree day or night against predators.' },
   { id: 'canopy', name: 'Canopy tower', cost: 3.0e9, rate: 280000, phase: 'any', art: 'canopy',
-    flavour: 'A building with a forest on it, or the other way round.' },
+    flavour: 'A tower with its own forest ecosystem. Surplus energy is delivered straight to your tree.' },
 ];
 
 export const GROWER_IDS = GROWERS.map(g => g.id);
