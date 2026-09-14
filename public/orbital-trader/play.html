@@ -1601,7 +1601,7 @@ function market(){
   if(rest.length){
     out += '<h3>They want</h3><p>' + rest.map(r => listed(r, 'lock')).join(' · ') + '</p>';
   }
-  if(!priced) out += '<p class="lock">What they would pay is a matter of opinion, and there is nobody aboard whose opinion is worth having.</p>';
+  if(!priced) out += '<p class="lock">No appraiser aboard, so these are worth whatever they turn out to be worth. Sign one on and you will see the price before you sell.</p>';
   return out;
 }
 

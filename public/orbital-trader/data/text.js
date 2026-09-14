@@ -86,7 +86,7 @@ export const NARRATIVE = {
    ]
   },
   "veyra": {
-   "blurb": "The wealthy Emberkin world, and the nearest of them to the Lamp: bright enough that shade is bought and sold here like anything else. Houses measure each other in public, and the measuring is done at auction. Nothing is bought here quietly and nothing is sold here cheap.",
+   "blurb": "The wealthy Emberkin world, and close enough to the Lamp that shade is property: a house is worth what its awnings cover. Everything changes hands at auction and in public, because a price nobody witnessed settles nothing.",
    "arrival": [
     "A steward meets you at the lock with a list of who is in port and who is not speaking to whom.",
     "The dock is swept. You had not realised a dock could be swept.",
@@ -580,7 +580,7 @@ export const NARRATIVE = {
    "pay": 270,
    "rep": "otter",
    "blurb": "Four jars of moonfish oil for a farm on Moss that has not smelled the sea in two generations. Wren has already had them carried aboard; she says they will not ask what it cost and you are not to tell them.",
-   "done": "They open one jar on the step and stand there with it. Nobody says anything for a while, which on Moss is a compliment."
+   "done": "They open a jar on the step. The old man says nothing for a moment, then tells his granddaughter the name of the boat his mother crewed out of Tassel. It is how she learns her family used to fish, and that he has been keeping the name for her."
   },
   {
    "id": "greenmedicine",
@@ -598,7 +598,7 @@ export const NARRATIVE = {
    "pay": 510,
    "rep": "otter",
    "blurb": "The Tassel rafts are short of cut herbs and the physician is short of patience. Moss has them by the bundle. Buy six and get them back before they are hay.",
-   "done": "She checks one bundle, smells it, and looks at you with something like respect. The rest goes straight into the dispensary."
+   "done": "She smells one bundle, pulls three stems out of it and drops them in the stove. \"Cut wet,\" she says, and shows you the trick with a thumbnail: the good ones squeak. The rest goes to the dispensary, and you can price a bundle yourself now."
   },
   {
    "id": "slatemessage",
@@ -611,7 +611,7 @@ export const NARRATIVE = {
    "pay": 230,
    "rep": "otter",
    "blurb": "A sealed note for the yard foreman on Slate. Theo will not say what is in it and has gone slightly pink about the ears. It weighs nothing and it is not to be opened.",
-   "done": "The foreman reads it twice, laughs once, and writes something on the back. She does not offer to show you."
+   "done": "The foreman reads it, goes very still, and reads it again. Then she writes four words on the back and folds it into your hand to carry home. It says: Yes. Bring the boat."
   },
   {
    "id": "heavystuff",
@@ -629,7 +629,7 @@ export const NARRATIVE = {
    "pay": 900,
    "rep": "emberkin",
    "blurb": "Four crates of ore for the engine smiths, loaded before you agreed to it. It is heavy and it is dull and the Emberkin are waiting on it, which is the whole job.",
-   "done": "A smith signs for it without looking up, then looks up, then asks where you learned to fly an approach like that."
+   "done": "A smith signs for it without looking up, then looks up, then asks where you learned an approach like that. When you say nowhere, she walks you in to see the forge — lit by her great-grandmother, banked every night since, and not once in four generations allowed to go out."
   },
   {
    "id": "enginetrouble",
@@ -648,7 +648,7 @@ export const NARRATIVE = {
    "rep": "emberkin",
    "crew": "engineer",
    "blurb": "Three crates of spare parts for the Slate yards, and Brikka wants to ride along and see them fitted. She has been at the Ninth Forge eleven years and has run out of things there she has not already taken apart.",
-   "done": "She watches the Slate shipwrights work for about four minutes, says one sentence nobody enjoys, and fixes it herself. Then she asks what your tank is rated at, and does not get off the ship."
+   "done": "The Slate shipwrights have the coil seated backwards. Brikka watches them do it for four minutes, says so in one sentence that nobody enjoys, and has it out and reseated before the argument can properly start. Afterwards she asks what your tank is rated at, hears the answer, and looks at you the way people look at a room they are thinking of taking. She does not get off the ship."
   },
   {
    "id": "engineerfavour",
@@ -679,7 +679,7 @@ export const NARRATIVE = {
    "pay": 2250,
    "rep": "emberkin",
    "blurb": "Three fire crystals, cut cold on Scorch, wanted on Veyra before the month turns. The agent does not say which house wants them and looks faintly pained when you ask.",
-   "done": "The three go under a lamp and hold the light for a long moment. The agent settles up without haggling, which on Veyra is nearly a compliment."
+   "done": "The agent holds all three under a lamp for a count of ten, then carries them into a windowless room and shuts the door. The strip of floor you can see underneath it is lit like evening, and stays lit. She pays without haggling, which on Veyra is as near a compliment as money gets."
   },
   {
    "id": "collector",
@@ -705,7 +705,7 @@ export const NARRATIVE = {
    "pay": 3600,
    "rep": "emberkin",
    "blurb": "A list, not a cargo: one string of Tassel pearls, one coral carving, one precision clock. House Ahl wants all three on the table at once and does not care where you get them. The clock is made on Veyra, which they appear to find funny.",
-   "done": "The three go on a velvet board in that order and a steward writes the sum out longhand. You are not told what it is for."
+   "done": "The three go on a velvet board in that order. House Ahl's heir, who is eleven, is brought in and asked which one came furthest. She picks the clock, because it is the finest thing she has ever been allowed near. It was made four streets away. The room is delighted with her, nobody corrects her, and a steward writes the sum out longhand."
   },
   {
    "id": "factionbusiness",
@@ -718,7 +718,7 @@ export const NARRATIVE = {
    "pay": 600,
    "rep": "emberkin",
    "blurb": "Confidential, the steward says, twice. It goes to a name on Cinder and into that person's hand and nobody else's. You are being paid for the part where you do not ask.",
-   "done": "The hand it goes into belongs to somebody who was clearly expecting it and clearly hoping not to get it. Nobody explains anything. The money is already arranged."
+   "done": "The name belongs to a woman minding a furnace on the third terrace. She reads it once, puts it in the fire, and watches until it is gone. Then she has you wait while she takes a ring off her hand and files the crest flat, and sends that back instead. The steward on Veyra takes it without looking at it and pays you twice what was agreed."
   },
   {
    "id": "intothebelt",
@@ -736,7 +736,7 @@ export const NARRATIVE = {
    "pay": 3400,
    "rep": "cat",
    "blurb": "Two reactor coils for the cats at Nail, crated and aboard before the paperwork was finished. The Forge would like it known that these are a favour and not a precedent.",
-   "done": "Half the rock comes out to watch the crates open. Somebody says a word in cat that Ashgrin declines to translate, and you are bought drinks for the rest of the evening."
+   "done": "Half the rock comes out to watch the crates open, and somebody says a word that the whole bar says back. Ashgrin translates it: roughly, the thing that was owed. Nail has been running a reactor short for two years and told nobody on Cinder, because saying it out loud would have made it a debt instead of a favour. You are bought drinks until counting stops being possible."
   },
   {
    "id": "somethingshiny",
@@ -754,7 +754,7 @@ export const NARRATIVE = {
    "pay": 1050,
    "rep": "cat",
    "blurb": "Two sets of salvaged sensors off Nail, for a client on Veyra who wants to see further than they are supposed to. Buy them honestly. The agent is very keen that you buy them honestly.",
-   "done": "They are unpacked, powered up, and pointed at something outside. Whatever the client sees, they do not mention it, and you are paid on the spot."
+   "done": "They are unpacked, powered up, and pointed — not at a rival's shipping lane, which is what you had assumed — straight up out of the plane of the system, at nothing, eighteen au out. The client watches for six hours. When they pay you they ask, very carefully, whether you have ever been that far."
   },
   {
    "id": "catsrequest",
@@ -773,7 +773,7 @@ export const NARRATIVE = {
    "rep": "cat",
    "crew": "navigator",
    "blurb": "Ashgrin wants you to go and be seen. Nail, then Whisker, then the Arc, in that order, and come back and tell her who was where. She will not say why, and it is rude to ask a cat twice.",
-   "done": "She hears you out, nods once, and introduces you to Celia, who has been sitting behind you the entire time and who apparently already knows what your ship is called."
+   "done": "She hears you out, nods once, and tells you what it was for. A cat from outside the Belt, flying a clean hull, seen at all three havens inside one run, is how you say the rocks are open without saying it. Somebody had been putting it about that they were not. Then she introduces you to Celia, who has been sitting behind you the whole time and who already knows what your ship is called."
   },
   {
    "id": "medicinerun",
@@ -791,7 +791,7 @@ export const NARRATIVE = {
    "pay": 2100,
    "rep": "frog",
    "blurb": "Four cases of medicine that came through Whisker and did not come with paperwork. Ashgrin wants them on Brine, cold, and soon. The apothecaries there will know exactly what they are and will not say so.",
-   "done": "A frog with very old hands checks each case, says nothing about where it came from, and gives you a jar of something for the journey home."
+   "done": "A frog with very old hands opens each case, names the raft that brewed it, and does not ask how it came to you. It goes to the ward at the end of the walkway, where eleven people have been waiting on it since the last shipment was priced out of reach. He gives you a jar for the road: sleep, he says, for when you cannot."
   },
   {
    "id": "ambercollector",
@@ -809,7 +809,7 @@ export const NARRATIVE = {
    "pay": 1350,
    "rep": "emberkin",
    "blurb": "Two pieces of brine amber, the kind with something inside that is not quite a leaf. Veyra has a collector and the collector has an opinion about which two.",
-   "done": "The collector turns each piece for a long time without speaking. Then they thank you, precisely, and you are shown out of a room you were never really in."
+   "done": "The collector turns each piece for a long time, then tilts the second one into the lamp and lets you see. It is not a leaf. Six arms, folded, with a seam down the middle that has been open and shut. \"Ammonia sea,\" they say. \"Nothing in it has bones.\" They pay precisely, and thank you twice."
   },
   {
    "id": "frogsquestion",
@@ -822,7 +822,7 @@ export const NARRATIVE = {
    "pay": 530,
    "rep": "frog",
    "blurb": "A question for the scholars under the ice on Glass. It is one sentence long and the apothecary has been working on it for eleven years. She would like an answer, eventually, and is in no hurry.",
-   "done": "A scholar reads it, sits down, and reads it again. She says the answer will take some time. She seems delighted about that."
+   "done": "A scholar reads it, sits down, and reads it again. Eleven words, she says, and about forty years. She writes the date on the wall beside eleven other dates in eleven other hands, and points at the top one, which was set down before this station had a roof and was answered last spring."
   },
   {
    "id": "appraisal",
@@ -849,7 +849,7 @@ export const NARRATIVE = {
    "rep": "frog",
    "crew": "appraiser",
    "blurb": "Wicket would like to look at three things at once: a piece of the Arc off Nail, a storm crystal fished out of Grumm's cloud tops, and one of Cinder's reactor coils. She is not buying them. She wants them on the same table under the same lamp, and she has wanted that for some while.",
-   "done": "She puts all three under the same lamp, is quiet for a long time, and then says something that is not an answer. Then she asks where you are going next, and starts packing."
+   "done": "She puts the Arc fragment, the storm crystal and the reactor coil under the one lamp and turns everything else off. Then she taps each of them in turn. The coil was wound by hand on Cinder nine days ago; the crystal came out of Grumm's weather last month; the fragment is older than anybody has a number for. All three ring at the same note. \"There,\" says Wicket. \"That is what I wanted to know.\" Then she asks where you are going next, and starts packing."
   }
  ]
 };

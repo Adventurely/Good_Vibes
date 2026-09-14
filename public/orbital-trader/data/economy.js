@@ -464,8 +464,8 @@ export const ECONOMY = {
    "lovedBy": [
     "veyra"
    ],
-   "blurb": "Woven in a heated room by people who are paid not to talk about it. This season's colour is worth twice last season's.",
-   "nature": "Woven in a heated room by people paid not to discuss it. This season's colour is worth twice last season's."
+   "blurb": "Woven in a heated room because it comes off the loom the colour of ash and will not take the dye below ninety degrees. Cinder changes the season's colour four times a year, and the dyers know the next one before anybody else does.",
+   "nature": "The dye bonds only in heat, which is why it has never been made anywhere cold, and it fades three shades in a year of daylight. Worn indoors, at night, and once."
   },
   {
    "id": "medals",
@@ -509,8 +509,8 @@ export const ECONOMY = {
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Good enough to navigate by and pretty enough to argue over. Otters buy them for the harbourmaster and then borrow them back.",
-   "nature": "Good enough to navigate by and pretty enough to argue over. The two are rarely the same object."
+   "blurb": "Good enough to navigate by, and pretty enough that no otter household will admit to owning one alone. A raft buys a clock together, argues about whose shelf it sits on, and settles it by moving it every season.",
+   "nature": "A spring wound in a house kept at one temperature for two hundred years. A second a month, which is the difference between planning a launch window and guessing at one."
   },
   {
    "id": "perfume",
@@ -604,8 +604,8 @@ export const ECONOMY = {
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Laid down in a balloon city before anyone alive was hatched. Otters weep at it; the frogs think that is the point.",
-   "nature": "Laid down in a balloon city before anyone alive was hatched. Age is the whole of it, and it cannot be hurried.",
+   "blurb": "Laid down in a balloon city ten thousand years ago, by frogs, for frogs who had not hatched yet. The cellar has been moved four times and never once opened in a hurry. Otters weep at it; the frogs consider weeping the correct response.",
+   "nature": "Ten thousand years in a cellar nobody has ever rushed. What it tastes of is mostly time, and there is no method for making more of that.",
    "needsTempControl": true
   },
   {
