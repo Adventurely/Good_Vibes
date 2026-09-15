@@ -66,16 +66,17 @@ export const GOOSE_ART = [
  * over a duckling's head; a planted one wears its own red bar instead.
  */
 const SKILL_BADGE = {
-  digger:  ['.N.', '.N.', 'NNN', '.N.'],   // down — cuts a ramp through the drop
+  digger:  ['...', '..N', 'NNN', '..N'],   // straight ahead — tunnels through
   builder: ['...', 'www', 'w.w', 'w.w'],   // a bridge standing on its legs
   climber: ['.t.', 'ttt', '.t.', '.t.'],   // up — scales the wall
+  flyer:   ['c.c', 'ccc', '.c.', '...'],   // wingtips out, gliding
   blocker: ['...', 'rrr', 'rrr', '...'],   // the bar a planted duckling wears
 };
 
 /* Drawn in this order wherever more than one is held, so the same pair
    always reads the same way round rather than in whatever order they were
    handed out in. */
-const BADGE_ORDER = ['digger', 'builder', 'climber'];
+const BADGE_ORDER = ['digger', 'builder', 'climber', 'flyer'];
 
 const BADGE_W = 3, BADGE_H = 4, BADGE_PAD = 1, BADGE_GAP = 1;
 export const BADGE_PLATE_W = BADGE_W + BADGE_PAD * 2;
@@ -451,9 +452,33 @@ export function drawGoose(ctx, state){
 
 /* ----------------------------------------------------------------- a duck */
 
-export function drawDuck(ctx, d){
+/* Spread out beside a duckling that is actually flapping its way down, and
+   nothing at all the rest of the time. This is the one skill whose working
+   state is worth drawing rather than badging: wings out mid-fall says what
+   is happening to that duckling right now, which a mark over its head does
+   not. Two frames, swapped on a slow beat rather than every tick — a real
+   wingbeat this size reads as motion at two or three flaps a second, not
+   the sixty-times-a-second flutter a per-frame swap would give it. */
+const WING_UP = [[-4, 1], [-3, 0], [3, 0], [4, 1]];
+const WING_DOWN = [[-4, -1], [-3, 0], [3, 0], [4, -1], [-3, 1], [3, 1]];
+const WINGBEAT_TICKS = 4;
+
+function drawWings(ctx, x, y, ticks){
+  const up = Math.floor(ticks / WINGBEAT_TICKS) % 2 === 0;
+  const cx = x + Math.round(DUCK_ART[0].length / 2);
+  const cy = y + 2;
+  ctx.fillStyle = hex('y');
+  for(const [dx, dy] of (up ? WING_UP : WING_DOWN)) ctx.fillRect(cx + dx, cy + dy, 1, 1);
+}
+
+export function drawDuck(ctx, d, ticks = 0){
   const x = Math.round(d.x) - 3;
   const y = Math.round(d.y) - DUCK_ART.length;
+
+  if(d.state === 'falling' && d.traits.has('flyer')){
+    drawWings(ctx, x, y, ticks);
+  }
+
   drawSprite(ctx, DUCK_ART, x, y, d.dir < 0);
 
   if(d.state === 'blocking'){
@@ -511,7 +536,7 @@ export function paintScene(ctx, state){
   drawGoose(ctx, state);
   for(const d of state.ducks){
     if(d.state === 'saved' || d.state === 'lost') continue;
-    drawDuck(ctx, d);
+    drawDuck(ctx, d, state.ticks);
   }
   for(const p of state.poofs) drawPoof(ctx, p);
 }

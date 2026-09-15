@@ -205,8 +205,8 @@
     <div class="about">
       <h2>Duck Duck Quack</h2>
       <p>Ducklings hatch and walk straight into whatever is in front of them.
-         Hand out a dig, a bridge or a ladder in time, and get the flock past
-         the goose to the pond.</p>
+         Hand out a dig, a bridge, a ladder or a pair of wings in time, and get
+         the flock past the goose to the pond.</p>
       <ul class="tags">
         <li>Single player</li>
         <li class="sun">Puzzle</li>
@@ -469,25 +469,24 @@ const DQ_CROP_Y = 60;
 
 /* The same bot the title screen runs, because the card and the screen behind
    the click should not be playing the level two different ways: bridge the gap
-   and clear the step down the moment either is possible, and hand a climber to
-   anything unskilled that is nearing the wall. It wins — eight of ten home,
-   against a quota of eight — so the card is a run going well rather than a
-   flock walking into a pit for the length of somebody's visit. */
+   once, then give every duckling its own climber for the wall and its own
+   flyer for the drop beyond it. It wins — eight of ten home, against a quota
+   of eight — so the card is a run going well rather than a flock walking into
+   a pit for the length of somebody's visit. */
 let dqState = dqNewGame(DQ_LEVEL);
-let dqBuilderUsed = false, dqDiggerUsed = false;
+let dqBuilderUsed = false;
 
 function dqStep(){
   for(const d of dqState.ducks){
     if(d.state !== 'walking') continue;
     if(!dqBuilderUsed && d.x === 69 && dqAssign(dqState, d.id, 'builder')) dqBuilderUsed = true;
-    else if(!dqDiggerUsed && d.x === 219 && dqAssign(dqState, d.id, 'digger')) dqDiggerUsed = true;
     else if(!dqHasTrait(d, 'climber') && d.x >= 130 && d.x < 150) dqAssign(dqState, d.id, 'climber');
+    else if(!dqHasTrait(d, 'flyer') && d.x >= 160 && d.x < 219) dqAssign(dqState, d.id, 'flyer');
   }
   dqTick(dqState);
   if(dqState.ended){
     dqState = dqNewGame(DQ_LEVEL);
     dqBuilderUsed = false;
-    dqDiggerUsed = false;
   }
 }
 

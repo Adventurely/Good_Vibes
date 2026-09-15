@@ -8,7 +8,7 @@
  * whole run be played out and checked in a test with no browser near it.
  */
 
-import { SCENE_H, FALL_SAFE, WALK_STEP, FALL_SPEED, CLIMB_SPEED, DIG_RATE,
+import { SCENE_H, FALL_SAFE, WALK_STEP, FALL_SPEED, FLY_SPEED, CLIMB_SPEED,
   BUILD_MAX_STEPS, DIG_MAX_STEPS, SKILLS, GOOSE_FLEE_SPEED, GOOSE_FLEE_LIFT,
   POOF_TICKS, buildTerrain, winCount } from './content.js';
 
@@ -192,7 +192,12 @@ function stepWalking(state, d){
   const nextY = groundAt(state, nextX);
   const delta = nextY - d.y;   // positive: ground drops away; negative: ground rises
 
+  /* A wall: ground that rises faster than a duckling can step up. Two skills
+   * answer it, and a duckling holding both digs, because tunnelling leaves a
+   * way through for everyone behind it while climbing only ever gets the one
+   * duckling over. Given neither, it turns around, which costs nothing. */
   if(delta < -WALK_STEP){
+    if(hasTrait(d, 'digger')){ d.state = 'digging'; d.digLeft = DIG_MAX_STEPS; return; }
     if(hasTrait(d, 'climber')){ d.state = 'climbing'; d.x = nextX; return; }
     d.dir = -d.dir;
     return;
@@ -200,25 +205,20 @@ function stepWalking(state, d){
 
   if(delta > FALL_SAFE){
     /* A gap has no floor anywhere in the visible scene (see content.js's
-     * PIT_Y); a plain drop still has one, just further down. That is the
-     * real difference between "bridge it" and "dig down to it" — a digger
-     * sent at a gap would spend its whole ramp chasing a floor that is not
-     * there, and a builder sent at a drop would float a bridge over ground
-     * that was already perfectly walkable. So each skill only answers to
-     * the shape of hazard it actually solves; given the wrong one for what
-     * is ahead, a duckling just falls, the same as if it had no skill at
-     * all — which is also what makes it safe for a skill to be handed out
-     * long before the hazard it is for, rather than needing to land on the
-     * exact column where that hazard starts.
+     * PIT_Y); a plain drop still has one, just further down. Only the
+     * Builder reads that difference here, and only a gap is worth bridging:
+     * a bridge laid over a drop would hang in the air above ground that was
+     * already perfectly walkable.
+     *
+     * A Flyer needs no branch of its own. It does not avoid the fall, it
+     * survives it — see stepFalling, which is also why it is no use at all
+     * over a gap, where there is nothing to land on however gently you
+     * arrive. Nothing here waits for a particular column, which is what
+     * makes it safe to hand a skill out long before the obstacle it is for.
      */
     if(hasTrait(d, 'builder') && nextY >= SCENE_H){
       d.state = 'building';
       d.buildLeft = BUILD_MAX_STEPS;
-      return;
-    }
-    if(hasTrait(d, 'digger') && nextY < SCENE_H){
-      d.state = 'digging';
-      d.digLeft = DIG_MAX_STEPS;
       return;
     }
     d.x = nextX;
@@ -231,48 +231,49 @@ function stepWalking(state, d){
   d.y = nextY;
 }
 
+/* A Flyer flaps down slowly and walks away from whatever it lands on. It
+ * still needs something to land on, though — over a gap it flaps gently
+ * past the bottom of the world and is lost all the same, which is the line
+ * between "survives the drop" and "crosses the gap". */
 function stepFalling(state, d){
-  d.y += FALL_SPEED;
+  const flying = hasTrait(d, 'flyer');
+  d.y += flying ? FLY_SPEED : FALL_SPEED;
   if(d.y > SCENE_H){ loseDuckling(state, d, 'fell'); return; }
   const ground = groundAt(state, d.x);
   if(d.y >= ground){
     const dropped = ground - d.fallFrom;
     d.y = ground;
-    if(dropped > FALL_SAFE) loseDuckling(state, d, 'fell');
+    if(!flying && dropped > FALL_SAFE) loseDuckling(state, d, 'fell');
     else d.state = 'walking';
   }
 }
 
-/* A digger cuts forward and down, DIG_RATE at a time, until the natural
- * ground catches up with the ramp it is laying — the mirror image of a
- * builder, which cuts forward and up until the ramp catches up with the
- * ground. It never touches the column it started from.
+/* A digger drives straight ahead at the height it started from, cutting the
+ * wall down to that height one column at a time, and walks out the far side
+ * of it. Its own height never changes: this is a tunnel through, not a ramp
+ * down.
  *
- * That last part is not a detail: a digger that deepened its own column
- * instead would leave the column behind it exactly as tall as it always
- * was, which turns a fifty-pixel drop in front of the flock into a
- * fifty-pixel drop just one column further back — solving nothing, only
- * moving where the cliff is. Carving forward is what actually removes it.
+ * In a heightmap there is no roof to leave overhead (see content.js on why
+ * the terrain is one number per column), so what this actually leaves behind
+ * is a notch cut down to head height rather than a bored tunnel. At this
+ * scale the two read the same — a way through a wall that was not there
+ * before, open to everything walking behind it.
+ *
+ * It stops the moment the ground ahead is already at or below the height
+ * being cut, and stops without stepping onto it, so the ordinary walking
+ * rules get to decide what that ground is — flat to walk onto, or a drop to
+ * fall down. A digger that stepped out on its own could walk itself off a
+ * cliff the walking code would have handled properly.
  */
 function stepDigging(state, d){
   const level = state.level;
   const nextX = d.x + d.dir;
   if(nextX < 0 || nextX >= level.width){ d.state = 'walking'; return; }
 
-  const natural = groundAt(state, nextX);
-  const candidate = Math.min(SCENE_H, d.y + DIG_RATE);
+  if(groundAt(state, nextX) >= d.y){ d.state = 'walking'; return; }
 
-  if(candidate >= natural){
-    // The ramp has reached the level of the ground ahead: step onto it and stop.
-    d.x = nextX;
-    d.y = natural;
-    d.state = 'walking';
-    return;
-  }
-
-  setGroundAt(state, nextX, candidate);
+  setGroundAt(state, nextX, d.y);
   d.x = nextX;
-  d.y = candidate;
   d.digLeft -= 1;
   if(d.digLeft <= 0) d.state = 'walking';
 }

@@ -122,14 +122,19 @@ export function createAudio(){
     o.start(t); o.stop(t + dur + 0.02);
   }
 
-  /* Filtered noise: kick's click aside, every drum here is one of these. */
-  function hit(t, dur, vol, cut, type = 'highpass'){
+  /* Filtered noise: kick's click aside, every drum here is one of these.
+     `sweepTo` is optional — a filter that opens or closes as the noise
+     plays, rather than sitting at one fixed cutoff, which is what turns a
+     click into a puff of air with a shape to it. */
+  function hit(t, dur, vol, cut, type = 'highpass', sweepTo){
     const n = Math.floor(ctx.sampleRate * dur);
     const buf = ctx.createBuffer(1, n, ctx.sampleRate);
     const d = buf.getChannelData(0);
     for(let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
     const src = ctx.createBufferSource(); src.buffer = buf;
-    const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = cut;
+    const f = ctx.createBiquadFilter(); f.type = type;
+    f.frequency.setValueAtTime(cut, t);
+    if(sweepTo) f.frequency.exponentialRampToValueAtTime(sweepTo, t + dur);
     const g = ctx.createGain();
     g.gain.setValueAtTime(vol, t);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
@@ -213,57 +218,63 @@ export function createAudio(){
 
   /* ---- sound effects ------------------------------------------------ */
 
-  /* A quack, built the way a quack actually works rather than as two blips
-   * in a row — which is what this was, and it sounded like a microwave
-   * because that is what a bare sawtooth at 880Hz is.
+  /* A quack, built the way a quack actually works rather than as one blip —
+   * which is what an earlier pass of this was, and it sounded like a
+   * microwave because that is what a bare sawtooth through one filter is.
    *
-   * Three things make the difference. The pitch snaps *up* for the first
-   * twenty-five milliseconds and then falls well below where it started:
-   * that little rise on the attack is the shape of the bill opening, and a
-   * call that only falls reads as a slide whistle. The buzzy source runs
-   * through a bandpass sweeping down with it, because a duck is a rough
-   * source in a small resonant cavity — take that formant away and the
-   * harmonics are all still there but nothing is shaping them, which is
-   * the whole difference between a voice and a buzzer. And a slow warble
-   * on the frequency gives it the rasp; a perfectly steady pitch is a
-   * synth patch, never an animal.
+   * Three formants in parallel rather than one bandpass: a single filter
+   * gives a nasal "wah", but a bank of them is what gives a sound a throat.
+   * The middle of the note dips and comes back up rather than holding flat,
+   * which is what makes it land as "qua-ack" — two syllables of one call —
+   * instead of one flat blast. And a slow warble on the frequency supplies
+   * the rasp; a perfectly steady pitch is a synth patch, never an animal.
    */
+  const QUACK_FORMANTS = [[850, 7, 1], [1900, 9, 0.55], [3000, 11, 0.28]];
+
   function quackSyllable(t, dur, vol){
     const o = ctx.createOscillator();
     o.type = 'sawtooth';
-    o.frequency.setValueAtTime(400, t);
-    o.frequency.exponentialRampToValueAtTime(560, t + 0.025);
-    o.frequency.exponentialRampToValueAtTime(230, t + dur);
+    o.frequency.setValueAtTime(430, t);
+    o.frequency.exponentialRampToValueAtTime(590, t + 0.022);
+    o.frequency.exponentialRampToValueAtTime(240, t + dur);
 
     // The rasp: a slow warble either side of the note, not enough to read
     // as vibrato, just enough to stop it sitting perfectly still.
     const rasp = ctx.createOscillator();
     rasp.type = 'sine';
-    rasp.frequency.value = 48;
+    rasp.frequency.value = 50;
     const raspDepth = ctx.createGain();
-    raspDepth.gain.value = 28;
+    raspDepth.gain.value = 26;
     rasp.connect(raspDepth).connect(o.frequency);
 
-    // The nasal formant, falling with the pitch as the bill closes.
-    const band = ctx.createBiquadFilter();
-    band.type = 'bandpass';
-    band.frequency.setValueAtTime(1600, t);
-    band.frequency.exponentialRampToValueAtTime(650, t + dur);
-    band.Q.value = 4.2;
+    // The articulation: a dip a third of the way through and back up. This
+    // is the "qu-ack" split, not the pitch bend above — that shapes the
+    // note, this shapes the syllable.
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.exponentialRampToValueAtTime(1, t + 0.012);
+    env.gain.exponentialRampToValueAtTime(0.32, t + dur * 0.32);
+    env.gain.exponentialRampToValueAtTime(1, t + dur * 0.48);
+    env.gain.setValueAtTime(1, t + dur * 0.62);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
 
-    // And the top taken off, so it carries over the music without being
-    // the brightest thing on the page.
-    const tame = ctx.createBiquadFilter();
-    tame.type = 'lowpass';
-    tame.frequency.value = 2400;
+    const out = ctx.createGain();
+    out.gain.value = vol;
+    env.connect(out).connect(bus);
 
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol, t + 0.014);
-    g.gain.setValueAtTime(vol, t + dur * 0.5);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    // Each formant falls with the pitch as the bill closes, same as the
+    // note itself, just centred at a different resonance.
+    for(const [freq, q, level] of QUACK_FORMANTS){
+      const band = ctx.createBiquadFilter();
+      band.type = 'bandpass';
+      band.frequency.setValueAtTime(freq, t);
+      band.frequency.exponentialRampToValueAtTime(freq * 0.62, t + dur);
+      band.Q.value = q;
+      const fg = ctx.createGain();
+      fg.gain.value = level;
+      o.connect(band).connect(fg).connect(env);
+    }
 
-    o.connect(band).connect(tame).connect(g).connect(bus);
     o.start(t); o.stop(t + dur + 0.02);
     rasp.start(t); rasp.stop(t + dur + 0.02);
   }
@@ -280,21 +291,22 @@ export function createAudio(){
       // A short puff of breath on the attack, under the note rather than
       // in front of it — this is the air, not the voice.
       hit(t, 0.03, 0.05, 1400, 'bandpass');
-      quackSyllable(t, 0.17, 0.2);
+      quackSyllable(t, 0.22, 0.6);
     },
 
-    /* The duckling that didn't — a soft, sinking "womp" rather than
-     * anything sharp: this can fire up to nine times in one run (see
-     * art.js's poof, which it plays alongside), so it has to read as a
-     * shame rather than a punishment or it turns grating fast. A triangle
-     * gliding down an octave-plus, low-passed into a rounded thump, with a
-     * dull puff of filtered noise under it for the poof's own breath —
-     * the quack's noise burst was bright and band-passed because a quack
-     * is a call; this one is low-passed because it isn't a call at all.
+    /* The duckling that didn't — two sounds, not one, matching the poof it
+     * plays alongside (see art.js): a puff of air for the burst of down,
+     * and a soft knock underneath for the landing. This can fire up to
+     * nine times in one run, so both halves stay quiet — it has to read as
+     * a small shame, not a punishment, or it turns grating fast.
      */
     lost(t){
-      voice(340, t, 0.17, 'triangle', 0.14, 130, 750);
-      hit(t + 0.015, 0.08, 0.055, 700, 'lowpass');
+      // The puff: noise swept bright to dark as it settles, rather than
+      // sitting at one muffled cutoff the whole time.
+      hit(t, 0.2, 0.17, 2400, 'bandpass', 420);
+      // The thump: a low sine falling under the puff, for the landing
+      // rather than for the feathers.
+      voice(150, t, 0.12, 'sine', 0.14, 62, 300);
     },
   };
 

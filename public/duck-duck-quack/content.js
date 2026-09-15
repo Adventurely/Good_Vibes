@@ -39,14 +39,19 @@ export const PIT_Y = SCENE_H + 60;
    longer to react to, with no other constant needing to move to match —
    spawnInterval and timeLimit are already stated as `TICK_RATE * seconds`
    rather than as bare tick counts, precisely so this could be the only
-   thing that ever needs tuning for pace. Was 20; a duckling walking the
-   whole way to the pond with no obstacles at all went from about 15
-   seconds to about 21. */
-export const TICK_RATE = 14;
+   thing that ever needs tuning for pace. Was 20, then 14; a duckling
+   walking the whole way to the pond with no obstacles at all has gone from
+   about 15 seconds to about 21 to about 27. */
+export const TICK_RATE = 11;
 export const WALK_SPEED = 1;           // columns a walking duckling covers a tick
 export const FALL_SPEED = 3;           // pixels a falling duckling drops a tick
 export const CLIMB_SPEED = 1;          // pixels a climbing duckling rises a tick
-export const DIG_RATE = 2;             // pixels a digger deepens its column a tick
+
+/* A Flyer comes down at a third of the speed and lands from any height at
+   all — the drop that FALL_SAFE would otherwise make lethal included. Slow
+   enough that the wingbeats are plainly what is saving it, rather than a
+   fall that happens to end well. */
+export const FLY_SPEED = 1;            // pixels a flying duckling descends a tick
 
 /* A step this tall or shorter is just the ground changing height under a
    walking duckling — up or down, no different than the last column. Taller
@@ -60,10 +65,10 @@ export const WALK_STEP = 4;
    bridge, a gentle staircase). */
 export const FALL_SAFE = 24;
 
-/* How many columns a Builder will lay before giving up — a safety cap, not a
-   number any level here is tuned to reach. Building stops the moment it finds
-   solid ground, so a builder assigned right at a gap's edge stops well short
-   of this. */
+/* How many columns a Builder will lay, or a Digger will cut, before giving
+   up — a safety cap, not a number any level here is tuned to reach. Both
+   stop the moment the ground ahead makes them unnecessary, so one assigned
+   right at the obstacle's edge stops well short of this. */
 export const BUILD_MAX_STEPS = 60;
 export const DIG_MAX_STEPS = 60;
 
@@ -86,17 +91,28 @@ export const POOF_TICKS = 8;
 
 /* ------------------------------------------------------------------ skills */
 
-export const SKILLS = ['digger', 'builder', 'blocker', 'climber'];
+/* Three of these change the ground itself and so are spent once for the
+ * whole flock; two ride on the duckling that holds them and have to be given
+ * out again to the next one. Which kind a skill is matters more to how a
+ * level plays than what it does:
+ *
+ *   Digger, Builder   cut or lay ground, and every duckling after walks it
+ *   Blocker           plants one duckling as terrain for the others
+ *   Climber, Flyer     carry one duckling past one obstacle, once
+ */
+export const SKILLS = ['digger', 'builder', 'blocker', 'climber', 'flyer'];
 
 export const SKILL_INFO = {
   digger: { name: 'Digger', verb: 'Dig',
-    blurb: 'Digs a ramp down through the next drop instead of falling into it.' },
+    blurb: 'Tunnels straight through the next wall, leaving a way through for the rest.' },
   builder: { name: 'Builder', verb: 'Build',
-    blurb: 'Bridges the next gap instead of falling into it.' },
+    blurb: 'Bridges the next gap, leaving the bridge for the rest.' },
   blocker: { name: 'Blocker', verb: 'Block',
     blurb: 'Plants itself for good. Anything that walks into it turns around.' },
   climber: { name: 'Climber', verb: 'Climb',
-    blurb: 'Scales the next wall instead of turning back from it.' },
+    blurb: 'Scales the next wall instead of turning back from it. One duckling only.' },
+  flyer: { name: 'Flyer', verb: 'Fly',
+    blurb: 'Flaps down to a soft landing from any height. One duckling only.' },
 };
 
 /* ----------------------------------------------------------------- terrain */
@@ -116,14 +132,20 @@ export function buildTerrain(segments, width = SCENE_W){
 
 /* --------------------------------------------------------------- the level */
 
-/* "The Park": nest, a gap, a wall, a drop, a goose, a pond. One of each
- * obstacle a duckling can meet, in the order a first level should teach them.
+/* "The Park": nest, a gap, a wall, a drop, a goose, a pond.
  *
- * Building and digging change the terrain in place and stay changed for every
- * duckling after the one that did it — bridge the gap once and the whole
- * flock walks across it. Climbing does not: a wall is still a wall for the
- * next duckling, which is why the climber supply below is sized for most of
- * the flock rather than for one.
+ * Three obstacles, and deliberately one of each kind of answer. The gap is
+ * solved once and stays solved — one Builder lays a bridge the whole flock
+ * walks over. The wall and the drop are not: a Climber gets one duckling up
+ * and a Flyer gets one duckling down, and the next duckling arrives at an
+ * obstacle exactly as tall as the first one found it. That is why those two
+ * supplies are sized for most of the flock while the builder supply is two.
+ *
+ * No Diggers here at all. A Digger tunnels through a wall, which would make
+ * the wall a solved-once obstacle like the gap — worth meeting, but not on
+ * the level that exists to teach that some things have to be paid for one
+ * duckling at a time. The skill is still on the page, at zero, so it reads
+ * as something held back rather than something missing.
  */
 export const LEVEL_1 = {
   id: 'park',
@@ -135,8 +157,8 @@ export const LEVEL_1 = {
      [70, 105)  the gap — 35 columns of pit, wants a Builder
      [105, 150) flat ground up to the wall
      [150, 220) the wall and the plateau on top of it — wants a Climber
-     [220, 260) flat ground again, one column lower than the plateau — the
-                50px step down from it wants a Digger, or it is a lethal fall
+     [220, 260) flat ground again, well below the plateau — the 50px step
+                down from it wants a Flyer, or it is a lethal fall
      [260, 300) the goose's beat — no terrain trouble, just the goose
      [300, 320) the pond */
   segments: [
@@ -156,11 +178,12 @@ export const LEVEL_1 = {
   winRatio: 0.8,
 
   /* Generous on purpose — this is the first level anyone will ever play, and
-     the point of it is to feel the four skills work, not to run out of them.
-     Climber is the one every duckling that crosses the wall needs its own
-     copy of, so it is sized to the save quota with one to spare; the other
-     three only ever need to fire once each, plus a spare. */
-  supply: { digger: 2, builder: 2, blocker: 2, climber: 9 },
+     the point of it is to feel the skills work, not to run out of them.
+     Climber and Flyer are the two every crossing duckling needs its own
+     copy of, so both are sized to the save quota with one to spare. Builder
+     only ever needs to fire once, plus a spare. Digger is zero: see the
+     level's note above. */
+  supply: { digger: 0, builder: 2, blocker: 2, climber: 9, flyer: 9 },
 
   /* Patrols the near half of the pond's approach. `speed` is columns a tick,
      `catchRadius` is how close a duckling has to be to it, in columns, to get
