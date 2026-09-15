@@ -804,10 +804,14 @@ function drawPrediction(chart, view, pos, anchorList){
       ctx.stroke();
     }
   }
-  drawApses(chart, view, anchors, afterBurnAt, pos);
+  /* One list of what the frame has already spoken for, filled in the order the
+     marks matter: the burn being worked on, then the apses and their numbers,
+     and the encounter crosshair last because it duplicates one of them. */
+  const taken = burnBoxes(chart, view, pos, anchors);
+  drawApses(chart, view, anchors, afterBurnAt, taken);
   drawCrossings(chart, view, anchors, afterBurnAt);
   drawRailCrossings(chart, view, anchors);
-  drawIntercepts(chart, view, anchors, afterBurnAt);
+  drawIntercepts(chart, view, anchors, afterBurnAt, taken);
 }
 
 /* The marks on a road, each one a shape you can name without a legend:
@@ -840,7 +844,7 @@ function burnBoxes(chart, view, pos, anchors){
 }
 const boxesOverlap = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
 
-function drawApses(chart, view, anchors, afterBurnAt, pos){
+function drawApses(chart, view, anchors, afterBurnAt, takenBoxes){
   const { ctx } = chart;
   if(!view.apses) return;
   /* A low point and a burn land on the same stretch of road constantly — the
@@ -853,17 +857,12 @@ function drawApses(chart, view, anchors, afterBurnAt, pos){
      a small one. Whatever is drawn first keeps its place — the legs come in
      the order they are flown, so that is the road you are on now, and the
      plan's mark appears as soon as the burn is big enough to move it. */
-  const taken = burnBoxes(chart, view, pos, anchors);
+  const taken = takenBoxes;
   ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
   for(const a of view.apses){
     const seg = view.prediction.segments[a.segIndex];
     const anchor = anchors[a.segIndex];
     if(!seg || !anchor) continue;
-    /* An encounter is drawn as a crosshair at the leg's low point, so that one
-       mark would be two on the same pixel — a pile, not a chart. Only that one
-       though: it used to drop every apsis on the leg, which took the high
-       point with it for no reason. */
-    if((view.prediction.intercepts ?? []).some(ic => ic.segIndex === a.segIndex && Math.abs(ic.t - a.t) < 1e-6)) continue;
     const afterBurn = afterBurnAt(a.segIndex);
     const p = chart.toScreen(add(anchor, a.r));
     if(p[0] < -60 || p[1] < -30 || p[0] > chart.width + 60 || p[1] > chart.height + 30) continue;
@@ -979,10 +978,10 @@ function drawRailCrossings(chart, view, anchors){
  * It used to draw exactly one, for the world whose reach the road crossed
  * into. A road out of Tassel to the Belt goes past both of Tassel's moons and
  * then meets a haven that has no reach at all, and none of that was marked. */
-function drawIntercepts(chart, view, anchors, afterBurnAt){
-  for(const ic of view.prediction?.intercepts ?? []) drawIntercept(chart, view, anchors, afterBurnAt, ic);
+function drawIntercepts(chart, view, anchors, afterBurnAt, taken){
+  for(const ic of view.prediction?.intercepts ?? []) drawIntercept(chart, view, anchors, afterBurnAt, ic, taken);
 }
-function drawIntercept(chart, view, anchors, afterBurnAt, ic){
+function drawIntercept(chart, view, anchors, afterBurnAt, ic, taken){
   const { ctx } = chart;
   if(!ic) return;
   const seg = view.prediction.segments[ic.segIndex];
@@ -990,6 +989,14 @@ function drawIntercept(chart, view, anchors, afterBurnAt, ic){
   if(!seg || !anchor) return;
   const p = chart.toScreen(add(anchor, ic.r));
   if(p[0] < -80 || p[1] < -40 || p[0] > chart.width + 80 || p[1] > chart.height + 40) return;
+  /* An encounter is the low point of the leg that falls into the world, so the
+     apsis mark is already on this pixel — and that one carries the altitude,
+     which is the number a pilot lining up an aerobrake is reading. The
+     crosshair stands down rather than covering it, and is left for the case it
+     is the only mark there: a leg cut short by a burn before it ever reaches
+     its low point. */
+  const box = [p[0] - 10, p[1] - 10, p[0] + 10, p[1] + 10];
+  if((taken ?? []).some(b => boxesOverlap(box, b))) return;
   const colour = ic.grazes ? PALETTE.crash : afterBurnAt(ic.segIndex) ? PALETTE.pathPlan : PALETTE.apsis;
   ctx.strokeStyle = colour; ctx.fillStyle = colour; ctx.lineWidth = 1.5;
   // Crosshair on a ring, which is not a shape any other mark on this chart uses.
@@ -1552,21 +1559,47 @@ export function railCrossings(world, prediction, tNow, opts = {}){
     for(const b of world.bodies){
       if(b.parent !== seg.body || !(b.a > 0)) continue;
       const gap = r => norm(r) - railRadiusAt(b, Math.atan2(r[1], r[0]));
-      let prevGap = gap(pts[0]);
+      const at = t => gap(propagate(mu, seg.r0, seg.v0, t - seg.t0).r);
+      const gaps = pts.map(gap);
       for(let i = 1; i < pts.length; i++){
-        const g = gap(pts[i]);
-        const crossed = (prevGap < 0) !== (g < 0);
-        prevGap = g;
-        if(!crossed) continue;
-        const at = t => gap(propagate(mu, seg.r0, seg.v0, t - seg.t0).r);
-        let lo = times[i - 1], hi = times[i];
-        const loInside = at(lo) < 0;
-        for(let k = 0; k < 40; k++){
-          const mid = (lo + hi) / 2;
-          if((at(mid) < 0) === loInside) lo = mid; else hi = mid;
+        const crossed = (gaps[i - 1] < 0) !== (gaps[i] < 0);
+        /* A transfer that *touches* a rail rather than cutting it is the whole
+           point of a Hohmann: the apsis grazes the orbit being aimed at and
+           turns back. There is no change of sign to find at a tangent, so a
+           genuine local minimum of the gap counts too — but only when the road
+           really does reach the rail, within a millionth of its radius. Looser
+           than that and a road merely heading the right way gets a mark, which
+           is how a pass a hundred thousand kilometres short of Cinder's orbit
+           came to be labelled as being on it. */
+        const dip = !crossed && i + 1 < pts.length
+          && Math.abs(gaps[i]) < Math.abs(gaps[i - 1]) && Math.abs(gaps[i]) <= Math.abs(gaps[i + 1]);
+        if(!crossed && !dip) continue;
+        let t;
+        if(crossed){
+          let lo = times[i - 1], hi = times[i];
+          const loInside = at(lo) < 0;
+          for(let k = 0; k < 40; k++){
+            const mid = (lo + hi) / 2;
+            if((at(mid) < 0) === loInside) lo = mid; else hi = mid;
+          }
+          t = (lo + hi) / 2;
+        }else{
+          // No sign to chase: close in on the smallest gap there is.
+          let lo = times[i - 1], hi = times[i + 1];
+          const phi = (Math.sqrt(5) - 1) / 2;
+          let x = hi - phi * (hi - lo), y = lo + phi * (hi - lo);
+          let fx = Math.abs(at(x)), fy = Math.abs(at(y));
+          for(let k = 0; k < 60 && hi - lo > 1e-9; k++){
+            if(fx < fy){ hi = y; y = x; fy = fx; x = hi - phi * (hi - lo); fx = Math.abs(at(x)); }
+            else{ lo = x; x = y; fx = fy; y = lo + phi * (hi - lo); fy = Math.abs(at(y)); }
+          }
+          t = (lo + hi) / 2;
+          const here = propagate(mu, seg.r0, seg.v0, t - seg.t0).r;
+          if(Math.abs(gap(here)) > railRadiusAt(b, Math.atan2(here[1], here[0])) * 1e-6) continue;
         }
-        const t = (lo + hi) / 2;
         if(t <= tNow + minLead) continue;
+        // One mark per touch, however many samples noticed it.
+        if(out.some(c => c.body === b.id && Math.abs(c.t - t) < 1e-3)) continue;
         out.push({
           segIndex: si, body: b.id, t,
           r: propagate(mu, seg.r0, seg.v0, t - seg.t0).r,

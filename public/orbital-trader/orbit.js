@@ -180,6 +180,16 @@ export function elementsFromState(mu, r, v, floor = 0){
   return { a, e, rp, ra, omega, nu, period: T, energy, h, dir: h >= 0 ? 1 : -1, vmax, p, bound };
 }
 
+/* Where a conic is at a given true anomaly, in the frame the elements are in.
+ * `nu` is measured the way elementsFromState reports it — increasing with
+ * time whichever way round the ship is going — so a retrograde orbit is read
+ * back the same way it was written. */
+export function conicPointAt(el, nu){
+  const r = el.p / (1 + el.e * Math.cos(nu));
+  const th = el.omega + (el.dir >= 0 ? nu : -nu);
+  return [r * Math.cos(th), r * Math.sin(th)];
+}
+
 /* Time from now until the ship next reaches periapsis (or apoapsis), on an
  * elliptical orbit. Null on an escape trajectory when the point is behind us. */
 export function timeToAnomaly(mu, r, v, targetNu){
@@ -1260,8 +1270,39 @@ function finishSegment(world, start, body, t1, r1, v1, reason, opts){
   if(opts.noSamples){
     return { body: body.id, t0: start.t, t1, r0: start.r, v0: start.v, r1, v1, elements: el, points: [], times: [], scan: [], scanTimes: [], reason, lapped };
   }
+  /* Sampled evenly in angle, not evenly in time.
+   *
+   * On anything eccentric the ship covers most of its arc in a small part of
+   * its time: a fast flyby spends two days crawling in and a few minutes
+   * whipping round the bottom. Equal steps of time therefore put almost no
+   * points at the periapsis — which is the one part of the path that bends,
+   * and the one a pilot aims. Measured on a flyby of Grumm: twenty-five points
+   * over sixty-six hours, and the two either side of the low point a hundred
+   * and sixty thousand kilometres apart, across a periapsis eight thousand
+   * kilometres up. The chart drew a straight line through the manoeuvre and
+   * nudging the burn moved it by nothing anyone could see.
+   *
+   * Equal steps of true anomaly put the points where the corner is. Position
+   * comes straight off the conic — no Newton iteration per point — and the
+   * time each one happens at is Kepler's equation, which is what
+   * `timeToAnomaly` already answers. */
+  const span0 = elementsFromState(mu, start.r, start.v);
+  const usable = span0.p > 0 && span0.e >= 0 && Number.isFinite(span0.e) && Math.abs(span0.h) > 1e-15;
+  let sweep = 0;
+  if(usable){
+    if(lapped) sweep = TAU;
+    else{
+      const nu1 = elementsFromState(mu, r1, v1).nu;
+      sweep = ((nu1 - span0.nu) % TAU + TAU) % TAU;
+      // A leg that has barely moved, or one that has gone right round.
+      if(!(sweep > 1e-9)) sweep = dur > 0 ? TAU : 0;
+    }
+  }
   let n;
-  if(Number.isFinite(el.period)){
+  if(usable && sweep > 0){
+    // Enough points that a degree or so of arc separates them, within the cap.
+    n = Math.round(Math.min(cap, Math.max(24, 240 * sweep / TAU)));
+  }else if(Number.isFinite(el.period)){
     n = Math.round(Math.min(cap, Math.max(24, 240 * span / el.period)));
   }else{
     n = Math.round(Math.min(cap, Math.max(24, span / (opts.hyperbolicStep ?? 0.25))));
@@ -1270,11 +1311,25 @@ function finishSegment(world, start, body, t1, r1, v1, reason, opts){
   const times = new Array(n + 1);
   for(let i = 0; i <= n; i++){
     const f = i / n;
+    if(usable && sweep > 0){
+      const nu = span0.nu + sweep * f;
+      points[i] = conicPointAt(span0, nu);
+      /* The clock at that angle. Only the drawn lap is sampled, so a moment is
+         never more than one turn ahead and the first answer is the right one;
+         where the conic cannot say (an asymptote on the way past), fall back to
+         spreading the leg's own duration evenly, which is what this did all
+         along. */
+      const dt = i === 0 ? 0 : timeToAnomaly(mu, start.r, start.v, nu);
+      times[i] = start.t + (dt == null || !Number.isFinite(dt) ? span * f : Math.min(dt, span));
+      continue;
+    }
     const dt = span * f;
     const s = (!lapped && i === n) ? { r: r1 } : propagate(mu, start.r, start.v, dt);
     points[i] = s.r;
     times[i] = start.t + dt;
   }
+  // The leg ends exactly where it ends, whatever the last sample rounded to.
+  if(!lapped){ points[n] = r1; times[n] = t1; }
   /* A second, coarser set over the *whole* leg, for the searches rather than
      the drawing. closestApproach hunts for the nearest pass to a world, and a
      leg that laps fifty times may only line up with a moon on the fortieth —

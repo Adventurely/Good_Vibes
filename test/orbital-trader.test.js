@@ -3882,3 +3882,70 @@ test('but a moon the road reaches on the lap in front of you still is', () => {
   assert.ok(pred.events.some(e => e.kind === 'soi' && e.to === 'moss'), 'the door into Moss is gone');
   assert.ok(pred.intercept && pred.intercept.body === 'moss', 'the encounter at Moss is gone');
 });
+
+/* ------------------------------------------- what the drawn line is made of */
+
+test('a fast flyby is drawn finely where it bends, not where it is slow', () => {
+  /* The chart sampled a leg at equal steps of *time*. On anything eccentric
+     the ship covers most of its arc in a small part of its time — a flyby
+     spends two days crawling in and minutes whipping round the bottom — so
+     equal time steps put almost no points at the periapsis, which is the only
+     part that bends and the one a pilot aims. Measured on this very flyby: two
+     points either side of the low point a hundred and sixty thousand
+     kilometres apart, across a periapsis eight thousand kilometres up. The
+     chart drew a straight line through the manoeuvre. */
+  const g = world.get('grumm');
+  const s = S.newGame(4); S.undock(s); s.nodes = []; s.keys.heatShield = true;
+  const rp = g.radius + (g.atmo - g.radius) * 0.55, r0 = g.soi * 0.95;
+  const vInf = 1.2 * Math.sqrt(g.mu / rp), vp = Math.sqrt(vInf * vInf + 2 * g.mu / rp);
+  const h = rp * vp, v0 = Math.sqrt(vInf * vInf + 2 * g.mu / r0), vt = h / r0;
+  s.ship = { body: 'grumm', r: [r0, 0], v: [-Math.sqrt(Math.max(0, v0 * v0 - vt * vt)), vt] };
+  const seg = S.planImmediate(s, true, {}).segments[0];
+  assert.ok(!Number.isFinite(seg.elements.period), 'this leg is meant to be a hyperbola');
+
+  const pts = seg.points, ts = seg.times;
+  // Every sample is on the real path, not near it.
+  for(let i = 0; i < pts.length; i++){
+    const truth = O.propagate(g.mu, seg.r0, seg.v0, ts[i] - seg.t0).r;
+    assert.ok(O.dist(pts[i], truth) < seg.elements.rp * 1e-6, `sample ${i} is off the path`);
+  }
+  // And the line between them does not cut the corner at the bottom.
+  let worst = 0;
+  for(let i = 1; i < pts.length; i++){
+    const tm = (ts[i - 1] + ts[i]) / 2;
+    const mid = [(pts[i - 1][0] + pts[i][0]) / 2, (pts[i - 1][1] + pts[i][1]) / 2];
+    const truth = O.propagate(g.mu, seg.r0, seg.v0, tm - seg.t0).r;
+    worst = Math.max(worst, O.dist(mid, truth) / O.norm(truth));
+  }
+  assert.ok(worst < 0.01, `the drawn line strays ${(worst * 100).toFixed(2)}% of the way to the world it is bending round`);
+
+  /* The point of all that: the low point is drawn where it really is, so a
+     burn nudged against it moves something a player can see. */
+  let closest = Infinity;
+  for(const p of pts) closest = Math.min(closest, O.norm(p));
+  assert.ok(Math.abs(closest - seg.elements.rp) < seg.elements.rp * 1e-4,
+    `the drawn low point is ${((closest - seg.elements.rp) * 1.474e8).toFixed(0)} km off the real one`);
+});
+
+test('a transfer that just touches a rail is marked where it touches', () => {
+  /* A Hohmann does not cut the orbit it is aimed at, it grazes it: the apsis
+     touches and turns back, so there is no change of sign to find. The mark
+     was only ever appearing by floating-point luck in the old coarse sampling,
+     and sampling the curve properly took the luck away. */
+  const g = S.newGame(5);
+  g.dockedAt = null; g.justLeft = null; g.t = 0;
+  const from = O.absState(world, 'tassel', 0), mu = world.get('lamp').mu;
+  const r1 = O.norm(from.r), toR = world.get('veyra').a;
+  g.ship = { body: 'lamp', r: [...from.r],
+    v: O.scale(O.unit(from.v), Math.sqrt(mu / r1) * Math.sqrt(2 * toR / (r1 + toR))) };
+  const list = railCrossings(world, S.planImmediate(g), g.t, { minLead: S.MIN_LEAD, limit: 8 });
+  const veyra = list.filter(c => c.body === 'veyra');
+  assert.equal(veyra.length, 1, `the graze is marked ${veyra.length} times, not once`);
+  assert.ok(Math.abs(O.norm(veyra[0].r) - toR) < toR * 1e-6, 'and the mark is not on the rail it grazes');
+  // And nothing is marked for a rail the road never reaches.
+  for(const c of list){
+    const b = world.get(c.body);
+    const railR = b.e ? b.a * (1 - b.e * b.e) / (1 + b.e * Math.cos(Math.atan2(c.r[1], c.r[0]) - (b.omega ?? 0))) : b.a;
+    assert.ok(Math.abs(O.norm(c.r) - railR) < Math.max(1e-9, railR * 1e-6), `${b.name}: the mark is not on its rail`);
+  }
+});
