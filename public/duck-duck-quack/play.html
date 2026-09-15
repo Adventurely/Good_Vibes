@@ -105,9 +105,12 @@
   .overlay h2{ margin: 0; font-size: 1.5rem; }
   .overlay p{ margin: 0; font-size: 0.9rem; max-width: 22rem; }
 
+  /* Auto-fit rather than a fixed count: the number of skills is whatever
+     content.js says it is, and a fifth one should wrap onto a second row
+     rather than squeeze four columns into five. */
   .skills{
-    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.5rem;
-    margin-top: 0.6rem;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
+    gap: 0.5rem; margin-top: 0.6rem;
   }
   .skill{
     font: inherit; cursor: pointer; text-align: left;
@@ -162,16 +165,18 @@
        out first, and a 320x180 scene only needs about 640x360 to satisfy
        that budget at 2x; the rest of a screen that is 900+ wide goes to
        margin on both sides of a canvas visibly smaller than the room it has.
-       Here specifically the fix is to let the canvas fill the available
-       height exactly (`height: 100%`, `width: auto`) instead of stepping
-       down to the next whole multiple, which is why the script skips
-       `fitCanvas` for this layout — see `fitScene`. */
-    .screen-col{ display: flex; justify-content: center; height: calc(100vh - 3rem); }
-    .screen{ height: 100%; width: auto; }
-    #scene{ height: 100%; width: auto; max-width: 100%; }
+
+       No height is set here on purpose. This layout used `100vh`, which on a
+       phone is the viewport with the browser's own chrome collapsed — room
+       the page does not actually have while that chrome is showing, so the
+       scene was sized past the bottom of the screen and the bottom of the
+       park went with it. What is actually available is measured in
+       `fitScene` instead, from `visualViewport` and the canvas's own
+       position, which are the real numbers; the script sets the size. */
+    .screen-col{ display: flex; justify-content: center; align-items: flex-start; }
 
     .sidebar{
-      max-height: calc(100vh - 3rem); overflow-y: auto;
+      max-height: 100dvh; overflow-y: auto;
       display: flex; flex-direction: column; gap: 0.5rem;
     }
 
@@ -540,16 +545,34 @@
      in the other layout — a load in portrait, then a rotation — has to be
      cleared explicitly, or it would keep the CSS from taking effect too. */
   const compactLandscape = matchMedia('(orientation: landscape) and (max-height: 560px)');
+
+  /* In the compact landscape layout the scene is sized to whichever of the
+     two dimensions actually runs out first, measured rather than assumed:
+     `visualViewport.height` is what the viewport really shows right now
+     (`innerHeight` counts room behind the browser's own chrome), and the
+     canvas's own top edge is where the header and padding above it have
+     already ended. The whole scene fits inside both, or it is not a fit. */
+  const GUTTER = 10;
   function fitScene(){
     if(compactLandscape.matches){
-      ui.scene.style.width = '';
-      ui.scene.style.height = '';
+      const top = screenWrap.getBoundingClientRect().top;
+      const viewH = (window.visualViewport && window.visualViewport.height) || innerHeight;
+      const availH = Math.max(60, viewH - top - GUTTER);
+      const availW = Math.max(60, screenWrap.clientWidth);
+      const scale = Math.min(availW / LEVEL_1.width, availH / LEVEL_1.height);
+      ui.scene.style.width = `${Math.floor(LEVEL_1.width * scale)}px`;
+      ui.scene.style.height = `${Math.floor(LEVEL_1.height * scale)}px`;
       return;
     }
+    ui.scene.style.width = '';
+    ui.scene.style.height = '';
     fitCanvas(ui.scene, LEVEL_1.width, LEVEL_1.height, { container: screenWrap, maxHeightFraction: 0.85 });
   }
   fitScene();
   addEventListener('resize', fitScene);
+  // The visual viewport changes without a `resize` when the browser's own
+  // chrome slides in or out, which is exactly when this needs redoing.
+  if(window.visualViewport) window.visualViewport.addEventListener('resize', fitScene);
   // iOS Safari can report the old innerHeight for a moment after a rotation,
   // so the fit right after `resize` fires is sometimes the stale one.
   addEventListener('orientationchange', () => setTimeout(fitScene, 120));

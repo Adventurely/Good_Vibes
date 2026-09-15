@@ -34,90 +34,102 @@ import { newGame, tick, assignSkill, hasTrait } from '../public/duck-duck-quack/
 const STRATEGIES = {
   /* The point of the deferred-activation fix, and of letting a duckling hold
      more than one trait at once: nothing waits for a precise column, and
-     nothing is one skill only. The first duckling gets every trait it could
-     possibly need at hatch — builder for the gap, digger for the drop,
-     climber for the wall between them — so it alone can clear all three
-     hazards and bridge/ramp them permanently for the rest of the flock,
-     which then only ever needs a climber. */
-  atHatch(state, mem){
-    mem.pathfinderGiven ??= false;
+     nothing is one skill only. Builder only ever needs to fire once — the
+     bridge it lays is permanent — but Climber and Flyer ride on whoever
+     holds them, so unlike the old digger-ramp, surviving the drop does not
+     get any cheaper for the ducklings behind the first. Every duckling here
+     gets all three the instant it hatches, which is the most a policy can
+     possibly hand out and the baseline every other strategy is judged
+     against. */
+  atHatch(state){
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
-      if(!mem.pathfinderGiven){
-        assignSkill(state, d.id, 'builder');
-        assignSkill(state, d.id, 'digger');
-        assignSkill(state, d.id, 'climber');
-        mem.pathfinderGiven = true;
-        continue;
-      }
+      if(!hasTrait(d, 'builder')) assignSkill(state, d.id, 'builder');
       if(!hasTrait(d, 'climber')) assignSkill(state, d.id, 'climber');
+      if(!hasTrait(d, 'flyer')) assignSkill(state, d.id, 'flyer');
     }
   },
 
-  /* The tightest correct timing: assigned on the exact column each hazard
-     starts on. This is the bot the title screen and the shelf card play, and
-     it has to keep winning — it is the one thing on this page that is also
-     asserted, in duck-duck-quack.test.js. */
+  /* The tightest correct timing: builder assigned on the exact column the
+     gap starts on, and climber/flyer each assigned on the exact column its
+     own hazard starts on. This is the bot the title screen and the shelf
+     card play, and it has to keep winning — it is the one thing on this
+     page that is also asserted, in duck-duck-quack.test.js. */
   atTheEdge(state, mem){
     mem.builderGiven ??= false;
-    mem.diggerGiven ??= false;
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
       if(!mem.builderGiven && d.x === 69 && assignSkill(state, d.id, 'builder')){ mem.builderGiven = true; continue; }
-      if(!mem.diggerGiven && d.x === 219 && assignSkill(state, d.id, 'digger')){ mem.diggerGiven = true; continue; }
       if(!hasTrait(d, 'climber') && d.x >= 130 && d.x < 150) assignSkill(state, d.id, 'climber');
+      else if(!hasTrait(d, 'flyer') && d.x === 219) assignSkill(state, d.id, 'flyer');
     }
   },
 
   /* A slower reaction: climbers are only ever given in the last three
      columns before the wall rather than the whole plateau approach, and
-     the gap/drop are handled at the last safe moment rather than the first. */
+     the gap is bridged at the last safe moment rather than the first. */
   justInTime(state, mem){
     mem.builderGiven ??= false;
-    mem.diggerGiven ??= false;
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
       if(!mem.builderGiven && d.x === 69 && assignSkill(state, d.id, 'builder')){ mem.builderGiven = true; continue; }
-      if(!mem.diggerGiven && d.x === 219 && assignSkill(state, d.id, 'digger')){ mem.diggerGiven = true; continue; }
       if(!hasTrait(d, 'climber') && d.x >= 147 && d.x < 150) assignSkill(state, d.id, 'climber');
+      else if(!hasTrait(d, 'flyer') && d.x === 219) assignSkill(state, d.id, 'flyer');
     }
   },
 
-  /* Spends exactly one builder, one digger, and stops handing out climbers
-     the moment the quota (winCount) has been given out — never the spare
-     the level's own supply carries. If The Park only wins with a climber to
-     spare, this is the strategy that says so. */
+  /* Spends exactly one builder, and stops handing out climbers and flyers
+     the moment the quota (winCount) of each has gone out — never the spare
+     the level's own supply carries for either. If The Park only wins with a
+     climber or a flyer to spare, this is the strategy that says so. */
   minimalSpend(state, mem){
     mem.builderGiven ??= false;
-    mem.diggerGiven ??= false;
     mem.climbersGiven ??= 0;
+    mem.flyersGiven ??= 0;
     const need = winCount(LEVEL_1);
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
       if(!mem.builderGiven && d.x === 69 && assignSkill(state, d.id, 'builder')){ mem.builderGiven = true; continue; }
-      if(!mem.diggerGiven && d.x === 219 && assignSkill(state, d.id, 'digger')){ mem.diggerGiven = true; continue; }
-      if(mem.climbersGiven >= need) continue;
-      if(!hasTrait(d, 'climber') && d.x >= 130 && d.x < 150){
+      if(mem.climbersGiven < need && !hasTrait(d, 'climber') && d.x >= 130 && d.x < 150){
         if(assignSkill(state, d.id, 'climber')) mem.climbersGiven += 1;
+        continue;
+      }
+      if(mem.flyersGiven < need && !hasTrait(d, 'flyer') && d.x === 219){
+        if(assignSkill(state, d.id, 'flyer')) mem.flyersGiven += 1;
       }
     }
   },
 
-  /* One fewer climber than the quota needs — the other side of the minimal-
-     spend question: is 8 really the floor, or does the level actually want
-     a spare? */
+  /* One fewer climber than the quota needs, flyers otherwise full — the
+     other side of the minimal-spend question, isolated to the wall: is 8
+     really the floor for Climber, or does the level actually want a spare? */
   climberShortOne(state, mem){
     mem.builderGiven ??= false;
-    mem.diggerGiven ??= false;
     mem.climbersGiven ??= 0;
     const need = winCount(LEVEL_1) - 1;
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
       if(!mem.builderGiven && d.x === 69 && assignSkill(state, d.id, 'builder')){ mem.builderGiven = true; continue; }
-      if(!mem.diggerGiven && d.x === 219 && assignSkill(state, d.id, 'digger')){ mem.diggerGiven = true; continue; }
-      if(mem.climbersGiven >= need) continue;
-      if(!hasTrait(d, 'climber') && d.x >= 130 && d.x < 150){
+      if(mem.climbersGiven < need && !hasTrait(d, 'climber') && d.x >= 130 && d.x < 150){
         if(assignSkill(state, d.id, 'climber')) mem.climbersGiven += 1;
+        continue;
+      }
+      if(!hasTrait(d, 'flyer') && d.x === 219) assignSkill(state, d.id, 'flyer');
+    }
+  },
+
+  /* One fewer flyer than the quota needs, climbers otherwise full — the
+     same question aimed at the drop instead of the wall. */
+  flyerShortOne(state, mem){
+    mem.builderGiven ??= false;
+    mem.flyersGiven ??= 0;
+    const need = winCount(LEVEL_1) - 1;
+    for(const d of state.ducks){
+      if(d.state !== 'walking') continue;
+      if(!mem.builderGiven && d.x === 69 && assignSkill(state, d.id, 'builder')){ mem.builderGiven = true; continue; }
+      if(!hasTrait(d, 'climber') && d.x >= 130 && d.x < 150){ assignSkill(state, d.id, 'climber'); continue; }
+      if(mem.flyersGiven < need && !hasTrait(d, 'flyer') && d.x === 219){
+        if(assignSkill(state, d.id, 'flyer')) mem.flyersGiven += 1;
       }
     }
   },
@@ -139,13 +151,12 @@ const STRATEGIES = {
   blockerAtGap(state, mem){
     mem.builderGiven ??= false;
     mem.blockerGiven ??= false;
-    mem.diggerGiven ??= false;
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
       if(!mem.builderGiven && d.x === 69 && assignSkill(state, d.id, 'builder')){ mem.builderGiven = true; continue; }
       if(mem.builderGiven && !mem.blockerGiven && d.x === 65 && assignSkill(state, d.id, 'blocker')){ mem.blockerGiven = true; continue; }
-      if(!mem.diggerGiven && d.x === 219 && assignSkill(state, d.id, 'digger')){ mem.diggerGiven = true; continue; }
       if(!hasTrait(d, 'climber') && d.x >= 130 && d.x < 150) assignSkill(state, d.id, 'climber');
+      else if(!hasTrait(d, 'flyer') && d.x === 219) assignSkill(state, d.id, 'flyer');
     }
   },
 

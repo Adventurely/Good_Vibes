@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="../theme.css">
 <title>Duck Duck Quack &mdash; guide the hatch home</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%234fc4d3'/%3E%3Ccircle cx='9' cy='7' r='4' fill='%23ffd34e'/%3E%3Cpath d='M12 7h2l-1 1z' fill='%23f08c33'/%3E%3C/svg%3E">
-<meta name="description" content="A duckling hatches and walks on its own, straight into whatever is in front of it. Give it a skill before it does — dig, build, block, climb — and get enough of the hatch to the pond before the goose does, or the clock does.">
+<meta name="description" content="A duckling hatches and walks on its own, straight into whatever is in front of it. Give it a skill before it does — dig, build, block, climb, fly — and get enough of the hatch to the pond before the goose does, or the clock does.">
 <style>
   :root{
     --ink: var(--gv-paper);
@@ -116,7 +116,7 @@
     <p class="eyebrow">Good Vibe Games</p>
     <h1>Duck Duck Quack</h1>
     <p class="tag">A duckling hatches and walks straight into whatever is ahead of it.
-       <b>Dig, build, block or climb</b> — give it a skill before it meets a gap, a
+       <b>Dig, build, block, climb or fly</b> — give it a skill before it meets a gap, a
        wall, a drop, or the goose — and get enough of the hatch to the pond.</p>
 
     <a class="enter" href="./play.html">Hatch the flock</a>
@@ -124,7 +124,7 @@
     <ul class="facts">
       <li>Single player</li>
       <li class="sun">Puzzle</li>
-      <li>One level, four skills</li>
+      <li>One level, five skills</li>
       <li>Nothing saved, nothing sent anywhere</li>
     </ul>
     <button type="button" id="sound" class="sound" aria-pressed="false">Music off</button>
@@ -199,23 +199,23 @@
   addEventListener('resize', fitPlate);
 
   /* The same simple policy the balance test plays the level with: bridge the
-     gap and clear the drop the moment either is possible, and hand out a
-     climber to anything unskilled that is nearing the wall. */
+     gap once, then give every duckling its own climber for the wall and its
+     own flyer for the drop off the far side of the plateau, since neither
+     of those leaves anything behind for the next one. */
   let state = newGame(LEVEL_1);
-  let builderUsed = false, diggerUsed = false;
+  let builderUsed = false;
 
   function playStep(){
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
       if(!builderUsed && d.x === 69 && assignSkill(state, d.id, 'builder')) builderUsed = true;
-      else if(!diggerUsed && d.x === 219 && assignSkill(state, d.id, 'digger')) diggerUsed = true;
       else if(!hasTrait(d, 'climber') && d.x >= 130 && d.x < 150) assignSkill(state, d.id, 'climber');
+      else if(!hasTrait(d, 'flyer') && d.x >= 160 && d.x < 219) assignSkill(state, d.id, 'flyer');
     }
     tick(state);
     if(state.ended){
       state = newGame(LEVEL_1);
       builderUsed = false;
-      diggerUsed = false;
     }
   }
 
