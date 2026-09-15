@@ -17,6 +17,9 @@ import {
   makeWorld, advance, predict, absState, railState, circularState, elementsFromState,
   timeToAnomaly, propagate, hohmann, lambert, period, norm, sub, add, scale, unit, perp, dist,
   closestApproach, nodeMagnitude, nodeCost, nodeFromVector, cross, dot, localState, TAU,
+  /* aliased: seedFromLambert has a local `frameAt` of its own, and two things
+     of that name one function apart is a trap waiting for the next edit. */
+  frameAt as burnFrameAt, driftTargetAt,
 } from './orbit.js';
 import {
   CONST, BODIES, GOODS, PORTS, UPGRADES, FORMULAS, TEXT, SPECIES,
@@ -266,7 +269,8 @@ export function dockingStatus(state){
     take({
       port: c.id, kind: 'zone', distance, relSpeed,
       mouth: c.zoneRadius, dockSpeed: c.dockSpeed,
-      inZone, slow, ok: inZone && slow,
+      inZone, slow, needsNavigator: !canDockDrifting(state),
+      ok: inZone && slow && canDockDrifting(state),
       over: Math.max(0, relSpeed - c.dockSpeed),
       score: distance / c.zoneRadius,
       open: portOpen(c.id, state.t),
@@ -282,7 +286,14 @@ export function dockingStatus(state){
 /* Why not, in the words a pilot would use. */
 export function dockRefusal(st){
   if(!st) return 'no port';
-  if(st.kind === 'zone') return st.inZone ? 'too fast' : 'too far';
+  if(st.kind === 'zone'){
+    /* Say the thing the player can act on first. Being far is a burn and being
+       fast is a burn; having nobody aboard who can do this is neither, so it
+       is said only once the approach itself was good. */
+    if(!st.inZone) return 'too far';
+    if(!st.slow) return 'too fast';
+    return st.needsNavigator ? 'no navigator' : 'too far out';
+  }
   if(!st.bound) return 'not in orbit';
   if(!st.clear) return 'that orbit goes through it';
   return 'too far out';
@@ -429,6 +440,43 @@ export function unseen(state){
  * it, so with one the chart will draw the crossing after the crossing, and the
  * button in the corner turns that off again. */
 export const canSeePast = state => !!state?.crew?.navigator;
+
+/* Coming alongside something with no gravity is station-keeping rather than
+ * orbiting: you match the thing's velocity and hold there while somebody gets
+ * a line across. Nothing is pulling you in and nothing will catch you if you
+ * are wrong, so it wants instruments — how close the path actually comes, and
+ * how fast you are closing — and those are what the cat navigator is for. */
+export const canDockDrifting = state => !!state?.crew?.navigator;
+
+/* The drifting thing this ship is currently flying near, with the two numbers
+ * that matter, or null. Distance at intercept is the closest the *current*
+ * path comes, which is the number you fly a rendezvous on — the range right
+ * now says nothing about whether you are going to arrive. */
+export function rendezvous(state){
+  if(!state || state.dockedAt) return null;
+  const here = world.get(state.ship.body);
+  const tgt = driftTargetAt(world, here.id, state.ship.r, state.t);
+  if(!tgt) return null;
+  const rel = sub(state.ship.r, tgt.r);
+  const vRel = sub(state.ship.v, tgt.v);
+  const range = norm(rel), speed = norm(vRel);
+  /* Closest approach on the straight line the pair are on right now. Over the
+     minutes a rendezvous actually takes, neither is turning enough for the
+     conic to matter, and a number that updates smoothly is worth more here
+     than one that is exact and jumps. */
+  const closing = speed > 0 ? -dot(rel, vRel) / speed : 0;
+  const atIntercept = closing > 0 ? Math.sqrt(Math.max(0, range * range - closing * closing)) : range;
+  const port = PORTS[tgt.id];
+  return {
+    target: tgt.id, reach: tgt.reach, range, speed,
+    closing: closing > 0, atIntercept,
+    timeToIntercept: closing > 0 && speed > 0 ? closing / speed : null,
+    mouth: world.get(tgt.id).zoneRadius,
+    dockSpeed: world.get(tgt.id).dockSpeed,
+    instruments: canDockDrifting(state),
+    open: port ? portOpen(tgt.id, state.t) : true,
+  };
+}
 export const seesPast = state => canSeePast(state) && state.farSight !== false;
 
 /* The chance a single pass hurts the hull, from the speed it sheds.
@@ -948,14 +996,19 @@ export function addNodeAhead(state){
  * that are already written on the buttons, and the fuel it costs is shown
  * against the fuel gauge where the word "fuel" is. Nothing about a burn that
  * slows you down now goes up. */
-export function burnWords(node){
+export function burnWords(node, relTo){
   if(!node) return 'nothing yet';
   const parts = [];
   const pro = node.prograde ?? 0, rad = node.radial ?? 0;
+  /* Near something drifting, the same two numbers mean something else: forward
+     is along your speed relative to it, and the second axis points at it
+     rather than out of an orbit. Same axes, different sentence. */
   if(Math.abs(pro) > 1e-15) parts.push(`${pro > 0 ? 'forward' : 'back'} ${fmtKms(pro)}`);
-  if(Math.abs(rad) > 1e-15) parts.push(`${rad > 0 ? 'out' : 'in'} ${fmtKms(rad)}`);
+  if(Math.abs(rad) > 1e-15){
+    parts.push(relTo ? `${rad > 0 ? 'away' : 'toward'} ${fmtKms(rad)}` : `${rad > 0 ? 'out' : 'in'} ${fmtKms(rad)}`);
+  }
   if(!parts.length) return 'nothing yet';
-  return parts.join(' · ');
+  return parts.join(' · ') + (relTo ? ` · on ${relTo}` : '');
 }
 
 export function planCost(state, horizon){
@@ -1438,7 +1491,7 @@ function pickSeed(state, node, candidates, scoreFn, reference){
   const shortlist = [...new Set([...candidates.slice(0, 6), ...byTime.slice(0, 4)])];
   const scored = [];
   for(const c of shortlist){
-    const parts = nodeFromVector(c.r, c.v, c.dv);
+    const parts = nodeFromVector(c.r, c.v, c.dv, burnFrameAt(world, c.body ?? state.ship.body, c.r, c.v, state.t + c.dep));
     if(!parts) continue;
     node.t = state.t + c.dep;
     node.prograde = parts.prograde;

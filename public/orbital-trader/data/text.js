@@ -46,6 +46,11 @@ export const NARRATIVE = {
    "term": "docking range",
    "plain": "docking zone",
    "tip": "Get into a steady orbit whose high point is inside this and you can dock. Generous, on purpose."
+  },
+  {
+   "term": "coming alongside",
+   "plain": "rendezvous",
+   "tip": "Some things out here have no pull at all, so there is no orbit to fall into: you arrive by being in the same place going the same speed. Near one of those, forward and back are measured against it rather than against the world you are going round, and out and in become away and toward."
   }
  ],
  "ports": {
@@ -360,10 +365,10 @@ export const NARRATIVE = {
     "id": "navigator",
     "name": "Navigator",
     "species": "cat",
-    "does": "Reads a rock an au off and tells you which way it is going.",
+    "does": "Reads a rock an au off, and can hold a ship still beside one.",
     "person": {
      "name": "Celia",
-     "line": "Can read a rock an au off and tell you which way it is going. Says almost nothing, and is always already looking at the thing you are about to point at. On her second day aboard she marks a point of empty sky between Tassel and the Belt and says: go round that one, not past it."
+     "line": "Can read a rock an au off and tell you which way it is going. Says almost nothing, and is always already looking at the thing you are about to point at. On her second day aboard she marks a point of empty sky between Tassel and the Belt and says: go round that one, not past it. She can also put a ship alongside something that is not holding still, which is a thing almost nobody can do."
     }
    },
    {
@@ -428,7 +433,8 @@ export const NARRATIVE = {
   "repairHull": "They put the ship on a cradle, walk round it twice, and tell you what it will cost before they tell you what is wrong. Then they fix it properly, which takes longer and is the reason you came here.",
   "repairFuelCell": "The cell comes out in one piece, which surprises everybody, and the new one goes in while you wait. The gauge goes back to telling the truth.",
   "knotRevealed": "Celia puts a finger on a stretch of chart with nothing in it and waits for you to stop arguing. There is something there a kilometre across with Grumm's pull in it, and the cats have known for nine generations. Fly close enough and it will turn you most of the way round for nothing. She does not say why nobody mentions it, and from the way she says nothing, it is not a secret so much as a courtesy.",
-  "firstKnotPass": "You go round the outside of nothing at all and come out pointed somewhere else entirely, faster, with the tank exactly as full as it was. Behind you the Knot goes on not being there."
+  "firstKnotPass": "You go round the outside of nothing at all and come out pointed somewhere else entirely, faster, with the tank exactly as full as it was. Behind you the Knot goes on not being there.",
+  "firstRendezvous": "Celia takes the numbers off the board without being asked: how close the path actually comes, and how fast you are closing. Neither is the range, which she says is the number people watch when they want to be reassured rather than informed. You match speed with a thing that has no pull at all and hold there, and the hold is the whole trick."
  },
  "opening": {
   "title": "A crate for your Aunt Nellie",

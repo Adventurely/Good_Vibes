@@ -176,7 +176,7 @@ export const TUNING = {
    "retrograde": false,
    "mu": 1.2e-9,
    "radius": 5e-9,
-   "zoneRadius": 0.0004276412779571304,
+   "zoneRadius": 3e-8,
    "port": false,
    "species": null,
    "climate": "none",
@@ -216,7 +216,7 @@ export const TUNING = {
    "retrograde": false,
    "mu": 1.2e-13,
    "radius": 0.0000022,
-   "zoneRadius": 0.0000132,
+   "zoneRadius": 0.000013199999999999999,
    "port": true,
    "species": "cat",
    "climate": "micro",
@@ -371,7 +371,8 @@ export const TUNING = {
    "species": null,
    "climate": "cold",
    "notes": "A miniature black hole on an orbit nothing explains, with a Builder station keeping station on it. The last question.",
-   "soi": null
+   "soi": null,
+   "driftReach": 0.04
   }
  ],
  "belt": {
@@ -506,6 +507,7 @@ export const TUNING = {
   "tassel": 120,
   "slate": 1.15,
   "moss": 3.4,
+  "knot": 220.45,
   "nail": 378.3,
   "whisker": 440.6,
   "arc": 532.39,

@@ -668,6 +668,10 @@
   <div class="stat"><small>Coin</small><b id="h-money">—</b></div>
   <div class="stat"><small>Hold</small><b id="h-hold">—</b></div>
   <div class="stat" id="clock-stat" hidden><small>Clock</small><b id="h-warp">—</b></div>
+  <!-- What a cat navigator is for: not the range now, which says nothing about
+       whether you arrive, but how close the path actually comes and how fast
+       you are closing. Only drawn with her aboard and only near a drift. -->
+  <div class="stat" id="rv-stat" hidden><small>Rendezvous</small><b id="h-rv">—</b></div>
   <div class="stat" id="where"><small>Where</small><b id="h-where">—</b><span id="dockhint"></span></div>
 </header>
 <a id="back" href="./">&larr; title</a>
@@ -893,7 +897,8 @@ function refreshNodeLabel(){
   /* Direction words, not a length. "0.12 km/s" is the fuel this will burn,
      and two playtesters braking at Slate read it as their speed and were
      baffled that pressing Back made it climb. The fuel is on the gauge. */
-  nodeLabel = n ? `${S.burnWords(n)} · in ${S.fmtDays(n.t - state.t)}` : null;
+  const rvNow = S.rendezvous(state);
+  nodeLabel = n ? `${S.burnWords(n, rvNow ? S.portName(rvNow.target) : null)} · in ${S.fmtDays(n.t - state.t)}` : null;
 }
 function frame(now){
   const real = Math.min(0.1, (now - last) / 1000);
@@ -1002,6 +1007,21 @@ function handleEvents(events){
 
 /* ------------------------------------------------------------- HUD */
 
+/* Distance at intercept and relative speed, which are the two numbers a
+   rendezvous is actually flown on. Without a navigator the ship is still in
+   the reach and the axes still point at the target — she is the instruments,
+   not the physics — so the readout is hers and the flying is not. */
+function showRendezvous(){
+  const box = $('rv-stat');
+  const rv = S.rendezvous(state);
+  if(!rv || !rv.instruments){ box.hidden = true; return; }
+  box.hidden = false;
+  const miss = rv.closing ? fmtAu(rv.atIntercept) : fmtAu(rv.range) + ' (opening)';
+  $('h-rv').textContent = `${miss} · ${S.fmtKms(rv.speed)}`;
+  box.title = `Closest the path comes to ${S.portName(rv.target)}, and how fast you are closing.`
+    + (rv.timeToIntercept != null ? ` Nearest in ${S.fmtDays(rv.timeToIntercept)}.` : '');
+}
+
 function showHazard(){
   const box = $('h-hazard'), skim = $('haz-skim'), crash = $('haz-crash');
   const ground = hazard.crash, air = hazard.skim;
@@ -1027,6 +1047,7 @@ function showHazard(){
 function renderHud(docking){
   showHazard();
   refreshFarButton();
+  showRendezvous();
   /* The tank, and what the plan will take out of it. The cost of a burn is
      shown here and nowhere near the burn itself: it is a length of fuel, and
      next to a mark it read as a speed — which made pressing Back to slow down
@@ -1904,6 +1925,7 @@ function plan(){
     out += '<p class="say">Nothing written down. Tap your path on the chart and choose <b>Plan a burn</b>.</p>';
   }else{
     out += `<p>These cost <b class="${short ? 'down' : ''}">${S.fmtKms(cost)}</b> of your ${S.fmtKms(state.dv)}.${short ? ' <span class="down">The tank will not cover it.</span>' : ''}</p>`;
+    const drifting = !!S.rendezvous(state);
     state.nodes.forEach((n, i) => {
       const where = nodePositions[i];
       const frame = where ? world.get(where.body).name : '?';
@@ -1911,7 +1933,7 @@ function plan(){
       out += `<div class="node ${i === selectedNode ? 'sel' : ''}" data-act="selnode|${i}">
         <b>Burn ${i + 1}</b>
         <small>in ${S.fmtDays(n.t - state.t)} · ${esc(frame)}'s gravity</small>
-        <small>${fwd >= 0 ? 'forward' : 'back'} ${Math.abs(fwd)} m/s · ${side >= 0 ? 'out' : 'in'} ${Math.abs(side)} m/s</small>
+        <small>${fwd >= 0 ? 'forward' : 'back'} ${Math.abs(fwd)} m/s · ${drifting ? (side >= 0 ? 'away' : 'toward') : (side >= 0 ? 'out' : 'in')} ${Math.abs(side)} m/s</small>
         <small class="lock">uses ${S.fmtKms(marks[i]?.cost ?? 0)} of fuel</small>
       </div>`;
     });
@@ -2267,8 +2289,9 @@ function doDock(){
       'not in orbit': 'Get into an orbit round it first.',
       'that orbit goes through it': 'That orbit goes through the ground. Raise the low point.',
       'too far out': 'The high point is outside docking range. Bring it in.',
+      'no navigator': 'Nothing here is holding still, and nobody aboard can hold the ship against it. A cat navigator can.',
     };
-    toast(WHY[r.reason] ?? 'No port nearby.', 'bad');
+    toast(WHY[r.reason] ?? 'No port nearby.', 'bad', r.reason === 'no navigator' ? 7000 : 4000);
     return;
   }
   stopSkip();

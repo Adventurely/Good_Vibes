@@ -1257,7 +1257,10 @@ test('a burn that slows you down never reads as a number going up', () => {
 
 test('the cost of a burn is shown against the fuel, not against the burn', () => {
   const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
-  assert.match(PLAY, /nodeLabel = n \? `\$\{S\.burnWords\(n\)\}/, 'the mark is labelled with a length of engine again');
+  /* The label is words, not a bare length of engine. It takes a second
+     argument now — the drifting thing the axes are measured against, when
+     there is one — so the guard checks the call rather than its arity. */
+  assert.match(PLAY, /nodeLabel = n \? `\$\{S\.burnWords\(n[,)]/, 'the mark is labelled with a length of engine again');
   assert.doesNotMatch(PLAY, /nodeLabel = `\$\{S\.fmtKms/, 'the old bare-magnitude label is back');
   assert.match(PLAY, /planned`/, 'the gauge does not say what the plan will spend');
   assert.match(PLAY, /id="h-dvplan"/, 'the gauge has no planned-spend segment');
@@ -2321,17 +2324,27 @@ test('the two big rocks in the Belt are worlds you orbit', () => {
   }
 });
 
-test('the Maw is a rendezvous zone you match speeds with', () => {
-  /* No mass, so no reach and nothing to fall towards: you arrive by being in
-     the same place going the same way. Gating this on a navigator is a later
-     job; today anybody who can get there can tie up. */
+test('the Maw is a rendezvous you need a navigator to finish', () => {
+  /* No mass, so no reach to fall into and nothing to catch a mistake: you
+     arrive by being in the same place going the same way, and holding a ship
+     there against nothing is the cat's trick the navigator's berth buys. */
   const b = world.get('maw');
   assert.equal(b.mu, 0);
-  assert.equal(b.soi, null);
+  assert.equal(b.soi, null, 'no gravity well');
+  assert.ok(b.driftReach > b.zoneRadius * 2, 'but a reach for the axes, and a large one');
   assert.ok(b.port && b.zoneRadius > 0 && b.dockSpeed > 0);
+
+  const green = S.newGame(2);
+  S.undock(green); green.t = 1000;
+  parkAt(green, 'maw');
+  const st = S.dockingStatus(green);
+  assert.ok(st.inZone && st.slow, 'the approach itself is good');
+  assert.equal(st.ok, false);
+  assert.equal(S.dock(green).reason, 'no navigator', 'and it says which piece is missing');
+
   const far = S.newGame(2);
-  S.undock(far);
-  far.t = 1000;
+  S.undock(far); far.t = 1000;
+  far.crew.navigator = { role: 'navigator' };
   parkAt(far, 'maw');
   const r = S.dock(far);
   assert.ok(r.ok && far.flags.mawArrival, 'the Maw had nothing to say');
@@ -3048,4 +3061,104 @@ test('a stock ship can capture at both rocks and get away again', () => {
     /* And the mouth is wide enough to aim at: several times the ground. */
     assert.ok(b.zoneRadius / b.radius >= 5, `${id}: mouth is ${(b.zoneRadius / b.radius).toFixed(1)} radii`);
   }
+});
+
+/* ---------------------------------------------------- flying a rendezvous */
+
+test('a drifting thing has a reach that bends thrust and nothing else', () => {
+  const maw = world.get('maw');
+  assert.equal(maw.mu, 0, 'no gravity');
+  assert.equal(maw.soi, null, 'and so no gravitational reach');
+  assert.ok(maw.driftReach > maw.zoneRadius, 'but a reach all the same, and a large one');
+
+  const lamp = world.get('lamp');
+  const t = 2000;
+  const m = O.railState(maw, lamp.mu, t);
+  const inside = [m.r[0] + maw.driftReach * 0.2, m.r[1]];
+  const outside = [m.r[0] + maw.driftReach * 2, m.r[1]];
+  assert.ok(O.driftTargetAt(world, 'lamp', inside, t), 'inside the reach');
+  assert.equal(O.driftTargetAt(world, 'lamp', outside, t), null, 'and outside it');
+
+  /* The reach does nothing to the path: a ship coasting through it is on the
+     same conic it would be on if the Maw were not there. */
+  const s = S.newGame(6); S.undock(s); s.t = t; s.nodes = [];
+  s.ship = { body: 'lamp', r: inside, v: [m.v[0] + 0.002, m.v[1] + 0.001] };
+  const before = O.elementsFromState(lamp.mu, s.ship.r, s.ship.v);
+  S.tick(s, 0.5);
+  const after = O.elementsFromState(lamp.mu, s.ship.r, s.ship.v);
+  assert.ok(Math.abs(after.a - before.a) / before.a < 1e-6, 'coasting through changed the orbit');
+  assert.equal(s.ship.body, 'lamp', 'and never captured it');
+});
+
+test('inside the reach, the axes are measured against the target', () => {
+  const lamp = world.get('lamp'), maw = world.get('maw'), t = 2000;
+  const m = O.railState(maw, lamp.mu, t);
+  const r = [m.r[0] + 0.004, m.r[1] + 0.002];
+  const v = [m.v[0] - 0.0005, m.v[1] + 0.0003];
+
+  const f = O.frameAt(world, 'lamp', r, v, t);
+  const vRel = O.sub(v, m.v), away = O.sub(r, m.r);
+  /* Forward is along the speed relative to it, not along the orbit. */
+  assert.ok(Math.abs(O.dot(f.pro, O.unit(vRel)) - 1) < 1e-9, 'forward is relative prograde');
+  /* The second axis points at it — out is away, in is toward. */
+  assert.ok(O.dot(f.out, away) > 0, 'out is away from the target');
+  /* And they are still at right angles, which is what makes a mark cost the
+     hypotenuse of its own two numbers. */
+  assert.ok(Math.abs(O.dot(f.pro, f.out)) < 1e-12, 'the axes lean');
+
+  /* Well outside, it is the ordinary frame again. */
+  const farR = [m.r[0] + maw.driftReach * 3, m.r[1]];
+  const plain = O.frameAt(world, 'lamp', farR, v, t);
+  const ordinary = O.burnFrame(farR, v);
+  assert.ok(Math.abs(O.dot(plain.pro, ordinary.pro) - 1) < 1e-12, 'outside the reach nothing changed');
+});
+
+test('the two marks do the two jobs a rendezvous needs', () => {
+  const lamp = world.get('lamp'), t = 2000;
+  const m = O.railState(world.get('maw'), lamp.mu, t);
+  const make = () => {
+    const s = S.newGame(6); S.undock(s); s.t = t; s.dv = s.tank;
+    s.crew.navigator = { role: 'navigator' };
+    s.ship = { body: 'lamp', r: [m.r[0] + 0.004, m.r[1] + 0.002], v: [m.v[0] - 0.0005, m.v[1] + 0.0003] };
+    s.nodes = [];
+    return s;
+  };
+  const fly = s => { for(let i = 0; i < 8; i++) S.tick(s, 0.005); return S.rendezvous(s); };
+
+  const a = make(), start = S.rendezvous(a);
+  assert.ok(start && start.closing, 'the ship is closing on it');
+  a.nodes = [{ t: a.t + 0.01, prograde: -start.speed * 0.6, radial: 0 }];
+  const slowed = fly(a);
+  assert.ok(slowed.speed < start.speed * 0.5, `back should kill relative speed: ${S.fmtKms(start.speed)} -> ${S.fmtKms(slowed.speed)}`);
+
+  const b = make();
+  b.nodes = [{ t: b.t + 0.01, prograde: 0, radial: -start.speed * 0.15 }];
+  const steered = fly(b);
+  assert.ok(steered.atIntercept < start.atIntercept, 'toward should tighten the pass');
+  assert.ok(Math.abs(steered.speed - start.speed) / start.speed < 0.1,
+    'and should barely touch the speed along the track');
+});
+
+test('the navigator is the instruments, not the physics', () => {
+  const lamp = world.get('lamp'), t = 2000;
+  const m = O.railState(world.get('maw'), lamp.mu, t);
+  const at = nav => {
+    const s = S.newGame(6); S.undock(s); s.t = t;
+    if(nav) s.crew.navigator = { role: 'navigator' };
+    s.ship = { body: 'lamp', r: [m.r[0] + 0.004, m.r[1]], v: [m.v[0], m.v[1] + 0.0004] };
+    s.nodes = [];
+    return s;
+  };
+  const green = at(false), crewed = at(true);
+  /* The axes bend for everybody: she does not change how a ship flies. */
+  const f1 = O.frameAt(world, 'lamp', green.ship.r, green.ship.v, t);
+  const f2 = O.frameAt(world, 'lamp', crewed.ship.r, crewed.ship.v, t);
+  assert.deepEqual(f1, f2, 'the frame is the same with or without her');
+  /* What she brings is the two numbers, and the docking they make possible. */
+  assert.equal(S.rendezvous(green).instruments, false);
+  assert.equal(S.rendezvous(crewed).instruments, true);
+  const rv = S.rendezvous(crewed);
+  assert.ok(Number.isFinite(rv.atIntercept) && Number.isFinite(rv.speed), 'both readouts are numbers');
+  assert.equal(S.canDockDrifting(green), false);
+  assert.equal(S.canDockDrifting(crewed), true);
 });

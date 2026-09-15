@@ -369,7 +369,8 @@
    "species": null,
    "climate": "cold",
    "notes": "A miniature black hole on an orbit nothing explains, with a Builder station keeping station on it. The last question.",
-   "soi": null
+   "soi": null,
+   "driftReach": 0.04
   }
  ],
  "belt": {
