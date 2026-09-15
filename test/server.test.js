@@ -287,10 +287,37 @@ test('POST something that is not JSON is a 400', async () => {
   assert.equal((await res.json()).error, 'That was not JSON.');
 });
 
+test('a row can be taken off the board again, over the wire', async () => {
+  const id = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
+  const post = await fetch(`${baseUrl}${BOARD}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, name: 'Leaver', stats: { taps: 12, winters: 1, earned: 5, peakTaps: 2 } }),
+  });
+  assert.equal(post.status, 200);
+  assert.ok((await post.json()).boards.taps.some(r => r.name === 'Leaver'));
+
+  const gone = await fetch(`${baseUrl}${BOARD}`, {
+    method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id }),
+  });
+  assert.equal(gone.status, 200);
+  const after = await gone.json();
+  assert.equal(after.removed, true);
+  assert.ok(!after.boards.taps.some(r => r.name === 'Leaver'), 'the row must be off every board');
+
+  const check = await (await fetch(`${baseUrl}${BOARD}`)).json();
+  assert.ok(!check.boards.taps.some(r => r.name === 'Leaver'), 'and stay off it');
+
+  const nonsense = await fetch(`${baseUrl}${BOARD}`, {
+    method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: 'nobody' }),
+  });
+  assert.equal(nonsense.status, 400);
+});
+
 test('PUT the board is a 405, and the static 405 still holds elsewhere', async () => {
   const res = await fetch(`${baseUrl}${BOARD}`, { method: 'PUT', body: '{}' });
   assert.equal(res.status, 405);
-  assert.equal(res.headers.get('allow'), 'GET, POST');
+  assert.equal(res.headers.get('allow'), 'GET, POST, DELETE');
   assert.deepEqual(Object.keys(await res.json()), ['error']);
 
   // The board is the only path that takes a POST. Anywhere else is what it was.

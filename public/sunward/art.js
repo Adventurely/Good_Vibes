@@ -1055,17 +1055,76 @@ export function paintTree(dst, growth, { sway = 0, light = 1, sunSide = -1, shak
 }
 
 
-/* Paint the tree onto `ctx`: through the buffer where there is one, and
-   through the canvas calls where there is not. */
+/* The light a tap puts into the tree.
+ *
+ * A tap is energy going out of a finger and into a tree. The tree used to
+ * answer one by jumping sideways, which is what a tree does when something
+ * hits it — the wrong verb entirely for what the game is about. This is the
+ * right one: a light that starts where the finger landed and spreads out
+ * through the leaves, brightest at the moment of contact and gone half a
+ * second later.
+ *
+ * Softness in sixteen colours is dithering, because there is no alpha here.
+ * The disc is bone in the middle, through gold, to ember at its edge, and
+ * every pixel of it is thinned against the same ordered matrix the sky is
+ * graded with. It widens as it thins, so what the eye follows is an edge
+ * travelling outward rather than a circle being scaled up.
+ *
+ * Drawn at full light whatever the hour, like the fireflies and the lanterns:
+ * it is not a thing the sun is falling on, it is a thing giving light off.
+ */
+export const GLOW_MS = 600;
+
+export function paintGlow(dst, x, y, age, size = 1){
+  const t = Math.max(0, Math.min(1, age));
+  const R = Math.round((16 + 34 * size) * (0.3 + t * 0.7));
+  if(R <= 0) return;
+  /* It has to still be bright while it is getting wider, or what the eye sees
+     is a spark going out rather than a light travelling. The first cut faded
+     on the square of its age and had gone before it had spread at all — a
+     yellow smudge on the leaves and nothing more. */
+  const fade = Math.pow(1 - t, 1.45);
+  const cx = Math.round(x), cy = Math.round(y);
+  for(let dy = -R; dy <= R; dy++){
+    const row = cy + dy;
+    if(row < 0 || row >= SCENE_H) continue;
+    const half = Math.floor(Math.sqrt(Math.max(0, R * R - dy * dy)));
+    for(let dx = -half; dx <= half; dx++){
+      const col = cx + dx;
+      if(col < 0 || col >= SCENE_W) continue;
+      const d = Math.sqrt(dx * dx + dy * dy) / R;
+      /* Two parts. The veil is the whole disc, falling off towards its edge
+         and thinning as the light goes: it has to stay a dither and never a
+         fill, because a solid disc over the canopy is not a glow, it is a
+         hole in the tree. The core is the moment of contact only — cubed, so
+         it is gone within a fifth of the light's life, and while it is there
+         the pixel under the finger is solid. */
+      const density = fade * (1 - d) + fade * fade * fade * Math.max(0, 1 - d * 3);
+      if(density <= 0.02) continue;
+      if(BAYER[row & 3][col & 3] >= density * 16) continue;
+      dst.fill(d < 0.3 ? 'w' : d < 0.65 ? 'y' : 'o', 1, col, row, 1, 1);
+    }
+  }
+}
+
+/* Paint the tree onto `ctx`, and the light of any taps still ringing on it:
+   through the buffer where there is one, and through the canvas calls where
+   there is not. The light goes into the same buffer as the tree and down in
+   the same blit — it belongs on the tree, and a second layer would be a
+   second upload every frame for a handful of pixels. */
 export function drawTree(ctx, growth, opts = {}){
+  const glows = Array.isArray(opts.glows) ? opts.glows : null;
   const via = treeLayer();
   if(!via){
-    paintTree(rectTarget(ctx), growth, opts);
+    const target = rectTarget(ctx);
+    paintTree(target, growth, opts);
+    if(glows) for(const g of glows) paintGlow(target, g.x, g.y, g.age, g.size);
     return;
   }
   const raster = via.raster;
   raster.clear();
   paintTree(raster, growth, opts);
+  if(glows) for(const g of glows) paintGlow(raster, g.x, g.y, g.age, g.size);
   const box = raster.dirty;
   if(!box) return;
   via.ctx.putImageData(via.image, 0, 0, box.x, box.y, box.w, box.h);
@@ -1175,6 +1234,7 @@ function drawMotes(ctx, now, light, growers){
  */
 export function paintLot(ctx, {
   phase = 0.25, growth = 0, owned = {}, now = 0, sway = 0, shake = 0, growers = 0, pulse = 0, age = 0,
+  glows = null,
 } = {}){
   const light = Math.sin(phase * Math.PI * 2);
   const sunSide = Math.cos(phase * Math.PI * 2) > 0 ? -1 : 1;
@@ -1187,7 +1247,7 @@ export function paintLot(ctx, {
   const pieces = lotPieces(owned);
   // Everything behind the tree, then the tree, then everything in front of it.
   for(const p of pieces) if(p.ground <= TREE_Y) drawPiece(ctx, p, light);
-  drawTree(ctx, growth, { sway, light, sunSide, shake, pulse, age });
+  drawTree(ctx, growth, { sway, light, sunSide, shake, pulse, age, glows });
   for(const p of pieces) if(p.ground > TREE_Y) drawPiece(ctx, p, light);
 
   drawMotes(ctx, now, light, growers);
@@ -1220,7 +1280,8 @@ export function createLot(){
   };
 
   return function paint(ctx, opts = {}){
-    const { phase = 0.25, growth = 0, owned = {}, now = 0, sway = 0, shake = 0, growers = 0, pulse = 0, age = 0 } = opts;
+    const { phase = 0.25, growth = 0, owned = {}, now = 0, sway = 0, shake = 0,
+      growers = 0, pulse = 0, age = 0, glows = null } = opts;
     const light = Math.sin(phase * Math.PI * 2);
     const sunSide = Math.cos(phase * Math.PI * 2) > 0 ? -1 : 1;
 
@@ -1261,7 +1322,7 @@ export function createLot(){
     // which is the same order the uncached path produces for everything that
     // stands in front of the trunk — and the far ones are behind the ridge
     // anyway, where the tree does not reach.
-    drawTree(ctx, growth, { sway, light, sunSide, shake, pulse, age });
+    drawTree(ctx, growth, { sway, light, sunSide, shake, pulse, age, glows });
     ctx.drawImage(props.canvas, 0, 0);
     drawMotes(ctx, now, light, growers);
   };

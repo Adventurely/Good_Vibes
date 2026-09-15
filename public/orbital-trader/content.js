@@ -108,6 +108,20 @@ export function dockRange(radius, atmo){
   return Math.max(radius, atmo ?? radius) + 5 * radius;
 }
 
+/* Two kinds of harbour, and which one a place has is about the place rather
+ * than about its mass. Most worlds pull hard enough that tying up means being
+ * in orbit round them: the mouth is a circle your whole orbit has to fit
+ * inside, and gravity holds you there while you trade.
+ *
+ * A rendezvous is the other kind. The belt havens and the Maw have no weight
+ * at all, and Nail has so little — fifty metres a second of escape, which is
+ * a hard jump — that an orbit round it is not a thing anybody waits in. You
+ * come alongside instead: near enough, slow enough, and somebody throws you a
+ * line. This is authored rather than derived because it is a fact about the
+ * yards, not a consequence of the mass: Nail's berths are bolted to the rock,
+ * and Slate's ride above it. */
+export const isRendezvous = b => b?.harbour === 'rendezvous' || !((b?.mu ?? 0) > 0);
+
 const rawMu = Object.fromEntries(TUNING.bodies.map(b => [b.id, b.mu ?? 0]));
 export const BODIES = TUNING.bodies.map(b => ({
   ...b,
@@ -117,6 +131,7 @@ export const BODIES = TUNING.bodies.map(b => ({
   soi: soiRadius(b.mu ?? 0, b.a ?? 0, rawMu[b.parent] ?? 0),
   // A world's mouth comes from its size; a drifting haven keeps the one it was given.
   zoneRadius: (b.mu ?? 0) > 0 ? dockRange(b.radius ?? 0, b.atmo) : b.zoneRadius,
+  rendezvous: isRendezvous(b),
   colour: BODY_COLOURS[b.id] ?? null,
 }));
 
@@ -261,14 +276,19 @@ export const FORMULAS = {
   haggle: F.haggle ?? { spread: 0.07 },
   volatility: F.volatility ?? { bySpecies: {} },
   /* Aerobraking. The shed is a fraction of the speed at the bottom of the
-     dive, scaled by how deep into the air the dive goes — and the fraction has
-     to be small, because the design sells skimming as *free braking*, not as a
-     free crash landing. At half the periapsis speed a single pass dumped the
-     ship into a circle just above the cloud tops, which costs more to climb
-     out of than capturing would have cost in the first place. A few per cent a
-     pass lets a pilot walk an orbit down over several passes and stop where
-     they want to be, which is the technique the design is describing. */
-  aerobrake: { k: 0.04, maxFraction: 0.12, floorApo: 1.25 },
+     dive, and the fraction goes with the square of how deep the dive goes, so
+     the band of air is not one thing but two. The top of it is a feather: a
+     graze takes a per cent or two, costs nothing, and a pilot can walk an
+     orbit down over as many laps as they have days for. The bottom of it is a
+     wall: aim a few kilometres over the ground and the planet takes nearly
+     everything in a single lap, which is the maneuver a heat shield is for.
+     What stops that from being a crash is the floor below — the pass will
+     never leave the far end of the orbit inside the air — so the worst a deep
+     dive does is park you low, in an orbit you must burn to climb out of, with
+     a hull that probably felt it. That is the trade: fuel and risk against
+     days. The risk and repair figures live beside these in the design table,
+     and they are what makes the deep line cost something. */
+  aerobrake: { k: 1.4, depthPower: 2, maxFraction: 0.9, floorApo: 1.25, ...(F.aerobrake ?? {}) },
   toll: { ...F.toll, cooldownDays: 30, maxCargoFraction: 0.4, giftRep: 3, giftChance: 0.35 },
   tow: { ...F.tow, minDays: 3, crashMul: 1.5 },
 };

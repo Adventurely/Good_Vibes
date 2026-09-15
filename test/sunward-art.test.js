@@ -15,6 +15,7 @@ import { test } from 'node:test';
 import {
   TREE_STAGES, stageFor, agedScale, AGED_STEP, AGED_CAP,
   drawTree, drawTreeWithRects, paintTree, Raster, PACKED, treeBounds, paintLot, createLot,
+  paintGlow, GLOW_MS,
   SCENE_W, SCENE_H, TREE_X, TREE_Y, hex,
 } from '../public/sunward/art.js';
 import { PALETTE } from '../public/good-vibes/pixel.js';
@@ -364,4 +365,82 @@ test('the buffer clears what it drew, and knows what it has touched', () => {
   raster.run('g', 1, 3, -1, 8);
   raster.run('g', 1, 3, SCENE_H, 8);
   assert.equal(raster.dirty, null, 'and a row above or below the scene draws nothing');
+});
+
+/* --------------------------------------------------------------- the light */
+
+/* What a tap leaves behind. The tree used to jump sideways when you tapped it,
+ * which is what a tree does when something hits it rather than when something
+ * feeds it. This is a light that starts where the finger landed and spreads.
+ */
+
+const glow = (age, size = 1, x = TREE_X, y = TREE_Y - 60) => {
+  const ctx = new Recorder();
+  paintGlow(rectsFor(ctx), x, y, age, size);
+  return ctx.calls;
+};
+
+/* paintGlow paints through a target, the same way the tree does. */
+const rectsFor = ctx => ({
+  run: (key, light, rx, ry, w) => { ctx.fillStyle = hex(key); ctx.fillRect(Math.round(rx), Math.round(ry), Math.round(w), 1); },
+  fill: (key, light, rx, ry, w = 1, h = 1) => { ctx.fillStyle = hex(key); ctx.fillRect(rx | 0, ry | 0, w, h); },
+});
+
+test('the light of a tap spreads, thins, and then is gone', () => {
+  const young = glow(0.05);
+  const middle = glow(0.45);
+  const old = glow(0.8);
+
+  assert.ok(young.length > 0, 'a tap must light something');
+  assert.equal(glow(1).length, 0, 'and nothing of it may be left at the end');
+  assert.equal(glow(4).length, 0, 'even asked for an age past the end');
+
+  const reach = calls => {
+    const e = extents(calls);
+    return Math.max(e.x1 - e.x0, e.y1 - e.y0);
+  };
+  assert.ok(reach(middle) > reach(young), 'it has to be wider by the middle of its life');
+  assert.ok(reach(old) >= reach(middle), 'and wider still at the end');
+
+  // Wider and fainter at once: the later light covers more ground with fewer
+  // pixels, which is what makes it read as spreading rather than as growing.
+  const density = calls => extents(calls).pixels / Math.max(1, Math.pow(reach(calls), 2));
+  assert.ok(density(old) < density(middle), 'the light must thin as it spreads');
+  assert.ok(density(middle) < density(young), 'and be at its thickest where the finger was');
+});
+
+test('a windfall lights more of the tree than an ordinary tap', () => {
+  const ordinary = extents(glow(0.4, 1));
+  const windfall = extents(glow(0.4, 1.8));
+  assert.ok(windfall.x1 - windfall.x0 > ordinary.x1 - ordinary.x0, 'the tenth tap should light further');
+  assert.ok(windfall.pixels > ordinary.pixels);
+});
+
+test('the light stays in the picture and in the palette', () => {
+  const known = new Set(Object.keys(PALETTE).map(key => hex(key)));
+  for(const age of [0.02, 0.2, 0.5, 0.9]){
+    // Every corner and edge, where a disc would otherwise run off the scene.
+    for(const [x, y] of [[0, 0], [SCENE_W, 0], [0, SCENE_H], [SCENE_W, SCENE_H],
+      [TREE_X, 0], [-30, 100], [SCENE_W + 30, 100], [TREE_X, SCENE_H + 20]]){
+      for(const [style, cx, cy, w, h] of glow(age, 1.8, x, y)){
+        assert.ok(known.has(style), `the light painted "${style}", which is not in the palette`);
+        assert.ok(cx >= 0 && cx + w <= SCENE_W, `light drawn at x ${cx}..${cx + w}, outside the scene`);
+        assert.ok(cy >= 0 && cy + h <= SCENE_H, `light drawn at y ${cy}..${cy + h}, outside the scene`);
+      }
+    }
+  }
+});
+
+test('both lot painters hand the light to the tree', () => {
+  const before = globalThis.document;
+  globalThis.document = { createElement: () => { throw new Error('no canvas'); } };
+  try {
+    const lit = new Recorder();
+    paintLot(lit, { growth: 0.5, glows: [{ x: TREE_X, y: TREE_Y - 50, age: 0.1, size: 1 }] });
+    const dark = new Recorder();
+    paintLot(dark, { growth: 0.5 });
+    assert.ok(lit.calls.length > dark.calls.length, 'paintLot must draw the light it was given');
+  } finally {
+    globalThis.document = before;
+  }
 });

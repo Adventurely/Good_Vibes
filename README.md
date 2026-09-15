@@ -184,6 +184,9 @@ One Worker on **good-vibe-games.com** serves the shelf and every game on it.
       ├── /api/good-vibes/ws   src/worker.js → GameRoom,     one per room code
       ├── /api/solarium/ws     src/worker.js → SolariumRoom, one per room code
       └── /api/sunward/board   src/worker.js → SunwardBoard, one for the whole game
+                               GET reads it, POST puts a row up, DELETE takes
+                               one off — the id in the body is the authority
+                               for both of the last two
 
 **Three of the five play without the Worker.** Sunward, Orbital Trader and
 Greener Thumbs are one player and a save file, so the games are files in
@@ -214,7 +217,10 @@ self-reported and there is no way to verify one, so this is honest about what
 it is: a board for people who want to be on one. What defends it is a
 fifteen-second gap between accepted posts from one id, a record that only ever
 goes up, and a ceiling of five thousand rows with the ones nobody has heard
-from in longest pruned first. Somebody who wants to sit at the top with a
+from in longest pruned first. The same id takes a row off again — a board you
+can join but never leave is not one anybody should type a real name into, and
+since the id already decides who may write the row, letting it decide who may
+remove the row costs nothing and needs no account. Somebody who wants to sit at the top with a
 number nobody could reach can.
 
 There was a plausibility cap on each figure too — thirty taps a second, fifty
@@ -1551,7 +1557,26 @@ than an error anybody would see.
 marked `day`, `night` or `any`, and a marked one makes half again as much at its
 best hour and half as much at its worst — so a lot of nothing but solar panels
 watches its income halve every two minutes, and the fix is to own some
-mushrooms.
+mushrooms. Four of the nine are unmarked and simply tick.
+
+One of those four got there by argument rather than by design. The Glasshouse
+was marked `day`, and its description — written by the owner, who writes all
+of them — said it shields the tree day or night. Of the two ways to settle a
+description that contradicts the row above it, changing the game was the
+better one here: a glasshouse is the one building on this lot that obviously
+does keep working after dark. Its rated figure went from 44,000 to 51,000 at
+the same time, and not to make it better. `rate` is already the average over a
+whole day, so changing the mark alone leaves the average alone — but Night
+bloom lifts the trough of marked growers only, worth `SWING / pi` on them and
+nothing on an unmarked one, and anybody who owns a glasshouse bought Night
+bloom three tiers earlier. Left at 44,000 the simulation lost a fifth of a
+day's income at the top; multiplied back in, it lands within a few percent of
+where it was.
+
+**Every grower carries its description for good.** It used to give way to
+"5 planted · 12/s" the moment you owned one of a kind, which meant the only
+players who ever read it were the ones who had not bought the thing yet. The
+figures and the description both show now, on their own lines.
 
 **One upgrade lifts the trough**, and it lifts it without touching the peak.
 That asymmetry is the whole value of it, and it was not there at first: the

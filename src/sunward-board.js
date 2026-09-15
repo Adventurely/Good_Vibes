@@ -347,5 +347,23 @@ export function serve(store, method, body, query = {}, now = 0){
     return { status: 200, body: page(checked.entry.id) };
   }
 
-  return { status: 405, body: { error: 'The board answers GET and POST only.' } };
+  /* Taking your own row off again. The id is the authority here exactly as it
+     is for writing — whoever holds it holds the row — so this needs no secret
+     and no account, and there is nothing an attacker gains from an id they
+     would have to already hold. It is not rate limited: a delete cannot be
+     used to fill anything up, and somebody who has decided to come off a
+     public board should not be asked to wait.
+
+     A row that was not there is a 200 and not a 404. The caller asked for it
+     to be gone and it is gone; `removed` says whether anything was actually
+     there, for a caller that wants to know. */
+  if(method === 'DELETE'){
+    const id = typeof body?.id === 'string' ? body.id.toLowerCase() : '';
+    if(!ID_RE.test(id)) return { status: 400, body: { error: 'That board id does not look right.' } };
+    const had = players[id] !== undefined;
+    delete players[id];
+    return { status: 200, body: { ...page(null), removed: had } };
+  }
+
+  return { status: 405, body: { error: 'The board answers GET, POST and DELETE only.' } };
 }

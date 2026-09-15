@@ -21,7 +21,7 @@
  *    SOI rings, docking zones) are in au and grow with the zoom.
  */
 
-import { absState, railState, meanMotion, unit, norm, add, sub, scale, perp, dist, propagate } from './orbit.js';
+import { absState, railState, meanMotion, unit, norm, add, sub, scale, perp, dist, propagate, burnFrame } from './orbit.js';
 import { drawSprite } from './sprites.js';
 
 /* The palette: a star chart drawn on paper. The same paper as every page on
@@ -122,6 +122,10 @@ export function bodyColour(body){
    by the biggest orbit. */
 const MIN_ZOOM = 8, MAX_ZOOM = 2e7;
 
+/* One clock for the whole file, and one that does not throw where there is no
+   window: the chart is also drawn on the title screen and in tests. */
+const nowMs = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
+
 export function createChart(canvas, world, opts = {}){
   const ctx = canvas.getContext('2d', { alpha: false });
   const chart = {
@@ -161,15 +165,51 @@ export function createChart(canvas, world, opts = {}){
     belt: null,
   };
 
+  /* How many real pixels the chart is painted into, and why that is not one
+   * number.
+   *
+   * Every frame repaints the whole sky: a gradient over the ground, four
+   * hundred stars, the Scatter, every rail, the road, the worlds. Nothing is
+   * cached and nothing needs to be, because the cost is almost exactly linear
+   * in the size of the backing store — measured at 1600x1000, a pan costs 13
+   * ms at one device pixel per point, 25 at one and a half, 37 at two. On a
+   * retina screen that last one is twenty-seven frames a second, and dragging
+   * the chart visibly stutters.
+   *
+   * So the resolution follows the gesture. Still, it paints at the full ratio
+   * and the art is as sharp as the screen can show it. Moving — a drag, a
+   * wheel, a pinch — it drops to half of that until a fifth of a second after
+   * the last of it, which on a retina screen is a third of the work and takes
+   * the drag back under ten milliseconds. Nobody can see the difference in
+   * pixel art that is sliding under their finger, and everybody can see
+   * twenty-seven frames a second.
+   *
+   * The switch happens between frames, never inside one: resizing the canvas
+   * throws away its contents and resets the context, and the only places that
+   * ask for it are the event handlers and the top of a draw. */
+  const MOTION_SETTLE_MS = 200;
+  let liveDpr = 0, movingUntil = -1e9;
+  const fullDpr = () => Math.min(2, window.devicePixelRatio || 1);
+  const applyDpr = dpr => {
+    if(dpr === liveDpr) return;
+    liveDpr = dpr;
+    chart.dpr = dpr;
+    canvas.width = Math.round(chart.width * dpr);
+    canvas.height = Math.round(chart.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  };
+  /* Say that the view is moving. Anything that shifts the camera by hand
+     calls this; the clock moving the ship does not, because the chart is
+     locked to the ship and the sky under it barely stirs. */
+  chart.stir = () => { movingUntil = nowMs() + MOTION_SETTLE_MS; };
+  chart.syncDpr = now => applyDpr((now ?? nowMs()) < movingUntil ? Math.max(1, fullDpr() / 2) : fullDpr());
+
   chart.resize = () => {
     const rect = canvas.getBoundingClientRect();
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    chart.dpr = dpr;
     chart.width = Math.max(1, Math.round(rect.width));
     chart.height = Math.max(1, Math.round(rect.height));
-    canvas.width = Math.round(rect.width * dpr);
-    canvas.height = Math.round(rect.height * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    liveDpr = 0;                       // the store is the wrong size whatever it was
+    applyDpr(fullDpr());
   };
 
   chart.toScreen = p => [
@@ -196,6 +236,7 @@ export function createChart(canvas, world, opts = {}){
     const cam = chart.camera;
     cam.pan[0] -= dxPx / cam.zoom;
     cam.pan[1] += dyPx / cam.zoom;
+    chart.stir();
     chart.settle();
   };
   /* Back to the middle of whatever is being followed, keeping the scale. */
@@ -220,6 +261,7 @@ export function createChart(canvas, world, opts = {}){
        one and the sky jumps back under the pointer. */
     cam.pan[0] += before[0] - after[0];
     cam.pan[1] += before[1] - after[1];
+    chart.stir();
     chart.settle();
   };
   /* Lock onto a body and pick a zoom that frames its reach. Focusing is also
@@ -269,6 +311,13 @@ function makeStars(seed){
 
 function draw(chart, view){
   const { ctx, world, camera } = chart;
+  /* Before anything is painted, and never after: the resolution this frame is
+     going into. See the note on chart.resize. */
+  chart.syncDpr(view.now);
+  /* What this ship has not been told about. The sky is the same either way —
+     the kernel never reads this — but a body nobody has mentioned draws no
+     dot, no rail, no reach and no label, and cannot be tapped. */
+  chart.hidden = view.hidden instanceof Set ? view.hidden : EMPTY_HIDDEN;
   const W = chart.width, H = chart.height;
   const t = view.t;
   chart.hits = { bodies: [], nodes: [], handles: [], pathSegs: [], rails: [], inset: chart.hits?.inset ?? null };
@@ -388,12 +437,15 @@ function ellipsePath(ctx, chart, centreAbs, el){
   ctx.ellipse(c[0], c[1], a * z, b * z, -rot, 0, Math.PI * 2);
 }
 
+const EMPTY_HIDDEN = new Set();
+
 function drawOrbits(chart, pos, t){
   const { ctx, world, camera } = chart;
   void t;
   const diag = Math.hypot(chart.width, chart.height);
   for(const b of world.bodies){
     if(b.parent == null) continue;
+    if(chart.hidden.has(b.id)) continue;
     const px = b.a * camera.zoom;
     // Too small to be a shape, or so large that all you see of it is a line
     // drawn across the whole chart. Neither is worth the ink.
@@ -461,6 +513,7 @@ function drawSoiRings(chart, pos){
   const { ctx, world, camera } = chart;
   for(const b of world.bodies){
     if(b.soi == null || b.mu <= 0) continue;
+    if(chart.hidden.has(b.id)) continue;
     const px = b.soi * camera.zoom;
     if(px < 10 || px > 6000) continue;
     const p = chart.toScreen(pos.get(b.id).r);
@@ -481,6 +534,7 @@ function drawBodies(chart, view, pos, t){
   const placed = [];   // label boxes already used, for collision avoidance
   const bodies = [...world.bodies].sort((x, y) => (y.radius ?? 0) - (x.radius ?? 0));
   for(const b of bodies){
+    if(chart.hidden.has(b.id)) continue;
     const p = chart.toScreen(pos.get(b.id).r);
     if(p[0] < -60 || p[1] < -60 || p[0] > chart.width + 60 || p[1] > chart.height + 60) continue;
     const real = (b.radius ?? 0) * zoom;
@@ -540,6 +594,23 @@ function drawBodies(chart, view, pos, t){
        a low orbit visibly inside the ground it was clearing. The clip also
        keeps rings and sparks off the sky around the body. */
     let drew = false;
+    if(b.kind === 'hole'){
+      /* Nothing is the point. A disc of the background with a lensed ring
+         round it reads as a hole at every zoom, where a black dot on black
+         reads as nothing at all — and a hole is what it is. */
+      const r = Math.max(3.5, rpx);
+      ctx.beginPath(); ctx.arc(p[0], p[1], r, 0, Math.PI * 2);
+      ctx.fillStyle = PALETTE.space; ctx.fill();
+      const halo = ctx.createRadialGradient(p[0], p[1], r, p[0], p[1], r * 3.2);
+      halo.addColorStop(0, 'rgba(255,210,63,.80)');
+      halo.addColorStop(0.35, 'rgba(245,154,46,.30)');
+      halo.addColorStop(1, 'rgba(245,154,46,0)');
+      ctx.fillStyle = halo;
+      ctx.beginPath(); ctx.arc(p[0], p[1], r * 3.2, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,225,140,.95)'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.arc(p[0], p[1], r * 1.5, 0, Math.PI * 2); ctx.stroke();
+      drew = true;
+    }
     if(rpx >= 3.5){
       ctx.save();
       ctx.beginPath(); ctx.arc(p[0], p[1], rpx, 0, Math.PI * 2); ctx.clip();
@@ -557,7 +628,7 @@ function drawBodies(chart, view, pos, t){
       if(b.kind === 'star'){ ctx.fillStyle = PALETTE.starCore; ctx.beginPath(); ctx.arc(p[0], p[1], rpx * 0.55, 0, Math.PI * 2); ctx.fill(); }
       ctx.globalAlpha = 1;
     }
-    if((b.kind === 'zone' || b.mu === 0) && !drew){
+    if((b.kind === 'zone' || b.mu === 0) && !drew && b.kind !== 'hole'){
       // Gravity-less things are hollow: the belt havens and the Maw.
       ctx.strokeStyle = colour; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(p[0], p[1], rpx + 3, 0, Math.PI * 2); ctx.stroke();
@@ -572,7 +643,7 @@ function drawBodies(chart, view, pos, t){
 
     // Labels: planets always; moons when their orbit is drawn; zones when
     // they are more than a dot. Never over another label.
-    const wantLabel = b.kind === 'star' || b.kind === 'planet' || camera.follow === b.id
+    const wantLabel = b.kind === 'star' || b.kind === 'planet' || b.kind === 'hole' || camera.follow === b.id
       || (b.parent && b.a * zoom > 28);
     if(!wantLabel) continue;
     const text = labelFor(b);
@@ -712,7 +783,7 @@ function drawPrediction(chart, view, pos){
   drawApses(chart, view, anchors, afterBurnAt);
   drawCrossings(chart, view, anchors, afterBurnAt);
   drawRailCrossings(chart, view, anchors);
-  drawIntercept(chart, view, anchors, afterBurnAt);
+  drawIntercepts(chart, view, anchors, afterBurnAt);
 }
 
 /* The marks on a road, each one a shape you can name without a legend:
@@ -733,7 +804,7 @@ function drawApses(chart, view, anchors, afterBurnAt){
     /* The leg the intercept is on already has a labelled crosshair at its low
        point; a second mark and a second number on the same pixel is a pile,
        not a chart. */
-    if(a.segIndex === view.prediction.intercept?.segIndex) continue;
+    if((view.prediction.intercepts ?? []).some(ic => ic.segIndex === a.segIndex)) continue;
     const afterBurn = afterBurnAt(a.segIndex);
     const p = chart.toScreen(add(anchor, a.r));
     if(p[0] < -60 || p[1] < -30 || p[0] > chart.width + 60 || p[1] > chart.height + 30) continue;
@@ -835,14 +906,20 @@ function drawRailCrossings(chart, view, anchors){
   }
 }
 
-/* The intercept: the nearest the road comes to the world it has just entered.
- * This is the question a pilot is actually asking while they push a burn
- * around — not "does this reach Slate" but "how close, and how fast" — so it is
- * marked wherever the chart is zoomed, even when the whole encounter is a few
- * pixels wide, and it carries its own numbers. */
-function drawIntercept(chart, view, anchors, afterBurnAt){
+/* The intercepts: the nearest the road comes to each world it passes, once
+ * per world and at the first pass. This is the question a pilot is actually
+ * asking while they push a burn around — not "does this reach Slate" but "how
+ * close, and how fast" — so they are marked wherever the chart is zoomed, even
+ * when the whole encounter is a few pixels wide.
+ *
+ * It used to draw exactly one, for the world whose reach the road crossed
+ * into. A road out of Tassel to the Belt goes past both of Tassel's moons and
+ * then meets a haven that has no reach at all, and none of that was marked. */
+function drawIntercepts(chart, view, anchors, afterBurnAt){
+  for(const ic of view.prediction?.intercepts ?? []) drawIntercept(chart, view, anchors, afterBurnAt, ic);
+}
+function drawIntercept(chart, view, anchors, afterBurnAt, ic){
   const { ctx } = chart;
-  const ic = view.prediction?.intercept;
   if(!ic) return;
   const seg = view.prediction.segments[ic.segIndex];
   const anchor = anchors[ic.segIndex];
@@ -939,9 +1016,16 @@ function drawNodes(chart, view, pos){
     chart.hits.nodes.push({ index: i, x: p[0], y: p[1], r: 18 });
     if(!selected) continue;
 
-    const vdir = unit(where.v);
-    const pro = [vdir[0], -vdir[1]];            // screen y is down
-    const rad = unit(where.r); const radS = [rad[0], -rad[1]];
+    /* The same frame the burn is actually flown in — forward along the
+       velocity, out square across it — rather than forward along the velocity
+       and out along the position vector, which is where these arrows used to
+       point. Those two agree on a circle and nowhere else, so the legend drew
+       a right angle at Tassel's docking orbit and an obviously wrong one the
+       moment a ship arrived on anything eccentric. A legend that disagrees
+       with the buttons it is a legend for is worse than no legend. */
+    const { pro: proW, out: outW } = burnFrame(where.r, where.v);
+    const pro = [proW[0], -proW[1]];            // screen y is down
+    const radS = [outW[0], -outW[1]];
     const arrows = [
       ['pro',   pro,                   PALETTE.prograde,   n.prograde],
       ['retro', [-pro[0], -pro[1]],    PALETTE.retrograde, -n.prograde],

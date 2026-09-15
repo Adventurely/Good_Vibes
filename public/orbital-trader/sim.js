@@ -102,6 +102,9 @@ export function newGame(seed = 1){
     flags: { tutorial: 0 },
     toll: { lastT: -1e9, inBelt: false },
     pending: null,
+    hull: 0,
+    faults: {},
+    farSight: true,
     justLeft: null, justLeftAt: -1e9,
     stats: { burns: 0, dvSpent: 0, docks: 0, sold: 0, bought: 0, tows: 0, tolls: 0, rescues: 0, farthest: 0 },
     visited: [start],
@@ -225,17 +228,45 @@ function placeDocked(state, portId){
  * were flying, and which let a ship on a wild ellipse tie up because it
  * happened to be slow at the top of it.
  *
- * Things with no gravity — the Arc, Claw Rock, the comet — have no orbit to
- * be in, so those keep the distance-and-speed test they always had.
+ * A rendezvous harbour is the other kind, and keeps the distance-and-speed
+ * test: the belt havens and the Maw have no gravity to be held by, and Nail
+ * has so little that an orbit round it is not somewhere anybody waits. You
+ * come alongside instead. Which places are which is decided in content.js,
+ * not here.
  */
+/* Coming alongside: near enough to the rock and slow enough beside it. Used
+ * for a haven in the frame the ship is flying in, and for the rock itself
+ * once the ship is inside its reach — the same two numbers either way, so
+ * crossing that boundary does not change what the harbour asks of you. */
+function rendezvousStatus(state, c, r, v){
+  const distance = norm(r), relSpeed = norm(v);
+  const inZone = distance <= c.zoneRadius;
+  const slow = relSpeed <= c.dockSpeed;
+  return {
+    port: c.id, kind: 'zone', distance, relSpeed,
+    mouth: c.zoneRadius, dockSpeed: c.dockSpeed,
+    inZone, slow, ok: inZone && slow,
+    over: Math.max(0, relSpeed - c.dockSpeed),
+    score: distance / c.zoneRadius,
+    open: portOpen(c.id, state.t),
+  };
+}
 export function dockingStatus(state){
   if(state.dockedAt) return null;
   const here = world.get(state.ship.body);
   let best = null;
   const take = st => { if(!best || st.score < best.score) best = st; };
 
+  /* The rock we are inside the reach of, when that rock is one you come
+     alongside. Ship coordinates are already in its frame, so the two numbers
+     are simply where we are and how fast. Without this a ship that crossed
+     into Nail's reach found no harbour at all: Nail is not its own child, and
+     the orbit test below would have asked it to orbit a thing it cannot. */
+  if(here.port && here.rendezvous && here.mu > 0 && state.justLeft !== here.id){
+    take(rendezvousStatus(state, here, state.ship.r, state.ship.v));
+  }
   // The world we are going round.
-  if(here.port && here.mu > 0 && state.justLeft !== here.id){
+  if(here.port && here.mu > 0 && !here.rendezvous && state.justLeft !== here.id){
     const el = elementsFromState(here.mu, state.ship.r, state.ship.v);
     const floor = Math.max(here.radius ?? 0, here.atmo ?? 0);
     const mouth = here.zoneRadius ?? Infinity;
@@ -252,22 +283,11 @@ export function dockingStatus(state){
       open: portOpen(here.id, state.t),
     });
   }
-  // Gravity-less ports in this frame: near enough, slow enough.
+  // Rendezvous ports in this frame: near enough, slow enough.
   for(const c of world.children(here.id)){
-    if(!c.port || c.mu > 0 || state.justLeft === c.id) continue;
-    const s = railState(c, here.mu, state.t);
-    const distance = dist(state.ship.r, s.r);
-    const relSpeed = norm(sub(state.ship.v, s.v));
-    const inZone = distance <= c.zoneRadius;
-    const slow = relSpeed <= c.dockSpeed;
-    take({
-      port: c.id, kind: 'zone', distance, relSpeed,
-      mouth: c.zoneRadius, dockSpeed: c.dockSpeed,
-      inZone, slow, ok: inZone && slow,
-      over: Math.max(0, relSpeed - c.dockSpeed),
-      score: distance / c.zoneRadius,
-      open: portOpen(c.id, state.t),
-    });
+    if(!c.port || !c.rendezvous || state.justLeft === c.id) continue;
+    const st = railState(c, here.mu, state.t);
+    take(rendezvousStatus(state, c, sub(state.ship.r, st.r), sub(state.ship.v, st.v)));
   }
   if(!best) return null;
   // Nowhere near: do not clutter the HUD with a port you are nothing like at.
@@ -401,19 +421,82 @@ export function skipPlan(state, t){
   return { t, days, rate, seconds: days / (rate * CONST.BASE_RATE_DAYS_PER_SEC), capped: ideal > MAX_WARP };
 }
 
-/* Whether a ship skims air rather than burning up in it. Nothing does, yet:
- * heat shielding and cryo hull cooling are on the rack and wired to nothing,
- * because the risky skim and the safe one are two different manoeuvres and
- * neither is built (§2.8). The arithmetic below is what they will both be
- * built out of, so it stays, and `skim` lets a test reach it directly rather
- * than leaving it to rot behind a flag no caller can set. */
-export const skimsAir = () => false;
+/* Whether a ship skims air rather than burning up in it. A heat shield is the
+ * whole of it: without one the air is a wall and the hull meets it, which is
+ * what `atmosphere: true` in the predictor means. Cryo cooling does not change
+ * whether you may skim, only whether it costs you anything (see skimRisk). */
+export const skimsAir = state => !!state?.keys?.heatShield;
+
+/* The Knot is out there whether or not anybody has told you. What the cat
+ * navigator brings is knowing where — the cats have had it for generations and
+ * have never seen a reason to mention it. Gravitational sensors find it the
+ * other way, by looking, which is the phenomenon that key was always sold to
+ * see. Either one puts it on the chart; neither changes the sky. */
+export const knowsKnot = state => !!(state?.crew?.navigator || state?.keys?.gravSensors);
+/* Bodies the chart should not draw for this player. Physics never consults
+ * this: a thing nobody has told you about still has hold of you. */
+export function unseen(state){
+  const hide = new Set();
+  if(!knowsKnot(state)) hide.add('knot');
+  return hide;
+}
+/* Seeing past the encounter. The road normally stops one crossing out — see
+ * the note on fullLap — because a road that chases every encounter it can find
+ * is a road nobody reads. A navigator aboard is exactly the person who reads
+ * it, so with one the chart will draw the crossing after the crossing, and the
+ * button in the corner turns that off again. */
+export const canSeePast = state => !!state?.crew?.navigator;
+export const seesPast = state => canSeePast(state) && state.farSight !== false;
+
+/* The chance a single pass hurts the hull, from the speed it sheds.
+ *
+ * Convex on purpose. The first `freeKms` of a pass is free and the rest grows
+ * with the square, so splitting a hard brake into several shallow ones is
+ * genuinely safer rather than the same risk spread thinner — the pilot who
+ * takes four orbits over it is playing better, not just slower, and pays in
+ * days instead. Cryo cooling takes it to nothing at any depth, which is what
+ * the rack has always claimed it does. */
+export function skimRisk(state, shedAuDay){
+  if(state?.keys?.cryoCooling) return 0;
+  const f = FORMULAS.aerobrake;
+  const over = Math.max(0, kms(shedAuDay) - f.freeKms);
+  if(over <= 0) return 0;
+  return Math.min(f.maxRisk, f.riskPerKms2 * over * over);
+}
+
+/* Hull: 0 sound, 1 knocked about, 2 buckled, 3 failing, 4 is not a hull any
+ * more. A fuel cell fault caps what the tank will hold until a yard sees it;
+ * it never empties the tank in flight, because a fault that bites where the
+ * player cannot answer it is a tax rather than a decision. */
+export const HULL_WRECKED = 4;
+export const hullLevel = state => state.hull ?? 0;
+export const hasFuelCellFault = state => !!state.faults?.fuelCell;
+/* What the tank will actually hold right now. Everything that fills, draws or
+ * draws a gauge goes through this rather than state.tank. */
+export function usableTank(state){
+  return hasFuelCellFault(state) ? state.tank * FORMULAS.aerobrake.fuelCellCap : state.tank;
+}
+export const FUEL_CELL_CAP = FORMULAS.aerobrake.fuelCellCap;
+const HULL_WORDS = ['Sound', 'Knocked about', 'Buckled', 'Failing', 'Not a hull any more'];
+export const hullWord = state => HULL_WORDS[hullLevel(state)] ?? HULL_WORDS[0];
+export function repairCost(state, what){
+  const f = FORMULAS.aerobrake.repair;
+  if(what === 'fuelCell') return hasFuelCellFault(state) ? f.fuelCell : 0;
+  return f[String(hullLevel(state))] ?? 0;
+}
 
 /* The maneuvers the kernel should actually fly: the player's nodes plus any
  * aerobrake a shielded ship will take at a periapsis inside an atmosphere.
  * Computed by predicting, finding such a periapsis, inserting a retrograde
  * pseudo-node there, and predicting again — so the drawn path and the flown
  * path both include the skim. */
+export function skimHorizon(state, dtDays){
+  const b = world.get(state.ship.body);
+  const el = elementsFromState(b.mu, state.ship.r, state.ship.v);
+  const laps = Number.isFinite(el.period) && el.period > 0 ? el.period * 2.5 : Infinity;
+  return Math.max(dtDays + 1, Math.min(150, laps));
+}
+
 export function effectiveNodes(state, horizon, { skim = skimsAir(state) } = {}){
   const nodes = state.nodes.map(n => ({ ...n })).sort((a, b) => a.t - b.t);
   if(!skim) return nodes;
@@ -440,12 +523,19 @@ export function effectiveNodes(state, horizon, { skim = skimsAir(state) } = {}){
       if(norm(at.r) > b.atmo * 1.001) continue;
       const vp = el.vmax;
       const depth = Math.max(0, Math.min(1, (b.atmo - el.rp) / (b.atmo - b.radius)));
-      const wanted = Math.min(FORMULAS.aerobrake.maxFraction, FORMULAS.aerobrake.k * depth) * vp;
+      /* How much of the speed the air takes, from how deep the dive goes. The
+         curve is steep rather than straight: the thin stuff at the top of the
+         band barely touches you, and the bottom of it is a wall. That is what
+         makes a tight pass a real maneuver — aim deep and the planet catches
+         you in one lap — while a graze stays the gentle, repeatable thing a
+         pilot can walk an orbit down with. */
+      const f = FORMULAS.aerobrake;
+      const wanted = Math.min(f.maxFraction, f.k * Math.pow(depth, f.depthPower ?? 1)) * vp;
       /* The floor: an orbit whose far end still clears the clouds. Skimming can
          circularise you around a world; it must never quietly bury you in it.
          Pass after pass the shed shrinks to nothing, and the ship is left on a
          low orbit for the pilot to raise out of the air themselves. */
-      const aTarget = (el.rp + FORMULAS.aerobrake.floorApo * b.atmo) / 2;
+      const aTarget = (el.rp + f.floorApo * b.atmo) / 2;
       const vFloor = Math.sqrt(Math.max(0, b.mu * (2 / el.rp - 1 / aTarget)));
       const shed = Math.max(0, Math.min(wanted, vp - vFloor));
       if(shed < vp * 1e-3) break;   // nothing left to give: stop inserting skims
@@ -473,7 +563,14 @@ export function tick(state, dtDays){
      away — which is how a shielded ship sailed straight through Grumm's air
      without the shield ever being used. */
   const inAir = world.get(state.ship.body).atmo && skimsAir(state);
-  const nodes = effectiveNodes(state, inAir ? Math.max(dtDays + 1, 150) : dtDays + 1);
+  /* How far to look for the coming dive. A flat 150 days was right for the
+     arrival it was written for — falling in from the edge of a reach, where
+     the bottom really is months away — and ruinous afterwards: a ship that has
+     just braked into a low orbit has a period of hours, so 150 days is
+     thousands of laps predicted every step, three times over. Bound it to a
+     few laps once the orbit is closed, and keep the long look only for the arc
+     that needs it. */
+  const nodes = effectiveNodes(state, inAir ? skimHorizon(state, dtDays) : dtDays + 1);
   // Stop the step at the first change of reach or burn, so warp cannot skip
   // past an encounter the player was warping towards.
   const opts = { atmosphere: !skimsAir(state), dvAvailable: state.dv, stopOnSoi: true, stopOnBurn: true };
@@ -485,6 +582,32 @@ export function tick(state, dtDays){
       if(e.node.aero){
         logLine(state, 'burn', TEXT.logTemplates.aerobrake ?? 'Air braked at {body}: {dv} shed to the clouds.', { body: portName(e.node.body), dv: fmtKms(e.magnitude) });
         flag(state, 'firstAerobrake', events);
+        state.stats.skims = (state.stats.skims ?? 0) + 1;
+        const risk = skimRisk(state, e.magnitude);
+        if(risk > 0 && rnd(state) < risk){
+          /* One fault per pass, never two: a pass that goes wrong should be one
+             thing the player can name afterwards. The fuel cell is the smaller
+             share because it is the more interesting of the two. */
+          const f = FORMULAS.aerobrake;
+          if(!hasFuelCellFault(state) && rnd(state) < f.fuelCellShare){
+            state.faults = { ...(state.faults ?? {}), fuelCell: true };
+            state.dv = Math.min(state.dv, usableTank(state));
+            logLine(state, 'story', TEXT.events.skimFuelCell);
+            events.push({ kind: 'skimFault', fault: 'fuelCell' });
+          }else{
+            state.hull = Math.min(HULL_WRECKED, hullLevel(state) + 1);
+            const wrecked = hullLevel(state) >= HULL_WRECKED;
+            logLine(state, 'story', wrecked ? TEXT.events.skimWrecked : TEXT.events.skimDamage[hullLevel(state) - 1]);
+            events.push({ kind: 'skimFault', fault: 'hull', level: hullLevel(state) });
+            /* A hull that has stopped being one goes down the road the game
+               already has for a ship that cannot fly: a tow, a bill, and the
+               harbour bank behind it. Nothing here costs the save. */
+            if(wrecked){
+              state.pending = { kind: 'crash', body: e.node.body, atmosphere: true, wrecked: true };
+              events.push({ kind: 'crash', body: e.node.body, wrecked: true });
+            }
+          }
+        }
       }else{
         state.dv = Math.max(0, state.dv - e.magnitude);
         state.stats.burns++; state.stats.dvSpent += e.magnitude;
@@ -864,6 +987,32 @@ export function planCost(state, horizon){
   return markStates(state, horizon).reduce((s, m) => s + m.cost, 0);
 }
 
+/* What the drawn path is about to do to you, for the two marks in the corner
+ * of the chart. A skim is a warning; ground is a different warning, and they
+ * are different pictures because they want different answers — one is "brace",
+ * the other is "move the burn". Both read the same prediction the chart draws,
+ * so the corner and the road can never disagree. */
+export function hazards(state){
+  const none = { skim: null, crash: null };
+  if(!state || state.dockedAt || state.pending) return none;
+  const pred = planImmediate(state);
+  let crash = null;
+  for(const sg of pred?.segments ?? []){
+    if(sg.reason === 'crash'){ crash = { body: sg.body }; break; }
+  }
+  let skim = null;
+  if(skimsAir(state)){
+    const lead = state.nodes.length ? state.nodes[state.nodes.length - 1].t - state.t : 0;
+    const horizon = Math.max(lead + 1, 150);
+    const a = effectiveNodes(state, horizon).find(n => n.aero && n.t >= state.t);
+    if(a){
+      const shed = Math.abs(a.prograde);
+      skim = { body: a.body, t: a.t, dv: shed, risk: skimRisk(state, shed) };
+    }
+  }
+  return { skim, crash };
+}
+
 /* The plan as the solver reads it: as far ahead as it is asked for. */
 export function plan(state, horizon){
   const nodes = effectiveNodes(state, horizon);
@@ -1009,10 +1158,142 @@ function interceptOf(segments, crossed){
   return best;
 }
 
-export function planImmediate(state, flown = true){
+/* How near the road has to come to a world before the pass is worth a mark.
+ *
+ * The first three terms are the encounter: a world's own reach, twice over, so
+ * a near miss is called before it is a miss; harbour mouths for the havens,
+ * which have no reach; the ground for anything with neither. Those make the
+ * crosshair a thing that confirms an arrival.
+ *
+ * The fourth makes it a thing you can *steer* by, which is what it is actually
+ * for, and there is no aim helper in the chart — every road is flown by pushing
+ * a burn around and watching this number. Measured against a reach alone the
+ * number does not exist until the road is nearly right: fifty metres a second
+ * off a five kilometre burn to Nail leaves the pass fourteen hundred million
+ * kilometres out, well inside one per cent of the answer and still far outside
+ * twice Nail's reach, so the pilot pushed the burn through the whole useful
+ * range of it with a blank chart and the mark appeared only once they no longer
+ * needed it.
+ *
+ * So a port is also marked within a tenth of its own orbit. That is the scale
+ * at which "am I anywhere near it" is a real question, it grows with the system
+ * so a road to Grumm gets a Grumm-sized band, and it stays a signal rather than
+ * a decoration: a world crosses its own band's width in a few days, so a road
+ * that misses the timing is still not marked, and a road only ever sweeps past
+ * the handful of worlds between its low point and its high one. Measured on the
+ * roads out of Tassel, the widest band here never puts more than two crosshairs
+ * on the chart. */
+function markWithin(b){
+  const aimed = b.port && b.a > 0 ? b.a * 0.1 : 0;
+  return Math.max((b.soi ?? 0) * 2, (b.zoneRadius ?? 0) * 8, (b.radius ?? 0) * 20, aimed);
+}
+
+/* Where the road comes nearest each world, once per world, and the *first*
+ * time rather than the nearest time.
+ *
+ * The chart used to mark exactly one encounter: the world whose reach the road
+ * crossed into. That missed two things a pilot wants. Nail and Whisker have no
+ * reach to cross — they are rendezvous points, matched rather than fallen into
+ * — so flying straight at one was marked with nothing at all. And a road that
+ * goes past one world on its way to another is a thing that happens constantly
+ * out here, with only the far end of it marked.
+ *
+ * One mark per world, at the first close pass, and nothing after it: a road
+ * that cuts the same rail three laps running earns one crosshair, which is the
+ * same refusal the rest of this chart already makes. */
+function interceptsOf(segments, crossed){
+  const out = new Map();
+  /* The encounter the ship actually falls into keeps its exact numbers: inside
+     a reach the nearest point is that leg's periapsis, solved rather than
+     sampled. Everything else is found by walking the drawn road. */
+  const exact = interceptOf(segments, crossed);
+  if(exact) out.set(exact.body, exact);
+
+  /* The world the ship is going round right now is usually not an encounter
+     with anything. A parking orbit reaches its low point once a lap, which is
+     a real local minimum and completely uninteresting: it is where you already
+     are. It becomes interesting again only if the road leaves and comes back,
+     so it is ignored up to the moment the road quits that world's frame.
+     
+     Only on a closed orbit, though. A ship that has just fallen through a
+     world's door is going round it in the arithmetic and nowhere near it yet:
+     the low point ahead is the encounter, the one place a rendezvous can be
+     made, and the only thing on that road worth pointing the clock at. A skip
+     ends at every change of reach, so this is exactly where the pilot is put
+     down — and with the low point suppressed the panel offered them nothing
+     but the way out the far side. */
+  const home = segments[0]?.body ?? null;
+  const homeBound = Number.isFinite(segments[0]?.elements?.period);
+  const leftHome = segments.find(sg => sg.body !== home)?.t0 ?? Infinity;
+
+  for(const b of world.bodies){
+    if(b.id === 'lamp' || out.has(b.id)) continue;
+    const bound = markWithin(b);
+    if(!(bound > 0)) continue;
+    const notBefore = b.id === home && homeBound ? leftHome : -Infinity;
+    /* A pass has to be a pass: the road comes closer and then goes away again.
+       Anything else is not an encounter, and two things in particular are not.
+       A ship that has just cast off is sitting on its own harbour's doorstep,
+       so without this the world you are leaving marks itself at t = nought
+       under the ship. And a road still closing when it runs out of drawn
+       length has not passed anything yet — it is a crossing that may or may
+       not happen past the end of what is shown. */
+    let best = null, rising = 0, closed = false;
+    outer:
+    for(let si = 0; si < segments.length; si++){
+      const seg = segments[si];
+      const frame = world.get(seg.body);
+      const pts = seg.scan ?? seg.points, ts = seg.scanTimes ?? seg.times;
+      const own = seg.body === b.id, child = b.parent === seg.body;
+      for(let i = 0; i < pts.length; i++){
+        const t = ts[i];
+        const d = own ? norm(pts[i])
+          : child ? dist(pts[i], railState(b, frame.mu, t).r)
+          : dist(add(absState(world, seg.body, t).r, pts[i]), absState(world, b.id, t).r);
+        if(!best || d < best.d){
+          if(best) closed = true;                 // it got nearer than it was
+          best = { d, t, si, seg }; rising = 0;
+        }else if(++rising >= 2 && closed && best.d <= bound){
+          break outer;                            // approached, passed, done looking
+        }
+      }
+    }
+    if(!best || !closed || rising < 2 || best.d > bound || best.t < notBefore) continue;
+    /* The sample grid is coarse next to a crosshair, so the minimum is closed
+       in on the same way the aim solver does it. */
+    const seg = best.seg, frame = world.get(seg.body);
+    const at = tt => {
+      const local = propagate(frame.mu, seg.r0, seg.v0, tt - seg.t0);
+      const shipAbs = add(absState(world, seg.body, tt).r, local.r);
+      const tg = absState(world, b.id, tt);
+      return { d: dist(shipAbs, tg.r), rel: norm(sub(add(absState(world, seg.body, tt).v, local.v), tg.v)), local };
+    };
+    const span = (seg.t1 - seg.t0) / Math.max(1, (seg.scanTimes ?? seg.times).length - 1);
+    let lo = Math.max(seg.t0, best.t - span), hi = Math.min(seg.t1, best.t + span);
+    const phi = (Math.sqrt(5) - 1) / 2;
+    let x = hi - phi * (hi - lo), y = lo + phi * (hi - lo);
+    let fx = at(x).d, fy = at(y).d;
+    for(let i = 0; i < 40 && hi - lo > 1e-6; i++){
+      if(fx < fy){ hi = y; y = x; fy = fx; x = hi - phi * (hi - lo); fx = at(x).d; }
+      else{ lo = x; x = y; fx = fy; y = lo + phi * (hi - lo); fy = at(y).d; }
+    }
+    const t = (lo + hi) / 2, got = at(t);
+    out.set(b.id, {
+      segIndex: best.si, body: b.id, t, r: got.local.r,
+      distance: got.d, altitude: Math.max(0, got.d - (b.radius ?? 0)),
+      speed: got.rel, grazes: got.d <= (b.radius ?? 0),
+      inMouth: b.zoneRadius != null && got.d <= b.zoneRadius,
+      passing: true,
+    });
+  }
+  return [...out.values()].sort((a, c) => a.t - c.t);
+}
+
+export function planImmediate(state, flown = true, opts = {}){
   if(state.dockedAt) return null;
+  const far = opts.farSight ?? seesPast(state);
   const bare = flown ? state : { ...state, nodes: [] };
-  if(!flown) return planImmediate(bare, true);
+  if(!flown) return planImmediate(bare, true, opts);
   const b = world.get(state.ship.body);
   const el = elementsFromState(b.mu, state.ship.r, state.ship.v);
   const lastNode = state.nodes.length ? state.nodes[state.nodes.length - 1].t : state.t;
@@ -1023,7 +1304,7 @@ export function planImmediate(state, flown = true){
      last burn) actually leaves us on. */
   let horizon = Math.min(IMMEDIATE_CAP, lead + lapOf(el) * 1.02);
   let pred = plan(state, horizon);
-  for(let pass = 0; pass < 3 && !settled(pred); pass++){
+  for(let pass = 0; pass < (far ? 5 : 3) && !settled(pred); pass++){
       const fin = finalLeg(pred);
     if(!fin) break;
     /* A leg that already ends at a boundary is as long as it is going to be;
@@ -1036,8 +1317,36 @@ export function planImmediate(state, flown = true){
     horizon = want;
     pred = plan(state, horizon);
   }
+  /* With a navigator aboard, look one encounter further. The loop above stops
+     the moment the road ends at a door — right for the ordinary chart, and
+     exactly what hides the thing she is there to show. Grow the horizon by a
+     lap of whatever the crossing leaves us on and solve again, at most twice,
+     and only until a second door turns up. */
+  if(far){
+    for(let pass = 0; pass < 2; pass++){
+      const now = pred.segments;
+      const doors = now.filter(sg => sg.reason === 'exit' || sg.reason === 'enter').length;
+      if(doors >= 2) break;
+      const fin = now[now.length - 1];
+      if(!fin) break;
+      const lap = lapOf(fin.elements);
+      if(!Number.isFinite(lap) || lap <= 0) break;
+      const want = Math.min(IMMEDIATE_CAP, (fin.t1 - state.t) + lap * 1.02);
+      if(want <= horizon * 1.001) break;
+      horizon = want;
+      pred = plan(state, horizon);
+    }
+  }
   const segs = pred.segments;
-  const crossed = segs.findIndex(sg => sg.reason === 'exit' || sg.reason === 'enter');
+  const firstCross = segs.findIndex(sg => sg.reason === 'exit' || sg.reason === 'enter');
+  /* One crossing, or two with somebody aboard who can hold the second in their
+     head. Everything downstream keys off `crossed`, so moving it is the whole
+     of the change: the trim, the full lap and the marks all follow it. */
+  let crossed = firstCross;
+  if(far && firstCross >= 0){
+    const second = segs.findIndex((sg, i) => i > firstCross && (sg.reason === 'exit' || sg.reason === 'enter'));
+    if(second >= 0) crossed = second;
+  }
   /* Everything up to the crossing, then the road inside the new reach up to
      whatever ends it. A burn written down inside that reach — the brake that
      turns a flyby into an arrival — splits it into more than one leg, and
@@ -1077,11 +1386,15 @@ export function planImmediate(state, flown = true){
       to: events.find(e => e.kind === 'soi' && Math.abs(e.t - sg.t1) < 1e-6)?.to ?? null,
     });
   });
+  const intercepts = interceptsOf(segments, crossed);
   return {
     ...pred, segments, events, end: endT, horizon,
     crossings,
     crossing: crossings[0] ?? null,
-    intercept: interceptOf(segments, crossed),
+    /* One per world, earliest first. `intercept` is the next one, which is
+       what the readouts and the encounter window have always wanted. */
+    intercepts,
+    intercept: intercepts[0] ?? null,
     /* From here on the road is drawn in the second colour: it is a different
        world's orbit, and it should not read as more of the same one. */
     afterFrom: crossed >= 0 ? crossed + 1 : segments.length,
@@ -1819,7 +2132,7 @@ export function transferWindows(state){
        it: this is a fact about the sky and the ship, not about whether you
        happen to be running low at a pump. */
     const ratio = best.cost > 0 ? now.cost / best.cost : Infinity;
-    const band = now.cost > state.tank ? 'impossible'
+    const band = now.cost > usableTank(state) ? 'impossible'
       : ratio <= WINDOW_BANDS.perfect ? 'perfect'
       : ratio <= WINDOW_BANDS.good ? 'good'
       : 'bad';
@@ -2140,10 +2453,36 @@ export function fuelCredit(state){
   return Math.max(0, short - canPay);
 }
 
+
+/* Putting it right. A yard will do hull and cell; neither can be done under
+ * way, and neither is ever compulsory — a battered ship still undocks, which
+ * is what keeps a broke one from being a stuck one. */
+export function canRepair(state, what){
+  if(!state.dockedAt) return { ok: false, reason: 'Only at a dock.' };
+  if(!PORTS[state.dockedAt]?.shipyard) return { ok: false, reason: 'No yard here.' };
+  const cost = repairCost(state, what);
+  if(cost <= 0) return { ok: false, reason: what === 'fuelCell' ? 'The cell is sound.' : 'The hull is sound.' };
+  if(state.money < cost) return { ok: false, reason: 'Not enough coin.', cost };
+  return { ok: true, cost };
+}
+export function repair(state, what){
+  const c = canRepair(state, what);
+  if(!c.ok) return c;
+  state.money -= c.cost;
+  if(what === 'fuelCell'){
+    state.faults = { ...(state.faults ?? {}), fuelCell: false };
+    logLine(state, 'story', TEXT.events.repairFuelCell);
+  }else{
+    state.hull = 0;
+    logLine(state, 'story', TEXT.events.repairHull);
+  }
+  return { ok: true, cost: c.cost };
+}
+
 export function refuel(state, kmsWanted){
   const price = fuelPrice(state);
   if(price == null) return { ok: false, reason: 'No fuel sold here.' };
-  const room = kms(state.tank - state.dv);
+  const room = kms(usableTank(state) - state.dv);
   let amount = Math.min(kmsWanted, room);
   if(amount <= 0) return { ok: false, reason: 'The tank is full.' };
   const credit = fuelCredit(state);
@@ -2154,7 +2493,7 @@ export function refuel(state, kmsWanted){
   const borrowed = Math.max(0, cost - state.money);
   state.money -= cost;
   if(state.money < 0){ state.debt += -state.money; state.money = 0; }
-  state.dv = Math.min(state.tank, state.dv + auDay(amount));
+  state.dv = Math.min(usableTank(state), state.dv + auDay(amount));
   logLine(state, 'refuelled', TEXT.logTemplates.refuelled, { amount: `${amount.toFixed(1)} km/s`, price: fmtMoney(cost), port: portName(state.dockedAt) });
   if(borrowed > 0) logLine(state, 'story', TEXT.events.bankDebt);
   return { ok: true, amount, cost, borrowed };
@@ -2210,6 +2549,7 @@ export function grantUpgrade(state, u){
     const newTank = auDay(u.value);
     state.dv += newTank - state.tank;   // a bigger tank comes full of what it cost
     state.tank = newTank;
+    state.dv = Math.min(state.dv, usableTank(state));   // a bad cell caps the new one too
   }
 }
 
@@ -2357,6 +2697,11 @@ export function callTow(state, reason = 'dry'){
   state.lastPort = q.port;
   placeDocked(state, q.port);
   state.stats.tows++;
+  /* The tow is what puts a wreck back together — "they pick the ship up in
+     pieces and put most of them back". Leaving the hull at wrecked would
+     strand the player at a level the yard has no price for, and re-wreck them
+     on the next pass. The crash multiplier on the bill is what it cost. */
+  if(reason === 'crash' || reason === 'atmosphere') state.hull = 0;
   const pool = reason === 'crash' ? TEXT.events.towCrash : TEXT.events.towDry;
   const story = reason === 'atmosphere' ? TEXT.events.towAtmosphere : pool[Math.floor(rnd(state) * pool.length)];
   if(!state.visited.includes(q.port)) state.visited.push(q.port);
@@ -2464,6 +2809,112 @@ function milestonesOnDock(state, port, events){
 
 /* ------------------------------------------------------------ persist */
 
+/* ------------------------------------------------------------- the slots
+ *
+ * Three saves per browser, one legacy key, and a string you can carry between
+ * machines. All of it lives here rather than in either page, because the title
+ * screen and the game both read and write these and a second copy of the rules
+ * is how the two come to disagree about what a save is.
+ *
+ * The store is a parameter so the tests can run it without a browser, and so a
+ * page with no localStorage at all (a private window, blocked site data) gets
+ * `null` back rather than an exception in the middle of drawing.
+ */
+export const LEGACY_KEY = 'ot:save:v1';
+export const SLOTS = [1, 2, 3];
+export const slotKey = n => `${LEGACY_KEY}:${n}`;
+export const ACTIVE_KEY = `${LEGACY_KEY}:active`;
+export const isSlot = n => SLOTS.includes(Number(n));
+
+function store(given){
+  if(given) return given;
+  try{ return globalThis.localStorage ?? null; }catch{ return null; }   // blocked site data throws on access
+}
+const read = (key, st) => { try{ return store(st)?.getItem(key) ?? null; }catch{ return null; } };
+const write = (key, value, st) => { try{ store(st)?.setItem(key, value); return true; }catch{ return false; } };
+const drop = (key, st) => { try{ store(st)?.removeItem(key); return true; }catch{ return false; } };
+
+/* ---------------------------------------------------------------- hex */
+
+/* A save as something a person can paste into a message. Hex rather than
+ * base64 on purpose: it survives being word-wrapped, retyped in the wrong
+ * case, or mangled by a chat client that thinks + and / are worth escaping,
+ * and a bad character is obvious rather than silently decoding to rubbish. */
+export function toHex(text){
+  const bytes = new TextEncoder().encode(String(text));
+  let out = '';
+  for(const b of bytes) out += b.toString(16).padStart(2, '0');
+  return out;
+}
+export function fromHex(hex){
+  /* Whatever the paste picked up on the way: spaces, newlines, the tabs a
+     code block adds. What is left has to be hex and has to be whole. */
+  const clean = String(hex).replace(/\s+/g, '').toLowerCase();
+  if(!clean) throw new Error('There is nothing there to read.');
+  if(!/^[0-9a-f]+$/.test(clean)) throw new Error('That is not a save: it has characters a save never has.');
+  if(clean.length % 2) throw new Error('That save is cut short — it ends in the middle of a character.');
+  const bytes = new Uint8Array(clean.length / 2);
+  for(let i = 0; i < bytes.length; i++) bytes[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
+  try{ return new TextDecoder('utf-8', { fatal: true }).decode(bytes); }
+  catch{ throw new Error('That save is damaged: what is in it is not text.'); }
+}
+export const exportSave = state => toHex(serialize(state));
+/* Imported saves go through the same door as saved ones — version gate and
+ * all — so a hand-edited string cannot get a shape the game cannot fly. */
+export const importSave = hex => restore(fromHex(hex));
+
+/* --------------------------------------------------------------- slots */
+
+export function readSlot(n, st){
+  if(!isSlot(n)) return null;
+  const raw = read(slotKey(n), st);
+  if(!raw) return null;
+  try{ return restore(raw); }catch{ return null; }   // an unreadable slot reads as an empty one
+}
+export function writeSlot(n, state, st){
+  if(!isSlot(n) || !state) return false;
+  return write(slotKey(n), serialize(state), st);
+}
+export function clearSlot(n, st){
+  if(!isSlot(n)) return false;
+  return drop(slotKey(n), st);
+}
+export function activeSlot(st){
+  const n = Number(read(ACTIVE_KEY, st));
+  return isSlot(n) ? n : 1;
+}
+export const setActiveSlot = (n, st) => isSlot(n) ? write(ACTIVE_KEY, String(n), st) : false;
+
+/* What a slot says about itself on the title screen, without the caller
+ * having to know how a ship's whereabouts are spelled. */
+export function slotSummary(state){
+  if(!state) return null;
+  const { year, day } = calendar(state.t);
+  return {
+    shipName: state.shipName ?? 'Your ship',
+    year, day,
+    where: state.dockedAt ? portName(state.dockedAt) : null,
+    money: state.money,
+    text: `${state.shipName ?? 'Your ship'} · year ${year}, day ${day} · ${state.dockedAt ? 'docked at ' + portName(state.dockedAt) : 'under way'}`,
+  };
+}
+
+/* The one-time move. A save written before there were slots becomes slot one,
+ * and only if slot one is free — a player who has already started a game there
+ * is not going to have it replaced by something older. The legacy key is only
+ * dropped once the copy has been read back, so a write that silently failed
+ * leaves the original where it was. */
+export function migrateLegacy(st){
+  const raw = read(LEGACY_KEY, st);
+  if(!raw) return 'none';
+  if(read(slotKey(1), st)) return 'kept';       // slot one is spoken for
+  try{ restore(raw); }catch{ return 'unreadable'; }
+  if(!write(slotKey(1), raw, st)) return 'failed';
+  if(read(slotKey(1), st) !== raw) return 'failed';
+  drop(LEGACY_KEY, st);
+  return 'moved';
+}
+
 export function serialize(state){ return JSON.stringify(state); }
 /* What a save must carry to be playable, and what it may simply be missing.
  * Anything that gets read while drawing a frame has to be right before the
@@ -2495,7 +2946,7 @@ export function restore(json){
   s.pending ??= null; s.flags ??= {}; s.stats ??= {}; s.visited ??= [s.dockedAt].filter(Boolean);
   s.toll ??= { lastT: -1e9, inBelt: false };
   s.quests ??= QUESTS.map(q => ({ id: q.id, step: 0, done: false }));
-  s.debt ??= 0; s.target ??= null; s.justLeft ??= null; s.justLeftAt ??= -1e9;
+  s.debt ??= 0; s.hull ??= 0; s.faults ??= {}; s.farSight ??= true; s.target ??= null; s.justLeft ??= null; s.justLeftAt ??= -1e9;
   /* A save written before anybody could call for help knows where it is tied
      up but not where it was last tied up. Those are the same thing at a
      mooring, and the first port is a fair guess in flight. */
