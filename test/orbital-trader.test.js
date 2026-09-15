@@ -8,7 +8,7 @@ import {
   CONST, BODIES, GOODS, PORTS, UPGRADES, FORMULAS, TEXT, GLOSSARY, SPECIES, BELT_ROCKS,
 } from '../public/orbital-trader/content.js';
 import * as S from '../public/orbital-trader/sim.js';
-import { createChart, railCrossings, railLead, locateOnPrediction, PALETTE } from '../public/orbital-trader/render.js';
+import { createChart, railCrossings, railLead, locateOnPrediction, pathAnchors, KM_PER_AU, PALETTE } from '../public/orbital-trader/render.js';
 import { DURATION, BREACH, BEATS, CAPTION_AT, beatAt, ascent, skyAt, ROCKET } from '../public/orbital-trader/intro.js';
 
 /* Orbital Trader has no server: everything it knows is in public/ and is
@@ -1897,7 +1897,7 @@ test('a new game starts in orbit above Tassel, full, with an errand from Uncle T
   assert.deepEqual(back, JSON.parse(JSON.stringify(s)));
 });
 
-test('the game opens in a low orbit, and the clock is tuned so a lap of it is ten real minutes', () => {
+test('the game opens in a low orbit, clear of the air, and a lap of it is about eleven real minutes', () => {
   const s = S.newGame(5);
   const b = world.get('tassel');
   const el = O.elementsFromState(b.mu, s.ship.r, s.ship.v);
@@ -1905,24 +1905,37 @@ test('the game opens in a low orbit, and the clock is tuned so a lap of it is te
 
   /* Low means what a pilot means by it and not what a chart does: the high
      point of the orbit is an altitude over the ground, and it sits under one
-     planet-diameter of it. At Tassel that is 0.000075 au over a world 0.00008
-     au across — close enough in that the ocean fills the chart. */
+     planet-diameter of it — close enough in that the ocean fills the chart. */
   const apoapsisAltitude = el.ra - b.radius;
   assert.ok(apoapsisAltitude > 0, 'and above the ocean, not through it');
   assert.ok(apoapsisAltitude < 2 * b.radius, `apoapsis altitude ${apoapsisAltitude} is not below the diameter ${2 * b.radius}`);
   assert.ok(el.ra < world.get('tassel').zoneRadius, 'inside the harbour mouth, so Tassel can still be tied up at');
   assert.ok(el.ra < b.dockAlt, 'and below the harbour, which is where undocking puts you');
 
-  /* The clock has exactly one job: a lap of this orbit, at ×1, is ten real
-     minutes. Everything else in the sky is slower, so this is the fastest the
-     game ever looks. */
-  const lapSeconds = el.period / S.dtForFrame(s, 1);
-  assert.ok(Math.abs(lapSeconds - 600) < 0.5, `a lap takes ${lapSeconds.toFixed(2)} real seconds, not 600`);
+  /* But clear of it, which is the other half of "low". The opening orbit used
+     to sit a hundred kilometres up with only thirty of those above the air,
+     and the chart opened on a ship apparently touching the ocean. A hundred
+     and fifty leaves daylight between the two. */
+  const km = au => au * KM_PER_AU;          // the game's own scale, which the sky was authored at
+  assert.ok(km(el.rp - b.radius) > 140, `the low point is only ${km(el.rp - b.radius).toFixed(0)} km up`);
+  assert.ok(km(el.rp - b.atmo) > 70, `the low point is only ${km(el.rp - b.atmo).toFixed(0)} km above the air`);
 
-  // And flying it for those ten minutes really does come back round.
+  /* The clock has exactly one job: at ×1, a lap of this orbit is the fastest
+     thing in the sky, and everything else is slower still. It was tuned to ten
+     real minutes when the orbit was a hundred kilometres up; raising it to a
+     hundred and fifty stretched the lap rather than the clock, because the
+     clock is what every *other* body's speed is read against and speeding it
+     up to keep a round number would have set the whole sky moving faster. */
+  const lapSeconds = el.period / S.dtForFrame(s, 1);
+  assert.ok(Math.abs(lapSeconds - 677) < 2, `a lap takes ${lapSeconds.toFixed(2)} real seconds, not about 677`);
+
+  /* And flying it for those eleven minutes really does come back round. The
+     lap is no longer a whole number of seconds, so the last frame is a short
+     one — a run of 673 one-second frames stops three tenths of a second shy
+     of the lap, which is two kilometres of ocean at this speed. */
   const r0 = [...s.ship.r];
-  for(let i = 0; i < 600; i++) S.tick(s, S.dtForFrame(s, 1));
-  assert.ok(O.dist(s.ship.r, r0) < el.ra * 1e-6, 'ten real minutes of ×1 is one lap, back where it started');
+  for(let left = lapSeconds; left > 0; left -= 1) S.tick(s, S.dtForFrame(s, Math.min(1, left)));
+  assert.ok(O.dist(s.ship.r, r0) < el.ra * 1e-6, 'one lap of ×1 is back where it started');
 });
 
 test('undocking puts the ship in a prograde parking orbit at the docking altitude', () => {
@@ -3844,4 +3857,44 @@ test('a world\'s ring cannot be tapped to wait while the lesson is running', () 
      Warp here" is a card in the lesson, so that one has to keep working. */
   assert.match(PLAY, /const p = prediction && !state\.dockedAt \? chart\.nearestPathPoint\(/,
     'the path tap should be untouched');
+});
+
+/* ------------------------------------------- marks land on the road they mark */
+
+test('a mark on the road is drawn on the road, in every frame the road crosses', () => {
+  /* The ring that shows which bit of road you just tapped, and the flame for a
+     burn, are placed against the leg they fall on. A leg inside a moon's reach
+     is drawn where the moon *will be* when the ship gets there, not where the
+     moon is now — the road has always known that and the marks did not, so
+     tapping the planned road past a crossing put the ring fifteen hundred
+     pixels off the line it belonged to. */
+  const chart = stubChart(900, 700);
+  try{
+    const s = S.newGame(1); S.undock(s); s.dv = s.tank = 0.01;
+    assert.ok(S.trimToTarget(s, 'slate').ok, 'could not aim at Slate');
+    const pred = S.planImmediate(s, true, {});
+    const frames = new Set(pred.segments.map(sg => sg.body));
+    assert.ok(frames.size > 1, `this road never leaves ${[...frames]} — it proves nothing`);
+
+    chart.camera.follow = 'tassel'; chart.camera.zoom = 3e7;
+    chart.camera.anchor = [...O.absState(world, 'tassel', s.t).r]; chart.settle();
+    chart.draw({ t: s.t, now: 0, shipAbs: { r: S.shipAbsPos(s), v: S.shipAbsVel(s) }, shipBody: s.ship.body,
+      prediction: pred, nodes: s.nodes, nodePositions: s.nodes.map(n => locateOnPrediction(world, pred, n.t)),
+      selectedNode: -1, apses: [], railCrossings: [] });
+
+    const pos = new Map(world.bodies.map(b => [b.id, O.absState(world, b.id, s.t)]));
+    const anchors = pathAnchors(pred, pos);
+    let checked = 0;
+    for(const { seg, screenPts } of chart.hits.pathSegs){
+      const i = Math.floor(screenPts.length / 2);
+      const at = locateOnPrediction(world, pred, seg.times[i]);
+      assert.ok(at, 'a moment on a drawn leg is not on the road');
+      // Exactly the sum drawTapMark and drawNodes do.
+      const mark = chart.toScreen(O.add(anchors[at.segIndex] ?? pos.get(at.body).r, at.r));
+      const miss = Math.hypot(mark[0] - screenPts[i][0], mark[1] - screenPts[i][1]);
+      assert.ok(miss < 1, `${seg.body}/${seg.reason}: the mark is ${miss.toFixed(0)} px off the line it marks`);
+      checked++;
+    }
+    assert.ok(checked >= 3, `only ${checked} legs were drawn`);
+  }finally{ chart.restore(); }
 });

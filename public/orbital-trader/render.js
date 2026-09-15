@@ -348,10 +348,18 @@ function draw(chart, view){
   drawOrbits(chart, pos, t);
   drawSoiRings(chart, pos);
   drawBodies(chart, view, pos, t);
-  if(view.prediction) drawPrediction(chart, view, pos);
+  /* Where each leg of the road is pinned on the screen, worked out once and
+     handed to everything that puts a mark on the road. It used to be worked
+     out inside drawPrediction and nowhere else, so the road knew that a leg
+     in a moon's frame is drawn where the moon *will be* and the marks did
+     not: a burn written inside a moon's reach, and the ring showing which
+     bit of road you just tapped, were both drawn against where the moon is
+     now — fifteen hundred pixels off the line they belong to. */
+  const anchors = view.prediction ? pathAnchors(view.prediction, pos) : null;
+  if(view.prediction) drawPrediction(chart, view, pos, anchors);
   drawShip(chart, view, pos);
-  if(view.prediction && view.nodes) drawNodes(chart, view, pos);
-  if(view.tapMark) drawTapMark(chart, view, pos);
+  if(view.prediction && view.nodes) drawNodes(chart, view, pos, anchors);
+  if(view.tapMark) drawTapMark(chart, view, pos, anchors);
   if(view.prediction) drawEncounterInset(chart, view);
   if(chart.showScale) drawScaleBar(chart);
 }
@@ -714,7 +722,38 @@ function crosshair(ctx, p, r){
  * anchored at that body's position now. Colour changes at each burn so the
  * plan reads as "this, then that"; a leg after a burn the tank cannot pay for
  * is drawn grey. */
-function drawPrediction(chart, view, pos){
+/* Where each leg is pinned on the screen. The first is pinned to its world
+ * where that world is now; every leg after it continues from where the last
+ * one stopped:
+ *
+ *     anchor(n) = anchor(n-1) + end(n-1) - start(n)
+ *
+ * which is the same point in space written in two frames, so the road joins
+ * up exactly at every change of reach. Pinning a moon's leg to where the moon
+ * is *now* instead draws the swing past Slate in one corner of the chart and
+ * the door into Slate's reach in another, because the encounter happens where
+ * Slate will be, not where it is.
+ */
+export function pathAnchors(pred, pos){
+  const anchors = [];
+  for(let i = 0; i < pred.segments.length; i++){
+    const seg = pred.segments[i];
+    if(i === 0){ anchors.push(pos.get(seg.body)?.r ?? [0, 0]); continue; }
+    const prev = pred.segments[i - 1];
+    anchors.push(prev.body === seg.body
+      ? anchors[i - 1]
+      : sub(add(anchors[i - 1], prev.r1), seg.r0));
+  }
+  return anchors;
+}
+
+/* The anchor a moment on the road is drawn against: the one belonging to the
+ * leg it falls on. `at` is anything locateOnPrediction returned. */
+function anchorAt(anchors, at, pos){
+  return anchors?.[at.segIndex] ?? pos.get(at.body)?.r ?? [0, 0];
+}
+
+function drawPrediction(chart, view, pos, anchorList){
   const { ctx } = chart;
   const pred = view.prediction;
   const burns = pred.events.filter(e => e.kind === 'burn');
@@ -727,26 +766,8 @@ function drawPrediction(chart, view, pos){
      your presses are moving is the bright, continuous one. */
   const editing = !!view.editing;
   const afterBurnAt = si => pred.segments.slice(0, si).some(sg => sg.reason === 'burn');
-  /* Where each leg is pinned on the screen. The first is pinned to its world
-     where that world is now; every leg after it continues from where the last
-     one stopped:
-     
-         anchor(n) = anchor(n-1) + end(n-1) - start(n)
-     
-     which is the same point in space written in two frames, so the road joins
-     up exactly at every change of reach. Pinning a moon's leg to where the
-     moon is *now* instead — which is what this did — drew the swing past Slate
-     in one corner of the chart and the door into Slate's reach in another,
-     because the encounter happens where Slate will be, not where it is. */
-  const anchors = [];
-  for(let i = 0; i < pred.segments.length; i++){
-    const seg = pred.segments[i];
-    if(i === 0){ anchors.push(pos.get(seg.body)?.r ?? [0, 0]); continue; }
-    const prev = pred.segments[i - 1];
-    anchors.push(prev.body === seg.body
-      ? anchors[i - 1]
-      : sub(add(anchors[i - 1], prev.r1), seg.r0));
-  }
+  // Worked out once for the whole frame; see pathAnchors.
+  const anchors = anchorList ?? pathAnchors(pred, pos);
   for(let si = 0; si < pred.segments.length; si++){
     const seg = pred.segments[si];
     const anchor = anchors[si];
@@ -1024,11 +1045,11 @@ function drawShip(chart, view, pos){
  * before they pressed anything on it. So: a ring on the road at that moment,
  * breathing so it is not mistaken for a mark already written down, and it
  * goes when the card does. */
-function drawTapMark(chart, view, pos){
+function drawTapMark(chart, view, pos, anchors){
   const { ctx } = chart;
   const m = view.tapMark;
   if(!m || !pos.has(m.body)) return;
-  const p = chart.toScreen(add(pos.get(m.body).r, m.r));
+  const p = chart.toScreen(add(anchorAt(anchors, m, pos), m.r));
   const breath = chart.reducedMotion ? 0 : Math.sin((view.now ?? 0) / 180);
   ctx.strokeStyle = PALETTE.pathNow; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.arc(p[0], p[1], 9 + 2 * breath, 0, Math.PI * 2); ctx.stroke();
@@ -1074,15 +1095,14 @@ function drawFlame(ctx, x, y, s, selected){
   ctx.restore();
 }
 
-function drawNodes(chart, view, pos){
+function drawNodes(chart, view, pos, anchors){
   const { ctx } = chart;
   const nodes = view.nodes;
   for(let i = 0; i < nodes.length; i++){
     const n = nodes[i];
     const where = view.nodePositions?.[i];
     if(!where || !pos.has(where.body)) continue;
-    const anchor = pos.get(where.body).r;
-    const p = chart.toScreen(add(anchor, where.r));
+    const p = chart.toScreen(add(anchorAt(anchors, where, pos), where.r));
     const selected = view.selectedNode === i;
     if(selected){
       ctx.strokeStyle = PALETTE.node; ctx.lineWidth = 2;
@@ -1524,12 +1544,16 @@ export function railCrossings(world, prediction, tNow, opts = {}){
 
 /* Where a node sits on the plan: the ship's state at the node's time in the
  * frame it will be in. Computed from the prediction so it agrees with the path. */
+/* `segIndex` comes back with it, because which leg a moment falls on is what
+ * decides where on the screen it is drawn — a leg in a moon's frame is pinned
+ * to where the moon will be, not to where it is. See pathAnchors. */
 export function locateOnPrediction(world, prediction, t){
-  for(const seg of prediction.segments){
+  for(let i = 0; i < prediction.segments.length; i++){
+    const seg = prediction.segments[i];
     if(t >= seg.t0 - 1e-9 && t <= seg.t1 + 1e-9){
       const mu = world.get(seg.body).mu;
       const s = propagate(mu, seg.r0, seg.v0, t - seg.t0);
-      return { body: seg.body, r: s.r, v: s.v };
+      return { body: seg.body, r: s.r, v: s.v, segIndex: i };
     }
   }
   return null;
