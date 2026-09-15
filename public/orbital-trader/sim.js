@@ -1209,19 +1209,28 @@ function interceptsOf(segments, crossed){
   const exact = interceptOf(segments, crossed);
   if(exact) out.set(exact.body, exact);
 
-  /* The world the ship is going round right now is not an encounter with
-     anything. A parking orbit reaches its low point once a lap, which is a
-     real local minimum and completely uninteresting: it is where you already
+  /* The world the ship is going round right now is usually not an encounter
+     with anything. A parking orbit reaches its low point once a lap, which is
+     a real local minimum and completely uninteresting: it is where you already
      are. It becomes interesting again only if the road leaves and comes back,
-     so it is ignored up to the moment the road quits that world's frame. */
+     so it is ignored up to the moment the road quits that world's frame.
+     
+     Only on a closed orbit, though. A ship that has just fallen through a
+     world's door is going round it in the arithmetic and nowhere near it yet:
+     the low point ahead is the encounter, the one place a rendezvous can be
+     made, and the only thing on that road worth pointing the clock at. A skip
+     ends at every change of reach, so this is exactly where the pilot is put
+     down — and with the low point suppressed the panel offered them nothing
+     but the way out the far side. */
   const home = segments[0]?.body ?? null;
+  const homeBound = Number.isFinite(segments[0]?.elements?.period);
   const leftHome = segments.find(sg => sg.body !== home)?.t0 ?? Infinity;
 
   for(const b of world.bodies){
     if(b.id === 'lamp' || out.has(b.id)) continue;
     const bound = markWithin(b);
     if(!(bound > 0)) continue;
-    const notBefore = b.id === home ? leftHome : -Infinity;
+    const notBefore = b.id === home && homeBound ? leftHome : -Infinity;
     /* A pass has to be a pass: the road comes closer and then goes away again.
        Anything else is not an encounter, and two things in particular are not.
        A ship that has just cast off is sitting on its own harbour's doorstep,

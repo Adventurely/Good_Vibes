@@ -2465,6 +2465,40 @@ test('the belt havens and the Maw are rendezvous zones you match speeds with', (
   assert.ok(r.ok && far.flags.mawArrival, 'the Maw had nothing to say');
 });
 
+test('falling through a world\'s door leaves something to point the clock at', () => {
+  /* A skip ends at every change of reach, so the door is exactly where the
+     pilot is put down — and at a place with no gravity to speak of, half a
+     game hour from the one moment a rendezvous can be made. The low point
+     ahead was suppressed, because the world you are going round is normally
+     not an encounter with anything: true of a parking orbit, false of a
+     hyperbola you fell into four seconds ago. So the panel offered the way out
+     the far side and nothing else, and at x1 that crossing is nine real
+     minutes of watching. */
+  const s = S.newGame(7);
+  s.dockedAt = 'tassel'; S.undock(s); s.dv = s.tank = S.auDay(60);
+  assert.ok(S.trimToTarget(s, 'nail', 6000).ok);
+  let guard = 0;
+  while(s.ship.body !== 'lamp' && guard++ < 40000){ S.tick(s, 0.05); if(s.pending) break; }
+  assert.ok(S.trimToTarget(s, 'nail', 6000).ok);
+  const t0 = s.t;
+  while(s.ship.body !== 'nail' && s.t - t0 < 200) S.tick(s, 0.005);
+  assert.equal(s.ship.body, 'nail', 'this road never reached Nail');
+
+  const pred = S.planImmediate(s, true);
+  const ic = (pred.intercepts ?? []).find(i => i.body === 'nail');
+  assert.ok(ic, 'inside Nail\'s reach and the panel says nothing about Nail');
+  assert.ok(ic.t > s.t, 'the low point should be ahead of the ship, not under it');
+  assert.ok(ic.inMouth, 'this road was aimed into the mouth and the mark disagrees');
+  assert.ok(ic.speed > 0, 'and it has to say the speed: that is the half a rendezvous turns on');
+
+  /* The rule it must not have broken on the way: a parking orbit's own low
+     point is still not an encounter, or every game would open with a
+     crosshair under the ship. */
+  const parked = S.newGame(7); S.undock(parked);
+  const own = (S.planImmediate(parked, true).intercepts ?? []).find(i => i.body === parked.ship.body);
+  assert.ok(!own, 'a parking orbit marks the world it is parked at');
+});
+
 test('the crosshair is there while the burn is still wrong, which is when it is wanted', () => {
   /* The mark is not a rosette for arriving. There is no aim helper on the
      chart: every road is flown by pushing a burn around and watching this one
