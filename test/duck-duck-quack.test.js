@@ -16,7 +16,7 @@ import {
   SKILLS, SKILL_INFO, LEVEL_1, LEVELS, buildTerrain, winCount, formatTime,
 } from '../public/duck-duck-quack/content.js';
 
-import { newGame, tick, assignSkill, assignRefusal, duckNear } from '../public/duck-duck-quack/sim.js';
+import { newGame, tick, assignSkill, assignRefusal, duckNear, hasTrait } from '../public/duck-duck-quack/sim.js';
 
 /* A minimal level for a test that only cares about one mechanic. Every field
    the game reads has a harmless default, so a test only has to say what makes
@@ -362,7 +362,7 @@ function playLevel1(){
       if(d.state !== 'walking') continue;
       if(!builderUsed && d.x === 69 && assignSkill(state, d.id, 'builder')) builderUsed = true;
       else if(!diggerUsed && d.x === 219 && assignSkill(state, d.id, 'digger')) diggerUsed = true;
-      else if(d.skill !== 'climber' && d.x >= 130 && d.x < 150) assignSkill(state, d.id, 'climber');
+      else if(!hasTrait(d, 'climber') && d.x >= 130 && d.x < 150) assignSkill(state, d.id, 'climber');
     }
     tick(state);
   }

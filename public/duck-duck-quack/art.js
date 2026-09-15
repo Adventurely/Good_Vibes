@@ -230,9 +230,17 @@ export function drawDuck(ctx, d){
   if(d.state === 'blocking'){
     ctx.fillStyle = hex('r');
     ctx.fillRect(x + 1, y - 3, 4, 2);
-  } else if(d.skill && SKILL_MARK[d.skill] && d.state === 'walking'){
-    ctx.fillStyle = hex(SKILL_MARK[d.skill]);
-    ctx.fillRect(x + 2, y - 3, 2, 2);
+  } else if(d.state === 'walking' && d.traits.size){
+    // One small mark per trait held, side by side — a duckling can carry
+    // more than one at once, and all of them should show, not just one.
+    let mx = x;
+    for(const skill of d.traits){
+      const key = SKILL_MARK[skill];
+      if(!key) continue;
+      ctx.fillStyle = hex(key);
+      ctx.fillRect(mx, y - 3, 2, 2);
+      mx += 3;
+    }
   }
 }
 

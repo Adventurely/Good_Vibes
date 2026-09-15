@@ -22,13 +22,22 @@ function hatchling(level, groundY){
     y: groundY,
     dir: 1,
     state: 'walking',   // walking | falling | digging | building | climbing | blocking | saved | lost
-    skill: null,
+    // Digger, Builder and Climber are traits, and a duckling can hold more
+    // than one at once — see assignSkill for why. Blocker is not in here at
+    // all: it is an instant, terminal action, not something to check for
+    // later.
+    traits: new Set(),
     fallFrom: 0,
     buildLeft: 0,
     digLeft: 0,
     cause: null,        // set when lost: 'fell' | 'edge' | 'goosed'
   };
 }
+
+/* Does this duckling currently hold this trait? The one thing anything
+   outside this module should ever ask about a duckling's skills — see
+   assignSkill for the shape underneath. */
+export const hasTrait = (d, skill) => d.traits.has(skill);
 
 /* ---------------------------------------------------------------- the game */
 
@@ -152,7 +161,7 @@ function stepWalking(state, d){
   const delta = nextY - d.y;   // positive: ground drops away; negative: ground rises
 
   if(delta < -WALK_STEP){
-    if(d.skill === 'climber'){ d.state = 'climbing'; d.x = nextX; return; }
+    if(hasTrait(d, 'climber')){ d.state = 'climbing'; d.x = nextX; return; }
     d.dir = -d.dir;
     return;
   }
@@ -170,12 +179,12 @@ function stepWalking(state, d){
      * long before the hazard it is for, rather than needing to land on the
      * exact column where that hazard starts.
      */
-    if(d.skill === 'builder' && nextY >= SCENE_H){
+    if(hasTrait(d, 'builder') && nextY >= SCENE_H){
       d.state = 'building';
       d.buildLeft = BUILD_MAX_STEPS;
       return;
     }
-    if(d.skill === 'digger' && nextY < SCENE_H){
+    if(hasTrait(d, 'digger') && nextY < SCENE_H){
       d.state = 'digging';
       d.digLeft = DIG_MAX_STEPS;
       return;
@@ -270,13 +279,16 @@ function stepClimbing(state, d){
 /* Why a skill cannot be given right now, or null. A duckling can only take a
    new job while it is plainly walking — mid-fall, mid-dig, already planted as
    a blocker, already saved or already lost are all "no", and each says why
-   rather than the click just doing nothing. */
+   rather than the click just doing nothing. Already holding the trait being
+   offered is also a "no": nothing changes, and there is no reason to spend a
+   second builder finding that out. */
 export function assignRefusal(state, duckId, skill){
   if(state.ended) return 'The level is over.';
   if(!SKILLS.includes(skill)) return 'There is no such skill.';
   const d = state.ducks.find(duck => duck.id === duckId);
   if(!d) return 'There is no such duckling.';
   if(d.state !== 'walking') return 'That one is busy.';
+  if(skill !== 'blocker' && hasTrait(d, skill)) return 'That one already has it.';
   if(!(state.supply[skill] > 0)) return `Out of ${skill}s.`;
   return null;
 }
@@ -286,21 +298,25 @@ export function assignRefusal(state, duckId, skill){
  *
  * Blocker is the one that acts at once — planting itself is not something
  * that waits for a particular spot. Digger, Builder and Climber are all
- * traits rather than instant actions: each only matters the next time this
+ * traits rather than instant actions, and — unlike Blocker — a duckling can
+ * hold more than one at a time: each only matters the next time this
  * duckling actually meets the thing it answers (a wall too tall to step up,
- * a drop, a gap), which is what stepWalking checks for on every step. That
- * is also why a skill can be handed out the moment a duckling hatches and
- * still work fine at the hazard three obstacles later — there is no exact
- * column it has to be given on.
+ * a drop, a gap), which is what stepWalking checks for on every step, and
+ * the three answer three different shapes of hazard that never overlap.
+ * That stacking is not a nicety — a duckling given Builder for the gap still
+ * has to get past the wall afterwards, and Climber is the only thing that
+ * gets it there. Handed out one at a time as each hazard is reached, that
+ * is automatic; handed out all at once at the nest, it only works at all
+ * because holding Builder never stops it from also holding Climber.
  */
 export function assignSkill(state, duckId, skill){
   if(assignRefusal(state, duckId, skill)) return null;
   const d = state.ducks.find(duck => duck.id === duckId);
   state.supply[skill] -= 1;
-  d.skill = skill;
 
   if(skill === 'blocker'){ d.state = 'blocking'; return d; }
   // digger, builder, climber: stay 'walking' until the right hazard asks for them.
+  d.traits.add(skill);
   return d;
 }
 
