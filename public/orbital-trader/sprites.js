@@ -479,8 +479,8 @@ export const PORTRAITS = {
       '.kjjjjjjjjJJJJjjjjjjjjk.',
       'kkkkkkkkkkkkkkkkkkkkkkkk',
     ]},
-  /* Brikka, Emberkin, off the Ninth Forge: a crest, and the goggles pushed up
-     on it because she has just stopped doing something. */
+  /* Kiran, Emberkin, off the Ninth Forge: a crest, and the goggles pushed up
+     on it because he has just stopped doing something. */
   engineer: { legend: PORTRAIT_INK,
     rows: [
       '........................',
@@ -508,7 +508,7 @@ export const PORTRAITS = {
       '.kjjjjjjjjJJJJjjjjjjjjk.',
       'kkkkkkkkkkkkkkkkkkkkkkkk',
     ]},
-  /* Celia, cat, who can read a rock at four au. Ears tall and narrow — a wide
+  /* Tsuki, cat, who can read a rock an au off. Ears tall and narrow — a wide
      one is a dog at this size. */
   navigator: { legend: PORTRAIT_INK,
     rows: [

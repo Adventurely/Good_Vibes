@@ -78,7 +78,11 @@ Two consequences are worth stating plainly, because the formula means different 
 
 On the chart the mouth is a dashed ring with **a small anchor hung at the top of it**, green where they will take your lines and amber where they will not yet. The anchor is there because a dashed circle round a world is the same shape as three other things the chart draws — a sphere of influence, an atmosphere, a hollow rock — and this is the only one you can tie up inside.
 
-The **drifting havens keep their authored mouths.** The Maw has no surface to stand five radii off and no air over it; its radius is a dot on a chart rather than a ground. A pilot arrives there by matching speeds, and the size of that rendezvous is a design choice with nothing physical to derive it from. *Nail and Whisker used to be on this list.* They are the two biggest rocks in the Belt now — 449 km and 329 km, with mass, a reach and a parking orbit — so their mouths are derived from their size like every other world's, and a pilot gets into an orbit round them rather than pulling alongside. That is what makes the run out to them the lesson the crew quests are hung on.
+**Two kinds of harbour.** At most worlds, tying up means being in orbit: the mouth is a circle your whole orbit has to fit inside, gravity holds you there, and getting captured is the manoeuvre. A **rendezvous** is the other kind — no orbit to wait in, so the harbour asks the two questions it always asked instead: near enough, and slow enough beside it. Which one a place uses is authored (`harbour: "rendezvous"`) rather than derived, because it is a fact about the yards and not a consequence of the mass; a body with no mass at all is a rendezvous by default, having no orbit to offer.
+
+**Nail and Whisker are worlds you orbit.** They are the two biggest rocks in the Belt — 449 km and 329 km — with real weight, a reach, a mouth five radii over the ground like everybody else's, and a parking orbit you sit in. That was a deliberate choice over making them rendezvous harbours: the run out to them is the lesson the two crew quests are hung on, and the lesson is the tutorial's own skill — get into an orbit, bring the high point inside the mouth — asked for again somewhere it matters. The change matters more than the numbers suggest. Nail used to be a three-hundred-thousand-kilometre bubble in the Belt: aim vaguely at the Belt and you were docked. Its mouth is 2700 km now, which makes reaching it a real approach.
+
+**The Maw is the one rendezvous left.** It has no surface to stand five radii off and no air over it, so it keeps the authored mouth the five-radii formula has nothing to act on, and a pilot arrives by matching speeds. Because there is nothing to fall into, **the intercept mark is the instrument you fly it on**. See §2.6.1.
 
 This is a scope decision as much as a fictional one. Landing would need a second control scheme, a second set of physics, and a second art problem, and it would buy nothing the orbital game does not already have. The fiction absorbs it easily: Tassel is an ocean of floating harbour cities that meet ships in orbit, the cats cannot survive a heavy world at all, and the frogs' balloon villages have no ground under them either.
 
@@ -152,6 +156,12 @@ A cap on the rate means the longest hauls take proportionally more than ten seco
 
 Two rules keep the chart readable, and both of them are about refusing to show things.
 
+**The chart is repainted whole, every frame, and its cost is the size of the backing store.** Nothing on it is cached — ground, four hundred stars, the Scatter, every rail, the road, the worlds — and it does not need to be, because the arithmetic behind it is cheap: at 1600×1000 the drawing commands take about 2 ms a frame to issue and the rest is the rasteriser filling pixels. That makes the frame time very nearly linear in pixel count: **13 ms at one device pixel per CSS point, 25 at one and a half, 37 at two.**
+
+A retina screen asks for two, which is four times the pixels of an ordinary one — so on a high-DPI display the chart ran at twenty-seven frames a second and dragging it visibly stuttered. This was never about the kernel: the same measurement on a build from before any of this week's work gives the same 37 ms.
+
+So **the resolution follows the gesture.** At rest the chart paints at the full device ratio and the pixel art is as sharp as the screen can show. While the view is being moved by hand — a drag, a wheel, a pinch — it paints at half that, until a fifth of a second after the last of it: 37 ms becomes 12. Nobody can see the difference in pixel art that is sliding under their finger, and everybody can see twenty-seven frames a second. The clock moving the ship does not trigger it, because the chart is locked to the ship and the sky under it barely stirs. The switch happens at the top of a draw and nowhere else, since resizing a canvas discards its contents and resets the context.
+
 **The view is locked to the world you are going round.** The chart is always centred on the smallest sphere of influence containing the ship, and it changes when that changes — crossing into a moon's reach swings the chart to that moon and re-frames it. The zoom follows the drawn road: it re-frames when the road grows past the edge of the screen or shrinks to a knot in the middle, and leaves the player's own zooming alone in between.
 
 **Panning rides the lock instead of replacing it.** The chart can be dragged — one finger, two fingers, or the arrow keys when no burn is selected — but what is stored is not a position in the sky. It is an offset from the thing last focused, and the thing last focused is looked up again every frame, so a pan keeps its meaning as the world it is measured from moves: look a little ahead of your ship and it stays a little ahead of your ship; drag over a moon and the view travels with the moon. The original objection stands and is answered rather than ignored — a view that can be lost is a view somebody has to get back — so focusing anything at all (tapping a body, pressing `f`, the ◎ button) sets the offset back to nothing, and ◎ lights while the view is off its lock.
@@ -188,6 +198,20 @@ on purpose: a dashed line between them was the obvious thing to draw and the
 wrong one, because a straight line across a chart of curves reads as a path
 you could fly.
 
+**A world you are already going round is not an encounter — unless you have just fallen into it.** A parking orbit reaches its low point once a lap; that is where you already are, and marking it would put a crosshair under the ship in the opening frame of every game. But a skip ends at every change of reach, so the door into a world is exactly where a pilot gets put down, and on the hyperbola they arrived on the low point ahead *is* the encounter — at a rendezvous it is the one moment the ship can be tied up. Suppressing it left the panel offering nothing but the way out the far side, and at ×1 the crossing of Nail's reach is nine real minutes of watching. So the rule is keyed on the orbit being closed, not on it being yours.
+
+**Where the road comes nearest a world, the chart puts a crosshair, and the panel puts a number beside it.** One per world, at the *first* close pass and never the second — a road that cuts the same rail three laps running earns one mark, the same refusal the road itself makes. The line reads *closest approach to Nail: 1,250 km at 4.75 km/s, in 146 days*, and it is two numbers rather than one on purpose.
+
+This is the whole instrument at a place with no gravity worth the name. At a planet you aim roughly, get captured, and tidy up afterwards; the well does most of the work and being a few thousand kilometres out is forgiven. At a rendezvous nothing catches you, so arriving means putting the ship in the same place *and* at the same speed, and the only way to see whether a burn is doing that is a mark that says how close and how fast. A readout that said "inside docking range" on distance alone would send a pilot 146 days down a road to discover on arrival that they were going four times too fast to tie up, so where the pass is inside a rendezvous mouth but over its speed limit, the line says so and says what to match it to.
+
+**A port is marked within a tenth of its own orbit, and that is the number that makes the mark useful.** Measured against a world's reach alone — twice the sphere of influence, which is what the mark was originally cut to — the crosshair does not exist until the road is nearly right. Fifty metres a second off a five-kilometre burn to Nail leaves the pass 1,480 Mm out: inside one per cent of the answer, and still far outside twice Nail's reach. So the pilot pushed the burn through the entire useful range of it with a blank chart, and the mark appeared only once they no longer needed it. That is a rosette for arriving, not an instrument.
+
+There is no aim helper on the chart — `trimToTarget` exists in the kernel and is not wired to a button — so every road is flown by pushing a burn around and watching this one number come down. A tenth of the world's own orbit is the scale at which "am I anywhere near it" is a real question; it grows with the system, so a road to Grumm gets a Grumm-sized band; and it stays a signal rather than a decoration, because a world crosses its own band's width in a few days and a road that misses the timing is still not marked. The noise cost is near zero: a road only ever sweeps past the handful of worlds between its low point and its high one, and measured across the roads out of Tassel the widest band tried never put more than two crosshairs on the chart.
+
+**The panel beside the chart does not repeat it.** Flying, the ship menu is three tabs — Ship, Quests, Crew — and the Astrolabe when it is fitted; the port menu replaces them while you are tied up. It used to carry two more while flying, and both were deleted: *Orbit* recited the low point, high point, height, speed and lap of an orbit the chart was already drawing and labelling, and *Burns* listed the marks you set and move **on the chart** without being able to edit one. A panel of numbers about a picture, beside the picture, is a worse place to work than the picture.
+
+Three things in them were load-bearing and moved rather than went. **Ahead** — what the road runs into next, the crossings, the air brakes, the intercept lines above — is now the first thing on the Ship tab while flying, above everything the ship is made of, because it is the only thing in the panel the chart cannot say better. The **tow** and the **distress call** went with it: an empty tank is the one hole a tow cannot always dig you out of, since a tow has a price and a purse can be empty, so the floor under it has to live somewhere a stranded pilot can find without being told.
+
 ### 2.2.1 The Astrolabe
 
 **A transfer is won or lost before the burn.** Thirty degrees off the window, Cinder to Tassel costs **+2.6 to +3.8 km/s** on top of a perfect 6.5 — 47% of a starter tank becomes 65–74% — and sixty degrees off makes it 13.8 of 14, which is to say impossible. None of that was visible anywhere. The chart draws the road and the rail; the orange diamonds say how far out of phase you are; nothing turned that into fuel.
@@ -201,7 +225,7 @@ The Astrolabe is the instrument that does. It is a key upgrade, and its tab appe
 | **Bad** | dearer than that, but the tank can still pay it. |
 | **Impossible** | more than the tank holds. |
 
-Each row is a name, a verdict, the cost and flight time of leaving today, and **the days until the next window** — a dash where no window helps, because the crossing is past this tank at every phase. Waiting is nearly always the answer: thirty degrees is about nine days at Cinder, and nine days are free. The four words do the explaining; the rows do not.
+Each row is a name, a verdict, the cost and flight time of leaving today, and **the days until the next window** — a dash where no window helps, because the crossing is past this tank at every phase, and the word **now** where the window is the one you are standing in. That last case is not a nicety. The countdown is to the *next* window, so the moment a wait lands the row read `PERFECT` over `103 d`, which together say the instrument is wrong; it is the first thing anybody sees after using the button, and it made a correct instrument look broken. A window that is open says so and stops offering to be waited for. Waiting is nearly always the answer otherwise: thirty degrees is about nine days at Cinder, and nine days are free. The four words do the explaining; the rows do not.
 
 The cost comes from Lambert, searched over flight times from half the Hohmann time to half again as long. The cheapest conic at a bad phase is a very slow one — a two-year crawl out to Grumm, priced as though it were a bargain — and an instrument that recommends that is lying by omission, so the search only offers roads a person would actually fly.
 
@@ -213,9 +237,19 @@ card a tap on your own road does, with the time counted to the moment that
 world reaches the point under your finger — so the usual way to plan a
 transfer is to tap a rail, read the wait, and burn from there. The road wins a
 tie over a rail and a world wins over both, because a rail runs straight
-through its own world and a planet has to stay tappable. Tied up at a dock,
-neither the road nor a rail takes a tap: a skip started at a port sets the
-rate and never stops.
+through its own world and a planet has to stay tappable. It works tied up as
+well as adrift, which is where the waiting mostly happens.
+
+**A skip has to be able to end at a mooring**, and for a long time it could
+not: the frame loop cleared a skip's stop on every frame that saw a docked
+ship, so a wait started at a port set the clock to nine days a second and
+nothing ever turned it off. Ten seconds took you to the window; twenty put you
+ninety days past it, and the clock readout was invisible throughout because it
+keys off the same stop that had just been discarded. The Astrolabe's own
+Wait-for-it button is on a tab you read while tied up, which is how a working
+instrument came to be "always wrong". The rule the loop wanted was that
+*arriving* ends a skip — a tow can dock you in the middle of one — not that
+being docked forbids having one.
 
 ### 2.7 Trading
 
@@ -341,22 +375,52 @@ off, because where you buy a thing is half of what it is.
 | Upgrade | Bought at | Wants | Does |
 |---|---|---|---|
 | Temperature control | Cinder | Engineer | Carries the six goods that will not keep at hold temperature |
-| Gravitational sensors | Nail | — | *Nothing yet.* Will show gravitational phenomena on the chart |
-| Heat shielding | Cinder | Engineer | *Nothing yet.* Will allow risky aerobraking |
-| Cryo hull cooling | Cinder | Engineer, heat shielding | *Nothing yet.* Will make that aerobraking safe |
+| Gravitational sensors | Nail | — | Puts the Knot on the chart for a crew with no navigator to have told them |
+| Heat shielding | Cinder | Engineer | Lets the ship fly through air instead of into it — aerobraking, at a price |
+| Cryo hull cooling | Cinder | Engineer, heat shielding | Takes the price off: the same passes, no risk |
 
-**Three of the four are sold and wired to nothing.** That is deliberate and it
-is said out loud: each row on the rack carries "not fitted to anything yet",
-because selling a captain a box that does nothing without saying so is a
-swindle, and because the alternative — holding the upgrade back until the
-mechanic lands — means the mechanic arrives with no place to be bought.
+**A rendezvous has to say what it is waiting for.** It is the one state in the game where the ship is exactly where it wants to be and doing the wrong thing about it: inside Whisker's mouth, thirty thousand kilometres from the harbour, going five and a half kilometres a second past it. There is no gravity to finish the job — being near a rendezvous is not being caught by one — so the ship will sail straight out the far side unless the pilot matches its speed. The Ahead panel therefore leads with the harbour the ship is inside, live while the burn brings the number down: *Whisker is right here, and there is nothing to fall into: 32,800 km off and closing at 5.55 km/s. Match its speed to 1000 m/s or under and it will take you* — and then *Whisker will take you now*. Inside the mouth with only the speed wrong is also no longer greyed in the HUD, because that is not "nowhere near it", it is the most actionable thing on the screen.
 
-Aerobraking is the one that used to work. A shielded ship could skim Grumm's
-air and be captured by it, free. That is switched off: risky and safe skims are
-two different manoeuvres, neither is built, and until they are, the clouds are
-lethal to everybody. The arithmetic survives in `effectiveNodes`, which takes a
-`skim` flag so a test can still reach it rather than leaving it to rot behind a
-flag no caller can set.
+Without that, the whole screen agrees the place is broken. The anchor only appears once docking is already possible, the mouth is an unlabelled ring at that zoom, and a player who has just learned that Nail has a reach you fall into will reasonably conclude that Whisker is missing one.
+
+**All four do something now.** They were not always: the rack carries a "not
+fitted to anything yet" line for any row that is ahead of its mechanic, because
+selling a captain a box that does nothing without saying so is a swindle, and
+because the alternative — holding the upgrade back until the mechanic lands —
+means the mechanic arrives with no place to be bought. Nothing wears that line
+today.
+
+**Aerobraking.** Without a heat shield the air is a wall and the hull meets it.
+With one, a periapsis inside the air inserts a free retrograde node at the
+bottom of the dive, and how much it takes goes with the *square* of how deep
+the dive goes:
+
+    shed = min(maxFraction, k · depth²) · v_periapsis      k 1.4, cap 0.9
+
+so the band of air is two different places. The top of it is a feather — a
+graze a few kilometres under the cloud tops takes two or three per cent, costs
+nothing, and a patient pilot can walk an orbit down over as many laps as they
+have days for. The bottom of it is a wall: aim a few kilometres over the ground
+and the planet takes an arrival's whole excess in one lap. A ship falling into
+Tassel at 1 km/s of excess leaves a 7 km pass in a closed orbit, having spent
+no fuel.
+
+What stops that from being a crash is the floor. However hard a pass bites, the
+node is clipped so the far end of the resulting orbit still clears the air
+(`floorApo`, 1.25 × the cloud tops), and once a ship is sitting on that floor
+further passes shed nothing. The worst a deep dive can do is park you low, in
+an orbit you must burn to climb out of.
+
+The price is the hull. `skimRisk` is convex — the first 350 m/s of a pass is
+free and the rest grows with the square, capped at 85% — so splitting a hard
+brake across four shallow laps is genuinely safer rather than the same risk
+spread thinner, and the pilot who takes the days is playing better rather than
+just slower. The measured shape at Tassel: a 60 km graze is free, a 40 km pass
+sheds a quarter of the speed at about one chance in ten of damage, a 7 km pass
+captures outright at one in six against a slow arrival and near-certainly hurts
+against a fast one. Cryo cooling sets that to zero at any depth, which is the
+whole of the difference between the two boxes on the rack: the heat shield buys
+the manoeuvre, the cooling buys it cheap.
 
 **What went.** Engine tiers are gone — fuel cost the same everywhere the moment
 they were removed, which is one fewer axis and one fewer thing to price. The
@@ -453,6 +517,20 @@ Four living species, one extinct. Each has one thing it is better at than anybod
 - Floating cities and ancient traditions
 - Slow-moving but deeply knowledgeable
 - **Strength: Knowledge**
+
+**Naming.** Each people names from its own well, so a name says where somebody
+is from before anything else does. The wells are:
+
+| People | Scheme | In the game |
+|---|---|---|
+| Otters | Short, soft, one or two syllables, from small birds, weather and water | Finn, Wren, Theo, Nellie |
+| Emberkin | Indian given names, and an institution rather than a family — `Name of the Ninth Forge`, `House Rathore`. The institution is the important half | Kiran, Devika, House Rathore |
+| Cats | Japanese given names | Tsuki, Kaede, Haru, Rin |
+| Frogs | Two syllables, always | Wicket |
+
+The rule that matters is that these are wells, not costumes: a new quest giver
+is named by picking from the right one, and a name that does not fit its people
+is a bug in the fiction the same way a wrong price is a bug in the market.
 
 **The Builders — Extinct**
 
@@ -792,7 +870,7 @@ teaches at Slate, asked for again somewhere it matters.
 ### 5.2 What the Line Needs That the Game Does Not Have
 
 1. ~~**Crew as a reward.**~~ Done, as far as the line needs. Three of the
-   twenty hand over a person — Brikka the Emberkin engineer at #6, Celia the cat
+   twenty hand over a person — Kiran the Emberkin engineer at #6, Tsuki the cat
    navigator at #13, Wicket the frog appraiser at #19 — one each from the three
    peoples whose region the player has just finished crossing. Finishing one
    of those quests fills that berth and the Crew menu shows who is in it. What
@@ -839,7 +917,7 @@ parts to Slate, fire crystals to Veyra (who love them), reactor coils to Nail
 
 ## 6. Technical Notes
 
-**Decided since the first draft.** Reaches are computed from mass and harbour mouths from size rather than written down (2.1, 2.3), and the invariant checker proves the promises a hand-tuned table used to make. The Belt is decorative — a field of drawn rocks — and the Maw is a massless rendezvous with a harbour mouth rather than a body with a well: a pilot arrives there by matching speeds, not by falling in. It also carries a *drift reach*, four times its mouth, which has no effect on any path at all: inside it the burn axes are measured against the target instead of against the Lamp, so forward and back are relative closing speed and out and in are away and toward. Holding a ship there against nothing is what the cat navigator's berth buys, along with the two numbers it is flown on — distance at intercept and relative speed. The two cat havens were the same until the crew quests were moved onto them; Nail and Whisker have mass now, and are docked at by orbiting.
+**Decided since the first draft.** Reaches are computed from mass and harbour mouths from size rather than written down (2.1, 2.3), and the invariant checker proves the promises a hand-tuned table used to make. The Belt is decorative — a field of drawn rocks — but Nail and Whisker are not two of them: they are bodies with wells, reaches and mouths like any other, and are docked at in orbit. The Arc is a small body you orbit too. The Maw is the last massless zone with an authored mouth, and it carries a *drift reach* four times that mouth which has no effect on any path at all: inside it the burn axes are measured against the target instead of against the Lamp, so forward and back are relative closing speed and out and in are away and toward. Holding a ship there against nothing is what the cat navigator's berth buys, along with the two numbers it is flown on — distance at intercept and relative speed.
 
 **Still to tune.** Gravity-assist approaches at Grumm, and the Δv ladder between the tanks now that the map has been respaced.
 
@@ -864,9 +942,9 @@ berth fills with a name, a species, a portrait and a line:
 
 | Berth | Who | People | From |
 |---|---|---|---|
-| Engineer | Brikka | Emberkin | #6 Engine Trouble (Cinder → Scorch) |
-| Navigator | Celia | Cats | #13 A Cat's Request (Nail → Whisker) |
-| Appraiser | Wicket | Frogs | #19 Appraisal |
+| Engineer | Kiran (he) | Emberkin | #6 Engine Trouble (Cinder → Scorch) |
+| Navigator | Tsuki (she) | Cats | #13 A Cat's Request (Nail → Whisker) |
+| Appraiser | Wicket (he) | Frogs | #19 Appraisal |
 
 `state.crew` carries a slot per berth, null until earned and then `{ role,
 from, joinedAt }` — who they are, which job brought them, and when.

@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../theme.css">
+<title>Duck Duck Quack &mdash; guide the hatch home</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%234fc4d3'/%3E%3Ccircle cx='9' cy='7' r='4' fill='%23ffd34e'/%3E%3Cpath d='M12 7h2l-1 1z' fill='%23f08c33'/%3E%3C/svg%3E">
+<meta name="description" content="A duckling hatches and walks on its own, straight into whatever is in front of it. Give it a skill before it does — dig, build, block, climb — and get enough of the hatch to the pond before the goose does, or the clock does.">
+<style>
+  :root{
+    --ink: var(--gv-paper);
+    --paper: var(--gv-text);
+    --muted: var(--gv-muted);
+    --leaf: var(--gv-leaf);
+    --sun: var(--gv-sun);
+    --edge: var(--gv-line);
+  }
+  *{ box-sizing: border-box; }
+  html, body{ min-height: 100%; }
+  body{
+    margin: 0;
+    background: var(--ink);
+    color: var(--paper);
+    font: 16px/1.55 var(--gv-type);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #plate{
+    position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    image-rendering: pixelated; image-rendering: crisp-edges;
+    z-index: 0;
+  }
+  .veil{
+    position: fixed; inset: 0; z-index: 1;
+    background:
+      radial-gradient(60% 42% at 50% 46%, rgba(244,239,228,.90) 0%, rgba(244,239,228,.60) 60%, rgba(244,239,228,0) 100%),
+      linear-gradient(180deg, rgba(244,239,228,.88) 0%, rgba(244,239,228,.34) 40%,
+                              rgba(244,239,228,.60) 74%, rgba(244,239,228,.95) 100%);
+  }
+
+  main{
+    position: relative; z-index: 2;
+    min-height: 100vh;
+    display: grid; grid-template-rows: 1fr auto 1fr;
+    justify-items: center; text-align: center;
+    padding: clamp(1.2rem, 4vw, 3rem);
+    gap: 1.5rem;
+  }
+  .wrap{ grid-row: 2; max-width: 40rem; width: 100%; }
+
+  .eyebrow{
+    margin: 0 0 .6rem; font-size: clamp(.68rem, 2vw, .8rem);
+    letter-spacing: .34em; text-transform: uppercase; color: var(--leaf);
+  }
+  h1{
+    margin: 0;
+    font-size: clamp(2.1rem, 9vw, 4.4rem);
+    line-height: .95; letter-spacing: -.02em; font-weight: 800;
+    background: linear-gradient(180deg, #1d6f7d 0%, #4fc4d3 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .tag{ margin: 1rem auto 0; max-width: 32rem; color: var(--paper);
+        font-size: clamp(.9rem, 2.6vw, 1.02rem); }
+  .tag b{ color: var(--sun); font-weight: 700; }
+
+  .enter{
+    display: inline-block; margin-top: clamp(1.4rem, 4vw, 2.2rem);
+    padding: .8rem 2.6rem; border: 0; border-radius: 999px;
+    background: linear-gradient(180deg, #6cc24a 0%, var(--leaf) 100%);
+    color: #06120a; font: inherit; font-weight: 800; font-size: 1.12rem;
+    text-decoration: none;
+    box-shadow: var(--gv-shadow);
+    transition: transform .12s ease, filter .12s ease;
+  }
+  .enter:hover, .enter:focus-visible{ transform: translateY(-2px); filter: brightness(1.1); }
+  .enter:focus-visible{ outline: 3px solid var(--gv-leaf); outline-offset: 3px; }
+
+  .facts{
+    margin: 1.6rem auto 0; padding: 0; list-style: none;
+    display: flex; flex-wrap: wrap; gap: .4rem; justify-content: center;
+  }
+  .facts li{
+    font-size: .74rem; letter-spacing: .04em; text-transform: uppercase; font-weight: 600;
+    color: var(--leaf); border: 1px solid var(--edge); border-radius: 999px;
+    padding: .18rem .7rem; background: var(--gv-glass);
+  }
+  .facts li.sun{ color: var(--sun); }
+
+  .back{ grid-row: 3; align-self: end; color: var(--muted); font-size: .8rem; text-decoration: none; }
+  .back:hover, .back:focus-visible{ color: var(--gv-text); }
+
+  .sound{
+    display: block; margin: 1.1rem auto 0;
+    font: inherit; font-size: .78rem; padding: .4rem 1rem; cursor: pointer;
+    background: var(--gv-glass); border: 1px solid var(--edge); border-radius: 999px;
+    color: var(--muted);
+  }
+  .sound[aria-pressed='true']{ color: var(--leaf); border-color: var(--leaf); }
+  .sound:hover, .sound:focus-visible{ color: var(--gv-text); }
+
+  @media (prefers-reduced-motion: reduce){
+    .enter{ transition: none; }
+    .enter:hover, .enter:focus-visible{ transform: none; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="plate" width="320" height="180" aria-hidden="true"></canvas>
+<div class="veil"></div>
+
+<main>
+  <div class="wrap">
+    <p class="eyebrow">Good Vibe Games</p>
+    <h1>Duck Duck Quack</h1>
+    <p class="tag">A duckling hatches and walks straight into whatever is ahead of it.
+       <b>Dig, build, block or climb</b> — give it a skill before it meets a gap, a
+       wall, a drop, or the goose — and get enough of the hatch to the pond.</p>
+
+    <a class="enter" href="./play.html">Hatch the flock</a>
+
+    <ul class="facts">
+      <li>Single player</li>
+      <li class="sun">Puzzle</li>
+      <li>One level, four skills</li>
+      <li>Nothing saved, nothing sent anywhere</li>
+    </ul>
+    <button type="button" id="sound" class="sound" aria-pressed="false">Music off</button>
+  </div>
+
+  <a class="back" href="/">&larr; all Good Vibe Games</a>
+</main>
+
+<script type="module">
+  /* The plate is the park itself, running, with a slow bot playing it over
+     and over — the same rule every title screen on this site follows: this is
+     not a picture of the game, it is the game, and it cannot go stale. */
+  import { LEVEL_1 } from './content.js';
+  import { newGame, tick, assignSkill } from './sim.js';
+  import { paintScene } from './art.js';
+  import { createAudio } from './audio.js';
+
+  /* Autoplay policy decides when sound can start, not us: the context cannot
+     exist until a gesture, so the button reflects intent and the first click
+     or key on the page is what actually opens it. The choice persists per
+     browser, in the same key play.html reads, so turning the music off here
+     does not mean turning it back on once the flock hatches. */
+  const audio = createAudio();
+  const soundButton = document.getElementById('sound');
+  const syncSound = () => {
+    const on = !audio.isMuted();
+    soundButton.textContent = on ? 'Music on' : 'Music off';
+    soundButton.setAttribute('aria-pressed', String(on));
+  };
+  audio.play('park');
+  syncSound();
+
+  /* iOS Safari's Web Audio autoplay unlock is pickier than the video/audio
+     element autoplay policy — a page where a <video> plays fine can still
+     leave a freshly-made AudioContext stuck `suspended` after a gesture, and
+     it is specifically `touchend`/`click` that Safari has always honoured
+     most reliably, `pointerdown` being the newer, less certain one. Listening
+     for all of them costs nothing extra: `unlock()` no-ops once the context
+     is already running.
+     And attempts are not one-shot — the first gesture's `resume()` can fail
+     silently, so the listeners stay attached until `isRunning()` actually
+     confirms it worked, rather than being torn down after a single try that
+     may or may not have landed. */
+  const UNLOCK_EVENTS = ['pointerdown', 'touchend', 'mousedown', 'click', 'keydown'];
+  const tryUnlock = () => {
+    audio.unlock();
+    if(!audio.isRunning()) return;
+    for(const type of UNLOCK_EVENTS) removeEventListener(type, tryUnlock);
+  };
+  for(const type of UNLOCK_EVENTS) addEventListener(type, tryUnlock);
+
+  soundButton.addEventListener('click', () => {
+    audio.setMuted(!audio.isMuted());
+    audio.unlock();
+    syncSound();
+  });
+
+  // Leaving for the game should not leave a theme playing behind it.
+  addEventListener('pagehide', () => audio.stop());
+
+  const canvas = document.getElementById('plate');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  ctx.imageSmoothingEnabled = false;
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function fitPlate(){
+    const scale = Math.max(1, Math.ceil(Math.max(innerWidth / LEVEL_1.width, innerHeight / LEVEL_1.height)));
+    canvas.style.width = `${LEVEL_1.width * scale}px`;
+    canvas.style.height = `${LEVEL_1.height * scale}px`;
+  }
+  fitPlate();
+  addEventListener('resize', fitPlate);
+
+  /* The same simple policy the balance test plays the level with: bridge the
+     gap and clear the drop the moment either is possible, and hand out a
+     climber to anything unskilled that is nearing the wall. */
+  let state = newGame(LEVEL_1);
+  let builderUsed = false, diggerUsed = false;
+
+  function playStep(){
+    for(const d of state.ducks){
+      if(d.state !== 'walking') continue;
+      if(!builderUsed && d.x === 69 && assignSkill(state, d.id, 'builder')) builderUsed = true;
+      else if(!diggerUsed && d.x === 219 && assignSkill(state, d.id, 'digger')) diggerUsed = true;
+      else if(d.skill !== 'climber' && d.x >= 130 && d.x < 150) assignSkill(state, d.id, 'climber');
+    }
+    tick(state);
+    if(state.ended){
+      state = newGame(LEVEL_1);
+      builderUsed = false;
+      diggerUsed = false;
+    }
+  }
+
+  function frame(now){
+    // A quarter speed: this screen is a shop window, not the game itself, and
+    // a flock crossing the whole park in a couple of seconds is a blur nobody
+    // reads as ducklings.
+    if(!still){ for(let i = 0; i < 5; i++) playStep(); }
+    paintScene(ctx, state);
+    if(!still) requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  if(still) paintScene(ctx, state);
+
+  addEventListener('keydown', event => {
+    if(event.key === 'Enter' && event.target === document.body) document.querySelector('.enter').click();
+  });
+</script>
+</body>
+</html>

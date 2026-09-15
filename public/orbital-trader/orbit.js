@@ -681,7 +681,10 @@ export function driftTargetAt(world, bodyId, r, t){
   if(!parent) return null;
   let best = null;
   for(const c of world.children(bodyId)){
-    if(c.mu > 0 || !(c.driftReach > 0)) continue;
+    /* Keyed on the harbour rather than the mass: a rock can carry enough pull
+       to have a reach and still be a thing you come alongside, and that one
+       should fly relative too. */
+    if(!c.rendezvous || !(c.driftReach > 0)) continue;
     const st = railState(c, parent.mu, t);
     const d = norm(sub(r, st.r));
     if(d > c.driftReach) continue;

@@ -231,17 +231,50 @@ function placeDocked(state, portId){
  * were flying, and which let a ship on a wild ellipse tie up because it
  * happened to be slow at the top of it.
  *
- * Things with no gravity — the Arc, Claw Rock, the comet — have no orbit to
- * be in, so those keep the distance-and-speed test they always had.
+ * A rendezvous harbour is the other kind, and keeps the distance-and-speed
+ * test: the belt havens and the Maw have no gravity to be held by, and Nail
+ * has so little that an orbit round it is not somewhere anybody waits. You
+ * come alongside instead. Which places are which is decided in content.js,
+ * not here.
  */
+/* Coming alongside: near enough to the rock and slow enough beside it. Used
+ * for a haven in the frame the ship is flying in, and for the rock itself
+ * once the ship is inside its reach — the same two numbers either way, so
+ * crossing that boundary does not change what the harbour asks of you. */
+function rendezvousStatus(state, c, r, v){
+  const distance = norm(r), relSpeed = norm(v);
+  const inZone = distance <= c.zoneRadius;
+  const slow = relSpeed <= c.dockSpeed;
+  /* Nothing is holding you here and nothing will catch you if you are wrong,
+     so holding a ship still against it is the cat's trick the navigator's
+     berth buys. Reported either way, so a ship without one learns that the
+     approach was good and what the missing piece is. */
+  const held = canDockDrifting(state);
+  return {
+    port: c.id, kind: 'zone', distance, relSpeed,
+    mouth: c.zoneRadius, dockSpeed: c.dockSpeed,
+    inZone, slow, needsNavigator: !held, ok: inZone && slow && held,
+    over: Math.max(0, relSpeed - c.dockSpeed),
+    score: distance / c.zoneRadius,
+    open: portOpen(c.id, state.t),
+  };
+}
 export function dockingStatus(state){
   if(state.dockedAt) return null;
   const here = world.get(state.ship.body);
   let best = null;
   const take = st => { if(!best || st.score < best.score) best = st; };
 
+  /* The rock we are inside the reach of, when that rock is one you come
+     alongside. Ship coordinates are already in its frame, so the two numbers
+     are simply where we are and how fast. Without this a ship that crossed
+     into Nail's reach found no harbour at all: Nail is not its own child, and
+     the orbit test below would have asked it to orbit a thing it cannot. */
+  if(here.port && here.rendezvous && here.mu > 0 && state.justLeft !== here.id){
+    take(rendezvousStatus(state, here, state.ship.r, state.ship.v));
+  }
   // The world we are going round.
-  if(here.port && here.mu > 0 && state.justLeft !== here.id){
+  if(here.port && here.mu > 0 && !here.rendezvous && state.justLeft !== here.id){
     const el = elementsFromState(here.mu, state.ship.r, state.ship.v);
     const floor = Math.max(here.radius ?? 0, here.atmo ?? 0);
     const mouth = here.zoneRadius ?? Infinity;
@@ -258,23 +291,11 @@ export function dockingStatus(state){
       open: portOpen(here.id, state.t),
     });
   }
-  // Gravity-less ports in this frame: near enough, slow enough.
+  // Rendezvous ports in this frame: near enough, slow enough.
   for(const c of world.children(here.id)){
-    if(!c.port || c.mu > 0 || state.justLeft === c.id) continue;
-    const s = railState(c, here.mu, state.t);
-    const distance = dist(state.ship.r, s.r);
-    const relSpeed = norm(sub(state.ship.v, s.v));
-    const inZone = distance <= c.zoneRadius;
-    const slow = relSpeed <= c.dockSpeed;
-    take({
-      port: c.id, kind: 'zone', distance, relSpeed,
-      mouth: c.zoneRadius, dockSpeed: c.dockSpeed,
-      inZone, slow, needsNavigator: !canDockDrifting(state),
-      ok: inZone && slow && canDockDrifting(state),
-      over: Math.max(0, relSpeed - c.dockSpeed),
-      score: distance / c.zoneRadius,
-      open: portOpen(c.id, state.t),
-    });
+    if(!c.port || !c.rendezvous || state.justLeft === c.id) continue;
+    const st = railState(c, here.mu, state.t);
+    take(rendezvousStatus(state, c, sub(state.ship.r, st.r), sub(state.ship.v, st.v)));
   }
   if(!best) return null;
   // Nowhere near: do not clutter the HUD with a port you are nothing like at.
@@ -419,14 +440,14 @@ export function skipPlan(state, t){
  * whole of it: without one the air is a wall and the hull meets it, which is
  * what `atmosphere: true` in the predictor means. Cryo cooling does not change
  * whether you may skim, only whether it costs you anything (see skimRisk). */
-export const skimsAir = state => !!state?.keys?.heatshield;
+export const skimsAir = state => !!state?.keys?.heatShield;
 
 /* The Knot is out there whether or not anybody has told you. What the cat
  * navigator brings is knowing where — the cats have had it for generations and
  * have never seen a reason to mention it. Gravitational sensors find it the
  * other way, by looking, which is the phenomenon that key was always sold to
  * see. Either one puts it on the chart; neither changes the sky. */
-export const knowsKnot = state => !!(state?.crew?.navigator || state?.keys?.gravsensors);
+export const knowsKnot = state => !!(state?.crew?.navigator || state?.keys?.gravSensors);
 /* Bodies the chart should not draw for this player. Physics never consults
  * this: a thing nobody has told you about still has hold of you. */
 export function unseen(state){
@@ -488,7 +509,7 @@ export const seesPast = state => canSeePast(state) && state.farSight !== false;
  * days instead. Cryo cooling takes it to nothing at any depth, which is what
  * the rack has always claimed it does. */
 export function skimRisk(state, shedAuDay){
-  if(state?.keys?.cryocooling) return 0;
+  if(state?.keys?.cryoCooling) return 0;
   const f = FORMULAS.aerobrake;
   const over = Math.max(0, kms(shedAuDay) - f.freeKms);
   if(over <= 0) return 0;
@@ -554,12 +575,19 @@ export function effectiveNodes(state, horizon, { skim = skimsAir(state) } = {}){
       if(norm(at.r) > b.atmo * 1.001) continue;
       const vp = el.vmax;
       const depth = Math.max(0, Math.min(1, (b.atmo - el.rp) / (b.atmo - b.radius)));
-      const wanted = Math.min(FORMULAS.aerobrake.maxFraction, FORMULAS.aerobrake.k * depth) * vp;
+      /* How much of the speed the air takes, from how deep the dive goes. The
+         curve is steep rather than straight: the thin stuff at the top of the
+         band barely touches you, and the bottom of it is a wall. That is what
+         makes a tight pass a real maneuver — aim deep and the planet catches
+         you in one lap — while a graze stays the gentle, repeatable thing a
+         pilot can walk an orbit down with. */
+      const f = FORMULAS.aerobrake;
+      const wanted = Math.min(f.maxFraction, f.k * Math.pow(depth, f.depthPower ?? 1)) * vp;
       /* The floor: an orbit whose far end still clears the clouds. Skimming can
          circularise you around a world; it must never quietly bury you in it.
          Pass after pass the shed shrinks to nothing, and the ship is left on a
          low orbit for the pilot to raise out of the air themselves. */
-      const aTarget = (el.rp + FORMULAS.aerobrake.floorApo * b.atmo) / 2;
+      const aTarget = (el.rp + f.floorApo * b.atmo) / 2;
       const vFloor = Math.sqrt(Math.max(0, b.mu * (2 / el.rp - 1 / aTarget)));
       const shed = Math.max(0, Math.min(wanted, vp - vFloor));
       if(shed < vp * 1e-3) break;   // nothing left to give: stop inserting skims
@@ -1187,6 +1215,137 @@ function interceptOf(segments, crossed){
   return best;
 }
 
+/* How near the road has to come to a world before the pass is worth a mark.
+ *
+ * The first three terms are the encounter: a world's own reach, twice over, so
+ * a near miss is called before it is a miss; harbour mouths for the havens,
+ * which have no reach; the ground for anything with neither. Those make the
+ * crosshair a thing that confirms an arrival.
+ *
+ * The fourth makes it a thing you can *steer* by, which is what it is actually
+ * for, and there is no aim helper in the chart — every road is flown by pushing
+ * a burn around and watching this number. Measured against a reach alone the
+ * number does not exist until the road is nearly right: fifty metres a second
+ * off a five kilometre burn to Nail leaves the pass fourteen hundred million
+ * kilometres out, well inside one per cent of the answer and still far outside
+ * twice Nail's reach, so the pilot pushed the burn through the whole useful
+ * range of it with a blank chart and the mark appeared only once they no longer
+ * needed it.
+ *
+ * So a port is also marked within a tenth of its own orbit. That is the scale
+ * at which "am I anywhere near it" is a real question, it grows with the system
+ * so a road to Grumm gets a Grumm-sized band, and it stays a signal rather than
+ * a decoration: a world crosses its own band's width in a few days, so a road
+ * that misses the timing is still not marked, and a road only ever sweeps past
+ * the handful of worlds between its low point and its high one. Measured on the
+ * roads out of Tassel, the widest band here never puts more than two crosshairs
+ * on the chart. */
+function markWithin(b){
+  const aimed = b.port && b.a > 0 ? b.a * 0.1 : 0;
+  return Math.max((b.soi ?? 0) * 2, (b.zoneRadius ?? 0) * 8, (b.radius ?? 0) * 20, aimed);
+}
+
+/* Where the road comes nearest each world, once per world, and the *first*
+ * time rather than the nearest time.
+ *
+ * The chart used to mark exactly one encounter: the world whose reach the road
+ * crossed into. That missed two things a pilot wants. Nail and Whisker have no
+ * reach to cross — they are rendezvous points, matched rather than fallen into
+ * — so flying straight at one was marked with nothing at all. And a road that
+ * goes past one world on its way to another is a thing that happens constantly
+ * out here, with only the far end of it marked.
+ *
+ * One mark per world, at the first close pass, and nothing after it: a road
+ * that cuts the same rail three laps running earns one crosshair, which is the
+ * same refusal the rest of this chart already makes. */
+function interceptsOf(segments, crossed){
+  const out = new Map();
+  /* The encounter the ship actually falls into keeps its exact numbers: inside
+     a reach the nearest point is that leg's periapsis, solved rather than
+     sampled. Everything else is found by walking the drawn road. */
+  const exact = interceptOf(segments, crossed);
+  if(exact) out.set(exact.body, exact);
+
+  /* The world the ship is going round right now is usually not an encounter
+     with anything. A parking orbit reaches its low point once a lap, which is
+     a real local minimum and completely uninteresting: it is where you already
+     are. It becomes interesting again only if the road leaves and comes back,
+     so it is ignored up to the moment the road quits that world's frame.
+     
+     Only on a closed orbit, though. A ship that has just fallen through a
+     world's door is going round it in the arithmetic and nowhere near it yet:
+     the low point ahead is the encounter, the one place a rendezvous can be
+     made, and the only thing on that road worth pointing the clock at. A skip
+     ends at every change of reach, so this is exactly where the pilot is put
+     down — and with the low point suppressed the panel offered them nothing
+     but the way out the far side. */
+  const home = segments[0]?.body ?? null;
+  const homeBound = Number.isFinite(segments[0]?.elements?.period);
+  const leftHome = segments.find(sg => sg.body !== home)?.t0 ?? Infinity;
+
+  for(const b of world.bodies){
+    if(b.id === 'lamp' || out.has(b.id)) continue;
+    const bound = markWithin(b);
+    if(!(bound > 0)) continue;
+    const notBefore = b.id === home && homeBound ? leftHome : -Infinity;
+    /* A pass has to be a pass: the road comes closer and then goes away again.
+       Anything else is not an encounter, and two things in particular are not.
+       A ship that has just cast off is sitting on its own harbour's doorstep,
+       so without this the world you are leaving marks itself at t = nought
+       under the ship. And a road still closing when it runs out of drawn
+       length has not passed anything yet — it is a crossing that may or may
+       not happen past the end of what is shown. */
+    let best = null, rising = 0, closed = false;
+    outer:
+    for(let si = 0; si < segments.length; si++){
+      const seg = segments[si];
+      const frame = world.get(seg.body);
+      const pts = seg.scan ?? seg.points, ts = seg.scanTimes ?? seg.times;
+      const own = seg.body === b.id, child = b.parent === seg.body;
+      for(let i = 0; i < pts.length; i++){
+        const t = ts[i];
+        const d = own ? norm(pts[i])
+          : child ? dist(pts[i], railState(b, frame.mu, t).r)
+          : dist(add(absState(world, seg.body, t).r, pts[i]), absState(world, b.id, t).r);
+        if(!best || d < best.d){
+          if(best) closed = true;                 // it got nearer than it was
+          best = { d, t, si, seg }; rising = 0;
+        }else if(++rising >= 2 && closed && best.d <= bound){
+          break outer;                            // approached, passed, done looking
+        }
+      }
+    }
+    if(!best || !closed || rising < 2 || best.d > bound || best.t < notBefore) continue;
+    /* The sample grid is coarse next to a crosshair, so the minimum is closed
+       in on the same way the aim solver does it. */
+    const seg = best.seg, frame = world.get(seg.body);
+    const at = tt => {
+      const local = propagate(frame.mu, seg.r0, seg.v0, tt - seg.t0);
+      const shipAbs = add(absState(world, seg.body, tt).r, local.r);
+      const tg = absState(world, b.id, tt);
+      return { d: dist(shipAbs, tg.r), rel: norm(sub(add(absState(world, seg.body, tt).v, local.v), tg.v)), local };
+    };
+    const span = (seg.t1 - seg.t0) / Math.max(1, (seg.scanTimes ?? seg.times).length - 1);
+    let lo = Math.max(seg.t0, best.t - span), hi = Math.min(seg.t1, best.t + span);
+    const phi = (Math.sqrt(5) - 1) / 2;
+    let x = hi - phi * (hi - lo), y = lo + phi * (hi - lo);
+    let fx = at(x).d, fy = at(y).d;
+    for(let i = 0; i < 40 && hi - lo > 1e-6; i++){
+      if(fx < fy){ hi = y; y = x; fy = fx; x = hi - phi * (hi - lo); fx = at(x).d; }
+      else{ lo = x; x = y; fx = fy; y = lo + phi * (hi - lo); fy = at(y).d; }
+    }
+    const t = (lo + hi) / 2, got = at(t);
+    out.set(b.id, {
+      segIndex: best.si, body: b.id, t, r: got.local.r,
+      distance: got.d, altitude: Math.max(0, got.d - (b.radius ?? 0)),
+      speed: got.rel, grazes: got.d <= (b.radius ?? 0),
+      inMouth: b.zoneRadius != null && got.d <= b.zoneRadius,
+      passing: true,
+    });
+  }
+  return [...out.values()].sort((a, c) => a.t - c.t);
+}
+
 export function planImmediate(state, flown = true, opts = {}){
   if(state.dockedAt) return null;
   const far = opts.farSight ?? seesPast(state);
@@ -1284,11 +1443,15 @@ export function planImmediate(state, flown = true, opts = {}){
       to: events.find(e => e.kind === 'soi' && Math.abs(e.t - sg.t1) < 1e-6)?.to ?? null,
     });
   });
+  const intercepts = interceptsOf(segments, crossed);
   return {
     ...pred, segments, events, end: endT, horizon,
     crossings,
     crossing: crossings[0] ?? null,
-    intercept: interceptOf(segments, crossed),
+    /* One per world, earliest first. `intercept` is the next one, which is
+       what the readouts and the encounter window have always wanted. */
+    intercepts,
+    intercept: intercepts[0] ?? null,
     /* From here on the road is drawn in the second colour: it is a different
        world's orbit, and it should not read as more of the same one. */
     afterFrom: crossed >= 0 ? crossed + 1 : segments.length,
