@@ -73,9 +73,9 @@ export const SKILLS = ['digger', 'builder', 'blocker', 'climber'];
 
 export const SKILL_INFO = {
   digger: { name: 'Digger', verb: 'Dig',
-    blurb: 'Cuts a gentle ramp forward and down until the ground catches up.' },
+    blurb: 'Digs a ramp down through the next drop instead of falling into it.' },
   builder: { name: 'Builder', verb: 'Build',
-    blurb: 'Lays a flat plank bridge forward until it reaches solid ground.' },
+    blurb: 'Bridges the next gap instead of falling into it.' },
   blocker: { name: 'Blocker', verb: 'Block',
     blurb: 'Plants itself for good. Anything that walks into it turns around.' },
   climber: { name: 'Climber', verb: 'Climb',

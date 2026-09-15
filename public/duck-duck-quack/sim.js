@@ -158,6 +158,28 @@ function stepWalking(state, d){
   }
 
   if(delta > FALL_SAFE){
+    /* A gap has no floor anywhere in the visible scene (see content.js's
+     * PIT_Y); a plain drop still has one, just further down. That is the
+     * real difference between "bridge it" and "dig down to it" — a digger
+     * sent at a gap would spend its whole ramp chasing a floor that is not
+     * there, and a builder sent at a drop would float a bridge over ground
+     * that was already perfectly walkable. So each skill only answers to
+     * the shape of hazard it actually solves; given the wrong one for what
+     * is ahead, a duckling just falls, the same as if it had no skill at
+     * all — which is also what makes it safe for a skill to be handed out
+     * long before the hazard it is for, rather than needing to land on the
+     * exact column where that hazard starts.
+     */
+    if(d.skill === 'builder' && nextY >= SCENE_H){
+      d.state = 'building';
+      d.buildLeft = BUILD_MAX_STEPS;
+      return;
+    }
+    if(d.skill === 'digger' && nextY < SCENE_H){
+      d.state = 'digging';
+      d.digLeft = DIG_MAX_STEPS;
+      return;
+    }
     d.x = nextX;
     d.state = 'falling';
     d.fallFrom = d.y;
@@ -262,10 +284,14 @@ export function assignRefusal(state, duckId, skill){
 /* Give a duckling a skill. Returns the duckling, or null if it was refused
  * and nothing changed.
  *
- * Digger, Builder and Blocker act at once — they are things a duckling does
- * starting exactly where it is standing. Climber is the one exception: it is
- * a trait rather than an action, and it only matters the next time this
- * duckling meets a wall too tall to just step up.
+ * Blocker is the one that acts at once — planting itself is not something
+ * that waits for a particular spot. Digger, Builder and Climber are all
+ * traits rather than instant actions: each only matters the next time this
+ * duckling actually meets the thing it answers (a wall too tall to step up,
+ * a drop, a gap), which is what stepWalking checks for on every step. That
+ * is also why a skill can be handed out the moment a duckling hatches and
+ * still work fine at the hazard three obstacles later — there is no exact
+ * column it has to be given on.
  */
 export function assignSkill(state, duckId, skill){
   if(assignRefusal(state, duckId, skill)) return null;
@@ -274,9 +300,7 @@ export function assignSkill(state, duckId, skill){
   d.skill = skill;
 
   if(skill === 'blocker'){ d.state = 'blocking'; return d; }
-  if(skill === 'digger'){ d.state = 'digging'; d.digLeft = DIG_MAX_STEPS; return d; }
-  if(skill === 'builder'){ d.state = 'building'; d.buildLeft = BUILD_MAX_STEPS; return d; }
-  // climber: stays 'walking' until a wall asks for it.
+  // digger, builder, climber: stay 'walking' until the right hazard asks for them.
   return d;
 }
 
