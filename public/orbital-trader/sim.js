@@ -1159,22 +1159,33 @@ function interceptOf(segments, crossed){
 }
 
 /* How near the road has to come to a world before the pass is worth a mark.
- * A world's own reach is the honest answer where there is one — inside it you
- * are having an encounter whether you meant to or not — and twice that, so a
- * near miss is called before it is a miss. The havens and the Maw have no
- * reach at all, so they are measured in harbour mouths instead.
  *
- * A rendezvous gets a band lent to it on top of that, because the mouth alone
- * is no use at one. Nail's is 2400 km across, and a road that will eventually
- * arrive there starts out half a million kilometres wide: a band cut to the
- * mouth would leave a pilot tuning the burn that closes that gap with no
- * number anywhere on the screen, which is the one number they are tuning it
- * against. A hundredth of its own orbit picks the road up while it is still
- * crooked and still misses a road that was never aimed — Nail moves its own
- * band's width in under a day. */
+ * The first three terms are the encounter: a world's own reach, twice over, so
+ * a near miss is called before it is a miss; harbour mouths for the havens,
+ * which have no reach; the ground for anything with neither. Those make the
+ * crosshair a thing that confirms an arrival.
+ *
+ * The fourth makes it a thing you can *steer* by, which is what it is actually
+ * for, and there is no aim helper in the chart — every road is flown by pushing
+ * a burn around and watching this number. Measured against a reach alone the
+ * number does not exist until the road is nearly right: fifty metres a second
+ * off a five kilometre burn to Nail leaves the pass fourteen hundred million
+ * kilometres out, well inside one per cent of the answer and still far outside
+ * twice Nail's reach, so the pilot pushed the burn through the whole useful
+ * range of it with a blank chart and the mark appeared only once they no longer
+ * needed it.
+ *
+ * So a port is also marked within a tenth of its own orbit. That is the scale
+ * at which "am I anywhere near it" is a real question, it grows with the system
+ * so a road to Grumm gets a Grumm-sized band, and it stays a signal rather than
+ * a decoration: a world crosses its own band's width in a few days, so a road
+ * that misses the timing is still not marked, and a road only ever sweeps past
+ * the handful of worlds between its low point and its high one. Measured on the
+ * roads out of Tassel, the widest band here never puts more than two crosshairs
+ * on the chart. */
 function markWithin(b){
-  const lent = b.rendezvous && b.a > 0 ? b.a * 0.01 : 0;
-  return Math.max((b.soi ?? 0) * 2, (b.zoneRadius ?? 0) * 8, (b.radius ?? 0) * 20, lent);
+  const aimed = b.port && b.a > 0 ? b.a * 0.1 : 0;
+  return Math.max((b.soi ?? 0) * 2, (b.zoneRadius ?? 0) * 8, (b.radius ?? 0) * 20, aimed);
 }
 
 /* Where the road comes nearest each world, once per world, and the *first*

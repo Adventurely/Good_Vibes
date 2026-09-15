@@ -2417,6 +2417,49 @@ test('the belt havens and the Maw are rendezvous zones you match speeds with', (
   assert.ok(r.ok && far.flags.mawArrival, 'the Maw had nothing to say');
 });
 
+test('the crosshair is there while the burn is still wrong, which is when it is wanted', () => {
+  /* The mark is not a rosette for arriving. There is no aim helper on the
+     chart: every road is flown by pushing a burn around and watching this one
+     number come down, so the number has to exist through the whole range the
+     pilot pushes it through. Measured against a reach alone it did not —
+     fifty metres a second off a five kilometre burn to Nail leaves the pass
+     1,480 Mm out, inside one per cent of the answer and still nowhere near
+     twice Nail's reach, so the chart stayed blank until the road was already
+     right and the mark only ever confirmed what the pilot had guessed. */
+  const s = S.newGame(7);
+  s.dockedAt = 'tassel'; S.undock(s);
+  s.dv = s.tank = S.auDay(60);
+  assert.ok(S.trimToTarget(s, 'nail', 6000).ok);
+  let guard = 0;
+  while(s.ship.body !== 'lamp' && guard++ < 40000){ S.tick(s, 0.05); if(s.pending) break; }
+  assert.ok(S.trimToTarget(s, 'nail', 6000).ok, 'could not lay the road this test is about');
+  const good = s.nodes[0].prograde;
+  const markAt = off => {
+    s.nodes[0].prograde = good + S.auDay(off / 1000);
+    return (S.planImmediate(s, true).intercepts ?? []).find(i => i.body === 'nail');
+  };
+  let last = 0;
+  for(const off of [0, 20, 50, 100, 200, 400]){
+    const ic = markAt(off);
+    assert.ok(ic, `${off} m/s off the answer and the chart says nothing about Nail`);
+    assert.ok(ic.distance >= last, 'and a worse burn should read as a wider miss');
+    last = ic.distance;
+  }
+  /* And it is still a signal rather than a decoration: a road that is not
+     going to Nail at all does not wear Nail's crosshair. */
+  assert.equal(markAt(4000), undefined, 'a road nowhere near Nail is marked for it anyway');
+
+  /* One more thing it must not become: a chart of crosshairs. A road only
+     sweeps past the worlds between its low point and its high one, so even a
+     badly aimed one carries very few. */
+  for(const off of [0, 100, 400]){
+    s.nodes[0].prograde = good + S.auDay(off / 1000);
+    const all = S.planImmediate(s, true).intercepts ?? [];
+    assert.ok(all.length <= 3, `${off} m/s off: ${all.length} crosshairs (${all.map(i => i.body).join(', ')})`);
+  }
+  s.nodes[0].prograde = good;
+});
+
 test('Nail is a rock you match speeds with, and the road to it is flown on the mark', () => {
   /* Nail used to be a three-hundred-thousand-kilometre bubble in the Belt: fly
      roughly at the Belt and you were docked. It is a four-hundred-kilometre
