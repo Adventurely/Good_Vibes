@@ -846,6 +846,41 @@ function handOver(state, goodId, qty = 1, questId = null){
 /* ---- taking one on */
 
 export const activeQuests = state => (state.quests ?? []).filter(l => !l.done);
+/* Done, and still owed for. These hold no berth against the three-job limit —
+ * the work is over — but the log puts them at the top until somebody collects. */
+export const unclaimedQuests = state => (state.quests ?? []).filter(l => l.done && !l.claimed);
+
+export function canClaimQuest(state, id){
+  const live = (state.quests ?? []).find(l => l.id === id);
+  if(!live) return { ok: false, reason: 'No such job.' };
+  if(!live.done) return { ok: false, reason: 'That one is not finished.' };
+  if(live.claimed) return { ok: false, reason: 'Already collected.' };
+  return { ok: true };
+}
+
+/* Collecting. Everything a job pays lands here and nowhere else, so there is
+ * exactly one moment in the code where a purse grows because of a quest. */
+export function claimQuest(state, id){
+  const c = canClaimQuest(state, id);
+  if(!c.ok) return c;
+  const live = state.quests.find(l => l.id === id);
+  const q = questById(id);
+  const paid = q?.pay ?? 0;
+  if(paid) state.money += paid;
+  if(q?.rep && q.rep in state.rep) state.rep[q.rep] += 1;
+  /* Some jobs pay in a person. The berth is filled with who they are and
+     nothing else: a berth with somebody in it is the whole of the reward. */
+  let crew = null;
+  if(q?.crew && state.crew && q.crew in state.crew && !state.crew[q.crew]){
+    state.crew[q.crew] = { role: q.crew, from: q.id, joinedAt: state.t };
+    crew = q.crew;
+  }
+  live.claimed = true;
+  live.claimedAt = state.t;
+  logLine(state, 'questDone', TEXT.logTemplates.questDone ?? 'Finished {title}. Paid {pay}.',
+    { title: q?.title ?? id, pay: fmtMoney(paid) });
+  return { ok: true, pay: paid, rep: q?.rep ?? null, crew, quest: q };
+}
 /* What is on offer at a port: the jobs given out there that you have not
  * taken and have not already done. This is the board — the one thing the
  * quest catalogue was missing, and the reason fourteen written quests could
@@ -924,19 +959,17 @@ export function questCheck(state, events = []){
       moved = true;
     }
     if(live.step >= steps.length && !live.done){
+      /* Finishing the work and being paid for it are two things now. The job
+         stops counting against the three you can hold the moment the last step
+         is met — that part should never make a player wait — but the money,
+         the standing and the person are collected by hand, so the end of a job
+         is something you do rather than something that happens in the corner
+         of the screen while you are looking at the chart. */
       live.done = true;
       // When, so the finished list can put the last thing you did at the top.
       live.doneAt = state.t;
-      if(q.pay) state.money += q.pay;
-      if(q.rep && q.rep in state.rep) state.rep[q.rep] += 1;
-      /* Some jobs pay in a person. The berth is filled with who they are and
-         nothing else: crew do nothing yet, and a berth with somebody in it is
-         the whole of the reward until they do. */
-      if(q.crew && state.crew && q.crew in state.crew && !state.crew[q.crew]){
-        state.crew[q.crew] = { role: q.crew, from: q.id, joinedAt: state.t };
-        events.push({ kind: 'crewJoined', role: q.crew, quest: q });
-      }
-      logLine(state, 'questDone', TEXT.logTemplates.questDone ?? 'Finished {title}. Paid {pay}.',
+      live.claimed = false;
+      logLine(state, 'questDone', TEXT.logTemplates.questReady ?? 'Finished {title}. There is something to collect.',
         { title: q.title, pay: fmtMoney(q.pay ?? 0) });
       events.push({ kind: 'questDone', quest: q });
     }else if(moved){
@@ -3003,7 +3036,11 @@ export function restore(json){
   s.pending ??= null; s.flags ??= {}; s.stats ??= {}; s.visited ??= [s.dockedAt].filter(Boolean);
   s.toll ??= { lastT: -1e9, inBelt: false };
   s.quests ??= QUESTS.map(q => ({ id: q.id, step: 0, done: false }));
-  s.debt ??= 0; s.hull ??= 0; s.faults ??= {}; s.farSight ??= true; s.target ??= null; s.justLeft ??= null; s.justLeftAt ??= -1e9;
+  s.debt ??= 0; s.hull ??= 0; s.faults ??= {}; s.farSight ??= true;
+  /* A save from before rewards were collected by hand has already been paid
+     for everything finished in it, so a finished job there is a collected
+     one. Marking them unclaimed would hand out every purse a second time. */
+  for(const l of s.quests ?? []) if(l.done) l.claimed ??= true; s.target ??= null; s.justLeft ??= null; s.justLeftAt ??= -1e9;
   /* A save written before anybody could call for help knows where it is tied
      up but not where it was last tied up. Those are the same thing at a
      mooring, and the first port is a fair guess in flight. */

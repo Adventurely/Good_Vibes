@@ -137,6 +137,17 @@
   #v-fit.off{ color:var(--gold-ink); border-color:var(--gold-2); }
   #v-far[hidden]{ display:none; }
   #v-far.off{ opacity:.55; }
+  /* A job finished and waiting to be collected. The log lives behind the ship
+     button, so the ship button is what says so — the same slow breath the
+     mooring ring uses, because it is the same kind of news: there is something
+     here worth pressing. It stops under the pointer, and it stops altogether
+     once the log is open, having said what it had to say. */
+  #m-ship.owed{ color:var(--gold-ink); border-color:var(--gold-2); animation:owedflash 1.8s ease-in-out infinite; }
+  @keyframes owedflash{
+    0%, 100%{ box-shadow:0 0 0 0 transparent; }
+    50%{ box-shadow:0 0 12px -1px var(--gold-2); }
+  }
+  #m-ship.owed:hover, #m-ship.owed:focus-visible{ animation:none; box-shadow:0 0 12px -1px var(--gold-2); }
 
   /* ---- The panel: right column on wide screens, a sheet on narrow ---- */
   #panel{
@@ -627,6 +638,8 @@
     /* The mooring ring still has to be noticed, so it keeps the brightness the
        flash was carrying it to and drops the breathing. */
     #dock-go{ animation:none; opacity:1; }
+    /* Same bargain for the ship button: keep the glow, lose the breath. */
+    #m-ship.owed{ animation:none; box-shadow:0 0 12px -1px var(--gold-2); }
   }
   /* The hazard marks. Amber is "this will happen and it will hurt a bit";
      red is the colour the chart already uses for ground, so the corner and
@@ -653,6 +666,47 @@
     background:var(--sunk, rgba(0,0,0,.35)); color:inherit;
     border:1px solid var(--line); border-radius:.4rem; padding:.5rem;
     word-break:break-all; resize:vertical;
+  }
+  /* Collecting a job. The card is the animation: a gold edge, a lift, and the
+     things you were owed climbing out of it. */
+  .quest.owed{ border-color:var(--gold-2); box-shadow:0 0 0 1px var(--gold-2) inset; position:relative; }
+  .quest.owed .btns{ margin-top:.5rem; }
+  .quest.collecting{
+    position:relative; overflow:visible;
+    animation:collect-lift .55s cubic-bezier(.2,.9,.25,1) both;
+  }
+  @keyframes collect-lift{
+    0%{ transform:translateY(0) scale(1); box-shadow:0 0 0 1px var(--gold-2) inset; }
+    35%{ transform:translateY(-4px) scale(1.015); box-shadow:0 0 18px 2px var(--gold-2); }
+    100%{ transform:translateY(0) scale(1); box-shadow:0 0 0 1px transparent inset; opacity:.55; }
+  }
+  .reward-fly{
+    position:absolute; left:50%; top:45%;
+    transform:translate(-50%,0);
+    font-weight:700; font-size:1rem; color:var(--gold);
+    text-shadow:0 1px 6px rgba(0,0,0,.8);
+    pointer-events:none; white-space:nowrap;
+    animation:reward-climb .8s ease-out both;
+  }
+  @keyframes reward-climb{
+    0%{ opacity:0; transform:translate(-50%,6px) scale(.9); }
+    25%{ opacity:1; transform:translate(-50%,-6px) scale(1.06); }
+    100%{ opacity:0; transform:translate(-50%,-42px) scale(1); }
+  }
+  /* A berth filled gets a face rather than a line of text. */
+  .joined{ text-align:center; }
+  .joined-face{
+    display:block; margin:0 auto .6rem;
+    width:96px; height:96px; image-rendering:pixelated;
+    border-radius:.6rem; border:1px solid var(--gold-2);
+    background:var(--sunk, rgba(0,0,0,.3));
+    animation:joined-in .5s cubic-bezier(.2,.9,.25,1) both;
+  }
+  @keyframes joined-in{ 0%{ opacity:0; transform:scale(.8) translateY(8px); } 100%{ opacity:1; transform:none; } }
+  .joined .say{ text-align:left; }
+  @media (prefers-reduced-motion: reduce){
+    .quest.collecting, .reward-fly, .joined-face{ animation:none; }
+    .reward-fly{ opacity:0; }
   }
 </style>
 </head>
@@ -797,6 +851,9 @@ let hazard = { skim: null, crash: null };
    before choosing what to do with it. Gone when the card closes. */
 let tapMark = null;
 let selectedNode = -1;
+/* Whether the clock is stopped because a burn is open, as opposed to because
+   the player stopped it. Only a hold we put on do we take off again. */
+let heldForPlan = false;
 let panelOpen = innerWidth > 760;
 let tab = null;
 
@@ -997,6 +1054,21 @@ function frame(now){
 /* Somebody signing on is the one reward that does not show up in the purse,
    and finishing a quest is otherwise silent — the Quests card just quietly
    ticks over. Without this a berth fills and nothing says so. */
+/* A berth filled is the one reward with a face, so it gets shown rather than
+   mentioned: the portrait, who they are, and the line their card carries. */
+function showCrewPortrait(role, quest){
+  const r = (TEXT.crew?.roles ?? []).find(x => x.id === role);
+  const name = r?.person?.name ?? 'Somebody';
+  const url = portraitURL(role);
+  openModal(`<div class="joined">
+      ${url ? `<img class="joined-face" src="${url}" alt="" width="96" height="96">` : ''}
+      <h2>${esc(name)} signs on</h2>
+      <p class="lock">Your ${esc((r?.name ?? role).toLowerCase())}${quest ? ` · ${esc(quest.title)}` : ''}</p>
+      <p class="say">${esc(r?.person?.line ?? '')}</p>
+      <div class="btns"><button class="btn primary" id="m-ok">Welcome aboard</button></div>
+    </div>`, m => m.querySelector('#m-ok').addEventListener('click', closeModal));
+}
+
 function noteCrew(events){
   for(const e of events ?? []){
     if(e.kind !== 'crewJoined') continue;
@@ -1077,6 +1149,7 @@ function renderHud(docking){
   showHazard();
   refreshFarButton();
   showRendezvous();
+  refreshOwedFlash();
   /* The tank, and what the plan will take out of it. The cost of a burn is
      shown here and nowhere near the burn itself: it is a length of fuel, and
      next to a mark it read as a speed — which made pressing Back to slow down
@@ -1262,7 +1335,7 @@ function askAtPath(t){
       /* The chart is the editor, so writing a burn down leaves the panel
          exactly as it was: shoving the side menu open over the sky is the
          opposite of what somebody who just tapped the sky wanted. */
-      selectedNode = ix; holdForPlanning(ix); replan(true);
+      selectNode(ix); replan(true);
       if(tab === 'ship') renderTab();
       tutorialCheck(); save();
     });
@@ -1358,7 +1431,7 @@ canvas.addEventListener('pointerdown', e => {
   if(hit?.kind === 'inset'){ lookAtEncounter(); drag = null; return; }
   if(hit?.kind === 'handle'){
     if(hit.axis === 'delete'){
-      S.removeNode(state, hit.index); selectedNode = -1; replan(true); renderTab(); save();
+      S.removeNode(state, hit.index); selectNode(-1); replan(true); renderTab(); save();
       drag = null; return;
     }
     drag = { kind: 'arrow' };
@@ -1367,7 +1440,7 @@ canvas.addEventListener('pointerdown', e => {
     return;
   }
   if(hit?.kind === 'node'){
-    selectedNode = selectedNode === hit.index ? -1 : hit.index;
+    selectNode(selectedNode === hit.index ? -1 : hit.index);
     drag = { kind: 'node', index: hit.index, x: e.clientX, y: e.clientY, moved: false };
     replan(true); if(tab === 'ship') renderTab();
     return;
@@ -1484,8 +1557,8 @@ addEventListener('keydown', e => {
     /* One key for both: it opens the ship, and at a port it steps on to the
        dock and then shuts, which is the whole cycle in one thumb. */
     case 'p': openMenu(state.dockedAt && panelOpen && panelMenu === 'ship' ? 'dock' : 'ship'); break;
-    case 'Escape': if(selectedNode >= 0){ selectedNode = -1; renderTab(); } else togglePanel(false); break;
-    case 'Delete': case 'Backspace': if(state.nodes[selectedNode]){ S.removeNode(state, selectedNode); selectedNode = -1; replan(true); renderTab(); } break;
+    case 'Escape': if(selectedNode >= 0){ selectNode(-1); renderTab(); } else togglePanel(false); break;
+    case 'Delete': case 'Backspace': if(state.nodes[selectedNode]){ S.removeNode(state, selectedNode); selectNode(-1); replan(true); renderTab(); } break;
     /* The arrows push the selected burn; with nothing selected they are the
        keyboard's pan, so the chart can be walked around without a pointer.
        Shift makes both of them fine. */
@@ -1506,13 +1579,38 @@ const PLAN_HOLD_SECONDS = 25;
 function realSecondsTo(t){
   return (t - state.t) / Math.max(1e-12, CONST.BASE_RATE_DAYS_PER_SEC * S.warpRate(state));
 }
+/* Closing the burn gives the clock back, but only if it was this that stopped
+   it: a player who pressed space to stop time and then poked a mark should not
+   have time start again when they put the mark away. */
+function releasePlanHold(){
+  if(!heldForPlan) return;
+  heldForPlan = false;
+  if(state.paused) setPaused(false);
+}
+/* Every way of opening a burn holds the clock; every way of closing one lets
+   it go. Selection is the one thing that says which, so it goes through here. */
+function selectNode(ix){
+  const open = ix >= 0 && !!state.nodes[ix];
+  selectedNode = open ? ix : -1;
+  if(open) holdForPlanning(ix); else releasePlanHold();
+}
+
 function holdForPlanning(ix){
   const n = state.nodes[ix];
   if(!n || state.paused) return;
-  if(realSecondsTo(n.t) > PLAN_HOLD_SECONDS) return;
+  /* The clock stops whenever a burn is open, not only when the burn is nearly
+     due. The old rule held it inside twenty-five seconds and let it run
+     otherwise, which is backwards: a mark months out is the one you are going
+     to sit and nudge, and having the sky move under the arrows while you do it
+     is the thing that made a careful pass into a chase. PLAN_HOLD_SECONDS is
+     kept because the toast still says something different for a burn that is
+     about to fire. */
   state.paused = true;
+  heldForPlan = true;
   setRate(1);
-  toast('Clock held while you plan. Press space to start it again.');
+  toast(realSecondsTo(n.t) <= PLAN_HOLD_SECONDS
+    ? 'Clock held while you plan. Press space to start it again.'
+    : 'Clock held while this burn is open. Press space, or close the burn, to start it again.');
 }
 
 /* Frame what the chart is drawing. The view is locked to the world the ship
@@ -1628,6 +1726,16 @@ function tabsFor(){
 /* Open one of the two, or shut the panel if it is already showing that one. */
 function openMenu(which){
   if(which === 'dock' && !state.dockedAt) which = 'ship';
+  /* While a reward is sitting uncollected the ship button is flashing, and a
+     button that flashes has made a promise about what pressing it does. It
+     keeps the promise by opening the log rather than whichever tab you happened
+     to leave open — and once the log is up it is an ordinary toggle again. */
+  if(which === 'ship' && !onOwedLog() && S.unclaimedQuests(state).length){
+    panelMenu = 'ship'; tab = 'quests';
+    renderTabs(); setTab('quests');
+    refreshMenuButtons();
+    return;
+  }
   if(panelOpen && panelMenu === which){ togglePanel(false); return; }
   panelMenu = which;
   renderTabs();
@@ -1638,6 +1746,17 @@ function refreshMenuButtons(){
   $('m-dock').hidden = !state.dockedAt;
   $('m-ship').setAttribute('aria-pressed', String(panelOpen && panelMenu === 'ship'));
   $('m-dock').setAttribute('aria-pressed', String(panelOpen && panelMenu === 'dock'));
+  refreshOwedFlash();
+}
+/* The log is already on screen: the flash has nothing left to point at. */
+function onOwedLog(){ return panelOpen && panelMenu === 'ship' && tab === 'quests'; }
+/* Called every frame, because a job can finish mid-coast with no menu open and
+   nothing else on the page to notice it. The button's own class is the record
+   of what was last drawn, so a steady state writes nothing. */
+function refreshOwedFlash(){
+  const btn = $('m-ship');
+  const owed = !onOwedLog() && S.unclaimedQuests(state).length > 0;
+  if(owed !== btn.classList.contains('owed')) btn.classList.toggle('owed', owed);
 }
 function renderTabs(){
   // Casting off takes the port menu with it; there is nothing left in it.
@@ -2148,12 +2267,37 @@ function questsTab(){
   let out = '<h2>Quests</h2>';
   const held = (state.quests ?? []).map(l => ({ l, q: S.questById(l.id) })).filter(x => x.q);
   if(!held.length) return out + '<p class="say">Nobody has asked you for anything yet.</p>';
+  /* Three groups, in the order a player wants them: something owed to you,
+     then what you are doing, then what is behind you. */
+  const owed = held.filter(x => x.l.done && !x.l.claimed)
+    .sort((a, b) => (a.l.doneAt ?? 0) - (b.l.doneAt ?? 0));
   const live = held.filter(x => !x.l.done);
-  const done = held.filter(x => x.l.done)
-    .sort((a, b) => (b.l.doneAt ?? b.l.takenAt ?? 0) - (a.l.doneAt ?? a.l.takenAt ?? 0));
+  const done = held.filter(x => x.l.done && x.l.claimed)
+    .sort((a, b) => (b.l.claimedAt ?? b.l.doneAt ?? 0) - (a.l.claimedAt ?? a.l.doneAt ?? 0));
 
-  out += `<p class="lock">${live.length} of ${S.MAX_ACTIVE_QUESTS} in hand${done.length ? ` · ${done.length} finished, which cost you nothing` : ''}.</p>`;
-  if(!live.length) out += '<p class="say">Nothing in hand. A port\'s Requests tab is where the next one comes from.</p>';
+  out += `<p class="lock">${live.length} of ${S.MAX_ACTIVE_QUESTS} in hand`
+    + `${owed.length ? ` · <b class="up">${owed.length} to collect</b>` : ''}`
+    + `${done.length ? ` · ${done.length} finished` : ''}.</p>`;
+
+  if(owed.length){
+    out += '<h3>Ready to collect</h3>';
+    for(const { l, q } of owed){
+      void l;
+      const pays = [];
+      if(q.pay) pays.push(S.fmtMoney(q.pay));
+      if(q.rep) pays.push(`standing with the ${sp(q.rep)}`);
+      if(q.crew) pays.push('somebody for a berth');
+      out += `<div class="quest owed" id="owed-${esc(q.id)}">`
+        + `<h3>${esc(q.title)}</h3>`
+        + `<p class="lock">${esc(q.giver)} · the work is done</p>`
+        + `<p class="say">${esc(q.done ?? q.blurb)}</p>`
+        + `<p>Owed: ${pays.length ? pays.join(' · ') : 'the thanks of the person who asked'}.</p>`
+        + `<div class="btns"><button class="btn primary collect" data-act="claim|${esc(q.id)}">Collect</button></div>`
+        + '</div>';
+    }
+  }
+
+  if(!live.length && !owed.length) out += '<p class="say">Nothing in hand. A port\'s Requests tab is where the next one comes from.</p>';
   for(const { l, q } of live){
     out += '<div class="quest">';
     out += `<h3>${esc(q.title)}</h3>`;
@@ -2226,6 +2370,41 @@ function astrolabeTab(){
 /* ------------------------------------------------------------- actions */
 
 const actions = {
+  /* Collecting a job. The card is the animation: it lights, lifts, and the
+     things you were owed fly up out of it one after another, and only then
+     does the log redraw with the card moved down to Finished. A reward that
+     appears in a corner while you are looking at the chart is not a reward. */
+  claim(id){
+    const r = S.claimQuest(state, id);
+    if(!r.ok){ toast(r.reason, 'bad'); return; }
+    const card = document.getElementById(`owed-${id}`);
+    const bits = [];
+    if(r.pay) bits.push(`+${S.fmtMoney(r.pay)}`);
+    if(r.rep) bits.push('+ standing');
+    if(r.crew) bits.push('+ a berth filled');
+    if(card){
+      card.classList.add('collecting');
+      bits.forEach((text, i) => {
+        const fly = document.createElement('div');
+        fly.className = 'reward-fly';
+        fly.textContent = text;
+        fly.style.animationDelay = `${i * 160}ms`;
+        card.appendChild(fly);
+      });
+    }
+    renderHud();
+    save();
+    const settle = () => {
+      renderTab();
+      if(r.crew) showCrewPortrait(r.crew, r.quest);
+      else toast(TEXT.events.questCollected ?? 'Collected.', 'story', 5000);
+    };
+    /* Long enough for the last chip to finish its climb, and short enough that
+       nobody presses anything twice. Reduced motion skips straight to the end. */
+    const motion = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if(card && motion) setTimeout(settle, 640 + bits.length * 160);
+    else settle();
+  },
   exportsave(){
     const hex = S.exportSave(state);
     openModal(`<h2>This game, written out</h2>
@@ -2286,8 +2465,8 @@ const actions = {
     selectedNode = -1; replan(true); renderTabs(); backToShip(true); tutorialCheck(); save();
   },
   dock(){ doDock(); },
-  closenode(){ selectedNode = -1; replan(true); renderTab(); save(); },
-  delnode(i){ S.removeNode(state, Number(i)); selectedNode = -1; replan(true); renderTab(); save(); },
+  closenode(){ selectNode(-1); replan(true); renderTab(); save(); },
+  delnode(i){ S.removeNode(state, Number(i)); selectNode(-1); replan(true); renderTab(); save(); },
   warpnode(i){ const n = state.nodes[Number(i)]; if(n) askSkip(n.t - 0.05, `Burn ${Number(i) + 1}`); },
   skipto(t, what){ askSkip(Number(t), typeof what === 'string' ? what : undefined); },
   push(i, k){ pushAxis(Number(i), k); },
