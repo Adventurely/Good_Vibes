@@ -50,9 +50,54 @@ export const GOOSE_ART = [
   '..o......o..',
 ];
 
-/* A duckling standing still with a skill in hand gets a small mark over its
-   head, so a busy one reads as busy at a glance rather than only on click. */
-const SKILL_MARK = { digger: 'N', builder: 'o', blocker: 's', climber: 'c' };
+/* What a duckling is carrying, worn over its head.
+ *
+ * Shape first, colour second. These were four two-pixel squares in four
+ * palette colours, and at this size that is not readable — oak and ember
+ * are a few shades apart and the squares were the same square, so "which
+ * one is that" came down to squinting at a hue. An arrow pointing down is
+ * never mistaken for a bridge no matter how small it is or what is behind
+ * it, which is the whole point of giving each one its own silhouette.
+ *
+ * Each sits on a plate of ink, because the badge has to read against sky,
+ * grass, dirt and water alike rather than against whichever one it was
+ * designed over. Blocker is in here for the legend on the page only — it
+ * is never a held trait (see sim.js's assignSkill), so it never gets drawn
+ * over a duckling's head; a planted one wears its own red bar instead.
+ */
+const SKILL_BADGE = {
+  digger:  ['.N.', '.N.', 'NNN', '.N.'],   // down — cuts a ramp through the drop
+  builder: ['...', 'www', 'w.w', 'w.w'],   // a bridge standing on its legs
+  climber: ['.t.', 'ttt', '.t.', '.t.'],   // up — scales the wall
+  blocker: ['...', 'rrr', 'rrr', '...'],   // the bar a planted duckling wears
+};
+
+/* Drawn in this order wherever more than one is held, so the same pair
+   always reads the same way round rather than in whatever order they were
+   handed out in. */
+const BADGE_ORDER = ['digger', 'builder', 'climber'];
+
+const BADGE_W = 3, BADGE_H = 4, BADGE_PAD = 1, BADGE_GAP = 1;
+export const BADGE_PLATE_W = BADGE_W + BADGE_PAD * 2;
+export const BADGE_PLATE_H = BADGE_H + BADGE_PAD * 2;
+
+/* One badge, at any whole-number scale — 1 over a duckling's head in the
+   scene, larger on the page itself, so the key beside the skill button is
+   the same drawing the duckling wears rather than a second thing to learn. */
+export function drawSkillBadge(ctx, skill, x, y, scale = 1){
+  const rows = SKILL_BADGE[skill];
+  if(!rows) return;
+  ctx.fillStyle = hex('k');
+  ctx.fillRect(x, y, BADGE_PLATE_W * scale, BADGE_PLATE_H * scale);
+  for(let r = 0; r < rows.length; r++){
+    for(let c = 0; c < rows[r].length; c++){
+      const key = rows[r][c];
+      if(key === '.') continue;
+      ctx.fillStyle = hex(key);
+      ctx.fillRect(x + (BADGE_PAD + c) * scale, y + (BADGE_PAD + r) * scale, scale, scale);
+    }
+  }
+}
 
 /* ---------------------------------------------------------------- dither */
 
@@ -414,17 +459,22 @@ export function drawDuck(ctx, d){
   if(d.state === 'blocking'){
     ctx.fillStyle = hex('r');
     ctx.fillRect(x + 1, y - 3, 4, 2);
-  } else if(d.state === 'walking' && d.traits.size){
-    // One small mark per trait held, side by side — a duckling can carry
-    // more than one at once, and all of them should show, not just one.
-    let mx = x;
-    for(const skill of d.traits){
-      const key = SKILL_MARK[skill];
-      if(!key) continue;
-      ctx.fillStyle = hex(key);
-      ctx.fillRect(mx, y - 3, 2, 2);
-      mx += 3;
-    }
+    return;
+  }
+
+  /* Every state a duckling can be carrying something in, not just walking:
+     the one currently climbing the wall or laying a bridge is exactly the
+     one you most want to be able to pick out of the flock, and it was the
+     one showing nothing at all. */
+  const held = BADGE_ORDER.filter(skill => d.traits.has(skill));
+  if(!held.length) return;
+
+  const total = held.length * BADGE_PLATE_W + (held.length - 1) * BADGE_GAP;
+  let bx = Math.round(x + DUCK_ART[0].length / 2 - total / 2);
+  const by = y - BADGE_PLATE_H - 1;
+  for(const skill of held){
+    drawSkillBadge(ctx, skill, bx, by);
+    bx += BADGE_PLATE_W + BADGE_GAP;
   }
 }
 

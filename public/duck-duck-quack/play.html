@@ -114,6 +114,9 @@
     background: var(--panel); border: 2px solid var(--line); border-radius: 6px;
     padding: 0.5rem 0.6rem;
   }
+  .skill .head{ display: flex; align-items: center; gap: 0.35rem; }
+  .skill .badge{ image-rendering: pixelated; image-rendering: crisp-edges; flex: none; }
+  .skill:disabled .badge{ opacity: 0.6; }
   .skill .name{ font-weight: 800; display: block; }
   .skill .count{ font-variant-numeric: tabular-nums; color: var(--muted); font-size: 0.82rem; }
   .skill:hover:not(:disabled){ border-color: var(--accent); }
@@ -178,6 +181,10 @@
        says enough to play from. */
     .skills{ grid-template-columns: 1fr; gap: 0.3rem; margin-top: 0; }
     .skill{ padding: 0.35rem 0.5rem; }
+    /* Inline-flex rather than flex here so the name keeps its badge beside
+       it while the count still sits on the same line, the way it does in
+       the roomier layout's own two-line card. */
+    .skill .head{ display: inline-flex; vertical-align: middle; }
     .skill .name{ display: inline; }
     .skill .count{ display: inline; margin-left: 0.35rem; }
     .skill .blurb{ display: none; }
@@ -240,9 +247,13 @@
 <script type="module">
   import { LEVEL_1, SKILLS, SKILL_INFO, TICK_RATE, winCount, formatTime } from './content.js';
   import { newGame, tick, assignSkill, assignRefusal, duckNear } from './sim.js';
-  import { paintScene } from './art.js';
+  import { paintScene, drawSkillBadge, BADGE_PLATE_W, BADGE_PLATE_H } from './art.js';
   import { createAudio } from './audio.js';
   import { fitCanvas, context2d } from '../good-vibes/pixel.js';
+
+  // How much bigger the badge on a skill button is than the one a duckling
+  // wears. Whole-number, so it stays a pixel drawing rather than a blur.
+  const BADGE_SCALE = 4;
 
   const els = id => document.getElementById(id);
   const ui = {
@@ -307,9 +318,23 @@
     btn.className = 'skill';
     btn.dataset.skill = skill;
     btn.setAttribute('aria-pressed', 'false');
-    btn.innerHTML = `<span class="name">${info.name}</span>`
+    btn.innerHTML = `<span class="head"><span class="name">${info.name}</span></span>`
       + `<span class="count" id="count-${skill}"></span>`
       + `<span class="blurb">${info.blurb}</span>`;
+
+    /* The same badge the duckling wears, drawn from the same code at three
+       times the size (see art.js) — so "what is that thing over its head"
+       is answered by the button you armed it from, rather than by a second
+       legend somewhere that could drift out of step with the scene. */
+    const badge = document.createElement('canvas');
+    badge.className = 'badge';
+    badge.width = BADGE_PLATE_W * BADGE_SCALE;
+    badge.height = BADGE_PLATE_H * BADGE_SCALE;
+    badge.setAttribute('aria-hidden', 'true');
+    const bctx = badge.getContext('2d');
+    bctx.imageSmoothingEnabled = false;
+    drawSkillBadge(bctx, skill, 0, 0, BADGE_SCALE);
+    btn.querySelector('.head').prepend(badge);
     btn.addEventListener('click', () => {
       armed = armed === skill ? null : skill;
       say(armed ? `${info.name} armed — click a walking duckling.` : '');
@@ -345,11 +370,25 @@
     };
   }
 
+  /* Clicking a duckling with nothing armed is a question, not an order —
+     it answers what that one is already carrying. The badges over its head
+     say the same thing at a glance; this is the version you can read. */
+  function describeDuck(d){
+    if(d.state === 'blocking') return 'That one is planted as a Blocker.';
+    const held = SKILLS.filter(s => s !== 'blocker' && d.traits.has(s));
+    if(!held.length) return 'That one is carrying nothing yet.';
+    return `That one has: ${held.map(s => SKILL_INFO[s].name).join(', ')}.`;
+  }
+
   ui.scene.addEventListener('pointerdown', event => {
     event.preventDefault();
     ui.scene.focus({ preventScroll: true });
-    if(!armed) return say('Arm a skill first, then click a duckling.');
-    const { x, y } = sceneXY(event);
+    const at = sceneXY(event);
+    if(!armed){
+      const asked = duckNear(state, at.x, at.y, 12);
+      return say(asked ? describeDuck(asked) : 'Arm a skill first, then click a duckling.');
+    }
+    const { x, y } = at;
     const duck = duckNear(state, x, y, 12);
     if(!duck) return say('No duckling there.');
     const refusal = assignRefusal(state, duck.id, armed);
