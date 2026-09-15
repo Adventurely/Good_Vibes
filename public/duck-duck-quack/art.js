@@ -160,6 +160,29 @@ function drawClouds(ctx, ticks){
   }
 }
 
+/* Two birds, each three pixels in a shallow V, tracing a slow rise-and-fall
+   across the high sky. Drawn as three fillRects rather than a sprite — at
+   this size a "flying bird" is a chevron, nothing a bitmap would earn its
+   keep over. Ticks-driven like the clouds, and each on its own sine so the
+   pair never move in lockstep. */
+const BIRDS = [
+  { y: 14, speed: 0.46, bob: 3, phase: 0 },
+  { y: 24, speed: 0.6, bob: 2, phase: 2.1 },
+];
+
+function drawBirds(ctx, ticks){
+  ctx.fillStyle = hex('k');
+  for(let i = 0; i < BIRDS.length; i++){
+    const b = BIRDS[i];
+    const span = SCENE_W + 8;
+    const x = Math.round(((ticks * b.speed + i * 97) % span) - 4);
+    const y = Math.round(b.y + Math.sin(ticks * 0.05 + b.phase) * b.bob);
+    ctx.fillRect(x - 2, y, 1, 1);
+    ctx.fillRect(x, y - 1, 1, 1);
+    ctx.fillRect(x + 2, y, 1, 1);
+  }
+}
+
 export function drawSky(ctx, ticks = 0){
   ctx.fillStyle = hex('b');
   ctx.fillRect(0, 0, SCENE_W, SKY_SEAM_Y);
@@ -168,6 +191,7 @@ export function drawSky(ctx, ticks = 0){
   ctx.fillRect(0, SKY_SEAM_Y + SKY_SEAM_H, SCENE_W, SCENE_H - SKY_SEAM_Y - SKY_SEAM_H);
   drawClouds(ctx, ticks);
   drawHills(ctx);
+  drawBirds(ctx, ticks);
   drawSun(ctx);
 }
 
@@ -230,7 +254,10 @@ export function drawGround(ctx, terrain, level){
   }
   drawTufts(ctx, terrain, level);
   drawFlowers(ctx, terrain, level);
+  drawRockSpeckle(ctx, terrain, level);
   drawNest(ctx, level, terrain);
+  drawCattails(ctx, level, terrain);
+  drawLilyPads(ctx, terrain, level);
 }
 
 /* The pond: two bands of blue with a dithered seam, the same trick the sky
@@ -286,6 +313,32 @@ function drawFlowers(ctx, terrain, level){
   }
 }
 
+/* A scatter of dark flecks in the rock band — the same fixed-count hash
+   technique as the tufts and flowers, seeded a third way, so the slate
+   below the soil reads as stone grain rather than a second flat fill. Only
+   ever a few dozen pixels regardless of how much rock is on screen, same as
+   every other scatter here. */
+const SPECKLE_COUNT = 40;
+
+function drawRockSpeckle(ctx, terrain, level){
+  ctx.fillStyle = hex('k');
+  for(let i = 0; i < SPECKLE_COUNT; i++){
+    const h = Math.imul(i + 1109, 2246822519) >>> 0;
+    const x = h % terrain.length;
+    const y = terrain[x];
+    if(y >= SCENE_H || x >= level.goalX) continue;
+    const fillH = SCENE_H - y;
+    const grassH = Math.min(GRASS_DEPTH, fillH);
+    const dirtH = fillH - grassH;
+    if(dirtH <= 0) continue;
+    const soilH = Math.round(dirtH * SOIL_SHARE);
+    const rockH = dirtH - soilH;
+    if(rockH <= 0) continue;
+    const dy = (h >>> 11) % rockH;
+    ctx.fillRect(x, y + grassH + soilH + dy, 1, 1);
+  }
+}
+
 /* A bundle of twigs rather than two bare rectangles — a handful of crossed
    lines in two shades of oak, which at this size is enough to read as
    "woven" instead of "stacked". */
@@ -300,6 +353,45 @@ function drawNest(ctx, level, terrain){
   ctx.fillStyle = hex('N');
   ctx.fillRect(x - 2, y - 7, 1, 2);
   ctx.fillRect(x + 2, y - 7, 1, 2);
+}
+
+/* A few cattails right at the shoreline, straddling the grass/pond seam —
+   pine stems with an oak head, tall enough to break the line where lawn
+   meets water the way real reeds do. A handful of fixed positions, not a
+   scatter: unlike the tufts these need to actually stand at the edge, not
+   anywhere on the lawn. */
+const CATTAIL_DX = [-4, -1, 3, 7];
+
+function drawCattails(ctx, level, terrain){
+  const bankY = terrain[Math.max(0, level.goalX - 1)];
+  if(bankY >= SCENE_H) return;
+  for(const dx of CATTAIL_DX){
+    const x = level.goalX + dx;
+    if(x < 0 || x >= terrain.length) continue;
+    ctx.fillStyle = hex('G');
+    ctx.fillRect(x, bankY - 7, 1, 7);
+    ctx.fillStyle = hex('N');
+    ctx.fillRect(x, bankY - 9, 1, 3);
+  }
+}
+
+/* Lily pads scattered across the pond, the tufts' hash-scatter trick
+   seeded a fourth way and aimed at the water columns instead of the lawn —
+   flat two-pixel ovals sitting right on the water line so the pond reads
+   as a place with life in it, not just a rectangle of blue. */
+const LILY_COUNT = 6;
+
+function drawLilyPads(ctx, terrain, level){
+  const span = terrain.length - level.goalX;
+  if(span <= 0) return;
+  ctx.fillStyle = hex('G');
+  for(let i = 0; i < LILY_COUNT; i++){
+    const h = Math.imul(i + 5303, 2246822519) >>> 0;
+    const x = level.goalX + (h % span);
+    const y = terrain[x];
+    if(y >= SCENE_H) continue;
+    ctx.fillRect(x, y, Math.min(2, terrain.length - x), 1);
+  }
 }
 
 /* ------------------------------------------------------------------ goose */
