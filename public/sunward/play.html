@@ -544,7 +544,7 @@
         newGame, fromSave, toSave, tick, tap, plant, plantRefusal, study, studyRefusal,
         prestige, prestigeRefusal, pendingSeeds, energyForSeeds, MAX_TICK,
         seedsEarned, seedMedal, PRESTIGE, rootRefusal, root,
-        catchUp, OFFLINE_CAP, GROWERS, GROWER_BY_ID, GROWER_IDS,
+        catchUp, GROWERS, GROWER_BY_ID, GROWER_IDS,
         bulkCost, affordable, bonuses, totalRate, steadyRate, averageFactor,
         tapValue, momentum, isWindfall, STREAK_CAP, WINDFALL_EVERY,
         snapshot, offered, award, breakdown, note, sample, tapRate,
@@ -633,9 +633,11 @@
 
       /* What the tree is drawn at, which is the biggest it has ever been and
          not the size of the lot standing under it. The growers themselves are
-         still cleared at the end of a season, and the props with them — the
-         swing goes when the swing's grower does — but the trunk and the crown
-         stay where a year of growth put them. */
+         still cleared at the end of a season, and their sprites with them —
+         the hives and the glasshouses go when the growers do — but the trunk
+         and the crown stay where a year of growth put them. The swing and the
+         lanterns come with the tree's age rather than with a grower, so those
+         stay too. */
       const drawnGrowers = () => Math.max(growers(), state.grown || 0);
 
       /* ---- what happened, written down ---------------------------------- */
@@ -1134,10 +1136,11 @@
             const refusal = rootRefusal(state, up.id);
             if(refusal) return say(refusal);
             root(state, up.id);
-            /* No toast. A seed is the thing worth announcing — it arrives once
-               a season and opens a row — and spending energy on a row that is
-               already open is an ordinary purchase, like every other row in
-               the shop, none of which toast either. The row going green and
+            /* No toast, on the owner's instruction: the seed is the thing
+               worth announcing, and it already has one. A shop upgrade toasts
+               its flavour because that line is the only place it is written;
+               a rung's blurb is sitting on the row you just clicked, so a
+               toast would be reading it back to you. The row going green and
                reading "Bought" is the whole of the news. */
             note(state, `Bought ${up.name}.`);
             drawSeeds();
@@ -1161,7 +1164,7 @@
         const medal = seedMedal(earned + 1);
         if(pending >= 1){
           ui.seedLine.textContent = `A seed is waiting. Ending the season takes the lot back to bare ground and pays it`
-            + `${medal ? `, along with ${medal.name}` : ''}. The seeds, the rows below, the record and the`
+            + `${medal ? `, and the ${medal.name} medal` : ''}. The seeds, the rows below, the record and the`
             + ` tree's size all stay.`;
         } else {
           ui.seedLine.textContent = `The next seed lands at ${formatEnergy(want)} energy earned, all told —`
@@ -1190,20 +1193,32 @@
         const refusal = prestigeRefusal(state);
         if(refusal) return say(refusal);
         const next = seedsEarned(state) + 1;
+        /* It has to name this run's upgrades among the losses. The short draft
+           said "your upgrades" among the things kept, which is true of the
+           rows a seed opens and flatly false of the twenty in the shop, and a
+           confirmation for something you cannot undo is the last place to be
+           loose about which is which. */
         if(!confirm(`End the season?\n\n`
           + `You gain your ${ordinal(next)} seed, and the tree keeps everything a season has given it —`
-          + ` its size, your seeds, your upgrades and your medals.\n\n`
-          + `The energy and the growers start again from nothing.\n\n`
+          + ` its size, your seeds, the rows those seeds opened, and your medals.\n\n`
+          + `The energy, the growers and this run's upgrades start again.\n\n`
           + `The tree stands tall through another season!`)) return;
         prestige(state);
         const now = seedsEarned(state);
         note(state, `Season ${now}. The lot goes back to bare ground, and you gained a seed.`);
-        /* The one toast a season. Buying a row does not announce itself; the
-           seed that opened the row does — and if that seed also won the medal
-           named after it, this toast speaks for both. */
+        /* The one toast a season, and it has to be true on the four hundredth
+           season as well as the first: the ladder of rows stops at twelve
+           seeds, so past that there is no new row to announce and the toast
+           says the other true thing instead. */
+        const title = `${ordinalWord(now)} seed`;
+        const opened = PRESTIGE.some(up => up.seed === now);
+        /* And it speaks for the medal only when it would otherwise be saying
+           the same words twice — "Sixth seed" over "Sixth seed". The medals
+           further up are named differently enough to be worth their own toast,
+           and the one at the top of the ladder certainly is. */
         const medalWon = seedMedal(now);
-        if(medalWon) quiet = medalWon.id;
-        say('Another row of upgrades is open.', `${ordinalWord(now)} seed`);
+        if(medalWon && medalWon.name === title) quiet = medalWon.id;
+        say(opened ? 'Another row of upgrades is open.' : 'The tree stands taller.', title);
         shopKey = null;
         drawShop();
         drawSeeds();
@@ -1628,9 +1643,15 @@
       if(boot.away > 60 && steadyRate(state) > 0){
         const gain = catchUp(state, boot.away);
         if(gain.light > 0){
+          /* Read off the save rather than off the module constants. Still air
+             pays the full rate and Long sleep counts a whole day, and a line
+             that says "half rate" to somebody who bought their way out of it
+             is the game calling its own upgrade a lie. */
+          const bonus = bonuses(state);
           note(state, `Away ${formatTime(gain.seconds)} — the lot made ${formatEnergy(gain.light)}.`);
-          say(`Away for ${formatTime(boot.away)}. The lot made ${formatEnergy(gain.light)} at half rate`
-            + `${gain.capped ? `, counting the first ${formatTime(OFFLINE_CAP)}` : ''}.`, 'Back');
+          say(`Away for ${formatTime(boot.away)}. The lot made ${formatEnergy(gain.light)}`
+            + `${bonus.offlineRate < 1 ? ' at half rate' : ' at its full rate'}`
+            + `${gain.capped ? `, counting the first ${formatTime(bonus.offlineCap)}` : ''}.`, 'Back');
         }
       } else if(boot.away > 60){
         state.elapsed += boot.away;

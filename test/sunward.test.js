@@ -1179,3 +1179,50 @@ test('planting is what marks the tree, so no call site can forget to', () => {
   plant(broke, 'moss', 1);
   assert.equal(broke.grown, 0);
 });
+
+test('the ladder tops out at twelve rows, which is what the season toast promises', () => {
+  // The toast says "Another row of upgrades is open" only when a row actually
+  // opens at that seed. It can only know that if there is exactly one row a
+  // seed from one upward, with no gaps and no two rows on the same rung.
+  const seeds = PRESTIGE.map(u => u.seed);
+  assert.deepEqual(seeds, seeds.map((_, i) => i + 1), 'one row a seed, from the first');
+  const top = Math.max(...seeds);
+  assert.equal(top, 12);
+  for(let n = 1; n <= top; n++) assert.ok(PRESTIGE.some(u => u.seed === n), `nothing opens at seed ${n}`);
+  assert.ok(!PRESTIGE.some(u => u.seed === top + 1), 'a season past the top opens nothing, and must not say it does');
+});
+
+test('the first ten seed medals are named for the seed, which is what lets one toast speak for both', () => {
+  // The page suppresses the medal's own toast only when the medal's name is
+  // word-for-word the title the season toast already used. If a medal here is
+  // renamed, the page stops deduplicating rather than silently swallowing it —
+  // but the pairing is worth stating, because it is why the rule works at all.
+  const words = ['', 'First', 'Second', 'Third', 'Fourth', 'Fifth',
+    'Sixth', 'Seventh', 'Eighth', 'Ninth', 'Tenth'];
+  for(let n = 1; n <= 10; n++){
+    const medal = seedMedal(n);
+    assert.ok(medal, `no medal at seed ${n}`);
+    assert.equal(medal.name, `${words[n]} seed`);
+  }
+  // And the ones above it are named differently, so they keep their own toast.
+  for(const n of [12, 15, 20, 25, 30, 40]){
+    const medal = seedMedal(n);
+    assert.ok(medal, `no medal at seed ${n}`);
+    assert.ok(!/^(First|Second|Third|Fourth|Fifth|Sixth|Seventh|Eighth|Ninth|Tenth) seed$/.test(medal.name));
+  }
+});
+
+test('the welcome-back line reads the save, not the module constants', () => {
+  // "at half rate, counting the first 12h" is true of a bare save and false of
+  // one that has bought its way out of both, and a game that calls its own
+  // upgrade a lie is worse than one that says nothing.
+  const plain = newGame();
+  assert.equal(bonuses(plain).offlineRate, OFFLINE_RATE);
+  assert.equal(bonuses(plain).offlineCap, OFFLINE_CAP);
+
+  const bought = newGame();
+  bought.rooted['still-air'] = true;
+  bought.rooted['long-sleep'] = true;
+  assert.equal(bonuses(bought).offlineRate, 1, 'full rate, so the line must not say half');
+  assert.equal(bonuses(bought).offlineCap, OFFLINE_CAP * 2, 'and a longer cap to name');
+});
