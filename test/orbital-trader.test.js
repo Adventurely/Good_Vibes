@@ -115,7 +115,7 @@ test('every body has what the kernel and the chart read', () => {
     const w = `body "${b.id}"`;
     assert.match(b.id, /^[a-z][a-z0-9]*$/, `${w}: id`);
     assert.equal(typeof b.name, 'string', `${w}: name`);
-    assert.ok(['star', 'planet', 'moon', 'station', 'zone', 'hole'].includes(b.kind), `${w}: kind ${b.kind}`);
+    assert.ok(['star', 'planet', 'moon', 'station', 'zone', 'hole', 'rock'].includes(b.kind), `${w}: kind ${b.kind}`);
     if(b.parent == null){ assert.equal(b.kind, 'star'); assert.equal(b.soi, null); continue; }
     assert.ok(ids.has(b.parent), `${w}: parent ${b.parent} exists`);
     for(const k of ['a', 'e', 'omega', 'M0', 'mu', 'radius']) assert.ok(Number.isFinite(b[k]), `${w}: ${k} is a number`);
@@ -147,7 +147,10 @@ test('every body has what the kernel and the chart read', () => {
     // outside its own docking range.
     if(b.dockAlt) assert.ok(b.dockAlt < b.zoneRadius, `${b.id}: the harbour at ${b.dockAlt} is outside its own mouth ${b.zoneRadius}`);
   }
-  for(const id of ['nail', 'whisker', 'maw']){
+  /* Nail and Whisker used to be on this list. They have mass now, so their
+     mouths are derived like every other world's by the loop above, and the
+     Maw is the last thing in the sky you arrive at by matching speeds. */
+  for(const id of ['maw']){
     assert.ok(world.get(id).zoneRadius >= 1e-3, `${id} is a rendezvous, not a world; its mouth stays the one it was given`);
   }
   /* Seventeen: the sixteen the setting names, and the Knot, which it does
@@ -1777,10 +1780,18 @@ test('a job of each kind builds the steps its kind earns', () => {
   assert.deepEqual(kinds(S.questById('tasteofhome')), ['handover'], 'delivery: it is already aboard');
   assert.deepEqual(kinds(S.questById('collector')), ['acquire', 'acquire', 'acquire', 'handover'], 'shopping: one step per line on the list');
   assert.deepEqual(kinds(S.questById('slatemessage')), ['handover'], 'message: just be there');
-  assert.deepEqual(kinds(S.questById('catsrequest')), ['visit', 'visit', 'visit', 'handover'], 'chain: one step per stop');
-  assert.deepEqual(S.questSteps(S.questById('catsrequest')).map(st => st.text),
+  assert.deepEqual(kinds(S.questById('catsrequest')), ['handover'], 'the cat\'s request is a message now, not a tour');
+
+  /* Chain is the one shape the catalogue no longer uses: Ashgrin's three-haven
+     tour became a hop next door so the navigator's berth fills early enough to
+     be worth having. The machinery is still here and still works, so it is
+     still checked — against a made-up job, which is the honest way to say that
+     nothing in the game is currently shaped like this. */
+  const tour = { id: 'x', type: 'chain', from: 'nail', to: 'nail', stops: ['nail', 'whisker', 'arc'], goods: [] };
+  assert.deepEqual(kinds(tour), ['visit', 'visit', 'visit', 'handover'], 'chain: one step per stop');
+  assert.deepEqual(S.questSteps(tour).map(st => st.text),
     ['Call at Nail', 'Call at Whisker', 'Call at The Arc', 'Report to Nail']);
-  assert.equal(S.questTarget(S.questById('catsrequest')), 'nail', 'a chain points at its first stop');
+  assert.equal(S.questTarget(tour), 'nail', 'a chain points at its first stop');
 
   // Authored wording wins where a quest bothers to write it.
   assert.equal(S.questSteps(S.questById('pebble'))[1].text, 'Bring it home to Tassel');
@@ -2292,16 +2303,32 @@ test('a harbour takes you when you are in a stable orbit close in, and not befor
   assert.equal(S.dockRefusal(st), 'too far out');
 });
 
-test('the belt havens and the Maw are rendezvous zones you match speeds with', () => {
+test('the two big rocks in the Belt are worlds you orbit', () => {
+  /* Nail and Whisker used to be gravity-less havens you pulled alongside. They
+     are the biggest rocks in the Belt now: small worlds with a reach, a ground
+     and a parking orbit, docked at the way everything else with mass is. */
+  for(const id of ['nail', 'whisker']){
+    const b = world.get(id);
+    assert.ok(b.mu > 0, `${id} has mass`);
+    assert.ok(b.soi > 0, `${id} has a reach`);
+    assert.ok(b.radius < b.dockAlt && b.dockAlt < b.zoneRadius, `${id}: ground < parking < mouth`);
+    assert.ok(b.port);
+    const s = S.newGame(2); S.undock(s); s.t = 1000;
+    parkAt(s, id);
+    const st = S.dockingStatus(s);
+    assert.equal(st.kind, 'orbit', `${id} is docked at by orbiting`);
+    assert.ok(S.dock(s).ok, `an orbit round ${id} is docking at it`);
+  }
+});
+
+test('the Maw is a rendezvous zone you match speeds with', () => {
   /* No mass, so no reach and nothing to fall towards: you arrive by being in
-     the same place going the same way, which is what a harbour mouth is for. */
-  for(const id of ['nail', 'whisker', 'maw']){ const b = world.get(id); assert.equal(b.mu, 0); assert.equal(b.soi, null); assert.ok(b.port); assert.ok(b.zoneRadius > 0); }
-  const s = S.newGame(2);
-  S.undock(s);
-  s.t = 1000;
-  parkAt(s, 'nail');
-  assert.ok(S.dock(s).ok, 'matching speeds with Nail is docking at it');
-  // And the Maw says its piece to a first visitor, which is the whole of it.
+     the same place going the same way. Gating this on a navigator is a later
+     job; today anybody who can get there can tie up. */
+  const b = world.get('maw');
+  assert.equal(b.mu, 0);
+  assert.equal(b.soi, null);
+  assert.ok(b.port && b.zoneRadius > 0 && b.dockSpeed > 0);
   const far = S.newGame(2);
   S.undock(far);
   far.t = 1000;
@@ -2972,4 +2999,53 @@ test('a slot describes itself for the title screen', () => {
   assert.equal(S.slotSummary(docked).where, S.portName('tassel'));
   assert.match(S.slotSummary(docked).text, /docked at /);
   assert.equal(S.slotSummary(null), null);
+});
+
+test('both crew berths fill on a local hop, early', () => {
+  /* A crew member is a mechanic: the engineer gates the deep-sky tank, the
+     navigator puts the Knot on the chart. Handed over in the last hour they
+     are a trophy rather than a tool, so both quests are hops now. */
+  const eng = S.questById('enginetrouble');
+  assert.equal(eng.from, 'cinder');
+  assert.equal(eng.to, 'scorch');
+  assert.equal(eng.type, 'delivery', 'handed to you, so it needs no capital');
+  assert.equal(S.questLeavesSystem(eng), false, 'Scorch is Cinder\'s own moon: no Astrolabe');
+
+  const nav = S.questById('catsrequest');
+  assert.equal(nav.from, 'nail');
+  assert.equal(nav.to, 'whisker');
+  assert.equal(S.questLoad(nav), 0, 'a message costs no hold');
+
+  /* And both actually pay out a person when flown. */
+  for(const [q, berth] of [[eng, 'engineer'], [nav, 'navigator']]){
+    const s = S.newGame(3);
+    s.keys.astrolabe = true;
+    s.dockedAt = q.from;
+    assert.ok(S.canAcceptQuest(s, q).ok, `${q.id} can be taken at ${q.from}`);
+    assert.ok(S.acceptQuest(s, q.id).ok);
+    s.dockedAt = q.to;
+    S.questCheck(s, []);
+    assert.ok(s.quests.find(l => l.id === q.id)?.done, `${q.id} completes at ${q.to}`);
+    assert.ok(s.crew[berth], `${q.id} fills the ${berth} berth`);
+  }
+  /* The berth is the whole reward, and the navigator's brings two abilities
+     that were previously out of reach until very late. */
+  const crewed = S.newGame(3);
+  crewed.crew.navigator = { role: 'navigator' };
+  assert.equal(S.knowsKnot(crewed), true);
+  assert.equal(S.canSeePast(crewed), true);
+});
+
+test('a stock ship can capture at both rocks and get away again', () => {
+  /* Giving them mass makes arrival a manoeuvre rather than a drift, which is
+     the point — but it must not price the Belt out of a starter tank. */
+  for(const id of ['nail', 'whisker']){
+    const b = world.get(id);
+    const vc = Math.sqrt(b.mu / b.dockAlt);
+    const esc = Math.sqrt(b.mu * (2 / b.dockAlt - 1 / ((b.dockAlt + b.soi) / 2))) - vc;
+    assert.ok(S.kms(esc) < 1.0, `${id}: leaving costs ${S.kms(esc).toFixed(3)} km/s`);
+    assert.ok(S.kms(vc) < 1.0, `${id}: a parked orbit runs at ${S.kms(vc).toFixed(3)} km/s`);
+    /* And the mouth is wide enough to aim at: several times the ground. */
+    assert.ok(b.zoneRadius / b.radius >= 5, `${id}: mouth is ${(b.zoneRadius / b.radius).toFixed(1)} radii`);
+  }
 });

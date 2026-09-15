@@ -649,20 +649,20 @@ export const NARRATIVE = {
    "id": "enginetrouble",
    "title": "Engine Trouble",
    "giver": "Brikka of the Ninth Forge",
-   "type": "retrieval",
+   "type": "delivery",
    "from": "cinder",
-   "to": "slate",
+   "to": "scorch",
    "goods": [
     {
      "good": "engineparts",
-     "qty": 3
+     "qty": 2
     }
    ],
-   "pay": 1050,
+   "pay": 420,
    "rep": "emberkin",
    "crew": "engineer",
-   "blurb": "Three crates of spare parts for the Slate yards, and Brikka wants to ride along and see them fitted. She has been at the Ninth Forge eleven years and has run out of things there she has not already taken apart.",
-   "done": "The Slate shipwrights have the coil seated backwards. Brikka watches them do it for four minutes, says so in one sentence that nobody enjoys, and has it out and reseated before the argument can properly start. Afterwards she asks what your tank is rated at, hears the answer, and looks at you the way people look at a room they are thinking of taking. She does not get off the ship."
+   "blurb": "Two crates of spares for the pit crews on Scorch, and Brikka is coming with them. She has been at the Ninth Forge eleven years, has run out of things there she has not already taken apart, and has heard the hoists on Scorch are held together with wire and opinion.",
+   "done": "The big hoist has been running on a worn bearing for two seasons and every shift knew. Brikka has it apart in eleven minutes, says one sentence nobody enjoys, and puts it back together better than it left Cinder. Then she asks what your tank is rated at, hears the answer, and looks at you the way people look at a room they are thinking of taking. She does not get off the ship."
   },
   {
    "id": "engineerfavour",
@@ -774,20 +774,15 @@ export const NARRATIVE = {
    "id": "catsrequest",
    "title": "A Cat's Request",
    "giver": "Captain Ashgrin",
-   "type": "chain",
+   "type": "message",
    "from": "nail",
-   "to": "nail",
-   "stops": [
-    "nail",
-    "whisker",
-    "arc"
-   ],
+   "to": "whisker",
    "goods": [],
-   "pay": 1350,
+   "pay": 520,
    "rep": "cat",
    "crew": "navigator",
-   "blurb": "Ashgrin wants you to go and be seen. Nail, then Whisker, then the Arc, in that order, and come back and tell her who was where. She will not say why, and it is rude to ask a cat twice.",
-   "done": "She hears you out, nods once, and tells you what it was for. A cat from outside the Belt, flying a clean hull, seen at all three havens inside one run, is how you say the rocks are open without saying it. Somebody had been putting it about that they were not. Then she introduces you to Celia, who has been sitting behind you the whole time and who already knows what your ship is called."
+   "blurb": "Ashgrin wants a word carried to Whisker by hand, by somebody who is not a cat. It weighs nothing and it is not to be opened. She will not say what is in it, and it is rude to ask a cat twice.",
+   "done": "The cat who takes it reads it twice and then, to your surprise, tells you what it says. The rocks are open, and Ashgrin has put her name to that. The proof is a ship from outside the Belt getting into a clean orbit round both of them inside one run, which is the thing you have just spent a week doing. Then Celia comes down off the cradle where she has been sitting the whole time, and it turns out she already knows what your ship is called."
   },
   {
    "id": "medicinerun",

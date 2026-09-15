@@ -2255,7 +2255,22 @@ const actions = {
 
 function doDock(){
   const r = S.dock(state);
-  if(!r.ok){ toast(r.reason === 'too fast' ? 'Too fast to dock. Kill some speed first.' : 'No port nearby.', 'bad'); return; }
+  if(!r.ok){
+    /* Every refusal says the next thing to do. This used to answer "too fast"
+       and call everything else "No port nearby", which was survivable while
+       the only orbital harbours were worlds you already knew; now that the two
+       big rocks are docked at by orbiting, a player meets "not in orbit" and
+       "that orbit goes through it" early and often. */
+    const WHY = {
+      'too fast': 'Too fast to come alongside. Match its speed first.',
+      'too far': 'Not close enough yet.',
+      'not in orbit': 'Get into an orbit round it first.',
+      'that orbit goes through it': 'That orbit goes through the ground. Raise the low point.',
+      'too far out': 'The high point is outside docking range. Bring it in.',
+    };
+    toast(WHY[r.reason] ?? 'No port nearby.', 'bad');
+    return;
+  }
   stopSkip();
   selectedNode = -1; replan(true); panelMenu = 'dock'; tab = 'market'; renderTabs(); setTab('market');
   const txt = TEXT.ports[r.port];

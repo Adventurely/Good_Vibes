@@ -78,7 +78,7 @@ Two consequences are worth stating plainly, because the formula means different 
 
 On the chart the mouth is a dashed ring with **a small anchor hung at the top of it**, green where they will take your lines and amber where they will not yet. The anchor is there because a dashed circle round a world is the same shape as three other things the chart draws — a sphere of influence, an atmosphere, a hollow rock — and this is the only one you can tie up inside.
 
-The **drifting havens keep their authored mouths.** Nail, Whisker and the Maw have no surface to stand five radii off and no air over it; their radius is a dot on a chart rather than a ground. A pilot arrives at those by matching speeds, and the size of that rendezvous is a design choice with nothing physical to derive it from.
+The **drifting havens keep their authored mouths.** The Maw has no surface to stand five radii off and no air over it; its radius is a dot on a chart rather than a ground. A pilot arrives there by matching speeds, and the size of that rendezvous is a design choice with nothing physical to derive it from. *Nail and Whisker used to be on this list.* They are the two biggest rocks in the Belt now — 449 km and 329 km, with mass, a reach and a parking orbit — so their mouths are derived from their size like every other world's, and a pilot gets into an orbit round them rather than pulling alongside. That is what makes the run out to them the lesson the crew quests are hung on.
 
 This is a scope decision as much as a fictional one. Landing would need a second control scheme, a second set of physics, and a second art problem, and it would buy nothing the orbital game does not already have. The fiction absorbs it easily: Tassel is an ocean of floating harbour cities that meet ships in orbit, the cats cannot survive a heavy world at all, and the frogs' balloon villages have no ground under them either.
 
@@ -684,14 +684,14 @@ before it can be asked for.
 | 3 | Green Medicine | Retrieval | Moss: retrieve medicinal herbs → Tassel | Credits |
 | 4 | A Message for Slate | Message | Tassel → Slate | Credits |
 | 5 | The Heavy Stuff | Delivery | Slate → Cinder: deliver iron ore | Credits |
-| 6 | Engine Trouble | Retrieval | Cinder: retrieve spare engine parts → Slate | **Emberkin Engineer** |
+| 6 | Engine Trouble | Delivery | Cinder: spares → Scorch, its own moon | **Emberkin Engineer** |
 | 7 | A Favor for an Engineer | Message | Cinder → Scorch: deliver a message | Credits / faction reputation |
 | 8 | Emberkin Luxury | Retrieval | Scorch: retrieve fire crystals → Veyra | Credits |
 | 9 | The Collector | Shopping List | Veyra: acquire pearls, coral carvings, precision clock | Large payout |
 | 10 | Faction Business | Message | Veyra → Cinder: deliver confidential message | Faction reputation |
 | 11 | Into the Belt | Delivery | Cinder → Nail: deliver reactor coils | Credits |
 | 12 | Something Shiny | Retrieval | Nail: retrieve salvaged sensors → Veyra | Credits |
-| 13 | A Cat's Request | Quest Chain | Nail → several cat settlements | **Cat Navigator** |
+| 13 | A Cat's Request | Message | Nail → Whisker, the rock next door | **Cat Navigator** |
 | 14 | First Salvage | Salvage | With the cat navigator: recover a drifting wreck | Salvage + credits *(not built)* |
 | 15 | Lost Cargo | Salvage | Belt: intercept a derelict cargo ship | Salvage *(not built)* |
 | 16 | Medicine Run | Delivery | Nail → Brine: deliver medicinal supplies | Credits |
@@ -770,6 +770,25 @@ Every quest names the port it is offered at, so a board has something to read.
 and the opening errand is the only one a player can take, because there is
 nowhere to press. That is the last piece.
 
+### 5.1.2 The two early berths
+
+Both crew quests were long hauls and a player reached them late. A crew member
+is a mechanic — the engineer's berth is what the deep-sky tank is gated on, the
+navigator's is what puts the Knot on the chart and the second crossing on the
+road — and a mechanic handed over in the last hour is one nobody gets to use.
+
+So both are local hops now. **Engine Trouble** is a delivery from Cinder to
+Scorch, its own moon, which needs no Astrolabe because it never leaves Cinder's
+sky and needs no capital because a delivery is handed to you. **A Cat's
+Request** is a message from Nail to Whisker, which weighs nothing and costs no
+hold. Neither asks the player to cross the system for a person they have not
+met yet.
+
+The pair also carry the lesson for the change under them: Nail and Whisker have
+mass now, so both runs are flown by getting into an orbit round a small world
+and bringing the high point inside the mouth — the same skill the tutorial
+teaches at Slate, asked for again somewhere it matters.
+
 ### 5.2 What the Line Needs That the Game Does Not Have
 
 1. ~~**Crew as a reward.**~~ Done, as far as the line needs. Three of the
@@ -820,7 +839,7 @@ parts to Slate, fire crystals to Veyra (who love them), reactor coils to Nail
 
 ## 6. Technical Notes
 
-**Decided since the first draft.** Reaches are computed from mass and harbour mouths from size rather than written down (2.1, 2.3), and the invariant checker proves the promises a hand-tuned table used to make. The Belt is decorative — a field of drawn rocks — and the two cat havens inside it are massless rendezvous zones with a harbour mouth rather than bodies with a well, as are the Arc and the Maw: a pilot arrives at those by matching speeds, not by falling in.
+**Decided since the first draft.** Reaches are computed from mass and harbour mouths from size rather than written down (2.1, 2.3), and the invariant checker proves the promises a hand-tuned table used to make. The Belt is decorative — a field of drawn rocks — and the Arc and the Maw are massless rendezvous zones with a harbour mouth rather than bodies with a well: a pilot arrives at those by matching speeds, not by falling in. The two cat havens were the same until the crew quests were moved onto them; Nail and Whisker have mass now, and are docked at by orbiting.
 
 **Still to tune.** Gravity-assist approaches at Grumm, and the Δv ladder between the tanks now that the map has been respaced.
 
@@ -845,8 +864,8 @@ berth fills with a name, a species, a portrait and a line:
 
 | Berth | Who | People | From |
 |---|---|---|---|
-| Engineer | Brikka | Emberkin | #6 Engine Trouble |
-| Navigator | Celia | Cats | #13 A Cat's Request |
+| Engineer | Brikka | Emberkin | #6 Engine Trouble (Cinder → Scorch) |
+| Navigator | Celia | Cats | #13 A Cat's Request (Nail → Whisker) |
 | Appraiser | Wicket | Frogs | #19 Appraisal |
 
 `state.crew` carries a slot per berth, null until earned and then `{ role,
