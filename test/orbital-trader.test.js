@@ -1705,6 +1705,35 @@ test('a rail nobody drew is a rail nobody can tap', () => {
   } finally { chart.restore(); }
 });
 
+test('the chart paints fewer pixels while the view is moving', () => {
+  /* The chart repaints the whole sky every frame and nothing about that is
+     cached, which is fine — but it means the cost is very nearly linear in the
+     size of the backing store. Measured on a 1600x1000 window: a pan costs
+     13 ms at one device pixel per point, 25 at one and a half, 37 at two. A
+     retina screen asks for the last of those, so dragging the chart ran at
+     twenty-seven frames a second and visibly stuttered. Half resolution while
+     a gesture is in flight takes it to 12, and pixel art sliding under a
+     finger does not show the difference. */
+  const R = readFileSync(new URL('../public/orbital-trader/render.js', import.meta.url), 'utf8');
+  assert.match(R, /chart\.stir = \(\) =>/, 'nothing can say the view is moving');
+  assert.match(R, /chart\.syncDpr = /, 'nothing sets the resolution for the frame');
+  assert.match(R, /Math\.max\(1, fullDpr\(\) \/ 2\)/, 'a moving chart no longer drops resolution — or drops below one device pixel');
+  /* Both hand gestures, and only those: the clock moving the ship must not
+     blur the chart, because the chart is locked to the ship and the sky under
+     it barely stirs. */
+  const pan = R.slice(R.indexOf('chart.panBy = '), R.indexOf('chart.zoomBy = '));
+  assert.ok(pan.includes('chart.stir()'), 'panning does not lower the resolution');
+  const zoom = R.slice(R.indexOf('chart.zoomBy = '), R.indexOf('chart.focus'));
+  assert.ok(zoom.includes('chart.stir()'), 'zooming does not lower the resolution');
+  /* And the switch lands between frames. Resizing a canvas throws away what is
+     on it and resets the context, so doing it part-way through a draw would
+     paint half a sky. */
+  const drawFn = R.slice(R.indexOf('function draw(chart, view){'));
+  const syncAt = drawFn.indexOf('chart.syncDpr(');
+  const firstPaint = drawFn.indexOf('ctx.fillRect(0, 0, W, H)');
+  assert.ok(syncAt > 0 && syncAt < firstPaint, 'the resolution is set after the frame has started painting');
+});
+
 test('the page wires the rail gesture and the marks to the chart', () => {
   /* Both halves of this live in play.html, which Node cannot run. The wiring
      is what breaks silently: a solver nobody calls draws nothing, and a

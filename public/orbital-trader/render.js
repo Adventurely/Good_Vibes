@@ -122,6 +122,10 @@ export function bodyColour(body){
    by the biggest orbit. */
 const MIN_ZOOM = 8, MAX_ZOOM = 2e7;
 
+/* One clock for the whole file, and one that does not throw where there is no
+   window: the chart is also drawn on the title screen and in tests. */
+const nowMs = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
+
 export function createChart(canvas, world, opts = {}){
   const ctx = canvas.getContext('2d', { alpha: false });
   const chart = {
@@ -161,15 +165,51 @@ export function createChart(canvas, world, opts = {}){
     belt: null,
   };
 
+  /* How many real pixels the chart is painted into, and why that is not one
+   * number.
+   *
+   * Every frame repaints the whole sky: a gradient over the ground, four
+   * hundred stars, the Scatter, every rail, the road, the worlds. Nothing is
+   * cached and nothing needs to be, because the cost is almost exactly linear
+   * in the size of the backing store — measured at 1600x1000, a pan costs 13
+   * ms at one device pixel per point, 25 at one and a half, 37 at two. On a
+   * retina screen that last one is twenty-seven frames a second, and dragging
+   * the chart visibly stutters.
+   *
+   * So the resolution follows the gesture. Still, it paints at the full ratio
+   * and the art is as sharp as the screen can show it. Moving — a drag, a
+   * wheel, a pinch — it drops to half of that until a fifth of a second after
+   * the last of it, which on a retina screen is a third of the work and takes
+   * the drag back under ten milliseconds. Nobody can see the difference in
+   * pixel art that is sliding under their finger, and everybody can see
+   * twenty-seven frames a second.
+   *
+   * The switch happens between frames, never inside one: resizing the canvas
+   * throws away its contents and resets the context, and the only places that
+   * ask for it are the event handlers and the top of a draw. */
+  const MOTION_SETTLE_MS = 200;
+  let liveDpr = 0, movingUntil = -1e9;
+  const fullDpr = () => Math.min(2, window.devicePixelRatio || 1);
+  const applyDpr = dpr => {
+    if(dpr === liveDpr) return;
+    liveDpr = dpr;
+    chart.dpr = dpr;
+    canvas.width = Math.round(chart.width * dpr);
+    canvas.height = Math.round(chart.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  };
+  /* Say that the view is moving. Anything that shifts the camera by hand
+     calls this; the clock moving the ship does not, because the chart is
+     locked to the ship and the sky under it barely stirs. */
+  chart.stir = () => { movingUntil = nowMs() + MOTION_SETTLE_MS; };
+  chart.syncDpr = now => applyDpr((now ?? nowMs()) < movingUntil ? Math.max(1, fullDpr() / 2) : fullDpr());
+
   chart.resize = () => {
     const rect = canvas.getBoundingClientRect();
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    chart.dpr = dpr;
     chart.width = Math.max(1, Math.round(rect.width));
     chart.height = Math.max(1, Math.round(rect.height));
-    canvas.width = Math.round(rect.width * dpr);
-    canvas.height = Math.round(rect.height * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    liveDpr = 0;                       // the store is the wrong size whatever it was
+    applyDpr(fullDpr());
   };
 
   chart.toScreen = p => [
@@ -196,6 +236,7 @@ export function createChart(canvas, world, opts = {}){
     const cam = chart.camera;
     cam.pan[0] -= dxPx / cam.zoom;
     cam.pan[1] += dyPx / cam.zoom;
+    chart.stir();
     chart.settle();
   };
   /* Back to the middle of whatever is being followed, keeping the scale. */
@@ -220,6 +261,7 @@ export function createChart(canvas, world, opts = {}){
        one and the sky jumps back under the pointer. */
     cam.pan[0] += before[0] - after[0];
     cam.pan[1] += before[1] - after[1];
+    chart.stir();
     chart.settle();
   };
   /* Lock onto a body and pick a zoom that frames its reach. Focusing is also
@@ -269,6 +311,9 @@ function makeStars(seed){
 
 function draw(chart, view){
   const { ctx, world, camera } = chart;
+  /* Before anything is painted, and never after: the resolution this frame is
+     going into. See the note on chart.resize. */
+  chart.syncDpr(view.now);
   /* What this ship has not been told about. The sky is the same either way —
      the kernel never reads this — but a body nobody has mentioned draws no
      dot, no rail, no reach and no label, and cannot be tapped. */
