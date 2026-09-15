@@ -1,4 +1,4 @@
-/* Duck Duck Goose — the park, drawn.
+/* Duck Duck Quack — the park, drawn.
  *
  * One entry point, `paintScene`, called by the game page every frame and by
  * the title screen for its own backdrop. It takes the whole picture as

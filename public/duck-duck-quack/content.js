@@ -1,4 +1,4 @@
-/* Duck Duck Goose — the game as data.
+/* Duck Duck Quack — the game as data.
  *
  * A duckling hatches at the nest and walks forward on its own, turning around
  * at anything too tall to step over and falling if the ground drops away too

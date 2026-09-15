@@ -1,4 +1,4 @@
-/* Duck Duck Goose — the rules, and whether the one level here can be won.
+/* Duck Duck Quack — the rules, and whether the one level here can be won.
  *
  * Each mechanic gets its own tiny level rather than sharing LEVEL_1, so a
  * test failure points at the one rule that broke instead of at "something in
@@ -14,9 +14,9 @@ import { test } from 'node:test';
 import {
   SCENE_W, SCENE_H, WALK_STEP, FALL_SAFE, DIG_RATE, TICK_RATE,
   SKILLS, SKILL_INFO, LEVEL_1, LEVELS, buildTerrain, winCount, formatTime,
-} from '../public/duck-duck-goose/content.js';
+} from '../public/duck-duck-quack/content.js';
 
-import { newGame, tick, assignSkill, assignRefusal, duckNear } from '../public/duck-duck-goose/sim.js';
+import { newGame, tick, assignSkill, assignRefusal, duckNear } from '../public/duck-duck-quack/sim.js';
 
 /* A minimal level for a test that only cares about one mechanic. Every field
    the game reads has a harmless default, so a test only has to say what makes

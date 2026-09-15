@@ -1,4 +1,4 @@
-/* Duck Duck Goose — the rules.
+/* Duck Duck Quack — the rules.
  *
  * One state object, `newGame()` below, and every function here takes it.
  * `tick` is the only one called every frame; it advances the whole flock by
