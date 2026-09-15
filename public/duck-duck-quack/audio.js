@@ -205,5 +205,29 @@ export function createAudio(){
     if(bus) bus.gain.value = muted ? 0 : 0.5;
   }
 
-  return { play, stop, unlock, setMuted, isMuted: () => muted, current: () => songName };
+  /* ---- sound effects ------------------------------------------------ */
+
+  /* One so far: the duckling that just made it. Two quick nasal blips,
+   * sawtooth rather than sine so it has the buzz an actual quack has, each
+   * one bent sharply downward — a duck's call falls in pitch as it cuts off,
+   * a whistle does not, and a whistle is what this was before the bend went
+   * in. A touch of band-passed noise under the first blip is the breath
+   * behind it; without it the pair read as two clean beeps, which is a
+   * microwave finishing, not a bird.
+   */
+  const SFX = {
+    quack(t){
+      voice(880, t, 0.07, 'sawtooth', 0.13, 480);
+      hit(t, 0.045, 0.05, 2800, 'bandpass');
+      voice(620, t + 0.09, 0.06, 'sawtooth', 0.1, 340);
+    },
+  };
+
+  function sfx(name){
+    if(muted || !ctx) return;
+    const fn = SFX[name];
+    if(fn) fn(ctx.currentTime + 0.01);
+  }
+
+  return { play, stop, unlock, sfx, setMuted, isMuted: () => muted, current: () => songName };
 }

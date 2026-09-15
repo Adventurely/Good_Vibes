@@ -271,6 +271,19 @@
   const STEP = 1 / TICK_RATE;
   let acc = 0, last = null;
 
+  // Ids already credited with a quack, so a duckling sitting saved in the
+  // pond for the rest of the run does not honk on every subsequent frame —
+  // only the tick it actually arrives on.
+  let quacked = new Set();
+
+  function quackNewArrivals(){
+    for(const d of state.ducks){
+      if(d.state !== 'saved' || quacked.has(d.id)) continue;
+      quacked.add(d.id);
+      audio.sfx('quack');
+    }
+  }
+
   function endMessage(){
     const won = state.ended === 'won';
     ui.overlayTitle.textContent = won ? 'The flock made it!' : 'Out of time';
@@ -295,6 +308,7 @@
     if(!paused && !state.ended){
       acc += dt;
       while(acc >= STEP){ tick(state); acc -= STEP; }
+      quackNewArrivals();
       if(state.ended){ refreshSkills(); endMessage(); }
     }
 
@@ -311,6 +325,7 @@
     state = newGame(LEVEL_1);
     armed = null;
     paused = false;
+    quacked = new Set();
     ui.pause.textContent = 'Pause';
     ui.overlay.hidden = true;
     say('');
