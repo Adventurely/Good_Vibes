@@ -344,14 +344,42 @@ export function dock(state){
  * up. A prograde circle at the docking altitude, placed so that the ship's
  * velocity points the way the port itself is moving, which means the first
  * burn a beginner makes is already in the right direction. */
+/* A parking orbit is very slightly an ellipse rather than exactly a circle.
+ *
+ * On an exact circle the low point and the high point are the same distance
+ * out, so which part of the orbit is which is decided by the last bit of a
+ * floating-point number — and the chart, which marks both, swapped its two
+ * labels from one side of the world to the other every few frames. There is
+ * no right answer to give a circle; the fix is not to fly one.
+ *
+ * Measured at Tassel's harbour, flying a lap and watching where the low point
+ * says it is: on an exact circle it moves 179 degrees round the orbit, which
+ * is the flip. At any eccentricity from a ten-millionth upward it does not
+ * move at all — the drift is zero to three decimal places of a degree — so
+ * what this number has to be is not "big enough to work" but "small enough
+ * not to show". A hundred-thousandth is both, with two orders of margin over
+ * the point where stability begins: the low point and the high point differ
+ * by sixty-one metres in three thousand kilometres, which is a hundredth of a
+ * pixel on a chart that fills the screen with the orbit, and the two marks
+ * print the same altitude as each other.
+ *
+ * The ship is put at the low point, so the semi-major axis — and with it the
+ * period the clock is tuned to — is exactly the radius asked for.
+ */
+const PARK_E = 1e-5;
+
 function placeParked(state, portId, radius){
   const b = world.get(portId);
   if(b.mu > 0){
     const pv = absState(world, portId, state.t).v;
     const dir = norm(pv) > 0 ? unit(pv) : [0, 1];
     const theta = Math.atan2(dir[1], dir[0]) - Math.PI / 2;
-    const s = circularState(b.mu, radius ?? b.dockAlt, theta);
-    state.ship = { body: portId, r: s.r, v: s.v };
+    const a = radius ?? b.dockAlt;
+    const rp = a * (1 - PARK_E);
+    // circularState points both vectors; only the speed is ours to set.
+    const s = circularState(b.mu, rp, theta);
+    const vp = Math.sqrt(b.mu * (1 + PARK_E) / rp);
+    state.ship = { body: portId, r: s.r, v: scale(unit(s.v), vp) };
   }else{
     const parent = world.get(b.parent);
     const local = railState(b, parent.mu, state.t);

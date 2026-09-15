@@ -1874,8 +1874,13 @@ test('a new game starts in orbit above Tassel, full, with an errand from Uncle T
   assert.equal(s.ship.body, 'tassel');
   assert.equal(s.justLeft, 'tassel', "Tassel's own mouth is where we started");
   const b = world.get('tassel');
-  assert.ok(Math.abs(O.norm(s.ship.r) - b.startAlt) < 1e-12, 'in the low orbit the game opens in');
-  assert.ok(Math.abs(O.norm(s.ship.v) - Math.sqrt(b.mu / b.startAlt)) < 1e-12, 'and going round it');
+  /* The opening orbit is the low one, measured by its semi-major axis: a
+     parking orbit is a hair off a circle on purpose — see PARK_E — so the
+     radius the game is asked for is the average one and not every one. */
+  const opening = O.elementsFromState(b.mu, s.ship.r, s.ship.v);
+  assert.ok(Math.abs(opening.a - b.startAlt) < b.startAlt * 1e-9, 'in the low orbit the game opens in');
+  assert.ok(Math.abs(O.norm(s.ship.r) - b.startAlt) < b.startAlt * 1e-3, 'and within a whisker of its altitude');
+  assert.ok(Math.abs(O.norm(s.ship.v) - Math.sqrt(b.mu / b.startAlt)) < Math.sqrt(b.mu / b.startAlt) * 1e-3, 'and going round it');
   /* The opening is an errand, not a cargo: no crate in the hold, one quest on
      the list, and Slate already the target. */
   assert.equal(s.cargo.length, 0);
@@ -1896,7 +1901,7 @@ test('the game opens in a low orbit, and the clock is tuned so a lap of it is te
   const s = S.newGame(5);
   const b = world.get('tassel');
   const el = O.elementsFromState(b.mu, s.ship.r, s.ship.v);
-  assert.ok(el.e < 1e-9 && el.dir > 0, 'a prograde circle, so the first burn points the right way');
+  assert.ok(el.e > 0 && el.e < 1e-3 && el.dir > 0, 'a prograde near-circle, so the first burn points the right way');
 
   /* Low means what a pilot means by it and not what a chart does: the high
      point of the orbit is an altitude over the ground, and it sits under one
@@ -1920,14 +1925,15 @@ test('the game opens in a low orbit, and the clock is tuned so a lap of it is te
   assert.ok(O.dist(s.ship.r, r0) < el.ra * 1e-6, 'ten real minutes of ×1 is one lap, back where it started');
 });
 
-test('undocking puts the ship in a circular prograde orbit at the docking altitude', () => {
+test('undocking puts the ship in a prograde parking orbit at the docking altitude', () => {
   /* Casting off is not the same frame as a new game: the opening orbit is low
      and the harbour's is not, so this ties up first and then lets go. */
   const s = undockedAt(3);
   assert.equal(s.dockedAt, null);
   const b = world.get('tassel');
   const el = O.elementsFromState(b.mu, s.ship.r, s.ship.v);
-  assert.ok(Math.abs(O.norm(s.ship.r) - b.dockAlt) < 1e-12 && el.e < 1e-9 && el.dir > 0);
+  assert.ok(Math.abs(el.a - b.dockAlt) < b.dockAlt * 1e-9, 'at the harbour altitude, on average');
+  assert.ok(el.e > 0 && el.e < 1e-3 && el.dir > 0, 'prograde, and a hair off a circle');
   /* And the port you just left stays quiet until you are out of its mouth:
      a card saying "tie up" one second after casting off is an invitation to
      undo what you just did. */
@@ -3773,4 +3779,69 @@ test('an uncollected reward flashes the ship button, and the button goes to the 
   /* Both helpers are function declarations: refreshOwedFlash is called from
      renderHud and from togglePanel, both written above where they live. */
   assert.match(PLAY, /function onOwedLog\(\)\{/, 'onOwedLog is not hoisted and will be read before it exists');
+});
+
+/* --------------------------------------------- the parking orbit's apsides */
+
+test('a parking orbit has a low point and a high point that stay where they are', () => {
+  /* The bug this is here for: on an exact circle the two apsides are the same
+     distance out, so which is which came down to the last bit of a floating
+     point number, and the chart's "Low" and "High" marks swapped sides of the
+     world every few frames. A parking orbit is now a hair off a circle so the
+     question has an answer. */
+  const s = undockedAt(3);
+  const b = world.get('tassel');
+  const first = O.elementsFromState(b.mu, s.ship.r, s.ship.v);
+  assert.ok(first.e > 1e-7, `a circle has no answer to give: e is ${first.e}`);
+  assert.ok(first.ra - first.rp > 0, 'and the two apsides are different distances out');
+
+  /* Fly a whole lap and the apsis line has not moved. Sampled often enough to
+     have caught the flip, which happened frame to frame. */
+  let worst = 0;
+  for(let i = 0; i < 120; i++){
+    S.tick(s, first.period / 120);
+    const now = O.elementsFromState(b.mu, s.ship.r, s.ship.v);
+    let d = now.omega - first.omega;
+    while(d > Math.PI) d -= 2 * Math.PI;
+    while(d < -Math.PI) d += 2 * Math.PI;
+    worst = Math.max(worst, Math.abs(d));
+  }
+  assert.ok(worst < 1e-3, `the low point wandered ${(worst * 180 / Math.PI).toFixed(1)} degrees round the orbit`);
+});
+
+test('and the wobble that buys it is too small to see or to matter', () => {
+  for(const id of ['tassel', 'veyra', 'cinder', 'grumm']){
+    const b = world.get(id);
+    if(!(b.mu > 0) || !b.dockAlt) continue;
+    const s = undockedAt(3, id);
+    const el = O.elementsFromState(b.mu, s.ship.r, s.ship.v);
+    /* A hundredth of a pixel on a chart that fills the screen with the orbit:
+       the whole spread from low to high is a ten-thousandth of the radius. */
+    assert.ok((el.ra - el.rp) / el.a < 1e-4, `${id}: the orbit is visibly an ellipse`);
+    /* Both marks round to the same altitude, so the two labels agree. */
+    const km = x => Math.round((x - b.radius) * 1.496e8);
+    assert.equal(km(el.rp), km(el.ra), `${id}: the low and high marks read different altitudes`);
+    /* And it still fits in the harbour, which is the thing a parking orbit is
+       for — at Tassel the mouth is only a per cent above the mooring. */
+    assert.ok(el.ra <= b.zoneRadius, `${id}: the high point is outside the harbour mouth`);
+    assert.ok(el.rp > Math.max(b.radius, b.atmo ?? 0), `${id}: the low point is in the ground or the air`);
+    assert.ok(S.dockingStatus(s) === null || S.dockingStatus(s).port === id, `${id}: cannot be tied up at any more`);
+  }
+});
+
+/* ------------------------------------------------- waiting, during a lesson */
+
+test('a world\'s ring cannot be tapped to wait while the lesson is running', () => {
+  /* Tapping the ring a world travels on asks the clock to wait until it gets
+     there. It is a real move and the chart offers it everywhere — but it is
+     not the move any card is asking for, and a beginner who taps a ring while
+     reading about their own orbit gets a confirmation about somewhere they
+     have never been and a clock that runs off with them. */
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.match(PLAY, /S\.tutorialRunning\(state\) \? null : chart\.nearestRailPoint\(/,
+    'the rail tap is not gated on the lesson');
+  /* The road's own warp is not gated: "tap your path past the burn and choose
+     Warp here" is a card in the lesson, so that one has to keep working. */
+  assert.match(PLAY, /const p = prediction && !state\.dockedAt \? chart\.nearestPathPoint\(/,
+    'the path tap should be untouched');
 });

@@ -1600,7 +1600,12 @@ function endPointer(e){
        at nine days a second on a promise of ten. That was a bug in the loop
        rather than a fact about harbours: waiting at a mooring for a world to
        come round is exactly what a pilot does at one. */
-    const rail = chart.nearestRailPoint(e.clientX, e.clientY, state.t);
+    /* Not while the lesson is running. Waiting for a world to come round is a
+       real move and the chart offers it everywhere, but it is not the move any
+       card is asking for, and a beginner who taps a ring while reading about
+       their own orbit gets a confirmation about Grumm and a clock that runs
+       off with them. It comes back the moment the lesson is done or waved off. */
+    const rail = S.tutorialRunning(state) ? null : chart.nearestRailPoint(e.clientX, e.clientY, state.t);
     if(rail){ askSkip(rail.t, `${S.portName(rail.id)} reaching that point`); return; }
     selectedNode = -1; if(tab === 'ship') renderTab();
   }
