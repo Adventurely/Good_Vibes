@@ -1570,40 +1570,23 @@ test('only the first crossing is marked, however many the road makes', () => {
   assert.equal(railCrossings(world, S.planImmediate(wide), wide.t, { minLead: S.MIN_LEAD }).length, 1);
 });
 
-test('every world the road passes is marked once, at the first pass', () => {
-  /* The chart marked exactly one encounter: the world whose reach the road
-     crossed into. Two things fell through that. Nail and Whisker have no reach
-     at all — they are rendezvous points, matched rather than fallen into — so
-     flying straight at one was marked with nothing whatever. And a road that
-     goes past one world on the way to another is ordinary out here, with only
-     the far end of it marked. */
+test('a road past a dozen worlds wears one crosshair at most, and only for an arrival', () => {
+  /* The chart used to sweep every world in the sky at every sample of the
+     drawn road and mark any the road happened to pass near. It cost a quarter
+     of every road solved, and what it mostly produced was a crosshair sitting
+     on a parking orbit reporting how far below the planet was. What a pilot
+     steers an approach by is where a world will be when the road cuts its
+     rail — which the chart draws separately — and what the road does once it
+     arrives, which is the one mark left here. */
   const s = S.newGame(7);
   s.dockedAt = 'tassel'; S.undock(s);
   s.dv = s.tank = S.auDay(60);
   assert.ok(S.trimToTarget(s, 'nail', 6000)?.ok, 'could not plot the road this test is about');
   const pred = S.planImmediate(s, true, { farSight: true });
-  const byBody = new Map((pred.intercepts ?? []).map(ic => [ic.body, ic]));
-
-  /* The one that was missing: a rendezvous, which has no reach to cross into.
-     Nail's mouth is 2400 km and this road is still half a million wide of it,
-     which is exactly the case the mark exists for — a pilot closing that gap
-     is steering by this number and nothing else. So it has to be here while
-     the road is still crooked, and it has to say how far off it is. */
-  const nail = byBody.get('nail');
-  assert.ok(nail, 'the Belt haven the road is aimed at is not marked');
-  assert.ok(nail.distance > world.get('nail').zoneRadius, 'this road has not arrived yet');
-  assert.ok(nail.speed > 0, 'and the mark says what speed the pass is at, which is the other half of a rendezvous');
-
-  // And the moons it goes past on the way out, which were never marked either.
-  assert.ok(byBody.has('slate') && byBody.has('moss'), 'the moons the road passes are not marked');
-
-  // Once each, and in the order they happen.
   const ids = (pred.intercepts ?? []).map(ic => ic.body);
-  assert.equal(new Set(ids).size, ids.length, `a world is marked twice: ${ids.join(', ')}`);
-  const times = pred.intercepts.map(ic => ic.t);
-  assert.deepEqual(times, [...times].sort((a, b) => a - b), 'the marks are not in the order they happen');
-  // The readouts take the next one, so it has to be the first.
-  assert.equal(pred.intercept, pred.intercepts[0]);
+  assert.ok(ids.length <= 1, `a road out of Tassel wears ${ids.length} crosshairs: ${ids.join(', ')}`);
+  assert.ok(!(pred.intercepts ?? []).some(ic => ic.passing), 'a sampled close pass is marked again');
+  assert.equal(pred.intercept, pred.intercepts[0] ?? null);
 });
 
 test('the world you are leaving is not an encounter with anything', () => {
@@ -2637,48 +2620,6 @@ test('falling through a world\'s door leaves something to point the clock at', (
   assert.ok(!own, 'a parking orbit marks the world it is parked at');
 });
 
-test('the crosshair is there while the burn is still wrong, which is when it is wanted', () => {
-  /* The mark is not a rosette for arriving. There is no aim helper on the
-     chart: every road is flown by pushing a burn around and watching this one
-     number come down, so the number has to exist through the whole range the
-     pilot pushes it through. Measured against a reach alone it did not —
-     fifty metres a second off a five kilometre burn to Nail leaves the pass
-     1,480 Mm out, inside one per cent of the answer and still nowhere near
-     twice Nail's reach, so the chart stayed blank until the road was already
-     right and the mark only ever confirmed what the pilot had guessed. */
-  const s = S.newGame(7);
-  s.dockedAt = 'tassel'; S.undock(s);
-  s.dv = s.tank = S.auDay(60);
-  assert.ok(S.trimToTarget(s, 'nail', 6000).ok);
-  let guard = 0;
-  while(s.ship.body !== 'lamp' && guard++ < 40000){ S.tick(s, 0.05); if(s.pending) break; }
-  assert.ok(S.trimToTarget(s, 'nail', 6000).ok, 'could not lay the road this test is about');
-  const good = s.nodes[0].prograde;
-  const markAt = off => {
-    s.nodes[0].prograde = good + S.auDay(off / 1000);
-    return (S.planImmediate(s, true).intercepts ?? []).find(i => i.body === 'nail');
-  };
-  let last = 0;
-  for(const off of [0, 20, 50, 100, 200, 400]){
-    const ic = markAt(off);
-    assert.ok(ic, `${off} m/s off the answer and the chart says nothing about Nail`);
-    assert.ok(ic.distance >= last, 'and a worse burn should read as a wider miss');
-    last = ic.distance;
-  }
-  /* And it is still a signal rather than a decoration: a road that is not
-     going to Nail at all does not wear Nail's crosshair. */
-  assert.equal(markAt(4000), undefined, 'a road nowhere near Nail is marked for it anyway');
-
-  /* One more thing it must not become: a chart of crosshairs. A road only
-     sweeps past the worlds between its low point and its high one, so even a
-     badly aimed one carries very few. */
-  for(const off of [0, 100, 400]){
-    s.nodes[0].prograde = good + S.auDay(off / 1000);
-    const all = S.planImmediate(s, true).intercepts ?? [];
-    assert.ok(all.length <= 3, `${off} m/s off: ${all.length} crosshairs (${all.map(i => i.body).join(', ')})`);
-  }
-  s.nodes[0].prograde = good;
-});
 
 test('Nail is a rock you orbit, and the road to it is flown on the mark', () => {
   /* Nail used to be a three-hundred-thousand-kilometre bubble in the Belt: fly
@@ -2696,17 +2637,15 @@ test('Nail is a rock you orbit, and the road to it is flown on the mark', () => 
   assert.ok(n.soi > n.zoneRadius, 'its reach still contains its own harbour');
   assert.ok(n.zoneRadius * KM < 5000, `the mouth is a harbour mouth now (${(n.zoneRadius * KM).toFixed(0)} km)`);
 
-  /* The two-step the mouth forces, and the reason the mark matters. Out of a
-     Tassel parking orbit the helper can only set the road up — one mark inside
-     a planet's reach cannot also thread a few-thousand-kilometre window most
-     of an AU away — and what the pilot steers by in between is the crosshair.
+  /* The two-step the mouth forces. Out of a Tassel parking orbit the helper can
+     only set the road up — one mark inside a planet's reach cannot also thread
+     a few-thousand-kilometre window most of an AU away — and what the pilot
+     steers by in between is where Nail will be when the road cuts its rail.
      Once the ship is out in the Lamp's frame the same helper closes it. */
   const s = S.newGame(7);
   s.dockedAt = 'tassel'; S.undock(s);
   s.dv = s.tank = S.auDay(60);
   assert.ok(S.trimToTarget(s, 'nail', 6000).ok, 'could not set the road up at all');
-  const rough = (S.planImmediate(s, true, { farSight: true }).intercepts ?? []).find(i => i.body === 'nail');
-  assert.ok(rough, 'the road is aimed at Nail and the chart says nothing about it');
 
   let guard = 0;
   while(s.ship.body !== 'lamp' && guard++ < 40000){ S.tick(s, 0.05); if(s.pending) break; }

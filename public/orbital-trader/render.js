@@ -825,10 +825,11 @@ function drawApses(chart, view, anchors, afterBurnAt){
     const seg = view.prediction.segments[a.segIndex];
     const anchor = anchors[a.segIndex];
     if(!seg || !anchor) continue;
-    /* The leg the intercept is on already has a labelled crosshair at its low
-       point; a second mark and a second number on the same pixel is a pile,
-       not a chart. */
-    if((view.prediction.intercepts ?? []).some(ic => ic.segIndex === a.segIndex)) continue;
+    /* An encounter is drawn as a crosshair at the leg's low point, so that one
+       mark would be two on the same pixel — a pile, not a chart. Only that one
+       though: it used to drop every apsis on the leg, which took the high
+       point with it for no reason. */
+    if((view.prediction.intercepts ?? []).some(ic => ic.segIndex === a.segIndex && Math.abs(ic.t - a.t) < 1e-6)) continue;
     const afterBurn = afterBurnAt(a.segIndex);
     const p = chart.toScreen(add(anchor, a.r));
     if(p[0] < -60 || p[1] < -30 || p[0] > chart.width + 60 || p[1] > chart.height + 30) continue;

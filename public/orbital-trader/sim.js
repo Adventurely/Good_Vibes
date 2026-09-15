@@ -1276,20 +1276,40 @@ function fullLap(seg, mu){
  * exact. It is the number a pilot is actually asking for while they push a
  * burn around: not "does this reach Slate" but "how close, and how fast". */
 function interceptOf(segments, crossed){
-  if(crossed < 0) return null;
-  /* Only an *entry* has an intercept. Climbing out of a world's reach leaves
-     you on an orbit round its parent, and the low point of that orbit is not
-     an encounter with anything — reporting it as one put "the Lamp, eighty
-     million kilometres" on the chart as though it were a near miss. */
-  if(segments[crossed].reason !== 'enter') return null;
-  const first = segments[crossed + 1];
+  let from;
+  if(crossed >= 0 && segments[crossed].reason === 'enter'){
+    /* A door the road goes in through: the encounter is inside the new reach.
+       An *exit* is not one. Climbing out of a world's reach leaves you on an
+       orbit round its parent, and the low point of that orbit is not an
+       encounter with anything — reporting it as one put "the Lamp, eighty
+       million kilometres" on the chart as though it were a near miss. */
+    from = crossed + 1;
+  }else{
+    /* No door the road goes *in* through, but the ship may already be through
+       one. A ship that has just fallen into a world's reach is going round it
+       in the arithmetic and nowhere near it yet: the low point ahead is the
+       encounter, and the one place a rendezvous can be made. A skip ends at
+       every change of reach, so this is exactly where a pilot gets put down,
+       and without this the panel offers them nothing but the way out the far
+       side.
+
+       Two things this must not call an encounter. A parking orbit reaches its
+       low point once a lap as well, and that is where you already are, not
+       somewhere you are going. And a ship on its way *out* of a reach has its
+       low point behind it — so it has to be falling, not climbing. */
+    const first = segments[0];
+    if(!first || Number.isFinite(first.elements?.period)) return null;
+    if(!(dot(first.r0, first.v0) < 0)) return null;
+    from = 0;
+  }
+  const first = segments[from];
   if(!first) return null;
   const b = world.get(first.body);
   if(!b || !(b.mu > 0)) return null;
   /* Every leg inside that reach, because a brake written down at the kiss
      splits it and the nearest pass may be on either side of the burn. */
   let best = null;
-  for(let i = crossed + 1; i < segments.length && segments[i].body === first.body; i++){
+  for(let i = from; i < segments.length && segments[i].body === first.body; i++){
     const leg = segments[i];
     const dt = timeToAnomaly(b.mu, leg.r0, leg.v0, 0);
     const within = dt != null && dt >= 0 && dt <= leg.t1 - leg.t0;
@@ -1311,160 +1331,6 @@ function interceptOf(segments, crossed){
     };
   }
   return best;
-}
-
-/* How near the road has to come to a world before the pass is worth a mark.
- *
- * The first three terms are the encounter: a world's own reach, twice over, so
- * a near miss is called before it is a miss; harbour mouths for the havens,
- * which have no reach; the ground for anything with neither. Those make the
- * crosshair a thing that confirms an arrival.
- *
- * The fourth makes it a thing you can *steer* by, which is what it is actually
- * for, and there is no aim helper in the chart — every road is flown by pushing
- * a burn around and watching this number. Measured against a reach alone the
- * number does not exist until the road is nearly right: fifty metres a second
- * off a five kilometre burn to Nail leaves the pass fourteen hundred million
- * kilometres out, well inside one per cent of the answer and still far outside
- * twice Nail's reach, so the pilot pushed the burn through the whole useful
- * range of it with a blank chart and the mark appeared only once they no longer
- * needed it.
- *
- * So a port is also marked within a tenth of its own orbit. That is the scale
- * at which "am I anywhere near it" is a real question, it grows with the system
- * so a road to Grumm gets a Grumm-sized band, and it stays a signal rather than
- * a decoration: a world crosses its own band's width in a few days, so a road
- * that misses the timing is still not marked, and a road only ever sweeps past
- * the handful of worlds between its low point and its high one. Measured on the
- * roads out of Tassel, the widest band here never puts more than two crosshairs
- * on the chart. */
-function markWithin(b){
-  const aimed = b.port && b.a > 0 ? b.a * 0.1 : 0;
-  return Math.max((b.soi ?? 0) * 2, (b.zoneRadius ?? 0) * 8, (b.radius ?? 0) * 20, aimed);
-}
-
-/* Where the road comes nearest each world, once per world, and the *first*
- * time rather than the nearest time.
- *
- * The chart used to mark exactly one encounter: the world whose reach the road
- * crossed into. That missed two things a pilot wants. Nail and Whisker have no
- * reach to cross — they are rendezvous points, matched rather than fallen into
- * — so flying straight at one was marked with nothing at all. And a road that
- * goes past one world on its way to another is a thing that happens constantly
- * out here, with only the far end of it marked.
- *
- * One mark per world, at the first close pass, and nothing after it: a road
- * that cuts the same rail three laps running earns one crosshair, which is the
- * same refusal the rest of this chart already makes. */
-function interceptsOf(segments, crossed){
-  const out = new Map();
-  /* The encounter the ship actually falls into keeps its exact numbers: inside
-     a reach the nearest point is that leg's periapsis, solved rather than
-     sampled. Everything else is found by walking the drawn road. */
-  const exact = interceptOf(segments, crossed);
-  if(exact) out.set(exact.body, exact);
-
-  /* The world the ship is going round right now is usually not an encounter
-     with anything. A parking orbit reaches its low point once a lap, which is
-     a real local minimum and completely uninteresting: it is where you already
-     are. It becomes interesting again only if the road leaves and comes back,
-     so it is ignored up to the moment the road quits that world's frame.
-     
-     Only on a closed orbit, though. A ship that has just fallen through a
-     world's door is going round it in the arithmetic and nowhere near it yet:
-     the low point ahead is the encounter, the one place a rendezvous can be
-     made, and the only thing on that road worth pointing the clock at. A skip
-     ends at every change of reach, so this is exactly where the pilot is put
-     down — and with the low point suppressed the panel offered them nothing
-     but the way out the far side. */
-  const home = segments[0]?.body ?? null;
-  const homeBound = Number.isFinite(segments[0]?.elements?.period);
-  const leftHome = segments.find(sg => sg.body !== home)?.t0 ?? Infinity;
-
-  /* Where things are, remembered. Every world is measured against the same
-     samples, and the ship's own place at a sample is the same whichever
-     world is being measured — it was worked out afresh for each of the
-     seventeen, and a moon's planet again for each of its moons. */
-  const absMemo = new Map();
-  const absAt = (id, t) => {
-    const k = id + '|' + t;
-    let s = absMemo.get(k);
-    if(!s){ s = absState(world, id, t); absMemo.set(k, s); }
-    return s;
-  };
-  const shipAbsMemo = new Map();
-  const shipAbsPts = seg => {
-    let a = shipAbsMemo.get(seg);
-    if(!a){
-      const pts = seg.scan ?? seg.points, ts = seg.scanTimes ?? seg.times;
-      a = pts.map((p, i) => add(absAt(seg.body, ts[i]).r, p));
-      shipAbsMemo.set(seg, a);
-    }
-    return a;
-  };
-
-  for(const b of world.bodies){
-    if(b.id === 'lamp' || out.has(b.id)) continue;
-    const bound = markWithin(b);
-    if(!(bound > 0)) continue;
-    const notBefore = b.id === home && homeBound ? leftHome : -Infinity;
-    /* A pass has to be a pass: the road comes closer and then goes away again.
-       Anything else is not an encounter, and two things in particular are not.
-       A ship that has just cast off is sitting on its own harbour's doorstep,
-       so without this the world you are leaving marks itself at t = nought
-       under the ship. And a road still closing when it runs out of drawn
-       length has not passed anything yet — it is a crossing that may or may
-       not happen past the end of what is shown. */
-    let best = null, rising = 0, closed = false;
-    outer:
-    for(let si = 0; si < segments.length; si++){
-      const seg = segments[si];
-      const frame = world.get(seg.body);
-      const pts = seg.scan ?? seg.points, ts = seg.scanTimes ?? seg.times;
-      const own = seg.body === b.id, child = b.parent === seg.body;
-      const abs = own || child ? null : shipAbsPts(seg);
-      for(let i = 0; i < pts.length; i++){
-        const t = ts[i];
-        const d = own ? norm(pts[i])
-          : child ? dist(pts[i], railState(b, frame.mu, t).r)
-          : dist(abs[i], absAt(b.id, t).r);
-        if(!best || d < best.d){
-          if(best) closed = true;                 // it got nearer than it was
-          best = { d, t, si, seg }; rising = 0;
-        }else if(++rising >= 2 && closed && best.d <= bound){
-          break outer;                            // approached, passed, done looking
-        }
-      }
-    }
-    if(!best || !closed || rising < 2 || best.d > bound || best.t < notBefore) continue;
-    /* The sample grid is coarse next to a crosshair, so the minimum is closed
-       in on the same way the aim solver does it. */
-    const seg = best.seg, frame = world.get(seg.body);
-    const at = tt => {
-      const local = propagate(frame.mu, seg.r0, seg.v0, tt - seg.t0);
-      const fr = absState(world, seg.body, tt);
-      const tg = absState(world, b.id, tt);
-      return { d: dist(add(fr.r, local.r), tg.r), rel: norm(sub(add(fr.v, local.v), tg.v)), local };
-    };
-    const span = (seg.t1 - seg.t0) / Math.max(1, (seg.scanTimes ?? seg.times).length - 1);
-    let lo = Math.max(seg.t0, best.t - span), hi = Math.min(seg.t1, best.t + span);
-    const phi = (Math.sqrt(5) - 1) / 2;
-    let x = hi - phi * (hi - lo), y = lo + phi * (hi - lo);
-    let fx = at(x).d, fy = at(y).d;
-    for(let i = 0; i < 40 && hi - lo > 1e-6; i++){
-      if(fx < fy){ hi = y; y = x; fy = fx; x = hi - phi * (hi - lo); fx = at(x).d; }
-      else{ lo = x; x = y; fx = fy; y = lo + phi * (hi - lo); fy = at(y).d; }
-    }
-    const t = (lo + hi) / 2, got = at(t);
-    out.set(b.id, {
-      segIndex: best.si, body: b.id, t, r: got.local.r,
-      distance: got.d, altitude: Math.max(0, got.d - (b.radius ?? 0)),
-      speed: got.rel, grazes: got.d <= (b.radius ?? 0),
-      inMouth: b.zoneRadius != null && got.d <= b.zoneRadius,
-      passing: true,
-    });
-  }
-  return [...out.values()].sort((a, c) => a.t - c.t);
 }
 
 export function planImmediate(state, flown = true, opts = {}){
@@ -1537,7 +1403,20 @@ export function planImmediate(state, flown = true, opts = {}){
       to: events.find(e => e.kind === 'soi' && Math.abs(e.t - sg.t1) < 1e-6)?.to ?? null,
     });
   });
-  const intercepts = interceptsOf(segments, crossed);
+  /* The encounter, if the road falls into one: inside a world's reach the ship
+     is on one conic about it, so the nearest point is that leg's periapsis —
+     solved, not sampled, and exact.
+
+     There used to be a second kind beside it: a sweep over every world in the
+     sky at every sample of the drawn road, marking any that the road happened
+     to pass near. It was meant as something to steer an approach by, and it
+     cost a quarter of every road solved to produce a crosshair that mostly
+     sat on a parking orbit saying how far away the planet below was. What a
+     pilot steers by is where a world will be when the road cuts its rail,
+     which the chart already draws, and what the road does once it arrives,
+     which is this. */
+  const exact = interceptOf(segments, crossed);
+  const intercepts = exact ? [exact] : [];
   return {
     ...pred, segments, events, end: endT, horizon,
     crossings,
