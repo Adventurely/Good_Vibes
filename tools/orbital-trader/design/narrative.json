@@ -44,6 +44,11 @@
    "term": "docking range",
    "plain": "docking zone",
    "tip": "Get into a steady orbit whose high point is inside this and you can dock. Generous, on purpose."
+  },
+  {
+   "term": "coming alongside",
+   "plain": "rendezvous",
+   "tip": "Some things out here have no pull at all, so there is no orbit to fall into: you arrive by being in the same place going the same speed. Near one of those, forward and back are measured against it rather than against the world you are going round, and out and in become away and toward."
   }
  ],
  "ports": {
@@ -358,10 +363,10 @@
     "id": "navigator",
     "name": "Navigator",
     "species": "cat",
-    "does": "Reads a rock an au off and tells you which way it is going.",
+    "does": "Reads a rock an au off, and can hold a ship still beside one.",
     "person": {
      "name": "Tsuki",
-     "line": "Can read a rock an au off and tell you which way it is going. Says almost nothing, and is always already looking at the thing you are about to point at. On her second day aboard she marks a point of empty sky between Tassel and the Belt and says: go round that one, not past it."
+     "line": "Can read a rock an au off and tell you which way it is going. Says almost nothing, and is always already looking at the thing you are about to point at. On her second day aboard she marks a point of empty sky between Tassel and the Belt and says: go round that one, not past it. She can also put a ship alongside something that is not holding still, which is a thing almost nobody can do."
     }
    },
    {
@@ -426,7 +431,8 @@
   "repairHull": "They put the ship on a cradle, walk round it twice, and tell you what it will cost before they tell you what is wrong. Then they fix it properly, which takes longer and is the reason you came here.",
   "repairFuelCell": "The cell comes out in one piece, which surprises everybody, and the new one goes in while you wait. The gauge goes back to telling the truth.",
   "knotRevealed": "Tsuki puts a finger on a stretch of chart with nothing in it and waits for you to stop arguing. There is something there a kilometre across with Grumm's pull in it, and the cats have known for nine generations. Fly close enough and it will turn you most of the way round for nothing. She does not say why nobody mentions it, and from the way she says nothing, it is not a secret so much as a courtesy.",
-  "firstKnotPass": "You go round the outside of nothing at all and come out pointed somewhere else entirely, faster, with the tank exactly as full as it was. Behind you the Knot goes on not being there."
+  "firstKnotPass": "You go round the outside of nothing at all and come out pointed somewhere else entirely, faster, with the tank exactly as full as it was. Behind you the Knot goes on not being there.",
+  "firstRendezvous": "Tsuki takes the numbers off the board without being asked: how close the path actually comes, and how fast you are closing. Neither is the range, which she says is the number people watch when they want to be reassured rather than informed. You match speed with a thing that has no pull at all and hold there, and the hold is the whole trick."
  },
  "opening": {
   "title": "A crate for your Aunt Nellie",
@@ -647,20 +653,20 @@
    "id": "enginetrouble",
    "title": "Engine Trouble",
    "giver": "Kiran of the Ninth Forge",
-   "type": "retrieval",
+   "type": "delivery",
    "from": "cinder",
-   "to": "slate",
+   "to": "scorch",
    "goods": [
     {
      "good": "engineparts",
-     "qty": 3
+     "qty": 2
     }
    ],
-   "pay": 1050,
+   "pay": 420,
    "rep": "emberkin",
    "crew": "engineer",
-   "blurb": "Three crates of spare parts for the Slate yards, and Kiran wants to ride along and see them fitted. He has been at the Ninth Forge eleven years and has run out of things there he has not already taken apart.",
-   "done": "The Slate shipwrights have the coil seated backwards. Kiran watches them do it for four minutes, says so in one sentence that nobody enjoys, and has it out and reseated before the argument can properly start. Afterwards he asks what your tank is rated at, hears the answer, and looks at you the way people look at a room they are thinking of taking. He does not get off the ship."
+   "blurb": "Two crates of spares for the pit crews on Scorch, and Kiran is coming with them. He has been at the Ninth Forge eleven years, has run out of things there he has not already taken apart, and has heard the hoists on Scorch are held together with wire and opinion.",
+   "done": "The big hoist has been running on a worn bearing for two seasons and every shift knew. Kiran has it apart in eleven minutes, says one sentence nobody enjoys, and puts it back together better than it left Cinder. Then he asks what your tank is rated at, hears the answer, and looks at you the way people look at a room they are thinking of taking. He does not get off the ship."
   },
   {
    "id": "engineerfavour",
@@ -772,20 +778,15 @@
    "id": "catsrequest",
    "title": "A Cat's Request",
    "giver": "Captain Kaede",
-   "type": "chain",
+   "type": "message",
    "from": "nail",
-   "to": "nail",
-   "stops": [
-    "nail",
-    "whisker",
-    "arc"
-   ],
+   "to": "whisker",
    "goods": [],
-   "pay": 1350,
+   "pay": 520,
    "rep": "cat",
    "crew": "navigator",
-   "blurb": "Kaede wants you to go and be seen. Nail, then Whisker, then the Arc, in that order, and come back and tell her who was where. She will not say why, and it is rude to ask a cat twice.",
-   "done": "She hears you out, nods once, and tells you what it was for. A cat from outside the Belt, flying a clean hull, seen at all three havens inside one run, is how you say the rocks are open without saying it. Somebody had been putting it about that they were not. Then she introduces you to Tsuki, who has been sitting behind you the whole time and who already knows what your ship is called."
+   "blurb": "Kaede wants a word carried to Whisker by hand, by somebody who is not a cat. It weighs nothing and it is not to be opened. She will not say what is in it, and it is rude to ask a cat twice.",
+   "done": "The cat who takes it reads it twice and then, to your surprise, tells you what it says. The rocks are open, and Kaede has put her name to that. The proof is a ship from outside the Belt getting into a clean orbit round both of them inside one run, which is the thing you have just spent a week doing. Then Tsuki comes down off the cradle where she has been sitting the whole time, and it turns out she already knows what your ship is called."
   },
   {
    "id": "medicinerun",

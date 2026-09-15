@@ -150,11 +150,10 @@ test('every body has what the kernel and the chart read', () => {
     // outside its own docking range.
     if(b.dockAlt) assert.ok(b.dockAlt < b.zoneRadius, `${b.id}: the harbour at ${b.dockAlt} is outside its own mouth ${b.zoneRadius}`);
   }
-  /* The two with no ground at all keep the mouth they were authored with:
-     there is no radius to take five of. Nail has ground now, so its mouth is
-     five radii over it like everybody's — which is the whole of the change
-     that turned it from a region of the Belt into a rock you have to hit. */
-  for(const id of ['whisker', 'maw']){
+  /* Nail and Whisker both have ground now, so their mouths are five radii over
+     it like everybody's. The Maw is the last thing in the sky with no radius
+     to take five of, and the last one you arrive at by matching speeds. */
+  for(const id of ['maw']){
     assert.ok(world.get(id).zoneRadius >= 1e-3, `${id} has no ground; its mouth stays the one it was given`);
   }
   /* Seventeen: the sixteen the setting names, and the Knot, which it does
@@ -1402,7 +1401,10 @@ test('the ship menu is the only one flying, and nothing load-bearing went with t
 
 test('the cost of a burn is shown against the fuel, not against the burn', () => {
   const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
-  assert.match(PLAY, /nodeLabel = n \? `\$\{S\.burnWords\(n\)\}/, 'the mark is labelled with a length of engine again');
+  /* The label is words, not a bare length of engine. It takes a second
+     argument now — the drifting thing the axes are measured against, when
+     there is one — so the guard checks the call rather than its arity. */
+  assert.match(PLAY, /nodeLabel = n \? `\$\{S\.burnWords\(n[,)]/, 'the mark is labelled with a length of engine again');
   assert.doesNotMatch(PLAY, /nodeLabel = `\$\{S\.fmtKms/, 'the old bare-magnitude label is back');
   assert.match(PLAY, /planned`/, 'the gauge does not say what the plan will spend');
   assert.match(PLAY, /id="h-dvplan"/, 'the gauge has no planned-spend segment');
@@ -2022,10 +2024,18 @@ test('a job of each kind builds the steps its kind earns', () => {
   assert.deepEqual(kinds(S.questById('tasteofhome')), ['handover'], 'delivery: it is already aboard');
   assert.deepEqual(kinds(S.questById('collector')), ['acquire', 'acquire', 'acquire', 'handover'], 'shopping: one step per line on the list');
   assert.deepEqual(kinds(S.questById('slatemessage')), ['handover'], 'message: just be there');
-  assert.deepEqual(kinds(S.questById('catsrequest')), ['visit', 'visit', 'visit', 'handover'], 'chain: one step per stop');
-  assert.deepEqual(S.questSteps(S.questById('catsrequest')).map(st => st.text),
+  assert.deepEqual(kinds(S.questById('catsrequest')), ['handover'], 'the cat\'s request is a message now, not a tour');
+
+  /* Chain is the one shape the catalogue no longer uses: Ashgrin's three-haven
+     tour became a hop next door so the navigator's berth fills early enough to
+     be worth having. The machinery is still here and still works, so it is
+     still checked — against a made-up job, which is the honest way to say that
+     nothing in the game is currently shaped like this. */
+  const tour = { id: 'x', type: 'chain', from: 'nail', to: 'nail', stops: ['nail', 'whisker', 'arc'], goods: [] };
+  assert.deepEqual(kinds(tour), ['visit', 'visit', 'visit', 'handover'], 'chain: one step per stop');
+  assert.deepEqual(S.questSteps(tour).map(st => st.text),
     ['Call at Nail', 'Call at Whisker', 'Call at The Arc', 'Report to Nail']);
-  assert.equal(S.questTarget(S.questById('catsrequest')), 'nail', 'a chain points at its first stop');
+  assert.equal(S.questTarget(tour), 'nail', 'a chain points at its first stop');
 
   // Authored wording wins where a quest bothers to write it.
   assert.equal(S.questSteps(S.questById('pebble'))[1].text, 'Bring it home to Tassel');
@@ -2462,21 +2472,59 @@ test('a harbour takes you when you are in a stable orbit close in, and not befor
   assert.equal(S.dockRefusal(st), 'too far out');
 });
 
+test('the two big rocks in the Belt are worlds you orbit', () => {
+  /* Nail and Whisker used to be gravity-less havens you pulled alongside. They
+     are the biggest rocks in the Belt now: small worlds with a reach, a ground
+     and a parking orbit, docked at the way everything else with mass is. */
+  for(const id of ['nail', 'whisker']){
+    const b = world.get(id);
+    assert.ok(b.mu > 0, `${id} has mass`);
+    assert.ok(b.soi > 0, `${id} has a reach`);
+    assert.ok(b.radius < b.dockAlt && b.dockAlt < b.zoneRadius, `${id}: ground < parking < mouth`);
+    assert.ok(b.port);
+    const s = S.newGame(2); S.undock(s); s.t = 1000;
+    parkAt(s, id);
+    const st = S.dockingStatus(s);
+    assert.equal(st.kind, 'orbit', `${id} is docked at by orbiting`);
+    assert.ok(S.dock(s).ok, `an orbit round ${id} is docking at it`);
+  }
+});
+
+test('the Maw is a rendezvous you need a navigator to finish', () => {
+  /* No mass, so no reach to fall into and nothing to catch a mistake: you
+     arrive by being in the same place going the same way, and holding a ship
+     there against nothing is the cat's trick the navigator's berth buys. */
+  const b = world.get('maw');
+  assert.equal(b.mu, 0);
+  assert.equal(b.soi, null, 'no gravity well');
+  assert.ok(b.driftReach > b.zoneRadius * 2, 'but a reach for the axes, and a large one');
+  assert.ok(b.port && b.zoneRadius > 0 && b.dockSpeed > 0);
+
+  const green = S.newGame(2);
+  S.undock(green); green.t = 1000;
+  parkAt(green, 'maw');
+  const st = S.dockingStatus(green);
+  assert.ok(st.inZone && st.slow, 'the approach itself is good');
+  assert.equal(st.ok, false);
+  assert.equal(S.dock(green).reason, 'no navigator', 'and it says which piece is missing');
+
+
 test('a rendezvous refuses on speed, and says so where the pilot is looking', () => {
-  /* The report this came from: "I got to Whisker and I cannot dock — it does
-     not have an SOI and I cannot dock without one." The harbour was working.
-     Whisker wants two things and only one of them was met: the ship was 33,000
-     km inside a 299,000 km mouth and going 5.6 km/s past it. What was missing
-     was the saying-so. The Ahead panel — which is the whole of the flight
-     panel now — listed nothing at all about the world the ship was sitting
-     inside, and the only mention on the screen was a grey twelve-pixel line in
-     the corner of the HUD. A player who has just learned that Nail has a reach
-     you fall into will conclude the place is broken, and be right to. */
-  const w = world.get('whisker');
+  /* From a playtest report: "I got to Whisker and I cannot dock — it does not
+     have an SOI and I cannot dock without one." The harbour was working. The
+     ship was well inside the mouth and going kilometres a second past it, and
+     nothing on screen said so except a grey line in the corner. A player will
+     conclude the place is broken, and be right to.
+
+     Whisker is a rock you orbit now, so the guard moved to the Maw, which is
+     the last rendezvous in the sky. The lesson it is guarding is the panel,
+     not the body. */
+  const w = world.get('maw');
   const lamp = world.get('lamp');
   const auDayPerMs = 1 / 1731481.5;
   const at = (offKm, relMs) => {
     const s = S.newGame(1); S.undock(s); s.t = 1000;
+    s.crew.navigator = { role: 'navigator' };   // the hands; the harbour is still the harbour
     const st = O.railState(w, lamp.mu, s.t);
     s.ship = { body: 'lamp', r: [st.r[0] + offKm / 1.496e8, st.r[1]], v: [st.v[0] + relMs * auDayPerMs, st.v[1]] };
     return S.dockingStatus(s);
@@ -2485,15 +2533,16 @@ test('a rendezvous refuses on speed, and says so where the pilot is looking', ()
   assert.ok(limit > 900 && limit < 1100, `the speed it asks for is about a km/s (${limit.toFixed(0)} m/s)`);
   assert.equal(w.soi, null, 'and it has no reach at all, which is the point');
 
-  const fast = at(33000, 5600);
-  assert.equal(fast.port, 'whisker');
+  const mouthKm = w.zoneRadius * 1.496e8;
+  const fast = at(mouthKm * 0.1, 5600);
+  assert.equal(fast.port, 'maw');
   assert.equal(fast.ok, false, 'five and a half km/s past it is not an arrival');
   assert.ok(fast.inZone, 'but it is inside the mouth, which is the half that was met');
   assert.equal(S.dockRefusal(fast), 'too fast');
 
-  assert.equal(at(33000, 900).ok, true, 'matched speed inside the mouth is a docking');
-  assert.equal(at(250000, 900).ok, true, 'and the mouth really is that wide');
-  assert.equal(at(400000, 100).ok, false, 'outside it, slow is not enough');
+  assert.equal(at(mouthKm * 0.1, 900).ok, true, 'matched speed inside the mouth is a docking');
+  assert.equal(at(mouthKm * 0.8, 900).ok, true, 'and the mouth really is that wide');
+  assert.equal(at(mouthKm * 1.4, 100).ok, false, 'outside it, slow is not enough');
 
   /* And the panel has to lead with it. This is the one state in the game where
      the ship is somewhere it wants to be and doing the wrong thing about it. */
@@ -2505,33 +2554,9 @@ test('a rendezvous refuses on speed, and says so where the pilot is looking', ()
   assert.match(PLAY, /#dockhint\.near\{/, 'inside the mouth and merely too fast still reads as "nowhere near it"');
 });
 
-test('the belt havens and the Maw are rendezvous zones you match speeds with', () => {
-  /* Nothing to fall towards, or so little it makes no difference: you arrive
-     by being in the same place going the same way, which is what a harbour
-     mouth is for. Whisker and the Maw have no mass at all. Nail has a little —
-     it is a four-hundred-kilometre rock — but fifty metres a second of escape
-     is not an orbit anybody waits in, so its harbour asks the same two
-     questions theirs do. */
-  for(const id of ['whisker', 'maw']){ const b = world.get(id); assert.equal(b.mu, 0); assert.equal(b.soi, null); }
-  for(const id of ['nail', 'whisker', 'maw']){
-    const b = world.get(id);
-    assert.ok(b.rendezvous, `${id} should be a rendezvous`);
-    assert.ok(b.port); assert.ok(b.zoneRadius > 0);
-  }
-  /* And every other port is the other kind, or the orbit rule has quietly
-     stopped applying to the worlds it was written for. */
-  for(const id of ['tassel', 'slate', 'moss', 'cinder', 'veyra', 'grumm', 'haven', 'arc']){
-    assert.equal(world.get(id).rendezvous, false, `${id} should be tied up at in orbit`);
-  }
-  const s = S.newGame(2);
-  S.undock(s);
-  s.t = 1000;
-  parkAt(s, 'nail');
-  assert.ok(S.dock(s).ok, 'matching speeds with Nail is docking at it');
-  // And the Maw says its piece to a first visitor, which is the whole of it.
   const far = S.newGame(2);
-  S.undock(far);
-  far.t = 1000;
+  S.undock(far); far.t = 1000;
+  far.crew.navigator = { role: 'navigator' };
   parkAt(far, 'maw');
   const r = S.dock(far);
   assert.ok(r.ok && far.flags.mawArrival, 'the Maw had nothing to say');
@@ -2614,27 +2639,27 @@ test('the crosshair is there while the burn is still wrong, which is when it is 
   s.nodes[0].prograde = good;
 });
 
-test('Nail is a rock you match speeds with, and the road to it is flown on the mark', () => {
+test('Nail is a rock you orbit, and the road to it is flown on the mark', () => {
   /* Nail used to be a three-hundred-thousand-kilometre bubble in the Belt: fly
-     roughly at the Belt and you were docked. It is a four-hundred-kilometre
-     rock now with a harbour mouth like everybody else's, so getting there is a
-     real approach — and with three millimetres a second of gravity at the
-     ground there is nothing to fall into, so the approach is a rendezvous:
-     match the position and match the speed. */
+     roughly at the Belt and you were docked. It is a four-hundred-and-fifty
+     kilometre rock now with a harbour mouth like everybody else's, so getting
+     there is a real approach — and enough weight that the approach ends the
+     way every other approach does, by getting into an orbit. */
   const n = world.get('nail');
   const KM = 1.496e8;
-  assert.ok(n.mu > 0, 'it has weight now');
-  assert.ok(Math.abs(n.radius * KM - 400) < 1, `400 km of rock, not ${(n.radius * KM).toFixed(0)}`);
+  assert.ok(n.mu > 0, 'it has weight');
+  assert.ok(Math.abs(n.radius * KM - 449) < 2, `about 450 km of rock, not ${(n.radius * KM).toFixed(0)}`);
   const vEsc = Math.sqrt(2 * n.mu / n.radius) * S.KMS * 1000;
-  assert.ok(vEsc > 20 && vEsc < 90, `escape is a hard jump, not an orbit (${vEsc.toFixed(0)} m/s)`);
+  assert.ok(vEsc > 400, `enough to hold an orbit worth waiting in (${vEsc.toFixed(0)} m/s escape)`);
+  assert.equal(n.rendezvous, false, 'so its harbour is an orbit, not a rendezvous');
   assert.ok(n.soi > n.zoneRadius, 'its reach still contains its own harbour');
   assert.ok(n.zoneRadius * KM < 5000, `the mouth is a harbour mouth now (${(n.zoneRadius * KM).toFixed(0)} km)`);
 
   /* The two-step the mouth forces, and the reason the mark matters. Out of a
      Tassel parking orbit the helper can only set the road up — one mark inside
-     a planet's reach cannot also thread a 2400 km window most of an AU away —
-     and what the pilot has to steer by in between is the crosshair. Once the
-     ship is out in the Lamp's frame the same helper closes it. */
+     a planet's reach cannot also thread a few-thousand-kilometre window most
+     of an AU away — and what the pilot steers by in between is the crosshair.
+     Once the ship is out in the Lamp's frame the same helper closes it. */
   const s = S.newGame(7);
   s.dockedAt = 'tassel'; S.undock(s);
   s.dv = s.tank = S.auDay(60);
@@ -2646,18 +2671,18 @@ test('Nail is a rock you match speeds with, and the road to it is flown on the m
   while(s.ship.body !== 'lamp' && guard++ < 40000){ S.tick(s, 0.05); if(s.pending) break; }
   assert.equal(s.ship.body, 'lamp', 'the ship never got out of Tassel\'s reach');
   const close = S.trimToTarget(s, 'nail', 6000);
-  assert.ok(close.ok && close.distance <= n.zoneRadius,
-    `the second aim should arrive: ${(close.distance * KM).toFixed(0)} km of a ${(n.zoneRadius * KM).toFixed(0)} km mouth`);
+  assert.ok(close.ok && close.distance <= n.soi,
+    `the second aim should arrive: ${(close.distance * KM).toFixed(0)} km of a ${(n.soi * KM).toFixed(0)} km reach`);
   assert.ok(close.cost < S.auDay(0.5), `and cost a nudge, not a transfer (${S.fmtKms(close.cost)})`);
 
-  /* And arriving is tying up: no orbit to capture into, just the two numbers. */
+  /* And arriving is capturing: an orbit inside the mouth, like anywhere else. */
   const park = S.newGame(7);
   S.undock(park); park.t = 1000;
-  park.ship = { body: 'nail', r: [n.zoneRadius * 0.5, 0, 0], v: [0, 0, 0] };
+  parkAt(park, 'nail');
   const st = S.dockingStatus(park);
   assert.equal(st?.port, 'nail');
-  assert.equal(st.kind, 'zone', 'Nail is come alongside, not orbited');
-  assert.ok(S.dock(park).ok, 'matching speeds with Nail is docking at it');
+  assert.equal(st.kind, 'orbit', 'Nail is orbited, not come alongside');
+  assert.ok(S.dock(park).ok, 'an orbit round Nail is docking at it');
 });
 
 test('aiming turns a rough plan into an arrival, everywhere in Tassel\'s system', () => {
@@ -3381,4 +3406,153 @@ test('a slot describes itself for the title screen', () => {
   assert.equal(S.slotSummary(docked).where, S.portName('tassel'));
   assert.match(S.slotSummary(docked).text, /docked at /);
   assert.equal(S.slotSummary(null), null);
+});
+
+test('both crew berths fill on a local hop, early', () => {
+  /* A crew member is a mechanic: the engineer gates the deep-sky tank, the
+     navigator puts the Knot on the chart. Handed over in the last hour they
+     are a trophy rather than a tool, so both quests are hops now. */
+  const eng = S.questById('enginetrouble');
+  assert.equal(eng.from, 'cinder');
+  assert.equal(eng.to, 'scorch');
+  assert.equal(eng.type, 'delivery', 'handed to you, so it needs no capital');
+  assert.equal(S.questLeavesSystem(eng), false, 'Scorch is Cinder\'s own moon: no Astrolabe');
+
+  const nav = S.questById('catsrequest');
+  assert.equal(nav.from, 'nail');
+  assert.equal(nav.to, 'whisker');
+  assert.equal(S.questLoad(nav), 0, 'a message costs no hold');
+
+  /* And both actually pay out a person when flown. */
+  for(const [q, berth] of [[eng, 'engineer'], [nav, 'navigator']]){
+    const s = S.newGame(3);
+    s.keys.astrolabe = true;
+    s.dockedAt = q.from;
+    assert.ok(S.canAcceptQuest(s, q).ok, `${q.id} can be taken at ${q.from}`);
+    assert.ok(S.acceptQuest(s, q.id).ok);
+    s.dockedAt = q.to;
+    S.questCheck(s, []);
+    assert.ok(s.quests.find(l => l.id === q.id)?.done, `${q.id} completes at ${q.to}`);
+    assert.ok(s.crew[berth], `${q.id} fills the ${berth} berth`);
+  }
+  /* The berth is the whole reward, and the navigator's brings two abilities
+     that were previously out of reach until very late. */
+  const crewed = S.newGame(3);
+  crewed.crew.navigator = { role: 'navigator' };
+  assert.equal(S.knowsKnot(crewed), true);
+  assert.equal(S.canSeePast(crewed), true);
+});
+
+test('a stock ship can capture at both rocks and get away again', () => {
+  /* Giving them mass makes arrival a manoeuvre rather than a drift, which is
+     the point — but it must not price the Belt out of a starter tank. */
+  for(const id of ['nail', 'whisker']){
+    const b = world.get(id);
+    const vc = Math.sqrt(b.mu / b.dockAlt);
+    const esc = Math.sqrt(b.mu * (2 / b.dockAlt - 1 / ((b.dockAlt + b.soi) / 2))) - vc;
+    assert.ok(S.kms(esc) < 1.0, `${id}: leaving costs ${S.kms(esc).toFixed(3)} km/s`);
+    assert.ok(S.kms(vc) < 1.0, `${id}: a parked orbit runs at ${S.kms(vc).toFixed(3)} km/s`);
+    /* And the mouth is wide enough to aim at: several times the ground. */
+    assert.ok(b.zoneRadius / b.radius >= 5, `${id}: mouth is ${(b.zoneRadius / b.radius).toFixed(1)} radii`);
+  }
+});
+
+/* ---------------------------------------------------- flying a rendezvous */
+
+test('a drifting thing has a reach that bends thrust and nothing else', () => {
+  const maw = world.get('maw');
+  assert.equal(maw.mu, 0, 'no gravity');
+  assert.equal(maw.soi, null, 'and so no gravitational reach');
+  assert.ok(maw.driftReach > maw.zoneRadius, 'but a reach all the same, and a large one');
+
+  const lamp = world.get('lamp');
+  const t = 2000;
+  const m = O.railState(maw, lamp.mu, t);
+  const inside = [m.r[0] + maw.driftReach * 0.2, m.r[1]];
+  const outside = [m.r[0] + maw.driftReach * 2, m.r[1]];
+  assert.ok(O.driftTargetAt(world, 'lamp', inside, t), 'inside the reach');
+  assert.equal(O.driftTargetAt(world, 'lamp', outside, t), null, 'and outside it');
+
+  /* The reach does nothing to the path: a ship coasting through it is on the
+     same conic it would be on if the Maw were not there. */
+  const s = S.newGame(6); S.undock(s); s.t = t; s.nodes = [];
+  s.ship = { body: 'lamp', r: inside, v: [m.v[0] + 0.002, m.v[1] + 0.001] };
+  const before = O.elementsFromState(lamp.mu, s.ship.r, s.ship.v);
+  S.tick(s, 0.5);
+  const after = O.elementsFromState(lamp.mu, s.ship.r, s.ship.v);
+  assert.ok(Math.abs(after.a - before.a) / before.a < 1e-6, 'coasting through changed the orbit');
+  assert.equal(s.ship.body, 'lamp', 'and never captured it');
+});
+
+test('inside the reach, the axes are measured against the target', () => {
+  const lamp = world.get('lamp'), maw = world.get('maw'), t = 2000;
+  const m = O.railState(maw, lamp.mu, t);
+  const r = [m.r[0] + 0.004, m.r[1] + 0.002];
+  const v = [m.v[0] - 0.0005, m.v[1] + 0.0003];
+
+  const f = O.frameAt(world, 'lamp', r, v, t);
+  const vRel = O.sub(v, m.v), away = O.sub(r, m.r);
+  /* Forward is along the speed relative to it, not along the orbit. */
+  assert.ok(Math.abs(O.dot(f.pro, O.unit(vRel)) - 1) < 1e-9, 'forward is relative prograde');
+  /* The second axis points at it — out is away, in is toward. */
+  assert.ok(O.dot(f.out, away) > 0, 'out is away from the target');
+  /* And they are still at right angles, which is what makes a mark cost the
+     hypotenuse of its own two numbers. */
+  assert.ok(Math.abs(O.dot(f.pro, f.out)) < 1e-12, 'the axes lean');
+
+  /* Well outside, it is the ordinary frame again. */
+  const farR = [m.r[0] + maw.driftReach * 3, m.r[1]];
+  const plain = O.frameAt(world, 'lamp', farR, v, t);
+  const ordinary = O.burnFrame(farR, v);
+  assert.ok(Math.abs(O.dot(plain.pro, ordinary.pro) - 1) < 1e-12, 'outside the reach nothing changed');
+});
+
+test('the two marks do the two jobs a rendezvous needs', () => {
+  const lamp = world.get('lamp'), t = 2000;
+  const m = O.railState(world.get('maw'), lamp.mu, t);
+  const make = () => {
+    const s = S.newGame(6); S.undock(s); s.t = t; s.dv = s.tank;
+    s.crew.navigator = { role: 'navigator' };
+    s.ship = { body: 'lamp', r: [m.r[0] + 0.004, m.r[1] + 0.002], v: [m.v[0] - 0.0005, m.v[1] + 0.0003] };
+    s.nodes = [];
+    return s;
+  };
+  const fly = s => { for(let i = 0; i < 8; i++) S.tick(s, 0.005); return S.rendezvous(s); };
+
+  const a = make(), start = S.rendezvous(a);
+  assert.ok(start && start.closing, 'the ship is closing on it');
+  a.nodes = [{ t: a.t + 0.01, prograde: -start.speed * 0.6, radial: 0 }];
+  const slowed = fly(a);
+  assert.ok(slowed.speed < start.speed * 0.5, `back should kill relative speed: ${S.fmtKms(start.speed)} -> ${S.fmtKms(slowed.speed)}`);
+
+  const b = make();
+  b.nodes = [{ t: b.t + 0.01, prograde: 0, radial: -start.speed * 0.15 }];
+  const steered = fly(b);
+  assert.ok(steered.atIntercept < start.atIntercept, 'toward should tighten the pass');
+  assert.ok(Math.abs(steered.speed - start.speed) / start.speed < 0.1,
+    'and should barely touch the speed along the track');
+});
+
+test('the navigator is the instruments, not the physics', () => {
+  const lamp = world.get('lamp'), t = 2000;
+  const m = O.railState(world.get('maw'), lamp.mu, t);
+  const at = nav => {
+    const s = S.newGame(6); S.undock(s); s.t = t;
+    if(nav) s.crew.navigator = { role: 'navigator' };
+    s.ship = { body: 'lamp', r: [m.r[0] + 0.004, m.r[1]], v: [m.v[0], m.v[1] + 0.0004] };
+    s.nodes = [];
+    return s;
+  };
+  const green = at(false), crewed = at(true);
+  /* The axes bend for everybody: she does not change how a ship flies. */
+  const f1 = O.frameAt(world, 'lamp', green.ship.r, green.ship.v, t);
+  const f2 = O.frameAt(world, 'lamp', crewed.ship.r, crewed.ship.v, t);
+  assert.deepEqual(f1, f2, 'the frame is the same with or without her');
+  /* What she brings is the two numbers, and the docking they make possible. */
+  assert.equal(S.rendezvous(green).instruments, false);
+  assert.equal(S.rendezvous(crewed).instruments, true);
+  const rv = S.rendezvous(crewed);
+  assert.ok(Number.isFinite(rv.atIntercept) && Number.isFinite(rv.speed), 'both readouts are numbers');
+  assert.equal(S.canDockDrifting(green), false);
+  assert.equal(S.canDockDrifting(crewed), true);
 });

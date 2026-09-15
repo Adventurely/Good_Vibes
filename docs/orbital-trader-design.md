@@ -78,11 +78,11 @@ Two consequences are worth stating plainly, because the formula means different 
 
 On the chart the mouth is a dashed ring with **a small anchor hung at the top of it**, green where they will take your lines and amber where they will not yet. The anchor is there because a dashed circle round a world is the same shape as three other things the chart draws — a sphere of influence, an atmosphere, a hollow rock — and this is the only one you can tie up inside.
 
-**Two kinds of harbour.** At most worlds, tying up means being in orbit: the mouth is a circle your whole orbit has to fit inside, gravity holds you there, and getting captured is the manoeuvre. A **rendezvous** is the other kind — no orbit to wait in, so the harbour asks the two questions it always asked instead: near enough, and slow enough beside it. Whisker and the Maw are rendezvous because they have no mass at all; their radius is a dot on a chart rather than a ground, so they keep the authored mouths the five-radii formula has nothing to act on.
+**Two kinds of harbour.** At most worlds, tying up means being in orbit: the mouth is a circle your whole orbit has to fit inside, gravity holds you there, and getting captured is the manoeuvre. A **rendezvous** is the other kind — no orbit to wait in, so the harbour asks the two questions it always asked instead: near enough, and slow enough beside it. Which one a place uses is authored (`harbour: "rendezvous"`) rather than derived, because it is a fact about the yards and not a consequence of the mass; a body with no mass at all is a rendezvous by default, having no orbit to offer.
 
-**Nail is the interesting case, and it is authored rather than derived.** It is a four-hundred-kilometre rock with real weight — three millimetres a second squared at the ground, fifty metres a second of escape, a hard jump — so it has a reach, a harbour mouth five radii over the ground like everybody else's, and a parking orbit you can genuinely sit in. But nobody waits in an orbit that slow, and its yards are bolted to the rock rather than riding above it, so its harbour is a rendezvous. That is a fact about the place, not a consequence of the mass, which is why it is a field in the table (`harbour: "rendezvous"`) and not a threshold somebody picked.
+**Nail and Whisker are worlds you orbit.** They are the two biggest rocks in the Belt — 449 km and 329 km — with real weight, a reach, a mouth five radii over the ground like everybody else's, and a parking orbit you sit in. That was a deliberate choice over making them rendezvous harbours: the run out to them is the lesson the two crew quests are hung on, and the lesson is the tutorial's own skill — get into an orbit, bring the high point inside the mouth — asked for again somewhere it matters. The change matters more than the numbers suggest. Nail used to be a three-hundred-thousand-kilometre bubble in the Belt: aim vaguely at the Belt and you were docked. Its mouth is 2700 km now, which makes reaching it a real approach.
 
-The change matters more than the numbers suggest. Nail used to be a three-hundred-thousand-kilometre bubble in the Belt: aim vaguely at the Belt and you were docked. Its mouth is 2400 km now, which makes reaching it a real approach — and because there is nothing to fall into, **the intercept mark is the instrument you fly it on**. See §2.6.1.
+**The Maw is the one rendezvous left.** It has no surface to stand five radii off and no air over it, so it keeps the authored mouth the five-radii formula has nothing to act on, and a pilot arrives by matching speeds. Because there is nothing to fall into, **the intercept mark is the instrument you fly it on**. See §2.6.1.
 
 This is a scope decision as much as a fictional one. Landing would need a second control scheme, a second set of physics, and a second art problem, and it would buy nothing the orbital game does not already have. The fiction absorbs it easily: Tassel is an ocean of floating harbour cities that meet ships in orbit, the cats cannot survive a heavy world at all, and the frogs' balloon villages have no ground under them either.
 
@@ -762,14 +762,14 @@ before it can be asked for.
 | 3 | Green Medicine | Retrieval | Moss: retrieve medicinal herbs → Tassel | Credits |
 | 4 | A Message for Slate | Message | Tassel → Slate | Credits |
 | 5 | The Heavy Stuff | Delivery | Slate → Cinder: deliver iron ore | Credits |
-| 6 | Engine Trouble | Retrieval | Cinder: retrieve spare engine parts → Slate | **Emberkin Engineer** |
+| 6 | Engine Trouble | Delivery | Cinder: spares → Scorch, its own moon | **Emberkin Engineer** |
 | 7 | A Favor for an Engineer | Message | Cinder → Scorch: deliver a message | Credits / faction reputation |
 | 8 | Emberkin Luxury | Retrieval | Scorch: retrieve fire crystals → Veyra | Credits |
 | 9 | The Collector | Shopping List | Veyra: acquire pearls, coral carvings, precision clock | Large payout |
 | 10 | Faction Business | Message | Veyra → Cinder: deliver confidential message | Faction reputation |
 | 11 | Into the Belt | Delivery | Cinder → Nail: deliver reactor coils | Credits |
 | 12 | Something Shiny | Retrieval | Nail: retrieve salvaged sensors → Veyra | Credits |
-| 13 | A Cat's Request | Quest Chain | Nail → several cat settlements | **Cat Navigator** |
+| 13 | A Cat's Request | Message | Nail → Whisker, the rock next door | **Cat Navigator** |
 | 14 | First Salvage | Salvage | With the cat navigator: recover a drifting wreck | Salvage + credits *(not built)* |
 | 15 | Lost Cargo | Salvage | Belt: intercept a derelict cargo ship | Salvage *(not built)* |
 | 16 | Medicine Run | Delivery | Nail → Brine: deliver medicinal supplies | Credits |
@@ -848,6 +848,25 @@ Every quest names the port it is offered at, so a board has something to read.
 and the opening errand is the only one a player can take, because there is
 nowhere to press. That is the last piece.
 
+### 5.1.2 The two early berths
+
+Both crew quests were long hauls and a player reached them late. A crew member
+is a mechanic — the engineer's berth is what the deep-sky tank is gated on, the
+navigator's is what puts the Knot on the chart and the second crossing on the
+road — and a mechanic handed over in the last hour is one nobody gets to use.
+
+So both are local hops now. **Engine Trouble** is a delivery from Cinder to
+Scorch, its own moon, which needs no Astrolabe because it never leaves Cinder's
+sky and needs no capital because a delivery is handed to you. **A Cat's
+Request** is a message from Nail to Whisker, which weighs nothing and costs no
+hold. Neither asks the player to cross the system for a person they have not
+met yet.
+
+The pair also carry the lesson for the change under them: Nail and Whisker have
+mass now, so both runs are flown by getting into an orbit round a small world
+and bringing the high point inside the mouth — the same skill the tutorial
+teaches at Slate, asked for again somewhere it matters.
+
 ### 5.2 What the Line Needs That the Game Does Not Have
 
 1. ~~**Crew as a reward.**~~ Done, as far as the line needs. Three of the
@@ -898,7 +917,7 @@ parts to Slate, fire crystals to Veyra (who love them), reactor coils to Nail
 
 ## 6. Technical Notes
 
-**Decided since the first draft.** Reaches are computed from mass and harbour mouths from size rather than written down (2.1, 2.3), and the invariant checker proves the promises a hand-tuned table used to make. The Belt is decorative — a field of drawn rocks — but Nail is not one of them: it is a body with a well, a reach and a mouth like any other, and only its *harbour* is a rendezvous. Whisker and the Maw are still massless zones with an authored mouth, and the Arc is a small body you orbit.
+**Decided since the first draft.** Reaches are computed from mass and harbour mouths from size rather than written down (2.1, 2.3), and the invariant checker proves the promises a hand-tuned table used to make. The Belt is decorative — a field of drawn rocks — but Nail and Whisker are not two of them: they are bodies with wells, reaches and mouths like any other, and are docked at in orbit. The Arc is a small body you orbit too. The Maw is the last massless zone with an authored mouth, and it carries a *drift reach* four times that mouth which has no effect on any path at all: inside it the burn axes are measured against the target instead of against the Lamp, so forward and back are relative closing speed and out and in are away and toward. Holding a ship there against nothing is what the cat navigator's berth buys, along with the two numbers it is flown on — distance at intercept and relative speed.
 
 **Still to tune.** Gravity-assist approaches at Grumm, and the Δv ladder between the tanks now that the map has been respaced.
 
@@ -923,8 +942,8 @@ berth fills with a name, a species, a portrait and a line:
 
 | Berth | Who | People | From |
 |---|---|---|---|
-| Engineer | Kiran (he) | Emberkin | #6 Engine Trouble |
-| Navigator | Tsuki (she) | Cats | #13 A Cat's Request |
+| Engineer | Kiran (he) | Emberkin | #6 Engine Trouble (Cinder → Scorch) |
+| Navigator | Tsuki (she) | Cats | #13 A Cat's Request (Nail → Whisker) |
 | Appraiser | Wicket (he) | Frogs | #19 Appraisal |
 
 `state.crew` carries a slot per berth, null until earned and then `{ role,

@@ -672,6 +672,10 @@
   <div class="stat"><small>Coin</small><b id="h-money">—</b></div>
   <div class="stat"><small>Hold</small><b id="h-hold">—</b></div>
   <div class="stat" id="clock-stat" hidden><small>Clock</small><b id="h-warp">—</b></div>
+  <!-- What a cat navigator is for: not the range now, which says nothing about
+       whether you arrive, but how close the path actually comes and how fast
+       you are closing. Only drawn with her aboard and only near a drift. -->
+  <div class="stat" id="rv-stat" hidden><small>Rendezvous</small><b id="h-rv">—</b></div>
   <div class="stat" id="where"><small>Where</small><b id="h-where">—</b><span id="dockhint"></span></div>
 </header>
 <a id="back" href="./">&larr; title</a>
@@ -908,7 +912,8 @@ function refreshNodeLabel(){
   /* Direction words, not a length. "0.12 km/s" is the fuel this will burn,
      and two playtesters braking at Slate read it as their speed and were
      baffled that pressing Back made it climb. The fuel is on the gauge. */
-  nodeLabel = n ? `${S.burnWords(n)} · in ${S.fmtDays(n.t - state.t)}` : null;
+  const rvNow = S.rendezvous(state);
+  nodeLabel = n ? `${S.burnWords(n, rvNow ? S.portName(rvNow.target) : null)} · in ${S.fmtDays(n.t - state.t)}` : null;
 }
 function frame(now){
   const real = Math.min(0.1, (now - last) / 1000);
@@ -1031,6 +1036,21 @@ function handleEvents(events){
 
 /* ------------------------------------------------------------- HUD */
 
+/* Distance at intercept and relative speed, which are the two numbers a
+   rendezvous is actually flown on. Without a navigator the ship is still in
+   the reach and the axes still point at the target — she is the instruments,
+   not the physics — so the readout is hers and the flying is not. */
+function showRendezvous(){
+  const box = $('rv-stat');
+  const rv = S.rendezvous(state);
+  if(!rv || !rv.instruments){ box.hidden = true; return; }
+  box.hidden = false;
+  const miss = rv.closing ? fmtAu(rv.atIntercept) : fmtAu(rv.range) + ' (opening)';
+  $('h-rv').textContent = `${miss} · ${S.fmtKms(rv.speed)}`;
+  box.title = `Closest the path comes to ${S.portName(rv.target)}, and how fast you are closing.`
+    + (rv.timeToIntercept != null ? ` Nearest in ${S.fmtDays(rv.timeToIntercept)}.` : '');
+}
+
 function showHazard(){
   const box = $('h-hazard'), skim = $('haz-skim'), crash = $('haz-crash');
   const ground = hazard.crash, air = hazard.skim;
@@ -1056,6 +1076,7 @@ function showHazard(){
 function renderHud(docking){
   showHazard();
   refreshFarButton();
+  showRendezvous();
   /* The tank, and what the plan will take out of it. The cost of a burn is
      shown here and nowhere near the burn itself: it is a length of fuel, and
      next to a mark it read as a speed — which made pressing Back to slow down
@@ -2279,7 +2300,23 @@ const actions = {
 
 function doDock(){
   const r = S.dock(state);
-  if(!r.ok){ toast(r.reason === 'too fast' ? 'Too fast to dock. Kill some speed first.' : 'No port nearby.', 'bad'); return; }
+  if(!r.ok){
+    /* Every refusal says the next thing to do. This used to answer "too fast"
+       and call everything else "No port nearby", which was survivable while
+       the only orbital harbours were worlds you already knew; now that the two
+       big rocks are docked at by orbiting, a player meets "not in orbit" and
+       "that orbit goes through it" early and often. */
+    const WHY = {
+      'too fast': 'Too fast to come alongside. Match its speed first.',
+      'too far': 'Not close enough yet.',
+      'not in orbit': 'Get into an orbit round it first.',
+      'that orbit goes through it': 'That orbit goes through the ground. Raise the low point.',
+      'too far out': 'The high point is outside docking range. Bring it in.',
+      'no navigator': 'Nothing here is holding still, and nobody aboard can hold the ship against it. A cat navigator can.',
+    };
+    toast(WHY[r.reason] ?? 'No port nearby.', 'bad', r.reason === 'no navigator' ? 7000 : 4000);
+    return;
+  }
   stopSkip();
   selectedNode = -1; replan(true); panelMenu = 'dock'; tab = 'market'; renderTabs(); setTab('market');
   const txt = TEXT.ports[r.port];

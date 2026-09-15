@@ -628,7 +628,7 @@ export function advance(world, ship, t, dt, nodes = [], opts = {}){
       r = s.r; v = s.v; now += span;
     }
     if(nodeNext && Math.abs(now - nodeNext.t) <= T_TOL + 1e-12){
-      const burn = burnVector(r, v, nodeNext, opts.dvAvailable);
+      const burn = burnVector(r, v, nodeNext, opts.dvAvailable, frameAt(world, body.id, r, v, now));
       v = add(v, burn.dv);
       events.push({ kind: 'burn', t: now, node: nodeNext, dv: burn.dv, magnitude: burn.magnitude, short: burn.short, body: body.id });
       if(opts.dvAvailable != null) opts.dvAvailable = Math.max(0, opts.dvAvailable - burn.magnitude);
@@ -662,11 +662,56 @@ export function burnFrame(r, v){
   return dot(out, r) < 0 ? { pro, out: scale(out, -1) } : { pro, out };
 }
 
+/* Something with no gravity still gets a reach — it just does nothing to your
+ * path. Inside it the burn axes stop being about the world you are going round
+ * and start being about the thing you are trying to come alongside: forward is
+ * along your speed *relative to it*, and out is away from it. That is the whole
+ * of the effect, and it is the whole of what a rendezvous is.
+ *
+ * The reach is deliberately far larger than the object, because the object is
+ * a dot and the flying is done a long way off it.
+ *
+ * Note this is `burnFrame` again, handed relative position and relative
+ * velocity instead of absolute ones. Doing it that way rather than inventing a
+ * "toward the target" axis keeps the two axes at right angles, which is what
+ * makes a mark cost the hypotenuse of its own two numbers — see the note above
+ * burnFrame for the three bugs that invariant was bought with. */
+export function driftTargetAt(world, bodyId, r, t){
+  const parent = world.get(bodyId);
+  if(!parent) return null;
+  let best = null;
+  for(const c of world.children(bodyId)){
+    /* Keyed on the harbour rather than the mass: a rock can carry enough pull
+       to have a reach and still be a thing you come alongside, and that one
+       should fly relative too. */
+    if(!c.rendezvous || !(c.driftReach > 0)) continue;
+    const st = railState(c, parent.mu, t);
+    const d = norm(sub(r, st.r));
+    if(d > c.driftReach) continue;
+    if(!best || d < best.distance) best = { id: c.id, r: st.r, v: st.v, distance: d, reach: c.driftReach };
+  }
+  return best;
+}
+
+/* The frame a burn at (r, v) is actually written in: relative to a drifting
+ * thing when the ship is inside one's reach, and to the world it is going
+ * round otherwise. */
+export function frameAt(world, bodyId, r, v, t){
+  const tgt = world && bodyId ? driftTargetAt(world, bodyId, r, t) : null;
+  if(!tgt) return burnFrame(r, v);
+  const vRel = sub(v, tgt.v);
+  /* Speeds already matched: there is no relative forward to measure from, so
+     fall back rather than hand back a basis made of NaN. A ship this still is
+     one that should be tying up, not burning. */
+  if(!(norm(vRel) > 1e-12)) return burnFrame(r, v);
+  return burnFrame(sub(r, tgt.r), vRel);
+}
+
 /* A node's burn as a vector in the current frame. If the tank cannot cover it,
  * the burn is scaled down to what there is and flagged: the design says a
  * short tank costs time, never the save. */
-export function burnVector(r, v, node, dvAvailable){
-  const { pro, out } = burnFrame(r, v);
+export function burnVector(r, v, node, dvAvailable, frame){
+  const { pro, out } = frame ?? burnFrame(r, v);
   let dv = add(scale(pro, node.prograde || 0), scale(out, node.radial || 0));
   let magnitude = norm(dv);
   let short = false;
@@ -703,9 +748,9 @@ export const nodeMagnitude = node => Math.hypot(node.prograde || 0, node.radial 
  *
  * The one thing with no answer is a ship with no velocity, which has no
  * forward to measure from. Callers still check. */
-export function nodeFromVector(r, v, dv){
+export function nodeFromVector(r, v, dv, frame){
   if(!(norm(v) > 0)) return null;
-  const { pro, out } = burnFrame(r, v);
+  const { pro, out } = frame ?? burnFrame(r, v);
   return { prograde: dot(dv, pro), radial: dot(dv, out) };
 }
 
@@ -755,7 +800,7 @@ export function predict(world, ship, t0, nodes = [], horizon = 720, opts = {}){
     }
     if(step.reason === 'burn'){
       const node = nodes[ni];
-      const burn = burnVector(step.r, step.v, node, o.dvAvailable);
+      const burn = burnVector(step.r, step.v, node, o.dvAvailable, frameAt(world, body.id, step.r, step.v, step.t));
       const vNew = add(step.v, burn.dv);
       if(o.dvAvailable != null) o.dvAvailable = Math.max(0, o.dvAvailable - burn.magnitude);
       dvTotal += burn.magnitude;
