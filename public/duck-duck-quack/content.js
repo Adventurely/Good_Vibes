@@ -31,7 +31,18 @@ export const PIT_Y = SCENE_H + 60;
 
 /* ------------------------------------------------------------- the physics */
 
-export const TICK_RATE = 20;           // simulation steps a second
+/* Simulation steps a second — the one knob that sets how fast the whole
+   level plays out in real time, since every distance below (a wall's
+   height, the width of a gap, how far a duckling walks) is stated in plain
+   game units and only turns into wall-clock speed by way of this number.
+   Lower, and the exact same tick-for-tick level takes longer to watch and
+   longer to react to, with no other constant needing to move to match —
+   spawnInterval and timeLimit are already stated as `TICK_RATE * seconds`
+   rather than as bare tick counts, precisely so this could be the only
+   thing that ever needs tuning for pace. Was 20; a duckling walking the
+   whole way to the pond with no obstacles at all went from about 15
+   seconds to about 21. */
+export const TICK_RATE = 14;
 export const WALK_SPEED = 1;           // columns a walking duckling covers a tick
 export const FALL_SPEED = 3;           // pixels a falling duckling drops a tick
 export const CLIMB_SPEED = 1;          // pixels a climbing duckling rises a tick

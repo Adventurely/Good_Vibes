@@ -53,17 +53,23 @@ export const PARK_SONG = {
     [0, 0, 3], [3, 0, 1], [4, 12, 2], [6, 0, 2],
     [8, 7, 2], [10, 0, 1], [12, 12, 2], [14, 0, 2],
   ],
-  bassType: 'sawtooth',
-  bassCut: 850,          // low-passed for a plucked, rounded funk-bass tone
-  bassLevel: 0.16,
+  /* Triangle rather than sawtooth or square, and both filtered — a saw and
+     a square are the two waveforms that read as "video game" before a
+     single note plays, because they carry every harmonic at full strength;
+     a triangle only carries the odd ones and carries them quietly, which is
+     most of the difference between a chiptune and a synth bass. */
+  bassType: 'triangle',
+  bassCut: 700,          // low-passed for a rounder, less buzzy low end
+  bassLevel: 0.17,
 
   // A short hook an octave above the root, syncopated against the bass
   // rather than doubling it — the two only land together on the downbeat.
   lead: [
     [0, 12, 2], [2, 15, 1], [6, 19, 2], [9, 17, 1], [12, 15, 3],
   ],
-  leadType: 'square',
-  leadLevel: 0.07,
+  leadType: 'triangle',
+  leadCut: 3400,
+  leadLevel: 0.08,
 
   kickAt: [0, 6, 8, 14],
   snareAt: [4, 12],
@@ -147,7 +153,7 @@ export function createAudio(){
       if(at === inBar) voice(midi(root - 12 + semis), t, stepLen * len * 0.92, cfg.bassType, cfg.bassLevel, null, cfg.bassCut);
     }
     for(const [at, semis, len] of cfg.lead){
-      if(at === inBar) voice(midi(root + semis), t, stepLen * len * 0.85, cfg.leadType, cfg.leadLevel);
+      if(at === inBar) voice(midi(root + semis), t, stepLen * len * 0.85, cfg.leadType, cfg.leadLevel, null, cfg.leadCut);
     }
 
     if(cfg.kickAt.includes(inBar)) voice(112, t, 0.09, 'sine', 0.2, 42);
