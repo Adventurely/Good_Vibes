@@ -832,7 +832,7 @@ function replan(force = false){
      nothing written down at all there is one road, a whole lap of the orbit
      the ship is actually on. */
   prediction = S.planImmediate(state, true, { farSight: S.seesPast(state) });
-  hazard = S.hazards(state);
+  hazard = S.hazards(state, prediction);
   if(!prediction){ nodePositions = []; apses = []; crossedRails = []; return; }
   nodePositions = state.nodes.map(n => locateOnPrediction(world, prediction, n.t));
   /* The low point and the high point of every closed leg on the drawn road.
