@@ -21,33 +21,83 @@
  */
 
 import { PALETTE, hex, drawSprite, drawTextOutlined } from '../good-vibes/pixel.js';
-import { SCENE_W, SCENE_H } from './content.js';
+import { SCENE_W, SCENE_H, POOF_TICKS } from './content.js';
 
 export { PALETTE, hex };
 
 /* ------------------------------------------------------------------ sprites */
 
-/* Facing right. `flip` mirrors it for a duckling walking the other way. */
+/* Facing right. `flip` mirrors it for a duckling walking the other way.
+   Bigger than the first cut, with a back highlight and a wing patch, which
+   between them are what turn a coloured blob into something with a front
+   and a back. */
 export const DUCK_ART = [
-  '..yyy.',
-  '.yyyyk',
-  '.yyyyo',
-  '..yyy.',
-  '..o.o.',
+  '..yyyy..',
+  '.yyyyyk.',
+  'wyyyyyyo',
+  'wyyyoyyo',
+  '.yyyyyy.',
+  '..o..o..',
 ];
 
 export const GOOSE_ART = [
-  '..www...',
-  '.wwwww..',
-  'wwwwwwk.',
-  'wwwwwwo.',
-  '.wwwww..',
-  '..s..s..',
+  '....kk......',
+  '..kwwwk.....',
+  '.wwwwwwwko..',
+  'wwwwwwwwwwo.',
+  'wwwwwswwwww.',
+  '.wwwwwwwww..',
+  '..o......o..',
 ];
 
-/* A duckling standing still with a skill in hand gets a small mark over its
-   head, so a busy one reads as busy at a glance rather than only on click. */
-const SKILL_MARK = { digger: 'N', builder: 'o', blocker: 's', climber: 'c' };
+/* What a duckling is carrying, worn over its head.
+ *
+ * Shape first, colour second. These were four two-pixel squares in four
+ * palette colours, and at this size that is not readable — oak and ember
+ * are a few shades apart and the squares were the same square, so "which
+ * one is that" came down to squinting at a hue. An arrow pointing down is
+ * never mistaken for a bridge no matter how small it is or what is behind
+ * it, which is the whole point of giving each one its own silhouette.
+ *
+ * Each sits on a plate of ink, because the badge has to read against sky,
+ * grass, dirt and water alike rather than against whichever one it was
+ * designed over. Blocker is in here for the legend on the page only — it
+ * is never a held trait (see sim.js's assignSkill), so it never gets drawn
+ * over a duckling's head; a planted one wears its own red bar instead.
+ */
+const SKILL_BADGE = {
+  digger:  ['.N.', '.N.', 'NNN', '.N.'],   // down — cuts a ramp through the drop
+  builder: ['...', 'www', 'w.w', 'w.w'],   // a bridge standing on its legs
+  climber: ['.t.', 'ttt', '.t.', '.t.'],   // up — scales the wall
+  blocker: ['...', 'rrr', 'rrr', '...'],   // the bar a planted duckling wears
+};
+
+/* Drawn in this order wherever more than one is held, so the same pair
+   always reads the same way round rather than in whatever order they were
+   handed out in. */
+const BADGE_ORDER = ['digger', 'builder', 'climber'];
+
+const BADGE_W = 3, BADGE_H = 4, BADGE_PAD = 1, BADGE_GAP = 1;
+export const BADGE_PLATE_W = BADGE_W + BADGE_PAD * 2;
+export const BADGE_PLATE_H = BADGE_H + BADGE_PAD * 2;
+
+/* One badge, at any whole-number scale — 1 over a duckling's head in the
+   scene, larger on the page itself, so the key beside the skill button is
+   the same drawing the duckling wears rather than a second thing to learn. */
+export function drawSkillBadge(ctx, skill, x, y, scale = 1){
+  const rows = SKILL_BADGE[skill];
+  if(!rows) return;
+  ctx.fillStyle = hex('k');
+  ctx.fillRect(x, y, BADGE_PLATE_W * scale, BADGE_PLATE_H * scale);
+  for(let r = 0; r < rows.length; r++){
+    for(let c = 0; c < rows[r].length; c++){
+      const key = rows[r][c];
+      if(key === '.') continue;
+      ctx.fillStyle = hex(key);
+      ctx.fillRect(x + (BADGE_PAD + c) * scale, y + (BADGE_PAD + r) * scale, scale, scale);
+    }
+  }
+}
 
 /* ---------------------------------------------------------------- dither */
 
@@ -103,12 +153,90 @@ function drawSun(ctx){
 const SKY_SEAM_Y = 92;
 const SKY_SEAM_H = 4;
 
-export function drawSky(ctx){
+/* Three overlapping domes rather than one ridge line — a single hill silhouette
+   reads as a speed bump; three at different widths and heights read as a range.
+   Each is drawn one row at a time, narrowing toward the top, the same technique
+   Sunward's clouds use for the same reason: a shape built from a few dozen
+   short horizontal runs costs nothing next to filling it pixel by pixel.
+   Static rather than parallaxed — the flock never gets far enough from the
+   camera for a fixed background to give the game away. */
+const HILLS = [
+  { cx: 44, w: 100, h: 15, key: 's' },
+  { cx: 168, w: 130, h: 22, key: 'v' },
+  { cx: 274, w: 110, h: 17, key: 's' },
+];
+
+function drawHills(ctx){
+  for(const hill of HILLS){
+    ctx.fillStyle = hex(hill.key);
+    for(let row = 0; row < hill.h; row++){
+      const y = SKY_SEAM_Y + SKY_SEAM_H + hill.h - row;
+      if(y >= SCENE_H) continue;
+      // A dome: wide at the base, narrowing to nothing at the crown, along
+      // a quarter-circle rather than a triangle so the skyline curves.
+      const t = row / hill.h;
+      const width = Math.round(hill.w * Math.sqrt(Math.max(0, 1 - (1 - t) * (1 - t))));
+      if(width <= 0) continue;
+      ctx.fillRect(Math.round(hill.cx - width / 2), y, width, 1);
+    }
+  }
+}
+
+/* Two puffs drifting at their own speeds, wrapping around once they clear
+   the far edge — `ticks` is the sim's own clock (see paintScene), not the
+   page's, so the sky moves at the same rate the flock does regardless of
+   frame rate. */
+const CLOUDS = [
+  { y: 18, w: 34, h: 6, speed: 0.32 },
+  { y: 38, w: 24, h: 5, speed: 0.5 },
+];
+
+function drawClouds(ctx, ticks){
+  for(let i = 0; i < CLOUDS.length; i++){
+    const c = CLOUDS[i];
+    const span = SCENE_W + c.w * 2;
+    const x = Math.round(((ticks * c.speed + i * 151) % span) - c.w);
+    for(let py = 0; py < c.h; py++){
+      const inset = Math.round(Math.abs(py - (c.h - 1) / 2) * 1.8);
+      const w = c.w - inset * 2;
+      if(w <= 0) continue;
+      ditherSeam(ctx, x + inset, c.y + py, w, 1, 'w', 'c', 0.4);
+    }
+  }
+}
+
+/* Two birds, each three pixels in a shallow V, tracing a slow rise-and-fall
+   across the high sky. Drawn as three fillRects rather than a sprite — at
+   this size a "flying bird" is a chevron, nothing a bitmap would earn its
+   keep over. Ticks-driven like the clouds, and each on its own sine so the
+   pair never move in lockstep. */
+const BIRDS = [
+  { y: 14, speed: 0.46, bob: 3, phase: 0 },
+  { y: 24, speed: 0.6, bob: 2, phase: 2.1 },
+];
+
+function drawBirds(ctx, ticks){
+  ctx.fillStyle = hex('k');
+  for(let i = 0; i < BIRDS.length; i++){
+    const b = BIRDS[i];
+    const span = SCENE_W + 8;
+    const x = Math.round(((ticks * b.speed + i * 97) % span) - 4);
+    const y = Math.round(b.y + Math.sin(ticks * 0.05 + b.phase) * b.bob);
+    ctx.fillRect(x - 2, y, 1, 1);
+    ctx.fillRect(x, y - 1, 1, 1);
+    ctx.fillRect(x + 2, y, 1, 1);
+  }
+}
+
+export function drawSky(ctx, ticks = 0){
   ctx.fillStyle = hex('b');
   ctx.fillRect(0, 0, SCENE_W, SKY_SEAM_Y);
   ditherSeam(ctx, 0, SKY_SEAM_Y, SCENE_W, SKY_SEAM_H, 'b', 'c', 0.5);
   ctx.fillStyle = hex('c');
   ctx.fillRect(0, SKY_SEAM_Y + SKY_SEAM_H, SCENE_W, SCENE_H - SKY_SEAM_Y - SKY_SEAM_H);
+  drawClouds(ctx, ticks);
+  drawHills(ctx);
+  drawBirds(ctx, ticks);
   drawSun(ctx);
 }
 
@@ -120,6 +248,13 @@ export function drawSky(ctx){
    would still be grass at the bottom, and a cliff with no dirt showing on
    its face reads as a green wall, not a cut edge. */
 const GRASS_DEPTH = 11;
+
+/* Below the soil, rock — a second cross-section split rather than one flat
+   dirt fill, so a deep column (the wall's face, fifty pixels of it) reads
+   as strata rather than a slab of one colour. Proportional this time, not
+   capped: unlike the grass cap, there is no shallow-column case where a
+   fixed depth would swallow the whole dirt band. */
+const SOIL_SHARE = 0.55;
 
 /* The terrain height array, filled column by column from its surface to the
  * bottom of the scene. A gap's columns sit far below SCENE_H (see content.js's
@@ -149,8 +284,13 @@ export function drawGround(ctx, terrain, level){
 
     const dirtH = fillH - grassH;
     if(dirtH > 0){
+      const soilH = Math.round(dirtH * SOIL_SHARE);
       ctx.fillStyle = hex('N');
-      ctx.fillRect(x, y + grassH, 1, dirtH);
+      ctx.fillRect(x, y + grassH, 1, soilH);
+      if(dirtH > soilH){
+        ctx.fillStyle = hex('s');
+        ctx.fillRect(x, y + grassH + soilH, 1, dirtH - soilH);
+      }
       // The seam itself, one row of ink, so the cap reads as sitting on the
       // dirt rather than fading into it.
       ctx.fillStyle = hex('k');
@@ -158,7 +298,11 @@ export function drawGround(ctx, terrain, level){
     }
   }
   drawTufts(ctx, terrain, level);
+  drawFlowers(ctx, terrain, level);
+  drawRockSpeckle(ctx, terrain, level);
   drawNest(ctx, level, terrain);
+  drawCattails(ctx, level, terrain);
+  drawLilyPads(ctx, terrain, level);
 }
 
 /* The pond: two bands of blue with a dithered seam, the same trick the sky
@@ -195,6 +339,51 @@ function drawTufts(ctx, terrain, level){
   }
 }
 
+/* A few flowers among the tufts — a different hash seed than the tufts use,
+   so the two scatters land in different spots rather than one drawn over
+   the other, and two petal colours picked the same way the tufts pick their
+   two greens. Fixed count, same reasoning as the tufts: colour without a
+   per-pixel cost. */
+const FLOWER_COUNT = 22;
+const FLOWER_COLOURS = ['r', 'p', 'y'];
+
+function drawFlowers(ctx, terrain, level){
+  for(let i = 0; i < FLOWER_COUNT; i++){
+    const h = Math.imul(i + 401, 2654435761) >>> 0;
+    const x = h % terrain.length;
+    const y = terrain[x];
+    if(y >= SCENE_H || x >= level.goalX) continue;
+    ctx.fillStyle = hex(FLOWER_COLOURS[(h >>> 13) % FLOWER_COLOURS.length]);
+    ctx.fillRect(x, y - 1, 1, 1);
+  }
+}
+
+/* A scatter of dark flecks in the rock band — the same fixed-count hash
+   technique as the tufts and flowers, seeded a third way, so the slate
+   below the soil reads as stone grain rather than a second flat fill. Only
+   ever a few dozen pixels regardless of how much rock is on screen, same as
+   every other scatter here. */
+const SPECKLE_COUNT = 40;
+
+function drawRockSpeckle(ctx, terrain, level){
+  ctx.fillStyle = hex('k');
+  for(let i = 0; i < SPECKLE_COUNT; i++){
+    const h = Math.imul(i + 1109, 2246822519) >>> 0;
+    const x = h % terrain.length;
+    const y = terrain[x];
+    if(y >= SCENE_H || x >= level.goalX) continue;
+    const fillH = SCENE_H - y;
+    const grassH = Math.min(GRASS_DEPTH, fillH);
+    const dirtH = fillH - grassH;
+    if(dirtH <= 0) continue;
+    const soilH = Math.round(dirtH * SOIL_SHARE);
+    const rockH = dirtH - soilH;
+    if(rockH <= 0) continue;
+    const dy = (h >>> 11) % rockH;
+    ctx.fillRect(x, y + grassH + soilH + dy, 1, 1);
+  }
+}
+
 /* A bundle of twigs rather than two bare rectangles — a handful of crossed
    lines in two shades of oak, which at this size is enough to read as
    "woven" instead of "stacked". */
@@ -211,12 +400,52 @@ function drawNest(ctx, level, terrain){
   ctx.fillRect(x + 2, y - 7, 1, 2);
 }
 
+/* A few cattails right at the shoreline, straddling the grass/pond seam —
+   pine stems with an oak head, tall enough to break the line where lawn
+   meets water the way real reeds do. A handful of fixed positions, not a
+   scatter: unlike the tufts these need to actually stand at the edge, not
+   anywhere on the lawn. */
+const CATTAIL_DX = [-4, -1, 3, 7];
+
+function drawCattails(ctx, level, terrain){
+  const bankY = terrain[Math.max(0, level.goalX - 1)];
+  if(bankY >= SCENE_H) return;
+  for(const dx of CATTAIL_DX){
+    const x = level.goalX + dx;
+    if(x < 0 || x >= terrain.length) continue;
+    ctx.fillStyle = hex('G');
+    ctx.fillRect(x, bankY - 7, 1, 7);
+    ctx.fillStyle = hex('N');
+    ctx.fillRect(x, bankY - 9, 1, 3);
+  }
+}
+
+/* Lily pads scattered across the pond, the tufts' hash-scatter trick
+   seeded a fourth way and aimed at the water columns instead of the lawn —
+   flat two-pixel ovals sitting right on the water line so the pond reads
+   as a place with life in it, not just a rectangle of blue. */
+const LILY_COUNT = 6;
+
+function drawLilyPads(ctx, terrain, level){
+  const span = terrain.length - level.goalX;
+  if(span <= 0) return;
+  ctx.fillStyle = hex('G');
+  for(let i = 0; i < LILY_COUNT; i++){
+    const h = Math.imul(i + 5303, 2246822519) >>> 0;
+    const x = level.goalX + (h % span);
+    const y = terrain[x];
+    if(y >= SCENE_H) continue;
+    ctx.fillRect(x, y, Math.min(2, terrain.length - x), 1);
+  }
+}
+
 /* ------------------------------------------------------------------ goose */
 
 export function drawGoose(ctx, state){
+  if(state.goose.gone) return;
   const g = state.level.goose;
   const x = Math.round(state.goose.x) - 4;
-  const y = g.y - GOOSE_ART.length;
+  const y = g.y - GOOSE_ART.length - Math.round(state.goose.lift);
   drawSprite(ctx, GOOSE_ART, x, y, state.goose.dir < 0);
 }
 
@@ -230,9 +459,45 @@ export function drawDuck(ctx, d){
   if(d.state === 'blocking'){
     ctx.fillStyle = hex('r');
     ctx.fillRect(x + 1, y - 3, 4, 2);
-  } else if(d.skill && SKILL_MARK[d.skill] && d.state === 'walking'){
-    ctx.fillStyle = hex(SKILL_MARK[d.skill]);
-    ctx.fillRect(x + 2, y - 3, 2, 2);
+    return;
+  }
+
+  /* Every state a duckling can be carrying something in, not just walking:
+     the one currently climbing the wall or laying a bridge is exactly the
+     one you most want to be able to pick out of the flock, and it was the
+     one showing nothing at all. */
+  const held = BADGE_ORDER.filter(skill => d.traits.has(skill));
+  if(!held.length) return;
+
+  const total = held.length * BADGE_PLATE_W + (held.length - 1) * BADGE_GAP;
+  let bx = Math.round(x + DUCK_ART[0].length / 2 - total / 2);
+  const by = y - BADGE_PLATE_H - 1;
+  for(const skill of held){
+    drawSkillBadge(ctx, skill, bx, by);
+    bx += BADGE_PLATE_W + BADGE_GAP;
+  }
+}
+
+/* --------------------------------------------------------------- a poof */
+
+/* Where a lost duckling went down (see sim.js's `loseDuckling`) — a small
+   burst of pale down that spreads and fades over `POOF_TICKS`, rather than
+   the duckling's sprite just being gone the next frame. Fixed offsets and a
+   shrinking pixel count, the same cheap scatter every other flourish in
+   this file uses, not a particle system. */
+const POOF_OFFSETS = [
+  [0, -1], [-1, 0], [1, 0], [-2, -2], [2, -2], [-2, 1], [2, 1], [0, -3],
+];
+
+function drawPoof(ctx, p){
+  const t = p.age / POOF_TICKS;          // 0 just spawned, 1 about to clear
+  const spread = 1 + t * 3;              // drifts outward as it ages
+  const shown = Math.max(1, Math.round(POOF_OFFSETS.length * (1 - t)));
+  const cx = Math.round(p.x), cy = Math.round(p.y) - 3;
+  ctx.fillStyle = hex(t < 0.6 ? 'w' : 'N');
+  for(let i = 0; i < shown; i++){
+    const [dx, dy] = POOF_OFFSETS[i];
+    ctx.fillRect(cx + Math.round(dx * spread), cy + Math.round(dy * spread), 1, 1);
   }
 }
 
@@ -241,13 +506,14 @@ export function drawDuck(ctx, d){
 /* The whole picture, in back-to-front order. `state` is a sim.js game state;
    nothing here mutates it. */
 export function paintScene(ctx, state){
-  drawSky(ctx);
+  drawSky(ctx, state.ticks);
   drawGround(ctx, state.terrain, state.level);
   drawGoose(ctx, state);
   for(const d of state.ducks){
     if(d.state === 'saved' || d.state === 'lost') continue;
     drawDuck(ctx, d);
   }
+  for(const p of state.poofs) drawPoof(ctx, p);
 }
 
 /* A caption under the title screen's demo scene, drawn with the same font as

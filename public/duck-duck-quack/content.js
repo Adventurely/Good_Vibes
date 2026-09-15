@@ -67,15 +67,32 @@ export const FALL_SAFE = 24;
 export const BUILD_MAX_STEPS = 60;
 export const DIG_MAX_STEPS = 60;
 
+/* Once the goose has caught its one duckling (see sim.js's `goose.fed`) it
+   has nothing left to threaten, so rather than leave it patrolling the same
+   stretch forever as an empty prop, it flies off — the same direction it was
+   already facing, climbing as it goes — and stops being drawn once it clears
+   the scene. Faster than its patrol speed on purpose: a fleeing goose should
+   read as fleeing, not as the same lazy sweep with nothing to show for it. */
+export const GOOSE_FLEE_SPEED = 4;     // columns a fleeing goose covers a tick
+export const GOOSE_FLEE_LIFT = 2;      // pixels a fleeing goose climbs a tick
+
+/* A lost duckling — fallen too far, walked off the level's edge, or caught
+   by the goose — leaves a short-lived poof where it went down. Without one,
+   a duckling that had been visibly falling for a second or more simply
+   isn't there the next frame, which reads as a rendering fault rather than
+   as the loss it actually is. `sim.js` owns spawning and ageing these;
+   `art.js` only ever draws whatever is left in `state.poofs`. */
+export const POOF_TICKS = 8;
+
 /* ------------------------------------------------------------------ skills */
 
 export const SKILLS = ['digger', 'builder', 'blocker', 'climber'];
 
 export const SKILL_INFO = {
   digger: { name: 'Digger', verb: 'Dig',
-    blurb: 'Cuts a gentle ramp forward and down until the ground catches up.' },
+    blurb: 'Digs a ramp down through the next drop instead of falling into it.' },
   builder: { name: 'Builder', verb: 'Build',
-    blurb: 'Lays a flat plank bridge forward until it reaches solid ground.' },
+    blurb: 'Bridges the next gap instead of falling into it.' },
   blocker: { name: 'Blocker', verb: 'Block',
     blurb: 'Plants itself for good. Anything that walks into it turns around.' },
   climber: { name: 'Climber', verb: 'Climb',

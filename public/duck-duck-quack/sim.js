@@ -9,7 +9,8 @@
  */
 
 import { SCENE_H, FALL_SAFE, WALK_STEP, FALL_SPEED, CLIMB_SPEED, DIG_RATE,
-  BUILD_MAX_STEPS, DIG_MAX_STEPS, SKILLS, buildTerrain, winCount } from './content.js';
+  BUILD_MAX_STEPS, DIG_MAX_STEPS, SKILLS, GOOSE_FLEE_SPEED, GOOSE_FLEE_LIFT,
+  POOF_TICKS, buildTerrain, winCount } from './content.js';
 
 /* ----------------------------------------------------------------- a duck */
 
@@ -22,13 +23,22 @@ function hatchling(level, groundY){
     y: groundY,
     dir: 1,
     state: 'walking',   // walking | falling | digging | building | climbing | blocking | saved | lost
-    skill: null,
+    // Digger, Builder and Climber are traits, and a duckling can hold more
+    // than one at once — see assignSkill for why. Blocker is not in here at
+    // all: it is an instant, terminal action, not something to check for
+    // later.
+    traits: new Set(),
     fallFrom: 0,
     buildLeft: 0,
     digLeft: 0,
     cause: null,        // set when lost: 'fell' | 'edge' | 'goosed'
   };
 }
+
+/* Does this duckling currently hold this trait? The one thing anything
+   outside this module should ever ask about a duckling's skills — see
+   assignSkill for the shape underneath. */
+export const hasTrait = (d, skill) => d.traits.has(skill);
 
 /* ---------------------------------------------------------------- the game */
 
@@ -46,9 +56,19 @@ export function newGame(level){
     saved: 0,
     lost: 0,
     supply: { ...level.supply },
-    goose: { x: level.goose.x0, dir: 1, fed: false },
+    goose: { x: level.goose.x0, dir: 1, fed: false, lift: 0, gone: false },
+    poofs: [],
     ended: null,        // null | 'won' | 'lost'
   };
+}
+
+/* The one place a duckling is ever marked lost — dropping a poof where it
+   went down is what stops that from reading as the duckling just vanishing.
+   See POOF_TICKS in content.js for how long it lingers. */
+function loseDuckling(state, d, cause){
+  d.state = 'lost';
+  d.cause = cause;
+  state.poofs.push({ x: d.x, y: d.y, age: 0 });
 }
 
 const groundAt = (state, x) => {
@@ -73,6 +93,7 @@ export function tick(state){
   hatch(state);
   stepGoose(state);
   for(const d of state.ducks) stepDuck(state, d);
+  stepPoofs(state);
 
   state.saved = state.ducks.reduce((n, d) => n + (d.state === 'saved' ? 1 : 0), 0);
   state.lost = state.ducks.reduce((n, d) => n + (d.state === 'lost' ? 1 : 0), 0);
@@ -90,7 +111,27 @@ function hatch(state){
   state.nextHatch = state.ticks + level.spawnInterval;
 }
 
+function stepPoofs(state){
+  for(const p of state.poofs) p.age += 1;
+  state.poofs = state.poofs.filter(p => p.age < POOF_TICKS);
+}
+
 function stepGoose(state){
+  if(state.goose.gone) return;
+
+  // Fed and fleeing: keep going the way it was already facing, climbing as
+  // it goes, until it has actually cleared the scene — a fixed tick count
+  // would either cut the flight short on a wide level or linger pointlessly
+  // on a narrow one.
+  if(state.goose.fed){
+    state.goose.x += state.goose.dir * GOOSE_FLEE_SPEED;
+    state.goose.lift += GOOSE_FLEE_LIFT;
+    if(state.goose.x < -20 || state.goose.x > state.level.width + 20){
+      state.goose.gone = true;
+    }
+    return;
+  }
+
   const g = state.level.goose;
   state.goose.x += state.goose.dir * g.speed;
   if(state.goose.x >= g.x1){ state.goose.x = g.x1; state.goose.dir = -1; }
@@ -141,10 +182,10 @@ function stepWalking(state, d){
   const level = state.level;
 
   if(d.x >= level.goalX){ d.state = 'saved'; return; }
-  if(goosedAt(state, d.x)){ d.state = 'lost'; d.cause = 'goosed'; state.goose.fed = true; return; }
+  if(goosedAt(state, d.x)){ loseDuckling(state, d, 'goosed'); state.goose.fed = true; return; }
 
   const nextX = d.x + d.dir;
-  if(nextX < 0 || nextX >= level.width){ d.state = 'lost'; d.cause = 'edge'; return; }
+  if(nextX < 0 || nextX >= level.width){ loseDuckling(state, d, 'edge'); return; }
 
   if(blockerAt(state, nextX)){ d.dir = -d.dir; return; }
 
@@ -152,12 +193,34 @@ function stepWalking(state, d){
   const delta = nextY - d.y;   // positive: ground drops away; negative: ground rises
 
   if(delta < -WALK_STEP){
-    if(d.skill === 'climber'){ d.state = 'climbing'; d.x = nextX; return; }
+    if(hasTrait(d, 'climber')){ d.state = 'climbing'; d.x = nextX; return; }
     d.dir = -d.dir;
     return;
   }
 
   if(delta > FALL_SAFE){
+    /* A gap has no floor anywhere in the visible scene (see content.js's
+     * PIT_Y); a plain drop still has one, just further down. That is the
+     * real difference between "bridge it" and "dig down to it" — a digger
+     * sent at a gap would spend its whole ramp chasing a floor that is not
+     * there, and a builder sent at a drop would float a bridge over ground
+     * that was already perfectly walkable. So each skill only answers to
+     * the shape of hazard it actually solves; given the wrong one for what
+     * is ahead, a duckling just falls, the same as if it had no skill at
+     * all — which is also what makes it safe for a skill to be handed out
+     * long before the hazard it is for, rather than needing to land on the
+     * exact column where that hazard starts.
+     */
+    if(hasTrait(d, 'builder') && nextY >= SCENE_H){
+      d.state = 'building';
+      d.buildLeft = BUILD_MAX_STEPS;
+      return;
+    }
+    if(hasTrait(d, 'digger') && nextY < SCENE_H){
+      d.state = 'digging';
+      d.digLeft = DIG_MAX_STEPS;
+      return;
+    }
     d.x = nextX;
     d.state = 'falling';
     d.fallFrom = d.y;
@@ -170,13 +233,13 @@ function stepWalking(state, d){
 
 function stepFalling(state, d){
   d.y += FALL_SPEED;
-  if(d.y > SCENE_H){ d.state = 'lost'; d.cause = 'fell'; return; }
+  if(d.y > SCENE_H){ loseDuckling(state, d, 'fell'); return; }
   const ground = groundAt(state, d.x);
   if(d.y >= ground){
     const dropped = ground - d.fallFrom;
     d.y = ground;
-    d.state = dropped > FALL_SAFE ? 'lost' : 'walking';
-    if(d.state === 'lost') d.cause = 'fell';
+    if(dropped > FALL_SAFE) loseDuckling(state, d, 'fell');
+    else d.state = 'walking';
   }
 }
 
@@ -248,13 +311,16 @@ function stepClimbing(state, d){
 /* Why a skill cannot be given right now, or null. A duckling can only take a
    new job while it is plainly walking — mid-fall, mid-dig, already planted as
    a blocker, already saved or already lost are all "no", and each says why
-   rather than the click just doing nothing. */
+   rather than the click just doing nothing. Already holding the trait being
+   offered is also a "no": nothing changes, and there is no reason to spend a
+   second builder finding that out. */
 export function assignRefusal(state, duckId, skill){
   if(state.ended) return 'The level is over.';
   if(!SKILLS.includes(skill)) return 'There is no such skill.';
   const d = state.ducks.find(duck => duck.id === duckId);
   if(!d) return 'There is no such duckling.';
   if(d.state !== 'walking') return 'That one is busy.';
+  if(skill !== 'blocker' && hasTrait(d, skill)) return 'That one already has it.';
   if(!(state.supply[skill] > 0)) return `Out of ${skill}s.`;
   return null;
 }
@@ -262,21 +328,27 @@ export function assignRefusal(state, duckId, skill){
 /* Give a duckling a skill. Returns the duckling, or null if it was refused
  * and nothing changed.
  *
- * Digger, Builder and Blocker act at once — they are things a duckling does
- * starting exactly where it is standing. Climber is the one exception: it is
- * a trait rather than an action, and it only matters the next time this
- * duckling meets a wall too tall to just step up.
+ * Blocker is the one that acts at once — planting itself is not something
+ * that waits for a particular spot. Digger, Builder and Climber are all
+ * traits rather than instant actions, and — unlike Blocker — a duckling can
+ * hold more than one at a time: each only matters the next time this
+ * duckling actually meets the thing it answers (a wall too tall to step up,
+ * a drop, a gap), which is what stepWalking checks for on every step, and
+ * the three answer three different shapes of hazard that never overlap.
+ * That stacking is not a nicety — a duckling given Builder for the gap still
+ * has to get past the wall afterwards, and Climber is the only thing that
+ * gets it there. Handed out one at a time as each hazard is reached, that
+ * is automatic; handed out all at once at the nest, it only works at all
+ * because holding Builder never stops it from also holding Climber.
  */
 export function assignSkill(state, duckId, skill){
   if(assignRefusal(state, duckId, skill)) return null;
   const d = state.ducks.find(duck => duck.id === duckId);
   state.supply[skill] -= 1;
-  d.skill = skill;
 
   if(skill === 'blocker'){ d.state = 'blocking'; return d; }
-  if(skill === 'digger'){ d.state = 'digging'; d.digLeft = DIG_MAX_STEPS; return d; }
-  if(skill === 'builder'){ d.state = 'building'; d.buildLeft = BUILD_MAX_STEPS; return d; }
-  // climber: stays 'walking' until a wall asks for it.
+  // digger, builder, climber: stay 'walking' until the right hazard asks for them.
+  d.traits.add(skill);
   return d;
 }
 

@@ -213,19 +213,88 @@ export function createAudio(){
 
   /* ---- sound effects ------------------------------------------------ */
 
-  /* One so far: the duckling that just made it. Two quick nasal blips,
-   * sawtooth rather than sine so it has the buzz an actual quack has, each
-   * one bent sharply downward — a duck's call falls in pitch as it cuts off,
-   * a whistle does not, and a whistle is what this was before the bend went
-   * in. A touch of band-passed noise under the first blip is the breath
-   * behind it; without it the pair read as two clean beeps, which is a
-   * microwave finishing, not a bird.
+  /* A quack, built the way a quack actually works rather than as two blips
+   * in a row — which is what this was, and it sounded like a microwave
+   * because that is what a bare sawtooth at 880Hz is.
+   *
+   * Three things make the difference. The pitch snaps *up* for the first
+   * twenty-five milliseconds and then falls well below where it started:
+   * that little rise on the attack is the shape of the bill opening, and a
+   * call that only falls reads as a slide whistle. The buzzy source runs
+   * through a bandpass sweeping down with it, because a duck is a rough
+   * source in a small resonant cavity — take that formant away and the
+   * harmonics are all still there but nothing is shaping them, which is
+   * the whole difference between a voice and a buzzer. And a slow warble
+   * on the frequency gives it the rasp; a perfectly steady pitch is a
+   * synth patch, never an animal.
+   */
+  function quackSyllable(t, dur, vol){
+    const o = ctx.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(400, t);
+    o.frequency.exponentialRampToValueAtTime(560, t + 0.025);
+    o.frequency.exponentialRampToValueAtTime(230, t + dur);
+
+    // The rasp: a slow warble either side of the note, not enough to read
+    // as vibrato, just enough to stop it sitting perfectly still.
+    const rasp = ctx.createOscillator();
+    rasp.type = 'sine';
+    rasp.frequency.value = 48;
+    const raspDepth = ctx.createGain();
+    raspDepth.gain.value = 28;
+    rasp.connect(raspDepth).connect(o.frequency);
+
+    // The nasal formant, falling with the pitch as the bill closes.
+    const band = ctx.createBiquadFilter();
+    band.type = 'bandpass';
+    band.frequency.setValueAtTime(1600, t);
+    band.frequency.exponentialRampToValueAtTime(650, t + dur);
+    band.Q.value = 4.2;
+
+    // And the top taken off, so it carries over the music without being
+    // the brightest thing on the page.
+    const tame = ctx.createBiquadFilter();
+    tame.type = 'lowpass';
+    tame.frequency.value = 2400;
+
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.014);
+    g.gain.setValueAtTime(vol, t + dur * 0.5);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+
+    o.connect(band).connect(tame).connect(g).connect(bus);
+    o.start(t); o.stop(t + dur + 0.02);
+    rasp.start(t); rasp.stop(t + dur + 0.02);
+  }
+
+  /* The duckling that just made it.
+   *
+   * Loud on purpose, relative to the music bed it plays over (bassLevel
+   * 0.17, leadLevel 0.08) — this is the one sound in the game that means
+   * "a duckling just made it home", and it was getting lost under the
+   * backing track instead of landing as a payoff.
    */
   const SFX = {
     quack(t){
-      voice(880, t, 0.07, 'sawtooth', 0.13, 480);
-      hit(t, 0.045, 0.05, 2800, 'bandpass');
-      voice(620, t + 0.09, 0.06, 'sawtooth', 0.1, 340);
+      // A short puff of breath on the attack, under the note rather than
+      // in front of it — this is the air, not the voice.
+      hit(t, 0.03, 0.05, 1400, 'bandpass');
+      quackSyllable(t, 0.17, 0.2);
+    },
+
+    /* The duckling that didn't — a soft, sinking "womp" rather than
+     * anything sharp: this can fire up to nine times in one run (see
+     * art.js's poof, which it plays alongside), so it has to read as a
+     * shame rather than a punishment or it turns grating fast. A triangle
+     * gliding down an octave-plus, low-passed into a rounded thump, with a
+     * dull puff of filtered noise under it for the poof's own breath —
+     * the quack's noise burst was bright and band-passed because a quack
+     * is a call; this one is low-passed because it isn't a call at all.
+     */
+    lost(t){
+      voice(340, t, 0.17, 'triangle', 0.14, 130, 750);
+      hit(t + 0.015, 0.08, 0.055, 700, 'lowpass');
     },
   };
 

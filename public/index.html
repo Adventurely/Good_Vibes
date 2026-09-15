@@ -256,7 +256,7 @@ import { createLot, growthFor } from './sunward/art.js';
 /* Aliased throughout: this game's `paintScene` is not Save Solarium's, and its
    `newGame`/`tick` are names half the games here would claim if asked. */
 import { LEVEL_1 as DQ_LEVEL, TICK_RATE as DQ_TICK_RATE } from './duck-duck-quack/content.js';
-import { newGame as dqNewGame, tick as dqTick, assignSkill as dqAssign } from './duck-duck-quack/sim.js';
+import { newGame as dqNewGame, tick as dqTick, assignSkill as dqAssign, hasTrait as dqHasTrait } from './duck-duck-quack/sim.js';
 import { paintScene as dqPaintScene } from './duck-duck-quack/art.js';
 
 const W = 320, H = 190;
@@ -481,7 +481,7 @@ function dqStep(){
     if(d.state !== 'walking') continue;
     if(!dqBuilderUsed && d.x === 69 && dqAssign(dqState, d.id, 'builder')) dqBuilderUsed = true;
     else if(!dqDiggerUsed && d.x === 219 && dqAssign(dqState, d.id, 'digger')) dqDiggerUsed = true;
-    else if(d.skill !== 'climber' && d.x >= 130 && d.x < 150) dqAssign(dqState, d.id, 'climber');
+    else if(!dqHasTrait(d, 'climber') && d.x >= 130 && d.x < 150) dqAssign(dqState, d.id, 'climber');
   }
   dqTick(dqState);
   if(dqState.ended){

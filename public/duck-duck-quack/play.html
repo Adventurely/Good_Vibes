@@ -82,6 +82,14 @@
   }
   .hud b{ font-size: 0.95rem; }
   .hud .right{ text-align: right; }
+  .hud .hint{ font-size: 0.62rem; letter-spacing: 0.02em; opacity: 0.85; }
+  .hud b.at-risk{ color: #ff8a7a; }
+  .hud .hint.at-risk{ color: #ff8a7a; opacity: 1; font-weight: 700; }
+
+  .count-num{
+    font-size: 4.5rem; font-weight: 800; line-height: 1;
+    color: #fdf6e3; text-shadow: 0 2px 0 rgba(0,0,0,0.5);
+  }
 
   .overlay{
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
@@ -106,6 +114,9 @@
     background: var(--panel); border: 2px solid var(--line); border-radius: 6px;
     padding: 0.5rem 0.6rem;
   }
+  .skill .head{ display: flex; align-items: center; gap: 0.35rem; }
+  .skill .badge{ image-rendering: pixelated; image-rendering: crisp-edges; flex: none; }
+  .skill:disabled .badge{ opacity: 0.6; }
   .skill .name{ font-weight: 800; display: block; }
   .skill .count{ font-variant-numeric: tabular-nums; color: var(--muted); font-size: 0.82rem; }
   .skill:hover:not(:disabled){ border-color: var(--accent); }
@@ -170,6 +181,10 @@
        says enough to play from. */
     .skills{ grid-template-columns: 1fr; gap: 0.3rem; margin-top: 0; }
     .skill{ padding: 0.35rem 0.5rem; }
+    /* Inline-flex rather than flex here so the name keeps its badge beside
+       it while the count still sits on the same line, the way it does in
+       the roomier layout's own two-line card. */
+    .skill .head{ display: inline-flex; vertical-align: middle; }
     .skill .name{ display: inline; }
     .skill .count{ display: inline; margin-left: 0.35rem; }
     .skill .blurb{ display: none; }
@@ -194,13 +209,16 @@
                 aria-label="The park. Arm a skill below, then click a walking duckling to give it that skill."></canvas>
         <div class="hud" aria-hidden="true">
           <div>
-            Saved <b id="hud-saved">0 / 0</b><br>
+            Saved <b id="hud-saved">0 / 0</b> <span class="hint" id="hud-hint">needed</span><br>
             Lost <b id="hud-lost">0</b>
           </div>
           <div class="right">
             Hatched <b id="hud-hatched">0 / 0</b><br>
             Time <b id="hud-time">0:00</b>
           </div>
+        </div>
+        <div class="overlay" id="countdown" hidden aria-hidden="true">
+          <div class="count-num" id="countdown-num">3</div>
         </div>
         <div class="overlay" id="overlay" hidden>
           <h2 id="overlay-title"></h2>
@@ -229,9 +247,13 @@
 <script type="module">
   import { LEVEL_1, SKILLS, SKILL_INFO, TICK_RATE, winCount, formatTime } from './content.js';
   import { newGame, tick, assignSkill, assignRefusal, duckNear } from './sim.js';
-  import { paintScene } from './art.js';
+  import { paintScene, drawSkillBadge, BADGE_PLATE_W, BADGE_PLATE_H } from './art.js';
   import { createAudio } from './audio.js';
   import { fitCanvas, context2d } from '../good-vibes/pixel.js';
+
+  // How much bigger the badge on a skill button is than the one a duckling
+  // wears. Whole-number, so it stays a pixel drawing rather than a blur.
+  const BADGE_SCALE = 4;
 
   const els = id => document.getElementById(id);
   const ui = {
@@ -240,6 +262,7 @@
     overlay: els('overlay'), overlayTitle: els('overlay-title'), overlayBody: els('overlay-body'),
     again: els('again'), status: els('status'), pause: els('pause'), restart: els('restart'),
     sound: els('sound'), skills: document.querySelector('.skills'),
+    countdown: els('countdown'), countdownNum: els('countdown-num'), hudHint: els('hud-hint'),
   };
   const ctx = context2d(ui.scene);
 
@@ -295,9 +318,23 @@
     btn.className = 'skill';
     btn.dataset.skill = skill;
     btn.setAttribute('aria-pressed', 'false');
-    btn.innerHTML = `<span class="name">${info.name}</span>`
+    btn.innerHTML = `<span class="head"><span class="name">${info.name}</span></span>`
       + `<span class="count" id="count-${skill}"></span>`
       + `<span class="blurb">${info.blurb}</span>`;
+
+    /* The same badge the duckling wears, drawn from the same code at three
+       times the size (see art.js) — so "what is that thing over its head"
+       is answered by the button you armed it from, rather than by a second
+       legend somewhere that could drift out of step with the scene. */
+    const badge = document.createElement('canvas');
+    badge.className = 'badge';
+    badge.width = BADGE_PLATE_W * BADGE_SCALE;
+    badge.height = BADGE_PLATE_H * BADGE_SCALE;
+    badge.setAttribute('aria-hidden', 'true');
+    const bctx = badge.getContext('2d');
+    bctx.imageSmoothingEnabled = false;
+    drawSkillBadge(bctx, skill, 0, 0, BADGE_SCALE);
+    btn.querySelector('.head').prepend(badge);
     btn.addEventListener('click', () => {
       armed = armed === skill ? null : skill;
       say(armed ? `${info.name} armed — click a walking duckling.` : '');
@@ -333,11 +370,25 @@
     };
   }
 
+  /* Clicking a duckling with nothing armed is a question, not an order —
+     it answers what that one is already carrying. The badges over its head
+     say the same thing at a glance; this is the version you can read. */
+  function describeDuck(d){
+    if(d.state === 'blocking') return 'That one is planted as a Blocker.';
+    const held = SKILLS.filter(s => s !== 'blocker' && d.traits.has(s));
+    if(!held.length) return 'That one is carrying nothing yet.';
+    return `That one has: ${held.map(s => SKILL_INFO[s].name).join(', ')}.`;
+  }
+
   ui.scene.addEventListener('pointerdown', event => {
     event.preventDefault();
     ui.scene.focus({ preventScroll: true });
-    if(!armed) return say('Arm a skill first, then click a duckling.');
-    const { x, y } = sceneXY(event);
+    const at = sceneXY(event);
+    if(!armed){
+      const asked = duckNear(state, at.x, at.y, 12);
+      return say(asked ? describeDuck(asked) : 'Arm a skill first, then click a duckling.');
+    }
+    const { x, y } = at;
     const duck = duckNear(state, x, y, 12);
     if(!duck) return say('No duckling there.');
     const refusal = assignRefusal(state, duck.id, armed);
@@ -352,16 +403,27 @@
   const STEP = 1 / TICK_RATE;
   let acc = 0, last = null;
 
-  // Ids already credited with a quack, so a duckling sitting saved in the
-  // pond for the rest of the run does not honk on every subsequent frame —
-  // only the tick it actually arrives on.
+  // Ids already credited with a quack or a loss, so a duckling sitting
+  // saved in the pond — or one already gone — does not retrigger its sound
+  // on every subsequent frame, only the tick it actually happened on.
   let quacked = new Set();
+  let mourned = new Set();
 
   function quackNewArrivals(){
     for(const d of state.ducks){
       if(d.state !== 'saved' || quacked.has(d.id)) continue;
       quacked.add(d.id);
       audio.sfx('quack');
+    }
+  }
+
+  // Plays alongside the poof (see art.js/sim.js), on the same tick a
+  // duckling actually goes down rather than on every frame it stays lost.
+  function sfxNewLosses(){
+    for(const d of state.ducks){
+      if(d.state !== 'lost' || mourned.has(d.id)) continue;
+      mourned.add(d.id);
+      audio.sfx('lost');
     }
   }
 
@@ -373,11 +435,40 @@
     ui.overlay.hidden = false;
   }
 
+  /* Whether more ducklings could still be saved than have already been lost
+     leaves room for — the moment `lost` alone rules out ever reaching the
+     quota, the run is a loss in every way but the clock and the overlay
+     admitting it yet. Surfacing that the instant it becomes true is most of
+     what "clear about the status of the goal" means while a level is still
+     running rather than only once it ends. */
   function refreshHud(){
-    ui.hudSaved.textContent = `${state.saved} / ${winCount(LEVEL_1)}`;
+    const need = winCount(LEVEL_1);
+    const maxPossible = LEVEL_1.duckCount - state.lost;
+    const atRisk = state.saved < need && maxPossible < need;
+    ui.hudSaved.textContent = `${state.saved} / ${need}`;
+    ui.hudSaved.classList.toggle('at-risk', atRisk);
+    ui.hudHint.textContent = atRisk ? "can't reach" : 'needed';
+    ui.hudHint.classList.toggle('at-risk', atRisk);
     ui.hudLost.textContent = String(state.lost);
     ui.hudHatched.textContent = `${state.hatched} / ${LEVEL_1.duckCount}`;
     ui.hudTime.textContent = formatTime(Math.max(0, LEVEL_1.timeLimit - state.ticks));
+  }
+
+  /* --- the starting countdown ------------------------------------------- */
+
+  // Three full seconds on the clock in the middle of the screen before a
+  // level actually starts moving — real wall-clock time, not sim ticks,
+  // since nothing has hatched yet for ticks to matter to. `at` is set from
+  // the first frame's own timestamp rather than `performance.now()` here,
+  // so it is always measured against the same clock `frame`'s `now` is.
+  const COUNTDOWN_SECONDS = 3;
+  let starting = true;
+  let countdownAt = null;
+
+  function beginCountdown(){
+    starting = true;
+    countdownAt = null;
+    ui.countdown.hidden = false;
   }
 
   function frame(now){
@@ -386,10 +477,20 @@
     const dt = Math.min(0.25, (now - last) / 1000);
     last = now;
 
-    if(!paused && !state.ended){
+    if(starting){
+      if(countdownAt === null) countdownAt = now;
+      const remaining = COUNTDOWN_SECONDS - (now - countdownAt) / 1000;
+      if(remaining <= 0){
+        starting = false;
+        ui.countdown.hidden = true;
+      } else {
+        ui.countdownNum.textContent = String(Math.ceil(remaining));
+      }
+    } else if(!paused && !state.ended){
       acc += dt;
       while(acc >= STEP){ tick(state); acc -= STEP; }
       quackNewArrivals();
+      sfxNewLosses();
       if(state.ended){ refreshSkills(); endMessage(); }
     }
 
@@ -407,10 +508,12 @@
     armed = null;
     paused = false;
     quacked = new Set();
+    mourned = new Set();
     ui.pause.textContent = 'Pause';
     ui.overlay.hidden = true;
     say('');
     refreshSkills();
+    beginCountdown();
   }
   ui.restart.addEventListener('click', restart);
   ui.again.addEventListener('click', restart);
@@ -452,6 +555,7 @@
   addEventListener('orientationchange', () => setTimeout(fitScene, 120));
 
   refreshSkills();
+  beginCountdown();
   requestAnimationFrame(frame);
 </script>
 
