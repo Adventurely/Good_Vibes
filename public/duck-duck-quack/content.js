@@ -174,7 +174,14 @@ export const LEVEL_1 = {
 
   duckCount: 10,
   spawnInterval: TICK_RATE * 2,     // one every two seconds
-  timeLimit: TICK_RATE * 120,       // two minutes
+  /* Two minutes wasn't enough — not for the sim, which clears this with
+     room to spare (see the balance harness), but for a person: slowing the
+     ducks down (TICK_RATE 14 -> 11) made the walk itself take longer in
+     real seconds, and on top of that a real player has to notice each
+     hazard coming and click the right skill on the right duckling, up to
+     nine times over for Climber and again for Flyer. Three and a half
+     minutes gives that room without turning the level into a wait. */
+  timeLimit: TICK_RATE * 210,       // three and a half minutes
   winRatio: 0.8,
 
   /* Generous on purpose — this is the first level anyone will ever play, and
@@ -196,7 +203,75 @@ export const LEVEL_1 = {
   goose: { x0: 260, x1: 299, y: 150, speed: 1.5, catchRadius: 1.5 },
 };
 
-export const LEVELS = [LEVEL_1];
+/* "The Warren": a gap, then two walls, then the goose and the pond — the
+ * same vocabulary as The Park, but Climber and Flyer are both zero here.
+ * Every wall has to be tunnelled, not climbed, which is what a warren is.
+ *
+ * That makes Digger strictly necessary rather than merely available: there
+ * is no other way past either wall, and since a tunnel — like a bridge —
+ * changes the terrain itself, one successful dig through each is permanent
+ * for the whole flock behind it. Two walls, two required digs; the supply
+ * below carries one spare on top of that, the same margin Builder gets for
+ * its one gap.
+ *
+ * Blocker is not required the way Digger is, and — this is worth being
+ * straight about — there is no play here where it actually helps win,
+ * either. Turning a duckling back never lets it reach the goal (see
+ * sim.js), it cannot touch the goose, and a run ends the instant `saved`
+ * reaches the quota (see evaluate() in sim.js), so there is no leftover
+ * "stragglers left exposed" moment for a Blocker to close off — that was
+ * the first idea here, and it does not survive actually running the sim.
+ * It is on this level for the same honest reason it is on The Park: a
+ * duckling can be planted, and a plant is a real tool worth having in
+ * reach even on a level whose critical path never calls for one.
+ */
+export const LEVEL_2 = {
+  id: 'warren',
+  name: 'The Warren',
+  width: SCENE_W,
+  height: SCENE_H,
+
+  /* [0, 40)    flat ground out of the nest
+     [40, 65)   the gap — 25 columns of pit, wants a Builder
+     [65, 120)  flat ground up to the first wall
+     [120, 165) the first wall — 45 columns tall enough that only a tunnel
+                gets through it; there is no Climber supply on this level
+     [165, 220) flat ground between the two walls
+     [220, 260) the second wall — shorter, but the same deal
+     [260, 300) the goose's beat
+     [300, 320) the pond */
+  segments: [
+    { from: 0, to: 40, y: 150 },
+    { from: 40, to: 65, y: PIT_Y },
+    { from: 65, to: 120, y: 150 },
+    { from: 120, to: 165, y: 70 },
+    { from: 165, to: 220, y: 150 },
+    { from: 220, to: 260, y: 90 },
+    { from: 260, to: 320, y: 150 },
+  ],
+
+  nestX: 6,
+  goalX: 300,
+
+  /* Twelve hatch, nine needed — three more than the quota, on purpose: that
+     slack is what makes planting a Blocker once you've got nine home an
+     actual choice rather than a trap, instead of the tight margins The
+     Park plays with. */
+  duckCount: 12,
+  spawnInterval: TICK_RATE * 2,
+  timeLimit: TICK_RATE * 240,       // four minutes — two hazards need solving, not nine crossings
+  winRatio: 0.75,
+
+  /* Digger: one spare over the two required digs. Builder: one spare over
+     its one required bridge. Climber and Flyer: zero — this level's whole
+     point is that the wall gets tunnelled, not climbed. Blocker: enough to
+     close the gate on the slack ducklings once the quota's in. */
+  supply: { digger: 3, builder: 2, blocker: 2, climber: 0, flyer: 0 },
+
+  goose: { x0: 260, x1: 299, y: 150, speed: 1.5, catchRadius: 1.5 },
+};
+
+export const LEVELS = [LEVEL_1, LEVEL_2];
 
 export const winCount = level => Math.ceil(level.duckCount * level.winRatio);
 

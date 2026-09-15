@@ -37,6 +37,7 @@
 
   header{ display: flex; align-items: baseline; gap: 0.9rem; flex-wrap: wrap; padding-bottom: 0.5rem; }
   header h1{ margin: 0; font-size: 1.2rem; font-weight: 800; }
+  header .level-name{ color: var(--muted); font-weight: 600; }
   header .crumb{ color: var(--muted); font-size: 0.82rem; text-decoration: none; margin-left: auto; }
   header .crumb:hover{ color: var(--text); }
 
@@ -104,6 +105,8 @@
   .overlay[hidden]{ display: none; }
   .overlay h2{ margin: 0; font-size: 1.5rem; }
   .overlay p{ margin: 0; font-size: 0.9rem; max-width: 22rem; }
+  .overlay-actions{ display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; }
+  .overlay-actions .btn{ text-decoration: none; }
 
   /* Auto-fit rather than a fixed count: the number of skills is whatever
      content.js says it is, and a fifth one should wrap onto a second row
@@ -203,15 +206,15 @@
 <body>
 <div class="wrap">
   <header>
-    <h1>Duck Duck Quack</h1>
-    <a class="crumb" href="/">&larr; games</a>
+    <h1>Duck Duck Quack <span class="level-name" id="level-name"></span></h1>
+    <a class="crumb" href="/duck-duck-quack/">&larr; levels</a>
   </header>
 
   <div class="layout">
     <div class="screen-col">
       <div class="screen">
         <canvas id="scene" width="320" height="180" tabindex="0" role="application"
-                aria-label="The park. Arm a skill below, then click a walking duckling to give it that skill."></canvas>
+                aria-label="Arm a skill below, then click a walking duckling to give it that skill."></canvas>
         <div class="hud" aria-hidden="true">
           <div>
             Saved <b id="hud-saved">0 / 0</b> <span class="hint" id="hud-hint">needed</span><br>
@@ -228,7 +231,10 @@
         <div class="overlay" id="overlay" hidden>
           <h2 id="overlay-title"></h2>
           <p id="overlay-body"></p>
-          <button class="btn btn-go" id="again" type="button">Play again</button>
+          <div class="overlay-actions">
+            <button class="btn btn-go" id="again" type="button">Play again</button>
+            <a class="btn" id="next-level" href="#" hidden></a>
+          </div>
         </div>
       </div>
     </div>
@@ -250,7 +256,7 @@
 </div>
 
 <script type="module">
-  import { LEVEL_1, SKILLS, SKILL_INFO, TICK_RATE, winCount, formatTime } from './content.js';
+  import { LEVELS, SKILLS, SKILL_INFO, TICK_RATE, winCount, formatTime } from './content.js';
   import { newGame, tick, assignSkill, assignRefusal, duckNear } from './sim.js';
   import { paintScene, drawSkillBadge, BADGE_PLATE_W, BADGE_PLATE_H } from './art.js';
   import { createAudio } from './audio.js';
@@ -260,12 +266,21 @@
   // wears. Whole-number, so it stays a pixel drawing rather than a blur.
   const BADGE_SCALE = 4;
 
+  // Which level this page is: ?level=<id>, or the first one if that's
+  // missing or doesn't match anything — a bad or old link should still
+  // open a level, not a blank page.
+  const requestedId = new URLSearchParams(location.search).get('level');
+  const LEVEL = LEVELS.find(l => l.id === requestedId) || LEVELS[0];
+  const nextLevel = LEVELS[LEVELS.indexOf(LEVEL) + 1] || null;
+  document.getElementById('level-name').textContent = `— ${LEVEL.name}`;
+  document.title = `Duck Duck Quack — ${LEVEL.name}`;
+
   const els = id => document.getElementById(id);
   const ui = {
     scene: els('scene'), hudSaved: els('hud-saved'), hudLost: els('hud-lost'),
     hudHatched: els('hud-hatched'), hudTime: els('hud-time'),
     overlay: els('overlay'), overlayTitle: els('overlay-title'), overlayBody: els('overlay-body'),
-    again: els('again'), status: els('status'), pause: els('pause'), restart: els('restart'),
+    again: els('again'), nextLevel: els('next-level'), status: els('status'), pause: els('pause'), restart: els('restart'),
     sound: els('sound'), skills: document.querySelector('.skills'),
     countdown: els('countdown'), countdownNum: els('countdown-num'), hudHint: els('hud-hint'),
   };
@@ -309,7 +324,7 @@
 
   addEventListener('pagehide', () => audio.stop());
 
-  let state = newGame(LEVEL_1);
+  let state = newGame(LEVEL);
   let armed = null;
   let paused = false;
 
@@ -370,8 +385,8 @@
   function sceneXY(event){
     const box = ui.scene.getBoundingClientRect();
     return {
-      x: (event.clientX - box.left) / box.width * LEVEL_1.width,
-      y: (event.clientY - box.top) / box.height * LEVEL_1.height,
+      x: (event.clientX - box.left) / box.width * LEVEL.width,
+      y: (event.clientY - box.top) / box.height * LEVEL.height,
     };
   }
 
@@ -435,8 +450,18 @@
   function endMessage(){
     const won = state.ended === 'won';
     ui.overlayTitle.textContent = won ? 'The flock made it!' : 'Out of time';
-    ui.overlayBody.textContent = `${state.saved} of ${LEVEL_1.duckCount} saved`
-      + ` — needed ${winCount(LEVEL_1)}. ${state.lost} lost.`;
+    ui.overlayBody.textContent = `${state.saved} of ${LEVEL.duckCount} saved`
+      + ` — needed ${winCount(LEVEL)}. ${state.lost} lost.`;
+    // A next level to go to only means anything once this one is actually
+    // won — offering it on a loss would read as skipping past the level
+    // that just beat you.
+    if(won && nextLevel){
+      ui.nextLevel.href = `./play.html?level=${nextLevel.id}`;
+      ui.nextLevel.textContent = `Next: ${nextLevel.name}`;
+      ui.nextLevel.hidden = false;
+    } else {
+      ui.nextLevel.hidden = true;
+    }
     ui.overlay.hidden = false;
   }
 
@@ -447,16 +472,16 @@
      what "clear about the status of the goal" means while a level is still
      running rather than only once it ends. */
   function refreshHud(){
-    const need = winCount(LEVEL_1);
-    const maxPossible = LEVEL_1.duckCount - state.lost;
+    const need = winCount(LEVEL);
+    const maxPossible = LEVEL.duckCount - state.lost;
     const atRisk = state.saved < need && maxPossible < need;
     ui.hudSaved.textContent = `${state.saved} / ${need}`;
     ui.hudSaved.classList.toggle('at-risk', atRisk);
     ui.hudHint.textContent = atRisk ? "can't reach" : 'needed';
     ui.hudHint.classList.toggle('at-risk', atRisk);
     ui.hudLost.textContent = String(state.lost);
-    ui.hudHatched.textContent = `${state.hatched} / ${LEVEL_1.duckCount}`;
-    ui.hudTime.textContent = formatTime(Math.max(0, LEVEL_1.timeLimit - state.ticks));
+    ui.hudHatched.textContent = `${state.hatched} / ${LEVEL.duckCount}`;
+    ui.hudTime.textContent = formatTime(Math.max(0, LEVEL.timeLimit - state.ticks));
   }
 
   /* --- the starting countdown ------------------------------------------- */
@@ -509,7 +534,7 @@
   });
 
   function restart(){
-    state = newGame(LEVEL_1);
+    state = newGame(LEVEL);
     armed = null;
     paused = false;
     quacked = new Set();
@@ -559,14 +584,14 @@
       const viewH = (window.visualViewport && window.visualViewport.height) || innerHeight;
       const availH = Math.max(60, viewH - top - GUTTER);
       const availW = Math.max(60, screenWrap.clientWidth);
-      const scale = Math.min(availW / LEVEL_1.width, availH / LEVEL_1.height);
-      ui.scene.style.width = `${Math.floor(LEVEL_1.width * scale)}px`;
-      ui.scene.style.height = `${Math.floor(LEVEL_1.height * scale)}px`;
+      const scale = Math.min(availW / LEVEL.width, availH / LEVEL.height);
+      ui.scene.style.width = `${Math.floor(LEVEL.width * scale)}px`;
+      ui.scene.style.height = `${Math.floor(LEVEL.height * scale)}px`;
       return;
     }
     ui.scene.style.width = '';
     ui.scene.style.height = '';
-    fitCanvas(ui.scene, LEVEL_1.width, LEVEL_1.height, { container: screenWrap, maxHeightFraction: 0.85 });
+    fitCanvas(ui.scene, LEVEL.width, LEVEL.height, { container: screenWrap, maxHeightFraction: 0.85 });
   }
   fitScene();
   addEventListener('resize', fitScene);
