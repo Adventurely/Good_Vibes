@@ -202,18 +202,18 @@ const GROWERS_ON_LOT = Object.values(OWNED).reduce((a, b) => a + b, 0);
    own loader so a save it would refuse is a save this does not boast about.
    The tree on the plate is their tree too: it is drawn at the age of the save,
    so a player who has replanted four times comes back to the tree that has. */
-let winters = 0;
+let seeds = 0;
 try {
   const raw = localStorage.getItem('sunward:save');
   if(raw){
     const state = fromSave(JSON.parse(raw));
-    winters = state.prestiges || 0;
+    seeds = state.seeds || 0;
     const planted = GROWERS.reduce((n, g) => n + (state.owned[g.id] || 0), 0);
     if(planted > 0 || state.life.earned > 0){
       document.getElementById('enter').textContent = 'Back to the lot';
       document.getElementById('saved').textContent =
         `${planted} grower${planted === 1 ? '' : 's'} planted, ${formatEnergy(state.life.earned)} energy earned all told`
-        + `${state.seeds ? `, ${state.seeds} seed${state.seeds === 1 ? '' : 's'} held` : ''}.`;
+        + `${seeds ? `, ${seeds} seed${seeds === 1 ? '' : 's'} earned` : ''}.`;
     }
   }
 } catch { /* private window, or a save this build cannot read. Say nothing. */ }
@@ -229,7 +229,7 @@ function frame(now){
     growers: GROWERS_ON_LOT,
     now,
     sway: still ? 0 : Math.sin(now / 1400) * 0.05,
-    age: winters,
+    age: seeds,
   });
   if(!still) requestAnimationFrame(frame);
 }

@@ -500,14 +500,14 @@ const run = (ctx, key, light, x, y, w) => {
   ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), 1);
 };
 
-/* --------------------------------------------------------------- winters */
+/* --------------------------------------------------------------- seeds */
 
-/* How the tree comes back after each winter — which is what replanting the lot
- * is. `growth` says how planted the lot is; `age` says how many winters the
+/* How the tree comes back after each season — which is what replanting the lot
+ * is. `growth` says how planted the lot is; `age` says how many seeds the
  * tree has stood through, and a tree that has stood through seven should not
  * be the first-year sapling with a thicker trunk. Each stage keeps everything
  * the earlier ones added and adds one thing of its own, so a player who has
- * replanted four times can see all four winters in the tree, not just the
+ * replanted four times can see all four seeds in the tree, not just the
  * last.
  *
  * The multipliers are on the trunk width, the leaf-blob radius and the spread
@@ -517,15 +517,15 @@ const run = (ctx, key, light, x, y, w) => {
  * old tree looks next to a young one. `reach` trims the limbs where a stage
  * would otherwise put its crown through the top of the frame; the last stage
  * is allowed to, on purpose — a tree too big for its picture is the point of
- * seven winters. `fork` is the angle, in radians off vertical, of the low limb
- * that leaves the trunk from the second winter on. `hit` is how much wider and
+ * seven seeds. `fork` is the angle, in radians off vertical, of the low limb
+ * that leaves the trunk from the second season on. `hit` is how much wider and
  * taller the tap target gets, measured off the drawn extents.
  *
  * Stage 0 is today's tree and has to draw it pixel for pixel: the shelf card
  * and the tests both depend on it. Every multiplier here is exactly 1, and a
  * float times 1 is that float.
  */
-const WINTERS = [
+const SEASONS = [
   { id: 'sapling',     trunk: 1,    leaf: 1,    spread: 1,   depthBonus: 0, reach: 1,    fork: 0,    hit: [1, 1],
     adds: [] },
   { id: 'stout',       trunk: 1.35, leaf: 1.08, spread: 1,   depthBonus: 0, reach: 1,    fork: 0,    hit: [1.38, 1.28],
@@ -547,15 +547,15 @@ const WINTERS = [
 /* The same table with each stage's `features` filled in cumulatively and a
    `has` lookup built off it, so the painter asks `stage.has.swing` rather than
    searching an array sixty times a second. */
-export const TREE_STAGES = WINTERS.map((row, winters) => {
+export const TREE_STAGES = SEASONS.map((row, seeds) => {
   const features = [];
-  for(let i = 0; i <= winters; i++) features.push(...WINTERS[i].adds);
+  for(let i = 0; i <= seeds; i++) features.push(...SEASONS[i].adds);
   const has = {};
   for(const f of features) has[f] = true;
-  return { winters, ...row, features, has };
+  return { seeds, ...row, features, has };
 });
 
-/* The stage for a number of winters. Clamped at both ends and safe against a
+/* The stage for a number of seeds. Clamped at both ends and safe against a
    save that reads as NaN: a tree with no legible age is a first-year tree. */
 export const stageFor = age => {
   const i = Math.floor(age);
@@ -563,7 +563,7 @@ export const stageFor = age => {
 };
 
 /* Past the last stage the last design is reused and the tree simply goes on
-   thickening — four percent a winter on the trunk and the canopy, and never
+   thickening — four percent a season on the trunk and the canopy, and never
    more than half again in all. A tree that grew without bound would one day
    fill the frame with a single colour. */
 export const AGED_STEP = 0.04;
@@ -583,7 +583,7 @@ const scatter = i => Math.imul(i + 11, 2654435761) >>> 0;
  *
  * Everything below draws through two verbs, `run` and `fill`, and a
  * full-grown tree is seven thousand of them a frame — thirty thousand once it
- * has stood through a few winters. On the canvas each one is a fillRect: a
+ * has stood through a few seeds. On the canvas each one is a fillRect: a
  * call across into the browser's painter, a fill style parsed from a hex
  * string, a rectangle clipped and composited. Measured in Chromium that is
  * five milliseconds a frame for a first-year tree and nineteen for an old one;
@@ -703,7 +703,7 @@ function leafBlob(dst, cx, cy, r, o){
     dst.run('G', o.light, x0 + split, Math.round(cy) + dy, w - split);
   }
 
-  /* Blossom, from the fifth winter: five specks of rose and skin in one blob
+  /* Blossom, from the fifth season: five specks of rose and skin in one blob
      in sixteen, placed off a hash of the blob's index so they hold still, and
      drawn after the blob so they sit on top of it. */
   if(o.blossom){
@@ -834,10 +834,10 @@ function rootRow(dst, left, right, y, ext, o){
 }
 
 /* The root flare — two splayed runs each side at the ground line — and, from
-   the fifth winter, buttress roots over it: three runs each side reaching
+   the fifth season, buttress roots over it: three runs each side reaching
    about fourteen pixels out on a full-grown tree and stepping in as they
    climb, so they taper. Both are sized off the trunk, so a sapling that has
-   stood through five winters has roots in proportion and not a plinth. */
+   stood through five seeds has roots in proportion and not a plinth. */
 function roots(dst, cx, trunk, o){
   const w = Math.max(1, Math.round(trunk));
   const left = Math.round(cx - w / 2);
@@ -876,7 +876,7 @@ function fallenLeaves(dst, cx, trunk, o){
    is three by five on a middling tree and not a hole wider than the wood on a
    sapling. The upper half is deep violet rather than ink — the light is from
    above, and the top of a hole is the part you can see into. From the fifth
-   winter it glows gold at night, and the glow is drawn unshaded, like the
+   season it glows gold at night, and the glow is drawn unshaded, like the
    lanterns, because it is the light and not a thing lit. */
 function knot(dst, cx, cy, trunk, o){
   const kw = Math.max(2, Math.min(5, Math.round(trunk * 0.38)));

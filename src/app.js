@@ -2,7 +2,7 @@ import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { serve, MAX_BODY, TOO_LARGE, BAD_JSON } from './sunward-board.js';
+import { serve, migrateStore, MAX_BODY, TOO_LARGE, BAD_JSON } from './sunward-board.js';
 
 const publicDir = fileURLToPath(new URL('../public/', import.meta.url));
 
@@ -15,6 +15,7 @@ const BOARD_PATH = '/api/sunward/board';
  * dev server — the rooms do the same — and the rules are the same module
  * either way, so what passes here passes there. */
 const board = { players: {} };
+migrateStore(board);   // nothing to move in an empty one; here so the two paths match
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',

@@ -1691,21 +1691,53 @@ changed shape with the state — sometimes a count, sometimes a percentage,
 sometimes a threshold — and a player could not tell which of the three they
 were being told.
 
-**The tree ages with each winter.** A replanting is a winter the tree has
-stood through: the lot goes back to bare ground, the seeds stay, and the tree
-comes back a year older — and drawn bigger and grander, with a design of its
-own for each of the first seven winters (stouter, with its roots showing;
-forked low; a knot hole and moss; broad, with a swing; buttress roots and
-blossom; lanterns and a bench; twin trunks and vines, with the crown clipping
-the top of the picture) and a slow swelling after that. `TREE_STAGES` in `art.js` is the table; the
-age is the save's replant count, read through `winters` in `content.js`, and
-the tap target grows with it. Each of the first ten winters is its own medal,
-and the ladder goes on to a hundred. The word on the page is "winter" and
-never "reset", because a reset is a thing that makes the lot smaller and this
-is the one thing on it that a replanting makes bigger.
+**A seed is a season, and a season is a replant.** One number, three ways of
+saying it, and for a fortnight they were three different numbers. A replant
+gives the lot back and pays exactly one seed, however long you waited; the
+lifetime energy the next seed wants is four times the last — a million, four,
+sixteen, sixty-four — measured against a lifetime total no replant ever
+clears, so you never re-earn what you had, you add three times it again from
+bare ground.
+
+**What a seed buys is nothing. What it opens is a row.** Twelve of them in
+`PRESTIGE`, one a seed, each paid for in energy inside a run and then kept
+through every replant afterwards. That carrying-across is what the loop was
+missing: the lot went back to nothing while the next seed wanted four times as
+much, so without it every season was harder than the last and the loop stopped
+paying. Three of the rows do things nothing else in the game can — a head
+start in energy on every replant, full rate while the tab is shut instead of
+half, and a day of time away counted instead of half a day — and the rest go
+through the same bonus keys the run's own upgrades use, so a multiplier is a
+multiplier wherever it was bought.
+
+Simulated against the real module, with a player who replants on sight and
+roots whatever they can afford: six seeds in the first day, at 1h24m, 3h21m,
+6h21m, 9h39m, 13h54m and 19h36m; thirteen in a week; the whole tree standing
+by day six; fifteen in a month. The medal ladder was rebuilt to match — it ran
+to a hundred, which a cube root could reach and this cannot — and now runs 1
+to 10, then 12, 15, 20 and 25.
+
+**The tree ages with each season.** The lot goes back to bare ground and the
+tree comes back a year older, drawn bigger and grander, with a design of its
+own for each of the first seven (stouter, with its roots showing; forked low;
+a knot hole and moss; broad, with a swing; buttress roots and blossom;
+lanterns and a bench; twin trunks and vines, with the crown clipping the top
+of the picture) and a slow swelling after that. `TREE_STAGES` in `art.js` is
+the table; the age is the seed count, read through `seedsEarned`, and the tap
+target grows with it. The word on the page is "replant" and never "reset",
+because a reset is a thing that makes the lot smaller and this is the one
+thing on it that a replanting makes bigger.
+
+The word **winter** is gone. It named all of this for a fortnight — the tree's
+ages, the medals, a board column — and then a seed became the same thing a
+winter was, and two names for one number is how a page and a table start
+disagreeing. `winters` and `winterMedal` survive in `content.js` as aliases
+onto the new names, because removing an export is how a save or a page stops
+loading, and the leaderboard still reads a `winters` figure posted by a tab
+that has not reloaded.
 
 **The board is opt-in, and joining sends a name and four numbers.** Nothing
-else leaves the device. Four lists — most taps, most winters, most energy
+else leaves the device. Four lists — most taps, most seeds, most energy
 earned all told, fastest hands — behind one Durable Object and one HTTP route,
 the first on this site that is not a socket. The id that goes with a name is random and
 made in the browser; whoever holds it can update the row and nobody else can,

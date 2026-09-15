@@ -14,7 +14,7 @@
  */
 
 import { DurableObject } from 'cloudflare:workers';
-import { serve, MAX_BODY, TOO_LARGE, BAD_JSON } from './sunward-board.js';
+import { serve, migrateStore, MAX_BODY, TOO_LARGE, BAD_JSON } from './sunward-board.js';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' };
 
@@ -46,6 +46,9 @@ export class SunwardBoard extends DurableObject {
     this.store = { players: {} };
     ctx.blockConcurrencyWhile(async () => {
       this.store.players = (await ctx.storage.get('players')) || {};
+      // Rows written before a board was renamed. Saved back only if anything
+      // actually moved, so a cold start on an up-to-date store writes nothing.
+      if(migrateStore(this.store)) await ctx.storage.put('players', this.store.players);
     });
   }
 
