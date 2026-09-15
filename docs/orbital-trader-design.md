@@ -379,6 +379,10 @@ off, because where you buy a thing is half of what it is.
 | Heat shielding | Cinder | Engineer | Lets the ship fly through air instead of into it — aerobraking, at a price |
 | Cryo hull cooling | Cinder | Engineer, heat shielding | Takes the price off: the same passes, no risk |
 
+**A rendezvous has to say what it is waiting for.** It is the one state in the game where the ship is exactly where it wants to be and doing the wrong thing about it: inside Whisker's mouth, thirty thousand kilometres from the harbour, going five and a half kilometres a second past it. There is no gravity to finish the job — being near a rendezvous is not being caught by one — so the ship will sail straight out the far side unless the pilot matches its speed. The Ahead panel therefore leads with the harbour the ship is inside, live while the burn brings the number down: *Whisker is right here, and there is nothing to fall into: 32,800 km off and closing at 5.55 km/s. Match its speed to 1000 m/s or under and it will take you* — and then *Whisker will take you now*. Inside the mouth with only the speed wrong is also no longer greyed in the HUD, because that is not "nowhere near it", it is the most actionable thing on the screen.
+
+Without that, the whole screen agrees the place is broken. The anchor only appears once docking is already possible, the mouth is an unlabelled ring at that zoom, and a player who has just learned that Nail has a reach you fall into will reasonably conclude that Whisker is missing one.
+
 **All four do something now.** They were not always: the rack carries a "not
 fitted to anything yet" line for any row that is ahead of its mechanic, because
 selling a captain a box that does nothing without saying so is a swindle, and

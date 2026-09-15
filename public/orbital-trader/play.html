@@ -88,6 +88,10 @@
   #where b{ color:var(--dim); font-weight:500; }
   #dockhint{ color:var(--mint); font-size:.85rem; }
   #dockhint.far{ color:var(--dim); }
+  /* Inside the mouth and only the speed is wrong. That is not "nowhere near
+     it", which is what the dim grey says; it is the one thing the pilot can
+     act on, and it wants to be read. */
+  #dockhint.near{ color:var(--gold); }
 
   /* ---- Warp controls: bottom left ------------------------------------ */
   /* The ×1 clock has no controls but one: a hold. Time is skipped by pointing
@@ -886,6 +890,7 @@ let nodeLabel = null, nodeLabelKey = '', interceptLabel = null, insetLabel = nul
 const WINDOWS_REDRAW_MS = 250;
 const WINDOWS_STEP_DAYS = 0.05;      // the resolution of the coarsest figure shown
 let windowsDrawnAt = -1e9, windowsDrawnT = null;
+let dockLineKey = null, dockLineAt = -1e9;
 /* What every mark written down will take out of the tank, drawn on the gauge. */
 let plannedSpend = 0;
 /* What the selected mark says on the chart, and what the whole plan will
@@ -963,6 +968,15 @@ function frame(now){
     windowsDrawnAt = now;
     windowsDrawnT = state.t;
     renderTab();
+  }
+  /* The Ahead panel now leads with the harbour you are inside, and that line
+     is a number the pilot is actively burning down — so it has to move. Keyed
+     on what it says rather than on the state behind it, so a steady coast
+     rebuilds nothing and a burn rebuilds it a few times a second. */
+  if(panelOpen && tab === 'ship' && dt > 0){
+    const key = docking && docking.kind === 'zone' && (docking.inZone || docking.ok)
+      ? `${docking.port}:${docking.ok}:${Math.round(S.kms(docking.relSpeed) * 100)}` : '';
+    if(key !== dockLineKey && now - dockLineAt > 200){ dockLineKey = key; dockLineAt = now; renderTab(); }
   }
   renderHud(docking);
   renderDockCard(docking);
@@ -1095,6 +1109,7 @@ function renderHud(docking){
       : !docking.clear ? ` · ${pb.name}: that orbit goes through it`
       : ` · ${pb.name}: bring the high point inside ${fmtAu(docking.mouth)}`;
   }else{
+    if(docking.inZone) hint.className = 'near';
     hint.textContent = docking.inZone
       ? ` · ${pb.name}: ${S.fmtKms(docking.over)} too fast`
       : ` · ${pb.name} ${fmtAu(docking.distance)} off`;
@@ -1940,6 +1955,22 @@ function aheadList(){
   if(!prediction) return '';
   const skip = t => `<button class="btn sm" data-act="skipto|${t}">Skip to it</button>`;
   const lines = [];
+  /* Before anything ahead: the harbour you are inside this second, and what it
+     is still waiting for. A rendezvous has no gravity to finish the job — you
+     are not captured, you are merely nearby — so a ship can sit in the middle
+     of Whisker's mouth at five kilometres a second with nothing on this panel
+     mentioning Whisker at all. The corner of the HUD said "4.55 km/s too fast"
+     in grey, and the reasonable thing to conclude from the rest of the screen
+     was that the place was broken. */
+  const now = state.dockedAt ? null : S.dockingStatus(state);
+  if(now && now.kind === 'zone' && now.inZone && !now.ok){
+    const pb = world.get(now.port);
+    lines.push({ t: -Infinity, html: `<p class="down"><b>${esc(pb.name)} is right here</b>, and there is nothing to fall into: `
+      + `${fmtAu(now.distance)} off and closing at ${S.fmtKms(now.relSpeed)}. `
+      + `Match its speed to ${S.fmtKms(now.dockSpeed)} or under and it will take you.</p>` });
+  }else if(now && now.ok){
+    lines.push({ t: -Infinity, html: `<p class="up"><b>${esc(world.get(now.port).name)} will take you now.</b> Press the anchor, or <kbd>d</kbd>.</p>` });
+  }
   for(const e of prediction.events){
     if(e.kind === 'soi'){
       const to = world.get(e.to), from = world.get(e.from);

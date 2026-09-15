@@ -2462,6 +2462,49 @@ test('a harbour takes you when you are in a stable orbit close in, and not befor
   assert.equal(S.dockRefusal(st), 'too far out');
 });
 
+test('a rendezvous refuses on speed, and says so where the pilot is looking', () => {
+  /* The report this came from: "I got to Whisker and I cannot dock — it does
+     not have an SOI and I cannot dock without one." The harbour was working.
+     Whisker wants two things and only one of them was met: the ship was 33,000
+     km inside a 299,000 km mouth and going 5.6 km/s past it. What was missing
+     was the saying-so. The Ahead panel — which is the whole of the flight
+     panel now — listed nothing at all about the world the ship was sitting
+     inside, and the only mention on the screen was a grey twelve-pixel line in
+     the corner of the HUD. A player who has just learned that Nail has a reach
+     you fall into will conclude the place is broken, and be right to. */
+  const w = world.get('whisker');
+  const lamp = world.get('lamp');
+  const auDayPerMs = 1 / 1731481.5;
+  const at = (offKm, relMs) => {
+    const s = S.newGame(1); S.undock(s); s.t = 1000;
+    const st = O.railState(w, lamp.mu, s.t);
+    s.ship = { body: 'lamp', r: [st.r[0] + offKm / 1.496e8, st.r[1]], v: [st.v[0] + relMs * auDayPerMs, st.v[1]] };
+    return S.dockingStatus(s);
+  };
+  const limit = w.dockSpeed / auDayPerMs;
+  assert.ok(limit > 900 && limit < 1100, `the speed it asks for is about a km/s (${limit.toFixed(0)} m/s)`);
+  assert.equal(w.soi, null, 'and it has no reach at all, which is the point');
+
+  const fast = at(33000, 5600);
+  assert.equal(fast.port, 'whisker');
+  assert.equal(fast.ok, false, 'five and a half km/s past it is not an arrival');
+  assert.ok(fast.inZone, 'but it is inside the mouth, which is the half that was met');
+  assert.equal(S.dockRefusal(fast), 'too fast');
+
+  assert.equal(at(33000, 900).ok, true, 'matched speed inside the mouth is a docking');
+  assert.equal(at(250000, 900).ok, true, 'and the mouth really is that wide');
+  assert.equal(at(400000, 100).ok, false, 'outside it, slow is not enough');
+
+  /* And the panel has to lead with it. This is the one state in the game where
+     the ship is somewhere it wants to be and doing the wrong thing about it. */
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  const ahead = PLAY.slice(PLAY.indexOf('function aheadList()'), PLAY.indexOf('function shipTab()'));
+  assert.match(ahead, /is right here/, 'the panel says nothing about the harbour the ship is inside');
+  assert.match(ahead, /Match its speed to/, 'and does not say what to do about it');
+  assert.match(ahead, /will take you now/, 'nor when it has been done');
+  assert.match(PLAY, /#dockhint\.near\{/, 'inside the mouth and merely too fast still reads as "nowhere near it"');
+});
+
 test('the belt havens and the Maw are rendezvous zones you match speeds with', () => {
   /* Nothing to fall towards, or so little it makes no difference: you arrive
      by being in the same place going the same way, which is what a harbour
