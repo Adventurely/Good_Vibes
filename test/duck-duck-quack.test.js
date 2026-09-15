@@ -13,7 +13,7 @@ import { test } from 'node:test';
 
 import {
   SCENE_W, SCENE_H, WALK_STEP, FALL_SAFE, FALL_SPEED, FLY_SPEED, TICK_RATE,
-  SKILLS, SKILL_INFO, LEVEL_1, LEVEL_2, LEVELS, buildTerrain, winCount, formatTime,
+  SKILLS, SKILL_INFO, LEVEL_1, LEVEL_2, LEVEL_3, LEVELS, buildTerrain, winCount, formatTime,
 } from '../public/duck-duck-quack/content.js';
 
 import { newGame, tick, assignSkill, assignRefusal, duckNear, hasTrait } from '../public/duck-duck-quack/sim.js';
@@ -481,6 +481,91 @@ test('The Warren cannot be won without a Digger — neither wall has any other w
   }
   assert.equal(state.saved, 0, 'nothing should get past the first wall without a Digger');
   assert.notEqual(state.ended, 'won');
+});
+
+/* ------------------------------------------------------------ The Orchard, played */
+
+/* A bot for The Orchard that climbs the wall rather than digging it — the
+ * level supplies both, and this is the one way to check Climber genuinely
+ * still works there too, not just the Digger path the other helpers below
+ * exercise. Flyer is given at hatch rather than at any particular column,
+ * because a climbed wall's own far side is a real drop (see content.js) —
+ * waiting for the later, unrelated drop to hand it out would be too late
+ * for the wall's own landing.
+ */
+function playLevel3Climbing(){
+  const state = newGame(LEVEL_3);
+  let builderUsed = false;
+  for(let i = 0; i < LEVEL_3.timeLimit && !state.ended; i++){
+    for(const d of state.ducks){
+      if(d.state !== 'walking') continue;
+      if(!builderUsed && d.x === 34 && assignSkill(state, d.id, 'builder')){ builderUsed = true; continue; }
+      if(!hasTrait(d, 'flyer') && d.x < 10) assignSkill(state, d.id, 'flyer');
+      if(!hasTrait(d, 'climber') && d.x >= 75 && d.x < 85) assignSkill(state, d.id, 'climber');
+    }
+    tick(state);
+  }
+  return state;
+}
+
+test('The Orchard can be won by climbing the wall instead of digging it', () => {
+  const state = playLevel3Climbing();
+  assert.equal(state.ended, 'won');
+  assert.ok(state.saved >= winCount(LEVEL_3), `only ${state.saved} saved, needed ${winCount(LEVEL_3)}`);
+});
+
+/* And the Digger path, for the same reason The Park keeps its "at the
+ * edge" bot honest: a digger given right where the wall starts should
+ * tunnel it for the whole flock, needing no Climber at all. */
+function playLevel3Digging(){
+  const state = newGame(LEVEL_3);
+  let builderUsed = false, diggerUsed = false;
+  for(let i = 0; i < LEVEL_3.timeLimit && !state.ended; i++){
+    for(const d of state.ducks){
+      if(d.state !== 'walking') continue;
+      if(!builderUsed && d.x === 34 && assignSkill(state, d.id, 'builder')){ builderUsed = true; continue; }
+      if(!diggerUsed && d.x === 84 && assignSkill(state, d.id, 'digger')){ diggerUsed = true; continue; }
+      if(!hasTrait(d, 'flyer') && d.x < 10) assignSkill(state, d.id, 'flyer');
+    }
+    tick(state);
+  }
+  return state;
+}
+
+test('The Orchard can also be won by digging the wall instead of climbing it', () => {
+  const state = playLevel3Digging();
+  assert.equal(state.ended, 'won');
+  assert.ok(state.saved >= winCount(LEVEL_3), `only ${state.saved} saved, needed ${winCount(LEVEL_3)}`);
+});
+
+test('The Orchard cannot be won without a Builder — the gap has no other answer', () => {
+  const state = newGame(LEVEL_3);
+  for(let i = 0; i < LEVEL_3.timeLimit && !state.ended; i++){
+    for(const d of state.ducks){
+      if(d.state !== 'walking') continue;
+      if(!hasTrait(d, 'flyer') && d.x < 10) assignSkill(state, d.id, 'flyer');
+      if(!hasTrait(d, 'climber') && d.x >= 75 && d.x < 85) assignSkill(state, d.id, 'climber');
+    }
+    tick(state);
+  }
+  assert.equal(state.saved, 0, 'nothing should get past the gap without a Builder');
+});
+
+test('The Orchard cannot be won without a Flyer, whichever way the wall was crossed', () => {
+  // The point of the buffer between the wall and the drop: a dig cannot
+  // reach far enough to also flatten this hazard the way it flattens the
+  // wall's own landing, so Flyer stays required even with Digger to spare.
+  const state = newGame(LEVEL_3);
+  let builderUsed = false, diggerUsed = false;
+  for(let i = 0; i < LEVEL_3.timeLimit && !state.ended; i++){
+    for(const d of state.ducks){
+      if(d.state !== 'walking') continue;
+      if(!builderUsed && d.x === 34 && assignSkill(state, d.id, 'builder')){ builderUsed = true; continue; }
+      if(!diggerUsed && d.x === 84 && assignSkill(state, d.id, 'digger')){ diggerUsed = true; continue; }
+    }
+    tick(state);
+  }
+  assert.equal(state.saved, 0, 'nothing should survive the drop without a Flyer');
 });
 
 test('formatTime reads as minutes:seconds', () => {

@@ -77,11 +77,11 @@
   .enter:hover, .enter:focus-visible{ transform: translateY(-2px); filter: brightness(1.1); }
   .enter:focus-visible{ outline: 3px solid var(--gv-leaf); outline-offset: 3px; }
 
-  .level2{
-    display: block; margin-top: .7rem;
-    color: var(--muted); font-size: .82rem; text-decoration: none;
+  .more-levels{
+    margin: .7rem 0 0; color: var(--muted); font-size: .82rem;
   }
-  .level2:hover, .level2:focus-visible{ color: var(--gv-text); }
+  .more-levels a{ color: var(--leaf); text-decoration: none; font-weight: 600; }
+  .more-levels a:hover, .more-levels a:focus-visible{ text-decoration: underline; }
 
   .facts{
     margin: 1.6rem auto 0; padding: 0; list-style: none;
@@ -126,12 +126,16 @@
        wall, a drop, or the goose — and get enough of the hatch to the pond.</p>
 
     <a class="enter" href="./play.html?level=park">Hatch the flock</a>
-    <a class="level2" href="./play.html?level=warren">or try The Warren, where the walls get tunnelled &rarr;</a>
+    <p class="more-levels">
+      or jump to
+      <a href="./play.html?level=warren">The Warren</a>,
+      <a href="./play.html?level=orchard">The Orchard</a>
+    </p>
 
     <ul class="facts">
       <li>Single player</li>
       <li class="sun">Puzzle</li>
-      <li>Two levels, five skills</li>
+      <li>Three levels, five skills</li>
       <li>Nothing saved, nothing sent anywhere</li>
     </ul>
     <button type="button" id="sound" class="sound" aria-pressed="false">Music off</button>

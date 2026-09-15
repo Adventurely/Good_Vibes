@@ -253,10 +253,9 @@ export const LEVEL_2 = {
   nestX: 6,
   goalX: 300,
 
-  /* Twelve hatch, nine needed — three more than the quota, on purpose: that
-     slack is what makes planting a Blocker once you've got nine home an
-     actual choice rather than a trap, instead of the tight margins The
-     Park plays with. */
+  /* Twelve hatch, nine needed — three more than the quota, on purpose:
+     real slack, the same reason The Park's own quota carries a duckling or
+     two of margin. */
   duckCount: 12,
   spawnInterval: TICK_RATE * 2,
   timeLimit: TICK_RATE * 240,       // four minutes — two hazards need solving, not nine crossings
@@ -264,14 +263,85 @@ export const LEVEL_2 = {
 
   /* Digger: one spare over the two required digs. Builder: one spare over
      its one required bridge. Climber and Flyer: zero — this level's whole
-     point is that the wall gets tunnelled, not climbed. Blocker: enough to
-     close the gate on the slack ducklings once the quota's in. */
+     point is that the wall gets tunnelled, not climbed. Blocker: present,
+     same as everywhere else, without a winning use (see the note above). */
   supply: { digger: 3, builder: 2, blocker: 2, climber: 0, flyer: 0 },
 
   goose: { x0: 260, x1: 299, y: 150, speed: 1.5, catchRadius: 1.5 },
 };
 
-export const LEVELS = [LEVEL_1, LEVEL_2];
+/* "The Orchard": a gap, a wall, then a drop that has nothing to do with the
+ * wall at all — the first level where a wall genuinely can be answered
+ * either way, Climber or Digger, and the first fact worth knowing about
+ * that choice is that they are not equivalent afterward.
+ *
+ * A wall's "far side" is really two different things depending on how it
+ * was crossed. Dig it, and the tunnel holds the digging duckling's own
+ * height the whole way through — cut down to nest level, there is no climb
+ * and so nothing to come back down from either, and every duckling behind
+ * it just walks through flat ground that used to be a wall. Climb it, and
+ * the duckling is still standing at the wall's own elevation when the
+ * plateau runs out, which is its own small drop back down — survivable
+ * here (see the segments below), but real, and Digger quietly skips it.
+ *
+ * That asymmetry does not extend to the second hazard, on purpose: the
+ * drop past the buffer at column 165 sits far enough past the wall — more
+ * than DIG_MAX_STEPS beyond where the wall's own tunnel could reach, even
+ * cut at full length — that no dig started at the wall can run into it.
+ * Whichever way the wall was crossed, every duckling reaches that drop on
+ * its own two feet, at a height only Flyer answers. Confirmed by actually
+ * running it four ways: digger-and-flyer, climber-and-flyer, no-builder,
+ * and no-flyer-at-all all come out exactly as their names say they should.
+ */
+export const LEVEL_3 = {
+  id: 'orchard',
+  name: 'The Orchard',
+  width: SCENE_W,
+  height: SCENE_H,
+
+  /* [0, 35)    flat ground out of the nest
+     [35, 55)   the gap — 20 columns of pit, wants a Builder
+     [55, 85)   flat ground up to the wall
+     [85, 130)  the wall — 45 columns, short enough to dig in one go with
+                room to spare, but Climber answers it just as well
+     [130, 165) flat ground the far side of the wall — long enough that a
+                dig started at column 85 always runs out inside it
+     [165, 300) a real drop, 25 columns past where any wall-tunnel could
+                possibly still be cutting, and the goose's beat after it
+     [300, 320) the pond */
+  segments: [
+    { from: 0, to: 35, y: 150 },
+    { from: 35, to: 55, y: PIT_Y },
+    { from: 55, to: 85, y: 150 },
+    { from: 85, to: 130, y: 100 },
+    { from: 130, to: 165, y: 150 },
+    { from: 165, to: 320, y: 175 },
+  ],
+
+  nestX: 6,
+  goalX: 300,
+
+  /* Twelve hatch, nine needed — the same margin The Orchard's neighbours
+     carry, not a tighter one; the escalation here is in what a run asks of
+     a player, not in how little room it leaves for one. */
+  duckCount: 12,
+  spawnInterval: TICK_RATE * 2,
+  timeLimit: TICK_RATE * 240,       // four minutes
+
+  winRatio: 0.75,
+
+  /* Climber and Digger both fully supplied — a real choice for the wall,
+     not a rationed one. Flyer generous too: it is needed regardless of
+     that choice (see the note above), so there is no reason to make it
+     scarce on top of being mandatory. Builder: one spare over its one
+     required bridge. Blocker: present, without a winning use, same as
+     everywhere else. */
+  supply: { digger: 3, builder: 2, blocker: 2, climber: 11, flyer: 11 },
+
+  goose: { x0: 260, x1: 299, y: 175, speed: 1.5, catchRadius: 1.5 },
+};
+
+export const LEVELS = [LEVEL_1, LEVEL_2, LEVEL_3];
 
 export const winCount = level => Math.ceil(level.duckCount * level.winRatio);
 

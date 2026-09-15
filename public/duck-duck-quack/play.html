@@ -447,6 +447,15 @@
     }
   }
 
+  // The countdown that carries a won run on to the next level on its own.
+  // Kept cancellable rather than just a bare `setTimeout` to `location.href`,
+  // because "Play again" during those few seconds has to mean replay this
+  // level, not get yanked into the next one a moment later anyway.
+  let autoAdvanceTimer = null;
+  function cancelAutoAdvance(){
+    if(autoAdvanceTimer){ clearInterval(autoAdvanceTimer); autoAdvanceTimer = null; }
+  }
+
   function endMessage(){
     const won = state.ended === 'won';
     ui.overlayTitle.textContent = won ? 'The flock made it!' : 'Out of time';
@@ -455,10 +464,19 @@
     // A next level to go to only means anything once this one is actually
     // won — offering it on a loss would read as skipping past the level
     // that just beat you.
+    cancelAutoAdvance();
     if(won && nextLevel){
-      ui.nextLevel.href = `./play.html?level=${nextLevel.id}`;
-      ui.nextLevel.textContent = `Next: ${nextLevel.name}`;
+      const href = `./play.html?level=${nextLevel.id}`;
+      ui.nextLevel.href = href;
       ui.nextLevel.hidden = false;
+      let secondsLeft = 4;
+      const countdown = () => {
+        ui.nextLevel.textContent = `Next: ${nextLevel.name} (${secondsLeft})`;
+        if(secondsLeft <= 0){ cancelAutoAdvance(); location.href = href; return; }
+        secondsLeft -= 1;
+      };
+      countdown();
+      autoAdvanceTimer = setInterval(countdown, 1000);
     } else {
       ui.nextLevel.hidden = true;
     }
@@ -534,6 +552,7 @@
   });
 
   function restart(){
+    cancelAutoAdvance();
     state = newGame(LEVEL);
     armed = null;
     paused = false;
