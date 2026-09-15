@@ -21,7 +21,7 @@
  */
 
 import { PALETTE, hex, drawSprite, drawTextOutlined } from '../good-vibes/pixel.js';
-import { SCENE_W, SCENE_H } from './content.js';
+import { SCENE_W, SCENE_H, POOF_TICKS } from './content.js';
 
 export { PALETTE, hex };
 
@@ -428,6 +428,29 @@ export function drawDuck(ctx, d){
   }
 }
 
+/* --------------------------------------------------------------- a poof */
+
+/* Where a lost duckling went down (see sim.js's `loseDuckling`) — a small
+   burst of pale down that spreads and fades over `POOF_TICKS`, rather than
+   the duckling's sprite just being gone the next frame. Fixed offsets and a
+   shrinking pixel count, the same cheap scatter every other flourish in
+   this file uses, not a particle system. */
+const POOF_OFFSETS = [
+  [0, -1], [-1, 0], [1, 0], [-2, -2], [2, -2], [-2, 1], [2, 1], [0, -3],
+];
+
+function drawPoof(ctx, p){
+  const t = p.age / POOF_TICKS;          // 0 just spawned, 1 about to clear
+  const spread = 1 + t * 3;              // drifts outward as it ages
+  const shown = Math.max(1, Math.round(POOF_OFFSETS.length * (1 - t)));
+  const cx = Math.round(p.x), cy = Math.round(p.y) - 3;
+  ctx.fillStyle = hex(t < 0.6 ? 'w' : 'N');
+  for(let i = 0; i < shown; i++){
+    const [dx, dy] = POOF_OFFSETS[i];
+    ctx.fillRect(cx + Math.round(dx * spread), cy + Math.round(dy * spread), 1, 1);
+  }
+}
+
 /* ------------------------------------------------------------------ scene */
 
 /* The whole picture, in back-to-front order. `state` is a sim.js game state;
@@ -440,6 +463,7 @@ export function paintScene(ctx, state){
     if(d.state === 'saved' || d.state === 'lost') continue;
     drawDuck(ctx, d);
   }
+  for(const p of state.poofs) drawPoof(ctx, p);
 }
 
 /* A caption under the title screen's demo scene, drawn with the same font as

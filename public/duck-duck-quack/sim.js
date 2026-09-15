@@ -10,7 +10,7 @@
 
 import { SCENE_H, FALL_SAFE, WALK_STEP, FALL_SPEED, CLIMB_SPEED, DIG_RATE,
   BUILD_MAX_STEPS, DIG_MAX_STEPS, SKILLS, GOOSE_FLEE_SPEED, GOOSE_FLEE_LIFT,
-  buildTerrain, winCount } from './content.js';
+  POOF_TICKS, buildTerrain, winCount } from './content.js';
 
 /* ----------------------------------------------------------------- a duck */
 
@@ -57,8 +57,18 @@ export function newGame(level){
     lost: 0,
     supply: { ...level.supply },
     goose: { x: level.goose.x0, dir: 1, fed: false, lift: 0, gone: false },
+    poofs: [],
     ended: null,        // null | 'won' | 'lost'
   };
+}
+
+/* The one place a duckling is ever marked lost — dropping a poof where it
+   went down is what stops that from reading as the duckling just vanishing.
+   See POOF_TICKS in content.js for how long it lingers. */
+function loseDuckling(state, d, cause){
+  d.state = 'lost';
+  d.cause = cause;
+  state.poofs.push({ x: d.x, y: d.y, age: 0 });
 }
 
 const groundAt = (state, x) => {
@@ -83,6 +93,7 @@ export function tick(state){
   hatch(state);
   stepGoose(state);
   for(const d of state.ducks) stepDuck(state, d);
+  stepPoofs(state);
 
   state.saved = state.ducks.reduce((n, d) => n + (d.state === 'saved' ? 1 : 0), 0);
   state.lost = state.ducks.reduce((n, d) => n + (d.state === 'lost' ? 1 : 0), 0);
@@ -98,6 +109,11 @@ function hatch(state){
   state.ducks.push(d);
   state.hatched++;
   state.nextHatch = state.ticks + level.spawnInterval;
+}
+
+function stepPoofs(state){
+  for(const p of state.poofs) p.age += 1;
+  state.poofs = state.poofs.filter(p => p.age < POOF_TICKS);
 }
 
 function stepGoose(state){
@@ -166,10 +182,10 @@ function stepWalking(state, d){
   const level = state.level;
 
   if(d.x >= level.goalX){ d.state = 'saved'; return; }
-  if(goosedAt(state, d.x)){ d.state = 'lost'; d.cause = 'goosed'; state.goose.fed = true; return; }
+  if(goosedAt(state, d.x)){ loseDuckling(state, d, 'goosed'); state.goose.fed = true; return; }
 
   const nextX = d.x + d.dir;
-  if(nextX < 0 || nextX >= level.width){ d.state = 'lost'; d.cause = 'edge'; return; }
+  if(nextX < 0 || nextX >= level.width){ loseDuckling(state, d, 'edge'); return; }
 
   if(blockerAt(state, nextX)){ d.dir = -d.dir; return; }
 
@@ -217,13 +233,13 @@ function stepWalking(state, d){
 
 function stepFalling(state, d){
   d.y += FALL_SPEED;
-  if(d.y > SCENE_H){ d.state = 'lost'; d.cause = 'fell'; return; }
+  if(d.y > SCENE_H){ loseDuckling(state, d, 'fell'); return; }
   const ground = groundAt(state, d.x);
   if(d.y >= ground){
     const dropped = ground - d.fallFrom;
     d.y = ground;
-    d.state = dropped > FALL_SAFE ? 'lost' : 'walking';
-    if(d.state === 'lost') d.cause = 'fell';
+    if(dropped > FALL_SAFE) loseDuckling(state, d, 'fell');
+    else d.state = 'walking';
   }
 }
 

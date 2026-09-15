@@ -76,6 +76,14 @@ export const DIG_MAX_STEPS = 60;
 export const GOOSE_FLEE_SPEED = 4;     // columns a fleeing goose covers a tick
 export const GOOSE_FLEE_LIFT = 2;      // pixels a fleeing goose climbs a tick
 
+/* A lost duckling — fallen too far, walked off the level's edge, or caught
+   by the goose — leaves a short-lived poof where it went down. Without one,
+   a duckling that had been visibly falling for a second or more simply
+   isn't there the next frame, which reads as a rendering fault rather than
+   as the loss it actually is. `sim.js` owns spawning and ageing these;
+   `art.js` only ever draws whatever is left in `state.poofs`. */
+export const POOF_TICKS = 8;
+
 /* ------------------------------------------------------------------ skills */
 
 export const SKILLS = ['digger', 'builder', 'blocker', 'climber'];
