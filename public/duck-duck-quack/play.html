@@ -82,6 +82,14 @@
   }
   .hud b{ font-size: 0.95rem; }
   .hud .right{ text-align: right; }
+  .hud .hint{ font-size: 0.62rem; letter-spacing: 0.02em; opacity: 0.85; }
+  .hud b.at-risk{ color: #ff8a7a; }
+  .hud .hint.at-risk{ color: #ff8a7a; opacity: 1; font-weight: 700; }
+
+  .count-num{
+    font-size: 4.5rem; font-weight: 800; line-height: 1;
+    color: #fdf6e3; text-shadow: 0 2px 0 rgba(0,0,0,0.5);
+  }
 
   .overlay{
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
@@ -194,13 +202,16 @@
                 aria-label="The park. Arm a skill below, then click a walking duckling to give it that skill."></canvas>
         <div class="hud" aria-hidden="true">
           <div>
-            Saved <b id="hud-saved">0 / 0</b><br>
+            Saved <b id="hud-saved">0 / 0</b> <span class="hint" id="hud-hint">needed</span><br>
             Lost <b id="hud-lost">0</b>
           </div>
           <div class="right">
             Hatched <b id="hud-hatched">0 / 0</b><br>
             Time <b id="hud-time">0:00</b>
           </div>
+        </div>
+        <div class="overlay" id="countdown" hidden aria-hidden="true">
+          <div class="count-num" id="countdown-num">3</div>
         </div>
         <div class="overlay" id="overlay" hidden>
           <h2 id="overlay-title"></h2>
@@ -240,6 +251,7 @@
     overlay: els('overlay'), overlayTitle: els('overlay-title'), overlayBody: els('overlay-body'),
     again: els('again'), status: els('status'), pause: els('pause'), restart: els('restart'),
     sound: els('sound'), skills: document.querySelector('.skills'),
+    countdown: els('countdown'), countdownNum: els('countdown-num'), hudHint: els('hud-hint'),
   };
   const ctx = context2d(ui.scene);
 
@@ -373,11 +385,40 @@
     ui.overlay.hidden = false;
   }
 
+  /* Whether more ducklings could still be saved than have already been lost
+     leaves room for — the moment `lost` alone rules out ever reaching the
+     quota, the run is a loss in every way but the clock and the overlay
+     admitting it yet. Surfacing that the instant it becomes true is most of
+     what "clear about the status of the goal" means while a level is still
+     running rather than only once it ends. */
   function refreshHud(){
-    ui.hudSaved.textContent = `${state.saved} / ${winCount(LEVEL_1)}`;
+    const need = winCount(LEVEL_1);
+    const maxPossible = LEVEL_1.duckCount - state.lost;
+    const atRisk = state.saved < need && maxPossible < need;
+    ui.hudSaved.textContent = `${state.saved} / ${need}`;
+    ui.hudSaved.classList.toggle('at-risk', atRisk);
+    ui.hudHint.textContent = atRisk ? "can't reach" : 'needed';
+    ui.hudHint.classList.toggle('at-risk', atRisk);
     ui.hudLost.textContent = String(state.lost);
     ui.hudHatched.textContent = `${state.hatched} / ${LEVEL_1.duckCount}`;
     ui.hudTime.textContent = formatTime(Math.max(0, LEVEL_1.timeLimit - state.ticks));
+  }
+
+  /* --- the starting countdown ------------------------------------------- */
+
+  // Three full seconds on the clock in the middle of the screen before a
+  // level actually starts moving — real wall-clock time, not sim ticks,
+  // since nothing has hatched yet for ticks to matter to. `at` is set from
+  // the first frame's own timestamp rather than `performance.now()` here,
+  // so it is always measured against the same clock `frame`'s `now` is.
+  const COUNTDOWN_SECONDS = 3;
+  let starting = true;
+  let countdownAt = null;
+
+  function beginCountdown(){
+    starting = true;
+    countdownAt = null;
+    ui.countdown.hidden = false;
   }
 
   function frame(now){
@@ -386,7 +427,16 @@
     const dt = Math.min(0.25, (now - last) / 1000);
     last = now;
 
-    if(!paused && !state.ended){
+    if(starting){
+      if(countdownAt === null) countdownAt = now;
+      const remaining = COUNTDOWN_SECONDS - (now - countdownAt) / 1000;
+      if(remaining <= 0){
+        starting = false;
+        ui.countdown.hidden = true;
+      } else {
+        ui.countdownNum.textContent = String(Math.ceil(remaining));
+      }
+    } else if(!paused && !state.ended){
       acc += dt;
       while(acc >= STEP){ tick(state); acc -= STEP; }
       quackNewArrivals();
@@ -411,6 +461,7 @@
     ui.overlay.hidden = true;
     say('');
     refreshSkills();
+    beginCountdown();
   }
   ui.restart.addEventListener('click', restart);
   ui.again.addEventListener('click', restart);
@@ -452,6 +503,7 @@
   addEventListener('orientationchange', () => setTimeout(fitScene, 120));
 
   refreshSkills();
+  beginCountdown();
   requestAnimationFrame(frame);
 </script>
 

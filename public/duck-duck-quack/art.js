@@ -397,9 +397,10 @@ function drawLilyPads(ctx, terrain, level){
 /* ------------------------------------------------------------------ goose */
 
 export function drawGoose(ctx, state){
+  if(state.goose.gone) return;
   const g = state.level.goose;
   const x = Math.round(state.goose.x) - 4;
-  const y = g.y - GOOSE_ART.length;
+  const y = g.y - GOOSE_ART.length - Math.round(state.goose.lift);
   drawSprite(ctx, GOOSE_ART, x, y, state.goose.dir < 0);
 }
 

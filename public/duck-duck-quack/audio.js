@@ -220,12 +220,17 @@ export function createAudio(){
    * in. A touch of band-passed noise under the first blip is the breath
    * behind it; without it the pair read as two clean beeps, which is a
    * microwave finishing, not a bird.
+   *
+   * Loud on purpose, relative to the music bed it plays over (bassLevel
+   * 0.17, leadLevel 0.08) — this is the one sound in the game that means
+   * "a duckling just made it home", and it was getting lost under the
+   * backing track instead of landing as a payoff.
    */
   const SFX = {
     quack(t){
-      voice(880, t, 0.07, 'sawtooth', 0.13, 480);
-      hit(t, 0.045, 0.05, 2800, 'bandpass');
-      voice(620, t + 0.09, 0.06, 'sawtooth', 0.1, 340);
+      voice(880, t, 0.07, 'sawtooth', 0.22, 480);
+      hit(t, 0.045, 0.09, 2800, 'bandpass');
+      voice(620, t + 0.09, 0.06, 'sawtooth', 0.18, 340);
     },
   };
 

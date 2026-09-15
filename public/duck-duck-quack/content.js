@@ -67,6 +67,15 @@ export const FALL_SAFE = 24;
 export const BUILD_MAX_STEPS = 60;
 export const DIG_MAX_STEPS = 60;
 
+/* Once the goose has caught its one duckling (see sim.js's `goose.fed`) it
+   has nothing left to threaten, so rather than leave it patrolling the same
+   stretch forever as an empty prop, it flies off — the same direction it was
+   already facing, climbing as it goes — and stops being drawn once it clears
+   the scene. Faster than its patrol speed on purpose: a fleeing goose should
+   read as fleeing, not as the same lazy sweep with nothing to show for it. */
+export const GOOSE_FLEE_SPEED = 4;     // columns a fleeing goose covers a tick
+export const GOOSE_FLEE_LIFT = 2;      // pixels a fleeing goose climbs a tick
+
 /* ------------------------------------------------------------------ skills */
 
 export const SKILLS = ['digger', 'builder', 'blocker', 'climber'];

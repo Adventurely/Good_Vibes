@@ -9,7 +9,8 @@
  */
 
 import { SCENE_H, FALL_SAFE, WALK_STEP, FALL_SPEED, CLIMB_SPEED, DIG_RATE,
-  BUILD_MAX_STEPS, DIG_MAX_STEPS, SKILLS, buildTerrain, winCount } from './content.js';
+  BUILD_MAX_STEPS, DIG_MAX_STEPS, SKILLS, GOOSE_FLEE_SPEED, GOOSE_FLEE_LIFT,
+  buildTerrain, winCount } from './content.js';
 
 /* ----------------------------------------------------------------- a duck */
 
@@ -55,7 +56,7 @@ export function newGame(level){
     saved: 0,
     lost: 0,
     supply: { ...level.supply },
-    goose: { x: level.goose.x0, dir: 1, fed: false },
+    goose: { x: level.goose.x0, dir: 1, fed: false, lift: 0, gone: false },
     ended: null,        // null | 'won' | 'lost'
   };
 }
@@ -100,6 +101,21 @@ function hatch(state){
 }
 
 function stepGoose(state){
+  if(state.goose.gone) return;
+
+  // Fed and fleeing: keep going the way it was already facing, climbing as
+  // it goes, until it has actually cleared the scene — a fixed tick count
+  // would either cut the flight short on a wide level or linger pointlessly
+  // on a narrow one.
+  if(state.goose.fed){
+    state.goose.x += state.goose.dir * GOOSE_FLEE_SPEED;
+    state.goose.lift += GOOSE_FLEE_LIFT;
+    if(state.goose.x < -20 || state.goose.x > state.level.width + 20){
+      state.goose.gone = true;
+    }
+    return;
+  }
+
   const g = state.level.goose;
   state.goose.x += state.goose.dir * g.speed;
   if(state.goose.x >= g.x1){ state.goose.x = g.x1; state.goose.dir = -1; }
