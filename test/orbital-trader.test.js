@@ -551,7 +551,11 @@ test('three jobs pay in a person, and finishing one fills that berth', () => {
       S.tick(s, 0.01);
     }
     assert.ok(live.done, `${q.id} did not finish`);
-    assert.ok(s.crew[q.crew], `${q.id} finished and the ${q.crew} berth is still empty`);
+    /* Finishing is not being paid. The berth stays empty until somebody
+       collects, which is the whole of the change. */
+    assert.equal(s.crew[q.crew], null, `${q.id}: the berth filled itself without being collected`);
+    assert.ok(S.claimQuest(s, q.id).ok, `${q.id} could not be collected`);
+    assert.ok(s.crew[q.crew], `${q.id} collected and the ${q.crew} berth is still empty`);
     const filled = Object.entries(s.crew).filter(([, v]) => v).map(([k]) => k);
     assert.deepEqual(filled, [q.crew], `${q.id} filled ${filled}`);
     /* And they do nothing. Crew is a face in a menu until it is not, so this
@@ -1314,6 +1318,7 @@ test('a finished job gives its slot back, and sits under the live ones', () => {
   g.t += 1.2; dockAt('slate');
   const fin = g.quests.find(l => l.id === 'slatemessage');
   assert.ok(fin.done, 'the message was delivered');
+  assert.equal(fin.claimed, false, 'and is waiting to be collected, which costs no slot');
   assert.ok(Number.isFinite(fin.doneAt), 'and the moment it was finished is written down');
   assert.equal(S.activeQuests(g).length, S.MAX_ACTIVE_QUESTS - 1, 'a finished job is not one of the three');
   assert.equal(S.canAcceptQuest(g, S.questById('heavystuff')).ok, true, 'so the slot is free');
@@ -1330,7 +1335,12 @@ test('a finished job gives its slot back, and sits under the live ones', () => {
   assert.ok(tab.indexOf('for(const { l, q } of live)') < tab.indexOf("out += '<h3>Finished</h3>'"),
     'the finished ones are not under the live ones');
   assert.match(tab, /of \$\{S\.MAX_ACTIVE_QUESTS\} in hand/, 'the tab does not say how many of the three are in hand');
-  assert.match(tab, /doneAt \?\? b\.l\.takenAt/, 'the finished ones are not newest first');
+  assert.match(tab, /claimedAt \?\? b\.l\.doneAt/, 'the collected ones are not newest first');
+  /* Three groups now, and owed-to-you leads: a reward waiting to be collected
+     is the one thing in this tab a player can act on. */
+  assert.ok(tab.indexOf("out += '<h3>Ready to collect</h3>'") < tab.indexOf('for(const { l, q } of live)'),
+    'what is owed does not come before what is in hand');
+  assert.match(tab, /x\.l\.done && !x\.l\.claimed/, 'the tab does not separate collected from merely finished');
 });
 
 test('a burn that slows you down never reads as a number going up', () => {
@@ -2113,6 +2123,9 @@ test('every quest in the catalogue can be flown from its giver to its end', () =
     }
     assert.ok(live.done, `${q.id} stuck on "${steps[live.step]?.text}"`);
     assert.equal(S.usedUnits(s), 0, `${q.id} left something in the hold`);
+    /* Finishing hands nothing over; collecting does. Both are checked, because
+       a job that cannot be collected is as broken as one that cannot be flown. */
+    assert.ok(S.claimQuest(s, q.id).ok, `${q.id} finished and could not be collected`);
     assert.ok(s.money > purse, `${q.id} cost more to finish than it paid`);
   }
 });
@@ -2187,6 +2200,11 @@ test('a delivery, a shopping list and a message each finish the way their kind s
   const live = d.quests.find(l => l.id === 'heavystuff');
   assert.equal(live.done, true, 'arriving with it is the whole job');
   assert.equal(S.carrying(d, 'ironore'), 0, 'and it was handed over');
+  /* Handed over is not paid for: the purse and the standing wait for a hand
+     on the Collect button. */
+  assert.equal(d.money - paid, 0, 'arriving paid the purse by itself');
+  assert.equal(d.rep.emberkin, 0);
+  assert.ok(S.claimQuest(d, 'heavystuff').ok);
   assert.equal(d.money - paid, S.questById('heavystuff').pay);
   assert.ok(d.rep.emberkin >= 1);
 
@@ -2246,6 +2264,10 @@ test("the opening errand: Theo's purse buys exactly one pebble, and Nellie pays 
   S.tick(s, 0.01);
   assert.equal(s.quests[0].done, true, 'home with it finishes the errand');
   assert.equal(S.carrying(s, 'pebble'), 0, 'and the pebble is Nellie\'s');
+  /* Theo settles up when you go and see him about it, not the moment you tie
+     up — the first job in the game is also where a player learns that. */
+  assert.equal(s.quests[0].claimed, false, 'the errand paid itself');
+  assert.ok(S.claimQuest(s, s.quests[0].id).ok);
   assert.ok(s.money > 400 && s.rep.otter >= 1, 'Theo settles up and the otters remember');
 });
 
@@ -3433,6 +3455,7 @@ test('both crew berths fill on a local hop, early', () => {
     s.dockedAt = q.to;
     S.questCheck(s, []);
     assert.ok(s.quests.find(l => l.id === q.id)?.done, `${q.id} completes at ${q.to}`);
+    assert.ok(S.claimQuest(s, q.id).ok, `${q.id} could not be collected`);
     assert.ok(s.crew[berth], `${q.id} fills the ${berth} berth`);
   }
   /* The berth is the whole reward, and the navigator's brings two abilities
@@ -3555,4 +3578,102 @@ test('the navigator is the instruments, not the physics', () => {
   assert.ok(Number.isFinite(rv.atIntercept) && Number.isFinite(rv.speed), 'both readouts are numbers');
   assert.equal(S.canDockDrifting(green), false);
   assert.equal(S.canDockDrifting(crewed), true);
+});
+
+/* ------------------------------------------------- collecting what is owed */
+
+test('finishing a job frees the slot; collecting it pays', () => {
+  const s = S.newGame(5);
+  s.money = 0; s.rep.emberkin = 0;
+  s.keys.astrolabe = true;                 // heavystuff leaves Tassel's sky
+  s.dockedAt = 'slate'; s.justLeft = null;
+  assert.ok(S.acceptQuest(s, 'heavystuff').ok);
+  const before = { money: s.money, rep: s.rep.emberkin };
+  s.dockedAt = 'cinder';
+  S.tick(s, 0.01);
+
+  const l = s.quests.find(x => x.id === 'heavystuff');
+  assert.equal(l.done, true, 'the work is over');
+  assert.equal(l.claimed, false, 'and nothing has been handed over');
+  assert.equal(s.money, before.money, 'the purse did not move');
+  assert.equal(s.rep.emberkin, before.rep, 'nor the standing');
+  /* The slot comes back at once: waiting to be paid must never cost a berth. */
+  assert.equal(S.activeQuests(s).some(x => x.id === 'heavystuff'), false);
+  assert.equal(S.unclaimedQuests(s).length, 1);
+
+  const r = S.claimQuest(s, 'heavystuff');
+  assert.ok(r.ok);
+  assert.equal(r.pay, S.questById('heavystuff').pay);
+  assert.equal(s.money, before.money + r.pay);
+  assert.ok(s.rep.emberkin > before.rep);
+  assert.equal(S.unclaimedQuests(s).length, 0);
+
+  /* And only once, however many times the button is pressed. */
+  const again = S.claimQuest(s, 'heavystuff');
+  assert.equal(again.ok, false);
+  assert.equal(s.money, before.money + r.pay, 'a second press paid twice');
+});
+
+test('a job that is not finished cannot be collected', () => {
+  const s = S.newGame(5);
+  s.keys.astrolabe = true;
+  s.dockedAt = 'slate'; s.justLeft = null;
+  assert.ok(S.acceptQuest(s, 'heavystuff').ok);
+  const purse = s.money;
+  assert.equal(S.canClaimQuest(s, 'heavystuff').ok, false);
+  assert.equal(S.claimQuest(s, 'heavystuff').ok, false);
+  assert.equal(s.money, purse);
+  assert.equal(S.claimQuest(s, 'nosuchjob').ok, false, 'and neither can one that does not exist');
+});
+
+test('a save from before collecting was a thing is not paid twice', () => {
+  /* Everything finished in an old save has already been paid for. Restoring it
+     as unclaimed would hand every purse over a second time. */
+  const s = S.newGame(5);
+  s.keys.astrolabe = true;
+  s.dockedAt = 'slate'; s.justLeft = null;
+  S.acceptQuest(s, 'heavystuff');
+  s.dockedAt = 'cinder';
+  S.tick(s, 0.01);
+  S.claimQuest(s, 'heavystuff');
+  const old = JSON.parse(S.serialize(s));
+  for(const l of old.quests) delete l.claimed;          // as an older save had it
+  const back = S.restore(JSON.stringify(old));
+  for(const l of back.quests){
+    if(l.done) assert.equal(l.claimed, true, `${l.id} came back owing a reward it was already paid`);
+  }
+  assert.equal(S.unclaimedQuests(back).length, 0);
+});
+
+test('the ship wears the same direction arrow its worlds do', () => {
+  const R = readFileSync(new URL('../public/orbital-trader/render.js', import.meta.url), 'utf8');
+  assert.match(R, /function shipLead\(/, 'the ship has no lead of its own');
+  assert.match(R, /drawShip\(chart, view, pos\)/, 'drawShip cannot reach the body positions it needs');
+  /* Built the same way a rail's is — a short arc forward and an arrowhead — so
+     the two read as the same mark rather than two different ideas. */
+  const lead = R.slice(R.indexOf('function shipLead('), R.indexOf('function drawShip('));
+  assert.match(lead, /propagate\(/, 'the lead is not flown forward from the ship\'s own state');
+  assert.match(lead, /Math\.atan2\(-end\.v\[1\], end\.v\[0\]\)/, 'the head does not point along the motion');
+  assert.match(lead, /view\.docked/, 'a tied-up ship still draws a heading');
+});
+
+test('opening a burn holds the clock, and closing it gives the clock back', () => {
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  /* The hold used to apply only inside twenty-five seconds of the burn, which
+     is backwards: a mark months out is the one you sit and nudge. */
+  const hold = PLAY.slice(PLAY.indexOf('function holdForPlanning('), PLAY.indexOf('/* Frame what the chart is drawing'));
+  assert.doesNotMatch(hold, /if\(realSecondsTo\(n\.t\) > PLAN_HOLD_SECONDS\) return;/,
+    'the clock still runs while a burn far enough out is being edited');
+  assert.match(hold, /heldForPlan = true/, 'nothing records that the clock was held for planning');
+  assert.match(PLAY, /function releasePlanHold\(\)/, 'closing a burn never gives the clock back');
+  assert.match(PLAY, /function selectNode\(ix\)/, 'selection does not go through one place');
+  /* The ways in and out of an open burn that a player actually uses: tapping a
+     mark's ring, closing it, deleting it, and Escape. Each has to go through
+     selectNode, or that one will leave the clock stopped for good. */
+  for(const [what, pattern] of [
+    ['tapping a mark', /selectNode\(selectedNode === hit\.index \? -1 : hit\.index\)/],
+    ['the close button', /closenode\(\)\{ selectNode\(-1\)/],
+    ['deleting one', /delnode\(i\)\{ S\.removeNode\(state, Number\(i\)\); selectNode\(-1\)/],
+    ['Escape', /if\(selectedNode >= 0\)\{ selectNode\(-1\)/],
+  ]) assert.match(PLAY, pattern, `${what} does not go through selectNode`);
 });
