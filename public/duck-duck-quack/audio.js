@@ -31,11 +31,25 @@ const QUALITIES = {
   dom7: [0, 4, 7, 10],
 };
 
-/* Eight bars, four of them repeated: Am7 - G7 - Fmaj - E7, the classic minor
- * walk-down, twice through. `bass` and `lead` are one riff each, written once
- * as [step, semitones off the bar's root, length in steps] and replayed under
- * every bar at that bar's own root — the whole reason four chords reads as one
- * groove instead of four unrelated bars.
+/* Eight bars, four chords twice through: Am7 - G7 - Fmaj - E7, the classic
+ * minor walk-down. The second pass is not a plain repeat, though — a tracker
+ * loop that plays note-for-note identical bars a second time announces its
+ * own loop point, which is the fastest way for a background track to start
+ * sounding like a background track. Three things break that up:
+ *
+ *   - the lead answers itself. Bars 0-3 play `lead`, the call; bars 4-5
+ *     play `leadResponse`, pitched higher and syncopated differently — a
+ *     real second phrase, not the same hook moved an octave.
+ *   - the chord's own quality gets heard. `bass` and `lead` only ever
+ *     needed a bar's root, so QUALITIES — the min7/dom7/maj shape of each
+ *     chord — sat in the data and never once reached the speaker. `stabAt`
+ *     now plays the *other* notes of that chord (everything but the root,
+ *     which the bass already owns) as a short off-beat stab, so an Am7
+ *     and an E7 finally sound like different chords rather than different
+ *     bass notes under the same lead line.
+ *   - the last bar gets a pickup: a short snare roll across its last four
+ *     steps, the turnaround a live band would play into bar 1 rather than
+ *     just stopping and starting over.
  */
 export const PARK_SONG = {
   bpm: 124,
@@ -43,8 +57,8 @@ export const PARK_SONG = {
   bars: [
     { chord: [57, 'min7'] }, { chord: [55, 'dom7'] },
     { chord: [53, 'maj'] },  { chord: [52, 'dom7'] },
-    { chord: [57, 'min7'] }, { chord: [55, 'dom7'] },
-    { chord: [53, 'maj'] },  { chord: [52, 'dom7'] },
+    { chord: [57, 'min7'], lead: 'response' }, { chord: [55, 'dom7'], lead: 'response' },
+    { chord: [53, 'maj'],  lead: 'response' }, { chord: [52, 'dom7'], lead: 'response', fill: true },
   ],
 
   // Root, root, octave, root, fifth, root, octave, root — the "on the one"
@@ -62,14 +76,29 @@ export const PARK_SONG = {
   bassCut: 700,          // low-passed for a rounder, less buzzy low end
   bassLevel: 0.17,
 
-  // A short hook an octave above the root, syncopated against the bass
-  // rather than doubling it — the two only land together on the downbeat.
+  // The call: a short hook an octave above the root, syncopated against
+  // the bass rather than doubling it — the two only land together on the
+  // downbeat.
   lead: [
     [0, 12, 2], [2, 15, 1], [6, 19, 2], [9, 17, 1], [12, 15, 3],
+  ],
+  // The response: starts on the "and" of beat 1 instead of the downbeat,
+  // climbs to a 9th the call never reaches, and resolves down through a
+  // passing tone instead of holding — a real answer, not an echo.
+  leadResponse: [
+    [3, 15, 1], [4, 19, 2], [8, 22, 1], [10, 19, 2], [13, 17, 1], [14, 15, 2],
   ],
   leadType: 'triangle',
   leadCut: 3400,
   leadLevel: 0.08,
+
+  // The stab: every chord tone but the root, on the off-beat, quiet and
+  // low-passed — a rhythm-guitar skank sitting between the bass and lead
+  // registers, not a pad.
+  stabAt: [3, 11],
+  stabType: 'sawtooth',
+  stabCut: 1100,
+  stabLevel: 0.045,
 
   kickAt: [0, 6, 8, 14],
   snareAt: [4, 12],
@@ -152,19 +181,32 @@ export function createAudio(){
     const bar = Math.floor(pos / stepsPerBar);
     const inBar = pos % stepsPerBar;
     const stepLen = 60 / cfg.bpm / 4;
-    const [root] = cfg.bars[bar].chord;
+    const barCfg = cfg.bars[bar];
+    const [root, quality] = barCfg.chord;
 
     for(const [at, semis, len] of cfg.bass){
       if(at === inBar) voice(midi(root - 12 + semis), t, stepLen * len * 0.92, cfg.bassType, cfg.bassLevel, null, cfg.bassCut);
     }
-    for(const [at, semis, len] of cfg.lead){
+
+    const leadPattern = barCfg.lead === 'response' ? cfg.leadResponse : cfg.lead;
+    for(const [at, semis, len] of leadPattern){
       if(at === inBar) voice(midi(root + semis), t, stepLen * len * 0.85, cfg.leadType, cfg.leadLevel, null, cfg.leadCut);
+    }
+
+    // The chord's own shape, finally audible — see the header note above.
+    if(cfg.stabAt && cfg.stabAt.includes(inBar)){
+      for(const interval of QUALITIES[quality]){
+        if(interval === 0) continue; // the bass already has the root
+        voice(midi(root + interval), t, stepLen * 0.9, cfg.stabType, cfg.stabLevel, null, cfg.stabCut);
+      }
     }
 
     if(cfg.kickAt.includes(inBar)) voice(112, t, 0.09, 'sine', 0.2, 42);
     if(cfg.snareAt.includes(inBar)) hit(t, 0.09, 0.13, 2200);
     if(cfg.hatAt.includes(inBar)) hit(t, 0.035, 0.05, 8500);
     if(cfg.openHatAt.includes(inBar)) hit(t, 0.15, 0.045, 7500);
+    // The turnaround: a quick pickup into the loop's start, on the last bar only.
+    if(barCfg.fill && inBar >= 12) hit(t, 0.05, 0.085, 2600);
   }
 
   function pump(){

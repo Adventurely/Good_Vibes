@@ -13,7 +13,7 @@ import { test } from 'node:test';
 
 import {
   SCENE_W, SCENE_H, WALK_STEP, FALL_SAFE, FALL_SPEED, FLY_SPEED, TICK_RATE,
-  SKILLS, SKILL_INFO, LEVEL_1, LEVELS, buildTerrain, winCount, formatTime,
+  SKILLS, SKILL_INFO, LEVEL_1, LEVEL_2, LEVELS, buildTerrain, winCount, formatTime,
 } from '../public/duck-duck-quack/content.js';
 
 import { newGame, tick, assignSkill, assignRefusal, duckNear, hasTrait } from '../public/duck-duck-quack/sim.js';
@@ -62,6 +62,17 @@ test('LEVEL_1 carries a supply for every skill and is registered', () => {
   assert.ok(LEVELS.includes(LEVEL_1));
   assert.ok(LEVEL_1.nestX >= 0 && LEVEL_1.nestX < LEVEL_1.goalX);
   assert.ok(LEVEL_1.goalX < LEVEL_1.width);
+});
+
+test('every registered level carries a supply for every skill, a sane nest and goal, and a unique id', () => {
+  const ids = new Set();
+  for(const level of LEVELS){
+    for(const skill of SKILLS) assert.ok(level.supply[skill] >= 0, `${level.id}: no supply for "${skill}"`);
+    assert.ok(level.nestX >= 0 && level.nestX < level.goalX, `${level.id}: nest is not before the goal`);
+    assert.ok(level.goalX < level.width, `${level.id}: goal is past the edge of the scene`);
+    assert.ok(!ids.has(level.id), `duplicate level id "${level.id}"`);
+    ids.add(level.id);
+  }
 });
 
 test('winCount rounds up, not down', () => {
@@ -425,6 +436,51 @@ test('The Park can be won by a simple bot', () => {
   const state = playLevel1();
   assert.equal(state.ended, 'won');
   assert.ok(state.saved >= winCount(LEVEL_1), `only ${state.saved} saved, needed ${winCount(LEVEL_1)}`);
+});
+
+/* ------------------------------------------------------------- The Warren, played */
+
+/* A greedy bot for The Warren: bridge the one gap, dig through each wall
+ * the first chance it appears. No Climber or Flyer to reach for — this
+ * level supplies neither, on purpose (see content.js), so a bot that only
+ * knows Builder and Digger should still be enough to clear it.
+ */
+function playLevel2(){
+  const state = newGame(LEVEL_2);
+  let builderUsed = false, digger1Used = false, digger2Used = false;
+  for(let i = 0; i < LEVEL_2.timeLimit && !state.ended; i++){
+    for(const d of state.ducks){
+      if(d.state !== 'walking') continue;
+      if(!builderUsed && d.x === 39 && assignSkill(state, d.id, 'builder')){ builderUsed = true; continue; }
+      if(!digger1Used && d.x === 119 && assignSkill(state, d.id, 'digger')){ digger1Used = true; continue; }
+      if(!digger2Used && d.x === 219 && assignSkill(state, d.id, 'digger')){ digger2Used = true; continue; }
+    }
+    tick(state);
+  }
+  return state;
+}
+
+test('The Warren can be won by a simple bot', () => {
+  const state = playLevel2();
+  assert.equal(state.ended, 'won');
+  assert.ok(state.saved >= winCount(LEVEL_2), `only ${state.saved} saved, needed ${winCount(LEVEL_2)}`);
+});
+
+test('The Warren cannot be won without a Digger — neither wall has any other way through', () => {
+  // The level supplies zero Climber and zero Flyer (see content.js), so
+  // this is really checking that the level design itself, not just the
+  // bot, actually forces the issue: bridging the gap alone is not enough.
+  const state = newGame(LEVEL_2);
+  let builderUsed = false;
+  for(let i = 0; i < LEVEL_2.timeLimit && !state.ended; i++){
+    for(const d of state.ducks){
+      if(d.state !== 'walking') continue;
+      if(!builderUsed && d.x === 39 && assignSkill(state, d.id, 'builder')){ builderUsed = true; continue; }
+    }
+    tick(state);
+  }
+  assert.equal(state.saved, 0, 'nothing should get past the first wall without a Digger');
+  assert.notEqual(state.ended, 'won');
 });
 
 test('formatTime reads as minutes:seconds', () => {

@@ -77,6 +77,12 @@
   .enter:hover, .enter:focus-visible{ transform: translateY(-2px); filter: brightness(1.1); }
   .enter:focus-visible{ outline: 3px solid var(--gv-leaf); outline-offset: 3px; }
 
+  .level2{
+    display: block; margin-top: .7rem;
+    color: var(--muted); font-size: .82rem; text-decoration: none;
+  }
+  .level2:hover, .level2:focus-visible{ color: var(--gv-text); }
+
   .facts{
     margin: 1.6rem auto 0; padding: 0; list-style: none;
     display: flex; flex-wrap: wrap; gap: .4rem; justify-content: center;
@@ -119,12 +125,13 @@
        <b>Dig, build, block, climb or fly</b> — give it a skill before it meets a gap, a
        wall, a drop, or the goose — and get enough of the hatch to the pond.</p>
 
-    <a class="enter" href="./play.html">Hatch the flock</a>
+    <a class="enter" href="./play.html?level=park">Hatch the flock</a>
+    <a class="level2" href="./play.html?level=warren">or try The Warren, where the walls get tunnelled &rarr;</a>
 
     <ul class="facts">
       <li>Single player</li>
       <li class="sun">Puzzle</li>
-      <li>One level, five skills</li>
+      <li>Two levels, five skills</li>
       <li>Nothing saved, nothing sent anywhere</li>
     </ul>
     <button type="button" id="sound" class="sound" aria-pressed="false">Music off</button>
