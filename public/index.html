@@ -93,6 +93,13 @@
      a grid of squares. */
   .shot.lot{ aspect-ratio: 320 / 240; }
 
+  /* Duck Duck Quack's park is 320x180, and the top third of it is empty sky.
+     The card keeps the full width — the pit, the wall, the step and the pond
+     are laid out left to right, and cropping any of them off would be cropping
+     the level — and takes the bottom 120 rows, so what is left is all game.
+     Its own ratio again, for the same reason as the lot above: square pixels. */
+  .shot.park{ aspect-ratio: 320 / 120; }
+
   /* One card is a photograph rather than a pixel drawing, and `pixelated` is
      inherited from the rule above — on a rendered image it turns a soft
      gradient into visible blocks, so it has to be turned back off explicitly. */
@@ -192,6 +199,22 @@
       </ul>
     </div>
   </a>
+  <a class="game" href="/duck-duck-quack/">
+    <canvas class="shot park" id="shot-dq" width="320" height="120"
+            aria-label="A park at low sun: a line of ducklings walking a green ridge toward a blue pond, with a pit, a wall and a goose between them and it."></canvas>
+    <div class="about">
+      <h2>Duck Duck Quack</h2>
+      <p>Ducklings hatch and walk straight into whatever is in front of them.
+         Hand out a dig, a bridge or a ladder in time, and get the flock past
+         the goose to the pond.</p>
+      <ul class="tags">
+        <li>Single player</li>
+        <li class="sun">Puzzle</li>
+        <li class="wip">One level</li>
+      </ul>
+    </div>
+  </a>
+
   <a class="game" href="/greener-thumbs/">
     <img class="shot photo" src="/greener-thumbs/bonsai-thumb.webp" width="640" height="380"
          loading="lazy" decoding="async"
@@ -229,6 +252,12 @@ import { makeWorld as otWorld } from './orbital-trader/orbit.js';
 import { PALETTE as SS_PAL, HERO_ART as SS_HERO, ENEMY_ART as SS_ENEMY } from './solarium/art.js';
 
 import { createLot, growthFor } from './sunward/art.js';
+
+/* Aliased throughout: this game's `paintScene` is not Save Solarium's, and its
+   `newGame`/`tick` are names half the games here would claim if asked. */
+import { LEVEL_1 as DQ_LEVEL, TICK_RATE as DQ_TICK_RATE } from './duck-duck-quack/content.js';
+import { newGame as dqNewGame, tick as dqTick, assignSkill as dqAssign } from './duck-duck-quack/sim.js';
+import { paintScene as dqPaintScene } from './duck-duck-quack/art.js';
 
 const W = 320, H = 190;
 const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -424,14 +453,77 @@ function paintOrbitalTrader(now){
   ot.draw({ t: otT, now, shipAbs: null, prediction: null, nodes: [], belt: otBelt, target: null });
 }
 
+/* ---- Duck Duck Quack: the park, being played ------------------------- */
+
+const dq = document.getElementById('shot-dq').getContext('2d', { alpha: false });
+dq.imageSmoothingEnabled = false;
+
+/* The scene paints at its own size and is cropped onto the card, the same way
+   Save Solarium's city is. `paintScene` draws a whole park or nothing — there
+   is no window argument — so the crop has to happen after the fact. Rows 60
+   and up: everything below the sun and above the bottom of the pond. */
+const dqBuf = document.createElement('canvas');
+dqBuf.width = 320; dqBuf.height = 180;
+const dqCtx = dqBuf.getContext('2d', { alpha: false });
+const DQ_CROP_Y = 60;
+
+/* The same bot the title screen runs, because the card and the screen behind
+   the click should not be playing the level two different ways: bridge the gap
+   and clear the step down the moment either is possible, and hand a climber to
+   anything unskilled that is nearing the wall. It wins — eight of ten home,
+   against a quota of eight — so the card is a run going well rather than a
+   flock walking into a pit for the length of somebody's visit. */
+let dqState = dqNewGame(DQ_LEVEL);
+let dqBuilderUsed = false, dqDiggerUsed = false;
+
+function dqStep(){
+  for(const d of dqState.ducks){
+    if(d.state !== 'walking') continue;
+    if(!dqBuilderUsed && d.x === 69 && dqAssign(dqState, d.id, 'builder')) dqBuilderUsed = true;
+    else if(!dqDiggerUsed && d.x === 219 && dqAssign(dqState, d.id, 'digger')) dqDiggerUsed = true;
+    else if(d.skill !== 'climber' && d.x >= 130 && d.x < 150) dqAssign(dqState, d.id, 'climber');
+  }
+  dqTick(dqState);
+  if(dqState.ended){
+    dqState = dqNewGame(DQ_LEVEL);
+    dqBuilderUsed = false;
+    dqDiggerUsed = false;
+  }
+}
+
+/* At the game's own tick rate, which is the one speed that needs no defending:
+   a run takes about thirty seconds, and a duckling crosses the park at the
+   pace it would under your own hands. Driven off the clock rather than off the
+   frame, or the whole park would run at double speed on a 120 Hz screen. The
+   clamp is for a tab coming back from the background — catching up four
+   minutes of missed ticks in one frame would drop the flock in the pond. */
+const DQ_STEP_MS = 1000 / DQ_TICK_RATE;
+let dqAcc = 0, dqLast = 0;
+
+function paintDuckDuckQuack(now){
+  const dt = dqLast ? Math.min(250, now - dqLast) : 0;
+  dqLast = now;
+  dqAcc += dt;
+  while(dqAcc >= DQ_STEP_MS){ dqAcc -= DQ_STEP_MS; dqStep(); }
+  dqPaintScene(dqCtx, dqState);
+  dq.drawImage(dqBuf, 0, DQ_CROP_Y, 320, 120, 0, 0, 320, 120);
+}
+
+/* With motion off there is no run to watch, and a fresh level is an empty park:
+   the first duckling has not hatched yet. So wind one far enough in that the
+   flock is strung out across the whole of it — past the bridged gap, up the
+   wall, down the step — which is the picture the card is for. */
+if(still){ for(let i = 0; i < 300; i++) dqStep(); }
+
 /* One loop for all the cards. Nothing here is the game, so it can afford to be
-   lazy: the turbines, the seeds, Sunward's sky and the moons are the only
-   things that move. */
+   lazy: the turbines, the seeds, Sunward's sky, the moons and one flock of
+   ducklings are the only things that move. */
 function frame(now){
   paintGoodVibes(now);
   paintSolarium(now);
   paintSunward(now);
   paintOrbitalTrader(now);
+  paintDuckDuckQuack(now);
   if(!still) requestAnimationFrame(frame);
 }
 
