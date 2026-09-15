@@ -499,12 +499,13 @@ export function railLead(chart, el, centre, mu, t){
   const length = 22;
   const arc = [];
   const N = 6;
+  let end = null;
   for(let i = 0; i <= N; i++){
     const along = clear + (length * i) / N;
-    const st = railState(el, mu, t + along / pxPerDay);
-    arc.push(chart.toScreen(add(centre, st.r)));
+    end = railState(el, mu, t + along / pxPerDay);
+    arc.push(chart.toScreen(add(centre, end.r)));
   }
-  const end = railState(el, mu, t + (clear + length) / pxPerDay);
+  // The last sample is the head: no second solve for the same moment.
   const angle = Math.atan2(-end.v[1], end.v[0]);    // screen y is down
   return { arc, head: arc[N], angle };
 }

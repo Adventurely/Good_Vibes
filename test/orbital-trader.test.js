@@ -3580,6 +3580,68 @@ test('the navigator is the instruments, not the physics', () => {
   assert.equal(S.canDockDrifting(crewed), true);
 });
 
+/* ------------------------------------------------- the search's shortcuts */
+
+test('a parking orbit is one leg that goes round for ever, and costs nothing to fly', () => {
+  /* The opening orbit sits between Tassel's air and the moons' rails, so the
+     kernel can prove nothing ever ends it. Before it could, the boundary
+     search crept round that orbit forty thousand laps a season: a 900-day
+     plan took three quarters of a second and gave up part way. */
+  const g = S.newGame(1); S.undock(g);
+  const b = world.get(g.ship.body);
+  assert.ok(O.coastStable(world, b, g.ship.r, g.ship.v, g.t, {}), 'the opening orbit reaches nothing');
+  const legs = O.predictLegs(world, g.ship, g.t, [], { maxTime: 900 });
+  assert.equal(legs.segments.length, 1);
+  assert.equal(legs.segments[0].reason, 'stable');
+  assert.ok(legs.stable);
+  /* And the old question — N days of road — is answered by that one leg too. */
+  const pred = O.predict(world, g.ship, g.t, [], 900, {});
+  assert.equal(pred.segments.length, 1, `a 900-day plan of a parking orbit is one leg, not ${pred.segments.length}`);
+  assert.notEqual(pred.segments[0].reason, 'partial', 'the search gave up');
+});
+
+test('the shortcuts in the boundary search agree with the exhaustive search', () => {
+  /* Random conics round every world with something to run into, each asked
+     the same question two ways: with the reachability tests, the solved
+     crossings and the skipped laps, and with none of them. Same event, same
+     world, same moment — or a shortcut has ruled out something real. */
+  let seed = 7;
+  const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  const parents = BODIES.filter(b => b.mu > 0 && (world.wells(b.id).length || b.soi != null));
+  let compared = 0;
+  for(let k = 0; k < 160; k++){
+    const body = parents[Math.floor(rnd() * parents.length)];
+    const floor = Math.max(body.radius ?? 0, body.atmo ?? 0);
+    const lr = Math.log(floor * 1.05), hr = Math.log((body.soi ?? 3) * 0.98);
+    const rad = Math.exp(lr + rnd() * (hr - lr));
+    const th = rnd() * O.TAU;
+    const r = [rad * Math.cos(th), rad * Math.sin(th)];
+    const speed = Math.sqrt(body.mu / rad) * (0.2 + rnd() * 1.4);
+    const ang = th + Math.PI / 2 + (rnd() - 0.5) * 1.2 * (rnd() < 0.5 ? 1 : -1);
+    const v = [speed * Math.cos(ang), speed * Math.sin(ang)];
+    const t0 = rnd() * 400;
+    const el = O.elementsFromState(body.mu, r, v, floor);
+    const span = Number.isFinite(el.period) ? Math.min(60, el.period * (1 + rnd() * 25)) : 60;
+    const opts = { atmosphere: rnd() < 0.5 };
+    const slow = O.nextEvent(world, body, r, v, t0, span, { ...opts, exhaustive: true });
+    const fast = O.nextEvent(world, body, r, v, t0, span, opts);
+    if(slow && slow.kind === 'timeout'){
+      // The exhaustive search gave up; the shortcuts may see further but never earlier than the truth.
+      if(fast && fast.kind !== 'timeout') assert.ok(fast.dt >= slow.dt - 1e-5, `${body.id}: shortcut found something before the exhaustive search had looked`);
+      continue;
+    }
+    compared++;
+    const key = e => e ? (e.kind === 'timeout' ? 'timeout' : e.kind + (e.into ? ':' + e.into.id : '')) : 'none';
+    if(key(fast) === 'timeout'){
+      assert.ok(!slow || fast.dt <= slow.dt + 2e-5, `${body.id}: the shortcut search ran past the event`);
+      continue;
+    }
+    assert.equal(key(fast), key(slow), `${body.id} r=${rad.toExponential(2)} e=${el.e.toFixed(3)}: different event`);
+    if(slow) assert.ok(Math.abs(fast.dt - slow.dt) <= 2e-5, `${body.id}: ${key(slow)} at ${slow.dt} vs ${fast.dt}`);
+  }
+  assert.ok(compared > 100, `only ${compared} comparisons had an answer to compare`);
+});
+
 /* ------------------------------------------------- collecting what is owed */
 
 test('finishing a job frees the slot; collecting it pays', () => {

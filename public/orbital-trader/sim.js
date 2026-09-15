@@ -14,7 +14,7 @@
  */
 
 import {
-  makeWorld, advance, predict, absState, railState, circularState, elementsFromState,
+  makeWorld, predict, predictLegs, absState, railState, circularState, elementsFromState,
   timeToAnomaly, propagate, hohmann, lambert, period, norm, sub, add, scale, unit, perp, dist,
   closestApproach, nodeMagnitude, nodeCost, nodeFromVector, cross, dot, localState, TAU,
   /* aliased: seedFromLambert has a local `frameAt` of its own, and two things
@@ -549,55 +549,119 @@ export function skimHorizon(state, dtDays){
   return Math.max(dtDays + 1, Math.min(150, laps));
 }
 
+/* What one pass through a world's air takes off the ship, in au/day, given
+ * the conic it arrives on and the state at the bottom of the dive. Zero means
+ * no skim: the kernel asks this at every periapsis inside an atmosphere and
+ * ends the leg there only when the answer is worth a mark.
+ *
+ * The skim goes at the bottom of the dive and nowhere else. A retrograde push
+ * anywhere else lowers the far end of the path instead of raising it — at the
+ * top of the orbit it would drop the ship straight into the planet, and which
+ * it did once depended on where the search happened to stop, which is to say
+ * on the time warp. */
+function skimShed(b, el, at){
+  if(dot(at.r, at.v) > norm(at.r) * norm(at.v) * 0.02) return 0;
+  if(norm(at.r) > b.atmo * 1.001) return 0;
+  const vp = el.vmax;
+  const depth = Math.max(0, Math.min(1, (b.atmo - el.rp) / (b.atmo - b.radius)));
+  /* How much of the speed the air takes, from how deep the dive goes. The
+     curve is steep rather than straight: the thin stuff at the top of the
+     band barely touches you, and the bottom of it is a wall. That is what
+     makes a tight pass a real maneuver — aim deep and the planet catches
+     you in one lap — while a graze stays the gentle, repeatable thing a
+     pilot can walk an orbit down with. */
+  const f = FORMULAS.aerobrake;
+  const wanted = Math.min(f.maxFraction, f.k * Math.pow(depth, f.depthPower ?? 1)) * vp;
+  /* The floor: an orbit whose far end still clears the clouds. Skimming can
+     circularise you around a world; it must never quietly bury you in it.
+     Pass after pass the shed shrinks to nothing, and the ship is left on a
+     low orbit for the pilot to raise out of the air themselves. */
+  const aTarget = (el.rp + f.floorApo * b.atmo) / 2;
+  const vFloor = Math.sqrt(Math.max(0, b.mu * (2 / el.rp - 1 / aTarget)));
+  const shed = Math.max(0, Math.min(wanted, vp - vFloor));
+  return shed < vp * 1e-3 ? 0 : shed;
+}
+
+/* The options every prediction of this ship is made with. The air is a wall
+ * to a ship without a shield and a brake to one with. */
+function legOpts(state, extra = {}){
+  const skim = skimsAir(state);
+  return { atmosphere: !skim, dvAvailable: state.dv, skimAt: skim ? skimShed : null, ...extra };
+}
+const sortedNodes = state => state.nodes.map(n => ({ ...n })).sort((a, b) => a.t - b.t);
+
 export function effectiveNodes(state, horizon, { skim = skimsAir(state) } = {}){
-  const nodes = state.nodes.map(n => ({ ...n })).sort((a, b) => a.t - b.t);
+  const nodes = sortedNodes(state);
   if(!skim) return nodes;
-  let list = nodes;
-  for(let pass = 0; pass < 3; pass++){
-    const pred = predict(world, state.ship, state.t, list, horizon, { atmosphere: false, dvAvailable: state.dv });
-    let added = false;
-    for(const seg of pred.segments){
-      const b = world.get(seg.body);
-      if(!b.atmo) continue;
-      const el = seg.elements;
-      if(!(el.rp < b.atmo && el.rp > b.radius)) continue;
-      const tp = timeToAnomaly(b.mu, seg.r0, seg.v0, 0);
-      if(tp == null || tp > seg.t1 - seg.t0 + 1e-9) continue;
-      const tAt = seg.t0 + tp;
-      if(list.some(n => n.aero && Math.abs(n.t - tAt) < 1e-3)) continue;
-      /* The skim goes at the bottom of the dive and nowhere else. A retrograde
-         push anywhere else lowers the far end of the path instead of raising
-         it — at the top of the orbit it would drop the ship straight into the
-         planet, and which it did depended on where the search happened to
-         stop, which is to say on the time warp. */
-      const at = propagate(b.mu, seg.r0, seg.v0, tp);
-      if(dot(at.r, at.v) > norm(at.r) * norm(at.v) * 0.02) continue;
-      if(norm(at.r) > b.atmo * 1.001) continue;
-      const vp = el.vmax;
-      const depth = Math.max(0, Math.min(1, (b.atmo - el.rp) / (b.atmo - b.radius)));
-      /* How much of the speed the air takes, from how deep the dive goes. The
-         curve is steep rather than straight: the thin stuff at the top of the
-         band barely touches you, and the bottom of it is a wall. That is what
-         makes a tight pass a real maneuver — aim deep and the planet catches
-         you in one lap — while a graze stays the gentle, repeatable thing a
-         pilot can walk an orbit down with. */
-      const f = FORMULAS.aerobrake;
-      const wanted = Math.min(f.maxFraction, f.k * Math.pow(depth, f.depthPower ?? 1)) * vp;
-      /* The floor: an orbit whose far end still clears the clouds. Skimming can
-         circularise you around a world; it must never quietly bury you in it.
-         Pass after pass the shed shrinks to nothing, and the ship is left on a
-         low orbit for the pilot to raise out of the air themselves. */
-      const aTarget = (el.rp + f.floorApo * b.atmo) / 2;
-      const vFloor = Math.sqrt(Math.max(0, b.mu * (2 / el.rp - 1 / aTarget)));
-      const shed = Math.max(0, Math.min(wanted, vp - vFloor));
-      if(shed < vp * 1e-3) break;   // nothing left to give: stop inserting skims
-      list = [...list, { t: tAt, prograde: -shed, radial: 0, aero: true, free: true, body: b.id }].sort((a, b) => a.t - b.t);
-      added = true;
-      break;
+  const pred = predictLegs(world, state.ship, state.t, nodes, { atmosphere: false, dvAvailable: state.dv, skimAt: skimShed, maxTime: horizon, noSamples: true });
+  const aero = pred.events.filter(e => e.kind === 'burn' && e.node.aero).map(e => e.node);
+  return [...nodes, ...aero].sort((a, b) => a.t - b.t);
+}
+
+/* The leg the ship is flying right now, kept between ticks.
+ *
+ * Nothing about a coast changes from one frame to the next: it is one conic,
+ * and where it ends was settled when it began. So the leg is solved once and
+ * every tick after that is a single propagation along it, however fast the
+ * clock runs — which is what the kernel's header promises about time warp
+ * and what re-solving every frame quietly failed to deliver.
+ *
+ * The cache is keyed on the things a leg is made of. The ship object itself:
+ * a tick writes a fresh one, so anything else that moves the ship (a tow, a
+ * dock, a load) fails the identity test without having to know about this.
+ * The clock, for the same reason. The marks, the tank and the shield, because
+ * each changes where a leg ends. Kept beside the state rather than in it so a
+ * save never carries it. */
+const FLIGHT = new WeakMap();
+function flightLeg(state, nodes){
+  const sig = nodes.map(n => `${n.t}|${n.prograde}|${n.radial}`).join(';');
+  const shield = skimsAir(state);
+  let c = FLIGHT.get(state);
+  if(c && c.ship === state.ship && c.t === state.t && c.sig === sig && c.dv === state.dv && c.shield === shield) return c;
+  const pred = predictLegs(world, state.ship, state.t, nodes, legOpts(state, { maxLegs: 1, maxTime: 1e7, noSamples: true, stop: () => true }));
+  c = { ship: state.ship, t: state.t, sig, dv: state.dv, shield, pred };
+  FLIGHT.set(state, c);
+  return c;
+}
+
+/* Fly dt days along the cached legs. Stops at the first burn or change of
+ * reach, leaving the rest of dt unspent: at the top time warp a single frame
+ * is days, long enough to pass clean through a moon's whole reach, and a
+ * player who was warping towards that encounter must be given the chance to
+ * act in it. A crash stops the clock at the moment of impact. */
+function fly(state, nodes, dt){
+  const events = [];
+  const end = state.t + dt;
+  for(let guard = 0; guard < 8 && end - state.t > 1e-12; guard++){
+    const entry = flightLeg(state, nodes);
+    const pred = entry.pred;
+    const leg = pred.segments[0];
+    if(!leg) break;
+    const mu = world.get(leg.body).mu;
+    if(pred.stable || end < leg.t1 - 1e-9){
+      const s = propagate(mu, leg.r0, leg.v0, end - leg.t0);
+      state.ship = { body: leg.body, r: s.r, v: s.v };
+      state.t = end;
+      // Still on the same leg: the cache follows the ship along it.
+      entry.ship = state.ship; entry.t = state.t;
+      return { events, crashed: false };
     }
-    if(!added) break;
+    // The leg ends inside this step: go to its end and do what ends it.
+    const n = pred.next;
+    state.t = leg.t1;
+    if(leg.reason === 'crash'){
+      state.ship = { body: leg.body, r: leg.r1, v: leg.v1 };
+      events.push({ kind: 'crash', body: leg.body, t: leg.t1, r: leg.r1, v: leg.v1 });
+      return { events, crashed: true };
+    }
+    state.ship = { body: n.body, r: n.r, v: n.v };
+    if(leg.reason === 'burn' || leg.reason === 'exit' || leg.reason === 'enter'){
+      for(const e of pred.events) events.push(e);
+      return { events, crashed: false };
+    }
+    // A leg cut by the search's own reach: the next one carries on from here.
   }
-  return list;
+  return { events, crashed: false };
 }
 
 /* One step of flight. Returns the events that happened, already applied. */
@@ -609,26 +673,11 @@ export function tick(state, dtDays){
     questCheck(state, events);
     return events;
   }
-  /* Far enough ahead to see the coming skim. Normally a step only needs to
-     know about the marks inside it, but a dive into a world's clouds has to be
-     written down before the dive begins, and the bottom of it can be months
-     away — which is how a shielded ship sailed straight through Grumm's air
-     without the shield ever being used. */
-  const inAir = world.get(state.ship.body).atmo && skimsAir(state);
-  /* How far to look for the coming dive. A flat 150 days was right for the
-     arrival it was written for — falling in from the edge of a reach, where
-     the bottom really is months away — and ruinous afterwards: a ship that has
-     just braked into a low orbit has a period of hours, so 150 days is
-     thousands of laps predicted every step, three times over. Bound it to a
-     few laps once the orbit is closed, and keep the long look only for the arc
-     that needs it. */
-  const nodes = effectiveNodes(state, inAir ? skimHorizon(state, dtDays) : dtDays + 1);
-  // Stop the step at the first change of reach or burn, so warp cannot skip
-  // past an encounter the player was warping towards.
-  const opts = { atmosphere: !skimsAir(state), dvAvailable: state.dv, stopOnSoi: true, stopOnBurn: true };
-  const res = advance(world, state.ship, state.t, dtDays, nodes, opts);
-  state.ship = res.ship;
-  state.t = res.t;
+  /* The skim is part of the leg, not a mark looked for ahead of it: the leg
+     the ship is on ends at the bottom of the dive if there is one, however far
+     off the bottom is, so a shielded ship arriving from the edge of a reach
+     finds its brake written down from the moment it crosses in. */
+  const res = fly(state, sortedNodes(state), dtDays);
   for(const e of res.events){
     if(e.kind === 'burn'){
       if(e.node.aero){
@@ -1018,7 +1067,12 @@ export function removeNode(state, index){ state.nodes.splice(index, 1); }
  * together, so their triangle is not the burn: only the state at the moment of
  * firing settles that. */
 export function markStates(state, horizon){
-  const pred = plan(state, horizon ?? 900);
+  if(!state.nodes.length) return [];
+  /* Only as far as the last mark: the road past it says nothing about where
+     any mark sits, and asking for it used to cost a solve across hundreds of
+     laps to place a mark a lap away. */
+  const last = Math.max(...state.nodes.map(n => n.t)) - state.t + 1e-6;
+  const pred = plan(state, Math.min(horizon ?? last, last));
   return state.nodes.map(n => {
     for(const seg of pred.segments){
       if(n.t >= seg.t0 - 1e-9 && n.t <= seg.t1 + 1e-9){
@@ -1082,19 +1136,26 @@ export function planCost(state, horizon){
  * are different pictures because they want different answers — one is "brace",
  * the other is "move the burn". Both read the same prediction the chart draws,
  * so the corner and the road can never disagree. */
-export function hazards(state){
+/* `pred` is the road the chart has just drawn, when the caller has one; the
+ * corner and the road must never disagree, and solving it twice was the most
+ * expensive way of making sure they did not. */
+export function hazards(state, pred = null){
   const none = { skim: null, crash: null };
   if(!state || state.dockedAt || state.pending) return none;
-  const pred = planImmediate(state);
+  pred ??= planImmediate(state);
   let crash = null;
   for(const sg of pred?.segments ?? []){
     if(sg.reason === 'crash'){ crash = { body: sg.body }; break; }
   }
   let skim = null;
   if(skimsAir(state)){
-    const lead = state.nodes.length ? state.nodes[state.nodes.length - 1].t - state.t : 0;
-    const horizon = Math.max(lead + 1, 150);
-    const a = effectiveNodes(state, horizon).find(n => n.aero && n.t >= state.t);
+    /* On the drawn road if it is there; otherwise a look a few laps ahead —
+       the same bounded look the flight takes, never a flat season of them. */
+    let a = (pred?.events ?? []).find(e => e.kind === 'burn' && e.node.aero && e.t >= state.t)?.node;
+    if(!a){
+      const lead = state.nodes.length ? state.nodes[state.nodes.length - 1].t - state.t : 0;
+      a = effectiveNodes(state, Math.max(lead + 1, skimHorizon(state, 1))).find(n => n.aero && n.t >= state.t);
+    }
     if(a){
       const shed = Math.abs(a.prograde);
       skim = { body: a.body, t: a.t, dv: shed, risk: skimRisk(state, shed) };
@@ -1105,8 +1166,7 @@ export function hazards(state){
 
 /* The plan as the solver reads it: as far ahead as it is asked for. */
 export function plan(state, horizon){
-  const nodes = effectiveNodes(state, horizon);
-  return predict(world, state.ship, state.t, nodes, horizon, { atmosphere: !skimsAir(state), dvAvailable: state.dv });
+  return predictLegs(world, state.ship, state.t, sortedNodes(state), legOpts(state, { maxTime: horizon }));
 }
 
 /* ------------------------------------------------- the immediate orbit */
@@ -1125,35 +1185,12 @@ export function plan(state, horizon){
  * encounters is a road nobody can read, and every one of them past the first
  * is a guess that a single burn will erase anyway.
  *
- * `predict` gives a leg per reach and per burn; all this does is choose a
- * horizon that ends the last drawn leg exactly one lap in, then cut. Two
- * passes: one to find out when the crossing happens and what conic it leaves
- * you on, one to draw that conic for precisely one lap.
+ * `predictLegs` walks the road one leg at a time and asks after each whether
+ * that is enough; the rule above is the answer. No horizon in days is ever
+ * guessed at.
  */
-const OPEN_LEG_DAYS = 720;     // an unbound leg has no lap; draw this much of it
 const IMMEDIATE_CAP = 6000;
-
-function lapOf(elements){
-  const p = elements?.period;
-  return Number.isFinite(p) && p > 0 ? p : OPEN_LEG_DAYS;
-}
-
-/* The leg the drawn road ends on: the one after the first crossing, or the
- * last one there is. */
-function finalLeg(pred){
-  const segs = pred.segments;
-  if(!segs.length) return null;
-  const crossed = segs.findIndex(sg => sg.reason === 'exit' || sg.reason === 'enter');
-  if(crossed < 0) return segs[segs.length - 1];
-  /* The same rule the drawn road is cut by: everything inside the new reach,
-     burns and all. Stopping at crossed + 1 measured a leg the burn after it
-     replaces, and asked for a 720-day lap of a hyperbola that was over in an
-     afternoon. */
-  let i = Math.min(crossed + 1, segs.length - 1);
-  while(i + 1 < segs.length && segs[i].reason === 'burn') i++;
-  return segs[i];
-}
-const settled = pred => pred.segments.some(sg => sg.reason === 'crash' || sg.reason === 'partial');
+const isDoor = sg => sg.reason === 'exit' || sg.reason === 'enter';
 
 /* `flown` false draws the road the ship is on *now*, as if nothing were
  * written down: that is what the chart shows when no burn is open, so the
@@ -1316,6 +1353,28 @@ function interceptsOf(segments, crossed){
   const homeBound = Number.isFinite(segments[0]?.elements?.period);
   const leftHome = segments.find(sg => sg.body !== home)?.t0 ?? Infinity;
 
+  /* Where things are, remembered. Every world is measured against the same
+     samples, and the ship's own place at a sample is the same whichever
+     world is being measured — it was worked out afresh for each of the
+     seventeen, and a moon's planet again for each of its moons. */
+  const absMemo = new Map();
+  const absAt = (id, t) => {
+    const k = id + '|' + t;
+    let s = absMemo.get(k);
+    if(!s){ s = absState(world, id, t); absMemo.set(k, s); }
+    return s;
+  };
+  const shipAbsMemo = new Map();
+  const shipAbsPts = seg => {
+    let a = shipAbsMemo.get(seg);
+    if(!a){
+      const pts = seg.scan ?? seg.points, ts = seg.scanTimes ?? seg.times;
+      a = pts.map((p, i) => add(absAt(seg.body, ts[i]).r, p));
+      shipAbsMemo.set(seg, a);
+    }
+    return a;
+  };
+
   for(const b of world.bodies){
     if(b.id === 'lamp' || out.has(b.id)) continue;
     const bound = markWithin(b);
@@ -1335,11 +1394,12 @@ function interceptsOf(segments, crossed){
       const frame = world.get(seg.body);
       const pts = seg.scan ?? seg.points, ts = seg.scanTimes ?? seg.times;
       const own = seg.body === b.id, child = b.parent === seg.body;
+      const abs = own || child ? null : shipAbsPts(seg);
       for(let i = 0; i < pts.length; i++){
         const t = ts[i];
         const d = own ? norm(pts[i])
           : child ? dist(pts[i], railState(b, frame.mu, t).r)
-          : dist(add(absState(world, seg.body, t).r, pts[i]), absState(world, b.id, t).r);
+          : dist(abs[i], absAt(b.id, t).r);
         if(!best || d < best.d){
           if(best) closed = true;                 // it got nearer than it was
           best = { d, t, si, seg }; rising = 0;
@@ -1354,9 +1414,9 @@ function interceptsOf(segments, crossed){
     const seg = best.seg, frame = world.get(seg.body);
     const at = tt => {
       const local = propagate(frame.mu, seg.r0, seg.v0, tt - seg.t0);
-      const shipAbs = add(absState(world, seg.body, tt).r, local.r);
+      const fr = absState(world, seg.body, tt);
       const tg = absState(world, b.id, tt);
-      return { d: dist(shipAbs, tg.r), rel: norm(sub(add(absState(world, seg.body, tt).v, local.v), tg.v)), local };
+      return { d: dist(add(fr.r, local.r), tg.r), rel: norm(sub(add(fr.v, local.v), tg.v)), local };
     };
     const span = (seg.t1 - seg.t0) / Math.max(1, (seg.scanTimes ?? seg.times).length - 1);
     let lo = Math.max(seg.t0, best.t - span), hi = Math.min(seg.t1, best.t + span);
@@ -1384,51 +1444,24 @@ export function planImmediate(state, flown = true, opts = {}){
   const far = opts.farSight ?? seesPast(state);
   const bare = flown ? state : { ...state, nodes: [] };
   if(!flown) return planImmediate(bare, true, opts);
-  const b = world.get(state.ship.body);
-  const el = elementsFromState(b.mu, state.ship.r, state.ship.v);
-  const lastNode = state.nodes.length ? state.nodes[state.nodes.length - 1].t : state.t;
-  const lead = Math.max(0, lastNode - state.t);
-  /* The opening guess: every burn, then one lap of the conic we are on now.
-     A crossing inside that lap turns up in the first pass, and the passes
-     after it only correct the lap length for the conic the crossing (or the
-     last burn) actually leaves us on. */
-  let horizon = Math.min(IMMEDIATE_CAP, lead + lapOf(el) * 1.02);
-  let pred = plan(state, horizon);
-  for(let pass = 0; pass < (far ? 5 : 3) && !settled(pred); pass++){
-      const fin = finalLeg(pred);
-    if(!fin) break;
-    /* A leg that already ends at a boundary is as long as it is going to be;
-       asking for a lap of it (720 days, for anything unbound) sends the
-       horizon to the cap and costs two more solves per keystroke for a road
-       that was finished at the first. */
-    const done = fin.reason === 'exit' || fin.reason === 'enter' || fin.reason === 'crash';
-    const want = Math.min(IMMEDIATE_CAP, (fin.t0 - state.t) + (done ? fin.t1 - fin.t0 : lapOf(fin.elements)));
-    if(Math.abs(want - horizon) <= Math.max(1e-6, horizon * 0.01)) break;
-    horizon = want;
-    pred = plan(state, horizon);
-  }
-  /* With a navigator aboard, look one encounter further. The loop above stops
-     the moment the road ends at a door — right for the ordinary chart, and
-     exactly what hides the thing she is there to show. Grow the horizon by a
-     lap of whatever the crossing leaves us on and solve again, at most twice,
-     and only until a second door turns up. */
-  if(far){
-    for(let pass = 0; pass < 2; pass++){
-      const now = pred.segments;
-      const doors = now.filter(sg => sg.reason === 'exit' || sg.reason === 'enter').length;
-      if(doors >= 2) break;
-      const fin = now[now.length - 1];
-      if(!fin) break;
-      const lap = lapOf(fin.elements);
-      if(!Number.isFinite(lap) || lap <= 0) break;
-      const want = Math.min(IMMEDIATE_CAP, (fin.t1 - state.t) + lap * 1.02);
-      if(want <= horizon * 1.001) break;
-      horizon = want;
-      pred = plan(state, horizon);
-    }
-  }
+  /* One crossing, or two with somebody aboard who can hold the second in her
+     head. The walk goes on through every burn before the wanted door, through
+     the door, and through the leg after it and any burns written inside that
+     reach; it stops at the first leg that ends by itself — a lap that goes
+     round, a crash, the far edge of the look — or at a third door, which is
+     drawn as the orbit it is and not chased. */
+  const wanted = far ? 2 : 1;
+  const stop = segs => {
+    const last = segs[segs.length - 1];
+    if(!isDoor(last) && last.reason !== 'burn') return true;
+    const doors = segs.filter(isDoor).length;
+    if(doors > wanted) return true;
+    return false;
+  };
+  const pred = predictLegs(world, state.ship, state.t, sortedNodes(state), legOpts(state, { maxTime: IMMEDIATE_CAP, stop }));
+  const horizon = pred.end - state.t;
   const segs = pred.segments;
-  const firstCross = segs.findIndex(sg => sg.reason === 'exit' || sg.reason === 'enter');
+  const firstCross = segs.findIndex(isDoor);
   /* One crossing, or two with somebody aboard who can hold the second in their
      head. Everything downstream keys off `crossed`, so moving it is the whole
      of the change: the trim, the full lap and the marks all follow it. */
@@ -1551,7 +1584,6 @@ function seedFromLambert(state, targetId, node, scoreFn){
   // Leaving a world takes about a quarter of an orbit to line up, so the
   // departure window is the local orbit itself rather than the transfer.
   const localSpan = localPeriod ?? Math.max(2, hoh);
-  const ccw = cross(sub(startAbs, frameNow.r), sub(add(frameNow.v, [0, 0]), frameNow.v)) >= 0 ? true : true;
   const candidates = [];
   /* How long the search may wait before burning. Leaving a moon for a sibling
      moon means waiting for them to line up, which takes a synodic period — the
@@ -1621,7 +1653,6 @@ function seedFromLambert(state, targetId, node, scoreFn){
       }
     }
   }
-  void ccw;
   return pickSeed(state, node, candidates, scoreFn, hohFor);
 }
 
@@ -2169,8 +2200,7 @@ function departure(state){
  * worse Hohmann, it is a different conic entirely — faster or slower, so that
  * the arrival lands where the target has got to — which is why this is a
  * search and not a formula. */
-export function crossingNow(state, targetId, samples = 140){
-  const from = departure(state);
+export function crossingNow(state, targetId, samples = 24, from = departure(state)){
   const to = world.get(targetId);
   if(!to || from.body?.id === to.id || to.parent !== 'lamp') return null;
   const mu = CONST.MU_LAMP;
@@ -2185,22 +2215,45 @@ export function crossingNow(state, targetId, samples = 140){
      would fly. An instrument that recommends that is lying by omission, so
      the search only offers crossings a person would actually take, and a
      phase that has no good road in that window reads as dear, which it is. */
-  let best = null;
-  for(let i = 0; i <= samples; i++){
-    const tof = tH * (0.5 + (1.1 * i) / samples);
+  const costAt = tof => {
     const tgt = absState(world, targetId, state.t + tof);
     const L = lambert(mu, a.r, tgt.r, tof, ccw);
-    if(!L) continue;
+    if(!L) return Infinity;
     const cost = wellOut(from.body, dist(L.v1, a.v)) + wellIn(to, dist(L.v2, tgt.v));
-    if(Number.isFinite(cost) && (!best || cost < best.cost)) best = { cost, tof };
+    return Number.isFinite(cost) ? cost : Infinity;
+  };
+  /* A coarse sweep to find the dip, then a golden section to sit in the
+     bottom of it. The cost is smooth in the flight time, so two dozen looks
+     and a dozen refinements find what a hundred and forty looks used to. */
+  const lo = tH * 0.5, hi = tH * 1.6;
+  let bi = -1, bc = Infinity;
+  const coarse = [];
+  for(let i = 0; i <= samples; i++){
+    const tof = lo + (hi - lo) * (i / samples);
+    const c = costAt(tof);
+    coarse.push(c);
+    if(c < bc){ bc = c; bi = i; }
   }
+  if(bi < 0) return null;
+  let best = { cost: bc, tof: lo + (hi - lo) * (bi / samples) };
+  let x0 = lo + (hi - lo) * (Math.max(0, bi - 1) / samples), x1 = lo + (hi - lo) * (Math.min(samples, bi + 1) / samples);
+  const phi = (Math.sqrt(5) - 1) / 2;
+  let p = x1 - phi * (x1 - x0), q = x0 + phi * (x1 - x0);
+  let fp = costAt(p), fq = costAt(q);
+  for(let i = 0; i < 14; i++){
+    if(fp < fq){ x1 = q; q = p; fq = fp; p = x1 - phi * (x1 - x0); fp = costAt(p); }
+    else{ x0 = p; p = q; fp = fq; q = x0 + phi * (x1 - x0); fq = costAt(q); }
+  }
+  const tof = (x0 + x1) / 2, c = costAt(tof);
+  if(c < best.cost) best = { cost: c, tof };
+  if(fp < best.cost) best = { cost: fp, tof: p };
+  if(fq < best.cost) best = { cost: fq, tof: q };
   return best;
 }
 
 /* And what the same crossing costs when the window is right: the plain
  * Hohmann between the two rails, through the same wells. */
-export function crossingBest(state, targetId){
-  const from = departure(state);
+export function crossingBest(state, targetId, from = departure(state)){
   const to = world.get(targetId);
   if(!to) return null;
   const r1 = norm(from.r);
@@ -2214,8 +2267,8 @@ export function transferWindows(state){
   const rows = [];
   for(const b of world.bodies){
     if(b.parent !== 'lamp' || b.id === from.body?.id) continue;
-    const now = crossingNow(state, b.id);
-    const best = crossingBest(state, b.id);
+    const now = crossingNow(state, b.id, undefined, from);
+    const best = crossingBest(state, b.id, from);
     const w = nextWindow(state, b.id);
     if(!now || !best) continue;
     /* Impossible is measured against the tank rather than against what is in
