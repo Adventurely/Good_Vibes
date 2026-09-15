@@ -168,18 +168,23 @@
   /* Fixed and placed when it opens, rather than hung off the button: the HUD
      is a stacking context underneath the panel, so a menu drawn inside it
      would open behind the panel it has to cover. */
+  /* Built like the side panel rather than like a dropdown, because it is one:
+     a tab row and a body under it. There is one tab today and room for the
+     next without moving anything. */
   #gearmenu{
-    position:fixed; z-index:9; min-width:196px; padding:.3rem;
+    position:fixed; z-index:9; width:230px; overflow:hidden;
     background:var(--glass-2); border:1px solid var(--line); border-radius:var(--radius);
-    backdrop-filter:blur(10px); display:flex; flex-direction:column; gap:2px;
+    backdrop-filter:blur(10px); display:flex; flex-direction:column;
+    box-shadow:0 10px 30px -12px rgba(0,0,0,.7);
   }
   #gearmenu[hidden]{ display:none; }
-  #gearmenu button{
-    border:0; background:none; color:var(--ink); cursor:pointer; font:inherit;
-    font-size:.85rem; text-align:left; padding:.5rem .6rem; border-radius:6px;
-  }
-  #gearmenu button:hover{ background:var(--gv-sunk); }
-  #gearmenu button:focus-visible{ outline:2px solid var(--gold); outline-offset:-2px; }
+  #gear-tabs{ display:flex; gap:2px; padding:.4rem .4rem 0; border-bottom:1px solid var(--line); }
+  /* Tabs start at the left and are as wide as their word. The panel's own tabs
+     share the row out between them, which for a row of one means a lone tab
+     stretched across the whole menu with its label stranded in the middle. */
+  #gear-tabs .tab{ flex:0 0 auto; padding:.45rem .7rem; }
+  #gear-body{ padding:.55rem; display:flex; flex-direction:column; gap:.35rem; }
+  #gear-body .btn{ width:100%; text-align:left; }
 
   /* ---- The panel: right column on wide screens, a sheet on narrow ---- */
   #panel{
@@ -758,11 +763,19 @@
        you are closing. Only drawn with her aboard and only near a drift. -->
   <div class="stat" id="rv-stat" hidden><small>Rendezvous</small><b id="h-rv">—</b></div>
   <div class="stat" id="where"><small>Where</small><b id="h-where">—</b><span id="dockhint"></span></div>
-  <button id="m-gear" title="Settings" aria-label="Settings" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.1"/><path d="M19.2 14.9a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.11a1.7 1.7 0 0 0-1.1-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.11a1.7 1.7 0 0 0 1.56-1.1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.08a1.7 1.7 0 0 0 1.03-1.56V3a2 2 0 1 1 4 0v.11a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.08a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 1 1 0 4h-.11a1.7 1.7 0 0 0-1.56 1.03z"/></svg></button>
+  <!-- A cog: one ring, one hub, eight teeth on the spokes of a compass. Drawn
+       from the middle out so it is symmetric by construction — the hand-written
+       bezier cog it replaces sat a pixel high and to the left of its own
+       button, which is exactly the sort of thing a gear icon cannot get away
+       with when it is the only round object in a row of text. -->
+  <button id="m-gear" title="Settings" aria-label="Settings" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6.4"/><circle cx="12" cy="12" r="2.5"/><path d="M12 5.6V2.4M12 18.4v3.2M5.6 12H2.4M18.4 12h3.2M7.47 7.47 5.2 5.2M16.53 16.53l2.27 2.27M16.53 7.47 18.8 5.2M7.47 16.53 5.2 18.8"/></svg></button>
 </header>
 <!-- Not inside the strip: see the note by #gearmenu in the stylesheet. -->
-<div id="gearmenu" role="menu" hidden>
-  <button id="gear-quit" role="menuitem">Quit to title screen</button>
+<div id="gearmenu" role="dialog" aria-label="Settings" hidden>
+  <div id="gear-tabs" role="tablist" aria-label="Settings sections">
+    <button class="tab" role="tab" data-gtab="game" aria-selected="true" aria-controls="gear-body">Game</button>
+  </div>
+  <div id="gear-body" role="tabpanel"></div>
 </div>
 
 <div id="act">
@@ -1408,6 +1421,29 @@ $('m-dock').addEventListener('click', () => openMenu('dock'));
    and starts again exactly as it was — not simply running — so that opening
    the gear while paused and closing it again does not quietly set the ship
    moving. */
+/* The sections, and what is in each. One today; the shape is here so the next
+   one is a line rather than a rebuild. */
+const GEAR_TABS = {
+  game: () => `<button class="btn sm" id="gear-quit">&larr; Quit to title screen</button>`,
+};
+let gearTab = 'game';
+function renderGearTab(){
+  $('gear-body').innerHTML = (GEAR_TABS[gearTab] ?? GEAR_TABS.game)();
+  for(const b of $('gear-tabs').querySelectorAll('[data-gtab]')){
+    b.setAttribute('aria-selected', String(b.dataset.gtab === gearTab));
+  }
+  /* It saves as you play, but not necessarily in the last few seconds of it,
+     so the way out writes the game down before it takes it. */
+  $('gear-quit')?.addEventListener('click', () => { save(); location.href = './'; });
+}
+$('gear-tabs').addEventListener('click', e => {
+  const b = e.target.closest('[data-gtab]');
+  if(!b) return;
+  gearTab = b.dataset.gtab;
+  renderGearTab();
+  $('gear-body').querySelector('button')?.focus();
+});
+
 let gearOpen = false;
 let gearWasPaused = false;
 function openGear(on = !gearOpen){
@@ -1419,13 +1455,14 @@ function openGear(on = !gearOpen){
   if(!on){ setPaused(gearWasPaused); return; }
   gearWasPaused = !!state.paused;
   setPaused(true);
+  renderGearTab();
   /* Placed off the button rather than pinned to the corner: the strip wraps
      to two rows on a phone, and a menu nailed to the top right would open
      somewhere the gear is not. */
   const r = btn.getBoundingClientRect();
   menu.style.top = `${Math.round(r.bottom + 6)}px`;
   menu.style.right = `${Math.round(innerWidth - r.right)}px`;
-  menu.querySelector('button')?.focus();
+  $('gear-body').querySelector('button')?.focus();
 }
 $('m-gear').addEventListener('click', () => openGear());
 /* Anywhere else is a dismissal, and only a dismissal: caught on the way down
@@ -1436,9 +1473,6 @@ addEventListener('pointerdown', e => {
   openGear(false);
   e.stopPropagation();
 }, true);
-/* It saves as you play, but not necessarily in the last few seconds of it, so
-   the way out writes the game down before it takes it. */
-$('gear-quit').addEventListener('click', () => { save(); location.href = './'; });
 /* The view is locked; there is nothing to keep in sync but the panel. */
 function syncView(){}
 /* `quiet` is for the times the layout moves the panel on its own — the first
@@ -1660,16 +1694,8 @@ addEventListener('keydown', e => {
   }
 });
 
-/* Planning is free, and it should not be a race. A mark written down for a
-   moment that is nearly here stops the clock, so the pad can be pressed
-   before it arrives; anything further off leaves the clock alone. The
-   threshold is in real seconds, not game days — at the top warp a fortnight
-   goes by while you look at it, and at ×1 a day is the better part of three
-   hours. */
-const PLAN_HOLD_SECONDS = 25;
-function realSecondsTo(t){
-  return (t - state.t) / Math.max(1e-12, CONST.BASE_RATE_DAYS_PER_SEC * S.warpRate(state));
-}
+/* Planning is free, and it should not be a race: a burn that is open stops the
+   clock, whether it is due in a minute or next spring. */
 /* Closing the burn gives the clock back, but only if it was this that stopped
    it: a player who pressed space to stop time and then poked a mark should not
    have time start again when they put the mark away. */
@@ -1693,15 +1719,14 @@ function holdForPlanning(ix){
      due. The old rule held it inside twenty-five seconds and let it run
      otherwise, which is backwards: a mark months out is the one you are going
      to sit and nudge, and having the sky move under the arrows while you do it
-     is the thing that made a careful pass into a chase. PLAN_HOLD_SECONDS is
-     kept because the toast still says something different for a burn that is
-     about to fire. */
+     is the thing that made a careful pass into a chase.
+
+     It used to say so in a toast every time. It did not need to: the Clock
+     stat in the strip says "held" for as long as it is, which is the same
+     news without a card over the sky every time a burn is opened and closed. */
   state.paused = true;
   heldForPlan = true;
   setRate(1);
-  toast(realSecondsTo(n.t) <= PLAN_HOLD_SECONDS
-    ? 'Clock held while you plan. Press space to start it again.'
-    : 'Clock held while this burn is open. Press space, or close the burn, to start it again.');
 }
 
 /* Frame what the chart is drawing. The view is locked to the world the ship

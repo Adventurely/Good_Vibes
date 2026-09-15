@@ -804,7 +804,7 @@ function drawPrediction(chart, view, pos, anchorList){
       ctx.stroke();
     }
   }
-  drawApses(chart, view, anchors, afterBurnAt);
+  drawApses(chart, view, anchors, afterBurnAt, pos);
   drawCrossings(chart, view, anchors, afterBurnAt);
   drawRailCrossings(chart, view, anchors);
   drawIntercepts(chart, view, anchors, afterBurnAt);
@@ -817,9 +817,43 @@ function drawPrediction(chart, view, pos, anchorList){
  *   crossing     a chevron in a ring — a door out of one world into another
  *   burn         a ring with the four directions round it (drawNodes)
  */
-function drawApses(chart, view, anchors, afterBurnAt){
+/* The boxes the burns take up on the screen this frame. A closed burn is its
+ * flame and the name beside it; an open one is the whole editor, which is most
+ * of a hand's width across. Nothing else is drawn inside one of these. */
+function burnBoxes(chart, view, pos, anchors){
+  const { ctx } = chart;
+  const out = [];
+  const nodes = view.nodes ?? [];
+  for(let i = 0; i < nodes.length; i++){
+    const where = view.nodePositions?.[i];
+    if(!where || !pos.has(where.body)) continue;
+    const p = chart.toScreen(add(anchorAt(anchors, where, pos), where.r));
+    if(view.selectedNode === i){
+      // The arrows reach HANDLE_OFFSET out and the scrap cross further still.
+      out.push([p[0] - 80, p[1] - 80, p[0] + 80, p[1] + 80]);
+    }else{
+      ctx.font = '600 12px ui-sans-serif, system-ui, sans-serif';
+      out.push([p[0] - 11, p[1] - 15, p[0] + 15 + ctx.measureText(`Burn ${i + 1}`).width, p[1] + 12]);
+    }
+  }
+  return out;
+}
+const boxesOverlap = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+
+function drawApses(chart, view, anchors, afterBurnAt, pos){
   const { ctx } = chart;
   if(!view.apses) return;
+  /* A low point and a burn land on the same stretch of road constantly — the
+     cheapest place to burn *is* the low point — and two marks and two labels
+     on one pixel is a pile. The burn is the one being worked on, so the apsis
+     is the one that stands down.
+
+     Apses pile up on each other too: a burn splits the road in two and both
+     halves have a high point, which sit on the same pixel whenever the burn is
+     a small one. Whatever is drawn first keeps its place — the legs come in
+     the order they are flown, so that is the road you are on now, and the
+     plan's mark appears as soon as the burn is big enough to move it. */
+  const taken = burnBoxes(chart, view, pos, anchors);
   ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
   for(const a of view.apses){
     const seg = view.prediction.segments[a.segIndex];
@@ -833,6 +867,11 @@ function drawApses(chart, view, anchors, afterBurnAt){
     const afterBurn = afterBurnAt(a.segIndex);
     const p = chart.toScreen(add(anchor, a.r));
     if(p[0] < -60 || p[1] < -30 || p[0] > chart.width + 60 || p[1] > chart.height + 30) continue;
+    // The mark is its disc and the words beside it; either one clashing is a clash.
+    const label = a.label ?? '';
+    const box = [p[0] - 6, p[1] - 7, p[0] + 9 + (label ? ctx.measureText(label).width : 0), p[1] + 8];
+    if(taken.some(b => boxesOverlap(box, b))) continue;
+    taken.push(box);
     const colour = afterBurn ? PALETTE.pathPlan : PALETTE.apsis;
     ctx.lineWidth = 2;
     ctx.strokeStyle = ctx.fillStyle = colour;
