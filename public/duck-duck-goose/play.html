@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../theme.css">
+<title>Duck Duck Goose</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%234fc4d3'/%3E%3Ccircle cx='9' cy='7' r='4' fill='%23ffd34e'/%3E%3Cpath d='M12 7h2l-1 1z' fill='%23f08c33'/%3E%3C/svg%3E">
+<meta name="description" content="A duckling hatches and walks on its own. Give it a skill before it wanders into something — a gap, a wall, a drop, or the goose — and get enough of the hatch to the pond.">
+<style>
+  :root{
+    --type: var(--gv-type);
+    --ink: var(--gv-paper);
+    --panel: var(--gv-paper-2);
+    --sunk: var(--gv-sunk);
+    --line: var(--gv-line);
+    --text: var(--gv-text);
+    --muted: var(--gv-muted);
+    --accent: var(--gv-leaf);
+    --sun: var(--gv-sun);
+    --bad: var(--gv-bad);
+  }
+  *{ box-sizing: border-box; }
+  body{
+    margin: 0;
+    padding: 0.6rem clamp(0.5rem, 3vw, 1.2rem) 2rem;
+    background: var(--ink);
+    background-image: var(--gv-ground);
+    color: var(--text);
+    font-family: var(--type);
+    line-height: 1.5;
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap{ max-width: 56rem; margin: 0 auto; }
+
+  header{ display: flex; align-items: baseline; gap: 0.9rem; flex-wrap: wrap; padding-bottom: 0.5rem; }
+  header h1{ margin: 0; font-size: 1.2rem; font-weight: 800; }
+  header .crumb{ color: var(--muted); font-size: 0.82rem; text-decoration: none; margin-left: auto; }
+  header .crumb:hover{ color: var(--text); }
+
+  .screen{
+    position: relative;
+    width: max-content; max-width: 100%; margin: 0 auto;
+    border: 2px solid var(--line);
+    border-radius: 6px;
+    background: #14304a;
+    box-shadow: 0 0 0 4px #e6dcc7, 0 14px 34px rgb(74 51 32 / 0.18);
+    overflow: hidden;
+    line-height: 0;
+  }
+  canvas{ display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
+  #scene{
+    cursor: pointer; touch-action: none; margin: 0 auto;
+    max-width: 100%; height: auto;
+    user-select: none; -webkit-user-select: none;
+    -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+  }
+  #scene:focus-visible{ outline: 3px solid var(--sun); outline-offset: -3px; }
+
+  .hud{
+    position: absolute; inset: 0.4rem 0.5rem auto 0.5rem;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 0.5rem; pointer-events: none; font-size: 0.7rem;
+    /* `.screen` sets `line-height: 0` to collapse whitespace around the
+       canvas, and that inherits into every descendant unless it is set again
+       — without this the HUD's two stacked lines land on top of each other. */
+    line-height: 1.35;
+    text-shadow: 0 1px 0 rgba(0,0,0,0.6);
+    color: #fdf6e3;
+  }
+  .hud b{ font-size: 0.95rem; }
+  .hud .right{ text-align: right; }
+
+  .overlay{
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(13, 11, 31, 0.72); color: #fdf6e3; text-align: center;
+    flex-direction: column; gap: 0.6rem; padding: 1rem;
+  }
+  /* The plain UA rule for [hidden] loses to the class rule above on
+     specificity order, not strength, so it has to be said again here — an
+     author style always wins over the default stylesheet regardless of which
+     was written first. Without this the overlay stayed visible (and kept
+     eating clicks meant for the scene) the entire time it was "hidden". */
+  .overlay[hidden]{ display: none; }
+  .overlay h2{ margin: 0; font-size: 1.5rem; }
+  .overlay p{ margin: 0; font-size: 0.9rem; max-width: 22rem; }
+
+  .skills{
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.5rem;
+    margin-top: 0.6rem;
+  }
+  .skill{
+    font: inherit; cursor: pointer; text-align: left;
+    background: var(--panel); border: 2px solid var(--line); border-radius: 6px;
+    padding: 0.5rem 0.6rem;
+  }
+  .skill .name{ font-weight: 800; display: block; }
+  .skill .count{ font-variant-numeric: tabular-nums; color: var(--muted); font-size: 0.82rem; }
+  .skill:hover:not(:disabled){ border-color: var(--accent); }
+  .skill[aria-pressed='true']{ background: #eef7e9; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+  .skill:disabled{ opacity: 0.45; cursor: not-allowed; }
+  .skill .blurb{ display: block; font-size: 0.74rem; color: var(--muted); margin-top: 0.15rem; }
+
+  .status{ min-height: 1.4em; margin: 0.5rem 0 0; font-size: 0.84rem; color: var(--muted); }
+  .status[data-bad='true']{ color: var(--bad); font-weight: 700; }
+
+  .controls{ display: flex; gap: 0.5rem; margin-top: 0.6rem; flex-wrap: wrap; }
+  .btn{
+    font: inherit; font-size: 0.84rem; padding: 0.4rem 0.9rem; cursor: pointer;
+    background: var(--sunk); border: 1px solid var(--line); border-radius: 5px; color: var(--text);
+  }
+  .btn:hover{ background: #fffdf6; }
+  .btn-go{ background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+  .btn-go:hover{ background: #256b28; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Duck Duck Goose</h1>
+    <a class="crumb" href="/">&larr; games</a>
+  </header>
+
+  <div class="screen">
+    <canvas id="scene" width="320" height="180" tabindex="0" role="application"
+            aria-label="The park. Arm a skill below, then click a walking duckling to give it that skill."></canvas>
+    <div class="hud" aria-hidden="true">
+      <div>
+        Saved <b id="hud-saved">0 / 0</b><br>
+        Lost <b id="hud-lost">0</b>
+      </div>
+      <div class="right">
+        Hatched <b id="hud-hatched">0 / 0</b><br>
+        Time <b id="hud-time">0:00</b>
+      </div>
+    </div>
+    <div class="overlay" id="overlay" hidden>
+      <h2 id="overlay-title"></h2>
+      <p id="overlay-body"></p>
+      <button class="btn btn-go" id="again" type="button">Play again</button>
+    </div>
+  </div>
+
+  <div class="skills" role="group" aria-label="Skills to arm">
+    <!-- Filled in by script from SKILLS / SKILL_INFO, so a skill added there
+         needs no second copy of its name and blurb written into the page. -->
+  </div>
+  <p class="status" id="status" role="status"></p>
+
+  <div class="controls">
+    <button class="btn" id="pause" type="button">Pause</button>
+    <button class="btn" id="restart" type="button">Restart level</button>
+  </div>
+</div>
+
+<script type="module">
+  import { LEVEL_1, SKILLS, SKILL_INFO, TICK_RATE, winCount, formatTime } from './content.js';
+  import { newGame, tick, assignSkill, assignRefusal, duckNear } from './sim.js';
+  import { paintScene } from './art.js';
+  import { fitCanvas, context2d } from '../good-vibes/pixel.js';
+
+  const els = id => document.getElementById(id);
+  const ui = {
+    scene: els('scene'), hudSaved: els('hud-saved'), hudLost: els('hud-lost'),
+    hudHatched: els('hud-hatched'), hudTime: els('hud-time'),
+    overlay: els('overlay'), overlayTitle: els('overlay-title'), overlayBody: els('overlay-body'),
+    again: els('again'), status: els('status'), pause: els('pause'), restart: els('restart'),
+    skills: document.querySelector('.skills'),
+  };
+  const ctx = context2d(ui.scene);
+
+  let state = newGame(LEVEL_1);
+  let armed = null;
+  let paused = false;
+
+  /* --- the skill palette ---------------------------------------------- */
+
+  const skillButtons = new Map();
+  for(const skill of SKILLS){
+    const info = SKILL_INFO[skill];
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'skill';
+    btn.dataset.skill = skill;
+    btn.setAttribute('aria-pressed', 'false');
+    btn.innerHTML = `<span class="name">${info.name}</span>`
+      + `<span class="count" id="count-${skill}"></span>`
+      + `<span class="blurb">${info.blurb}</span>`;
+    btn.addEventListener('click', () => {
+      armed = armed === skill ? null : skill;
+      say(armed ? `${info.name} armed — click a walking duckling.` : '');
+      refreshSkills();
+    });
+    ui.skills.append(btn);
+    skillButtons.set(skill, btn);
+  }
+
+  function refreshSkills(){
+    for(const skill of SKILLS){
+      const btn = skillButtons.get(skill);
+      const left = state.supply[skill];
+      btn.querySelector(`#count-${skill}`).textContent = `${left} left`;
+      btn.disabled = left <= 0 || Boolean(state.ended);
+      btn.setAttribute('aria-pressed', String(armed === skill));
+      if(btn.disabled && armed === skill) armed = null;
+    }
+  }
+
+  function say(text, bad = false){
+    ui.status.textContent = text;
+    ui.status.dataset.bad = String(bad);
+  }
+
+  /* --- clicking a duckling --------------------------------------------- */
+
+  function sceneXY(event){
+    const box = ui.scene.getBoundingClientRect();
+    return {
+      x: (event.clientX - box.left) / box.width * LEVEL_1.width,
+      y: (event.clientY - box.top) / box.height * LEVEL_1.height,
+    };
+  }
+
+  ui.scene.addEventListener('pointerdown', event => {
+    event.preventDefault();
+    ui.scene.focus({ preventScroll: true });
+    if(!armed) return say('Arm a skill first, then click a duckling.');
+    const { x, y } = sceneXY(event);
+    const duck = duckNear(state, x, y, 12);
+    if(!duck) return say('No duckling there.');
+    const refusal = assignRefusal(state, duck.id, armed);
+    if(refusal) return say(refusal, true);
+    assignSkill(state, duck.id, armed);
+    say(`${SKILL_INFO[armed].name} given.`);
+    refreshSkills();
+  });
+
+  /* --- the loop ---------------------------------------------------------- */
+
+  const STEP = 1 / TICK_RATE;
+  let acc = 0, last = null;
+
+  function endMessage(){
+    const won = state.ended === 'won';
+    ui.overlayTitle.textContent = won ? 'The flock made it!' : 'Out of time';
+    ui.overlayBody.textContent = `${state.saved} of ${LEVEL_1.duckCount} saved`
+      + ` — needed ${winCount(LEVEL_1)}. ${state.lost} lost.`;
+    ui.overlay.hidden = false;
+  }
+
+  function refreshHud(){
+    ui.hudSaved.textContent = `${state.saved} / ${winCount(LEVEL_1)}`;
+    ui.hudLost.textContent = String(state.lost);
+    ui.hudHatched.textContent = `${state.hatched} / ${LEVEL_1.duckCount}`;
+    ui.hudTime.textContent = formatTime(Math.max(0, LEVEL_1.timeLimit - state.ticks));
+  }
+
+  function frame(now){
+    requestAnimationFrame(frame);
+    if(last === null) last = now;
+    const dt = Math.min(0.25, (now - last) / 1000);
+    last = now;
+
+    if(!paused && !state.ended){
+      acc += dt;
+      while(acc >= STEP){ tick(state); acc -= STEP; }
+      if(state.ended){ refreshSkills(); endMessage(); }
+    }
+
+    paintScene(ctx, state);
+    refreshHud();
+  }
+
+  ui.pause.addEventListener('click', () => {
+    paused = !paused;
+    ui.pause.textContent = paused ? 'Resume' : 'Pause';
+  });
+
+  function restart(){
+    state = newGame(LEVEL_1);
+    armed = null;
+    paused = false;
+    ui.pause.textContent = 'Pause';
+    ui.overlay.hidden = true;
+    say('');
+    refreshSkills();
+  }
+  ui.restart.addEventListener('click', restart);
+  ui.again.addEventListener('click', restart);
+
+  fitCanvas(ui.scene, LEVEL_1.width, LEVEL_1.height, { maxHeightFraction: 0.6 });
+  addEventListener('resize', () => fitCanvas(ui.scene, LEVEL_1.width, LEVEL_1.height, { maxHeightFraction: 0.6 }));
+
+  refreshSkills();
+  requestAnimationFrame(frame);
+</script>
+
+<noscript>
+  <p style="max-width:40rem;margin:2rem auto">Duck Duck Goose runs in the browser and needs JavaScript.
+  Nothing is saved and nothing leaves this device.</p>
+</noscript>
+</body>
+</html>
