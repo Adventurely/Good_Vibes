@@ -149,6 +149,38 @@
   }
   #m-ship.owed:hover, #m-ship.owed:focus-visible{ animation:none; box-shadow:0 0 12px -1px var(--gold-2); }
 
+  /* ---- Settings: a gear at the end of the strip ----------------------- */
+  /* The one control that is about the game rather than about the ship or the
+     sky, so it sits apart from both, at the far end of the top strip where a
+     gear is the first place anybody looks for one. */
+  #m-gear{
+    width:34px; height:34px; border-radius:9px; border:1px solid var(--line);
+    background:var(--glass); color:var(--dim); cursor:pointer; backdrop-filter:blur(8px);
+    display:flex; align-items:center; justify-content:center; padding:0; line-height:1;
+    margin-left:auto; flex:0 0 auto;
+  }
+  #m-gear svg{
+    display:block; width:19px; height:19px;
+    fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;
+  }
+  #m-gear:hover{ color:var(--ink); border-color:var(--line-2); }
+  #m-gear[aria-expanded="true"]{ color:var(--gold-ink); border-color:var(--gold-2); }
+  /* Fixed and placed when it opens, rather than hung off the button: the HUD
+     is a stacking context underneath the panel, so a menu drawn inside it
+     would open behind the panel it has to cover. */
+  #gearmenu{
+    position:fixed; z-index:9; min-width:196px; padding:.3rem;
+    background:var(--glass-2); border:1px solid var(--line); border-radius:var(--radius);
+    backdrop-filter:blur(10px); display:flex; flex-direction:column; gap:2px;
+  }
+  #gearmenu[hidden]{ display:none; }
+  #gearmenu button{
+    border:0; background:none; color:var(--ink); cursor:pointer; font:inherit;
+    font-size:.85rem; text-align:left; padding:.5rem .6rem; border-radius:6px;
+  }
+  #gearmenu button:hover{ background:var(--gv-sunk); }
+  #gearmenu button:focus-visible{ outline:2px solid var(--gold); outline-offset:-2px; }
+
   /* ---- The panel: right column on wide screens, a sheet on narrow ---- */
   #panel{
     position:fixed; top:64px; right:.8rem; bottom:64px; width:min(var(--panel-w), calc(100vw - 5.5rem)); z-index:6;
@@ -548,9 +580,6 @@
   #tut.min h3{ font-size:.86rem; margin:.1rem 0 0; }
   #tut.min p, #tut.min .btns{ display:none; }
 
-  #back{ position:fixed; left:.8rem; top:calc(46px + env(safe-area-inset-top)); z-index:5; color:var(--faint); font-size:.78rem; text-decoration:none; }
-  #back:hover{ color:var(--ink); }
-
   /* Phone. The chart is the point, so nothing may stack on top of it: the HUD
      is two tight rows, the clock and the view buttons share one strip
      under them, the panel is a sheet that starts closed, and the cards that
@@ -563,8 +592,6 @@
     #dvbar{ width:64px; height:4px; }
     #where{ flex:1 1 8rem; text-align:left; }
     #where b, #dockhint{ font-size:.78rem; }
-    /* Two rows is the budget; the back link moves into the Shipyard tab. */
-    #back{ display:none; }
 
     #view{
       top:calc(74px + env(safe-area-inset-top)); bottom:auto; right:.4rem;
@@ -731,8 +758,12 @@
        you are closing. Only drawn with her aboard and only near a drift. -->
   <div class="stat" id="rv-stat" hidden><small>Rendezvous</small><b id="h-rv">—</b></div>
   <div class="stat" id="where"><small>Where</small><b id="h-where">—</b><span id="dockhint"></span></div>
+  <button id="m-gear" title="Settings" aria-label="Settings" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.1"/><path d="M19.2 14.9a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.11a1.7 1.7 0 0 0-1.1-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.11a1.7 1.7 0 0 0 1.56-1.1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.08a1.7 1.7 0 0 0 1.03-1.56V3a2 2 0 1 1 4 0v.11a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.08a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 1 1 0 4h-.11a1.7 1.7 0 0 0-1.56 1.03z"/></svg></button>
 </header>
-<a id="back" href="./">&larr; title</a>
+<!-- Not inside the strip: see the note by #gearmenu in the stylesheet. -->
+<div id="gearmenu" role="menu" hidden>
+  <button id="gear-quit" role="menuitem">Quit to title screen</button>
+</div>
 
 <div id="act">
   <button id="dock-go" hidden title="Dock (d)" aria-label="Dock here">
@@ -1366,6 +1397,48 @@ function refreshFarButton(){
 }
 $('m-ship').addEventListener('click', () => openMenu('ship'));
 $('m-dock').addEventListener('click', () => openMenu('dock'));
+
+/* ---------------------------------------------------------- settings */
+
+/* The gear. What is in it is about the game rather than about the ship or the
+   sky, which is why it is not another tab in the panel: leaving is not a thing
+   you do to your ship.
+
+   The clock stops while it is up, the way it does for every other menu here,
+   and starts again exactly as it was — not simply running — so that opening
+   the gear while paused and closing it again does not quietly set the ship
+   moving. */
+let gearOpen = false;
+let gearWasPaused = false;
+function openGear(on = !gearOpen){
+  if(on === gearOpen) return;
+  gearOpen = on;
+  const menu = $('gearmenu'), btn = $('m-gear');
+  btn.setAttribute('aria-expanded', String(on));
+  menu.hidden = !on;
+  if(!on){ setPaused(gearWasPaused); return; }
+  gearWasPaused = !!state.paused;
+  setPaused(true);
+  /* Placed off the button rather than pinned to the corner: the strip wraps
+     to two rows on a phone, and a menu nailed to the top right would open
+     somewhere the gear is not. */
+  const r = btn.getBoundingClientRect();
+  menu.style.top = `${Math.round(r.bottom + 6)}px`;
+  menu.style.right = `${Math.round(innerWidth - r.right)}px`;
+  menu.querySelector('button')?.focus();
+}
+$('m-gear').addEventListener('click', () => openGear());
+/* Anywhere else is a dismissal, and only a dismissal: caught on the way down
+   so the tap that closes the menu does not also land on the chart under it
+   and pan the sky or plan a burn. */
+addEventListener('pointerdown', e => {
+  if(!gearOpen || e.target.closest('#gearmenu, #m-gear')) return;
+  openGear(false);
+  e.stopPropagation();
+}, true);
+/* It saves as you play, but not necessarily in the last few seconds of it, so
+   the way out writes the game down before it takes it. */
+$('gear-quit').addEventListener('click', () => { save(); location.href = './'; });
 /* The view is locked; there is nothing to keep in sync but the panel. */
 function syncView(){}
 /* `quiet` is for the times the layout moves the panel on its own — the first
@@ -1566,7 +1639,11 @@ addEventListener('keydown', e => {
     /* One key for both: it opens the ship, and at a port it steps on to the
        dock and then shuts, which is the whole cycle in one thumb. */
     case 'p': openMenu(state.dockedAt && panelOpen && panelMenu === 'ship' ? 'dock' : 'ship'); break;
-    case 'Escape': if(selectedNode >= 0){ selectNode(-1); renderTab(); } else togglePanel(false); break;
+    case 'Escape':
+      if(gearOpen) openGear(false);
+      else if(selectedNode >= 0){ selectNode(-1); renderTab(); }
+      else togglePanel(false);
+      break;
     case 'Delete': case 'Backspace': if(state.nodes[selectedNode]){ S.removeNode(state, selectedNode); selectNode(-1); replan(true); renderTab(); } break;
     /* The arrows push the selected burn; with nothing selected they are the
        keyboard's pan, so the chart can be walked around without a pointer.
@@ -1734,6 +1811,8 @@ function tabsFor(){
 }
 /* Open one of the two, or shut the panel if it is already showing that one. */
 function openMenu(which){
+  // One menu at a time: the gear stands down for the ship and the port.
+  openGear(false);
   if(which === 'dock' && !state.dockedAt) which = 'ship';
   /* While a reward is sitting uncollected the ship button is flashing, and a
      button that flashes has made a promise about what pressing it does. It
