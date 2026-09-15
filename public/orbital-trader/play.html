@@ -137,6 +137,17 @@
   #v-fit.off{ color:var(--gold-ink); border-color:var(--gold-2); }
   #v-far[hidden]{ display:none; }
   #v-far.off{ opacity:.55; }
+  /* A job finished and waiting to be collected. The log lives behind the ship
+     button, so the ship button is what says so — the same slow breath the
+     mooring ring uses, because it is the same kind of news: there is something
+     here worth pressing. It stops under the pointer, and it stops altogether
+     once the log is open, having said what it had to say. */
+  #m-ship.owed{ color:var(--gold-ink); border-color:var(--gold-2); animation:owedflash 1.8s ease-in-out infinite; }
+  @keyframes owedflash{
+    0%, 100%{ box-shadow:0 0 0 0 transparent; }
+    50%{ box-shadow:0 0 12px -1px var(--gold-2); }
+  }
+  #m-ship.owed:hover, #m-ship.owed:focus-visible{ animation:none; box-shadow:0 0 12px -1px var(--gold-2); }
 
   /* ---- The panel: right column on wide screens, a sheet on narrow ---- */
   #panel{
@@ -627,6 +638,8 @@
     /* The mooring ring still has to be noticed, so it keeps the brightness the
        flash was carrying it to and drops the breathing. */
     #dock-go{ animation:none; opacity:1; }
+    /* Same bargain for the ship button: keep the glow, lose the breath. */
+    #m-ship.owed{ animation:none; box-shadow:0 0 12px -1px var(--gold-2); }
   }
   /* The hazard marks. Amber is "this will happen and it will hurt a bit";
      red is the colour the chart already uses for ground, so the corner and
@@ -1136,6 +1149,7 @@ function renderHud(docking){
   showHazard();
   refreshFarButton();
   showRendezvous();
+  refreshOwedFlash();
   /* The tank, and what the plan will take out of it. The cost of a burn is
      shown here and nowhere near the burn itself: it is a length of fuel, and
      next to a mark it read as a speed — which made pressing Back to slow down
@@ -1712,6 +1726,16 @@ function tabsFor(){
 /* Open one of the two, or shut the panel if it is already showing that one. */
 function openMenu(which){
   if(which === 'dock' && !state.dockedAt) which = 'ship';
+  /* While a reward is sitting uncollected the ship button is flashing, and a
+     button that flashes has made a promise about what pressing it does. It
+     keeps the promise by opening the log rather than whichever tab you happened
+     to leave open — and once the log is up it is an ordinary toggle again. */
+  if(which === 'ship' && !onOwedLog() && S.unclaimedQuests(state).length){
+    panelMenu = 'ship'; tab = 'quests';
+    renderTabs(); setTab('quests');
+    refreshMenuButtons();
+    return;
+  }
   if(panelOpen && panelMenu === which){ togglePanel(false); return; }
   panelMenu = which;
   renderTabs();
@@ -1722,6 +1746,17 @@ function refreshMenuButtons(){
   $('m-dock').hidden = !state.dockedAt;
   $('m-ship').setAttribute('aria-pressed', String(panelOpen && panelMenu === 'ship'));
   $('m-dock').setAttribute('aria-pressed', String(panelOpen && panelMenu === 'dock'));
+  refreshOwedFlash();
+}
+/* The log is already on screen: the flash has nothing left to point at. */
+function onOwedLog(){ return panelOpen && panelMenu === 'ship' && tab === 'quests'; }
+/* Called every frame, because a job can finish mid-coast with no menu open and
+   nothing else on the page to notice it. The button's own class is the record
+   of what was last drawn, so a steady state writes nothing. */
+function refreshOwedFlash(){
+  const btn = $('m-ship');
+  const owed = !onOwedLog() && S.unclaimedQuests(state).length > 0;
+  if(owed !== btn.classList.contains('owed')) btn.classList.toggle('owed', owed);
 }
 function renderTabs(){
   // Casting off takes the port menu with it; there is nothing left in it.

@@ -3677,3 +3677,38 @@ test('opening a burn holds the clock, and closing it gives the clock back', () =
     ['Escape', /if\(selectedNode >= 0\)\{ selectNode\(-1\)/],
   ]) assert.match(PLAY, pattern, `${what} does not go through selectNode`);
 });
+
+test('an uncollected reward flashes the ship button, and the button goes to the log', () => {
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  /* A job can finish mid-coast with the menus shut: nothing else on the page
+     would say so, which is the whole reason the button has to. */
+  assert.match(PLAY, /#m-ship\.owed\{[^}]*animation:owedflash/, 'the ship button has no flash to wear');
+  assert.match(PLAY, /@keyframes owedflash\{/, 'and the flash is not defined');
+  /* The same bargain the mooring ring makes under this preference: keep the
+     glow that says "press me", drop the breathing. */
+  const noMotion = PLAY.slice(PLAY.indexOf('#panel, .toast{ transition:none; animation:none; }'));
+  assert.match(noMotion.slice(0, noMotion.indexOf('\n  }')), /#m-ship\.owed\{ animation:none; box-shadow:/,
+    'the flash strobes at a player who asked for no motion');
+
+  const refresh = PLAY.slice(PLAY.indexOf('function refreshOwedFlash('), PLAY.indexOf('function renderTabs('));
+  assert.match(refresh, /S\.unclaimedQuests\(state\)\.length > 0/, 'the flash is not keyed on a reward being owed');
+  assert.match(refresh, /classList\.toggle\('owed', owed\)/, 'nothing puts the class on the button');
+  /* Driven from the frame loop rather than from a menu opening, or a job that
+     finishes while the panel is shut would light nothing until something else
+     happened to redraw the buttons. */
+  const hud = PLAY.slice(PLAY.indexOf('function renderHud(docking){'), PLAY.indexOf("$('h-dv').textContent"));
+  assert.match(hud, /refreshOwedFlash\(\)/, 'the flash is never refreshed as the game runs');
+
+  /* And the promise the flash makes: pressing it opens the log, not whichever
+     tab was last up. Once the log is open it is a plain toggle again. */
+  const open = PLAY.slice(PLAY.indexOf('function openMenu(which){'), PLAY.indexOf('function refreshMenuButtons('));
+  assert.match(open, /if\(which === 'ship' && !onOwedLog\(\) && S\.unclaimedQuests\(state\)\.length\)\{/,
+    'the ship button does not go to the log when a reward is waiting');
+  assert.match(open, /tab = 'quests';\s*\n\s*renderTabs\(\); setTab\('quests'\);/, 'and does not actually land on the quest tab');
+  assert.ok(open.indexOf("which === 'ship' && !onOwedLog()") < open.indexOf('togglePanel(false)'),
+    'the toggle-shut runs first, so the flashing button just closes the panel');
+
+  /* Both helpers are function declarations: refreshOwedFlash is called from
+     renderHud and from togglePanel, both written above where they live. */
+  assert.match(PLAY, /function onOwedLog\(\)\{/, 'onOwedLog is not hoisted and will be read before it exists');
+});
