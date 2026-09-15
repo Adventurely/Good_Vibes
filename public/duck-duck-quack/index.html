@@ -91,6 +91,15 @@
   .back{ grid-row: 3; align-self: end; color: var(--muted); font-size: .8rem; text-decoration: none; }
   .back:hover, .back:focus-visible{ color: var(--gv-text); }
 
+  .sound{
+    display: block; margin: 1.1rem auto 0;
+    font: inherit; font-size: .78rem; padding: .4rem 1rem; cursor: pointer;
+    background: var(--gv-glass); border: 1px solid var(--edge); border-radius: 999px;
+    color: var(--muted);
+  }
+  .sound[aria-pressed='true']{ color: var(--leaf); border-color: var(--leaf); }
+  .sound:hover, .sound:focus-visible{ color: var(--gv-text); }
+
   @media (prefers-reduced-motion: reduce){
     .enter{ transition: none; }
     .enter:hover, .enter:focus-visible{ transform: none; }
@@ -118,6 +127,7 @@
       <li>One level, four skills</li>
       <li>Nothing saved, nothing sent anywhere</li>
     </ul>
+    <button type="button" id="sound" class="sound" aria-pressed="false">Music off</button>
   </div>
 
   <a class="back" href="/">&larr; all Good Vibe Games</a>
@@ -130,6 +140,39 @@
   import { LEVEL_1 } from './content.js';
   import { newGame, tick, assignSkill } from './sim.js';
   import { paintScene } from './art.js';
+  import { createAudio } from './audio.js';
+
+  /* Autoplay policy decides when sound can start, not us: the context cannot
+     exist until a gesture, so the button reflects intent and the first click
+     or key on the page is what actually opens it. The choice persists per
+     browser, in the same key play.html reads, so turning the music off here
+     does not mean turning it back on once the flock hatches. */
+  const audio = createAudio();
+  const soundButton = document.getElementById('sound');
+  const syncSound = () => {
+    const on = !audio.isMuted();
+    soundButton.textContent = on ? 'Music on' : 'Music off';
+    soundButton.setAttribute('aria-pressed', String(on));
+  };
+  audio.play('park');
+  syncSound();
+
+  const unlockOnce = () => {
+    audio.unlock();
+    removeEventListener('pointerdown', unlockOnce);
+    removeEventListener('keydown', unlockOnce);
+  };
+  addEventListener('pointerdown', unlockOnce);
+  addEventListener('keydown', unlockOnce);
+
+  soundButton.addEventListener('click', () => {
+    audio.setMuted(!audio.isMuted());
+    audio.unlock();
+    syncSound();
+  });
+
+  // Leaving for the game should not leave a theme playing behind it.
+  addEventListener('pagehide', () => audio.stop());
 
   const canvas = document.getElementById('plate');
   const ctx = canvas.getContext('2d', { alpha: false });

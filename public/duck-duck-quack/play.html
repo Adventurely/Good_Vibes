@@ -152,6 +152,7 @@
   <div class="controls">
     <button class="btn" id="pause" type="button">Pause</button>
     <button class="btn" id="restart" type="button">Restart level</button>
+    <button class="btn" id="sound" type="button" aria-pressed="false">Music off</button>
   </div>
 </div>
 
@@ -159,6 +160,7 @@
   import { LEVEL_1, SKILLS, SKILL_INFO, TICK_RATE, winCount, formatTime } from './content.js';
   import { newGame, tick, assignSkill, assignRefusal, duckNear } from './sim.js';
   import { paintScene } from './art.js';
+  import { createAudio } from './audio.js';
   import { fitCanvas, context2d } from '../good-vibes/pixel.js';
 
   const els = id => document.getElementById(id);
@@ -167,9 +169,36 @@
     hudHatched: els('hud-hatched'), hudTime: els('hud-time'),
     overlay: els('overlay'), overlayTitle: els('overlay-title'), overlayBody: els('overlay-body'),
     again: els('again'), status: els('status'), pause: els('pause'), restart: els('restart'),
-    skills: document.querySelector('.skills'),
+    sound: els('sound'), skills: document.querySelector('.skills'),
   };
   const ctx = context2d(ui.scene);
+
+  /* ---- the music ---------------------------------------------------- */
+
+  const audio = createAudio();
+  const syncSound = () => {
+    const on = !audio.isMuted();
+    ui.sound.textContent = on ? 'Music on' : 'Music off';
+    ui.sound.setAttribute('aria-pressed', String(on));
+  };
+  audio.play('park');
+  syncSound();
+
+  const unlockOnce = () => {
+    audio.unlock();
+    removeEventListener('pointerdown', unlockOnce);
+    removeEventListener('keydown', unlockOnce);
+  };
+  addEventListener('pointerdown', unlockOnce);
+  addEventListener('keydown', unlockOnce);
+
+  ui.sound.addEventListener('click', () => {
+    audio.setMuted(!audio.isMuted());
+    audio.unlock();
+    syncSound();
+  });
+
+  addEventListener('pagehide', () => audio.stop());
 
   let state = newGame(LEVEL_1);
   let armed = null;
