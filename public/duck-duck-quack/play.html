@@ -40,6 +40,16 @@
   header .crumb{ color: var(--muted); font-size: 0.82rem; text-decoration: none; margin-left: auto; }
   header .crumb:hover{ color: var(--text); }
 
+  /* One column normally: the screen, then the sidebar (skills, status,
+     controls) stacked under it full-width. `.screen-col` exists only so
+     there is something with a real, non-shrink-wrapped width to measure the
+     canvas against — `.screen` itself is `width: max-content`, sized to
+     whatever the canvas already is, which is no use as a ruler for how big
+     the canvas is allowed to become. See the script's `fitScene`. */
+  .layout{ display: grid; grid-template-columns: 1fr; gap: 0.7rem; align-items: start; }
+  .screen-col{ width: 100%; min-width: 0; }
+  .sidebar{ width: 100%; }
+
   .screen{
     position: relative;
     width: max-content; max-width: 100%; margin: 0 auto;
@@ -114,6 +124,46 @@
   .btn:hover{ background: #fffdf6; }
   .btn-go{ background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
   .btn-go:hover{ background: #256b28; }
+
+  /* A landscape phone: wide enough for the screen and a sidebar side by
+     side, short enough that stacking them the normal way leaves the canvas
+     a postage stamp under a wall of skill cards. Keyed to height rather than
+     to `orientation` alone so a landscape tablet or a wide desktop window —
+     both plenty tall — keep the roomier stacked layout instead of being
+     squeezed into a phone's.
+
+     This has to be the last thing in the sheet. Every selector in it repeats
+     one from above at the same specificity, and a media query does not
+     raise that on its own — the rule that is later in the file still wins a
+     tie. Placed where the rest of this stylesheet was, right after
+     `.layout`, it lost silently to `.skills` and `.screen` further down and
+     the sidebar rendered as four illegible columns regardless of viewport. */
+  @media (orientation: landscape) and (max-height: 560px){
+    body{ padding-top: 0.35rem; padding-bottom: 0.5rem; }
+    header{ padding-bottom: 0.3rem; }
+    header h1{ font-size: 1rem; }
+
+    .layout{ grid-template-columns: minmax(0, 1fr) 10.5rem; gap: 0.6rem; }
+    .screen-col{ display: flex; justify-content: center; }
+    .sidebar{
+      max-height: calc(100vh - 3rem); overflow-y: auto;
+      display: flex; flex-direction: column; gap: 0.5rem;
+    }
+
+    /* One skill per row instead of four across, and the blurb dropped —
+       there isn't a 10rem-wide sidebar's worth of room for both a name and
+       three lines about what it does, and the name plus the count still
+       says enough to play from. */
+    .skills{ grid-template-columns: 1fr; gap: 0.3rem; margin-top: 0; }
+    .skill{ padding: 0.35rem 0.5rem; }
+    .skill .name{ display: inline; }
+    .skill .count{ display: inline; margin-left: 0.35rem; }
+    .skill .blurb{ display: none; }
+
+    .status{ margin-top: 0; font-size: 0.78rem; }
+    .controls{ flex-direction: column; margin-top: 0; }
+    .controls .btn{ width: 100%; }
+  }
 </style>
 </head>
 <body>
@@ -123,36 +173,42 @@
     <a class="crumb" href="/">&larr; games</a>
   </header>
 
-  <div class="screen">
-    <canvas id="scene" width="320" height="180" tabindex="0" role="application"
-            aria-label="The park. Arm a skill below, then click a walking duckling to give it that skill."></canvas>
-    <div class="hud" aria-hidden="true">
-      <div>
-        Saved <b id="hud-saved">0 / 0</b><br>
-        Lost <b id="hud-lost">0</b>
-      </div>
-      <div class="right">
-        Hatched <b id="hud-hatched">0 / 0</b><br>
-        Time <b id="hud-time">0:00</b>
+  <div class="layout">
+    <div class="screen-col">
+      <div class="screen">
+        <canvas id="scene" width="320" height="180" tabindex="0" role="application"
+                aria-label="The park. Arm a skill below, then click a walking duckling to give it that skill."></canvas>
+        <div class="hud" aria-hidden="true">
+          <div>
+            Saved <b id="hud-saved">0 / 0</b><br>
+            Lost <b id="hud-lost">0</b>
+          </div>
+          <div class="right">
+            Hatched <b id="hud-hatched">0 / 0</b><br>
+            Time <b id="hud-time">0:00</b>
+          </div>
+        </div>
+        <div class="overlay" id="overlay" hidden>
+          <h2 id="overlay-title"></h2>
+          <p id="overlay-body"></p>
+          <button class="btn btn-go" id="again" type="button">Play again</button>
+        </div>
       </div>
     </div>
-    <div class="overlay" id="overlay" hidden>
-      <h2 id="overlay-title"></h2>
-      <p id="overlay-body"></p>
-      <button class="btn btn-go" id="again" type="button">Play again</button>
-    </div>
-  </div>
 
-  <div class="skills" role="group" aria-label="Skills to arm">
-    <!-- Filled in by script from SKILLS / SKILL_INFO, so a skill added there
-         needs no second copy of its name and blurb written into the page. -->
-  </div>
-  <p class="status" id="status" role="status"></p>
+    <aside class="sidebar">
+      <div class="skills" role="group" aria-label="Skills to arm">
+        <!-- Filled in by script from SKILLS / SKILL_INFO, so a skill added
+             here needs no second copy of its name and blurb in the page. -->
+      </div>
+      <p class="status" id="status" role="status"></p>
 
-  <div class="controls">
-    <button class="btn" id="pause" type="button">Pause</button>
-    <button class="btn" id="restart" type="button">Restart level</button>
-    <button class="btn" id="sound" type="button" aria-pressed="false">Music off</button>
+      <div class="controls">
+        <button class="btn" id="pause" type="button">Pause</button>
+        <button class="btn" id="restart" type="button">Restart level</button>
+        <button class="btn" id="sound" type="button" aria-pressed="false">Music off</button>
+      </div>
+    </aside>
   </div>
 </div>
 
@@ -336,13 +392,13 @@
 
   /* `.screen` is `width: max-content`, sized to whatever the canvas already
      is — a container fitCanvas cannot measure against without also being the
-     thing it is trying to size. `.wrap`, a level up, is sized by the page
-     layout instead, which is what every other canvas in this repo measures
-     against (see Sunward's `#lot` and Good Vibes' own canvases). Without
-     this the scale was stuck at 1x everywhere, phone and desktop alike: a
-     320x180 scene at 1x is a postage stamp on a landscape phone, where the
-     screen is wide enough for 2x or 3x but short enough that the height cap
-     below has to be generous to ever get there. */
+     thing it is trying to size. `.screen-col`, a level up, is sized by the
+     grid track instead: full width in the normal stacked layout, or
+     whatever is left of the row after the sidebar's fixed column in the
+     landscape layout below — either way a real, content-independent number,
+     which is what every other canvas in this repo measures against (see
+     Sunward's `#lot` and Good Vibes' own canvases). Without this the scale
+     was stuck at 1x everywhere, phone and desktop alike. */
   const screenWrap = ui.scene.parentElement.parentElement;
   function fitScene(){
     fitCanvas(ui.scene, LEVEL_1.width, LEVEL_1.height, { container: screenWrap, maxHeightFraction: 0.85 });

@@ -53,9 +53,15 @@ export function drawSky(ctx){
     ctx.fillRect(0, y + 100, SCENE_W, 1);
   }
   // Low enough, and clear of the right edge, that the HUD's own text — drawn
-  // over this same corner — never sits on top of it.
+  // over this same corner — never sits on top of it. The HUD is sized in CSS
+  // pixels and does not shrink with the canvas, so the margin that clears it
+  // at a 2x scene is not automatically enough at 1x, where the scene's own
+  // pixels and the page's are the same size: the two-line "Hatched/Time"
+  // block runs to about 40 scene-pixels tall even at the smallest scale, and
+  // the sun needs to start below that everywhere, not just where there was
+  // room to spare.
   ctx.fillStyle = hex('y');
-  ctx.fillRect(SCENE_W - 30, 36, 12, 12);
+  ctx.fillRect(SCENE_W - 30, 58, 12, 12);
 }
 
 /* ----------------------------------------------------------------- ground */
