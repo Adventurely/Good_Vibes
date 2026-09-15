@@ -183,14 +183,37 @@ crossing has always been visible — but crossing it with Veyra a quarter of a
 lap away means you left too early, and the gap between the marks is how much
 too early.
 
-The same refusal as the road itself: **one crossing, the soonest, and no
-more.** A long ellipse cuts five rails going out and the same five coming
-back, and ten honest pairs of diamonds is a chart nobody can read. The rail
-also has to be on the screen — a crossing of a ring nobody can see is two
-marks in the dark with nothing to be against. And the pair is left unjoined
-on purpose: a dashed line between them was the obvious thing to draw and the
-wrong one, because a straight line across a chart of curves reads as a path
-you could fly.
+The same refusal the crosshairs make: **one pair per world, at its first cut,
+and never the second.** A long ellipse cuts five rails going out and the same
+five coming back, and ten honest pairs of diamonds is a chart nobody can read
+— but it is the repeats that are worth dropping, not the worlds. The second
+cut of Grumm's rail says nothing the first did not.
+
+This was one crossing in total for a while, and that is wrong the moment a
+road passes two worlds, which is most roads out here. The question a pilot has
+about each of them is a *different* question — of the near one, am I on time;
+of the far one, do I clear it — so answering only about the nearest left the
+other unanswerable at the moment it mattered. A fall from Tassel to Veyra cuts
+Cinder's rail on the way and Cinder's crossing is the sooner of the two, so
+the chart spent its one mark telling you about a world you were not flying to.
+
+**Four worlds at once, soonest first.** Eight diamonds and four names is where
+the road stops being the brightest thing on the screen. There are nine rails
+around the Lamp and a road only cuts the ones between its low point and its
+high one, so on the trips this game has, the cap bites rarely.
+
+The rail also has to be on the screen — a crossing of a ring nobody can see is
+two marks in the dark with nothing to be against — and **that test comes
+before the cap, not after it.** The other way round loses the whole answer
+whenever the soonest crossing happens to be of a ring the current zoom does
+not draw: the slot goes to it, the mark is then refused for having no rail to
+sit against, and a crossing in plain view has already been dropped to make
+room. Zooming in on the world you are trying to clear is exactly the move that
+triggers it, which is the worst possible moment for the chart to go blank.
+
+And the pair is left unjoined on purpose: a dashed line between them was the
+obvious thing to draw and the wrong one, because a straight line across a
+chart of curves reads as a path you could fly.
 
 **A world you are already going round is not an encounter — unless you have just fallen into it.** A parking orbit reaches its low point once a lap; that is where you already are, and marking it would put a crosshair under the ship in the opening frame of every game. But a skip ends at every change of reach, so the door into a world is exactly where a pilot gets put down, and on the hyperbola they arrived on the low point ahead *is* the encounter — at a rendezvous it is the one moment the ship can be tied up. Suppressing it left the panel offering nothing but the way out the far side, and at ×1 the crossing of Nail's reach is nine real minutes of watching. So the rule is keyed on the orbit being closed, not on it being yours.
 

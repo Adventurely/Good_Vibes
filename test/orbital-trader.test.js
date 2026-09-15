@@ -958,7 +958,7 @@ test('a rail crossing sits on the rail, and the world is marked where it will re
     assert.ok(O.dist(c.ghost, O.absState(world, c.body, c.t).r) < 1e-12, `${b.name}: the ghost is not where the world is`);
     assert.ok(c.t > g.t, 'and it is ahead, not behind');
   }
-  // Soonest first, so the one that survives the cap is the one about to happen.
+  // Soonest first, so the ones that survive the cap are the ones about to happen.
   for(let i = 1; i < list.length; i++) assert.ok(list[i].t >= list[i - 1].t, 'crossings come in time order');
 });
 
@@ -1537,25 +1537,81 @@ test('the page keeps the playtest fixes wired', () => {
   assert.match(PLAY, /const aimed = \([^\n]*\) && !hits;/, 'the aiming card passes a path into the ground');
 });
 
-test('only the first crossing is marked, however many the road makes', () => {
-  /* The same refusal the road itself makes. A long ellipse cuts five rails
-     going out and the same five coming back, and ten honest pairs of orange
-     diamonds is a chart nobody can read. */
+/* A long ellipse from Tassel right out to Grumm's rail: the busy case. It
+ * passes five worlds, and being closed it cuts every one of their rails twice
+ * — once climbing and once falling back — which is what the thinning is for. */
+const wideTransfer = () => transferShip('tassel', world.get('grumm').a);
+/* The orange marks a frame actually put down: the colour is set once per
+ * crossing and then two diamonds are stroked with it, so counting the
+ * assignments counts the pairs. */
+function railMarks(g, pred, zoom, hidden){
+  const ops = [];
+  const chart = stubChart(1000, 800, ops);
+  try{
+    chart.camera.follow = 'lamp'; chart.camera.zoom = zoom;
+    settleOn(chart, 'lamp', g.t);
+    chart.draw({ t: g.t, now: 0, shipAbs: { r: S.shipAbsPos(g), v: S.shipAbsVel(g) }, shipBody: 'lamp',
+      prediction: pred, nodes: [], nodePositions: [], apses: [],
+      railCrossings: railCrossings(world, pred, g.t, { minLead: S.MIN_LEAD }), hidden });
+  } finally { chart.restore(); }
+  return ops.filter(o => o[0] === 'strokeStyle' && o[1] === PALETTE.railCross).length;
+}
+
+test('each world the road cuts is marked once, not just the first world', () => {
+  /* A rail cut going out and again coming back is one world, and the first
+     pair has already said where it will be — so the second cut is dropped.
+     The *world* is not, which is the whole of this: a fall from Tassel to
+     Veyra crosses Cinder's rail on the way, and keeping one crossing in total
+     answered about Cinder while the pilot was asking about Veyra. */
+  const g = transferShip();
+  const shown = railCrossings(world, S.planImmediate(g), g.t, { minLead: S.MIN_LEAD });
+  const bodies = shown.map(c => c.body);
+  assert.deepEqual([...new Set(bodies)], bodies, 'a world is marked twice');
+  assert.ok(bodies.includes('veyra'), 'the rail it is aimed at is not marked');
+  assert.ok(bodies.includes('cinder'), 'the rail it passes on the way is not marked');
+  for(let i = 1; i < shown.length; i++) assert.ok(shown[i].t >= shown[i - 1].t, 'crossings come in time order');
+
+  /* And the repeats really are repeats being dropped, not crossings the road
+     never made: one lap of a closed ellipse cuts any rail between its low
+     point and its high one exactly twice. Counted here off the road's own
+     samples, so the claim is about the flight rather than about the code. */
+  const wide = wideTransfer();
+  const pred = S.planImmediate(wide);
+  const seg = pred.segments[0];
+  const b = world.get('nail');
+  const railR = th => (b.e ? b.a * (1 - b.e * b.e) / (1 + b.e * Math.cos((b.retrograde ? -th : th) - (b.omega ?? 0))) : b.a);
+  let cuts = 0;
+  for(let i = 1; i < seg.points.length; i++){
+    const gap = p => O.norm(p) - railR(Math.atan2(p[1], p[0]));
+    if((gap(seg.points[i - 1]) < 0) !== (gap(seg.points[i]) < 0)) cuts++;
+  }
+  assert.ok(cuts >= 2, `the busy road should cut Nail's rail twice; counted ${cuts}`);
+  const far = railCrossings(world, pred, wide.t, { minLead: S.MIN_LEAD });
+  assert.equal(far.filter(c => c.body === 'nail').length, 1, 'and it is marked once');
+  assert.ok(far.length >= 4, `the busy case needs to be busy; found ${far.length}`);
+});
+
+test('the chart keeps the crossings it can draw, and spends its room after that', () => {
+  /* The cap is spent at drawing time, not where the crossings are worked out.
+     Thinning first and testing for a visible rail afterwards lost the whole
+     answer whenever the soonest crossing was of a ring the camera does not
+     draw: the slot went to it, the mark was then refused for having no rail
+     to be against, and a crossing in plain view had been dropped to make room
+     for it. Hiding Cinder is that case exactly — its crossing is the soonest,
+     and Veyra's is the one the pilot is flying. */
   const g = transferShip();
   const pred = S.planImmediate(g);
-  const all = railCrossings(world, pred, g.t, { minLead: S.MIN_LEAD, limit: 8 });
-  assert.ok(all.length > 1, 'this road makes more than one, so there is something to refuse');
-  const shown = railCrossings(world, pred, g.t, { minLead: S.MIN_LEAD });
-  assert.equal(shown.length, 1, 'and only one is drawn');
-  assert.deepEqual(shown[0], all[0], 'the soonest one');
+  assert.equal(railMarks(g, pred, 240), 2, 'both crossings should be drawn when both rails are');
+  assert.equal(railMarks(g, pred, 240, new Set(['cinder'])), 1,
+    'hiding the soonest crossing’s rail took the crossing behind it down too');
 
-  /* A long ellipse right out past the Belt, which is the case that made this
-     necessary: five rails, twice each. */
-  const wide = transferShip('tassel', world.get('grumm').a * 0.68);
-  wide.ship.v = O.scale(O.unit(wide.ship.v), O.norm(wide.ship.v) * 1.28);
-  const far = railCrossings(world, S.planImmediate(wide), wide.t, { minLead: S.MIN_LEAD, limit: 64 });
-  assert.ok(far.length >= 4, `the busy case needs to be busy; found ${far.length}`);
-  assert.equal(railCrossings(world, S.planImmediate(wide), wide.t, { minLead: S.MIN_LEAD }).length, 1);
+  /* And the room is finite. Six worlds on the busy road, four pairs of
+     diamonds, soonest first — past that the road stops being the brightest
+     thing on the chart. */
+  const wide = wideTransfer();
+  const busy = railCrossings(world, S.planImmediate(wide), wide.t, { minLead: S.MIN_LEAD });
+  assert.ok(busy.length > 4, `the cap needs something to cap; found ${busy.length}`);
+  assert.equal(railMarks(wide, S.planImmediate(wide), 80), 4, 'the chart drew more pairs than it has room for');
 });
 
 test('every world the road passes is marked once, at the first pass', () => {

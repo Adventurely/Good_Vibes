@@ -809,11 +809,19 @@ function drawCrossings(chart, view, anchors, afterBurnAt){
  *
  * One sits where the road crosses the ring the world travels on; the other
  * sits where that world will actually be at that moment. That pair is the
- * whole of interplanetary timing, and it is drawn for the first crossing
- * only. Crossing Veyra's rail means nothing on its
+ * whole of interplanetary timing. Crossing Veyra's rail means nothing on its
  * own — the chart has always drawn the crossing, because the rail and the
  * road are both on it — but crossing it with Veyra a quarter of a lap away
  * means you left too early, and the gap between the two says by how much.
+ *
+ * One pair per world, at its first cut, and at most a few worlds. A road
+ * through the outer system passes several on its way, and the question a
+ * pilot has about each of them is a different question — the near one is
+ * *are you on time*, the far one is *do you clear it* — so answering only
+ * about the nearest left the other unanswerable at the moment it mattered.
+ * Dropping a world's second and third cut is what buys the room: a rail cut
+ * going out and again coming back is one world, and the first pair has
+ * already said where it will be.
  *
  * Both marks are drawn in the frame of the leg the crossing is on, not the
  * frame the rail is drawn in. Those are the same thing for the first leg,
@@ -828,17 +836,31 @@ function diamond(ctx, p, r){
   ctx.lineTo(p[0], p[1] + r); ctx.lineTo(p[0] - r, p[1]);
   ctx.closePath();
 }
+/* How many worlds' crossings the chart will carry at once. Four pairs is
+ * eight diamonds and up to four names, which is the point where the road
+ * stops being the brightest thing on the screen. There are nine rails round
+ * the Lamp and a road only ever cuts the ones between its low point and its
+ * high one, so on the trips this game actually has this bites rarely — and
+ * when it does, the four it keeps are the four happening soonest. */
+const MAX_RAIL_CROSSINGS = 4;
 function drawRailCrossings(chart, view, anchors){
   const { ctx, world } = chart;
   const list = view.railCrossings ?? [];
   if(!list.length) return;
   /* Only for rails that are on the screen. A crossing of a ring nobody can
      see is two orange diamonds floating in the dark with nothing to be
-     against. */
+     against.
+     This is also why the cap is spent here and not where the crossings are
+     worked out. Thinning to a handful first and testing them for a rail
+     afterwards threw the whole answer away whenever the soonest crossing
+     happened to be of a ring the current zoom does not draw: the slot was
+     spent on it, the mark was then refused, and a crossing of a ring in plain
+     view had already been dropped to make room. Zooming in to look at the
+     world you are trying to clear is exactly the move that did it. */
   const drawn = new Set(chart.hits.rails.map(r => r.id));
+  const shown = list.filter(c => drawn.has(c.body)).slice(0, MAX_RAIL_CROSSINGS);
   ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
-  for(const c of list){
-    if(!drawn.has(c.body)) continue;
+  for(const c of shown){
     const anchor = anchors[c.segIndex];
     if(!anchor) continue;
     const p = chart.toScreen(add(anchor, c.r));
@@ -1328,11 +1350,19 @@ export function railCrossings(world, prediction, tNow, opts = {}){
      that has just left Tassel is sitting exactly on Tassel's rail, so the
      first sample is a crossing at t = now — true, useless, and drawn right
      on top of the ship. */
-  /* One, unless a caller asks for more. A road that cuts five rails twice
-     over earns ten honest pairs of diamonds and becomes unreadable; the rest
-     of this chart already refuses to draw past the first thing that happens,
-     and this is the same refusal. */
-  const { limit = 1, minLead = 0 } = opts;
+  /* One per world, at the first crossing, and never the second — the same
+     refusal the crosshairs already make. A long ellipse cuts five rails going
+     out and the same five coming back, and ten honest pairs of diamonds is a
+     chart nobody can read; but the *second* cut of Grumm's rail is the only
+     one worth dropping, because the first already said where Grumm will be.
+     This used to keep one crossing in total, which is right up to the moment
+     a road passes two worlds — and then it answers about the near one while
+     the pilot is trying to decide whether they clear the far one.
+     `limit` caps how many worlds, not how many cuts, and the frame it is
+     applied in is the drawing rather than here: which rails are on the screen
+     is a fact about the camera, and it changes when nothing about the road
+     has. */
+  const { limit = Infinity, minLead = 0 } = opts;
   const out = [];
   if(!prediction?.segments) return out;
   for(let si = 0; si < prediction.segments.length; si++){
@@ -1369,9 +1399,14 @@ export function railCrossings(world, prediction, tNow, opts = {}){
       }
     }
   }
-  /* Soonest first, so the one that survives the cap is the one you are about
-     to fly. */
-  return out.sort((a, b) => a.t - b.t).slice(0, limit);
+  /* Soonest first, so the ones that survive the cap are the ones about to
+     happen — and then one per world. The bodies are walked in turn rather
+     than in time, so a world's own earliest cut is not the first of it found
+     and the sort has to come before the thinning. */
+  out.sort((a, b) => a.t - b.t);
+  const first = new Map();
+  for(const c of out) if(!first.has(c.body)) first.set(c.body, c);
+  return [...first.values()].slice(0, limit);
 }
 
 /* Where a node sits on the plan: the ship's state at the node's time in the

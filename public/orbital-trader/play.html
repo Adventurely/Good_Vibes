@@ -844,11 +844,14 @@ function replan(force = false){
         ? 'this path hits it'
         : `${fmtAu(ic.altitude)} · ${S.fmtKms(ic.speed)}${ic.inMouth ? ' · in docking range' : ''}`)
     : null;
-  /* The first rail the road cuts across, and where that world will be when it
-     does. Every crossing is found, because the soonest one is not the first
-     one discovered — bodies are walked in turn, not in time — and then all
-     but that one is dropped. Worked out here rather than every frame: it is a
-     bisection per crossing, and it only changes when the road does. */
+  /* Each rail the road cuts across, and where that world will be when it
+     does. Every crossing is found, because a world's soonest one is not the
+     first of it discovered — bodies are walked in turn, not in time — and
+     then all but each world's first is dropped. No cap asked for here: how
+     many will fit is a question about the camera, so the chart spends it at
+     drawing time and this stays a fact about the road. Worked out here rather
+     than every frame: it is a bisection per crossing, and it only changes
+     when the road does. */
   crossedRails = railCrossings(world, prediction, state.t, { minLead: S.MIN_LEAD });
   apses = [];
   prediction.segments.forEach((seg, i) => {
