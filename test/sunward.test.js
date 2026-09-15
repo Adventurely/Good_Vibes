@@ -26,7 +26,9 @@ import {
   rateOf, totalRate, steadyRate, tapValue, tapPays, momentum, isWindfall, STREAK_CAP, WINDFALL_EVERY,
   snapshot, meets, offered, award,
   MAX_TICK, tick, tap, plantRefusal, plant, studyRefusal, study,
-  SEED_SCALE, seedsFrom, pendingSeeds, lightForSeeds, energyForSeeds, prestigeRefusal, prestige, winters, winterMedal,
+  SEED_SCALE, SEED_RATIO, seedAt, seedsFrom, pendingSeeds, lightForSeeds, energyForSeeds,
+  prestigeRefusal, prestige, winters, winterMedal, seedsEarned, seedMedal,
+  PRESTIGE, PRESTIGE_BY_ID, prestigeOffered, rootRefusal, root,
   OFFLINE_RATE, OFFLINE_CAP, offlineGain, catchUp,
   toSave, fromSave, formatLight, formatTime, formatStat, breakdown,
 } from '../public/sunward/content.js';
@@ -313,46 +315,51 @@ test('every medal is winnable and names things that exist', () => {
   }
 });
 
-test('there is a medal for every one of the first ten winters, and the ladder goes on', () => {
-  /* A replanting is a winter the tree has stood through, and each of the
-     first ten is its own medal — that is what makes the tree's ageing a thing
-     the record can show. The first and fifth keep the ids they had when
-     they were the only two, because those ids are in every save that has
-     ever replanted. */
-  const ladder = ACHIEVEMENTS.filter(a => a.need.prestiges !== undefined);
+test('there is a medal for every one of the first ten seeds, and the ladder stops where the game does', () => {
+  /* A replanting is a season, a season is a seed, and each of the first ten
+     is its own medal — that is what makes the tree's ageing a thing the
+     record can show. Ids are untouched wherever the number they name still
+     holds, because a medal is a record and a record you lose to a rename is
+     not a record. */
+  const ladder = ACHIEVEMENTS.filter(a => a.need.seeds !== undefined);
   for(let n = 1; n <= 10; n++){
-    assert.ok(ladder.some(a => a.need.prestiges === n), `no medal for winter ${n}`);
+    assert.ok(ladder.some(a => a.need.seeds === n), `no medal for seed ${n}`);
   }
-  assert.equal(winterMedal(1).id, 'first-seed', 'the first winter keeps its old id');
-  assert.equal(winterMedal(5).id, 'five-seeds', 'and so does the fifth');
-  assert.equal(winterMedal(11), null, 'the eleventh winter is not a medal');
-  // `find` on an undefined count matches the first medal with no prestige in
-  // its need at all, which is the one for tapping the tree once.
+  assert.equal(seedMedal(1).id, 'first-seed', 'the first seed keeps its old id');
+  assert.equal(seedMedal(5).id, 'five-seeds', 'and so does the fifth');
+  assert.equal(seedMedal(11), null, 'the eleventh seed is not a rung');
+  assert.equal(winterMedal, seedMedal, 'the old name must still resolve');
+  // `find` on an undefined count matches the first medal with no seeds in its
+  // need at all, which is the one for tapping the tree once.
   for(const nonsense of [undefined, null, 0, -3, 1.5, NaN, '5']){
-    assert.equal(winterMedal(nonsense), null, `winterMedal(${String(nonsense)}) must be nothing`);
+    assert.equal(seedMedal(nonsense), null, `seedMedal(${String(nonsense)}) must be nothing`);
   }
-  const counts = ladder.map(a => a.need.prestiges);
+  const counts = ladder.map(a => a.need.seeds);
   assert.deepEqual(counts, [...counts].sort((a, b) => a - b), 'the ladder must be in order');
-  assert.equal(new Set(counts).size, counts.length, 'no two medals for the same winter');
-  assert.ok(counts[counts.length - 1] >= 100, 'the ladder should reach a hundred winters');
+  assert.equal(new Set(counts).size, counts.length, 'no two medals for the same seed');
+  /* The simulation reaches six seeds in a day, thirteen in a week and fifteen
+     in a month, so the top rung has to be a long way past that and still
+     inside the world: a rung nobody can ever stand on is a joke, not a goal. */
+  const top = counts[counts.length - 1];
+  assert.ok(top >= 20 && top <= 40, `the ladder tops out at ${top}, which is not a stretch a player could make`);
   for(const a of ladder){
-    assert.ok(Object.keys(a.need).length === 1, `winter medal "${a.id}" should be won by the winter alone`);
+    assert.ok(Object.keys(a.need).length === 1, `seed medal "${a.id}" should be won by the seed alone`);
   }
 });
 
-test('a replanting is a winter, and each one wins its medal', () => {
+test('a replanting is a season, and each one wins its seed and its medal', () => {
   const state = newGame();
-  assert.equal(winters(state), 0, 'a fresh lot has stood through nothing');
+  assert.equal(seedsEarned(state), 0, 'a fresh lot has stood through nothing');
   for(let n = 1; n <= 3; n++){
-    state.life.earned = energyForSeeds(n);
-    assert.equal(prestige(state), 1, `the ${n}th replanting should bank a seed`);
-    assert.equal(winters(state), n);
+    state.life.earned = seedAt(n);
+    assert.equal(prestige(state), 1, `the ${n}th replanting should pay a seed`);
+    assert.equal(seedsEarned(state), n);
     const won = award(state);
-    assert.ok(won.some(a => a.id === winterMedal(n).id), `winter ${n} should win "${winterMedal(n).name}"`);
+    assert.ok(won.some(a => a.id === seedMedal(n).id), `seed ${n} should win "${seedMedal(n).name}"`);
   }
   // Kept through the save, as the tree's age has to be.
   const back = fromSave(JSON.parse(JSON.stringify(toSave(state))));
-  assert.equal(winters(back), 3);
+  assert.equal(seedsEarned(back), 3);
 });
 
 test('a condition that names a key nothing reports is false, not true', () => {
@@ -596,23 +603,37 @@ test('seeds pay for themselves across everything', () => {
 
 /* ------------------------------------------------------------ the reset */
 
-test('the seed formula is a cube root and nothing is lost by resetting late', () => {
+test('every seed costs four times the one before it, exactly', () => {
   assert.equal(seedsFrom(0), 0);
-  assert.equal(seedsFrom(SEED_SCALE), 1, 'the first seed is one million light');
-  assert.equal(seedsFrom(1e9), 10);
-  assert.equal(seedsFrom(1e12), 100);
-  for(const seeds of [1, 7, 40, 300]){
-    assert.equal(seedsFrom(lightForSeeds(seeds)), seeds,
-      'the bar and the payout must agree about where the next seed is');
-  }
+  assert.equal(seedsFrom(SEED_SCALE), 1, 'the first seed is a million energy, all told');
+  assert.equal(seedAt(1), SEED_SCALE);
+  assert.equal(seedsFrom(SEED_SCALE - 1), 0, 'and a pound short is no seed at all');
 
-  // Late is never worse than on time: the banked seeds are subtracted, so the
-  // total only ever depends on the lifetime figure.
-  const early = newGame();
-  early.life.earned = 1e9;
-  prestige(early);
-  early.life.earned = 8e9;
-  assert.equal(early.seeds + pendingSeeds(early), seedsFrom(8e9));
+  /* The float is the thing to watch here. Twenty-five seeds is four to the
+     twenty-fourth, which is past where a double counts exactly, and a
+     logarithm taken across that gap can say a seed has been earned a hair
+     before seedAt agrees — a bar sitting at a hundred percent with the button
+     still refusing. The two must never disagree. */
+  for(let n = 1; n <= 30; n++){
+    assert.equal(seedsFrom(seedAt(n)), n, `at exactly the ${n}th threshold`);
+    assert.equal(seedsFrom(seedAt(n) * 0.999999), n - 1, `just under the ${n}th`);
+    assert.equal(seedAt(n + 1) / seedAt(n), SEED_RATIO, 'the step must be the ratio, every time');
+    assert.equal(lightForSeeds(n), seedAt(n), 'the bar and the payout read one number');
+  }
+});
+
+test('a replant pays one seed and one seed only, however long you waited', () => {
+  /* The trade the owner chose: a season is a seed, so crossing three
+     thresholds before getting round to it still pays one. With the thresholds
+     four times apart, crossing two at once is already work. */
+  const state = newGame();
+  state.life.earned = seedAt(4);          // three thresholds past the first
+  assert.equal(pendingSeeds(state), 1, 'still just the one');
+  assert.equal(prestige(state), 1);
+  assert.equal(state.seeds, 1);
+  assert.equal(pendingSeeds(state), 1, 'and the next is there straight away');
+  assert.equal(prestige(state), 1);
+  assert.equal(state.seeds, 2);
 });
 
 test('a reset refuses until it would pay something', () => {
@@ -625,14 +646,26 @@ test('a reset refuses until it would pay something', () => {
   state.light = 500;
   state.owned.moss = 12;
   state.bought['warm-hands'] = true;
+  state.rooted['deep-mulch'] = true;
   assert.equal(prestigeRefusal(state), null);
-  assert.equal(prestige(state), 12);
-  assert.equal(state.seeds, 12);
-  assert.equal(state.light, 0);
+  assert.equal(prestige(state), 1);
+  assert.equal(state.seeds, 1);
+  assert.equal(state.light, 0, 'and no head start, since nothing bought one');
   assert.equal(state.owned.moss, 0);
-  assert.deepEqual(state.bought, {});
+  assert.deepEqual(state.bought, {}, "the run's upgrades go");
+  assert.deepEqual(state.rooted, { 'deep-mulch': true }, 'and the seed upgrades stay');
   assert.equal(state.prestiges, 1);
   assert.deepEqual(state.owned, freshOwned());
+});
+
+test('a head start survives the replant that needs it', () => {
+  const state = newGame();
+  state.rooted['warm-earth'] = true;                 // begin every run with 500
+  state.life.earned = seedAt(1);
+  assert.equal(prestige(state), 1);
+  assert.equal(state.light, PRESTIGE_BY_ID['warm-earth'].effect.startEnergy,
+    'the lot must not come back empty-handed once that is bought');
+  assert.equal(state.rooted['warm-earth'], true);
 });
 
 /* ----------------------------------------------------------- while away */
@@ -701,7 +734,8 @@ test('a save round-trips everything that matters and drops the sitting', () => {
   state.bought['warm-hands'] = true;
   state.medals['first-light'] = true;
   state.seeds = 4;
-  state.prestiges = 2;
+  state.prestiges = 4;
+  state.rooted['warm-earth'] = true;
   state.decade = 7;
   score(state, 'taps', 88);
   note(state, 'something happened');
@@ -713,7 +747,8 @@ test('a save round-trips everything that matters and drops the sitting', () => {
   assert.equal(back.bought['warm-hands'], true);
   assert.equal(back.medals['first-light'], true);
   assert.equal(back.seeds, 4);
-  assert.equal(back.prestiges, 2);
+  assert.equal(back.prestiges, 4);
+  assert.equal(back.rooted['warm-earth'], true, 'the seed upgrades are the point of the save');
   assert.equal(back.decade, 7);
   assert.equal(back.life.taps, 88);
   assert.equal(back.run.taps, 88);
@@ -766,6 +801,10 @@ test('a save from the twelve-grower build keeps what it earned', () => {
     life: { taps: 5000, earned: 4e9, studied: 31 },
   };
   const state = fromSave(old);
+  /* Seeds and replants were two numbers in that build and are one now. The
+     replant count is the honest translation — one season, one seed — and it is
+     what the tree's age was already drawn from, so the lot comes back exactly
+     as old as it went away rather than suddenly three years older. */
   assert.equal(state.owned.moss, 30);
   assert.equal(state.owned.mirror, undefined, 'a grower that no longer exists must not come back');
   assert.deepEqual(Object.keys(state.bought).sort(), ['damp-corners', 'warm-hands'],
@@ -774,7 +813,8 @@ test('a save from the twelve-grower build keeps what it earned', () => {
   assert.ok(state.medals['first-light'], 'First tap was earned and must survive the rename');
   assert.ok(state.medals['ten-growers']);
   assert.equal(state.medals['fifty-mirror'], undefined, 'a medal for a grower that is gone is gone');
-  assert.equal(state.seeds, 3);
+  assert.equal(state.seeds, 1, 'one replant in that save is one seed in this one');
+  assert.equal(state.prestiges, 1);
   assert.ok(Number.isFinite(totalRate(state)));
   assert.ok(ACHIEVEMENT_BY_ID['thirty-upgrades'], 'the Studious id must stay what old saves call it');
 });
@@ -923,4 +963,115 @@ test('the sky has a stop for every part of the day and neighbours that are close
     }
   }
   assert.ok(GROUND_Y > 0 && GROUND_Y < SCENE_H, 'the horizon must be somewhere on the canvas');
+});
+
+/* ------------------------------------------------------ the seed upgrades */
+
+test('the seed tree is a ladder: one rung a seed, each dearer than the last', () => {
+  const ids = PRESTIGE.map(u => u.id);
+  assert.equal(new Set(ids).size, ids.length, 'duplicate seed upgrade id');
+  for(let i = 0; i < PRESTIGE.length; i++){
+    const up = PRESTIGE[i];
+    assert.match(up.id, /^[a-z][a-z0-9-]*$/, `seed upgrade "${up.id}": id must be kebab-case`);
+    assert.ok(up.name && up.blurb, `seed upgrade "${up.id}" needs a name and a blurb`);
+    assert.equal(up.seed, i + 1, `"${up.id}" should be the rung for seed ${i + 1}`);
+    assert.ok(up.cost > 0, `"${up.id}" must cost energy`);
+    if(i > 0) assert.ok(up.cost > PRESTIGE[i - 1].cost, `"${up.id}" must cost more than the rung below it`);
+    const does = Object.keys(up.effect);
+    assert.equal(does.length, 1, `"${up.id}": one effect a rung, not ${does.length}`);
+  }
+  // Pitched against the seed it opens: affordable inside the run that earns
+  // it, and never so cheap it buys itself.
+  for(const up of PRESTIGE){
+    const threshold = seedAt(up.seed);
+    assert.ok(up.cost < threshold, `"${up.id}" costs more than the lifetime total its own seed wanted`);
+    assert.ok(up.cost > threshold / 20, `"${up.id}" is small change against the seed that opens it`);
+  }
+});
+
+test('a seed opens a rung, and energy pays for it', () => {
+  const state = newGame();
+  assert.deepEqual(prestigeOffered(state), [], 'no seeds, nothing open');
+  assert.match(rootRefusal(state, 'warm-earth'), /more seed/, 'a shut rung says what it wants');
+  assert.match(rootRefusal(state, 'no-such-thing'), /no such/);
+
+  state.seeds = 1;
+  assert.deepEqual(prestigeOffered(state).map(u => u.id), ['warm-earth']);
+  assert.match(rootRefusal(state, 'warm-earth'), /Not enough energy/, 'the seed opens it, it does not buy it');
+  assert.match(rootRefusal(state, 'deep-mulch'), /1 more seed/, 'and the next rung is still shut');
+
+  state.light = PRESTIGE_BY_ID['warm-earth'].cost + 25;
+  assert.equal(rootRefusal(state, 'warm-earth'), null);
+  assert.equal(root(state, 'warm-earth').id, 'warm-earth');
+  assert.equal(state.light, 25, 'the energy is spent');
+  assert.equal(state.rooted['warm-earth'], true);
+  assert.match(rootRefusal(state, 'warm-earth'), /already/);
+  assert.equal(root(state, 'warm-earth'), null, 'and buying it twice changes nothing');
+  assert.equal(state.light, 25);
+
+  // A seed is never spent: it opened the rung and it is still there.
+  assert.equal(state.seeds, 1);
+});
+
+test('every rung of the seed tree reaches the game through the same bonuses', () => {
+  for(const up of PRESTIGE){
+    const bare = newGame();
+    for(const g of GROWERS) bare.owned[g.id] = 20;
+    const before = bonuses(bare);
+    const after = (() => {
+      const state = newGame();
+      for(const g of GROWERS) state.owned[g.id] = 20;
+      state.rooted[up.id] = true;
+      return bonuses(state);
+    })();
+    const moved = Object.keys(after).some(key => {
+      const a = before[key], b = after[key];
+      return typeof a === 'number' ? a !== b : false;
+    });
+    assert.ok(moved, `"${up.id}" changes nothing any part of the game reads`);
+  }
+});
+
+test('the seed tree survives every replant, and only the run goes', () => {
+  const state = newGame();
+  state.rooted['deep-mulch'] = true;
+  state.bought['warm-hands'] = true;
+  state.owned.moss = 30;
+  const lifted = bonuses(state).allMult;
+  assert.ok(lifted > 1, 'Deep mulch has to be doing something before the replant');
+
+  state.life.earned = seedAt(1);
+  prestige(state);
+  assert.deepEqual(state.bought, {}, "the run's upgrades go");
+  assert.equal(state.rooted['deep-mulch'], true);
+  assert.equal(bonuses(state).allMult, lifted, 'and it is still doing it after');
+});
+
+test('time away is worth more once the tree says so', () => {
+  const state = newGame();
+  state.owned.moss = 100;
+  const plain = offlineGain(state, 3600);
+
+  state.rooted['still-air'] = true;              // full rate rather than half
+  const full = offlineGain(state, 3600);
+  assert.ok(Math.abs(full.light - plain.light * 2) < 1e-6, 'full rate is twice half of it');
+
+  const day = offlineGain(state, 48 * 3600);
+  assert.equal(day.seconds, OFFLINE_CAP, 'and the cap still holds');
+  state.rooted['long-sleep'] = true;            // twice as long counted
+  const longer = offlineGain(state, 48 * 3600);
+  assert.equal(longer.seconds, OFFLINE_CAP * 2);
+  assert.ok(longer.capped, 'two days away is still more than it counts');
+});
+
+test('a seed pays nothing on its own any more', () => {
+  // It used to be two percent a seed simply for holding it. The power is in
+  // the tree now, and a save that holds twenty seeds and has bought nothing
+  // must be running at exactly the bare rate.
+  const state = newGame();
+  state.owned.moss = 50;
+  const bare = totalRate(state);
+  state.seeds = 20;
+  assert.equal(totalRate(state), bare);
+  assert.equal(seedBonus(20), 1);
 });

@@ -308,6 +308,86 @@ export const UPGRADES = [
 
 export const UPGRADE_BY_ID = Object.fromEntries(UPGRADES.map(u => [u.id, u]));
 
+/* ------------------------------------------------------- the seed upgrades */
+
+/* The tree of things a seed opens.
+ *
+ * Every upgrade above is bought with energy and lost at the next replant.
+ * These are bought with energy and KEPT — through every replant, for good —
+ * and what decides whether one is open to you at all is how many seeds you
+ * have earned. That is the whole shape of it: the seed is the key and the
+ * energy is the price, so a seed is never spent and never runs out, and the
+ * row it opens still has to be earned inside a run.
+ *
+ * It is what makes the second run faster than the first, which this game
+ * badly needed: a replant takes the lot back to bare ground while the next
+ * seed wants four times the lifetime energy of the last one, so without
+ * something carried across, every season is harder than the one before it and
+ * the loop stops paying.
+ *
+ * `seed` is how many seeds must have been earned, and it doubles as the
+ * order: one row a seed, so the first thing a player does with a new seed is
+ * find out what it opened. `cost` is energy, and it is pitched at about a
+ * third of the lifetime total that seed itself wanted — affordable inside the
+ * run that earns it, and not so cheap that it buys itself.
+ */
+export const PRESTIGE = [
+  { id: 'warm-earth', name: 'Warm earth', seed: 1, cost: 3e5, effect: { startEnergy: 500 },
+    blurb: 'Every replant begins with 500 energy in hand, so the first moss bed is already paid for.' },
+  { id: 'deep-mulch', name: 'Deep mulch', seed: 2, cost: 1.2e6, effect: { allMult: 1.25 },
+    blurb: 'Everything on the lot makes a quarter more, for good.' },
+  { id: 'practised-hands', name: 'Practised hands', seed: 3, cost: 5e6, effect: { clickMult: 3 },
+    blurb: 'A tap is worth three times as much, in every run from now on.' },
+  { id: 'long-memory', name: 'Long memory', seed: 4, cost: 2e7, effect: { startEnergy: 50000 },
+    blurb: 'Every replant begins with 50,000 energy, which is most of a beehive.' },
+  { id: 'night-watch', name: 'Night watch', seed: 5, cost: 8e7, effect: { steady: 0.5 },
+    blurb: 'The off hours stop costing anything, in every run, without buying Night bloom again.' },
+  { id: 'rich-soil', name: 'Rich soil', seed: 6, cost: 3e8, effect: { allMult: 1.5 },
+    blurb: 'Everything makes half again as much, on top of everything else.' },
+  { id: 'gleaners-share', name: "The gleaner's share", seed: 7, cost: 1.2e9, effect: { fingers: 0.05 },
+    blurb: 'A tap also pays 5% of what the whole lot makes in a second, for good.' },
+  { id: 'still-air', name: 'Still air', seed: 8, cost: 5e9, effect: { offlineRate: 1 },
+    blurb: 'The lot works at its full rate while the tab is shut, instead of half.' },
+  { id: 'long-sleep', name: 'Long sleep', seed: 9, cost: 2e10, effect: { offlineCap: 2 },
+    blurb: 'Time away counts for a whole day instead of half of one.' },
+  { id: 'old-growth', name: 'Old growth', seed: 10, cost: 8e10, effect: { allMult: 2 },
+    blurb: 'Everything makes twice as much. The lot you come back to is a different lot.' },
+  { id: 'heartwood', name: 'Heartwood', seed: 11, cost: 3e11, effect: { clickMult: 5 },
+    blurb: 'A tap is worth five times as much again.' },
+  { id: 'whole-valley', name: 'The whole valley', seed: 12, cost: 1.2e12, effect: { allMult: 2 },
+    blurb: 'Everything makes twice as much again. There is nothing after this one yet.' },
+];
+
+export const PRESTIGE_BY_ID = Object.fromEntries(PRESTIGE.map(u => [u.id, u]));
+
+/* Which of them this save has earned the seeds for. Ordered, because the tree
+   is read as a ladder and a gap in it is the next thing to aim at. */
+export const prestigeOffered = state =>
+  PRESTIGE.filter(u => u.seed <= state.seeds);
+
+/* Why that one cannot be rooted, or null. */
+export function rootRefusal(state, id){
+  const up = PRESTIGE_BY_ID[id];
+  if(!up) return 'There is no such upgrade.';
+  if(state.rooted[id]) return 'You have that one already.';
+  if(state.seeds < up.seed){
+    const want = up.seed - state.seeds;
+    return `Not yet — ${want} more seed${want === 1 ? '' : 's'} first.`;
+  }
+  if(state.light < up.cost) return `Not enough energy — ${formatEnergy(up.cost - state.light)} short.`;
+  return null;
+}
+
+/* Root it: pay the energy and keep it forever. */
+export function root(state, id){
+  if(rootRefusal(state, id)) return null;
+  const up = PRESTIGE_BY_ID[id];
+  state.light -= up.cost;
+  state.rooted[id] = true;
+  score(state, 'spent', up.cost);
+  return up;
+}
+
 /* --------------------------------------------------------------- the record */
 
 /* What the stats screen counts. Every one of these is a number that only ever
@@ -498,46 +578,48 @@ export const ACHIEVEMENTS = [
   { id: 'every-upgrade', name: 'The whole shelf', need: { upgrades: UPGRADES.length },
     blurb: 'Every upgrade there is, in one run.' },
 
-  /* One medal per winter. A replanting is a winter the tree has stood
-     through — the lot goes back to bare ground and the tree comes back a
-     year older and drawn bigger — so each of the first ten gets its own
-     medal, named for the year and saying what the tree gained that year,
-     and the ladder goes on in steps after that. The first and fifth keep
-     the ids they had when they were the only two, because those ids are in
-     every save that has ever replanted. */
-  { id: 'first-seed', name: 'First winter', need: { prestiges: 1 },
-    blurb: 'Replant the lot once. The tree comes back stouter, with its roots showing.' },
-  { id: 'second-winter', name: 'Second winter', need: { prestiges: 2 },
-    blurb: 'Replant twice. The trunk forks low.' },
-  { id: 'third-winter', name: 'Third winter', need: { prestiges: 3 },
-    blurb: 'Three winters. A knot hole, and moss on the shaded side.' },
-  { id: 'fourth-winter', name: 'Fourth winter', need: { prestiges: 4 },
-    blurb: 'Four winters. The crown spreads wider than it is tall, and somebody has hung a swing.' },
-  { id: 'five-seeds', name: 'Fifth winter', need: { prestiges: 5 },
-    blurb: 'Five winters. Buttress roots, and blossom in the canopy.' },
-  { id: 'sixth-winter', name: 'Sixth winter', need: { prestiges: 6 },
-    blurb: 'Six winters. Lanterns in the low branches, and a bench underneath.' },
-  { id: 'seventh-winter', name: 'Seventh winter', need: { prestiges: 7 },
-    blurb: 'Seven winters. The trunk splits in two and the crown reaches the top of the picture.' },
-  { id: 'eighth-winter', name: 'Eighth winter', need: { prestiges: 8 },
-    blurb: 'Eight winters. The trunk grows broader.' },
-  { id: 'ninth-winter', name: 'Ninth winter', need: { prestiges: 9 },
-    blurb: 'Nine winters. Another season, another ring of growth!' },
-  { id: 'tenth-winter', name: 'Tenth winter', need: { prestiges: 10 },
-    blurb: 'Ten winters stood through.' },
-  { id: 'fifteen-winters', name: 'Fifteen winters', need: { prestiges: 15 },
-    blurb: 'Fifteen winters stood through.' },
-  { id: 'twenty-winters', name: 'Twenty winters', need: { prestiges: 20 },
-    blurb: 'Twenty winters stood through.' },
-  { id: 'thirty-winters', name: 'Thirty winters', need: { prestiges: 30 },
-    blurb: 'Thirty winters stood through.' },
-  { id: 'fifty-winters', name: 'Fifty winters', need: { prestiges: 50 },
-    blurb: 'Half a century of winters.' },
-  { id: 'hundred-winters', name: 'A hundred winters', need: { prestiges: 100 },
-    blurb: 'A tree older than most humans. It\'s truly a marvel.' },
-  { id: 'hundred-seeds', name: 'Seed bank', need: { seeds: 100 },
-    blurb: 'Hold a hundred seeds.' },
+  /* One medal a seed. A replanting is a season the tree has stood through —
+     the lot goes back to bare ground and the tree comes back a year older and
+     drawn bigger — and it pays the one seed that opens the next rung of the
+     tree of upgrades, so each of the first ten gets its own medal, named for
+     the seed and saying what the tree gained that year.
 
+     The ladder used to run to a hundred, which was reachable when seeds came
+     off a cube root and a day of play paid fifty-five of them. A seed is a
+     replant now and the thresholds are four times apart, so the simulation
+     reaches six in a day, thirteen in a week and fifteen in a month: the top
+     rung is twenty-five, and it is meant to be a long way off rather than a
+     joke. The ids are untouched wherever the number they name still holds,
+     because a medal is a record and a record you lose to a rename is not
+     one. */
+  { id: 'first-seed', name: 'First seed', need: { seeds: 1 },
+    blurb: 'Replant the lot once. The tree comes back stouter, with its roots showing.' },
+  { id: 'second-winter', name: 'Second seed', need: { seeds: 2 },
+    blurb: 'Replant twice. The trunk forks low.' },
+  { id: 'third-winter', name: 'Third seed', need: { seeds: 3 },
+    blurb: 'Three seasons. A knot hole, and moss on the shaded side.' },
+  { id: 'fourth-winter', name: 'Fourth seed', need: { seeds: 4 },
+    blurb: 'Four seasons. The crown spreads wider than it is tall, and somebody has hung a swing.' },
+  { id: 'five-seeds', name: 'Fifth seed', need: { seeds: 5 },
+    blurb: 'Five seasons. Buttress roots, and blossom in the canopy.' },
+  { id: 'sixth-winter', name: 'Sixth seed', need: { seeds: 6 },
+    blurb: 'Six seasons. Lanterns in the low branches, and a bench underneath.' },
+  { id: 'seventh-winter', name: 'Seventh seed', need: { seeds: 7 },
+    blurb: 'Seven seasons. The trunk splits in two and the crown reaches the top of the picture.' },
+  { id: 'eighth-winter', name: 'Eighth seed', need: { seeds: 8 },
+    blurb: 'Eight seasons. The trunk grows broader.' },
+  { id: 'ninth-winter', name: 'Ninth seed', need: { seeds: 9 },
+    blurb: 'Nine seasons. Another season, another ring of growth!' },
+  { id: 'tenth-winter', name: 'Tenth seed', need: { seeds: 10 },
+    blurb: 'Ten seasons stood through.' },
+  { id: 'twelve-seeds', name: 'Twelve seeds', need: { seeds: 12 },
+    blurb: 'Twelve seasons stood through.' },
+  { id: 'fifteen-winters', name: 'Fifteen seeds', need: { seeds: 15 },
+    blurb: 'Fifteen seasons stood through.' },
+  { id: 'twenty-winters', name: 'Twenty seeds', need: { seeds: 20 },
+    blurb: 'Twenty seasons stood through.' },
+  { id: 'hundred-seeds', name: 'Seed bank', need: { seeds: 25 },
+    blurb: 'A tree older than most humans. It\'s truly a marvel.' },
   { id: 'an-hour', name: 'An afternoon', need: { seconds: 3600 },
     blurb: 'An hour of tending, all told.' },
   { id: 'a-full-day', name: 'Round the clock', need: { days: 12 },
@@ -567,6 +649,7 @@ export function newGame(){
     owned: freshOwned(),
     earnedBy: freshOwned(),  // energy each kind has made this run, for the table
     bought: {},          // upgrade id -> true, this run
+    rooted: {},          // seed upgrade id -> true, forever, through every replant
     medals: {},          // achievement id -> true, forever
     seeds: 0,            // banked at the last reset
     pending: 0,          // seeds this run would pay if you reset now
@@ -603,7 +686,31 @@ export function bonuses(state){
     lift: 0,
     grower: Object.fromEntries(GROWER_IDS.map(id => [id, 1])),
     seedMult: seedBonus(state.seeds),
+    // What the seed upgrades add on top of the run's own.
+    startEnergy: 0,
+    offlineRate: OFFLINE_RATE,
+    offlineCap: OFFLINE_CAP,
   };
+
+  /* The seed upgrades first, and through the same keys as the run's own, so
+     that a multiplier is a multiplier wherever it was bought and nothing
+     downstream has to know which shelf a bonus came off. */
+  for(const id of Object.keys(state.rooted || {})){
+    const up = PRESTIGE_BY_ID[id];
+    if(!up || !state.rooted[id]) continue;
+    const e = up.effect;
+    if(e.clickMult) out.clickMult *= e.clickMult;
+    if(e.allMult) out.allMult *= e.allMult;
+    if(e.fingers) out.fingers += e.fingers;
+    if(e.steady) out.lift = Math.min(out.swing, out.lift + e.steady);
+    if(e.grower && out.grower[e.grower] !== undefined) out.grower[e.grower] *= e.mult;
+    // Begin each run with this much: the biggest one wins rather than the sum,
+    // because they are the same promise made larger and not two promises.
+    if(e.startEnergy) out.startEnergy = Math.max(out.startEnergy, e.startEnergy);
+    if(e.offlineRate) out.offlineRate = Math.max(out.offlineRate, e.offlineRate);
+    if(e.offlineCap) out.offlineCap *= e.offlineCap;
+  }
+
   for(const id of Object.keys(state.bought)){
     const up = UPGRADE_BY_ID[id];
     // An unknown id is an upgrade deleted from the table while somebody's save
@@ -621,12 +728,13 @@ export function bonuses(state){
   return out;
 }
 
-/* Seeds pay 2% each, and they pay it to everything. Linear rather than
-   compounding: at a hundred seeds a compounding 2% is a multiplier of seven
-   and a linear one is three, and the reset loop wants to be worth doing twice,
-   not worth doing once and then forever. */
-export const SEED_RATE = 0.02;
-export const seedBonus = seeds => 1 + SEED_RATE * seeds;
+/* Seeds used to pay two percent each simply for being held, and that is over.
+   A seed is what opens a row of the prestige tree now, and the power is in
+   the row — which is the difference between a number going up on its own and
+   a decision. The two exports stay because removing an export from this file
+   is how a save or a page stops loading; they answer "nothing" now. */
+export const SEED_RATE = 0;
+export const seedBonus = () => 1;
 
 /* How much a grower's phase is worth right now: 1 at the equinox points, up to
    1 + swing at its best hour, and down to 1 - (swing - lift) at its worst. An
@@ -911,15 +1019,46 @@ export function study(state, id){
  */
 export const SEED_SCALE = 1e6;
 
-export const seedsFrom = lifetime =>
-  lifetime <= 0 ? 0 : Math.floor(Math.cbrt(lifetime / SEED_SCALE));
+/* The first seed wants a million energy, all told, and every seed after it
+ * wants four times what the one before it did. Exponential rather than the
+ * cube root this started with, and the difference is the whole feel of the
+ * game: a root curve hands out fifty-five seeds in a day and makes each one
+ * worth almost nothing, where four times a seed hands out ten in the first
+ * day and a dozen more over the following fortnight, so a seed is an event.
+ *
+ * Measured against LIFETIME energy, which no replant ever clears. You do not
+ * re-earn what you had; you have to add three times it again, from a lot that
+ * has just gone back to bare ground. That is what the tree of upgrades is for.
+ */
+export const SEED_RATIO = 4;
+
+/* The lifetime total the nth seed wants. Seed zero wants nothing. */
+export const seedAt = n => n < 1 ? 0 : SEED_SCALE * Math.pow(SEED_RATIO, n - 1);
+
+export const seedsFrom = lifetime => {
+  if(!(lifetime >= SEED_SCALE)) return 0;
+  // Counted with a logarithm rather than a loop, and then walked back onto the
+  // exact threshold: at 4^25 a float has drifted far enough that the log alone
+  // can say a seed is earned a hair before seedAt() agrees, and the bar on the
+  // page would sit at a hundred percent with the button still refusing.
+  let n = Math.floor(Math.log(lifetime / SEED_SCALE) / Math.log(SEED_RATIO)) + 1;
+  while(n > 0 && seedAt(n) > lifetime) n--;
+  while(seedAt(n + 1) <= lifetime) n++;
+  return n;
+};
+
+/* Only ever one. A replant is one season and one season is one seed, so
+   crossing three thresholds before you get round to replanting still pays
+   one — and with the thresholds four times apart, crossing two at once is
+   already a thing you have to work at. */
+export const SEEDS_PER_REPLANT = 1;
 
 export const pendingSeeds = state =>
-  Math.max(0, seedsFrom(state.life.earned) - state.seeds);
+  Math.min(SEEDS_PER_REPLANT, Math.max(0, seedsFrom(state.life.earned) - state.seeds));
 
-/* What lifetime total the next seed wants, so the reset panel can show a bar
-   rather than a number that sits still for an hour. */
-export const energyForSeeds = seeds => Math.pow(seeds, 3) * SEED_SCALE;
+/* What lifetime total the next seed wants, so the panel can show a bar rather
+   than a number that sits still for an hour. */
+export const energyForSeeds = seeds => seedAt(seeds);
 export const lightForSeeds = energyForSeeds;   // the old name, kept
 
 export function prestigeRefusal(state){
@@ -930,31 +1069,37 @@ export function prestigeRefusal(state){
   return null;
 }
 
-/* How many winters the tree has stood through, which is how many times the
-   lot has been replanted. The art reads this to decide how old a tree to
-   draw, and the medals read it under the older name. One name for the page
-   and the picture, so that "winters" on the Seeds tab and the tree on the lot
-   can never disagree. */
-export const winters = state => state.prestiges;
+/* How many seasons the tree has stood through, which is how many times the
+   lot has been replanted, which is how many seeds have been earned — one
+   number wearing three names until now, and one name from here. The art reads
+   it to decide how old a tree to draw, the tree of upgrades reads it to decide
+   which rungs are open, and the medals count it. */
+export const seedsEarned = state => state.seeds;
 
-/* The medal a given winter wins, or null if that winter is not one of the
-   rungs. One lookup into the ladder, so that whatever wants to know what a
-   winter is worth — the test that the first ten have no gap in them, anything
-   later that wants to name one — reads the table the award reads rather than
-   a copy of it.
+/* What this was called while a season and a seed were two different things.
+   Kept because removing an export is how a page stops loading. */
+export const winters = seedsEarned;
+
+/* The medal a given seed wins, or null if that seed is not one of the rungs.
+   One lookup into the ladder, so that whatever wants to know what a seed is
+   worth reads the table the award reads rather than a copy of it.
 
    The guard is not decoration: `find` on an undefined count matches the first
-   medal with no `prestiges` in its need at all, which is the one for tapping
-   the tree once — so a missing argument would have promised "First tap". */
-export const winterMedal = count =>
+   medal with no `seeds` in its need at all, which is the one for tapping the
+   tree once — so a missing argument would have promised "First tap". */
+export const seedMedal = count =>
   Number.isInteger(count) && count > 0
-    ? ACHIEVEMENTS.find(a => a.need.prestiges === count) || null
+    ? ACHIEVEMENTS.find(a => a.need.seeds === count) || null
     : null;
 
-/* Give the lot back. Keeps the seeds, the medals, the lifetime record and the
- * sitting; everything else starts again. Returns how many seeds it paid.
+/* The name it had while a season was a winter. */
+export const winterMedal = seedMedal;
+
+/* Give the lot back. Keeps the seeds, the seed upgrades, the medals, the
+ * lifetime record and the sitting; everything else starts again. Returns how
+ * many seeds it paid, which is always one.
  *
- * This is a winter. The tree stands through it and comes back a year older,
+ * This is a season. The tree stands through it and comes back a year older,
  * which is the one thing on the lot that a replanting makes bigger rather
  * than smaller, and the reason the word for it on the page is not "reset".
  */
@@ -963,12 +1108,19 @@ export function prestige(state){
   const won = pendingSeeds(state);
   state.seeds += won;
   state.pending = 0;
-  state.prestiges += 1;
-  state.light = 0;
+  // Kept in step with the seeds, and kept at all only because it is in every
+  // save ever written. One replant is one season is one seed.
+  state.prestiges = state.seeds;
+  // The head start a seed upgrade bought, if any: read before the run is
+  // cleared, since it is the seed upgrades that carry it and those stay.
+  state.light = bonuses(state).startEnergy;
   state.elapsed = DAY_START;
   state.owned = freshOwned();
   state.earnedBy = freshOwned();
   state.bought = {};
+  // state.rooted is deliberately not touched. It is the only thing besides the
+  // record that survives a replant, and it is the reason the next run is
+  // quicker than the last.
   state.run = blankStats();
   state.log = [];
   state.history = freshHistory();
@@ -992,8 +1144,10 @@ export const OFFLINE_CAP = 12 * 3600;
 
 /* What `seconds` away would be worth, without changing anything. */
 export function offlineGain(state, seconds){
-  const away = Math.max(0, Math.min(seconds, OFFLINE_CAP));
-  return { seconds: away, capped: seconds > OFFLINE_CAP, light: steadyRate(state) * OFFLINE_RATE * away };
+  const bonus = bonuses(state);
+  const cap = bonus.offlineCap;
+  const away = Math.max(0, Math.min(seconds, cap));
+  return { seconds: away, capped: seconds > cap, light: steadyRate(state, bonus) * bonus.offlineRate * away };
 }
 
 /* Pay it in. Advances the sky by the real time away — the world kept turning
@@ -1058,6 +1212,7 @@ export function toSave(state){
     owned: { ...state.owned },
     earnedBy: { ...state.earnedBy },
     bought: { ...state.bought },
+    rooted: { ...state.rooted },
     medals: { ...state.medals },
     seeds: state.seeds,
     prestiges: state.prestiges,
@@ -1093,8 +1248,18 @@ export function fromSave(raw){
 
   state.light = Math.max(0, num(raw.light));
   state.elapsed = Math.max(0, num(raw.elapsed));
-  state.seeds = Math.max(0, Math.floor(num(raw.seeds)));
-  state.prestiges = Math.max(0, Math.floor(num(raw.prestiges)));
+  /* Seeds and replants are one number now, and in a save written before they
+     were, they are two: seeds came off a cube root and could be a dozen from
+     one replant, while `prestiges` counted the replants themselves. The
+     replant count is the honest translation — one season, one seed — and it
+     is also what the tree's age was already drawn from, so a returning lot
+     comes back exactly as old as it went away. Nobody is docked for it: the
+     seeds that go are the ones that used to pay two percent, and that bonus
+     is gone for everybody. */
+  const seeds = Math.max(0, Math.floor(num(raw.seeds)));
+  const replants = Math.max(0, Math.floor(num(raw.prestiges)));
+  state.seeds = raw.rooted === undefined && replants > 0 ? replants : seeds;
+  state.prestiges = Math.max(state.seeds, replants);
   state.decade = Math.max(0, Math.floor(num(raw.decade)));
 
   for(const id of GROWER_IDS){
@@ -1103,6 +1268,9 @@ export function fromSave(raw){
   }
   for(const id of Object.keys(raw.bought || {})){
     if(UPGRADE_BY_ID[id] && raw.bought[id]) state.bought[id] = true;
+  }
+  for(const id of Object.keys(raw.rooted || {})){
+    if(PRESTIGE_BY_ID[id] && raw.rooted[id]) state.rooted[id] = true;
   }
   for(const id of Object.keys(raw.medals || {})){
     if(ACHIEVEMENT_BY_ID[id] && raw.medals[id]) state.medals[id] = true;
