@@ -364,16 +364,27 @@
   const STEP = 1 / TICK_RATE;
   let acc = 0, last = null;
 
-  // Ids already credited with a quack, so a duckling sitting saved in the
-  // pond for the rest of the run does not honk on every subsequent frame —
-  // only the tick it actually arrives on.
+  // Ids already credited with a quack or a loss, so a duckling sitting
+  // saved in the pond — or one already gone — does not retrigger its sound
+  // on every subsequent frame, only the tick it actually happened on.
   let quacked = new Set();
+  let mourned = new Set();
 
   function quackNewArrivals(){
     for(const d of state.ducks){
       if(d.state !== 'saved' || quacked.has(d.id)) continue;
       quacked.add(d.id);
       audio.sfx('quack');
+    }
+  }
+
+  // Plays alongside the poof (see art.js/sim.js), on the same tick a
+  // duckling actually goes down rather than on every frame it stays lost.
+  function sfxNewLosses(){
+    for(const d of state.ducks){
+      if(d.state !== 'lost' || mourned.has(d.id)) continue;
+      mourned.add(d.id);
+      audio.sfx('lost');
     }
   }
 
@@ -440,6 +451,7 @@
       acc += dt;
       while(acc >= STEP){ tick(state); acc -= STEP; }
       quackNewArrivals();
+      sfxNewLosses();
       if(state.ended){ refreshSkills(); endMessage(); }
     }
 
@@ -457,6 +469,7 @@
     armed = null;
     paused = false;
     quacked = new Set();
+    mourned = new Set();
     ui.pause.textContent = 'Pause';
     ui.overlay.hidden = true;
     say('');

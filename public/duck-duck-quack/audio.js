@@ -213,13 +213,13 @@ export function createAudio(){
 
   /* ---- sound effects ------------------------------------------------ */
 
-  /* One so far: the duckling that just made it. Two quick nasal blips,
-   * sawtooth rather than sine so it has the buzz an actual quack has, each
-   * one bent sharply downward — a duck's call falls in pitch as it cuts off,
-   * a whistle does not, and a whistle is what this was before the bend went
-   * in. A touch of band-passed noise under the first blip is the breath
-   * behind it; without it the pair read as two clean beeps, which is a
-   * microwave finishing, not a bird.
+  /* The duckling that just made it. Two quick nasal blips, sawtooth rather
+   * than sine so it has the buzz an actual quack has, each one bent sharply
+   * downward — a duck's call falls in pitch as it cuts off, a whistle does
+   * not, and a whistle is what this was before the bend went in. A touch of
+   * band-passed noise under the first blip is the breath behind it; without
+   * it the pair read as two clean beeps, which is a microwave finishing,
+   * not a bird.
    *
    * Loud on purpose, relative to the music bed it plays over (bassLevel
    * 0.17, leadLevel 0.08) — this is the one sound in the game that means
@@ -231,6 +231,20 @@ export function createAudio(){
       voice(880, t, 0.07, 'sawtooth', 0.22, 480);
       hit(t, 0.045, 0.09, 2800, 'bandpass');
       voice(620, t + 0.09, 0.06, 'sawtooth', 0.18, 340);
+    },
+
+    /* The duckling that didn't — a soft, sinking "womp" rather than
+     * anything sharp: this can fire up to nine times in one run (see
+     * art.js's poof, which it plays alongside), so it has to read as a
+     * shame rather than a punishment or it turns grating fast. A triangle
+     * gliding down an octave-plus, low-passed into a rounded thump, with a
+     * dull puff of filtered noise under it for the poof's own breath —
+     * the quack's noise burst was bright and band-passed because a quack
+     * is a call; this one is low-passed because it isn't a call at all.
+     */
+    lost(t){
+      voice(340, t, 0.17, 'triangle', 0.14, 130, 750);
+      hit(t + 0.015, 0.08, 0.055, 700, 'lowpass');
     },
   };
 
