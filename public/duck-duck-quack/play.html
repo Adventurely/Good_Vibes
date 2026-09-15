@@ -144,7 +144,21 @@
     header h1{ font-size: 1rem; }
 
     .layout{ grid-template-columns: minmax(0, 1fr) 10.5rem; gap: 0.6rem; }
-    .screen-col{ display: flex; justify-content: center; }
+
+    /* fitCanvas only scales by whole numbers, which is right everywhere else
+       in this repo — the alternative is pixels of uneven size, which reads
+       as a rendering fault. But on a phone in landscape, height is what runs
+       out first, and a 320x180 scene only needs about 640x360 to satisfy
+       that budget at 2x; the rest of a screen that is 900+ wide goes to
+       margin on both sides of a canvas visibly smaller than the room it has.
+       Here specifically the fix is to let the canvas fill the available
+       height exactly (`height: 100%`, `width: auto`) instead of stepping
+       down to the next whole multiple, which is why the script skips
+       `fitCanvas` for this layout — see `fitScene`. */
+    .screen-col{ display: flex; justify-content: center; height: calc(100vh - 3rem); }
+    .screen{ height: 100%; width: auto; }
+    #scene{ height: 100%; width: auto; max-width: 100%; }
+
     .sidebar{
       max-height: calc(100vh - 3rem); overflow-y: auto;
       display: flex; flex-direction: column; gap: 0.5rem;
@@ -400,7 +414,24 @@
      Sunward's `#lot` and Good Vibes' own canvases). Without this the scale
      was stuck at 1x everywhere, phone and desktop alike. */
   const screenWrap = ui.scene.parentElement.parentElement;
+
+  /* The compact landscape layout (see the media query above) sizes the
+     canvas itself, with `height: 100%` and `width: auto` — fitCanvas's
+     whole-number scale would otherwise win the size fight anyway, since it
+     sets an inline style and an inline style beats any stylesheet rule that
+     is not `!important`. Skipping it here, rather than fighting it with
+     `!important`, is what lets a phone in landscape actually use the height
+     it has instead of stepping down to the next whole multiple of 180 and
+     leaving margin on every side. Any leftover inline size from a fit made
+     in the other layout — a load in portrait, then a rotation — has to be
+     cleared explicitly, or it would keep the CSS from taking effect too. */
+  const compactLandscape = matchMedia('(orientation: landscape) and (max-height: 560px)');
   function fitScene(){
+    if(compactLandscape.matches){
+      ui.scene.style.width = '';
+      ui.scene.style.height = '';
+      return;
+    }
     fitCanvas(ui.scene, LEVEL_1.width, LEVEL_1.height, { container: screenWrap, maxHeightFraction: 0.85 });
   }
   fitScene();
