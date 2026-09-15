@@ -28,7 +28,7 @@ import {
   MAX_TICK, tick, tap, plantRefusal, plant, studyRefusal, study,
   SEED_SCALE, SEED_RATIO, seedAt, seedsFrom, pendingSeeds, lightForSeeds, energyForSeeds,
   prestigeRefusal, prestige, winters, winterMedal, seedsEarned, seedMedal,
-  PRESTIGE, PRESTIGE_BY_ID, prestigeOffered, rootRefusal, root,
+  PRESTIGE, PRESTIGE_BY_ID, prestigeOffered, rootRefusal, root, growerCount, markGrown,
   OFFLINE_RATE, OFFLINE_CAP, offlineGain, catchUp,
   toSave, fromSave, formatLight, formatTime, formatStat, breakdown,
 } from '../public/sunward/content.js';
@@ -1074,4 +1074,108 @@ test('a seed pays nothing on its own any more', () => {
   state.seeds = 20;
   assert.equal(totalRate(state), bare);
   assert.equal(seedBonus(20), 1);
+});
+
+/* ----------------------------------------------- the tree keeps its size */
+
+test('the tree is drawn from the biggest it has ever been, not from what is standing', () => {
+  const state = newGame();
+  assert.equal(state.grown, 0);
+  state.owned.moss = 40;
+  state.owned.fern = 10;
+  assert.equal(growerCount(state), 50);
+  assert.equal(markGrown(state), 50);
+
+  // Selling is not a thing here, but a season is, and it clears the lot.
+  state.life.earned = seedAt(1);
+  prestige(state);
+  assert.equal(growerCount(state), 0, 'the growers go, because the energy was really spent');
+  assert.equal(state.grown, 50, 'the tree does not go back to a sapling');
+  assert.ok(growthFor(state.grown) > 0, 'and it is still drawn at something');
+
+  // A smaller lot than last season does not shrink it either.
+  state.owned.moss = 5;
+  assert.equal(markGrown(state), 50);
+  // Passing the old mark does move it.
+  state.owned.moss = 90;
+  assert.equal(markGrown(state), 90);
+});
+
+test('the high-water mark survives a save, and an old save gets one from its lot', () => {
+  const state = newGame();
+  state.owned.moss = 33;
+  markGrown(state);
+  state.life.earned = seedAt(1);
+  prestige(state);
+  const back = fromSave(toSave(state));
+  assert.equal(back.grown, 33, 'a season with a bare lot still remembers the tree');
+
+  // Saves written before there was a mark: the lot standing on them is the
+  // best evidence the file has, and it must not load as a sapling.
+  const old = toSave(newGame());
+  old.owned.moss = 12;
+  delete old.grown;
+  assert.equal(fromSave(old).grown, 12);
+
+  // And nothing in a hostile save turns it into NaN.
+  const junk = toSave(newGame());
+  junk.grown = 'lots';
+  assert.equal(fromSave(junk).grown, 0);
+  junk.grown = -5;
+  assert.equal(fromSave(junk).grown, 0);
+});
+
+/* --------------------------------------------------- the words on the page */
+
+test('the ladder reaches forty, in order, with the ids it has always had', () => {
+  const rungs = ACHIEVEMENTS.filter(a => a.need.seeds !== undefined);
+  const needs = rungs.map(a => a.need.seeds);
+  assert.deepEqual(needs, [...needs].sort((a, b) => a - b), 'the seed medals must read as a ladder');
+  assert.deepEqual(needs, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20, 25, 30, 40]);
+  assert.equal(new Set(needs).size, needs.length, 'two medals for one seed count');
+  for(const id of ['first-seed', 'five-seeds', 'twelve-seeds', 'hundred-seeds']){
+    assert.ok(ACHIEVEMENT_BY_ID[id], `medal id "${id}" is in saves and cannot be renamed`);
+  }
+});
+
+test('no player ever reads the words "replant" or "rooted"', () => {
+  // Both were scrapped as terminology. They survive as identifiers — state.rooted,
+  // root(), SEEDS_PER_REPLANT — and that is fine, because nobody reads those.
+  // What must not happen is one of them turning up in a blurb again.
+  const scrapped = /\b(replant\w*|rooted)\b/i;
+  const shown = [];
+  for(const table of [GROWERS, UPGRADES, ACHIEVEMENTS, PRESTIGE]){
+    for(const row of table){
+      for(const field of ['name', 'blurb', 'flavour', 'what']){
+        if(typeof row[field] === 'string') shown.push([`${row.id}.${field}`, row[field]]);
+      }
+    }
+  }
+  for(const [where, text] of shown){
+    assert.ok(!scrapped.test(text), `"${where}" still says it: ${text}`);
+  }
+
+  // The refusals are read out loud too.
+  const state = newGame();
+  const refusals = [
+    prestigeRefusal(state),
+    rootRefusal(state, 'warm-earth'),
+    rootRefusal(state, 'no-such-thing'),
+    plantRefusal(state, 'moss', 1),
+  ].filter(Boolean);
+  assert.ok(refusals.length, 'a fresh game refuses at least one of those');
+  for(const line of refusals) assert.ok(!scrapped.test(line), `a refusal says it: ${line}`);
+});
+
+test('planting is what marks the tree, so no call site can forget to', () => {
+  const state = newGame();
+  state.light = 1e9;
+  plant(state, 'moss', 25);
+  assert.equal(state.grown, 25, 'plant() records it without being asked');
+  // A refused purchase changes nothing, the mark included.
+  const broke = newGame();
+  broke.light = 0;
+  assert.ok(plantRefusal(broke, 'moss', 1), 'a penniless lot cannot plant');
+  plant(broke, 'moss', 1);
+  assert.equal(broke.grown, 0);
 });

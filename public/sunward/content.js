@@ -333,13 +333,13 @@ export const UPGRADE_BY_ID = Object.fromEntries(UPGRADES.map(u => [u.id, u]));
  */
 export const PRESTIGE = [
   { id: 'warm-earth', name: 'Warm earth', seed: 1, cost: 3e5, effect: { startEnergy: 500 },
-    blurb: 'Every replant begins with 500 energy in hand, so the first moss bed is already paid for.' },
+    blurb: 'Every season begins with 500 energy in hand, so the first moss bed is already paid for.' },
   { id: 'deep-mulch', name: 'Deep mulch', seed: 2, cost: 1.2e6, effect: { allMult: 1.25 },
     blurb: 'Everything on the lot makes a quarter more, for good.' },
   { id: 'practised-hands', name: 'Practised hands', seed: 3, cost: 5e6, effect: { clickMult: 3 },
     blurb: 'A tap is worth three times as much, in every run from now on.' },
   { id: 'long-memory', name: 'Long memory', seed: 4, cost: 2e7, effect: { startEnergy: 50000 },
-    blurb: 'Every replant begins with 50,000 energy, which is most of a beehive.' },
+    blurb: 'Every season begins with 50,000 energy, which is most of a beehive.' },
   { id: 'night-watch', name: 'Night watch', seed: 5, cost: 8e7, effect: { steady: 0.5 },
     blurb: 'The off hours stop costing anything, in every run, without buying Night bloom again.' },
   { id: 'rich-soil', name: 'Rich soil', seed: 6, cost: 3e8, effect: { allMult: 1.5 },
@@ -586,16 +586,15 @@ export const ACHIEVEMENTS = [
 
      The ladder used to run to a hundred, which was reachable when seeds came
      off a cube root and a day of play paid fifty-five of them. A seed is a
-     replant now and the thresholds are four times apart, so the simulation
+     season now and the thresholds are four times apart, so the simulation
      reaches six in a day, thirteen in a week and fifteen in a month: the top
-     rung is twenty-five, and it is meant to be a long way off rather than a
-     joke. The ids are untouched wherever the number they name still holds,
-     because a medal is a record and a record you lose to a rename is not
-     one. */
+     rung is forty, and it is meant to be a long way off rather than a joke.
+     The ids are untouched wherever the number they name still holds, because
+     a medal is a record and a record you lose to a rename is not one. */
   { id: 'first-seed', name: 'First seed', need: { seeds: 1 },
-    blurb: 'Replant the lot once. The tree comes back stouter, with its roots showing.' },
+    blurb: 'One season. The tree comes back stouter, with its roots showing.' },
   { id: 'second-winter', name: 'Second seed', need: { seeds: 2 },
-    blurb: 'Replant twice. The trunk forks low.' },
+    blurb: 'Two seasons. The trunk forks low.' },
   { id: 'third-winter', name: 'Third seed', need: { seeds: 3 },
     blurb: 'Three seasons. A knot hole, and moss on the shaded side.' },
   { id: 'fourth-winter', name: 'Fourth seed', need: { seeds: 4 },
@@ -618,7 +617,11 @@ export const ACHIEVEMENTS = [
     blurb: 'Fifteen seasons stood through.' },
   { id: 'twenty-winters', name: 'Twenty seeds', need: { seeds: 20 },
     blurb: 'Twenty seasons stood through.' },
-  { id: 'hundred-seeds', name: 'Seed bank', need: { seeds: 25 },
+  { id: 'twenty-five-seeds', name: 'Twenty-five seeds', need: { seeds: 25 },
+    blurb: 'Twenty-five seasons stood through.' },
+  { id: 'thirty-seeds', name: 'Thirty seeds', need: { seeds: 30 },
+    blurb: 'Thirty seasons stood through.' },
+  { id: 'hundred-seeds', name: 'Seed bank', need: { seeds: 40 },
     blurb: 'A tree older than most humans. It\'s truly a marvel.' },
   { id: 'an-hour', name: 'An afternoon', need: { seconds: 3600 },
     blurb: 'An hour of tending, all told.' },
@@ -641,6 +644,23 @@ export const SAVE_VERSION = 2;
 
 export const freshOwned = () => Object.fromEntries(GROWER_IDS.map(id => [id, 0]));
 
+/* How many growers are standing right now. */
+export const growerCount = state =>
+  GROWER_IDS.reduce((n, id) => n + (state.owned[id] || 0), 0);
+
+/* The most that have ever stood at once, which is what the tree is drawn from
+ * rather than the ones standing now. A season takes the lot back to bare
+ * ground — the energy is spent and the shelf is empty, and that is the point
+ * of it — but the tree is the one thing on the lot that a year of growth is
+ * meant to make bigger, and a tree that came back a sapling every year would
+ * say the opposite. Never cleared, by a season or by anything else.
+ */
+export function markGrown(state){
+  const n = growerCount(state);
+  if(n > (state.grown || 0)) state.grown = n;
+  return state.grown;
+}
+
 export function newGame(){
   return {
     version: SAVE_VERSION,
@@ -649,6 +669,7 @@ export function newGame(){
     owned: freshOwned(),
     earnedBy: freshOwned(),  // energy each kind has made this run, for the table
     bought: {},          // upgrade id -> true, this run
+    grown: 0,            // most growers ever standing at once; the tree's drawn size
     rooted: {},          // seed upgrade id -> true, forever, through every replant
     medals: {},          // achievement id -> true, forever
     seeds: 0,            // banked at the last reset
@@ -982,6 +1003,11 @@ export function plant(state, id, count = 1){
   state.owned[id] = (state.owned[id] || 0) + count;
   score(state, 'spent', cost);
   score(state, 'planted', count);
+  // Here rather than at the call site: this is the only function in the game
+  // that raises a grower count, so this is the only place the tree's size can
+  // go stale, and a page that forgot to say so would shrink it at the next
+  // season without anything failing.
+  markGrown(state);
   return cost;
 }
 
@@ -1212,6 +1238,7 @@ export function toSave(state){
     owned: { ...state.owned },
     earnedBy: { ...state.earnedBy },
     bought: { ...state.bought },
+    grown: state.grown,
     rooted: { ...state.rooted },
     medals: { ...state.medals },
     seeds: state.seeds,
@@ -1266,6 +1293,11 @@ export function fromSave(raw){
     state.owned[id] = Math.max(0, Math.floor(num(raw.owned?.[id])));
     state.earnedBy[id] = Math.max(0, num(raw.earnedBy?.[id]));
   }
+  /* A save written before the tree stopped shrinking has no high-water mark,
+     so the lot standing on it is the mark: the tree it is showing right now is
+     the biggest it has been as far as this save knows. */
+  state.grown = Math.max(0, Math.floor(num(raw.grown)), growerCount(state));
+
   for(const id of Object.keys(raw.bought || {})){
     if(UPGRADE_BY_ID[id] && raw.bought[id]) state.bought[id] = true;
   }
