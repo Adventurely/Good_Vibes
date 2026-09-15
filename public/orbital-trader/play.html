@@ -1501,6 +1501,15 @@ function endPointer(e){
        forty pixels across for fingers and at the zoom you cast off at, the
        whole parking orbit fits inside Tassel's — which made lesson two
        impossible to follow by tapping the road it names. */
+    /* A burn first. A tap on the road or a rail within reach of a flame is a
+       tap on the flame — a finger that lands on the line a burn sits on
+       wants that burn opened, not a second one written on top of it. */
+    const nb = prediction && !state.dockedAt ? chart.nearestNode(e.clientX, e.clientY) : null;
+    if(nb && state.nodes[nb.index]){
+      selectNode(nb.index);
+      replan(true); if(tab === 'ship') renderTab();
+      return;
+    }
     const p = prediction && !state.dockedAt ? chart.nearestPathPoint(e.clientX, e.clientY, prediction, state.t) : null;
     const onBody = d.hit?.kind === 'body';
     const insideDrawn = onBody && d.hit.d <= (d.hit.drawn ?? 0) + 2;
