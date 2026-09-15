@@ -334,8 +334,24 @@
   ui.restart.addEventListener('click', restart);
   ui.again.addEventListener('click', restart);
 
-  fitCanvas(ui.scene, LEVEL_1.width, LEVEL_1.height, { maxHeightFraction: 0.6 });
-  addEventListener('resize', () => fitCanvas(ui.scene, LEVEL_1.width, LEVEL_1.height, { maxHeightFraction: 0.6 }));
+  /* `.screen` is `width: max-content`, sized to whatever the canvas already
+     is — a container fitCanvas cannot measure against without also being the
+     thing it is trying to size. `.wrap`, a level up, is sized by the page
+     layout instead, which is what every other canvas in this repo measures
+     against (see Sunward's `#lot` and Good Vibes' own canvases). Without
+     this the scale was stuck at 1x everywhere, phone and desktop alike: a
+     320x180 scene at 1x is a postage stamp on a landscape phone, where the
+     screen is wide enough for 2x or 3x but short enough that the height cap
+     below has to be generous to ever get there. */
+  const screenWrap = ui.scene.parentElement.parentElement;
+  function fitScene(){
+    fitCanvas(ui.scene, LEVEL_1.width, LEVEL_1.height, { container: screenWrap, maxHeightFraction: 0.85 });
+  }
+  fitScene();
+  addEventListener('resize', fitScene);
+  // iOS Safari can report the old innerHeight for a moment after a rotation,
+  // so the fit right after `resize` fires is sometimes the stale one.
+  addEventListener('orientationchange', () => setTimeout(fitScene, 120));
 
   refreshSkills();
   requestAnimationFrame(frame);
