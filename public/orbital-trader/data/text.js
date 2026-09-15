@@ -466,12 +466,12 @@ export const NARRATIVE = {
   {
    "step": "mark",
    "title": "Plan a burn",
-   "body": "Good. Let's get that present. Tap the white line you are riding and choose 'Plan a burn'.\n\nA planned burn is a point on your path where the engine will fire and change your speed. Nothing happens yet: you keep coasting until the clock reaches it, and until then you can move it or change it as much as you like.\n\nDon't worry about where you put it. We'll fix that next."
+   "body": "Good. Let's get that present. The white line is your planned route: the path you are flying now. Tap it and choose 'Plan a burn'.\n\nA burn is firing the engine to speed up, slow down or change direction. A planned burn is a point on your path where that happens. Nothing fires yet: you coast until the clock gets there, and can change it until then.\n\nDon't worry where it goes. We'll fix that next."
   },
   {
    "step": "push",
    "title": "Push it out to Slate's height",
-   "body": "Four arrows appeared around the burn. Green adds speed. Orange takes it back.\n\nGreen pushes the far side of your orbit outward. Press green until the yellow line reaches Slate's circle. Within a tenth is close enough.\n\nThe label by the burn says what the engine will do, like 'forward 120 m/s'. What it costs you comes off the Fuel gauge at the top."
+   "body": "Four arrow buttons appeared around the flame. Green adds speed. Orange takes it back.\n\nGreen pushes the far side of your orbit outward. Press green until the yellow line reaches Slate's circle. Within a tenth is close enough.\n\nThe label by the burn says what the engine will do, like 'forward 120 m/s'. What it costs you comes off the Fuel gauge at the top."
   },
   {
    "step": "aim",

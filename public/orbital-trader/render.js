@@ -82,6 +82,7 @@ export const PALETTE = {
   shipEdge:   '#000000',
   shipHalo:   'rgba(255,255,255,0.22)',
   node:       '#ffd23f',
+  flame:      '#ff7a2e',   // the body of a burn's flame; node is its core and its words
   nodeRing:   'rgba(255,210,63,0.7)',
   /* Where the road cuts across a world's rail, and where that world will be
      when it does. Orange, because every other mark on this chart is already
@@ -285,6 +286,7 @@ export function createChart(canvas, world, opts = {}){
   chart.draw = view => draw(chart, view);
   chart.hitTest = (x, y) => hitTest(chart, x, y);
   chart.nearestPathPoint = (x, y, prediction, t) => nearestPathPoint(chart, x, y, prediction, t);
+  chart.nearestNode = (x, y, within) => nearestNode(chart, x, y, within);
   chart.nearestRailPoint = (x, y, t) => nearestRailPoint(chart, x, y, t);
   chart.dragNodeTime = (x, y, prediction, t, nodes, index) => dragNodeTime(chart, x, y, prediction, t, nodes, index);
   chart.resize();
@@ -1034,14 +1036,44 @@ function drawTapMark(chart, view, pos){
   ctx.beginPath(); ctx.arc(p[0], p[1], 3, 0, Math.PI * 2); ctx.fill();
 }
 
-/* Maneuver nodes. A ring on the road at the moment the burn fires; when it is
- * open, four arrows around it and a cross beside it. That is the whole
- * editor — no panel, no card over the sky, nothing to cover a phone. The
- * arrows are buttons: one tap is one press, and holding one repeats. They are
- * drawn in pixels, so they are the same size to hit at any zoom, and their
- * hit radius is bigger than the glyph.
+/* Maneuver nodes. A flame on the road at the moment the burn fires — the
+ * engine lit, which is what a burn is — named "Burn 1", "Burn 2" while it is
+ * closed; when it is open, four arrows around it and a cross beside it. That
+ * is the whole editor — no panel, no card over the sky, nothing to cover a
+ * phone. The arrows are buttons: one tap is one press, and holding one
+ * repeats. They are drawn in pixels, so they are the same size to hit at any
+ * zoom, each sits on a disc so it reads as a thing to press, and the hit
+ * radius is bigger than the glyph.
  */
-const HANDLE_OFFSET = 34;
+const HANDLE_OFFSET = 54;
+const NODE_HIT = 26;
+/* How near a tap on the road or a rail has to land to a burn to be taken as
+ * a tap on the burn: a finger going for the flame that lands on the line it
+ * sits on should open the burn, not plan another one on top of it. */
+export const NODE_SNAP = 44;
+
+/* A flame, tip up, drawn about (0, 0) at scale `s`. */
+function flamePath(ctx, s){
+  ctx.beginPath();
+  ctx.moveTo(0, -13 * s);
+  ctx.bezierCurveTo(4 * s, -8 * s, 9 * s, -3 * s, 8 * s, 4 * s);
+  ctx.bezierCurveTo(7 * s, 10 * s, -7 * s, 10 * s, -8 * s, 4 * s);
+  ctx.bezierCurveTo(-9 * s, -3 * s, -4 * s, -8 * s, 0, -13 * s);
+  ctx.closePath();
+}
+function drawFlame(ctx, x, y, s, selected){
+  ctx.save(); ctx.translate(x, y);
+  ctx.fillStyle = PALETTE.flame;
+  flamePath(ctx, s); ctx.fill();
+  ctx.strokeStyle = selected ? '#fff' : PALETTE.node; ctx.lineWidth = selected ? 2 : 1.25;
+  ctx.stroke();
+  // The hot core.
+  ctx.fillStyle = PALETTE.node;
+  ctx.translate(0, 3 * s);
+  flamePath(ctx, s * 0.5); ctx.fill();
+  ctx.restore();
+}
+
 function drawNodes(chart, view, pos){
   const { ctx } = chart;
   const nodes = view.nodes;
@@ -1052,12 +1084,19 @@ function drawNodes(chart, view, pos){
     const anchor = pos.get(where.body).r;
     const p = chart.toScreen(add(anchor, where.r));
     const selected = view.selectedNode === i;
-    ctx.strokeStyle = PALETTE.node; ctx.lineWidth = selected ? 2.5 : 1.5;
-    ctx.beginPath(); ctx.arc(p[0], p[1], selected ? 12 : 8, 0, Math.PI * 2); ctx.stroke();
-    ctx.fillStyle = PALETTE.node;
-    ctx.beginPath(); ctx.arc(p[0], p[1], 3, 0, Math.PI * 2); ctx.fill();
-    chart.hits.nodes.push({ index: i, x: p[0], y: p[1], r: 18 });
-    if(!selected) continue;
+    if(selected){
+      ctx.strokeStyle = PALETTE.node; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(p[0], p[1], 20, 0, Math.PI * 2); ctx.stroke();
+    }
+    drawFlame(ctx, p[0], p[1], selected ? 1.25 : 1, selected);
+    chart.hits.nodes.push({ index: i, x: p[0], y: p[1], r: NODE_HIT });
+    if(!selected){
+      // Its name, so two burns on one road can be told apart and talked about.
+      ctx.font = '600 12px ui-sans-serif, system-ui, sans-serif';
+      ctx.fillStyle = PALETTE.node;
+      ctx.fillText(`Burn ${i + 1}`, p[0] + 13, p[1] + 5);
+      continue;
+    }
 
     /* The same frame the burn is actually flown in — forward along the
        velocity, out square across it — rather than forward along the velocity
@@ -1078,33 +1117,42 @@ function drawNodes(chart, view, pos){
     for(const [axis, d, colour, amount] of arrows){
       const h = [p[0] + d[0] * HANDLE_OFFSET, p[1] + d[1] * HANDLE_OFFSET];
       const lit = amount > 1e-12;
-      ctx.strokeStyle = colour; ctx.lineWidth = lit ? 2 : 1.25;
-      ctx.globalAlpha = lit ? 1 : 0.55;
-      ctx.beginPath(); ctx.moveTo(p[0] + d[0] * 16, p[1] + d[1] * 16); ctx.lineTo(h[0], h[1]); ctx.stroke();
-      ctx.fillStyle = colour;
+      ctx.globalAlpha = lit ? 1 : 0.7;
+      // The stem, from the ring out to the button.
+      ctx.strokeStyle = colour; ctx.lineWidth = lit ? 3 : 2;
+      ctx.beginPath(); ctx.moveTo(p[0] + d[0] * 24, p[1] + d[1] * 24); ctx.lineTo(p[0] + d[0] * (HANDLE_OFFSET - 18), p[1] + d[1] * (HANDLE_OFFSET - 18)); ctx.stroke();
+      // The button: a disc, brighter when the axis is in use, with the arrow on it.
+      ctx.fillStyle = colour; ctx.globalAlpha = lit ? 0.35 : 0.18;
+      ctx.beginPath(); ctx.arc(h[0], h[1], 19, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = lit ? 1 : 0.85;
+      ctx.strokeStyle = colour; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(h[0], h[1], 19, 0, Math.PI * 2); ctx.stroke();
       ctx.save(); ctx.translate(h[0], h[1]); ctx.rotate(Math.atan2(d[1], d[0]));
-      ctx.beginPath(); ctx.moveTo(7, 0); ctx.lineTo(-4, 5.5); ctx.lineTo(-4, -5.5); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(11, 0); ctx.lineTo(-7, 9); ctx.lineTo(-3, 0); ctx.lineTo(-7, -9); ctx.closePath(); ctx.fill();
       ctx.restore();
       ctx.globalAlpha = 1;
-      chart.hits.handles.push({ index: i, axis, x: h[0], y: h[1], r: 22 });
+      chart.hits.handles.push({ index: i, axis, x: h[0], y: h[1], r: 30 });
     }
 
-    /* Scrap it: a cross beside the ring, set far enough out that a thumb
-       going for the ring cannot catch it. */
-    const x = [p[0] + 40, p[1] - 40];
-    ctx.strokeStyle = PALETTE.crash; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(x[0], x[1], 9, 0, Math.PI * 2); ctx.stroke();
+    /* Scrap it: a cross beside the flame, set far enough out that a thumb
+       going for the flame or an arrow cannot catch it. */
+    const x = [p[0] + 58, p[1] - 58];
+    ctx.fillStyle = PALETTE.crash; ctx.globalAlpha = 0.18;
+    ctx.beginPath(); ctx.arc(x[0], x[1], 14, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = PALETTE.crash; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x[0], x[1], 14, 0, Math.PI * 2); ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(x[0] - 3.5, x[1] - 3.5); ctx.lineTo(x[0] + 3.5, x[1] + 3.5);
-    ctx.moveTo(x[0] + 3.5, x[1] - 3.5); ctx.lineTo(x[0] - 3.5, x[1] + 3.5);
+    ctx.moveTo(x[0] - 5, x[1] - 5); ctx.lineTo(x[0] + 5, x[1] + 5);
+    ctx.moveTo(x[0] + 5, x[1] - 5); ctx.lineTo(x[0] - 5, x[1] + 5);
     ctx.stroke();
-    chart.hits.handles.push({ index: i, axis: 'delete', x: x[0], y: x[1], r: 18 });
+    chart.hits.handles.push({ index: i, axis: 'delete', x: x[0], y: x[1], r: 24 });
 
     // What it costs, in a word, where the eye already is.
     if(view.nodeLabel){
       ctx.font = '600 12px ui-sans-serif, system-ui, sans-serif';
       ctx.fillStyle = PALETTE.node;
-      ctx.fillText(view.nodeLabel, p[0] + 16, p[1] + 26);
+      ctx.fillText(`Burn ${i + 1} · ${view.nodeLabel}`, p[0] + 24, p[1] + HANDLE_OFFSET + 34);
     }
   }
 }
@@ -1276,6 +1324,18 @@ function hitTest(chart, x, y){
   }
   if(best) return best;
   return null;
+}
+
+/* The nearest burn to a screen point, if one is within `within` pixels. A
+ * tap that misses the flame but lands on the road or rail it sits on means
+ * the flame, not a new burn on top of it. */
+function nearestNode(chart, x, y, within = NODE_SNAP){
+  let best = null;
+  for(const n of chart.hits.nodes){
+    const d = Math.hypot(n.x - x, n.y - y);
+    if(d <= within && (!best || d < best.d)) best = { index: n.index, d };
+  }
+  return best;
 }
 
 /* Nearest point on the drawn path to a screen point, with the time it stands
