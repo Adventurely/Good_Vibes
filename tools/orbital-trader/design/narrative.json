@@ -432,7 +432,8 @@
   "repairFuelCell": "The cell comes out in one piece, which surprises everybody, and the new one goes in while you wait. The gauge goes back to telling the truth.",
   "knotRevealed": "Tsuki puts a finger on a stretch of chart with nothing in it and waits for you to stop arguing. There is something there a kilometre across with Grumm's pull in it, and the cats have known for nine generations. Fly close enough and it will turn you most of the way round for nothing. She does not say why nobody mentions it, and from the way she says nothing, it is not a secret so much as a courtesy.",
   "firstKnotPass": "You go round the outside of nothing at all and come out pointed somewhere else entirely, faster, with the tank exactly as full as it was. Behind you the Knot goes on not being there.",
-  "firstRendezvous": "Tsuki takes the numbers off the board without being asked: how close the path actually comes, and how fast you are closing. Neither is the range, which she says is the number people watch when they want to be reassured rather than informed. You match speed with a thing that has no pull at all and hold there, and the hold is the whole trick."
+  "firstRendezvous": "Tsuki takes the numbers off the board without being asked: how close the path actually comes, and how fast you are closing. Neither is the range, which she says is the number people watch when they want to be reassured rather than informed. You match speed with a thing that has no pull at all and hold there, and the hold is the whole trick.",
+  "questCollected": "Signed for, counted, and put away. That is the job done."
  },
  "opening": {
   "title": "A crate for your Aunt Nellie",
@@ -551,7 +552,8 @@
   "questDone": "Finished {title}. Paid {pay}.",
   "skimDamage": "Hull damaged air braking at {body}.",
   "skimFuelCell": "Fuel cell lost air braking at {body}.",
-  "repaired": "Repaired at {port}: {cost}."
+  "repaired": "Repaired at {port}: {cost}.",
+  "questReady": "Finished {title}. There is something to collect."
  },
  "quests": [
   {

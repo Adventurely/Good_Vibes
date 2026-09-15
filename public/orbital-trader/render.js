@@ -347,7 +347,7 @@ function draw(chart, view){
   drawSoiRings(chart, pos);
   drawBodies(chart, view, pos, t);
   if(view.prediction) drawPrediction(chart, view, pos);
-  drawShip(chart, view);
+  drawShip(chart, view, pos);
   if(view.prediction && view.nodes) drawNodes(chart, view, pos);
   if(view.tapMark) drawTapMark(chart, view, pos);
   if(view.prediction) drawEncounterInset(chart, view);
@@ -942,7 +942,34 @@ function drawIntercept(chart, view, anchors, afterBurnAt, ic){
      numbers live in the encounter window instead, where there is room. */
 }
 
-function drawShip(chart, view){
+/* The same short lead-and-arrowhead every world wears on its rail, on the
+ * ship's own path. The nose already points the right way, but a nose is a
+ * shape and the arrow is a mark: at the zooms where a parking orbit is a
+ * circle of grey the two read very differently, and "which way am I going
+ * round" is the question the whole game is asked in. Built from the ship's
+ * own state rather than from the drawn road, so it is the same arithmetic the
+ * rails use and it exists before any road has been solved. */
+function shipLead(chart, view, pos){
+  const zoom = chart.camera.zoom;
+  if(!view.shipAbs || view.docked) return null;
+  const parent = view.shipBody && pos.has(view.shipBody) ? pos.get(view.shipBody) : null;
+  const mu = view.shipBody ? (chart.world.get(view.shipBody)?.mu ?? 0) : 0;
+  if(!(mu > 0) || !parent) return null;
+  const rLocal = sub(view.shipAbs.r, parent.r);
+  const vLocal = view.shipLocalV ?? sub(view.shipAbs.v, parent.v);
+  const pxPerDay = norm(vLocal) * zoom;
+  if(!(pxPerDay > 0)) return null;
+  const clear = 17, length = 20, N = 6;   // start outside the ship's own halo
+  const arc = [];
+  for(let i = 0; i <= N; i++){
+    const st = propagate(mu, rLocal, vLocal, (clear + (length * i) / N) / pxPerDay);
+    arc.push(chart.toScreen(add(parent.r, st.r)));
+  }
+  const end = propagate(mu, rLocal, vLocal, (clear + length) / pxPerDay);
+  return { arc, head: arc[N], angle: Math.atan2(-end.v[1], end.v[0]) };
+}
+
+function drawShip(chart, view, pos){
   const { ctx } = chart;
   if(!view.shipAbs) return;
   const p = chart.toScreen(view.shipAbs.r);
@@ -970,6 +997,21 @@ function drawShip(chart, view){
   if(view.docked){
     ctx.strokeStyle = PALETTE.zone; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(p[0], p[1], 12, 0, Math.PI * 2); ctx.stroke();
+  }
+  const lead = pos ? shipLead(chart, view, pos) : null;
+  if(lead){
+    ctx.strokeStyle = PALETTE.ship; ctx.lineWidth = 1.5;
+    ctx.lineJoin = ctx.lineCap = 'round';
+    ctx.beginPath();
+    lead.arc.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]));
+    ctx.stroke();
+    const [hx, hy] = lead.head, a = lead.angle;
+    ctx.beginPath();
+    ctx.moveTo(hx - 5 * Math.cos(a - 0.6), hy - 5 * Math.sin(a - 0.6));
+    ctx.lineTo(hx, hy);
+    ctx.lineTo(hx - 5 * Math.cos(a + 0.6), hy - 5 * Math.sin(a + 0.6));
+    ctx.stroke();
+    ctx.lineJoin = ctx.lineCap = 'butt';
   }
 }
 
