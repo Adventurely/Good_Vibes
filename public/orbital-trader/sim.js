@@ -1218,6 +1218,28 @@ export function plan(state, horizon){
  * guessed at.
  */
 const IMMEDIATE_CAP = 6000;
+/* How many laps of a closed orbit the *drawn* road will wait for something to
+ * happen before it gives up and simply draws the orbit.
+ *
+ * A leg is drawn as one lap however many it runs for — fifty turns of the same
+ * ellipse laid on top of one another is a scribble, not a road. That is fine
+ * while a leg ends on the lap you are looking at, and a lie as soon as it does
+ * not: an orbit that overlaps a moon's rail meets the moon on some later lap,
+ * and the door and the crosshair for that meeting were being painted onto the
+ * single lap the chart drew. The picture said "just there"; the clock said
+ * four days, or on a heliocentric orbit ten years. Tapping the road beside the
+ * mark warped to the first lap and nothing happened; tapping the mark warped
+ * past the rest of the game.
+ *
+ * So the road shows what happens on this lap and the next, and past that says
+ * the honest thing instead: you are going round. What a pilot lines up a later
+ * encounter with is the rail crossings — where a world will be when the road
+ * cuts its orbit — which are drawn on the lap in front of them.
+ *
+ * Only the chart is bounded. The flight still looks as far as it must, or a
+ * ship would fly into a reach the search had stopped short of; the aim helper
+ * still looks as far as it must, or it could not score a road that arrives. */
+const CHART_LAPS = 2;
 const isDoor = sg => sg.reason === 'exit' || sg.reason === 'enter';
 
 /* `flown` false draws the road the ship is on *now*, as if nothing were
@@ -1352,7 +1374,7 @@ export function planImmediate(state, flown = true, opts = {}){
     if(doors > wanted) return true;
     return false;
   };
-  const pred = predictLegs(world, state.ship, state.t, sortedNodes(state), legOpts(state, { maxTime: IMMEDIATE_CAP, stop }));
+  const pred = predictLegs(world, state.ship, state.t, sortedNodes(state), legOpts(state, { maxTime: IMMEDIATE_CAP, lapsLooked: CHART_LAPS, stop }));
   const horizon = pred.end - state.t;
   const segs = pred.segments;
   const firstCross = segs.findIndex(isDoor);

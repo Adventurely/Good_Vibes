@@ -3809,8 +3809,11 @@ test('a mark on the road is drawn on the road, in every frame the road crosses',
      pixels off the line it belonged to. */
   const chart = stubChart(900, 700);
   try{
+    /* Moss rather than Slate: the road to Moss crosses into its reach on the
+       lap the chart draws, and the chart only ever draws what happens on the
+       lap in front of you — see CHART_LAPS. */
     const s = S.newGame(1); S.undock(s); s.dv = s.tank = 0.01;
-    assert.ok(S.trimToTarget(s, 'slate').ok, 'could not aim at Slate');
+    assert.ok(S.trimToTarget(s, 'moss').ok, 'could not aim at Moss');
     const pred = S.planImmediate(s, true, {});
     const frames = new Set(pred.segments.map(sg => sg.body));
     assert.ok(frames.size > 1, `this road never leaves ${[...frames]} — it proves nothing`);
@@ -3836,4 +3839,46 @@ test('a mark on the road is drawn on the road, in every frame the road crosses',
     }
     assert.ok(checked >= 3, `only ${checked} legs were drawn`);
   }finally{ chart.restore(); }
+});
+
+/* ------------------------------------- the road only shows the lap in front */
+
+test('an orbit that overlaps a moon\'s rail is not marked with a meeting laps away', () => {
+  /* An orbit whose high point is out past Slate's rail crosses that rail twice
+     a lap, and meets Slate itself on some later lap. A leg is drawn as one lap
+     however many it runs for — fifty turns of the same ellipse on top of one
+     another is a scribble, not a road — so the door and the crosshair for a
+     meeting four laps out were being painted onto the single lap the chart
+     drew. The picture said "just there" and the clock said four days; a warp
+     tapped beside the mark went to the first lap and nothing happened, and one
+     tapped on the mark went most of a year. */
+  const b = world.get('tassel'), slate = world.get('slate');
+  const s = S.newGame(1); S.undock(s); s.dv = s.tank = 0.02;
+  const rp = b.dockAlt, ra = slate.a * 1.35, a = (rp + ra) / 2;
+  s.ship = { body: 'tassel', r: [rp, 0], v: [0, Math.sqrt(b.mu * (2 / rp - 1 / a))] };
+  const el = O.elementsFromState(b.mu, s.ship.r, s.ship.v);
+  assert.ok(el.rp < slate.a && el.ra > slate.a, 'this orbit does not overlap Slate after all');
+
+  const pred = S.planImmediate(s, true, {});
+  const road = pred.end - s.t;
+  assert.ok(road <= el.period * 2.5, `the drawn road runs ${(road / el.period).toFixed(1)} laps`);
+  for(const e of pred.events){
+    assert.ok(e.t - s.t <= road + 1e-9, `${e.kind} is marked at +${(e.t - s.t).toFixed(1)} d, past the end of the road`);
+  }
+  assert.equal(pred.intercept, null, 'a meeting several laps away is marked as though it were this lap');
+
+  /* What is left is the thing a pilot actually lines one of these up with: the
+     rail crossings, on the lap in front of them. */
+  const rc = railCrossings(world, pred, s.t, { minLead: S.MIN_LEAD, limit: 8 });
+  assert.ok(rc.length > 0, 'and nothing is left to line the meeting up with');
+  for(const c of rc) assert.ok(c.t - s.t <= road + 1e-9, 'a rail crossing is off the end of the drawn road');
+});
+
+test('but a moon the road reaches on the lap in front of you still is', () => {
+  // The other half: the bound above must not have thrown the real ones away.
+  const s = S.newGame(1); S.undock(s); s.dv = s.tank = 0.01;
+  assert.ok(S.trimToTarget(s, 'moss').ok);
+  const pred = S.planImmediate(s, true, {});
+  assert.ok(pred.events.some(e => e.kind === 'soi' && e.to === 'moss'), 'the door into Moss is gone');
+  assert.ok(pred.intercept && pred.intercept.body === 'moss', 'the encounter at Moss is gone');
 });
