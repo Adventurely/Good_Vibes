@@ -229,5 +229,13 @@ export function createAudio(){
     if(fn) fn(ctx.currentTime + 0.01);
   }
 
-  return { play, stop, unlock, sfx, setMuted, isMuted: () => muted, current: () => songName };
+  /* Whether the context is actually producing sound, as opposed to merely
+     existing. iOS Safari in particular can leave a freshly-created context
+     `suspended` even after `resume()` is called from inside a gesture
+     handler — the call does not throw, it just does not always take on the
+     first try, which is why the page has to keep listening for a gesture
+     rather than assuming the first one worked. */
+  const isRunning = () => Boolean(ctx) && ctx.state === 'running';
+
+  return { play, stop, unlock, sfx, setMuted, isMuted: () => muted, isRunning, current: () => songName };
 }

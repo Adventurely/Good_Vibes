@@ -157,13 +157,24 @@
   audio.play('park');
   syncSound();
 
-  const unlockOnce = () => {
+  /* iOS Safari's Web Audio autoplay unlock is pickier than the video/audio
+     element autoplay policy — a page where a <video> plays fine can still
+     leave a freshly-made AudioContext stuck `suspended` after a gesture, and
+     it is specifically `touchend`/`click` that Safari has always honoured
+     most reliably, `pointerdown` being the newer, less certain one. Listening
+     for all of them costs nothing extra: `unlock()` no-ops once the context
+     is already running.
+     And attempts are not one-shot — the first gesture's `resume()` can fail
+     silently, so the listeners stay attached until `isRunning()` actually
+     confirms it worked, rather than being torn down after a single try that
+     may or may not have landed. */
+  const UNLOCK_EVENTS = ['pointerdown', 'touchend', 'mousedown', 'click', 'keydown'];
+  const tryUnlock = () => {
     audio.unlock();
-    removeEventListener('pointerdown', unlockOnce);
-    removeEventListener('keydown', unlockOnce);
+    if(!audio.isRunning()) return;
+    for(const type of UNLOCK_EVENTS) removeEventListener(type, tryUnlock);
   };
-  addEventListener('pointerdown', unlockOnce);
-  addEventListener('keydown', unlockOnce);
+  for(const type of UNLOCK_EVENTS) addEventListener(type, tryUnlock);
 
   soundButton.addEventListener('click', () => {
     audio.setMuted(!audio.isMuted());
