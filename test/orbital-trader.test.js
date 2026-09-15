@@ -1025,6 +1025,52 @@ function pushedToSlate(){
   return { g, ix, P };
 }
 
+test('waiting out the countdown actually lands on the window', () => {
+  /* The promise the instrument makes: wait this many days and the crossing
+     costs what the perfect one costs. Nobody had ever checked it end to end,
+     and "I wait for the window and it is always wrong" turned out to be a
+     clock that never stopped rather than arithmetic that was off — so this
+     pins the arithmetic, and the source test below pins the clock. */
+  for(const port of ['tassel', 'cinder']){
+    const at = t => { const s = newDocked(4, port); s.t = t; s.keys.astrolabe = true; s.dv = s.tank = S.auDay(40); return s; };
+    const now = at(120);
+    for(const row of S.transferWindows(now)){
+      const w = S.nextWindow(now, row.id);
+      assert.ok(w, `${port} -> ${row.id}: a countdown with nothing at the end of it`);
+      assert.ok(w.days >= 0 && w.days <= w.synodic + 1e-6, `${port} -> ${row.id}: ${w.days} d is not inside one turn of ${w.synodic} d`);
+      const then = S.transferWindows(at(120 + w.days)).find(r => r.id === row.id);
+      assert.ok(then, `${port} -> ${row.id}: the row vanished on the way`);
+      assert.equal(then.band, 'perfect',
+        `${port} -> ${row.id}: after waiting ${w.days.toFixed(0)} d the window reads ${then.band} (${S.fmtKms(then.cost)} against ${S.fmtKms(then.best)})`);
+      assert.ok(then.cost <= row.cost + 1e-9 || row.band === 'perfect',
+        `${port} -> ${row.id}: waiting for the window made the crossing dearer`);
+    }
+  }
+});
+
+test('a skip runs to its end at a mooring, and the window you are standing in is not a countdown', () => {
+  /* The bug behind "the Astrolabe is always wrong". Its Wait-for-it button is
+     on a tab you read while tied up, and the frame loop threw the skip's stop
+     away on every frame it saw a docked ship — so the button set the clock to
+     nine days a second and nothing ever stopped it. Ten seconds got you to the
+     window; twenty put you ninety days past it, with the clock readout hidden
+     because that, too, keys off the stop that had just been discarded. */
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.doesNotMatch(PLAY, /if\(state\.dockedAt\) warpTarget = null;/,
+    'the loop is throwing away a skip again for no reason but a mooring');
+  assert.match(PLAY, /if\(!wasDocked && state\.dockedAt\)\{ stopSkip\(\);/,
+    'arriving mid-skip must still end it — a tow can dock you in the middle of one');
+  assert.match(PLAY, /if\(warpTarget != null && state\.t >= warpTarget\) stopSkip\(\);/,
+    'nothing stops the clock at the moment it was sent to');
+  /* And the reading that made a correct instrument look broken: land on the
+     window and the row said "103 d" beside PERFECT, which is when the next one
+     comes round. */
+  const tab = PLAY.slice(PLAY.indexOf('function astrolabeTab()'), PLAY.indexOf('const actions = {'));
+  assert.match(tab, /const open = r\.band === 'perfect'/, 'an open window is not distinguished from a waited-for one');
+  assert.match(tab, /open \? 'now'/, 'a window you are standing in still counts down to the next one');
+  assert.match(tab, /!open && ever/, 'a window that is already open still offers to wait for it');
+});
+
 test('the Astrolabe reads every world that goes round the Lamp, and no moon', () => {
   const s = newDocked(5, 'tassel');
   const rows = S.transferWindows(s);
@@ -1666,10 +1712,12 @@ test('the page wires the rail gesture and the marks to the chart', () => {
   const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
   assert.match(PLAY, /chart\.nearestRailPoint\(/, 'nothing listens for a tap on a rail');
   assert.match(PLAY, /askSkip\(rail\.t/, 'and a tap on one does not reach the clock');
-  /* A skip started at a dock sets the rate and never stops, because the loop
-     drops its target the moment it sees a docked ship. The road is already
-     untappable while tied up; a rail has to be too. */
-  assert.match(PLAY, /state\.dockedAt \? null : chart\.nearestRailPoint\(/, 'a rail can be tapped while docked, which runs the clock away');
+  /* This used to be refused at a mooring, to work around a loop that threw a
+     skip's stop away whenever it saw a docked ship. The loop is fixed, so the
+     gesture is not conditional any more: waiting at a dock for a world to come
+     round is exactly what a pilot does at one, and it is the same wait the
+     Astrolabe's own button asks for. */
+  assert.doesNotMatch(PLAY, /state\.dockedAt \? null : chart\.nearestRailPoint\(/, 'the rail gesture is being refused at a mooring again');
   assert.match(PLAY, /railCrossings\(world, prediction, state\.t/, 'the crossings are never worked out');
   assert.match(PLAY, /railCrossings: crossedRails/, 'and never reach the chart');
 });

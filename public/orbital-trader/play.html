@@ -913,7 +913,10 @@ function frame(now){
     const wasDocked = state.dockedAt;
     const events = S.tick(state, dt);
     handleEvents(events);
-    if(!wasDocked && state.dockedAt) replan(true);
+    /* Arriving ends a skip. A tow or a distress call can land a ship at a
+       harbour in the middle of one, and the clock should not carry on running
+       past the thing it was sent to. Pressing dock does this for itself. */
+    if(!wasDocked && state.dockedAt){ stopSkip(); replan(true); }
     else if(events.length) replan(true);
     else replan(false);
   }
@@ -942,7 +945,6 @@ function frame(now){
      for is the things with no reach to cross: the Arc, Claw Rock, the comet. */
   if(docking && docking.port !== skipHome && (docking.ok || docking.inZone) && state.warp > 1 && !state.flags.zoneWarpDropped){ stopSkip(); state.flags.zoneWarpDropped = true; }
   if(!docking) state.flags.zoneWarpDropped = false;
-  if(state.dockedAt) warpTarget = null;
   if(warpTarget != null && state.t >= warpTarget) stopSkip();
   const shipAbs = state.dockedAt ? { r: absState(world, state.dockedAt, state.t).r, v: absState(world, state.dockedAt, state.t).v } : { r: S.shipAbsPos(state), v: S.shipAbsVel(state) };
   chart.draw({
@@ -1401,11 +1403,13 @@ function endPointer(e){
        until now nothing on the chart would tell you when anybody else would
        be anywhere. A rail runs through its own world, so the world has to
        win that tie or a planet could not be tapped at all. */
-    /* Not while tied up. A skip started at a dock sets the rate and then
-       never stops — the loop drops `warpTarget` the moment it sees a docked
-       ship — so the clock would run away at a hundred days a second on a
-       promise of ten seconds. The same reason the road is not tappable here. */
-    const rail = state.dockedAt ? null : chart.nearestRailPoint(e.clientX, e.clientY, state.t);
+    /* Tied up as well as adrift. This used to be refused at a dock, because
+       the loop dropped `warpTarget` the moment it saw a docked ship and a skip
+       started there set the rate and then never stopped — the clock ran away
+       at nine days a second on a promise of ten. That was a bug in the loop
+       rather than a fact about harbours: waiting at a mooring for a world to
+       come round is exactly what a pilot does at one. */
+    const rail = chart.nearestRailPoint(e.clientX, e.clientY, state.t);
     if(rail){ askSkip(rail.t, `${S.portName(rail.id)} reaching that point`); return; }
     selectedNode = -1; if(tab === 'ship') renderTab();
   }
@@ -2149,12 +2153,19 @@ function astrolabeTab(){
        the numbers are right and will not visibly move for the better part of
        an hour. Everywhere else in the game you skip by pointing at the thing
        you are waiting for, so you can point at a window too. */
-    const wait = ever && r.days > 0.05
+    /* A window you are standing in does not get a countdown to the next one.
+       The clock lands on the window, the band turns perfect — and the row used
+       to say "103 d" beside it, because that is when the *next* one comes
+       round. Read together those say the instrument is wrong, which is how it
+       read to everybody who waited for a window and then looked at it. */
+    const open = r.band === 'perfect';
+    const wait = !open && ever && r.days > 0.05
       ? ` <button class="btn sm" data-act="skipto|${state.t + r.days}|${esc(r.name)}'s window">Wait for it</button>`
       : '';
+    const when = open ? 'now' : ever ? S.fmtDays(r.days) : '—';
     out += `<div class="win ${r.band}">`
       + `<div class="name"><b>${esc(r.name)}</b><small>${S.fmtKms(r.cost)} · ${S.fmtDays(r.tof)}</small></div>`
-      + `<div class="band">${BAND_WORD[r.band]}<small>${ever ? S.fmtDays(r.days) : '—'}</small>${wait}</div>`
+      + `<div class="band">${BAND_WORD[r.band]}<small>${when}</small>${wait}</div>`
       + '</div>';
   }
   return out;

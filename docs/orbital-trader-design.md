@@ -217,7 +217,7 @@ The Astrolabe is the instrument that does. It is a key upgrade, and its tab appe
 | **Bad** | dearer than that, but the tank can still pay it. |
 | **Impossible** | more than the tank holds. |
 
-Each row is a name, a verdict, the cost and flight time of leaving today, and **the days until the next window** — a dash where no window helps, because the crossing is past this tank at every phase. Waiting is nearly always the answer: thirty degrees is about nine days at Cinder, and nine days are free. The four words do the explaining; the rows do not.
+Each row is a name, a verdict, the cost and flight time of leaving today, and **the days until the next window** — a dash where no window helps, because the crossing is past this tank at every phase, and the word **now** where the window is the one you are standing in. That last case is not a nicety. The countdown is to the *next* window, so the moment a wait lands the row read `PERFECT` over `103 d`, which together say the instrument is wrong; it is the first thing anybody sees after using the button, and it made a correct instrument look broken. A window that is open says so and stops offering to be waited for. Waiting is nearly always the answer otherwise: thirty degrees is about nine days at Cinder, and nine days are free. The four words do the explaining; the rows do not.
 
 The cost comes from Lambert, searched over flight times from half the Hohmann time to half again as long. The cheapest conic at a bad phase is a very slow one — a two-year crawl out to Grumm, priced as though it were a bargain — and an instrument that recommends that is lying by omission, so the search only offers roads a person would actually fly.
 
@@ -229,9 +229,19 @@ card a tap on your own road does, with the time counted to the moment that
 world reaches the point under your finger — so the usual way to plan a
 transfer is to tap a rail, read the wait, and burn from there. The road wins a
 tie over a rail and a world wins over both, because a rail runs straight
-through its own world and a planet has to stay tappable. Tied up at a dock,
-neither the road nor a rail takes a tap: a skip started at a port sets the
-rate and never stops.
+through its own world and a planet has to stay tappable. It works tied up as
+well as adrift, which is where the waiting mostly happens.
+
+**A skip has to be able to end at a mooring**, and for a long time it could
+not: the frame loop cleared a skip's stop on every frame that saw a docked
+ship, so a wait started at a port set the clock to nine days a second and
+nothing ever turned it off. Ten seconds took you to the window; twenty put you
+ninety days past it, and the clock readout was invisible throughout because it
+keys off the same stop that had just been discarded. The Astrolabe's own
+Wait-for-it button is on a tab you read while tied up, which is how a working
+instrument came to be "always wrong". The rule the loop wanted was that
+*arriving* ends a skip — a tow can dock you in the middle of one — not that
+being docked forbids having one.
 
 ### 2.7 Trading
 
