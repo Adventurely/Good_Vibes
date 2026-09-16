@@ -772,8 +772,9 @@
          refuses a button it had just greyed in. */
       function howMany(grower){
         if(bulk !== 'max') return bulk;
+        const bonus = bonuses(state);
         return Math.max(1, affordable(grower, state.owned[grower.id] || 0, state.light,
-          bonuses(state).costGrowth));
+          bonus.costGrowth, bonus.crate));
       }
 
       function buyGrower(id){
@@ -925,7 +926,7 @@
           const { row, note, cost } = growerRows.get(g.id);
           const owned = state.owned[g.id] || 0;
           const count = howMany(g);
-          const price = bulkCost(g, owned, count, bonus.costGrowth);
+          const price = bulkCost(g, owned, count, bonus.costGrowth, bonus.crate);
           const afford = state.light >= price;
           row.dataset.afford = String(afford);
           row.setAttribute('aria-disabled', String(!afford));
@@ -933,7 +934,7 @@
           // without it, Night bloom bought and every row unchanged read as an
           // upgrade that did nothing.
           const each = g.rate * bonus.grower[g.id] * bonus.allMult * bonus.seedMult
-            * averageFactor(g.phase, bonus.lift, bonus.swing);
+            * averageFactor(g.phase, bonus.lift, bonus.swing, bonus.alwaysOn);
           // The figures when there are figures, and the description under
           // them either way.
           note.textContent = owned
@@ -942,7 +943,7 @@
           cost.innerHTML = `${formatEnergy(price)}<small>${count > 1 ? '&times;' + count + ' · ' : ''}`
             + `+${formatEnergy(each * count)}/s</small>`;
         }
-        const list = offered(state);
+        const list = offered(state, undefined, bonus);
         for(const up of list){
           const row = ui.upgrades.querySelector(`[data-up="${up.id}"]`);
           if(!row) continue;

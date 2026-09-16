@@ -29,7 +29,7 @@ import {
   SEED_SCALE, SEED_RATIO, seedAt, seedsFrom, pendingSeeds, lightForSeeds, energyForSeeds,
   prestigeRefusal, prestige, winters, winterMedal, seedsEarned, seedMedal,
   PRESTIGE, PRESTIGE_BY_ID, prestigeOffered, rootRefusal, root, growerCount, markGrown,
-  upgradeCost,
+  upgradeCost, CRATE, halfNeed, volunteerFor,
   RING_FROM, RING_MULT, ringFor, prestigeAt, prestigeUpTo, prestigeById, prestigeCost,
   OFFLINE_RATE, OFFLINE_CAP, offlineGain, catchUp,
   toSave, fromSave, formatLight, formatTime, formatStat, breakdown,
@@ -1479,17 +1479,41 @@ test('Still hands pays for the tapping while the tab is shut, at the season\'s o
   assert.equal(offlineGain(fresh, 3600).light, offlineGain(build(s => { s.run.taps = 0; s.run.seconds = 0; }), 3600).light);
 });
 
-test('The high sun lifts the best hours without deepening the worst', () => {
-  const plain = bonuses(newGame());
-  const high = bonuses(withRow('high-sun'));
-  const at = (bonus, t) => phaseFactor('day', t, bonus.swing, bonus.lift);
-  let bestPlain = 0, bestHigh = 0, worstPlain = Infinity, worstHigh = Infinity;
-  for(let t = 0; t < DAY_LENGTH; t += DAY_LENGTH / 360){
-    bestPlain = Math.max(bestPlain, at(plain, t)); bestHigh = Math.max(bestHigh, at(high, t));
-    worstPlain = Math.min(worstPlain, at(plain, t)); worstHigh = Math.min(worstHigh, at(high, t));
-  }
-  assert.ok(bestHigh > bestPlain, 'the peak has to rise');
-  assert.ok(worstHigh >= worstPlain - 1e-9, 'and the trough must not fall');
+test('The reserve pays on what you are holding, and never more than the lot makes', () => {
+  const lot = tweak => {
+    const state = newGame();
+    state.rooted['the-reserve'] = true;
+    for(const g of GROWERS) state.owned[g.id] = 10;
+    tweak(state);
+    return state;
+  };
+  const plain = newGame();
+  for(const g of GROWERS) plain.owned[g.id] = 10;
+  plain.light = 1e6;
+  const bare = tick(plain, 1);
+
+  const held = lot(s => { s.light = 1e6; });
+  const withIt = tick(held, 1);
+  assert.ok(withIt > bare, 'holding energy has to earn something');
+  // Relative, because both sides are a few million and a double cannot
+  // promise the difference of two of those to the microjoule.
+  assert.ok(Math.abs((withIt - bare) / (1e6 * 0.005) - 1) < 1e-9, 'half a percent of what is held');
+
+  // Never more than the lot's own second, however much is in hand.
+  const hoard = lot(s => { s.light = 1e30; });
+  const rate = totalRate(hoard);
+  const capped = tick(hoard, 1);
+  assert.ok(Math.abs(capped - rate * 2) < rate * 1e-6, 'the most it can double is the lot itself');
+
+  // Nothing held, nothing owed. The rate is read before the tick, because a
+  // tick moves the clock and the sky moves the rate with it.
+  const empty = lot(s => { s.light = 0; });
+  const expected = totalRate(empty);
+  assert.equal(tick(empty, 1), expected);
+  const counted = lot(s => { s.light = 1e6; });
+  const before = counted.run.grown;
+  const made = tick(counted, 1);
+  assert.ok(Math.abs((counted.run.grown - before) - made) < 1e-6, 'it goes in the grown column');
 });
 
 test('Half price charges half, on the button and at the till', () => {
@@ -1585,10 +1609,236 @@ test('a lot with nothing rooted plays exactly the game it played before', () => 
   assert.equal(b.spendBack, 0);
   assert.equal(b.keepGrowers, 0);
   assert.equal(b.startGrowers, 0);
-  assert.equal(b.alwaysOn, false);
+  assert.equal(b.alwaysOn, 0);
   assert.equal(b.offlineTaps, false);
   assert.equal(b.upgradeCost, 1);
+  assert.equal(b.interest, 0);
   assert.equal(b.swing, SWING);
   assert.equal(b.lift, 0);
   assert.equal(b.allMult, 1);
+});
+
+test('Around the clock holds the whole lot above the arc, all day and all night', () => {
+  const overADay = state => {
+    let sum = 0;
+    for(let i = 0; i < 240; i++){ state.elapsed = DAY_LENGTH * i / 240; sum += totalRate(state); }
+    return sum / 240;
+  };
+  const lot = rows => {
+    const s = newGame();
+    for(const r of rows) s.rooted[r] = true;
+    for(const g of GROWERS) s.owned[g.id] = 20;
+    return s;
+  };
+  const base = overADay(lot([]));
+  const held = PRESTIGE_BY_ID['night-shift'].effect.alwaysOn;
+  assert.ok(Math.abs(overADay(lot(['night-shift'])) / base - (1 + held)) < 1e-9,
+    'a day held above the arc is worth exactly what the row says');
+
+  /* The trap this row was built out of, and the reason it says 0.75 rather
+     than flattening the sky: flattening is worth nothing at all, because the
+     swing already averages to one and all a flat day does is take the peaks
+     away with the troughs. If this ever reads 1.0 again, the row has gone back
+     to charging a season's energy for a change of weather. */
+  assert.ok(overADay(lot(['night-shift'])) / base > 1.4, 'Around the clock must not be a flat day');
+
+  // It reaches the all-hours kinds too, which is where the late game lives.
+  const any = GROWERS.filter(g => g.phase === 'any').map(g => g.id);
+  const anyOnly = rows => {
+    const s = newGame();
+    for(const r of rows) s.rooted[r] = true;
+    for(const id of any) s.owned[id] = 20;
+    return s;
+  };
+  assert.ok(Math.abs(overADay(anyOnly(['night-shift'])) / overADay(anyOnly([])) - (1 + held)) < 1e-9,
+    'the three biggest earners are all-hours kinds and must not be skipped');
+
+  // And the shop's quoted average agrees with what a day actually pays.
+  for(const phase of ['day', 'night', 'any']){
+    assert.equal(averageFactor(phase, 0.5, SWING, held), 1 + held, `${phase} quoted where it is held`);
+  }
+});
+
+/* ---------------------------------------------- the nine that replaced kinds */
+
+test('Deep beds pays for depth in one kind, not for breadth', () => {
+  const lot = (rows, owned) => {
+    const s = newGame();
+    for(const r of rows) s.rooted[r] = true;
+    Object.assign(s.owned, owned);
+    return s;
+  };
+  // Forty of one kind: four tens, so four percent.
+  const flat = lot([], { moss: 40 });
+  const deep = lot(['deep-beds'], { moss: 40 });
+  assert.ok(Math.abs(totalRate(deep) / totalRate(flat) - 1.04) < 1e-9);
+  assert.ok(Math.abs(steadyRate(deep) / steadyRate(flat) - 1.04) < 1e-9, 'the quoted average has to agree');
+
+  // Nine of a kind is no tens at all, and it counts each kind on its own.
+  assert.equal(totalRate(lot(['deep-beds'], { moss: 9 })), totalRate(lot([], { moss: 9 })));
+  const spread = lot(['deep-beds'], { moss: 20, fern: 20 });
+  const plainSpread = lot([], { moss: 20, fern: 20 });
+  assert.ok(Math.abs(totalRate(spread) / totalRate(plainSpread) - 1.02) < 1e-9, 'two tens each, two percent each');
+});
+
+test('By the crate takes a fifth off ten or more, and the max button counts at that price', () => {
+  const moss = GROWER_BY_ID['moss'];
+  const crate = bonuses((() => { const s = newGame(); s.rooted['by-the-crate'] = true; return s; })()).crate;
+  assert.equal(crate, 0.2);
+
+  assert.equal(bulkCost(moss, 0, 9, COST_GROWTH, crate), bulkCost(moss, 0, 9), 'nine is not a crate');
+  // Within a penny: the discount is taken off the exact sum and rounded up
+  // once, not taken off an already-rounded figure and rounded up again.
+  const ten = bulkCost(moss, 0, CRATE), tenCrated = bulkCost(moss, 0, CRATE, COST_GROWTH, crate);
+  assert.ok(Math.abs(tenCrated - ten * 0.8) <= 1, `ten is: ${tenCrated} against ${ten}`);
+  assert.ok(tenCrated < ten, 'and it really is cheaper');
+  // Absolute rather than relative, because both sides are rounded up and at
+  // moss prices a penny is a whole percent.
+  for(const count of [10, 25, 100]){
+    const full = bulkCost(moss, 0, count), cut = bulkCost(moss, 0, count, COST_GROWTH, crate);
+    assert.ok(Math.abs(cut - full * 0.8) <= 1, `a fifth off ${count}: ${cut} against ${full}`);
+  }
+
+  // Whatever "max" says it can buy, the purchase must go through.
+  for(const light of [50, 500, 5000, 5e5, 5e8]){
+    const state = newGame();
+    state.rooted['by-the-crate'] = true;
+    state.light = light;
+    const bonus = bonuses(state);
+    const count = affordable(moss, 0, light, bonus.costGrowth, bonus.crate);
+    assert.ok(count >= 1);
+    assert.ok(bulkCost(moss, 0, count, bonus.costGrowth, bonus.crate) <= light,
+      `max said ${count} at ${light} and the till disagreed`);
+    assert.equal(plantRefusal(state, 'moss', count), null, `max said ${count} and the game refused`);
+  }
+});
+
+test('The seed drill puts two in for every one paid for', () => {
+  const state = newGame();
+  state.rooted['seed-drill'] = true;
+  state.light = 1e9;
+  const quoted = bulkCost(GROWER_BY_ID['moss'], 0, 10, COST_GROWTH, 0);
+  const before = state.light;
+  plant(state, 'moss', 10);
+  assert.equal(state.owned.moss, 20, 'ten paid for, twenty planted');
+  assert.equal(before - state.light, quoted, 'and the price is the price of ten');
+  assert.equal(state.grown, 20, 'the tree counts what is standing, not what was bought');
+});
+
+test('A running start and Carry over both leave something behind them', () => {
+  const ready = tweak => {
+    const s = newGame();
+    tweak(s);
+    s.life.earned = seedAt(1);
+    return s;
+  };
+  const plain = ready(s => { s.run.earned = 1e9; });
+  prestige(plain);
+  assert.deepEqual(plain.bought, {}, 'with neither row the shelf is bare');
+  assert.equal(plain.light, 0);
+
+  const running = ready(s => { s.rooted['running-start'] = true; });
+  prestige(running);
+  const cheapest = [...UPGRADES].sort((a, b) => a.cost - b.cost).slice(0, 5).map(u => u.id);
+  assert.deepEqual(Object.keys(running.bought).sort(), [...cheapest].sort());
+
+  const carried = ready(s => { s.rooted['carry-over'] = true; s.run.earned = 1e9; });
+  prestige(carried);
+  assert.ok(Math.abs(carried.light - 1e7) < 1e-6, 'a hundredth of a billion');
+
+  // The flat head start and the carried share add rather than compete.
+  const both = ready(s => {
+    s.rooted['carry-over'] = true; s.rooted['warm-earth'] = true; s.run.earned = 1e9;
+  });
+  prestige(both);
+  assert.ok(Math.abs(both.light - (500 + 1e7)) < 1e-6);
+});
+
+test('A quiet word halves what the shop asks, and never below one', () => {
+  const need = { taps: 100, owned: { id: 'moss', count: 7 }, earned: 1 };
+  const plain = bonuses(newGame());
+  const quiet = bonuses((() => { const s = newGame(); s.rooted['quiet-word'] = true; return s; })());
+  assert.equal(halfNeed(need, plain), need, 'untouched without the row');
+  assert.deepEqual(halfNeed(need, quiet), { taps: 50, owned: { id: 'moss', count: 4 }, earned: 1 });
+
+  // A row that was out of reach comes onto the shelf.
+  const lot = rows => {
+    const s = newGame();
+    for(const r of rows) s.rooted[r] = true;
+    for(const g of GROWERS) s.owned[g.id] = 3;
+    s.life.taps = 60; s.run.taps = 60; s.life.earned = 900; s.run.earned = 900;
+    s.life.seconds = 400; s.run.seconds = 400;
+    return s;
+  };
+  assert.ok(offered(lot(['quiet-word'])).length > offered(lot([])).length,
+    'half the requirement has to open at least one row');
+});
+
+test('Volunteers turn up on the thousandth tap, as the cheapest kind, for nothing', () => {
+  const state = newGame();
+  state.rooted['volunteers'] = true;
+  state.run.taps = 998;
+  const spentBefore = state.run.spent;
+
+  tap(state, 0);                                   // the 999th
+  assert.equal(GROWER_IDS.reduce((n, id) => n + state.owned[id], 0), 0, 'nothing yet');
+  tap(state, 0);                                   // the 1000th
+  assert.equal(state.owned.moss, 1, 'the cheapest kind on a bare lot is moss');
+  assert.equal(state.run.spent, spentBefore, 'and it cost nothing');
+  assert.equal(state.run.planted, 1, 'but it is on the record as planted');
+
+  // It follows the price, not the name: bury moss and the next one is a fern.
+  const later = newGame();
+  later.rooted['volunteers'] = true;
+  later.owned.moss = 400;
+  later.run.taps = 999;
+  tap(later, 0);
+  assert.equal(later.owned.moss, 400, 'moss is dear now');
+  assert.equal(later.owned.fern, 1);
+
+  // And without the row, a thousand taps plant nothing.
+  const bare = newGame();
+  bare.run.taps = 999;
+  tap(bare, 0);
+  assert.equal(GROWER_IDS.reduce((n, id) => n + bare.owned[id], 0), 0);
+});
+
+test('The heavy crop pays the lot on a windfall, and only on a windfall', () => {
+  const lot = rows => {
+    const s = newGame();
+    for(const r of rows) s.rooted[r] = true;
+    s.bought['windfall'] = true;
+    for(const g of GROWERS) s.owned[g.id] = 10;
+    return s;
+  };
+  const plain = lot([]);
+  const heavy = lot(['heavy-crop']);
+
+  plain.run.taps = 0; heavy.run.taps = 0;          // the next tap is an ordinary one
+  assert.equal(tapPays(heavy, 0), tapPays(plain, 0), 'an ordinary tap is unchanged');
+
+  plain.run.taps = 9; heavy.run.taps = 9;          // the next tap is the tenth
+  assert.ok(isWindfall(plain), 'the tenth must be the windfall');
+  assert.ok(Math.abs((tapPays(heavy, 0) - tapPays(plain, 0)) - totalRate(heavy)) < 1e-6,
+    'a windfall pays a second of the whole lot on top');
+});
+
+test('Compound raises the ceiling on The reserve and nothing else', () => {
+  const lot = rows => {
+    const s = newGame();
+    for(const r of rows) s.rooted[r] = true;
+    for(const g of GROWERS) s.owned[g.id] = 10;
+    s.light = 1e30;                                // far past any ceiling
+    return s;
+  };
+  const rate = totalRate(lot([]));
+  const capped = lot(['the-reserve']);
+  const raised = lot(['the-reserve', 'compound']);
+  assert.ok(Math.abs(tick(capped, 1) - rate * 2) < rate * 1e-6, 'one lot-second is the plain ceiling');
+  assert.ok(Math.abs(tick(raised, 1) - rate * 4) < rate * 1e-6, 'three of them is the raised one');
+
+  // On its own it is worth nothing, which is the point: it is a ceiling, not
+  // an income, and there is nothing under it until The reserve is bought.
+  const alone = lot(['compound']);
+  assert.ok(Math.abs(tick(alone, 1) - rate) < rate * 1e-6);
 });
