@@ -6,6 +6,7 @@ import * as O from '../public/orbital-trader/orbit.js';
 import { PORTRAITS, PORTRAIT_SIZE, portraitURL } from '../public/orbital-trader/sprites.js';
 import {
   CONST, BODIES, GOODS, PORTS, UPGRADES, FORMULAS, TEXT, GLOSSARY, SPECIES, BELT_ROCKS,
+  QUESTS, DIALOG,
 } from '../public/orbital-trader/content.js';
 import * as S from '../public/orbital-trader/sim.js';
 import { createChart, railCrossings, railLead, locateOnPrediction, pathAnchors, KM_PER_AU, PALETTE } from '../public/orbital-trader/render.js';
@@ -409,8 +410,8 @@ test('the text has every line the game asks for', () => {
     assert.ok(t.body.length <= 400, `${t.step}: ${t.body.length} characters is more card than screen`);
     assert.ok(t.title.length <= 44, `${t.step}: the title is too long for the card`);
   }
-  assert.ok(TEXT.quests?.length >= 1, 'there is an opening quest');
-  for(const q of TEXT.quests){
+  assert.ok(QUESTS.length >= 1, 'there is an opening quest');
+  for(const q of QUESTS){
     assert.ok(q.id && q.title && q.giver && q.blurb && q.done, `quest ${q.id} has its words`);
     assert.ok(['retrieval', 'delivery', 'shopping', 'chain', 'message'].includes(q.type), `quest ${q.id}: type ${q.type}`);
     /* Steps are built from the type, not written out — so what the words have
@@ -667,6 +668,120 @@ test('the page offers the distress call when the tank is dead', () => {
   assert.match(PLAY, /data-act="distress"/, 'there is no button to press');
   assert.match(PLAY, /distress\(\)\s*\{\s*showDistress\(\)/, 'and nothing listening for it');
   assert.match(PLAY, /S\.callDistress\(state\)/, 'the button never reaches the game');
+});
+
+/* ------------------------------------------------- the design tables */
+
+const design = name => JSON.parse(readFileSync(new URL(`../tools/orbital-trader/design/${name}`, import.meta.url), 'utf8'));
+
+/* The JSON under tools/ is what a person edits; the modules under data/ are
+   what the browser loads, and a build step stands between them. Forgetting to
+   run it is the one mistake that cannot be seen in a diff — the game simply
+   goes on shipping last week's words. */
+test('the modules the game ships say what the design tables say', () => {
+  assert.deepEqual(QUESTS, design('quests.json').quests, 'data/quests.js was not rebuilt');
+  assert.deepEqual(DIALOG, design('dialog.json').exchanges, 'data/dialog.js was not rebuilt');
+  assert.deepEqual(TEXT.glossary, design('narrative.json').glossary, 'data/text.js was not rebuilt');
+  assert.deepEqual(BODIES.map(b => b.id), design('tuning.json').bodies.map(b => b.id), 'data/world.js was not rebuilt');
+});
+
+/* Every errand in one file, in one shape. The shape is the point: a quest is a
+   record with a dozen fields and rules about them, and a table of records that
+   each please themselves is a table nothing can check. */
+test('the quests are one table in one standard shape', () => {
+  const book = design('quests.json');
+  assert.ok(Array.isArray(book.notes) && book.notes.length, 'the format is not written down at the top of the file');
+  for(const word of ['retrieval', 'delivery', 'shopping', 'chain', 'message']){
+    assert.ok(book.notes.join('\n').includes(word), `the notes never mention ${word}`);
+  }
+  assert.equal(TEXT.quests, undefined, 'narrative.json is still carrying the quests around');
+  /* The documented field order, which is also the order they read in: who is
+     asking and what kind of job, then the places, then what it is worth, then
+     the words. A record that wanders is a record somebody wrote from memory. */
+  const ORDER = ['id', 'title', 'giver', 'type', 'from', 'to', 'stops', 'goods', 'pay', 'rep', 'crew', 'blurb', 'steps', 'done'];
+  for(const q of book.quests){
+    const keys = Object.keys(q);
+    for(const k of keys) assert.ok(ORDER.includes(k), `quest ${q.id}: ${k} is not a field of the format`);
+    assert.deepEqual(keys, ORDER.filter(k => keys.includes(k)), `quest ${q.id}: the fields are out of the standard order`);
+  }
+  assert.equal(new Set(book.quests.map(q => q.id)).size, book.quests.length, 'two quests share an id');
+});
+
+/* ------------------------------------------------------- crew dialog */
+
+/* Pressing a face in the crew menu is the one thing in the game that changes
+   nothing at all, which is exactly why it is a table: a line is written, not
+   coded, and the machinery that finds the right one is twenty lines. */
+test('there is something for everybody aboard to say, everywhere there is to be', () => {
+  const book = design('dialog.json');
+  assert.ok(Array.isArray(book.notes) && book.notes.length, 'the format is not written down at the top of the file');
+  const speakers = ['captain', ...TEXT.crew.roles.map(r => r.id)];
+  for(const who of speakers){
+    assert.ok(DIALOG.some(x => x.at === '*' && x.who === who),
+      `${who} has nothing to say away from a port`);
+    for(const port of Object.keys(PORTS)){
+      assert.ok(DIALOG.some(x => x.at === port && x.who === who), `${who} has nothing to say at ${port}`);
+    }
+  }
+  for(const x of DIALOG){
+    assert.ok(x.id && (x.at === '*' || PORTS[x.at]) && speakers.includes(x.who), `exchange ${x.id} is malformed`);
+    assert.ok(x.lines?.length, `exchange ${x.id} says nothing`);
+    for(const l of x.lines) assert.ok(speakers.includes(l.who) && l.say, `exchange ${x.id}: a line belongs to nobody`);
+  }
+  assert.equal(new Set(DIALOG.map(x => x.id)).size, DIALOG.length, 'two exchanges share an id');
+});
+
+test('a line is found by where the ship is and who is aboard to say it', () => {
+  const s = S.newGame(1);
+  assert.deepEqual(S.aboard(s), ['captain'], 'a new ship is one otter and three empty berths');
+  assert.equal(S.exchangesFor(s, 'navigator').length, 0, 'an empty berth answered');
+
+  // Out in the black there is no port to have an opinion about.
+  s.dockedAt = null;
+  const away = S.exchangesFor(s, 'captain');
+  assert.ok(away.length && away.every(x => x.at === '*'), 'a port line came up out in the black');
+
+  // Tied up, what is written about this port wins outright.
+  s.dockedAt = 'cinder';
+  const here = S.exchangesFor(s, 'captain');
+  assert.ok(here.length && here.every(x => x.at === 'cinder'), 'a line about anywhere beat a line about Cinder');
+  s.dockedAt = 'whisker';
+  assert.ok(S.exchangesFor(s, 'captain').every(x => x.at === 'whisker'), 'the ship moved and the words did not');
+
+  // A berth filled is a berth with a voice, and somebody to answer it.
+  s.crew.navigator = { role: 'navigator', from: 'test', joinedAt: 0 };
+  assert.deepEqual(S.aboard(s), ['captain', 'navigator']);
+  const nav = S.exchangesFor(s, 'navigator');
+  assert.ok(nav.length, 'the navigator signed on and stayed silent');
+  for(const x of nav) for(const l of x.lines){
+    assert.ok(S.isAboard(s, l.who), `exchange ${x.id} gives a line to ${l.who}, who is not aboard`);
+  }
+});
+
+test('pressing the same face again gets the next thing, and then comes round', () => {
+  const s = S.newGame(1);
+  s.dockedAt = 'moss';
+  const list = S.exchangesFor(s, 'captain');
+  assert.ok(list.length, 'nothing to say at Moss');
+  assert.equal(S.exchangeFor(s, 'captain', 0), list[0]);
+  assert.equal(S.exchangeFor(s, 'captain', list.length), list[0], 'the last line is the end of the road');
+  assert.equal(S.exchangeFor(s, 'captain', list.length - 1), list[list.length - 1]);
+  assert.equal(S.exchangeFor(s, 'appraiser', 0), null, 'an empty berth had an opinion');
+  // The label the page puts above a line comes from the crew table, by name.
+  assert.equal(S.speaker('captain').name, TEXT.crew.captain.name);
+  assert.equal(S.speaker('navigator').name, 'Tsuki');
+});
+
+test('the crew menu turns a portrait into a question', () => {
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.match(PLAY, /class="face" data-act="say\|\$\{who\}"/, 'the portraits are not buttons');
+  assert.match(PLAY, /\bsay\(who\)\{/, 'nothing is listening for a pressed face');
+  assert.match(PLAY, /S\.exchangeFor\(state, who, talking\.nth\)/, 'the page never asks for the line');
+  assert.match(PLAY, /S\.speaker\(l\.who\)\.name/, 'the lines are not labelled with who said them');
+  /* A conversation is not a thing a save remembers, so the only record of one
+     is a page-local variable that the next menu clears. */
+  assert.match(PLAY, /if\(id !== tab\) talking = null;/, 'a line survives a change of menu');
+  assert.doesNotMatch(PLAY, /state\.talking/, 'talking got into the save');
 });
 
 test('the crew menu has a captain to show and three berths to leave empty', () => {

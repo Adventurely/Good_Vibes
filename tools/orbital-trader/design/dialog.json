@@ -1,0 +1,938 @@
+{
+ "notes": [
+  "What the crew say to each other, and where. One exchange is what you get for",
+  "pressing somebody's portrait in the crew menu: a line from them, and usually",
+  "somebody answering. It is flavour — nothing here changes the state of a game —",
+  "which is exactly why it wants a table of its own rather than a branch in the",
+  "code.",
+  "",
+  "An exchange record:",
+  "  id     required. Unique. Convention is <where>-<who>[-<n>].",
+  "  at     required. Where it can be said:",
+  "           a port id  only while docked there",
+  "           \"*\"        anywhere, including out in the black",
+  "         A port line always beats a \"*\" line, so \"*\" is the thing somebody",
+  "         says when they have nothing to say about the view.",
+  "  who    required. Whose portrait you pressed: captain, or a berth id",
+  "         (engineer, navigator, appraiser). A berth nobody is in has no",
+  "         portrait to press, so its lines simply never come up.",
+  "  needs  optional. Berth ids who must be aboard for the exchange to be",
+  "         reachable — for a line that answers back. `who` is implied.",
+  "  lines  required, at least one. [{ who, say }] in order. `who` is any",
+  "         speaker, so the captain can answer the navigator and the appraiser",
+  "         can talk over both of them.",
+  "",
+  "Several exchanges can share an `at` and a `who`. Pressing the portrait again",
+  "gives the next one, in the order they are written here, and then comes back",
+  "round to the first.",
+  "",
+  "A worked example of what belongs here, in the shape it belongs in:",
+  "",
+  "  { \"id\": \"cinder-navigator-pistols\", \"at\": \"cinder\", \"who\": \"navigator\",",
+  "    \"lines\": [",
+  "      { \"who\": \"navigator\", \"say\": \"The plasma pistols here are so shiny.\" },",
+  "      { \"who\": \"captain\", \"say\": \"They are. We are not staying long.\" } ] }",
+  "",
+  "Every line below is a placeholder. The table is the full grid of somewhere by",
+  "somebody so that every slot a writer might want already exists; replacing one",
+  "is replacing a string, and needs no code and no build beyond the usual one."
+ ],
+ "exchanges": [
+  {
+   "id": "any-captain",
+   "at": "*",
+   "who": "captain",
+   "lines": [
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "any-engineer",
+   "at": "*",
+   "who": "engineer",
+   "lines": [
+    {
+     "who": "engineer",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "any-navigator",
+   "at": "*",
+   "who": "navigator",
+   "lines": [
+    {
+     "who": "navigator",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "any-appraiser",
+   "at": "*",
+   "who": "appraiser",
+   "lines": [
+    {
+     "who": "appraiser",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "cinder-captain",
+   "at": "cinder",
+   "who": "captain",
+   "lines": [
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "cinder-engineer",
+   "at": "cinder",
+   "who": "engineer",
+   "lines": [
+    {
+     "who": "engineer",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "cinder-navigator",
+   "at": "cinder",
+   "who": "navigator",
+   "lines": [
+    {
+     "who": "navigator",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "cinder-appraiser",
+   "at": "cinder",
+   "who": "appraiser",
+   "lines": [
+    {
+     "who": "appraiser",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "scorch-captain",
+   "at": "scorch",
+   "who": "captain",
+   "lines": [
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "scorch-engineer",
+   "at": "scorch",
+   "who": "engineer",
+   "lines": [
+    {
+     "who": "engineer",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "scorch-navigator",
+   "at": "scorch",
+   "who": "navigator",
+   "lines": [
+    {
+     "who": "navigator",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "scorch-appraiser",
+   "at": "scorch",
+   "who": "appraiser",
+   "lines": [
+    {
+     "who": "appraiser",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "veyra-captain",
+   "at": "veyra",
+   "who": "captain",
+   "lines": [
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "veyra-engineer",
+   "at": "veyra",
+   "who": "engineer",
+   "lines": [
+    {
+     "who": "engineer",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "veyra-navigator",
+   "at": "veyra",
+   "who": "navigator",
+   "lines": [
+    {
+     "who": "navigator",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "veyra-appraiser",
+   "at": "veyra",
+   "who": "appraiser",
+   "lines": [
+    {
+     "who": "appraiser",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "tassel-captain",
+   "at": "tassel",
+   "who": "captain",
+   "lines": [
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "tassel-engineer",
+   "at": "tassel",
+   "who": "engineer",
+   "lines": [
+    {
+     "who": "engineer",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "tassel-navigator",
+   "at": "tassel",
+   "who": "navigator",
+   "lines": [
+    {
+     "who": "navigator",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "tassel-appraiser",
+   "at": "tassel",
+   "who": "appraiser",
+   "lines": [
+    {
+     "who": "appraiser",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "slate-captain",
+   "at": "slate",
+   "who": "captain",
+   "lines": [
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "slate-engineer",
+   "at": "slate",
+   "who": "engineer",
+   "lines": [
+    {
+     "who": "engineer",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "slate-navigator",
+   "at": "slate",
+   "who": "navigator",
+   "lines": [
+    {
+     "who": "navigator",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "slate-appraiser",
+   "at": "slate",
+   "who": "appraiser",
+   "lines": [
+    {
+     "who": "appraiser",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "moss-captain",
+   "at": "moss",
+   "who": "captain",
+   "lines": [
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "moss-engineer",
+   "at": "moss",
+   "who": "engineer",
+   "lines": [
+    {
+     "who": "engineer",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "moss-navigator",
+   "at": "moss",
+   "who": "navigator",
+   "lines": [
+    {
+     "who": "navigator",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "moss-appraiser",
+   "at": "moss",
+   "who": "appraiser",
+   "lines": [
+    {
+     "who": "appraiser",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "nail-captain",
+   "at": "nail",
+   "who": "captain",
+   "lines": [
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "nail-engineer",
+   "at": "nail",
+   "who": "engineer",
+   "lines": [
+    {
+     "who": "engineer",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "nail-navigator",
+   "at": "nail",
+   "who": "navigator",
+   "lines": [
+    {
+     "who": "navigator",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "nail-appraiser",
+   "at": "nail",
+   "who": "appraiser",
+   "lines": [
+    {
+     "who": "appraiser",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "whisker-captain",
+   "at": "whisker",
+   "who": "captain",
+   "lines": [
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "whisker-engineer",
+   "at": "whisker",
+   "who": "engineer",
+   "lines": [
+    {
+     "who": "engineer",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "whisker-navigator",
+   "at": "whisker",
+   "who": "navigator",
+   "lines": [
+    {
+     "who": "navigator",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "whisker-appraiser",
+   "at": "whisker",
+   "who": "appraiser",
+   "lines": [
+    {
+     "who": "appraiser",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "arc-captain",
+   "at": "arc",
+   "who": "captain",
+   "lines": [
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "arc-engineer",
+   "at": "arc",
+   "who": "engineer",
+   "lines": [
+    {
+     "who": "engineer",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "arc-navigator",
+   "at": "arc",
+   "who": "navigator",
+   "lines": [
+    {
+     "who": "navigator",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "arc-appraiser",
+   "at": "arc",
+   "who": "appraiser",
+   "lines": [
+    {
+     "who": "appraiser",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "grumm-captain",
+   "at": "grumm",
+   "who": "captain",
+   "lines": [
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "grumm-engineer",
+   "at": "grumm",
+   "who": "engineer",
+   "lines": [
+    {
+     "who": "engineer",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "grumm-navigator",
+   "at": "grumm",
+   "who": "navigator",
+   "lines": [
+    {
+     "who": "navigator",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "grumm-appraiser",
+   "at": "grumm",
+   "who": "appraiser",
+   "lines": [
+    {
+     "who": "appraiser",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "brine-captain",
+   "at": "brine",
+   "who": "captain",
+   "lines": [
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "brine-engineer",
+   "at": "brine",
+   "who": "engineer",
+   "lines": [
+    {
+     "who": "engineer",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "brine-navigator",
+   "at": "brine",
+   "who": "navigator",
+   "lines": [
+    {
+     "who": "navigator",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "brine-appraiser",
+   "at": "brine",
+   "who": "appraiser",
+   "lines": [
+    {
+     "who": "appraiser",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "glass-captain",
+   "at": "glass",
+   "who": "captain",
+   "lines": [
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "glass-engineer",
+   "at": "glass",
+   "who": "engineer",
+   "lines": [
+    {
+     "who": "engineer",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "glass-navigator",
+   "at": "glass",
+   "who": "navigator",
+   "lines": [
+    {
+     "who": "navigator",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "glass-appraiser",
+   "at": "glass",
+   "who": "appraiser",
+   "lines": [
+    {
+     "who": "appraiser",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "croak-captain",
+   "at": "croak",
+   "who": "captain",
+   "lines": [
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "croak-engineer",
+   "at": "croak",
+   "who": "engineer",
+   "lines": [
+    {
+     "who": "engineer",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "croak-navigator",
+   "at": "croak",
+   "who": "navigator",
+   "lines": [
+    {
+     "who": "navigator",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "croak-appraiser",
+   "at": "croak",
+   "who": "appraiser",
+   "lines": [
+    {
+     "who": "appraiser",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "haven-captain",
+   "at": "haven",
+   "who": "captain",
+   "lines": [
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "haven-engineer",
+   "at": "haven",
+   "who": "engineer",
+   "lines": [
+    {
+     "who": "engineer",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "haven-navigator",
+   "at": "haven",
+   "who": "navigator",
+   "lines": [
+    {
+     "who": "navigator",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "haven-appraiser",
+   "at": "haven",
+   "who": "appraiser",
+   "lines": [
+    {
+     "who": "appraiser",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "maw-captain",
+   "at": "maw",
+   "who": "captain",
+   "lines": [
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "maw-engineer",
+   "at": "maw",
+   "who": "engineer",
+   "lines": [
+    {
+     "who": "engineer",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "maw-navigator",
+   "at": "maw",
+   "who": "navigator",
+   "lines": [
+    {
+     "who": "navigator",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  },
+  {
+   "id": "maw-appraiser",
+   "at": "maw",
+   "who": "appraiser",
+   "lines": [
+    {
+     "who": "appraiser",
+     "say": "Hello Captain!"
+    },
+    {
+     "who": "captain",
+     "say": "Hello Captain!"
+    }
+   ]
+  }
+ ]
+}

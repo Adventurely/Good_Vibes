@@ -740,7 +740,7 @@ each of the three crew members is the reward for the stretch that introduces
 their people.
 
 **Seventeen of the twenty are built** — every one that is not salvage. They
-are written out in `narrative.json`, they work, and a player meets them: the
+are written out in `quests.json`, they work, and a player meets them: the
 Requests tab on the dock menu lists whatever jobs the port you are tied up at
 is offering, and you can hold three at once.
 
@@ -788,7 +788,8 @@ A quest is written as data — its type, the ports it names, the goods it wants
 — and the steps are generated from that. Authored wording wins where a quest
 supplies it, so the opening errand still says "Bring it home to Tassel" rather
 than anything a generator would produce. Adding a quest is a few lines in
-`narrative.json` and no code.
+`quests.json` and no code — the file opens with the record format, and the
+build step refuses a record that does not keep to it.
 
 | Type | Steps it earns | Built |
 |---|---|---|

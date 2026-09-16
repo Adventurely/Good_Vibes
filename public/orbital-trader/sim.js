@@ -23,7 +23,7 @@ import {
 } from './orbit.js';
 import {
   CONST, BODIES, GOODS, PORTS, UPGRADES, FORMULAS, TEXT, SPECIES,
-  REGION_OF, wantsGood, lovesGood,
+  REGION_OF, wantsGood, lovesGood, QUESTS as QUESTBOOK, DIALOG,
 } from './content.js';
 
 export const world = makeWorld(BODIES);
@@ -851,7 +851,9 @@ function flag(state, name, events){
 
 export const MAX_ACTIVE_QUESTS = 3;
 
-export const QUESTS = TEXT.quests ?? [];
+/* The catalogue comes out of quests.json now rather than out of the middle of
+ * narrative.json. Nothing below cares which file it was in. */
+export const QUESTS = QUESTBOOK;
 export const questById = id => QUESTS.find(q => q.id === id);
 /* Where the chart should point when a job is taken: wherever the first step
  * wants you. For a retrieval that is the stall it names; for a delivery or a
@@ -1054,6 +1056,59 @@ export function questCheck(state, events = []){
     }
   }
   return events;
+}
+
+/* ----------------------------------------------------------- crew talk */
+
+/* What somebody has to say, here, now. Pressing a face in the crew menu asks
+ * this; dialog.json holds the answers, keyed by where you are and whose face
+ * it was.
+ *
+ * Two rules, and they are the whole of it. A line written for the port you are
+ * tied up at beats a line written for anywhere, because a navigator with an
+ * opinion about Cinder should not shrug at Cinder — so the port's lines, if
+ * there are any, are the only ones offered. And everybody a line puts words in
+ * the mouth of has to actually be aboard, or an exchange half the crew is in
+ * plays to an empty room.
+ *
+ * Nothing here touches the state. Talking is free, it changes nothing, and it
+ * is not in the save: the only thing a game remembers about a conversation is
+ * that it happened, and it does not remember that either. */
+
+export const isAboard = (state, who) => who === 'captain' || !!state?.crew?.[who];
+
+/* Everybody whose portrait is in the crew menu, in the order it shows them. */
+export function aboard(state){
+  return ['captain', ...(TEXT.crew?.roles ?? []).map(r => r.id).filter(id => state?.crew?.[id])];
+}
+
+export function exchangesFor(state, who){
+  if(!isAboard(state, who)) return [];
+  const sayable = x => x.who === who
+    && [...(x.needs ?? []), ...(x.lines ?? []).map(l => l.who)].every(id => isAboard(state, id));
+  const here = state?.dockedAt ?? null;
+  const atPort = here ? DIALOG.filter(x => x.at === here && sayable(x)) : [];
+  return atPort.length ? atPort : DIALOG.filter(x => x.at === '*' && sayable(x));
+}
+
+/* The one to show, given how many times that face has been pressed already.
+ * Round and round rather than random: a player pressing twice wants the next
+ * thing, not a coin toss that might repeat. */
+export function exchangeFor(state, who, nth = 0){
+  const list = exchangesFor(state, who);
+  if(!list.length) return null;
+  return list[((nth % list.length) + list.length) % list.length];
+}
+
+/* Who a line belongs to, as a name and a berth, so the page can label it
+ * without knowing how the crew table is laid out. */
+export function speaker(who){
+  if(who === 'captain'){
+    const c = TEXT.crew?.captain;
+    return { id: 'captain', name: c?.name ?? 'The captain', role: c?.role ?? 'Captain' };
+  }
+  const r = (TEXT.crew?.roles ?? []).find(x => x.id === who);
+  return { id: who, name: r?.person?.name ?? r?.name ?? who, role: r?.name ?? who };
 }
 
 /* ------------------------------------------------------------ planning */

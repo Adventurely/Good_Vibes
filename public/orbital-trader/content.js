@@ -16,6 +16,8 @@
 import { TUNING } from './data/world.js';
 import { ECONOMY } from './data/economy.js';
 import { NARRATIVE } from './data/text.js';
+import { QUESTBOOK } from './data/quests.js';
+import { DIALOGUE } from './data/dialog.js';
 
 /* ------------------------------------------------------------ constants */
 
@@ -297,6 +299,19 @@ export const FORMULAS = {
 
 export const GLOSSARY = NARRATIVE.glossary ?? [];
 export const TEXT = NARRATIVE;
+
+/* The errands, and what the crew say. Both used to be keys in narrative.json,
+ * which was fine while there were three of one and none of the other and is
+ * not fine now: a quest is a record with a dozen fields and rules about them,
+ * and a table of records wants a file where its shape can be written down at
+ * the top and checked at build time. They are their own tables now, and
+ * quests.json and dialog.json each open with the format they hold.
+ *
+ * Nothing but the shape changed. `quests` and `dialog` are read here so that
+ * the rest of the game keeps asking content.js for content and never has to
+ * know how many files it came out of. */
+export const QUESTS = QUESTBOOK.quests ?? [];
+export const DIALOG = DIALOGUE.exchanges ?? [];
 TEXT.logTemplates ??= {};
 TEXT.logTemplates.aerobrake ??= 'Air braked at {body}: {dv} shed to the clouds.';
 TEXT.events ??= {};
