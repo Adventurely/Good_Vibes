@@ -63,8 +63,7 @@ export const GOOSE_ART = [
  * grass, dirt and water alike rather than against whichever one it was
  * designed over. Blocker is in here for the legend on the page only — it
  * is never drawn over a duckling's head at all (see sim.js's assignSkill);
- * a planted one wears its own red bar instead. Builder is drawn, but not
- * from a held trait the way the rest of BADGE_ORDER is — see drawDuck.
+ * a planted one wears its own red bar instead.
  */
 const SKILL_BADGE = {
   digger:  ['...', '..N', 'NNN', '..N'],   // straight ahead — tunnels through
@@ -76,8 +75,12 @@ const SKILL_BADGE = {
 
 /* Drawn in this order wherever more than one is held, so the same pair
    always reads the same way round rather than in whatever order they were
-   handed out in. Builder is not here — see drawDuck. */
-const BADGE_ORDER = ['digger', 'climber', 'flyer'];
+   handed out in. Builder shows through this list while it is still armed
+   and waiting for a gap (sim.js's stepWalking) same as any other trait; see
+   drawDuck for the moment it stops being one — a held Builder still needs
+   its badge even once it has been spent starting the very bridge it is
+   drawn over. */
+const BADGE_ORDER = ['digger', 'builder', 'climber', 'flyer'];
 
 const BADGE_W = 3, BADGE_H = 4, BADGE_PAD = 1, BADGE_GAP = 1;
 export const BADGE_PLATE_W = BADGE_W + BADGE_PAD * 2;
@@ -735,13 +738,14 @@ export function drawDuck(ctx, d, ticks = 0){
   /* Every state a duckling can be carrying something in, not just walking:
      the one currently climbing the wall or laying a bridge is exactly the
      one you most want to be able to pick out of the flock, and it was the
-     one showing nothing at all. Builder is never in `d.traits` (see
-     sim.js's assignSkill) — it is drawn straight from the state itself,
-     for exactly as long as that duckling is actively building and not a
-     tick longer, which is the one badge here that is not saying "this is
-     held" but "this is happening right now". */
+     one showing nothing at all. A held Builder shows through the ordinary
+     `d.traits` filter below like Digger or Climber do, right up until the
+     moment it is actually spent starting a bridge (sim.js's stepWalking
+     removes it from `traits` that same tick) — the explicit check here is
+     what keeps its badge showing for the rest of the build too, once it is
+     no longer a held trait but an active state instead. */
   const held = BADGE_ORDER.filter(skill => d.traits.has(skill));
-  if(d.state === 'building') held.unshift('builder');
+  if(d.state === 'building' && !held.includes('builder')) held.unshift('builder');
   if(!held.length) return;
 
   const total = held.length * BADGE_PLATE_W + (held.length - 1) * BADGE_GAP;

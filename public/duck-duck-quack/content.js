@@ -96,15 +96,20 @@ export const WALK_STEP = 4;
    bridge, a gentle staircase). */
 export const FALL_SAFE = 24;
 
-/* How long a Builder keeps laying deck before stopping on its own, whether
-   or not it has reached anywhere worth landing — see sim.js's assignSkill
-   and stepBuilding. A Builder starts the moment it is given, wherever that
-   duckling happens to be standing, so this is what stops one handed out on
-   ordinary ground, or over a gap wider than a duckling can usefully cross,
-   from just running to the edge of the level. Stated as seconds, the same
+/* How long a Builder has, total, from the moment it is given — see sim.js's
+   assignSkill and stepWalking. The clock starts running right away, before
+   the duckling has even met the gap it is for, and keeps running while it
+   walks there; reaching a gap with none of this left over means the
+   assignment is simply spent, the same as never having found one at all.
+   Whatever is left over at the moment a gap actually appears is what the
+   bridge itself then has to be laid within (see sim.js's pitSpanAt), so a
+   Builder given right at a wide gap's edge can still complete it in full
+   while one given so early that most of the budget burns away just
+   walking there may run out of road mid-span. Stated as seconds, the same
    way spawnInterval and timeLimit are, and converted once into ticks here
    rather than a bare number: one tick of building is one column, so this
-   number is a column cap too, in effect, without being written as one. */
+   number is a column cap on the bridge itself too, in effect, without
+   being written as one. */
 export const BUILD_SECONDS = 10;
 export const BUILD_MAX_STEPS = TICK_RATE * BUILD_SECONDS;
 
@@ -144,24 +149,28 @@ export const POOF_TICKS = 8;
  * a tunnel, a bridge, a wall — and only ever have to work once. Climber and
  * Flyer do not: they ride on the one duckling that holds them and have to be
  * given out again to the next one. But when a skill actually takes hold is
- * its own, separate axis, and the three sharing skills split right down the
- * middle of it:
+ * its own, separate axis:
  *
- *   Digger            deferred — waits, held, for the next wall it meets
- *   Builder            instant — starts laying ground the moment it is
- *                      given, wherever that duckling is already standing,
- *                      for BUILD_SECONDS (content.js) and not a tick longer
- *   Blocker            instant — plants that duckling for good, right there,
- *                      a wall nothing gets past — another duckling or the
- *                      goose alike, see sim.js's stepWalking and stepGoose
- *   Climber, Flyer      deferred, and never shared — each carries one
- *                      duckling past one obstacle, once, then is spent
+ *   Digger, Climber, Flyer   deferred — waits, held, for the next wall or
+ *                            drop it meets, and (Digger, Climber) stays
+ *                            held afterward, ready for the next one too
+ *   Builder                  deferred the same way, but one-shot rather than
+ *                            reusable — spent the moment a gap actually
+ *                            calls for it (see sim.js's stepWalking), and
+ *                            running against its own clock the whole time it
+ *                            is held, not only once it starts building (see
+ *                            BUILD_SECONDS above) — held too long without
+ *                            finding a gap and it simply expires, unused
+ *   Blocker                  instant — plants that duckling for good, right
+ *                            there, a wall nothing gets past — another
+ *                            duckling or the goose alike, see sim.js's
+ *                            stepWalking and stepGoose
  *
- * That means Builder is the one skill in a genuinely different spot on both
- * axes than everything around it: shared like a Digger's tunnel, but timed
- * like a Blocker's plant rather than waiting for a hazard to ask for it. See
- * sim.js's assignSkill for what that means in practice — it is the one skill
- * where *when* you click matters as much as *who*.
+ * A Builder handed out early is not wasted the way an early Blocker click
+ * would be pointless to warn about — it keeps walking, armed, toward
+ * whatever gap it eventually meets, same as a Digger or Climber would; what
+ * makes it worth aiming rather than just handing out on sight is that it
+ * only ever gets the one gap, and only within its own ten seconds.
  */
 export const SKILLS = ['digger', 'builder', 'blocker', 'climber', 'flyer'];
 
@@ -169,7 +178,7 @@ export const SKILL_INFO = {
   digger: { name: 'Digger', verb: 'Dig',
     blurb: 'Tunnels straight through the next wall, leaving a way through for the rest.' },
   builder: { name: 'Builder', verb: 'Build',
-    blurb: `Starts building right where it stands, for ${BUILD_SECONDS} seconds, then stops for good — aim before you click.` },
+    blurb: `Bridges the next gap it meets, within ${BUILD_SECONDS} seconds of being given — one gap only, then it's spent.` },
   blocker: { name: 'Blocker', verb: 'Block',
     blurb: 'Plants itself for good, turning back anything that meets it — another duckling, or the goose.' },
   climber: { name: 'Climber', verb: 'Climb',
