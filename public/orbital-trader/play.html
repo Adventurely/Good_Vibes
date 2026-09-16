@@ -597,6 +597,21 @@
     #dvbar{ width:64px; height:4px; }
     #where{ flex:1 1 8rem; text-align:left; }
     #where b, #dockhint{ font-size:.78rem; }
+    /* The gear comes out of the flex row on a phone. The strip is two tight
+       rows here and the gear was being carried along by the wrap, landing at
+       the end of whichever row had space — under the readouts, three pixels
+       to the left of the view buttons it then sat directly above, and six
+       narrower than them. Pinned to the corner it is the top of that column
+       instead of a stray fourth thing: same gutter, same edge, wherever the
+       text happens to break. */
+    #m-gear{
+      position:absolute; top:max(.3rem, env(safe-area-inset-top)); right:.4rem; margin:0;
+      /* The same size as the buttons it is now the top of, or the column has a
+         step in it. */
+      width:40px; height:40px; border-radius:10px;
+    }
+    /* And the readouts keep clear of it, since it is no longer in their row. */
+    #hud{ padding-right:calc(.4rem + 40px + .4rem); }
 
     #view{
       top:calc(74px + env(safe-area-inset-top)); bottom:auto; right:.4rem;
@@ -700,8 +715,23 @@
     word-break:break-all; resize:vertical;
   }
   /* Collecting a job. The card is the animation: a gold edge, a lift, and the
-     things you were owed climbing out of it. */
-  .quest.owed{ border-color:var(--gold-2); box-shadow:0 0 0 1px var(--gold-2) inset; position:relative; }
+     things you were owed climbing out of it.
+
+     A quest is otherwise just a rule and some text under it, so the gold ring
+     had nothing to stand off from and was drawn hard against the words on
+     every side. Given its own padding it reads as a card that has been picked
+     out, which is what it is. The top padding matches what .quest already had,
+     so nothing jumps when a job finishes. */
+  .quest.owed{
+    position:relative;
+    /* The grey rule a quest normally wears on top would run straight through
+       a rounded card, so the ring is the whole of the edge and the border is
+       only there to give it somewhere to sit. */
+    border:1px solid transparent; border-radius:.55rem;
+    padding:.6rem .7rem; margin-bottom:.2rem;
+    background:color-mix(in srgb, var(--gold-2) 7%, transparent);
+    box-shadow:0 0 0 1px var(--gold-2) inset;
+  }
   .quest.owed .btns{ margin-top:.5rem; }
   .quest.collecting{
     position:relative; overflow:visible;
