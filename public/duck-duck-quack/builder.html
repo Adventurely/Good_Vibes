@@ -1,0 +1,766 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../theme.css">
+<title>Duck Duck Quack — Level Builder</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%234fc4d3'/%3E%3Ccircle cx='9' cy='7' r='4' fill='%23ffd34e'/%3E%3Cpath d='M12 7h2l-1 1z' fill='%23f08c33'/%3E%3C/svg%3E">
+<meta name="description" content="A dev tool for shaping a Duck Duck Quack level's terrain, hazards and skill supply, then playtesting it with the real engine before exporting it as code.">
+<style>
+  :root{
+    --type: var(--gv-type);
+    --ink: var(--gv-paper);
+    --panel: var(--gv-paper-2);
+    --sunk: var(--gv-sunk);
+    --line: var(--gv-line);
+    --text: var(--gv-text);
+    --muted: var(--gv-muted);
+    --accent: var(--gv-leaf);
+    --sun: var(--gv-sun);
+    --bad: var(--gv-bad);
+  }
+  *{ box-sizing: border-box; }
+  body{
+    margin: 0;
+    padding: 0.6rem clamp(0.5rem, 3vw, 1.2rem) 2rem;
+    background: var(--ink);
+    background-image: var(--gv-ground);
+    color: var(--text);
+    font-family: var(--type);
+    line-height: 1.5;
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap{ max-width: 72rem; margin: 0 auto; }
+
+  header{ display: flex; align-items: baseline; gap: 0.9rem; flex-wrap: wrap; padding-bottom: 0.6rem; }
+  header h1{ margin: 0; font-size: 1.2rem; font-weight: 800; }
+  header p{ margin: 0; color: var(--muted); font-size: 0.82rem; }
+  header .crumb{ color: var(--muted); font-size: 0.82rem; text-decoration: none; margin-left: auto; white-space: nowrap; }
+  header .crumb:hover{ color: var(--text); }
+
+  .layout{ display: grid; grid-template-columns: 1fr; gap: 0.9rem; align-items: start; }
+  @media (min-width: 980px){
+    .layout{ grid-template-columns: minmax(0, 1fr) 22rem; }
+  }
+
+  .screen{
+    position: relative;
+    width: max-content; max-width: 100%; margin: 0 auto;
+    border: 2px solid var(--line);
+    border-radius: 6px;
+    background: #14304a;
+    box-shadow: 0 0 0 4px #e6dcc7, 0 14px 34px rgb(74 51 32 / 0.18);
+    overflow: hidden;
+    line-height: 0;
+  }
+  canvas{ display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
+  #scene{
+    cursor: crosshair; touch-action: none; margin: 0 auto;
+    max-width: 100%; height: auto;
+    user-select: none; -webkit-user-select: none;
+    -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+  }
+  #scene:focus-visible{ outline: 3px solid var(--sun); outline-offset: -3px; }
+  #scene.mode-play{ cursor: pointer; }
+
+  .readout{
+    position: absolute; left: 0.4rem; bottom: 0.35rem;
+    font-size: 0.68rem; color: #fdf6e3; text-shadow: 0 1px 0 rgba(0,0,0,0.6);
+    pointer-events: none; font-variant-numeric: tabular-nums;
+  }
+
+  .hud{
+    position: absolute; inset: 0.4rem 0.5rem auto 0.5rem;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 0.5rem; pointer-events: none; font-size: 0.7rem; line-height: 1.35;
+    text-shadow: 0 1px 0 rgba(0,0,0,0.6); color: #fdf6e3;
+  }
+  .hud b{ font-size: 0.95rem; }
+  .hud .right{ text-align: right; }
+  .hud[hidden]{ display: none; }
+
+  .overlay{
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(13, 11, 31, 0.72); color: #fdf6e3; text-align: center;
+    flex-direction: column; gap: 0.6rem; padding: 1rem;
+  }
+  .overlay[hidden]{ display: none; }
+  .overlay h2{ margin: 0; font-size: 1.4rem; }
+  .overlay p{ margin: 0; font-size: 0.88rem; max-width: 22rem; }
+
+  .toolbar{
+    display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.5rem;
+  }
+  .toolbar .btn[aria-pressed='true']{
+    background: #eef7e9; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset;
+  }
+
+  .panel{
+    background: var(--panel); border: 2px solid var(--line); border-radius: 8px;
+    padding: 0.7rem 0.8rem; margin-bottom: 0.7rem;
+  }
+  .panel h2{ margin: 0 0 0.5rem; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+
+  .row{ display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; flex-wrap: wrap; }
+  .row label{ flex: 1 1 8rem; font-size: 0.84rem; }
+  .row input[type='number'], .row input[type='text'], .row select{
+    width: 6.5rem; font: inherit; font-size: 0.84rem; padding: 0.25rem 0.4rem;
+    background: var(--sunk); border: 1px solid var(--line); border-radius: 5px; color: var(--text);
+  }
+  .row input[type='text']{ width: 100%; }
+  .row.wide input[type='text']{ flex: 1 1 12rem; }
+  .row input[type='checkbox']{ width: auto; }
+
+  .supply-grid{ display: grid; grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr)); gap: 0.4rem; }
+  .supply-grid label{ display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 0.15rem; }
+  .supply-grid input{ width: 100%; }
+
+  .status{ min-height: 1.4em; margin: 0.5rem 0 0; font-size: 0.84rem; color: var(--muted); }
+  .status[data-bad='true']{ color: var(--bad); font-weight: 700; }
+
+  .btn{
+    font: inherit; font-size: 0.84rem; padding: 0.4rem 0.9rem; cursor: pointer;
+    background: var(--sunk); border: 1px solid var(--line); border-radius: 5px; color: var(--text);
+  }
+  .btn:hover{ background: #fffdf6; }
+  .btn-go{ background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+  .btn-go:hover{ background: #256b28; }
+  .btn-bad{ border-color: var(--bad); color: var(--bad); }
+
+  .controls{ display: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap; }
+
+  textarea#export-code{
+    width: 100%; min-height: 16rem; font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.74rem; line-height: 1.4; padding: 0.5rem;
+    background: var(--sunk); border: 1px solid var(--line); border-radius: 5px; color: var(--text);
+    white-space: pre; resize: vertical;
+  }
+
+  .skills{
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: 0.4rem;
+  }
+  .skill{
+    font: inherit; cursor: pointer; text-align: left;
+    background: var(--panel); border: 2px solid var(--line); border-radius: 6px;
+    padding: 0.4rem 0.55rem; font-size: 0.8rem;
+  }
+  .skill .name{ font-weight: 800; display: block; }
+  .skill .count{ font-variant-numeric: tabular-nums; color: var(--muted); font-size: 0.78rem; }
+  .skill:hover:not(:disabled){ border-color: var(--accent); }
+  .skill[aria-pressed='true']{ background: #eef7e9; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+  .skill:disabled{ opacity: 0.45; cursor: not-allowed; }
+
+  [hidden]{ display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Duck Duck Quack <span style="color:var(--muted);font-weight:600">— Level Builder</span></h1>
+    <p>A dev tool. Nothing here ships to players.</p>
+    <a class="crumb" href="/duck-duck-quack/">&larr; levels</a>
+  </header>
+
+  <div class="layout">
+    <div>
+      <div class="screen">
+        <canvas id="scene" width="320" height="180" tabindex="0" role="application"
+                aria-label="The level under construction. Drag to sculpt terrain in edit mode; click a duckling in playtest mode."></canvas>
+        <div class="hud" id="hud" hidden aria-hidden="true">
+          <div>
+            Saved <b id="hud-saved">0 / 0</b><br>
+            Lost <b id="hud-lost">0</b>
+          </div>
+          <div class="right">
+            Hatched <b id="hud-hatched">0 / 0</b><br>
+            Time <b id="hud-time">0:00</b>
+          </div>
+        </div>
+        <div class="readout" id="readout"></div>
+        <div class="overlay" id="overlay" hidden>
+          <h2 id="overlay-title"></h2>
+          <p id="overlay-body"></p>
+          <button class="btn btn-go" id="playtest-restart" type="button">Playtest again</button>
+        </div>
+      </div>
+
+      <div class="toolbar" id="edit-toolbar">
+        <button class="btn" id="tool-terrain" type="button" aria-pressed="true">Terrain</button>
+        <button class="btn" id="tool-gap" type="button" aria-pressed="false">Gap</button>
+        <button class="btn" id="undo" type="button">Undo stroke</button>
+        <button class="btn" id="flatten" type="button">Reset to flat</button>
+      </div>
+      <div class="toolbar" id="play-toolbar" hidden>
+        <div class="skills" id="skills" role="group" aria-label="Skills to arm"></div>
+      </div>
+      <p class="status" id="status" role="status"></p>
+      <div class="controls">
+        <button class="btn btn-go" id="playtest-btn" type="button">Playtest ▶</button>
+        <button class="btn" id="stop-playtest" type="button" hidden>Back to editing</button>
+      </div>
+    </div>
+
+    <aside>
+      <div class="panel">
+        <h2>Start from</h2>
+        <div class="row wide">
+          <select id="start-from">
+            <option value="">Blank canvas</option>
+          </select>
+        </div>
+        <div class="controls" style="margin-top:0">
+          <button class="btn" id="load-start-from" type="button">Load</button>
+          <button class="btn btn-bad" id="new-level" type="button">New (clear)</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Level</h2>
+        <div class="row"><label for="f-name">Name</label><input type="text" id="f-name" value="Custom Level"></div>
+        <div class="row"><label for="f-id">Id</label><input type="text" id="f-id" value="custom"></div>
+        <div class="row"><label for="f-nestX">Nest x</label><input type="number" id="f-nestX" min="0" max="319" value="20"></div>
+        <div class="row"><label for="f-goalX">Pond starts at</label><input type="number" id="f-goalX" min="1" max="319" value="300"></div>
+        <div class="row"><label for="f-duckCount">Duck count</label><input type="number" id="f-duckCount" min="1" max="60" value="10"></div>
+        <div class="row"><label for="f-spawn">Spawn every (s)</label><input type="number" id="f-spawn" min="0.5" max="10" step="0.5" value="2"></div>
+        <div class="row"><label for="f-time">Time limit (s)</label><input type="number" id="f-time" min="10" max="600" value="180"></div>
+        <div class="row"><label for="f-winRatio">Win ratio</label><input type="number" id="f-winRatio" min="0.1" max="1" step="0.05" value="0.75"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Skill supply</h2>
+        <div class="supply-grid">
+          <div><label for="s-digger">Digger</label><input type="number" id="s-digger" min="0" max="60" value="2"></div>
+          <div><label for="s-builder">Builder</label><input type="number" id="s-builder" min="0" max="60" value="2"></div>
+          <div><label for="s-blocker">Blocker</label><input type="number" id="s-blocker" min="0" max="60" value="2"></div>
+          <div><label for="s-climber">Climber</label><input type="number" id="s-climber" min="0" max="60" value="2"></div>
+          <div><label for="s-flyer">Flyer</label><input type="number" id="s-flyer" min="0" max="60" value="2"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Goose</h2>
+        <div class="row"><label for="g-x0">Beat from (x0)</label><input type="number" id="g-x0" min="0" max="319" value="250"></div>
+        <div class="row"><label for="g-x1">Beat to (x1)</label><input type="number" id="g-x1" min="0" max="319" value="299"></div>
+        <div class="row"><label for="g-y">Height (y)</label><input type="number" id="g-y" min="0" max="180" value="150"></div>
+        <div class="row"><label for="g-speed">Speed</label><input type="number" id="g-speed" min="0" max="6" step="0.1" value="1.5"></div>
+        <div class="row"><label for="g-catchRadius">Catch radius</label><input type="number" id="g-catchRadius" min="0" max="10" step="0.1" value="1.5"></div>
+        <div class="row"><label for="g-relentless">Relentless</label><input type="checkbox" id="g-relentless"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Export</h2>
+        <p style="margin:0 0 0.5rem;font-size:0.78rem;color:var(--muted)">
+          Paste this into content.js, add it to LEVELS, and write the hand-drawn
+          design-note comment the other levels carry — that part's still yours.
+        </p>
+        <textarea id="export-code" readonly spellcheck="false"></textarea>
+        <div class="controls">
+          <button class="btn" id="copy-export" type="button">Copy to clipboard</button>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script type="module">
+  import { SCENE_W, SCENE_H, PIT_Y, TICK_RATE, SKILLS, SKILL_INFO, LEVELS,
+    buildTerrain, winCount, formatTime } from './content.js';
+  import { newGame, tick, assignSkill, assignRefusal, duckNear } from './sim.js';
+  import { paintScene, drawSkillBadge, BADGE_PLATE_W, BADGE_PLATE_H } from './art.js';
+  import { fitCanvas, context2d } from '../good-vibes/pixel.js';
+
+  const els = id => document.getElementById(id);
+  const ui = {
+    scene: els('scene'), hud: els('hud'), hudSaved: els('hud-saved'), hudLost: els('hud-lost'),
+    hudHatched: els('hud-hatched'), hudTime: els('hud-time'), readout: els('readout'),
+    overlay: els('overlay'), overlayTitle: els('overlay-title'), overlayBody: els('overlay-body'),
+    playtestRestart: els('playtest-restart'),
+    editToolbar: els('edit-toolbar'), playToolbar: els('play-toolbar'),
+    toolTerrain: els('tool-terrain'), toolGap: els('tool-gap'), undo: els('undo'), flatten: els('flatten'),
+    status: els('status'), skills: els('skills'),
+    playtestBtn: els('playtest-btn'), stopPlaytest: els('stop-playtest'),
+    startFrom: els('start-from'), loadStartFrom: els('load-start-from'), newLevel: els('new-level'),
+    exportCode: els('export-code'), copyExport: els('copy-export'),
+  };
+  const ctx = context2d(ui.scene);
+
+  for(const level of LEVELS){
+    const opt = document.createElement('option');
+    opt.value = level.id;
+    opt.textContent = level.name;
+    ui.startFrom.append(opt);
+  }
+
+  function say(text, bad = false){
+    ui.status.textContent = text;
+    ui.status.dataset.bad = String(bad);
+  }
+
+  /* ------------------------------------------------------------ the model */
+
+  // One height per column — the same shape sim.js's terrain is built into
+  // (see content.js's buildTerrain), just edited directly instead of typed
+  // out as segments. PIT_Y marks a column as open pit, same convention as
+  // everywhere else in this game.
+  let heights = new Array(SCENE_W).fill(150);
+
+  const meta = {
+    id: 'custom', name: 'Custom Level',
+    nestX: 20, goalX: 300,
+    duckCount: 10, spawnSeconds: 2, timeSeconds: 180, winRatio: 0.75,
+    supply: { digger: 2, builder: 2, blocker: 2, climber: 2, flyer: 2 },
+    goose: { x0: 250, x1: 299, y: 150, speed: 1.5, catchRadius: 1.5, relentless: false },
+  };
+
+  function heightsToSegments(hs){
+    const segments = [];
+    let start = 0;
+    for(let x = 1; x <= hs.length; x++){
+      if(x === hs.length || hs[x] !== hs[start]){
+        segments.push({ from: start, to: x, y: hs[start] });
+        start = x;
+      }
+    }
+    return segments;
+  }
+
+  function buildLevel(){
+    return {
+      id: meta.id || 'custom', name: meta.name || 'Custom Level',
+      width: SCENE_W, height: SCENE_H,
+      segments: heightsToSegments(heights),
+      nestX: meta.nestX, goalX: meta.goalX,
+      duckCount: meta.duckCount,
+      spawnInterval: Math.round(TICK_RATE * meta.spawnSeconds),
+      timeLimit: Math.round(TICK_RATE * meta.timeSeconds),
+      winRatio: meta.winRatio,
+      supply: { ...meta.supply },
+      goose: { ...meta.goose },
+    };
+  }
+
+  /* ------------------------------------------------------------- the form */
+
+  const fields = {
+    'f-name': ['text', v => meta.name = v, () => meta.name],
+    'f-id': ['text', v => meta.id = v, () => meta.id],
+    'f-nestX': ['num', v => meta.nestX = v, () => meta.nestX],
+    'f-goalX': ['num', v => meta.goalX = v, () => meta.goalX],
+    'f-duckCount': ['num', v => meta.duckCount = v, () => meta.duckCount],
+    'f-spawn': ['num', v => meta.spawnSeconds = v, () => meta.spawnSeconds],
+    'f-time': ['num', v => meta.timeSeconds = v, () => meta.timeSeconds],
+    'f-winRatio': ['num', v => meta.winRatio = v, () => meta.winRatio],
+    's-digger': ['num', v => meta.supply.digger = v, () => meta.supply.digger],
+    's-builder': ['num', v => meta.supply.builder = v, () => meta.supply.builder],
+    's-blocker': ['num', v => meta.supply.blocker = v, () => meta.supply.blocker],
+    's-climber': ['num', v => meta.supply.climber = v, () => meta.supply.climber],
+    's-flyer': ['num', v => meta.supply.flyer = v, () => meta.supply.flyer],
+    'g-x0': ['num', v => meta.goose.x0 = v, () => meta.goose.x0],
+    'g-x1': ['num', v => meta.goose.x1 = v, () => meta.goose.x1],
+    'g-y': ['num', v => meta.goose.y = v, () => meta.goose.y],
+    'g-speed': ['num', v => meta.goose.speed = v, () => meta.goose.speed],
+    'g-catchRadius': ['num', v => meta.goose.catchRadius = v, () => meta.goose.catchRadius],
+  };
+
+  function readFieldsIntoMeta(){
+    for(const [id, [kind, setter]] of Object.entries(fields)){
+      const el = els(id);
+      const raw = el.value;
+      if(kind === 'num'){
+        const n = parseFloat(raw);
+        if(!Number.isNaN(n)) setter(n);
+      } else {
+        setter(raw);
+      }
+    }
+    meta.goose.relentless = els('g-relentless').checked;
+  }
+
+  function writeMetaIntoFields(){
+    for(const [id, [, , getter]] of Object.entries(fields)) els(id).value = getter();
+    els('g-relentless').checked = Boolean(meta.goose.relentless);
+  }
+
+  for(const id of Object.keys(fields)){
+    els(id).addEventListener('input', () => { readFieldsIntoMeta(); refreshExport(); saveToStorage(); });
+  }
+  els('g-relentless').addEventListener('change', () => { readFieldsIntoMeta(); refreshExport(); saveToStorage(); });
+
+  /* --------------------------------------------------------- load a level */
+
+  function loadLevel(level){
+    heights = buildTerrain(level.segments, level.width).map(y => y ?? SCENE_H + 200);
+    meta.id = level.id; meta.name = level.name;
+    meta.nestX = level.nestX; meta.goalX = level.goalX;
+    meta.duckCount = level.duckCount;
+    meta.spawnSeconds = level.spawnInterval / TICK_RATE;
+    meta.timeSeconds = level.timeLimit / TICK_RATE;
+    meta.winRatio = level.winRatio;
+    meta.supply = { ...level.supply };
+    meta.goose = { ...level.goose };
+    writeMetaIntoFields();
+    refreshExport();
+    saveToStorage();
+  }
+
+  ui.loadStartFrom.addEventListener('click', () => {
+    const id = ui.startFrom.value;
+    if(!id){
+      heights = new Array(SCENE_W).fill(150);
+      say('Starting from a blank, flat canvas.');
+    } else {
+      const level = LEVELS.find(l => l.id === id);
+      loadLevel(level);
+      say(`Loaded ${level.name} as a starting point.`);
+    }
+  });
+
+  ui.newLevel.addEventListener('click', () => {
+    if(!confirm('Clear the current level and start over?')) return;
+    heights = new Array(SCENE_W).fill(150);
+    meta.id = 'custom'; meta.name = 'Custom Level';
+    meta.nestX = 20; meta.goalX = 300;
+    meta.duckCount = 10; meta.spawnSeconds = 2; meta.timeSeconds = 180; meta.winRatio = 0.75;
+    meta.supply = { digger: 2, builder: 2, blocker: 2, climber: 2, flyer: 2 };
+    meta.goose = { x0: 250, x1: 299, y: 150, speed: 1.5, catchRadius: 1.5, relentless: false };
+    writeMetaIntoFields();
+    refreshExport();
+    saveToStorage();
+    say('Cleared.');
+  });
+
+  /* ----------------------------------------------------------- the export */
+
+  function formatY(y){ return y >= PIT_Y ? 'PIT_Y' : String(Math.round(y)); }
+
+  function refreshExport(){
+    const level = buildLevel();
+    const segLines = level.segments.map(s =>
+      `    { from: ${s.from}, to: ${s.to}, y: ${formatY(s.y)} },`).join('\n');
+    const gooseParts = [
+      `x0: ${level.goose.x0}`, `x1: ${level.goose.x1}`, `y: ${level.goose.y}`,
+      `speed: ${level.goose.speed}`, `catchRadius: ${level.goose.catchRadius}`,
+    ];
+    if(level.goose.relentless) gooseParts.push('relentless: true');
+    const code = [
+      `export const LEVEL_${(level.id || 'custom').toUpperCase().replace(/[^A-Z0-9]+/g, '_')} = {`,
+      `  id: '${level.id}',`,
+      `  name: '${level.name}',`,
+      `  width: SCENE_W,`,
+      `  height: SCENE_H,`,
+      ``,
+      `  segments: [`,
+      segLines,
+      `  ],`,
+      ``,
+      `  nestX: ${level.nestX},`,
+      `  goalX: ${level.goalX},`,
+      ``,
+      `  duckCount: ${level.duckCount},`,
+      `  spawnInterval: TICK_RATE * ${meta.spawnSeconds},`,
+      `  timeLimit: TICK_RATE * ${meta.timeSeconds},`,
+      `  winRatio: ${level.winRatio},`,
+      ``,
+      `  supply: { digger: ${level.supply.digger}, builder: ${level.supply.builder}, blocker: ${level.supply.blocker}, climber: ${level.supply.climber}, flyer: ${level.supply.flyer} },`,
+      ``,
+      `  goose: { ${gooseParts.join(', ')} },`,
+      `};`,
+    ].join('\n');
+    ui.exportCode.value = code;
+  }
+
+  ui.copyExport.addEventListener('click', async () => {
+    try{
+      await navigator.clipboard.writeText(ui.exportCode.value);
+      say('Copied.');
+    }catch{
+      ui.exportCode.select();
+      say('Select and copy manually — clipboard access was refused.', true);
+    }
+  });
+
+  /* --------------------------------------------------------------- saving */
+
+  const STORAGE_KEY = 'ddq-builder-v1';
+  let saveTimer = null;
+  function saveToStorage(){
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      try{
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ heights, meta }));
+      }catch{ /* private mode, or full — fine, this is a convenience only */ }
+    }, 300);
+  }
+
+  function loadFromStorage(){
+    let saved = null;
+    try{ saved = JSON.parse(localStorage.getItem(STORAGE_KEY)); }catch{ /* ignore */ }
+    if(!saved || !Array.isArray(saved.heights) || saved.heights.length !== SCENE_W) return false;
+    heights = saved.heights;
+    Object.assign(meta, saved.meta);
+    meta.supply = { ...meta.supply };
+    meta.goose = { ...meta.goose };
+    writeMetaIntoFields();
+    return true;
+  }
+
+  /* ------------------------------------------------------------- terrain */
+
+  let mode = 'edit';    // 'edit' | 'play'
+  let tool = 'terrain'; // 'terrain' | 'gap'
+  let strokeUndo = null;
+  let painting = false;
+  let lastCol = null, lastRow = null;
+
+  function setTool(next){
+    tool = next;
+    ui.toolTerrain.setAttribute('aria-pressed', String(tool === 'terrain'));
+    ui.toolGap.setAttribute('aria-pressed', String(tool === 'gap'));
+  }
+  ui.toolTerrain.addEventListener('click', () => setTool('terrain'));
+  ui.toolGap.addEventListener('click', () => setTool('gap'));
+
+  ui.flatten.addEventListener('click', () => {
+    strokeUndo = heights.slice();
+    heights = new Array(SCENE_W).fill(150);
+    refreshExport();
+    saveToStorage();
+    say('Terrain reset to flat ground.');
+  });
+
+  ui.undo.addEventListener('click', () => {
+    if(!strokeUndo){ say('Nothing to undo.'); return; }
+    heights = strokeUndo;
+    strokeUndo = null;
+    refreshExport();
+    saveToStorage();
+    say('Undone.');
+  });
+
+  function sceneCoords(event){
+    const box = ui.scene.getBoundingClientRect();
+    return {
+      col: Math.max(0, Math.min(SCENE_W - 1, Math.round((event.clientX - box.left) / box.width * SCENE_W))),
+      row: Math.max(0, Math.min(SCENE_H, Math.round((event.clientY - box.top) / box.height * SCENE_H))),
+    };
+  }
+
+  function paintAt(col, row){
+    heights[col] = tool === 'gap' ? PIT_Y : row;
+  }
+
+  // A straight line between the last painted column and this one, so a fast
+  // drag still leaves a continuous edge rather than a dashed one — the mouse
+  // moves in jumps, the terrain should not.
+  function paintLine(col0, row0, col1, row1){
+    const steps = Math.abs(col1 - col0) || 1;
+    for(let i = 0; i <= steps; i++){
+      const t = i / steps;
+      const col = Math.round(col0 + (col1 - col0) * t);
+      const row = Math.round(row0 + (row1 - row0) * t);
+      paintAt(col, row);
+    }
+  }
+
+  ui.scene.addEventListener('pointerdown', event => {
+    if(mode !== 'edit') return;
+    event.preventDefault();
+    ui.scene.focus({ preventScroll: true });
+    ui.scene.setPointerCapture(event.pointerId);
+    const { col, row } = sceneCoords(event);
+    strokeUndo = heights.slice();
+    painting = true;
+    lastCol = col; lastRow = row;
+    paintAt(col, row);
+  });
+
+  ui.scene.addEventListener('pointermove', event => {
+    const { col, row } = sceneCoords(event);
+    if(mode === 'edit'){
+      ui.readout.textContent = `col ${col}, height ${row === SCENE_H ? 'open' : row}`;
+      if(painting){
+        paintLine(lastCol, lastRow, col, row);
+        lastCol = col; lastRow = row;
+      }
+    }
+  });
+
+  addEventListener('pointerup', () => {
+    if(painting){ painting = false; refreshExport(); saveToStorage(); }
+  });
+
+  /* ------------------------------------------------------------ rendering */
+
+  // Edit mode never runs the sim — no hatching, no goose sweep — just the
+  // scene as it would look at the very first frame, redrawn continuously so
+  // a terrain edit shows up at once. The sky's clouds and birds still drift,
+  // driven by a local clock rather than the sim's, so the preview reads as
+  // alive rather than as a frozen screenshot.
+  let previewTicks = 0;
+
+  function renderEdit(){
+    const state = newGame(buildLevel());
+    state.ticks = previewTicks;
+    paintScene(ctx, state);
+  }
+
+  /* ------------------------------------------------------------ playtest */
+
+  const skillButtons = new Map();
+  for(const skill of SKILLS){
+    const info = SKILL_INFO[skill];
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'skill';
+    btn.dataset.skill = skill;
+    btn.setAttribute('aria-pressed', 'false');
+    btn.innerHTML = `<span class="name">${info.name}</span><span class="count" id="pcount-${skill}"></span>`;
+    btn.addEventListener('click', () => {
+      armed = armed === skill ? null : skill;
+      say(armed ? `${info.name} armed — click a walking duckling.` : '');
+      refreshSkillButtons();
+    });
+    ui.skills.append(btn);
+    skillButtons.set(skill, btn);
+  }
+
+  let playState = null;
+  let armed = null;
+  let playAcc = 0, playLast = null;
+  let playRunning = false;
+
+  function refreshSkillButtons(){
+    if(!playState) return;
+    for(const skill of SKILLS){
+      const btn = skillButtons.get(skill);
+      const left = playState.supply[skill];
+      btn.querySelector(`#pcount-${skill}`).textContent = `${left} left`;
+      btn.disabled = left <= 0 || Boolean(playState.ended);
+      btn.setAttribute('aria-pressed', String(armed === skill));
+      if(btn.disabled && armed === skill) armed = null;
+    }
+  }
+
+  function enterPlaytest(){
+    const level = buildLevel();
+    if(level.nestX >= level.goalX){ say('Nest has to be before the pond.', true); return; }
+    playState = newGame(level);
+    armed = null;
+    playAcc = 0; playLast = null;
+    mode = 'play';
+    ui.scene.classList.add('mode-play');
+    ui.editToolbar.hidden = true;
+    ui.playToolbar.hidden = false;
+    ui.hud.hidden = false;
+    ui.overlay.hidden = true;
+    ui.playtestBtn.hidden = true;
+    ui.stopPlaytest.hidden = false;
+    refreshSkillButtons();
+    say('Click a walking duckling to give it the armed skill.');
+    playRunning = true;
+    requestAnimationFrame(playFrame);
+  }
+
+  function exitPlaytest(){
+    mode = 'edit';
+    playRunning = false;
+    ui.scene.classList.remove('mode-play');
+    ui.editToolbar.hidden = false;
+    ui.playToolbar.hidden = true;
+    ui.hud.hidden = true;
+    ui.overlay.hidden = true;
+    ui.playtestBtn.hidden = false;
+    ui.stopPlaytest.hidden = true;
+    say('');
+  }
+
+  ui.playtestBtn.addEventListener('click', enterPlaytest);
+  ui.stopPlaytest.addEventListener('click', exitPlaytest);
+  ui.playtestRestart.addEventListener('click', enterPlaytest);
+
+  ui.scene.addEventListener('pointerdown', event => {
+    if(mode !== 'play' || !playState) return;
+    const box = ui.scene.getBoundingClientRect();
+    const x = (event.clientX - box.left) / box.width * SCENE_W;
+    const y = (event.clientY - box.top) / box.height * SCENE_H;
+    if(!armed){
+      const asked = duckNear(playState, x, y, 12);
+      return say(asked ? 'That duckling is already in the flock.' : 'Arm a skill first, then click a duckling.');
+    }
+    const duck = duckNear(playState, x, y, 12);
+    if(!duck) return say('No duckling there.');
+    const refusal = assignRefusal(playState, duck.id, armed);
+    if(refusal) return say(refusal, true);
+    assignSkill(playState, duck.id, armed);
+    say(`${SKILL_INFO[armed].name} given.`);
+    refreshSkillButtons();
+  });
+
+  function endMessage(){
+    const won = playState.ended === 'won';
+    const need = winCount(playState.level);
+    ui.overlayTitle.textContent = won ? 'The flock made it!' : 'Out of time';
+    ui.overlayBody.textContent = `${playState.saved} of ${playState.level.duckCount} saved — needed ${need}. ${playState.lost} lost.`;
+    ui.overlay.hidden = false;
+  }
+
+  function refreshHud(){
+    const need = winCount(playState.level);
+    ui.hudSaved.textContent = `${playState.saved} / ${need}`;
+    ui.hudLost.textContent = String(playState.lost);
+    ui.hudHatched.textContent = `${playState.hatched} / ${playState.level.duckCount}`;
+    ui.hudTime.textContent = formatTime(Math.max(0, playState.level.timeLimit - playState.ticks));
+  }
+
+  const STEP = 1 / TICK_RATE;
+  function playFrame(now){
+    if(!playRunning) return;
+    requestAnimationFrame(playFrame);
+    if(playLast === null) playLast = now;
+    const dt = Math.min(0.25, (now - playLast) / 1000);
+    playLast = now;
+    if(!playState.ended){
+      playAcc += dt;
+      while(playAcc >= STEP){ tick(playState); playAcc -= STEP; }
+      if(playState.ended){ refreshSkillButtons(); endMessage(); }
+    }
+    paintScene(ctx, playState);
+    refreshHud();
+  }
+
+  /* ------------------------------------------------------------- the loop */
+
+  function editFrame(now){
+    requestAnimationFrame(editFrame);
+    if(mode !== 'edit') return;
+    previewTicks = now / (1000 / TICK_RATE);
+    renderEdit();
+  }
+
+  /* ------------------------------------------------------------- sizing */
+
+  const screenWrap = ui.scene.parentElement;
+  function fitScene(){
+    fitCanvas(ui.scene, SCENE_W, SCENE_H, { container: screenWrap, maxHeightFraction: 0.68 });
+  }
+  fitScene();
+  addEventListener('resize', fitScene);
+
+  /* --------------------------------------------------------------- start */
+
+  if(loadFromStorage()) say('Restored your last session from this browser.');
+  else writeMetaIntoFields();
+  refreshExport();
+  requestAnimationFrame(editFrame);
+</script>
+
+<noscript>
+  <p style="max-width:40rem;margin:2rem auto">The level builder runs in the browser and needs JavaScript.
+  Nothing here is saved anywhere but this device.</p>
+</noscript>
+</body>
+</html>
