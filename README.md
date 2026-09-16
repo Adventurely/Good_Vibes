@@ -1789,7 +1789,8 @@ Four peoples live out there and each wants what only the others make, so trade
 is the reason to leave and the physics is the reason it is hard.
 
 It is at `/orbital-trader/` and it is **entirely client-side**: no room, no
-socket, no server. One save in `localStorage`.
+socket, no server. Three save slots in `localStorage`, and a save can be
+written out as a string and pasted back in on any machine.
 
     public/orbital-trader/
       index.html      the title screen, with the real chart turning behind it
@@ -1817,16 +1818,19 @@ predicted path *exact* rather than a preview: `predict` and `advance` are the
 same arithmetic, so the road drawn on the chart is the road flown, to the last
 digit. It is also why time warp is free — ×2500 costs the same as ×1.
 
-**Spheres of influence are hand-tuned numbers, not derived ones.** The design
-document asks for that, and it buys a system where a moon can never wander out
-of its planet's reach and where Grumm's approach can be made as generous as it
-needs to be.
+**Spheres of influence are derived, not authored.** `content.js` computes each
+one from the standard patched-conic formula — `a · (m/M)^(2/5)` — so mass is the
+only knob and no table can quietly disagree with the physics it is meant to
+describe. Harbour mouths work the same way: five of a world's own radii above
+the top of its air. Both are written back into `tuning.json` so that
+`check-tuning.mjs` has something to check the sky against, but the game derives
+them afresh and never reads the recorded ones.
 
 ### What the worlds look like
 
-Every body used to be a coloured dot, which is honest and forgettable:
-Bramble and Ledger were a green circle and a gold one and nobody ever learned
-which was which. `sprites.js` gives each of them a face, sixteen pixels
+Every body used to be a coloured dot, which is honest and forgettable: Moss
+and Slate were a green circle and a pale one and nobody ever learned which was
+which. `sprites.js` gives each of them a face, sixteen pixels
 across, drawn once into an offscreen canvas and blitted with smoothing off so
 it stays crunchy at any zoom. Under about seven pixels the dot comes back — a
 sixteen-pixel picture at that size is mush.
@@ -1836,12 +1840,12 @@ body's own colour, plus a recipe of features painted onto it — bands,
 continents, craters, ice caps, a storm, city lights that only appear on the
 night side. Generated rather than drawn because sixteen hand-placed spheres
 drift apart in their lighting, and because a recipe is four lines somebody can
-change. The randomness is seeded from the body's own id, so Bramble's
-hedgerows are where they were yesterday.
+change. The randomness is seeded from the body's own id, so Moss's hedgerows
+are where they were yesterday.
 
 The things that are not spheres are **drawn**, one character per pixel: the
-Arc's broken ring, Claw Rock (which has ears, and the cats insist that is a
-coincidence), Merrow's bazaar-covered snowball, the Far Lantern, and the ship.
+Arc's broken ring, Nail (which has ears, and the cats insist that is a
+coincidence), Whisker's bazaar-covered snowball, the Maw, and the ship.
 A silhouette is the whole character of those, and a silhouette is what a
 generator is worst at.
 
@@ -1921,8 +1925,8 @@ why it now survives the next frame. Focusing anything (tapping a body, `f`, the
 the lock: a view that can be lost is a view somebody has to get back, and this
 is how it is got back.
 
-**The clock has no ladder.** ×1 is ten real minutes to a lap of the low orbit
-a new game opens in over Tessel, which is slow enough that nothing appears to
+**The clock has no ladder.** ×1 is about eleven real minutes to a lap of the
+low orbit a new game opens in over Tassel, which is slow enough that nothing appears to
 move, and that is the point. Time is skipped by tapping somewhere on your road:
 the game says how far off it is and how long you will wait, and then runs at whatever rate covers
 it in about ten seconds and stops itself. A burn, a change of reach or a
@@ -1934,7 +1938,7 @@ The code and this document keep the names they have always had — `kiss()`,
 `zoneRadius`, a world's *reach*, the *road*, a *mark*. None of that is what a
 player sees any more. The interface was rewritten in plain words, on the rule
 that a term a new player has to look up has failed, and the glossary shrank
-from eighteen entries to nine because most of them stopped needing to exist.
+from eighteen entries to ten because most of them stopped needing to exist.
 
 | In the code, and above | On screen |
 |---|---|
@@ -1967,8 +1971,8 @@ replaced "be inside this radius travelling under this speed", which asked for
 two numbers that were not the manoeuvre, and which let a ship on a wild
 ellipse tie up because it happened to be slow at the top of it.
 
-Things with no gravity — the Arc, Claw Rock, the comet — have no orbit to be
-in, so those keep the near-enough-and-slow-enough rule they always had.
+The Maw has no gravity at all, so there is no orbit to be in, and it keeps the
+near-enough-and-slow-enough rule that everywhere used to have.
 
 ### Flying it
 
@@ -1998,12 +2002,12 @@ timestep anywhere, and nothing tunnels through a small moon at high warp.
 
 | | |
 | --- | --- |
-| Distance | au (Tessel's orbit is 1) |
-| Time | days (Tessel's year is 360 of them) |
-| Speed, Δv | au/day inside; 1 au/day shows as 1706 km/s, so Tessel's orbit reads 29.8 km/s |
+| Distance | au (Tassel's orbit is 1) |
+| Time | days (Tassel's year is 360 of them) |
+| Speed, Δv | au/day inside; 1 au/day shows as 1706 km/s, so Tassel's orbit reads 29.8 km/s |
 | Fuel | *is* the Δv budget. A burn subtracts its own size. No mass, no rocket equation |
-| Clock | ×1 is 0.0000370182663 days a second: ten real minutes to a lap of the 100 km orbit a new game opens in over Tassel, which takes 32 minutes of game time. Ten minutes a lap is the rate's only job, so moving the opening orbit moves the rate |
-| Scale | KSP's, not ours: every body is a tenth of real size and many times denser. Tessel is 498 km across with 9.25 m/s² at the ground, air to 70 km, and a reach of 116,500 km |
+| Clock | ×1 is 0.0000370182663 days a second: about eleven real minutes to a lap of the 150 km orbit a new game opens in over Tassel, which takes 36 minutes of game time. A lap of the opening orbit is the rate's only job, so moving that orbit moves what the rate means |
+| Scale | KSP's, not ours: every body is a tenth of real size and many times denser. Tassel is 996 km across with 9.25 m/s² at the ground, air to 70 km, and a reach of 60,300 km |
 
 ### Aiming
 
@@ -2039,8 +2043,10 @@ is cacheable, importable by the tests under Node, and cannot 404 into a page
 that draws nothing.
 
 You begin **in orbit**, not at a mooring — there is no landing in this game,
-and every harbour is a parking orbit you match — with one crate in the hold for
-Pip, the nearest moon. That first delivery is the whole opening brief.
+and every harbour is a parking orbit you match — 150 km over Tassel with an
+empty hold and one errand: fetch a pebble from Slate, the nearest moon, and
+bring it home. That errand is the whole opening brief, and the tutorial's
+spine.
 
 **The sky has to pass its own checker** before it is worth building:
 
@@ -2053,8 +2059,8 @@ It asserts what the design document promises — the calendar and the sky are
 the same thing, no moon can leave its planet's reach, sibling moons never
 overlap, every harbour mouth sits well inside its world's reach, every harbour
 sits inside its own mouth, Grumm turns a Hohmann arrival through at least
-sixty degrees, a lap of the opening orbit is ten real minutes at ×1 — and it
-prints the Δv table the ladder is built on:
+sixty degrees, a lap of the opening orbit is about eleven real minutes at ×1 —
+and it prints the Δv table the ladder is built on:
 
 | Route | Δv | Time |
 | --- | --- | --- |
@@ -2169,8 +2175,8 @@ a flag no caller can set.
 Nothing here can cost the save. A dry tank calls a tow, for money and days. So
 does flying into something, at half again the price. A cat toll in the Scatter
 takes a share and never the hold, never a passenger, and never from a ship with
-nothing worth taking. Money can go below zero, and then it is a debt to Ledger,
-who are delighted. A skip ends at every change of reach, every burn and every
+nothing worth taking. Money can go below zero, and then it is a debt to the
+Tassel harbour bank, who are delighted. A skip ends at every change of reach, every burn and every
 harbour mouth — and a step of flight *stops* at the first of those, so even the
 fastest skip can never carry you clean through a moon you were aiming at.
 

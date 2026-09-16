@@ -47,10 +47,6 @@ export const SPECIES = {
   none:     { name: 'Nobody', plural: 'Nobody', adjective: '', colour: '#9a948a', animal: 'nobody at all' },
 };
 
-/* The four peoples who trade, remember and hold grudges. The Builders are gone
- * and nobody lives at the Maw, so neither keeps a reputation. */
-export const PEOPLES = ['emberkin', 'otter', 'cat', 'frog'];
-
 /* Colours for the chart, by body. Peoples' worlds take their people's hue;
  * the rest are what they are: a violet giant, a glass-snow world, a lamp. */
 const BODY_COLOURS = {
@@ -115,13 +111,12 @@ export function dockRange(radius, atmo){
  * in orbit round them: the mouth is a circle your whole orbit has to fit
  * inside, and gravity holds you there while you trade.
  *
- * A rendezvous is the other kind. The belt havens and the Maw have no weight
- * at all, and Nail has so little — fifty metres a second of escape, which is
- * a hard jump — that an orbit round it is not a thing anybody waits in. You
- * come alongside instead: near enough, slow enough, and somebody throws you a
- * line. This is authored rather than derived because it is a fact about the
- * yards, not a consequence of the mass: Nail's berths are bolted to the rock,
- * and Slate's ride above it. */
+ * A rendezvous is the other kind. The Maw has no weight at all, so there is no
+ * orbit round it to wait in: you come alongside instead — near enough, slow
+ * enough, and somebody throws you a line. Anything weightless is one of these
+ * whether or not a table says so, and `harbour: "rendezvous"` is there to make
+ * one of a world that does have a little pull, should a yard ever be built
+ * somewhere too small to orbit. Nothing uses that today. */
 export const isRendezvous = b => b?.harbour === 'rendezvous' || !((b?.mu ?? 0) > 0);
 
 const rawMu = Object.fromEntries(TUNING.bodies.map(b => [b.id, b.mu ?? 0]));
@@ -192,7 +187,6 @@ export const GOODS = ECONOMY.goods.map(g => ({
   buyers: g.buyers ?? [],
   lovedBy: g.lovedBy ?? [],
 }));
-const goodIds = new Set(GOODS.map(g => g.id));
 const goodIndex = new Map(GOODS.map(g => [g.id, g]));
 export const goodById = id => goodIndex.get(id);
 
@@ -242,7 +236,6 @@ export const PORTS = Object.fromEntries(Object.entries(ECONOMY.ports).map(([id, 
        is rolled per visit and lives in the save, not here. */
     sells: GOODS.filter(g => g.producedAt.includes(id)).map(g => ({ good: g.id, priceMul: 1 })),
     buys: GOODS.filter(g => wantsGood(id, g.id)).map(g => ({ good: g.id, priceMul: 1 })),
-    gifts: p.gifts ?? null,
     openWithin: p.openWhen?.rAuBelow ?? null,
     towAllowed: id !== 'maw',
   }];

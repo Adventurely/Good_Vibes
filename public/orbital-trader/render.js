@@ -1632,17 +1632,4 @@ export function locateOnPrediction(world, prediction, t){
   return null;
 }
 
-/* The target's ghost at closest approach, expressed in the frame of the leg
- * it happens on, ready for the chart. */
-export function approachForChart(world, prediction, ca, targetId){
-  if(!ca) return null;
-  const seg = prediction.segments.find(s => ca.t >= s.t0 - 1e-9 && ca.t <= s.t1 + 1e-9);
-  if(!seg) return null;
-  const mu = world.get(seg.body).mu;
-  const s = propagate(mu, seg.r0, seg.v0, ca.t - seg.t0);
-  const segAbs = absState(world, seg.body, ca.t).r;
-  const tgAbs = absState(world, targetId, ca.t).r;
-  return { segBody: seg.body, shipLocal: s.r, targetLocal: sub(tgAbs, segAbs), t: ca.t, distance: ca.distance, relSpeed: ca.relSpeed };
-}
-
 export { railState, norm, sub, scale, perp };

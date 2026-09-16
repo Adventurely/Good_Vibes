@@ -374,7 +374,7 @@ test('cryo hull cooling goes on over heat shielding, not instead of it', () => {
 });
 
 test('the text has every line the game asks for', () => {
-  /* The glossary shrank from 18 to 9 when the terms stopped needing a
+  /* The glossary shrank from 18 to 10 when the terms stopped needing a
      translation: "low point" and "docking range" explain themselves, so what
      is left is the handful that genuinely has something to say. Every entry
      still carries the technical word a KSP player would know it by. */
@@ -1499,11 +1499,11 @@ test('a burn that slows you down never reads as a number going up', () => {
   assert.ok(spend > 0, 'a braking burn still costs fuel');
   assert.ok(Math.abs(spend - ms(120)) < ms(1), `the gauge counts ${S.fmtKms(spend)} for a 120 m/s brake`);
 
-  /* And the four words are the four buttons. If a label ever disagreed with
-     the arrow a player just pressed, that is the same bug again. */
+  /* And the four words are the four arrows. If a label ever disagreed with
+     the arrow a player just pulled, that is the same bug again. */
   const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
   const axes = PLAY.slice(PLAY.indexOf('const AXES = {'), PLAY.indexOf('};', PLAY.indexOf('const AXES = {')));
-  for(const word of ['Forward', 'Back', 'Out', 'In']) assert.ok(axes.includes(`'${word}'`), `the pad has no ${word} button`);
+  for(const word of ['Forward', 'Back', 'Out', 'In']) assert.ok(axes.includes(`'${word}'`), `there is no ${word} arrow`);
 });
 
 test('the ship menu is the only one flying, and nothing load-bearing went with the two that left', () => {
