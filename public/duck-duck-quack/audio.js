@@ -3,18 +3,23 @@
  * Synthesised on the fly, the way Good Vibes does it: no file to fetch, a
  * look-ahead scheduler queueing notes a little ahead of the audio clock
  * because `setTimeout` drifts and a beat makes drift obvious immediately.
- * This game gets one track rather than three — one level does not need a
- * different mood for a title screen than it needs for itself — but it is
- * built to be busy about it: Lemmings' tunes are what this is chasing,
- * and what makes a tracker loop like that work is a bassline with more
- * going on than the chord tones, not a fuller chord.
+ * Each level gets its own track, keyed by level id — the park, the warren
+ * and the orchard don't feel like the same place, so they shouldn't sound
+ * like it either — but all three are built to be busy about it: Lemmings'
+ * tunes are what this is chasing, and what makes a tracker loop like that
+ * work is a bassline with more going on than the chord tones, not a
+ * fuller chord.
  *
- * A minor walking down to E, funk-shaped: the bass does not just sit on the
- * root, it hits the root, its octave and its fifth in a syncopated pattern
- * that repeats under every chord, and the lead is one riff transposed to
- * whichever root is under it rather than four different melodies — which is
- * exactly the trick a two-channel tracker used to make eight bars feel like
- * one idea instead of four.
+ * PARK_SONG: a minor walking down to E, funk-shaped: the bass does not
+ * just sit on the root, it hits the root, its octave and its fifth in a
+ * syncopated pattern that repeats under every chord, and the lead is one
+ * riff transposed to whichever root is under it rather than four different
+ * melodies — which is exactly the trick a two-channel tracker used to make
+ * eight bars feel like one idea instead of four. WARREN_SONG, ORCHARD_SONG
+ * and GROVE_SONG below follow the same eight-bar, call-and-response shape,
+ * but differ in tempo, swing, register and waveform on purpose: a tunnel is
+ * not a park, an orchard is not either of them, and a level with a goose
+ * that does not give up is not any of the three.
  *
  * Nothing plays until a user gesture, because autoplay policy decides that,
  * not us. The mute choice persists per browser, under its own key so it
@@ -106,7 +111,156 @@ export const PARK_SONG = {
   openHatAt: [15],
 };
 
-export const SONGS = { park: PARK_SONG };
+/* The Warren: underground, mechanical, a digging machine's steady chug
+ * rather than a groove. Square wave instead of triangle for a grittier
+ * core, heavily low-passed so it reads as gritty-but-warm rather than
+ * harsh; a steady four-on-the-floor pulse on the bass root instead of
+ * Park's syncopated root/octave/fifth pattern, because a tunnel does not
+ * swing. Minor throughout, lower register, barely any swing at all.
+ */
+export const WARREN_SONG = {
+  bpm: 96,
+  swing: 0.04,
+  bars: [
+    { chord: [48, 'min7'] }, { chord: [44, 'maj'] },
+    { chord: [51, 'maj'] },  { chord: [46, 'dom7'] },
+    { chord: [48, 'min7'], lead: 'response' }, { chord: [44, 'maj'], lead: 'response' },
+    { chord: [51, 'maj'],  lead: 'response' }, { chord: [46, 'dom7'], lead: 'response', fill: true },
+  ],
+
+  // A steady chug on the root, quarter notes, an octave down — an engine's
+  // pulse, not a funk pattern.
+  bass: [
+    [0, 0, 2], [4, 0, 2], [8, 0, 2], [12, 0, 2],
+  ],
+  bassType: 'square',
+  bassCut: 500,
+  bassLevel: 0.14,
+
+  // Sparse, mechanical calls rather than a hook — space is part of the
+  // sound of a tunnel.
+  lead: [
+    [0, 12, 3], [8, 12, 3], [12, 15, 2],
+  ],
+  leadResponse: [
+    [2, 10, 2], [6, 12, 1], [10, 17, 2], [13, 15, 1],
+  ],
+  leadType: 'square',
+  leadCut: 1200,
+  leadLevel: 0.06,
+
+  // One stab per bar, not two — sparser than Park across the board.
+  stabAt: [7],
+  stabType: 'square',
+  stabCut: 900,
+  stabLevel: 0.035,
+
+  kickAt: [0, 4, 8, 12],
+  snareAt: [8],
+  hatAt: [2, 10],
+  openHatAt: [],
+};
+
+/* The Orchard: bright, bouncy, a I-V-vi-IV daylight progression instead of
+ * a minor walk-down. Triangle bass keeps Park's warmth but skips through
+ * root-octave-fifth-octave instead of a syncopated funk pattern; the lead
+ * sits an octave higher and the filters open up (both cutoffs well above
+ * Park's) for a lighter, more open top end; the hats are dense and lively
+ * rather than sparse, for a daytime-orchard feel instead of a park-at-dusk
+ * one.
+ */
+export const ORCHARD_SONG = {
+  bpm: 132,
+  swing: 0.18,
+  bars: [
+    { chord: [60, 'maj'] },  { chord: [55, 'dom7'] },
+    { chord: [57, 'min7'] }, { chord: [53, 'maj'] },
+    { chord: [60, 'maj'], lead: 'response' },  { chord: [55, 'dom7'], lead: 'response' },
+    { chord: [57, 'min7'], lead: 'response' }, { chord: [53, 'maj'], lead: 'response', fill: true },
+  ],
+
+  // A skipping root-octave-fifth-octave bounce, eight hits a bar — livelier
+  // and denser than Park's syncopated funk pattern.
+  bass: [
+    [0, 0, 1], [2, 12, 1], [4, 7, 1], [6, 12, 1],
+    [8, 0, 1], [10, 12, 1], [12, 7, 1], [14, 12, 1],
+  ],
+  bassType: 'triangle',
+  bassCut: 1400,
+  bassLevel: 0.15,
+
+  lead: [
+    [0, 19, 2], [3, 22, 1], [6, 24, 2], [10, 22, 1], [13, 19, 2],
+  ],
+  leadResponse: [
+    [1, 22, 1], [4, 26, 2], [8, 24, 1], [11, 22, 2], [14, 19, 1],
+  ],
+  leadType: 'triangle',
+  leadCut: 5000,
+  leadLevel: 0.075,
+
+  stabAt: [2, 6, 10, 14],
+  stabType: 'sawtooth',
+  stabCut: 2000,
+  stabLevel: 0.04,
+
+  kickAt: [0, 8],
+  snareAt: [4, 12],
+  hatAt: [0, 2, 4, 6, 8, 10, 12, 14],
+  openHatAt: [7, 15],
+};
+
+/* The Grove: a goose that does not give up, so the music does not relax
+ * either. Sawtooth rather than triangle or square, for the grittiest edge
+ * of the four, and the fastest tempo with the tightest swing — driving
+ * rather than funky or bouncy or mechanical. i-VII-VI-V7 instead of a plain
+ * walk-down: that last chord is real dominant tension aimed back at the
+ * first, which the other three songs never reach for, and it is what makes
+ * the loop feel like it is chasing something instead of strolling past it.
+ */
+export const GROVE_SONG = {
+  bpm: 140,
+  swing: 0.06,
+  bars: [
+    { chord: [52, 'min7'] }, { chord: [50, 'dom7'] },
+    { chord: [48, 'maj'] },  { chord: [47, 'dom7'] },
+    { chord: [52, 'min7'], lead: 'response' }, { chord: [50, 'dom7'], lead: 'response' },
+    { chord: [48, 'maj'],  lead: 'response' }, { chord: [47, 'dom7'], lead: 'response', fill: true },
+  ],
+
+  // A driving eighth-note pulse, root and fifth only — urgency, not funk.
+  bass: [
+    [0, 0, 1], [2, 0, 1], [4, 7, 1], [6, 0, 1],
+    [8, 0, 1], [10, 0, 1], [12, 7, 1], [14, 0, 1],
+  ],
+  bassType: 'sawtooth',
+  bassCut: 900,
+  bassLevel: 0.13,
+
+  // Short, repeated alarm-calls rather than a melody that resolves —
+  // a lead that keeps circling back on itself instead of going anywhere.
+  lead: [
+    [0, 14, 1], [1, 14, 1], [6, 17, 1], [7, 17, 1], [11, 19, 2],
+  ],
+  leadResponse: [
+    [2, 17, 1], [3, 17, 1], [8, 19, 1], [9, 19, 1], [12, 22, 2],
+  ],
+  leadType: 'sawtooth',
+  leadCut: 2400,
+  leadLevel: 0.06,
+
+  stabAt: [5, 9, 13],
+  stabType: 'sawtooth',
+  stabCut: 1300,
+  stabLevel: 0.04,
+
+  kickAt: [0, 3, 6, 8, 11, 14],
+  snareAt: [4, 12],
+  hatAt: [2, 6, 10, 14],
+  openHatAt: [15],
+};
+
+export const SONGS = { park: PARK_SONG, warren: WARREN_SONG, orchard: ORCHARD_SONG, grove: GROVE_SONG };
 
 /* ------------------------------------------------------------------ engine --- */
 

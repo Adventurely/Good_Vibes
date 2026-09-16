@@ -49,6 +49,11 @@ export function newGame(level){
   return {
     level,
     terrain: buildTerrain(level.segments, level.width),
+    // Where a Digger or a Builder has actually changed the way through — see
+    // groundAt below for why these live apart from `terrain` rather than
+    // overwriting it. null everywhere nothing has been dug or bridged yet.
+    tunnelY: new Array(level.width).fill(null),
+    bridgeY: new Array(level.width).fill(null),
     ticks: 0,
     hatched: 0,
     nextHatch: 0,
@@ -71,15 +76,22 @@ function loseDuckling(state, d, cause){
   state.poofs.push({ x: d.x, y: d.y, age: 0 });
 }
 
+const columnAt = (state, x) => Math.max(0, Math.min(state.level.width - 1, Math.round(x)));
+
+/* The ground a walking duckling actually stands on: whichever a Digger or a
+   Builder has left at this column, or the level's own terrain if neither
+   ever touched it. `terrain` itself never changes after newGame — see
+   setTunnelAt/setBridgeAt, and content.js's header note on why the two are
+   kept apart rather than one overwriting the other. */
 const groundAt = (state, x) => {
-  const col = Math.max(0, Math.min(state.level.width - 1, Math.round(x)));
+  const col = columnAt(state, x);
+  if(state.tunnelY[col] != null) return state.tunnelY[col];
+  if(state.bridgeY[col] != null) return state.bridgeY[col];
   return state.terrain[col];
 };
 
-const setGroundAt = (state, x, y) => {
-  const col = Math.max(0, Math.min(state.level.width - 1, Math.round(x)));
-  state.terrain[col] = y;
-};
+const setTunnelAt = (state, x, y) => { state.tunnelY[columnAt(state, x)] = y; };
+const setBridgeAt = (state, x, y) => { state.bridgeY[columnAt(state, x)] = y; };
 
 const blockerAt = (state, x) =>
   state.ducks.some(d => d.state === 'blocking' && Math.round(d.x) === Math.round(x));
@@ -133,7 +145,29 @@ function stepGoose(state){
   }
 
   const g = state.level.goose;
-  state.goose.x += state.goose.dir * g.speed;
+  const dir = state.goose.dir;
+  const nextX = state.goose.x + dir * g.speed;
+
+  /* A Blocker stops the goose exactly the way it would a wall it cannot
+   * climb — which is the one thing a Blocker actually changes the outcome
+   * of, see sim.js's header note and content.js's SKILL_INFO. Scanned as a
+   * whole run of columns rather than just the rounded landing spot: the
+   * goose's own speed is not always a whole number, and a fast enough sweep
+   * must not step clean over a duckling planted in its way.
+   *
+   * It gives up the hunt outright rather than just turning around — the same
+   * `fed` flag a catch sets, so it flees the scene exactly as it would have
+   * after eating (see the branch above). On a level where a catch itself
+   * does not call the hunt off (`goose.relentless`, see content.js), this is
+   * the only thing that does.
+   */
+  const from = Math.ceil(Math.min(state.goose.x, nextX));
+  const to = Math.floor(Math.max(state.goose.x, nextX));
+  for(let x = from; x <= to; x++){
+    if(blockerAt(state, x)){ state.goose.dir = -dir; state.goose.fed = true; return; }
+  }
+
+  state.goose.x = nextX;
   if(state.goose.x >= g.x1){ state.goose.x = g.x1; state.goose.dir = -1; }
   if(state.goose.x <= g.x0){ state.goose.x = g.x0; state.goose.dir = 1; }
 }
@@ -165,13 +199,16 @@ function stepDuck(state, d){
 
 /* Whether the goose would catch a duckling standing at `x` right now.
  *
- * Only the *first* duckling it reaches counts, on purpose: the flock walks
- * the whole level in lockstep, evenly spaced by the same hatch interval, so a
- * sweep that can catch one duckling in a given position is either in range of
- * every duckling that ever stands there or none of them — there is no
- * "sometimes" for it to land on. One honk and a scattered feather is the
- * goose actually doing something; a hazard that is either free or total is
- * not a puzzle, it is a coin flip decided at level-design time. */
+ * Ordinarily only the *first* duckling it reaches counts, on purpose: the
+ * flock walks the whole level in lockstep, evenly spaced by the same hatch
+ * interval, so a sweep that can catch one duckling in a given position is
+ * either in range of every duckling that ever stands there or none of them —
+ * there is no "sometimes" for it to land on. One honk and a scattered
+ * feather is the goose actually doing something; a hazard that is either
+ * free or total is not a puzzle, it is a coin flip decided at level-design
+ * time. `goose.relentless` (content.js) is the one exception: there, a catch
+ * does not call the hunt off, only a Blocker does — see stepWalking and
+ * stepGoose. */
 function goosedAt(state, x){
   if(state.goose.fed) return false;
   const g = state.level.goose;
@@ -182,12 +219,17 @@ function stepWalking(state, d){
   const level = state.level;
 
   if(d.x >= level.goalX){ d.state = 'saved'; return; }
-  if(goosedAt(state, d.x)){ loseDuckling(state, d, 'goosed'); state.goose.fed = true; return; }
+  if(goosedAt(state, d.x)){
+    loseDuckling(state, d, 'goosed');
+    // Ordinarily one catch is the whole hunt — see goosedAt above. A
+    // relentless goose (content.js's goose.relentless) keeps hunting after
+    // a catch instead, so only a Blocker calls it off; see stepGoose.
+    if(!level.goose.relentless) state.goose.fed = true;
+    return;
+  }
 
   const nextX = d.x + d.dir;
   if(nextX < 0 || nextX >= level.width){ loseDuckling(state, d, 'edge'); return; }
-
-  if(blockerAt(state, nextX)){ d.dir = -d.dir; return; }
 
   const nextY = groundAt(state, nextX);
   const delta = nextY - d.y;   // positive: ground drops away; negative: ground rises
@@ -248,16 +290,17 @@ function stepFalling(state, d){
   }
 }
 
-/* A digger drives straight ahead at the height it started from, cutting the
- * wall down to that height one column at a time, and walks out the far side
+/* A digger drives straight ahead at the height it started from, cutting a
+ * tunnel through the wall one column at a time, and walks out the far side
  * of it. Its own height never changes: this is a tunnel through, not a ramp
  * down.
  *
- * In a heightmap there is no roof to leave overhead (see content.js on why
- * the terrain is one number per column), so what this actually leaves behind
- * is a notch cut down to head height rather than a bored tunnel. At this
- * scale the two read the same — a way through a wall that was not there
- * before, open to everything walking behind it.
+ * Unlike the old cut-to-head-height notch, this leaves `terrain` itself
+ * completely alone — see groundAt above and content.js's header note. What
+ * gets written is `tunnelY`, a second number for the same column that only
+ * ever matters where it is not null, so the wall the tunnel runs through
+ * still stands, full height, in art.js: a bored hole with rock still
+ * overhead, not a hillside quietly bulldozed down to head height.
  *
  * It stops the moment the ground ahead is already at or below the height
  * being cut, and stops without stepping onto it, so the ordinary walking
@@ -272,12 +315,18 @@ function stepDigging(state, d){
 
   if(groundAt(state, nextX) >= d.y){ d.state = 'walking'; return; }
 
-  setGroundAt(state, nextX, d.y);
+  setTunnelAt(state, nextX, d.y);
   d.x = nextX;
   d.digLeft -= 1;
   if(d.digLeft <= 0) d.state = 'walking';
 }
 
+/* A builder lays a bridge at the height it started from, one column at a
+ * time, until solid ground meets it on the far side. `bridgeY` is its own
+ * layer over the same column `tunnelY` uses for a dig — see groundAt above
+ * — so a bridged gap still shows as open air below the deck in art.js
+ * rather than the gap itself quietly filling in with dirt.
+ */
 function stepBuilding(state, d){
   const level = state.level;
   const nextX = d.x + d.dir;
@@ -292,7 +341,7 @@ function stepBuilding(state, d){
     return;
   }
 
-  setGroundAt(state, nextX, d.y);
+  setBridgeAt(state, nextX, d.y);
   d.x = nextX;
   d.buildLeft -= 1;
   if(d.buildLeft <= 0) d.state = 'walking';

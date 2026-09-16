@@ -306,6 +306,74 @@ export function drawGround(ctx, terrain, level){
   drawLilyPads(ctx, terrain, level);
 }
 
+/* How tall a Digger's tunnel reads on screen — enough headroom for a duck
+   sprite (six pixels) with room to spare, capped at the wall's own surface
+   (see drawTunnels) so a shallow wall never shows a hole poking out its
+   top. Independent of DIG_MAX_STEPS in content.js: that is how far a dig
+   can run, this is how tall one looks once it has. */
+const TUNNEL_HEADROOM = 16;
+
+/* A hole bored through a wall, one per tunnelled column — see sim.js's
+ * stepDigging and content.js's header note on why this is a second layer
+ * rather than `terrain` itself getting shorter. Ink rather than sky: this is
+ * the inside of a hillside, not a view out of one, and a bore this small
+ * reading as open air would look like the wall had simply been erased.
+ * A sliver of slate along the floor is what keeps the cut edge legible
+ * against the ink — without it the hole and the duck walking through it
+ * blur into the same flat black.
+ */
+function drawTunnels(ctx, state){
+  const { terrain, tunnelY } = state;
+  for(let x = 0; x < tunnelY.length; x++){
+    const floor = tunnelY[x];
+    if(floor == null) continue;
+    const top = Math.max(terrain[x], floor - TUNNEL_HEADROOM);
+    if(floor <= top) continue;
+    ctx.fillStyle = hex('k');
+    ctx.fillRect(x, top, 1, floor - top);
+    ctx.fillStyle = hex('s');
+    ctx.fillRect(x, floor - 1, 1, 1);
+  }
+}
+
+/* How thick a Builder's deck reads, and how far apart its support posts
+   stand — a post every few columns rather than one per column, the same
+   "suggest it, do not render every plank" economy the grass tufts and rock
+   speckle use elsewhere in this file. */
+const BRIDGE_DECK_H = 2;
+const BRIDGE_POST_GAP = 8;
+const BRIDGE_POST_H = 5;
+
+/* A deck laid over open air, one run per bridged span — see sim.js's
+ * stepBuilding and content.js's header note. `terrain` under a bridged
+ * column is still PIT_Y (see buildTerrain), so drawGround has already
+ * painted nothing at all there; this is what turns that absence into a
+ * crossing instead of leaving it looking like an unfinished level.
+ */
+function drawBridges(ctx, state){
+  const { bridgeY } = state;
+  let runStart = -1;
+  const flushPosts = (from, to, y) => {
+    for(let x = from; x <= to; x += BRIDGE_POST_GAP){
+      ctx.fillStyle = hex('n');
+      ctx.fillRect(x, y + BRIDGE_DECK_H, 1, BRIDGE_POST_H);
+    }
+  };
+  for(let x = 0; x <= bridgeY.length; x++){
+    const y = x < bridgeY.length ? bridgeY[x] : null;
+    if(y != null && runStart < 0) runStart = x;
+    if(y == null && runStart >= 0){
+      const deckY = bridgeY[runStart];
+      ctx.fillStyle = hex('N');
+      ctx.fillRect(runStart, deckY, x - runStart, BRIDGE_DECK_H);
+      ctx.fillStyle = hex('k');
+      ctx.fillRect(runStart, deckY, x - runStart, 1);
+      flushPosts(runStart, x - 1, deckY);
+      runStart = -1;
+    }
+  }
+}
+
 /* The pond: two bands of blue with a dithered seam, the same trick the sky
    uses, so the water reads as lit from above rather than as a flat tile. */
 function drawWaterColumn(ctx, x, y, fillH){
@@ -533,6 +601,8 @@ function drawPoof(ctx, p){
 export function paintScene(ctx, state){
   drawSky(ctx, state.ticks);
   drawGround(ctx, state.terrain, state.level);
+  drawTunnels(ctx, state);
+  drawBridges(ctx, state);
   drawGoose(ctx, state);
   for(const d of state.ducks){
     if(d.state === 'saved' || d.state === 'lost') continue;
