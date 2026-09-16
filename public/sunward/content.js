@@ -183,24 +183,59 @@ export function bulkCost(grower, owned, count, growth = COST_GROWTH, crate = 0, 
 /* How many you could afford at once, which is what the "max" button needs.
    Solved rather than counted, for the same reason. */
 export function affordable(grower, owned, light, growth = COST_GROWTH, crate = 0, cap = Infinity){
-  if(light < growerCost(grower, owned, growth, cap)) return 0;
-  /* Past the cap every copy is the same price, so the answer is division and
-     the logarithm below would be wrong by miles. */
-  if(owned >= cap){
-    const each = grower.cost * Math.pow(growth, cap);
-    let n = Math.max(1, Math.floor(light / (each * (1 - crate))));
-    while(n > 1 && bulkCost(grower, owned, n, growth, crate, cap) > light) n--;
-    return n;
+  const price = n => bulkCost(grower, owned, n, growth, crate, cap);
+  if(light < price(1)) return 0;
+
+  /* An estimate first, so the search below starts somewhere near the answer.
+     Three shapes, and the one in the middle is the one that was wrong: a buy
+     that starts below the price ceiling and ends above it. The plain geometric
+     solution assumes the price climbs for ever, so past the ceiling it thinks
+     each further copy costs more than it does and stops early — it was leaving
+     forty-eight moss beds unbought on a purse that could afford a hundred and
+     sixty-four. The purse is divided by the crate discount because the search
+     below runs where that discount applies. */
+  const purse = light / (1 - crate);
+  const climbing = Math.max(0, cap - owned);
+  let guess;
+  if(climbing <= 0){
+    // Every copy the same price: division, not logarithms.
+    guess = purse / (grower.cost * Math.pow(growth, cap));
+  } else {
+    const first = grower.cost * Math.pow(growth, owned);
+    const climb = first * (Math.pow(growth, climbing) - 1) / (growth - 1);
+    guess = purse < climb
+      ? Math.log(1 + (purse * (growth - 1)) / first) / Math.log(growth)
+      : climbing + (purse - climb) / (grower.cost * Math.pow(growth, cap));
   }
-  const first = grower.cost * Math.pow(growth, owned);
-  // Solved against the discounted purse, then walked back below — the discount
-  // only applies at ten or more, so the closed form can overshoot at nine.
-  const n = Math.log(1 + (light / (1 - crate) * (growth - 1)) / first) / Math.log(growth);
-  let count = Math.max(1, Math.floor(n));
-  // The logarithm is right to about a part in 1e15, and being one over is a
-  // button that spends money the player does not have. Walk it back if so.
-  while(count > 1 && bulkCost(grower, owned, count, growth, crate, cap) > light) count--;
-  return count;
+
+  /* Then bisect, rather than walking the estimate in. Every branch above is a
+     floating-point expression and can be out either way, and a walk cannot fix
+     it in the late game: by the time a lot is buying five thousand million
+     million at once, adding one to a double does nothing at all, so the loop
+     never advances and the tab stops answering. Bisection is fifty-three steps
+     at the worst and is exact.
+
+     It runs from CRATE up, because the discount makes the price NOT monotonic
+     across that boundary — ten can cost less than nine — and bisection needs a
+     monotonic predicate. Below the boundary there are nine numbers and they are
+     simply tried. */
+  let best = 0;
+  for(let n = 1; n < CRATE; n++){
+    if(price(n) <= light) best = n; else break;
+  }
+  let hi = Math.min(Number.MAX_SAFE_INTEGER, Math.max(CRATE, Math.ceil(guess) + 2));
+  if(price(CRATE) <= light){
+    let lo = CRATE;
+    while(price(hi) <= light && hi < Number.MAX_SAFE_INTEGER){
+      hi = Math.min(Number.MAX_SAFE_INTEGER, hi * 2);
+    }
+    while(lo < hi){
+      const mid = lo + Math.floor((hi - lo + 1) / 2);
+      if(price(mid) <= light) lo = mid; else hi = mid - 1;
+    }
+    best = Math.max(best, lo);
+  }
+  return Math.max(1, best);
 }
 
 /* ------------------------------------------------------------- the upgrades */

@@ -1916,3 +1916,44 @@ test('the rings climb, so a season past the fortieth is still worth having', () 
       `"${ring.blurb}" against ${ring.effect.allMult}`);
   }
 });
+
+test('the max button is exact and finishes, at every price curve and every purse', () => {
+  /* Two bugs lived here. The closed form solved the uncapped series, so once
+     The level ground was bought a buy that started below the ceiling and ended
+     above it stopped early — forty-eight moss beds left unbought on a purse
+     that could afford a hundred and sixty-four. And the walk that was meant to
+     fix that could not: by the time a lot buys five thousand million million at
+     once, adding one to a double does nothing, so the loop never advanced and
+     the tab stopped answering.
+
+     So: exact, and bounded, over every combination the game can produce. */
+  let checked = 0;
+  for(const g of GROWERS){
+    for(const cap of [Infinity, 100, 20]){
+      for(const crate of [0, 0.2]){
+        for(const growth of [COST_GROWTH, 1.13]){
+          for(const owned of [0, 5, 9, 10, 19, 20, 21, 50, 90, 99, 100, 101, 250]){
+            for(const light of [0, 1, 1e3, 1e6, 1e9, 1e12, 1e18, 1e30]){
+              const n = affordable(g, owned, light, growth, crate, cap);
+              const where = `${g.id} cap=${cap} crate=${crate} growth=${growth} owned=${owned} light=${light}`;
+              checked++;
+              if(n === 0){
+                assert.ok(bulkCost(g, owned, 1, growth, crate, cap) > light,
+                  `${where}: said none were affordable and one was`);
+                continue;
+              }
+              assert.ok(bulkCost(g, owned, n, growth, crate, cap) <= light,
+                `${where}: offered ${n} and the till would refuse`);
+              // Maximal, wherever a double can still tell n from n + 1.
+              if(Number.isSafeInteger(n + 1) && n + 1 !== n){
+                assert.ok(bulkCost(g, owned, n + 1, growth, crate, cap) > light,
+                  `${where}: offered ${n} and ${n + 1} was affordable`);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  assert.ok(checked > 10000, 'the sweep has to actually sweep');
+});
