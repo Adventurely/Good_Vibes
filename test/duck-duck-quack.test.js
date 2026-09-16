@@ -13,7 +13,7 @@ import { test } from 'node:test';
 
 import {
   SCENE_W, SCENE_H, WALK_STEP, FALL_SAFE, FALL_SPEED, FLY_SPEED, TICK_RATE, BUILD_SECONDS,
-  SKILLS, SKILL_INFO, LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5, LEVEL_6, LEVELS,
+  SKILLS, SKILL_INFO, LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5, LEVEL_6, LEVEL_7, LEVELS,
   buildTerrain, buildLayer, winCount, goalHeading, formatTime,
 } from '../public/duck-duck-quack/content.js';
 
@@ -920,6 +920,91 @@ test('a blocker planted on The Spire\'s ledge turns a wingless duckling back rat
   }
   assert.equal(state.saved, 0, 'a blocker turns ducklings back, it does not fly them down');
   assert.ok(state.ducks.some(d => d.state === 'blocking'), 'the blocker itself should still be standing there');
+});
+
+/* ------------------------------------------------------------- The Falls, played */
+
+/* A bot for The Falls: two bridges, a Flyer given at hatch (it answers all
+ * three drops off the one assignment, the level's whole point), and
+ * either Climber or Digger for the one wall partway down.
+ */
+function playLevel7(useDigger){
+  const state = newGame(LEVEL_7);
+  let builder1Used = false, builder2Used = false;
+  for(let i = 0; i < LEVEL_7.timeLimit && !state.ended; i++){
+    for(const d of state.ducks){
+      if(d.state !== 'walking') continue;
+      if(!hasTrait(d, 'flyer')) assignSkill(state, d.id, 'flyer');
+      if(!hasTrait(d, useDigger ? 'digger' : 'climber')) assignSkill(state, d.id, useDigger ? 'digger' : 'climber');
+      if(!builder1Used && d.x === 300){ if(assignSkill(state, d.id, 'builder')) builder1Used = true; continue; }
+      if(!builder2Used && d.x === 140){ if(assignSkill(state, d.id, 'builder')) builder2Used = true; continue; }
+    }
+    tick(state);
+  }
+  return state;
+}
+
+test('The Falls can be won by climbing the one wall', () => {
+  const state = playLevel7(false);
+  assert.equal(state.ended, 'won');
+  assert.ok(state.saved >= winCount(LEVEL_7), `only ${state.saved} saved, needed ${winCount(LEVEL_7)}`);
+});
+
+test('The Falls can also be won by digging the one wall instead of climbing it', () => {
+  const state = playLevel7(true);
+  assert.equal(state.ended, 'won');
+  assert.ok(state.saved >= winCount(LEVEL_7), `only ${state.saved} saved, needed ${winCount(LEVEL_7)}`);
+});
+
+test('The Falls cannot be won without a Flyer — two of its three drops are real', () => {
+  const state = newGame(LEVEL_7);
+  let builder1Used = false, builder2Used = false;
+  for(let i = 0; i < LEVEL_7.timeLimit && !state.ended; i++){
+    for(const d of state.ducks){
+      if(d.state !== 'walking') continue;
+      if(!hasTrait(d, 'climber')) assignSkill(state, d.id, 'climber');
+      if(!builder1Used && d.x === 300){ if(assignSkill(state, d.id, 'builder')) builder1Used = true; continue; }
+      if(!builder2Used && d.x === 140){ if(assignSkill(state, d.id, 'builder')) builder2Used = true; continue; }
+    }
+    tick(state);
+  }
+  assert.equal(state.saved, 0, 'nothing should survive the real drops without a Flyer');
+});
+
+test('The Falls cannot be won without a way past the one wall', () => {
+  const state = newGame(LEVEL_7);
+  let builder1Used = false, builder2Used = false;
+  for(let i = 0; i < LEVEL_7.timeLimit && !state.ended; i++){
+    for(const d of state.ducks){
+      if(d.state !== 'walking') continue;
+      if(!hasTrait(d, 'flyer')) assignSkill(state, d.id, 'flyer');
+      if(!builder1Used && d.x === 300){ if(assignSkill(state, d.id, 'builder')) builder1Used = true; continue; }
+      if(!builder2Used && d.x === 140){ if(assignSkill(state, d.id, 'builder')) builder2Used = true; continue; }
+    }
+    tick(state);
+  }
+  assert.equal(state.saved, 0, 'nothing should get past the wall without a Digger or a Climber');
+});
+
+test('The Falls cannot be won without a Builder — neither gap has any other answer', () => {
+  const state = newGame(LEVEL_7);
+  for(let i = 0; i < LEVEL_7.timeLimit && !state.ended; i++){
+    for(const d of state.ducks){
+      if(d.state !== 'walking') continue;
+      if(!hasTrait(d, 'flyer')) assignSkill(state, d.id, 'flyer');
+      if(!hasTrait(d, 'climber')) assignSkill(state, d.id, 'climber');
+    }
+    tick(state);
+  }
+  assert.equal(state.saved, 0, 'nothing should get past either gap without a Builder');
+});
+
+test('The Falls walks nest to pond right to left, from a higher start down to a lower pond', () => {
+  assert.equal(goalHeading(LEVEL_7), -1);
+  assert.ok(LEVEL_7.nestX > LEVEL_7.goalX);
+  const nestY = buildTerrain(LEVEL_7.segments, LEVEL_7.width)[LEVEL_7.nestX];
+  const goalY = buildTerrain(LEVEL_7.segments, LEVEL_7.width)[LEVEL_7.goalX];
+  assert.ok(goalY > nestY, 'the pond should sit lower (larger y) than the nest');
 });
 
 test('formatTime reads as minutes:seconds', () => {
