@@ -774,7 +774,7 @@
         if(bulk !== 'max') return bulk;
         const bonus = bonuses(state);
         return Math.max(1, affordable(grower, state.owned[grower.id] || 0, state.light,
-          bonus.costGrowth, bonus.crate));
+          bonus.costGrowth, bonus.crate, bonus.costCap));
       }
 
       function buyGrower(id){
@@ -926,7 +926,7 @@
           const { row, note, cost } = growerRows.get(g.id);
           const owned = state.owned[g.id] || 0;
           const count = howMany(g);
-          const price = bulkCost(g, owned, count, bonus.costGrowth, bonus.crate);
+          const price = bulkCost(g, owned, count, bonus.costGrowth, bonus.crate, bonus.costCap);
           const afford = state.light >= price;
           row.dataset.afford = String(afford);
           row.setAttribute('aria-disabled', String(!afford));

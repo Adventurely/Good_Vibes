@@ -158,25 +158,40 @@ export const COST_GROWTH = 1.15;
    shop's draw loop, once a row, once a frame, and they have no state to hand —
    but every caller that HAS a state must pass the same number the purchase
    will use, or the button says a price the till refuses. */
-export const growerCost = (grower, owned, growth = COST_GROWTH) =>
-  Math.ceil(grower.cost * Math.pow(growth, owned));
+export const growerCost = (grower, owned, growth = COST_GROWTH, cap = Infinity) =>
+  Math.ceil(grower.cost * Math.pow(growth, Math.min(owned, cap)));
 
 /* What `count` more cost in one go. The closed form of the sum, because the
    bulk buttons ask for a hundred at a time and a loop of a hundred pows to
    grey out one button is a loop that runs on every frame. */
 export const CRATE = 10;   // what counts as buying by the crate
 
-export function bulkCost(grower, owned, count, growth = COST_GROWTH, crate = 0){
+export function bulkCost(grower, owned, count, growth = COST_GROWTH, crate = 0, cap = Infinity){
   if(count <= 0) return 0;
-  const first = grower.cost * Math.pow(growth, owned);
-  const full = first * (Math.pow(growth, count) - 1) / (growth - 1);
+  /* Two parts: the copies still on the climb, summed in closed form, and the
+     ones past the cap, which all cost what the capped one costs. The closed
+     form alone would be wrong by everything above the cap, and a loop would
+     run a hundred pows a frame to grey out one button. */
+  const climbing = Math.max(0, Math.min(count, cap - owned));
+  const flat = count - climbing;
+  const first = grower.cost * Math.pow(growth, Math.min(owned, cap));
+  const full = (climbing > 0 ? first * (Math.pow(growth, climbing) - 1) / (growth - 1) : 0)
+    + flat * grower.cost * Math.pow(growth, Math.min(owned + climbing, cap));
   return Math.ceil(count >= CRATE ? full * (1 - crate) : full);
 }
 
 /* How many you could afford at once, which is what the "max" button needs.
    Solved rather than counted, for the same reason. */
-export function affordable(grower, owned, light, growth = COST_GROWTH, crate = 0){
-  if(light < growerCost(grower, owned, growth)) return 0;
+export function affordable(grower, owned, light, growth = COST_GROWTH, crate = 0, cap = Infinity){
+  if(light < growerCost(grower, owned, growth, cap)) return 0;
+  /* Past the cap every copy is the same price, so the answer is division and
+     the logarithm below would be wrong by miles. */
+  if(owned >= cap){
+    const each = grower.cost * Math.pow(growth, cap);
+    let n = Math.max(1, Math.floor(light / (each * (1 - crate))));
+    while(n > 1 && bulkCost(grower, owned, n, growth, crate, cap) > light) n--;
+    return n;
+  }
   const first = grower.cost * Math.pow(growth, owned);
   // Solved against the discounted purse, then walked back below — the discount
   // only applies at ten or more, so the closed form can overshoot at nine.
@@ -184,7 +199,7 @@ export function affordable(grower, owned, light, growth = COST_GROWTH, crate = 0
   let count = Math.max(1, Math.floor(n));
   // The logarithm is right to about a part in 1e15, and being one over is a
   // button that spends money the player does not have. Walk it back if so.
-  while(count > 1 && bulkCost(grower, owned, count, growth, crate) > light) count--;
+  while(count > 1 && bulkCost(grower, owned, count, growth, crate, cap) > light) count--;
   return count;
 }
 
@@ -384,8 +399,8 @@ export const PRESTIGE = [
     blurb: 'Time away also pays for tapping, at the pace you have kept up this season.' },
   { id: 'the-reserve', name: 'The reserve', seed: 21, cost: 3.3e17, effect: { interest: 0.005 },
     blurb: 'Energy you are holding earns half a percent a second, up to what the lot itself makes.' },
-  { id: 'half-price', name: 'Half price', seed: 22, cost: 1.3e18, effect: { upgradeCost: 0.5 },
-    blurb: 'Every upgrade in the shop costs half what it says.' },
+  { id: 'half-price', name: 'Half price', seed: 22, cost: 1.3e18, effect: { upgradeCost: 0.5, needHalf: true },
+    blurb: 'Every upgrade in the shop costs half what it says, and unlocks at half of what it asks for.' },
   { id: 'standing-start', name: 'A standing start', seed: 23, cost: 5.3e18, effect: { startGrowers: 5 },
     blurb: 'Every season begins with five of every kind already standing.' },
   { id: 'long-count', name: 'The long count', seed: 24, cost: 2.1e19, effect: { medalMult: 0.01 },
@@ -400,14 +415,14 @@ export const PRESTIGE = [
     blurb: 'Every grower you buy counts as two. You pay for one and two go in the ground.' },
   { id: 'running-start', name: 'A running start', seed: 29, cost: 2.2e22, effect: { startUpgrades: 5 },
     blurb: 'Every season begins with the five cheapest upgrades in the shop already bought.' },
-  { id: 'quiet-word', name: 'A quiet word', seed: 30, cost: 8.6e22, effect: { needHalf: true },
-    blurb: 'Every upgrade in the shop unlocks at half of what it asks for.' },
+  { id: 'level-ground', name: 'The level ground', seed: 30, cost: 8.6e22, effect: { costCap: 100 },
+    blurb: 'Past the hundredth of a kind, its price stops climbing. The hundred and first costs what the hundredth did.' },
   { id: 'volunteers', name: 'Volunteers', seed: 31, cost: 3.5e23, effect: { volunteers: 1000 },
     blurb: 'Every thousandth tap plants something for free, of whichever kind is cheapest.' },
   { id: 'heavy-crop', name: 'The heavy crop', seed: 32, cost: 1.4e24, effect: { windfallAll: true },
-    blurb: 'A windfall pays the whole lot as well as the hand: a second of everything, on top of the tap.' },
+    blurb: 'Every windfall also pays a whole second of what the lot makes, on top of the tap itself.' },
   { id: 'carry-over', name: 'Carry over', seed: 33, cost: 5.5e24, effect: { carryEnergy: 0.01 },
-    blurb: 'Every season begins with a hundredth of what the season before it earned.' },
+    blurb: 'Every season begins with one percent of what the season before it earned.' },
   { id: 'compound', name: 'Compound', seed: 34, cost: 2.2e25, effect: { interestCap: 3 },
     blurb: "The reserve's ceiling triples: energy in hand can earn up to three times what the lot makes." },
   { id: 'seed-for-seed', name: 'A seed for a seed', seed: 35, cost: 8.9e25, effect: { seedGain: 0.05 },
@@ -415,13 +430,13 @@ export const PRESTIGE = [
   { id: 'never-a-pause', name: 'Never a pause', seed: 36, cost: 3.5e26, effect: { streakFloor: 2 },
     blurb: 'Your hands never count as slower than two taps a second, even when they have stopped.' },
   { id: 'deep-sleep', name: 'Deep sleep', seed: 37, cost: 1.4e27, effect: { offlineRate: 1.5 },
-    blurb: 'The lot makes half again as much while the tab is shut as it does while you watch it.' },
+    blurb: 'The lot works at 150% of its rate while the tab is shut.' },
   { id: 'practice', name: 'Practice', seed: 38, cost: 5.7e27, effect: { practice: 0.01 },
     blurb: 'Everything makes 1% more for every hundred taps this season, up to three times as much.' },
   { id: 'slow-season', name: 'The slow season', seed: 39, cost: 2.3e28, effect: { patience: 0.001 },
     blurb: 'Everything makes a tenth of a percent more for every minute this season has run, up to twice as much.' },
   { id: 'hundred-summers', name: 'A hundred summers', seed: 40, cost: 9.1e28, effect: { allMult: 8 },
-    blurb: 'Everything makes eight times as much. This is the last row anyone sat down and wrote.' },
+    blurb: 'Everything makes eight times as much.' },
 ];
 
 export const PRESTIGE_BY_ID = Object.fromEntries(PRESTIGE.map(u => [u.id, u]));
@@ -435,6 +450,14 @@ export const PRESTIGE_BY_ID = Object.fromEntries(PRESTIGE.map(u => [u.id, u]));
  */
 export const RING_FROM = PRESTIGE.length + 1;
 export const RING_MULT = 2;
+/* And each ring a little more than the one below it. A tail of identical rows
+   is a tail that stops mattering: the seed above always costs four times the
+   one below, so a flat multiplier means every season past the fortieth is
+   worth less than the last. Two percent a ring is not enough to run away with
+   and is enough for the ladder to still be climbing. */
+export const RING_STEP = 1.02;
+export const ringMult = n =>
+  Number.isInteger(n) && n >= RING_FROM ? RING_MULT * Math.pow(RING_STEP, n - RING_FROM) : 0;
 
 /* What a row costs: about three tenths of the lifetime energy its own seed
    wanted. Every written row is priced at that, and it is what makes a row
@@ -455,10 +478,14 @@ const RINGS = new Map();
 export function ringFor(n){
   if(!Number.isInteger(n) || n < RING_FROM) return null;
   if(!RINGS.has(n)){
+    const mult = ringMult(n);
+    // Two figures, and no trailing zeroes on a round one: "twice as much" and
+    // "2.43 times as much" are both things a person can read.
+    const said = mult.toFixed(2).replace(/\.?0+$/, '');
     RINGS.set(n, Object.freeze({
       id: 'ring-' + n, name: 'Ring ' + n, seed: n, cost: prestigeCost(n),
-      effect: { allMult: RING_MULT },
-      blurb: 'Another ring of growth. Everything makes twice as much.',
+      effect: { allMult: mult },
+      blurb: `Another ring of growth. Everything makes ${said} times as much.`,
     }));
   }
   return RINGS.get(n);
@@ -854,6 +881,7 @@ export function bonuses(state){
     interestCap: 1,                 // how many lot-seconds that may reach
     deepBeds: 0,                    // per ten of a kind standing
     crate: 0,                       // taken off a buy of ten or more
+    costCap: Infinity,              // the copy past which a price stops climbing
     plantMult: 1,                   // how many go in for each one paid for
     startUpgrades: 0,               // cheapest shop rows bought at a season's start
     needHalf: false,                // shop rows unlock at half what they ask
@@ -892,6 +920,7 @@ export function bonuses(state){
     if(e.interestCap) out.interestCap = Math.max(out.interestCap, e.interestCap);
     if(e.deepBeds) out.deepBeds += e.deepBeds;
     if(e.crate) out.crate = Math.min(0.9, out.crate + e.crate);
+    if(e.costCap) out.costCap = Math.min(out.costCap, e.costCap);
     if(e.plantMult) out.plantMult = Math.max(out.plantMult, e.plantMult);
     if(e.startUpgrades) out.startUpgrades = Math.max(out.startUpgrades, e.startUpgrades);
     if(e.needHalf) out.needHalf = true;
@@ -1079,7 +1108,7 @@ export function volunteerFor(state, bonus = bonuses(state)){
   if(!bonus.volunteers || state.run.taps % bonus.volunteers !== 0) return null;
   let pick = null, best = Infinity;
   for(const id of GROWER_IDS){
-    const price = growerCost(GROWER_BY_ID[id], state.owned[id] || 0, bonus.costGrowth);
+    const price = growerCost(GROWER_BY_ID[id], state.owned[id] || 0, bonus.costGrowth, bonus.costCap);
     if(price < best){ best = price; pick = id; }
   }
   return pick;
@@ -1256,7 +1285,7 @@ export function plantRefusal(state, id, count = 1, bonus = bonuses(state)){
   if(!g) return 'There is no such grower.';
   if(!Number.isInteger(count) || count < 1) return 'One at a time, at least.';
   const owned = state.owned[id] || 0;
-  const cost = bulkCost(g, owned, count, bonus.costGrowth, bonus.crate);
+  const cost = bulkCost(g, owned, count, bonus.costGrowth, bonus.crate, bonus.costCap);
   if(state.light < cost) return `Not enough energy — ${formatEnergy(cost - state.light)} short.`;
   return null;
 }
@@ -1266,7 +1295,7 @@ export function plant(state, id, count = 1){
   const bonus = bonuses(state);
   if(plantRefusal(state, id, count, bonus)) return null;
   const g = GROWER_BY_ID[id];
-  const cost = bulkCost(g, state.owned[id] || 0, count, bonus.costGrowth, bonus.crate);
+  const cost = bulkCost(g, state.owned[id] || 0, count, bonus.costGrowth, bonus.crate, bonus.costCap);
   state.light -= cost;
   // The seed drill puts in more than you paid for. The price was already
   // settled above, so the extra is free in every sense.

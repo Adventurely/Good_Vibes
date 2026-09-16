@@ -1699,23 +1699,64 @@ next seed wants is four times the last — a million, four, sixteen, sixty-four 
 measured against a lifetime total nothing ever clears, so you never re-earn
 what you had, you add three times it again from bare ground.
 
-**What a seed buys is nothing. What it opens is a row.** Twelve of them in
-`PRESTIGE`, one a seed, each paid for in energy inside a run and then kept
-through every season afterwards. That carrying-across is what the loop was
-missing: the lot went back to nothing while the next seed wanted four times as
-much, so without it every season was harder than the last and the loop stopped
-paying. Three of the rows do things nothing else in the game can — a head
-start in energy every season, full rate while the tab is shut instead of half,
-and a day of time away counted instead of half a day — and the rest go through
-the same bonus keys the run's own upgrades use, so a multiplier is a
-multiplier wherever it was bought.
+**What a seed buys is nothing. What it opens is a row.** Forty of them
+written out by hand in `PRESTIGE`, one a seed, each paid for in energy inside
+a run and then kept through every season afterwards. That carrying-across is
+what the loop was missing: the lot went back to nothing while the next seed
+wanted four times as much, so without it every season was harder than the last
+and the loop stopped paying.
+
+**No two rungs do the same thing**, which is the owner's rule and the reason
+the ladder is written rather than generated. Nineteen of the levers under it
+did not exist before: a windfall every fifth tap rather than every tenth, a
+price curve that climbs at 13% a copy instead of 15% and another that stops
+climbing past the hundredth, a fifth off a crate of ten, two growers in the
+ground for every one paid for, a tenth of the lot living through the season
+and five of every kind standing at the start of the next, a season that opens
+with the five cheapest shop rows already bought and another that opens with a
+hundredth of what the last one earned, interest on energy in hand and a
+ceiling on that interest, a windfall that pays the whole lot a second of its
+own income, a free grower every thousandth tap, a percent for every medal on
+the record and five for every kind standing and five for every seed ever
+earned, a percent per hundred taps and a tenth of one per minute, a still hand
+that still counts as two a second, and a shut tab that out-earns an open one.
+A test folds each rung onto a bare save and fails if the numbers do not move;
+another asserts that a save with nothing rooted folds to exactly the game as
+it was.
+
+Three of them change what something costs, which is the dangerous kind. A shop
+that quotes one number and charges another is a shop that refuses a button it
+had just greyed in, so `growerCost`, `bulkCost` and `affordable` take the curve
+and its ceiling as arguments, `upgradeCost` is a function rather than a field
+read, and every call site on the page passes the same bonus the purchase will
+use. A test buys at seven counts either side of the cap and asserts the quote
+and the charge agree to the penny.
+
+**Past the fortieth the ladder grows itself**, one ring a season, for ever,
+because the season's toast says another row is open every season and it has to
+be true on the four hundredth as well as the first. Each ring is two percent
+better than the one below it: the seed above always wants four times the
+lifetime energy of the one below, so a flat tail would mean every season past
+the last written row was worth less than the one before it, which is a ladder
+that has stopped.
+
+Two of the rungs were dead when the owner read them back, which is what
+reading them back is for. *The high sun* raised the peak of the day, and
+*Around the clock* had flattened the day away, so the first did nothing once
+the second was bought. Then it turned out the second did nothing either:
+flattening the sky is worth exactly zero, because the swing already averages
+to one and all a flat day does is take the peaks away with the troughs. The
+two are one row now, holding the whole lot at the top of the arc — including
+the all-hours kinds, which are the three biggest earners on the lot and were
+being skipped by a sky upgrade sold in the late game.
 
 Simulated against the real module, with a player who ends a season on sight and
 buys whatever they can afford: six seeds in the first day, at 1h24m, 3h21m,
 6h21m, 9h39m, 13h54m and 19h36m; thirteen in a week; the whole tree standing
 by day six; fifteen in a month. The medal ladder was rebuilt to match — it ran
 to a hundred, which a cube root could reach and this cannot — and now runs 1
-to 10, then 12, 15, 20, 25, 30 and 40.
+to 10, then 12, 15, 20, 25, 30 and 40, the last of them landing on the same
+season as the last written rung.
 
 **The tree ages with each season, and never gets smaller.** The lot goes back
 to bare ground and the tree comes back a year older, drawn bigger and grander,

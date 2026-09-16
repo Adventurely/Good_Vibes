@@ -30,7 +30,7 @@ import {
   prestigeRefusal, prestige, winters, winterMedal, seedsEarned, seedMedal,
   PRESTIGE, PRESTIGE_BY_ID, prestigeOffered, rootRefusal, root, growerCount, markGrown,
   upgradeCost, CRATE, halfNeed, volunteerFor,
-  RING_FROM, RING_MULT, ringFor, prestigeAt, prestigeUpTo, prestigeById, prestigeCost,
+  RING_FROM, RING_MULT, RING_STEP, ringMult, ringFor, prestigeAt, prestigeUpTo, prestigeById, prestigeCost,
   OFFLINE_RATE, OFFLINE_CAP, offlineGain, catchUp,
   toSave, fromSave, formatLight, formatTime, formatStat, breakdown,
 } from '../public/sunward/content.js';
@@ -979,9 +979,12 @@ test('the seed tree is a ladder: one rung a seed, each dearer than the last', ()
     assert.equal(up.seed, i + 1, `"${up.id}" should be the rung for seed ${i + 1}`);
     assert.ok(up.cost > 0, `"${up.id}" must cost energy`);
     if(i > 0) assert.ok(up.cost > PRESTIGE[i - 1].cost, `"${up.id}" must cost more than the rung below it`);
-    // One thing a rung. A per-kind multiplier is spelled with two keys — which
-    // kind, and by how much — and is still one thing.
-    const does = Object.keys(up.effect).filter(k => k !== 'mult');
+    /* One thing a rung — counted as ideas, not as keys. A per-kind multiplier
+       needs two (which kind, and by how much), and Half price is one idea the
+       owner asked to be one row: the shop is kinder to you, in price and in
+       what it demands. */
+    const PAIRED = new Set(['mult', 'needHalf']);
+    const does = Object.keys(up.effect).filter(k => !PAIRED.has(k));
     assert.equal(does.length, 1, `"${up.id}": one effect a rung, not ${does.length}`);
     if(up.effect.grower){
       assert.ok(GROWER_BY_ID[up.effect.grower], `"${up.id}" names a grower that is not there`);
@@ -1265,7 +1268,8 @@ test('a ring in a save is a ring in the bonuses, and an impossible one is not', 
   assert.equal(rootRefusal(state, ring.id), null, 'it must be buyable when the seeds are there');
   root(state, ring.id);
   assert.equal(state.light, 0, 'and it must cost what it says');
-  assert.equal(bonuses(state).allMult, RING_MULT);
+  assert.ok(Math.abs(bonuses(state).allMult - ringMult(ring.seed)) < 1e-12);
+  assert.ok(ringMult(ring.seed) > RING_MULT, 'a ring above the first is worth more than the first');
 
   // It survives the save, and a ring below where the rings start does not.
   const back = fromSave(toSave(state));
@@ -1754,12 +1758,12 @@ test('A running start and Carry over both leave something behind them', () => {
   assert.ok(Math.abs(both.light - (500 + 1e7)) < 1e-6);
 });
 
-test('A quiet word halves what the shop asks, and never below one', () => {
+test('Half price halves the shop both ways, and never asks for less than one', () => {
   const need = { taps: 100, owned: { id: 'moss', count: 7 }, earned: 1 };
   const plain = bonuses(newGame());
-  const quiet = bonuses((() => { const s = newGame(); s.rooted['quiet-word'] = true; return s; })());
+  const half = bonuses((() => { const s = newGame(); s.rooted['half-price'] = true; return s; })());
   assert.equal(halfNeed(need, plain), need, 'untouched without the row');
-  assert.deepEqual(halfNeed(need, quiet), { taps: 50, owned: { id: 'moss', count: 4 }, earned: 1 });
+  assert.deepEqual(halfNeed(need, half), { taps: 50, owned: { id: 'moss', count: 4 }, earned: 1 });
 
   // A row that was out of reach comes onto the shelf.
   const lot = rows => {
@@ -1770,8 +1774,53 @@ test('A quiet word halves what the shop asks, and never below one', () => {
     s.life.seconds = 400; s.run.seconds = 400;
     return s;
   };
-  assert.ok(offered(lot(['quiet-word'])).length > offered(lot([])).length,
+  assert.ok(offered(lot(['half-price'])).length > offered(lot([])).length,
     'half the requirement has to open at least one row');
+});
+
+test('The level ground stops a price climbing past the hundredth of a kind', () => {
+  const moss = GROWER_BY_ID['moss'];
+  const cap = bonuses((() => { const s = newGame(); s.rooted['level-ground'] = true; return s; })()).costCap;
+  assert.equal(cap, 100);
+
+  // Under the cap nothing changes; over it, every copy is the capped price.
+  for(const owned of [0, 50, 99]) assert.equal(growerCost(moss, owned, COST_GROWTH, cap), growerCost(moss, owned));
+  const flat = growerCost(moss, 100, COST_GROWTH, cap);
+  for(const owned of [100, 150, 400]) assert.equal(growerCost(moss, owned, COST_GROWTH, cap), flat);
+  assert.ok(growerCost(moss, 400) > flat * 100, 'and uncapped it would have run away');
+
+  /* The bulk price is the climb plus the flat part, and it has to agree with
+     buying them one at a time — the closed form is the only thing standing
+     between a button and a price it cannot honour. */
+  const oneByOne = (owned, count) => {
+    let sum = 0;
+    for(let i = 0; i < count; i++) sum += moss.cost * Math.pow(COST_GROWTH, Math.min(owned + i, cap));
+    return Math.ceil(sum);
+  };
+  for(const [owned, count] of [[0, 1], [0, 10], [0, 150], [90, 30], [100, 5], [100, 200], [250, 40]]){
+    assert.equal(bulkCost(moss, owned, count, COST_GROWTH, 0, cap), oneByOne(owned, count),
+      `${count} from ${owned} owned`);
+  }
+
+  // And whatever "max" offers, the purchase must go through.
+  for(const owned of [0, 95, 100, 300]){
+    for(const light of [1e3, 1e6, 1e9]){
+      const state = newGame();
+      state.rooted['level-ground'] = true;
+      state.owned.moss = owned;
+      state.light = light;
+      const b = bonuses(state);
+      const count = affordable(moss, owned, light, b.costGrowth, b.crate, b.costCap);
+      if(count === 0){
+        assert.ok(growerCost(moss, owned, b.costGrowth, b.costCap) > light,
+          `it said none were affordable at ${owned} owned with ${light}, and one was`);
+        continue;
+      }
+      assert.ok(bulkCost(moss, owned, count, b.costGrowth, b.crate, b.costCap) <= light,
+        `max said ${count} at ${owned} owned with ${light}`);
+      assert.equal(plantRefusal(state, 'moss', count), null, `max said ${count} and the game refused`);
+    }
+  }
 });
 
 test('Volunteers turn up on the thousandth tap, as the cheapest kind, for nothing', () => {
@@ -1841,4 +1890,29 @@ test('Compound raises the ceiling on The reserve and nothing else', () => {
   // an income, and there is nothing under it until The reserve is bought.
   const alone = lot(['compound']);
   assert.ok(Math.abs(tick(alone, 1) - rate) < rate * 1e-6);
+});
+
+test('the rings climb, so a season past the fortieth is still worth having', () => {
+  // The seed above always wants four times the lifetime energy of the one
+  // below. A flat tail means every season past the last written row is worth
+  // less than the one before it, which is a ladder that has stopped.
+  assert.equal(ringMult(RING_FROM), RING_MULT, 'the first ring is the plain doubling');
+  let last = 0;
+  for(let n = RING_FROM; n < RING_FROM + 200; n++){
+    const m = ringMult(n);
+    assert.ok(m > last, `ring ${n} must be worth more than the one below`);
+    assert.ok(Math.abs(m / ringMult(n - 1 < RING_FROM ? RING_FROM : n - 1) - (n === RING_FROM ? 1 : RING_STEP)) < 1e-12
+      || n === RING_FROM, `ring ${n} must be exactly one step above`);
+    last = m;
+  }
+  assert.equal(ringMult(RING_FROM - 1), 0, 'a written rung is not a ring');
+  assert.equal(ringMult(2.5), 0);
+
+  // The blurb has to say the number the effect actually applies.
+  for(const n of [RING_FROM, RING_FROM + 1, RING_FROM + 9, RING_FROM + 59]){
+    const ring = ringFor(n);
+    const said = Number(/makes ([\d.]+) times/.exec(ring.blurb)[1]);
+    assert.ok(Math.abs(said - ring.effect.allMult) < 0.005,
+      `"${ring.blurb}" against ${ring.effect.allMult}`);
+  }
 });
