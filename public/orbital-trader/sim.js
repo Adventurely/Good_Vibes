@@ -523,8 +523,15 @@ export const WRECKS = [...WRECK_IDS];
  * the same machinery, and the same absence from the price list. */
 const HULK_IDS = new Set(BODIES.filter(b => b.port && !(b.mu > 0) && b.parent).map(b => b.id));
 export const isHulk = id => HULK_IDS.has(id);
-/* Bodies the chart should not draw for this player. Physics never consults
- * this: a thing nobody has told you about still has hold of you. */
+/* Bodies the chart should not draw for this player.
+ *
+ * Gravity never consults this — a world nobody has told you about still has
+ * hold of you, and the Knot will still whip a ship round whether or not the
+ * cat aboard has mentioned it. But everything the *ship* does with a body
+ * does: it is offered as a harbour, it bends the burn axes when you come
+ * alongside it, it gets a readout. All of that is knowing where something
+ * is, and it is all gated here, so an unfound thing is absent rather than
+ * merely undrawn. Passed to `legOpts`, `rendezvous` and `dockingStatus`. */
 export function unseen(state){
   const hide = new Set();
   if(!knowsKnot(state)) hide.add('knot');
@@ -578,9 +585,14 @@ export function rendezvous(state){
      where you are and how fast, with nothing to subtract. Without this, giving
      the Maw a well silently took its readout away: the drift reach sits inside
      the sphere of influence and can never fire again. */
+  /* The hidden set gates the *drifting* things and only those. A wreck nobody
+     has heard of gives no readout at all, because the ship has no idea it is
+     there; the Maw keeps its numbers and loses its name — the road still runs
+     into it, and how close and how fast are still true, which is exactly what
+     `nameFor` draws as ??? until the sensors are aboard. */
   const tgt = here.port && here.rendezvous && here.mu > 0
     ? { id: here.id, r: [0, 0], v: [0, 0], reach: here.soi }
-    : driftTargetAt(world, here.id, state.ship.r, state.t);
+    : driftTargetAt(world, here.id, state.ship.r, state.t, unseen(state));
   if(!tgt) return null;
   const rel = sub(state.ship.r, tgt.r);
   const vRel = sub(state.ship.v, tgt.v);
@@ -690,14 +702,17 @@ function skimShed(b, el, at){
  * to a ship without a shield and a brake to one with. */
 function legOpts(state, extra = {}){
   const skim = skimsAir(state);
-  return { atmosphere: !skim, dvAvailable: state.dv, skimAt: skim ? skimShed : null, ...extra };
+  /* What the ship has not been told about cannot bend its burns: the same set
+     the chart refuses to draw is handed to the flying, so an unfound wreck is
+     absent rather than merely invisible. */
+  return { atmosphere: !skim, dvAvailable: state.dv, skimAt: skim ? skimShed : null, hidden: unseen(state), ...extra };
 }
 const sortedNodes = state => state.nodes.map(n => ({ ...n })).sort((a, b) => a.t - b.t);
 
 export function effectiveNodes(state, horizon, { skim = skimsAir(state) } = {}){
   const nodes = sortedNodes(state);
   if(!skim) return nodes;
-  const pred = predictLegs(world, state.ship, state.t, nodes, { atmosphere: false, dvAvailable: state.dv, skimAt: skimShed, maxTime: horizon, noSamples: true });
+  const pred = predictLegs(world, state.ship, state.t, nodes, { atmosphere: false, dvAvailable: state.dv, skimAt: skimShed, hidden: unseen(state), maxTime: horizon, noSamples: true });
   const aero = pred.events.filter(e => e.kind === 'burn' && e.node.aero).map(e => e.node);
   return [...nodes, ...aero].sort((a, b) => a.t - b.t);
 }
@@ -1874,8 +1889,9 @@ function pickSeed(state, node, candidates, scoreFn, reference){
   const byTime = [...candidates].sort((a, b) => (a.arrives ?? 0) - (b.arrives ?? 0));
   const shortlist = [...new Set([...candidates.slice(0, 6), ...byTime.slice(0, 4)])];
   const scored = [];
+  const hidden = unseen(state);
   for(const c of shortlist){
-    const parts = nodeFromVector(c.r, c.v, c.dv, burnFrameAt(world, c.body ?? state.ship.body, c.r, c.v, state.t + c.dep));
+    const parts = nodeFromVector(c.r, c.v, c.dv, burnFrameAt(world, c.body ?? state.ship.body, c.r, c.v, state.t + c.dep, hidden));
     if(!parts) continue;
     node.t = state.t + c.dep;
     node.prograde = parts.prograde;

@@ -581,7 +581,15 @@ function drawBodies(chart, view, pos, t){
     const p = chart.toScreen(pos.get(b.id).r);
     if(p[0] < -60 || p[1] < -60 || p[0] > chart.width + 60 || p[1] > chart.height + 60) continue;
     const real = (b.radius ?? 0) * zoom;
-    const minPx = b.kind === 'star' ? 9 : b.kind === 'planet' ? 4.5 : b.kind === 'moon' ? 3 : 2.5;
+    /* A star that goes round something else is the Dancer, and the Dancer is a
+       signpost as much as a body. For most of a game it is the only thing
+       marking where the Maw is — the Maw itself does not draw until the
+       gravitational sensors are aboard — and where the Maw is is where the
+       story ends. So it is drawn as a landmark rather than as a dot its own
+       size: a floor that still reads at the widest zoom the chart allows, a
+       wider corona, and a rim so it is a star rather than a smudge. */
+    const beacon = b.kind === 'star' && b.parent != null;
+    const minPx = beacon ? 11 : b.kind === 'star' ? 9 : b.kind === 'planet' ? 4.5 : b.kind === 'moon' ? 3 : 2.5;
     const rpx = Math.max(minPx, real);
     const colour = bodyColour(b);
 
@@ -600,9 +608,10 @@ function drawBodies(chart, view, pos, t){
        one is blue, so a gradient hard-coded to the Lamp's orange would have put
        a sunset round it. */
     if(b.kind === 'star'){
-      const glow = ctx.createRadialGradient(p[0], p[1], rpx, p[0], p[1], rpx * 5);
-      glow.addColorStop(0, rgba(colour, 0.22)); glow.addColorStop(1, rgba(colour, 0));
-      ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(p[0], p[1], rpx * 5, 0, Math.PI * 2); ctx.fill();
+      const far = rpx * (beacon ? 7 : 5);
+      const glow = ctx.createRadialGradient(p[0], p[1], rpx, p[0], p[1], far);
+      glow.addColorStop(0, rgba(colour, beacon ? 0.34 : 0.22)); glow.addColorStop(1, rgba(colour, 0));
+      ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(p[0], p[1], far, 0, Math.PI * 2); ctx.fill();
     }
     /* The band of air, when it is big enough to mean something. In the world's
        own colour: four worlds have weather now and a violet haze round all of
@@ -639,7 +648,10 @@ function drawBodies(chart, view, pos, t){
     if(b.id === 'maw'){
       // The ring flickers at gaps nobody has explained. Under reduced motion it rests, lit.
       const lit = chart.reducedMotion || mawLit(view.now ?? 0);
-      alpha = lit ? 1 : 0.35;
+      /* Never at full strength. It is a hole: the reading is that something is
+         there, not that something is bright, and the Dancer next to it is the
+         thing the eye is meant to find first. */
+      alpha = lit ? 0.72 : 0.24;
     }
     /* The picture is the planet, so it is drawn at the planet's real size and
        clipped to it. It used to be painted at 1.2 times the radius with
@@ -684,8 +696,20 @@ function drawBodies(chart, view, pos, t){
     }
     if((b.kind === 'zone' || b.mu === 0) && !drew && b.kind !== 'hole'){
       // Gravity-less things are hollow: the belt havens and the Maw.
+      /* Under the body's own alpha, which for everything but the Maw is one.
+         The Maw's flicker used to be applied to the dot and not to the ring,
+         so the one mark it actually draws never dimmed at all and a thing
+         that is meant to be barely there out-shouted the star beside it. */
+      ctx.globalAlpha = alpha;
       ctx.strokeStyle = colour; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(p[0], p[1], rpx + 3, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    /* The beacon's rim: the corona alone is fog, and fog at the widest zoom is
+       what a player scrolls past. */
+    if(beacon){
+      ctx.strokeStyle = rgba(lighten(colour, 0.5), 0.9); ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(p[0], p[1], rpx + 3.5, 0, Math.PI * 2); ctx.stroke();
     }
     // The body the chart is centred on wears a ring, so "what am I looking
     // at" is answered by the picture rather than by a panel.
@@ -714,7 +738,10 @@ function drawBodies(chart, view, pos, t){
       if(!placed.some(o => o.x < box.x + box.w && o.x + o.w > box.x && o.y < box.y + box.h && o.y + o.h > box.y)){ spot = c; placed.push(box); break; }
     }
     if(!spot) continue;
-    ctx.fillStyle = camera.follow === b.id ? PALETTE.text : PALETTE.textDim;
+    /* A star's name in full strength. There are two, they are the only things
+       out here that give off light, and both are places the chart is read from
+       rather than dots among dots. */
+    ctx.fillStyle = camera.follow === b.id || b.kind === 'star' ? PALETTE.text : PALETTE.textDim;
     ctx.fillText(text, spot[0], spot[1]);
   }
   void t;

@@ -86,6 +86,8 @@ On the chart the mouth is a dashed ring with **a small anchor hung at the top of
 
 **It is also invisible.** Nothing on the chart until a ship carries gravitational sensors — no dot, no rail, no reach, no name. What a player sees instead is **the Dancer**: a small blue star of Grumm's size that laps the Maw every 234 days and appears, for as long as anybody has looked, to be going round nothing. That is the whole advertisement for the instrument. Where a road runs into the Maw the chart still marks the crossing and the pass, with the real distance and the real closing speed, and calls it **???**.
 
+Because the Dancer is carrying that whole hint on its own, it is drawn as a landmark rather than as a body its real size: a floor that still reads at the widest zoom the chart allows, a corona half again as wide as the Lamp's, a rim so it is a star and not a smudge, and its name at full strength. The Maw, once the sensors find it, is the opposite — never at full strength even when its ring is lit, because the reading is that something is *there*, not that something is bright, and the star beside it is what the eye should find first.
+
 This is a scope decision as much as a fictional one. Landing would need a second control scheme, a second set of physics, and a second art problem, and it would buy nothing the orbital game does not already have. The fiction absorbs it easily: Tassel is an ocean of floating harbour cities that meet ships in orbit, the cats cannot survive a heavy world at all, and the frogs' balloon villages have no ground under them either.
 
 The player therefore **starts in orbit**, not moored. A new game opens with the ship already going round Tassel — *low* round it, high point under one planet-diameter of altitude, so the ocean fills the chart and visibly turns underneath — with a road drawn ahead of it and a crate in the hold. There is nothing to cast off from and nothing to press before the chart means something. The harbour itself is higher up, at the docking altitude every other orbit in the game is measured from; tying up and casting off again is what puts a ship there.
@@ -762,6 +764,18 @@ empty ones. Seven of them are in the sky:
 | The Sixth Forge | the Belt, between the havens | an Emberkin freighter, still crated |
 | Hull 41 | the outer Belt | a hull with a yard number and no name |
 | The Long Sweet | a wide circle above Haven | a frog cider transport, perfectly intact |
+
+**A wreck does not exist until somebody names it.** Eight unexplained dots on
+the chart from the first day would be eight questions with no way to ask them;
+one that appears when a salvor tells you where to look is a lead. Taking the
+job is what reveals it, and handing it in does not hide it again — you have
+been there now. Absent means absent rather than merely undrawn: an unfound
+derelict is not offered as a harbour, gives no rendezvous readout, and does not
+bend the burn axes when a ship passes through the reach it would have had. The
+rails are the one thing that does not care — it goes round its world whether or
+not anybody has heard of it, which is why it is *there* to be found. (The Maw
+is the other way about, and deliberately: it keeps its numbers and loses its
+name. See §2.3.)
 
 An eighth is designed and not written: it is taken at the Arc and leads into
 the debris trailing behind it, where the key item for the closing line is. Hull

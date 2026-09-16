@@ -4231,9 +4231,10 @@ test('a wreck is a rumour until somebody hands you the job', () => {
   assert.ok(!after.has('cutterjaw'), 'taking the job does not put the wreck on the chart');
   for(const w of wrecksOf()) if(w.id !== 'cutterjaw') assert.ok(after.has(w.id), `${w.id} came along for the ride`);
 
-  /* Physics never reads this — the rails do not care what you have been told —
-     but a harbour is a place somebody told you about, so an unheard-of
-     derelict is not offered as one. */
+  /* The rails do not care what you have been told — a wreck goes round its
+     world whether or not anybody has named it — but everything the ship can
+     *do* with one is gated on having heard of it. A harbour is a place
+     somebody mentioned, so an unheard-of derelict is not offered as one. */
   const stranger = salvor();
   comeAlongside(stranger, 'cutterjaw');
   assert.equal(S.dockingStatus(stranger)?.port, 'slate', 'an unmentioned wreck is offered as a harbour');
@@ -4241,6 +4242,29 @@ test('a wreck is a rumour until somebody hands you the job', () => {
   told.dockedAt = 'slate'; S.acceptQuest(told, 'cutterjaw');
   comeAlongside(told, 'cutterjaw');
   assert.equal(S.dockingStatus(told)?.port, 'cutterjaw', 'and a mentioned one is not');
+});
+
+test('an unfound wreck bends nothing: no readout, and forward is still forward', () => {
+  /* Hiding a thing on the chart is a lie the player can feel if the flying
+     still leans on it: coming near a blank patch of sky would swing forward
+     and out round to face something that is not drawn, and the numbers on a
+     mark would stop meaning what the road shows. So the same set the chart
+     refuses to draw is handed to the burn frame. */
+  const stranger = comeAlongside(salvor(), 'cutterjaw');
+  const told = comeAlongside((() => { const s = salvor(); s.dockedAt = 'slate'; S.acceptQuest(s, 'cutterjaw'); return s; })(), 'cutterjaw');
+
+  assert.equal(S.rendezvous(stranger), null, 'a wreck nobody mentioned got a rendezvous readout');
+  assert.equal(S.rendezvous(told)?.target, 'cutterjaw', 'and a mentioned one did not');
+
+  /* Alongside but still closing: matched speeds have no relative forward to
+     measure from, and the frame falls back to the orbital one on its own. */
+  for(const s of [stranger, told]) s.ship.v = [s.ship.v[0] + 1e-4, s.ship.v[1] - 1e-4];
+  const frame = s => O.frameAt(S.world, s.ship.body, s.ship.r, s.ship.v, s.t, S.unseen(s));
+  const bare = O.frameAt(S.world, stranger.ship.body, stranger.ship.r, stranger.ship.v, stranger.t);
+  const orbital = O.burnFrame(stranger.ship.r, stranger.ship.v);
+  assert.ok(Math.abs(O.norm(O.sub(bare.pro, orbital.pro))) > 1e-6, 'the wreck is close enough to bend a burn at all');
+  assert.ok(O.norm(O.sub(frame(stranger).pro, orbital.pro)) < 1e-12, 'an unfound wreck still bent the burn axes');
+  assert.ok(O.norm(O.sub(frame(told).pro, bare.pro)) < 1e-12, 'a found one stopped bending them');
 });
 
 test('the haul comes aboard at the wreck and cannot be sold on the way home', () => {
