@@ -448,12 +448,12 @@ export const PRESTIGE = [
     blurb: 'Buying ten or more of something at once costs a fifth less.' },
   { id: 'seed-drill', name: 'The seed drill', seed: 28, cost: 5.4e21, effect: { plantMult: 2 },
     blurb: 'Every grower you buy counts as two. You pay for one and two go in the ground.' },
-  { id: 'running-start', name: 'A running start', seed: 29, cost: 2.2e22, effect: { startUpgrades: 5 },
-    blurb: 'Every season begins with the five cheapest upgrades in the shop already bought.' },
+  { id: 'running-start', name: 'A running start', seed: 29, cost: 2.2e22, effect: { startUpgrades: 0.5 },
+    blurb: 'Every season begins with half the upgrades you had bought when the last one ended.' },
   { id: 'level-ground', name: 'The level ground', seed: 30, cost: 8.6e22, effect: { costCap: 100 },
     blurb: 'Past the hundredth of a kind, its price stops climbing. The hundred and first costs what the hundredth did.' },
   { id: 'volunteers', name: 'Volunteers', seed: 31, cost: 3.5e23, effect: { volunteers: 1000 },
-    blurb: 'Every thousandth tap plants something for free, of whichever kind is cheapest.' },
+    blurb: 'Every thousandth tap plants one more of every kind you already have, for free.' },
   { id: 'heavy-crop', name: 'The heavy crop', seed: 32, cost: 1.4e24, effect: { windfallAll: true },
     blurb: 'Every windfall also pays a whole second of what the lot makes, on top of the tap itself.' },
   { id: 'carry-over', name: 'Carry over', seed: 33, cost: 5.5e24, effect: { carryEnergy: 0.01 },
@@ -1152,17 +1152,18 @@ export function tapPays(state, rate = 0, bonus = bonuses(state)){
   return value * bonus.windfall + (bonus.windfallAll ? totalRate(state, bonus) : 0);
 }
 
-/* Which kind a volunteer turns up as: the cheapest thing on the shelf right
-   now, so the free one is the one a player would have bought anyway. Returns
-   null when no row is due one. */
+/* Which kinds a volunteer turns up as: one of every kind already standing,
+ * and nothing at all of a kind that is not. Empty unless this tap is the one.
+ *
+ * It used to be the single cheapest kind, which is always the weakest — a moss
+ * bed makes a tenth of a unit a second against a canopy tower's two hundred and
+ * eighty thousand — so a rung costing 3.5e23 was handing out something worth a
+ * billionth of the lot. One of each is worth having and still cannot conjure a
+ * kind you have never planted.
+ */
 export function volunteerFor(state, bonus = bonuses(state)){
-  if(!bonus.volunteers || state.run.taps % bonus.volunteers !== 0) return null;
-  let pick = null, best = Infinity;
-  for(const id of GROWER_IDS){
-    const price = growerCost(GROWER_BY_ID[id], state.owned[id] || 0, bonus.costGrowth, bonus.costCap);
-    if(price < best){ best = price; pick = id; }
-  }
-  return pick;
+  if(!bonus.volunteers || state.run.taps % bonus.volunteers !== 0) return [];
+  return GROWER_IDS.filter(id => (state.owned[id] || 0) > 0);
 }
 
 /* ------------------------------------------------------------ conditions */
@@ -1318,9 +1319,9 @@ export function tap(state, rate = 0){
      tap. Free in every sense: nothing is deducted and nothing is recorded as
      spent, because nothing was. */
   const free = volunteerFor(state, bonus);
-  if(free){
-    state.owned[free] = (state.owned[free] || 0) + 1;
-    score(state, 'planted', 1);
+  if(free.length){
+    for(const id of free) state.owned[id] = (state.owned[id] || 0) + 1;
+    score(state, 'planted', free.length);
     markGrown(state);
   }
   state.pending = pendingSeeds(state);
@@ -1519,13 +1520,20 @@ export function prestige(state){
     }
   }
   state.earnedBy = freshOwned();
+  const had = Object.keys(state.bought);
   state.bought = {};
-  /* A running start puts the cheapest few back on the shelf as bought. Cheapest
-     by price rather than by where they sit in the table, so it keeps meaning
-     the same thing if the table is ever reordered. */
+  /* A running start keeps half of what you had, cheapest first. A share of
+     your own shelf rather than a fixed few: five of the cheapest came to four
+     thousand four hundred energy all told, dropped into a season that already
+     opens with five million from The long view, so the rung was worth the
+     second it saved you. Read from `had` above, because `state.bought` was
+     emptied a moment ago. */
   if(bonus.startUpgrades > 0){
-    const cheapest = [...UPGRADES].sort((a, b) => a.cost - b.cost).slice(0, bonus.startUpgrades);
-    for(const up of cheapest) state.bought[up.id] = true;
+    const kept = had
+      .map(id => UPGRADE_BY_ID[id]).filter(Boolean)
+      .sort((a, b) => a.cost - b.cost)
+      .slice(0, Math.floor(had.length * bonus.startUpgrades));
+    for(const up of kept) state.bought[up.id] = true;
   }
   // state.rooted is deliberately not touched. It is the only thing besides the
   // record that survives a replant, and it is the reason the next run is

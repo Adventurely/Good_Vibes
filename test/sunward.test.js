@@ -1752,10 +1752,21 @@ test('A running start and Carry over both leave something behind them', () => {
   assert.deepEqual(plain.bought, {}, 'with neither row the shelf is bare');
   assert.equal(plain.light, 0);
 
-  const running = ready(s => { s.rooted['running-start'] = true; });
+  /* Half of what YOU had, cheapest first — not a fixed few off the shelf. The
+     fixed five came to four thousand four hundred energy all told, dropped
+     into a season that already opens with five million. */
+  const eight = [...UPGRADES].sort((a, b) => a.cost - b.cost).slice(0, 8);
+  const running = ready(s => {
+    s.rooted['running-start'] = true;
+    for(const up of eight) s.bought[up.id] = true;
+  });
   prestige(running);
-  const cheapest = [...UPGRADES].sort((a, b) => a.cost - b.cost).slice(0, 5).map(u => u.id);
-  assert.deepEqual(Object.keys(running.bought).sort(), [...cheapest].sort());
+  assert.deepEqual(Object.keys(running.bought).sort(), eight.slice(0, 4).map(u => u.id).sort());
+
+  // Nothing bought last season, nothing carried into this one.
+  const empty = ready(s => { s.rooted['running-start'] = true; });
+  prestige(empty);
+  assert.deepEqual(empty.bought, {});
 
   const carried = ready(s => { s.rooted['carry-over'] = true; s.run.earned = 1e9; });
   prestige(carried);
@@ -1834,33 +1845,37 @@ test('The level ground stops a price climbing past the hundredth of a kind', () 
   }
 });
 
-test('Volunteers turn up on the thousandth tap, as the cheapest kind, for nothing', () => {
+test('Volunteers turn up on the thousandth tap, one of every kind you have, for nothing', () => {
   const state = newGame();
   state.rooted['volunteers'] = true;
+  state.owned.moss = 10; state.owned.fern = 4;      // two kinds standing
   state.run.taps = 998;
   const spentBefore = state.run.spent;
 
   tap(state, 0);                                   // the 999th
-  assert.equal(GROWER_IDS.reduce((n, id) => n + state.owned[id], 0), 0, 'nothing yet');
+  assert.equal(state.owned.moss, 10, 'nothing yet');
   tap(state, 0);                                   // the 1000th
-  assert.equal(state.owned.moss, 1, 'the cheapest kind on a bare lot is moss');
+  assert.equal(state.owned.moss, 11);
+  assert.equal(state.owned.fern, 5);
+  assert.equal(state.owned.panel, 0, 'it cannot conjure a kind you have never planted');
   assert.equal(state.run.spent, spentBefore, 'and it cost nothing');
-  assert.equal(state.run.planted, 1, 'but it is on the record as planted');
+  assert.equal(state.run.planted, 2, 'both are on the record as planted');
+  assert.equal(state.grown, 16, 'and the tree counts them');
 
-  // It follows the price, not the name: bury moss and the next one is a fern.
-  const later = newGame();
-  later.rooted['volunteers'] = true;
-  later.owned.moss = 400;
-  later.run.taps = 999;
-  tap(later, 0);
-  assert.equal(later.owned.moss, 400, 'moss is dear now');
-  assert.equal(later.owned.fern, 1);
-
-  // And without the row, a thousand taps plant nothing.
+  // A bare lot gets nothing, because there is nothing to volunteer.
   const bare = newGame();
+  bare.rooted['volunteers'] = true;
   bare.run.taps = 999;
   tap(bare, 0);
   assert.equal(GROWER_IDS.reduce((n, id) => n + bare.owned[id], 0), 0);
+
+  // And without the row, a thousand taps plant nothing at all.
+  const none = newGame();
+  none.owned.moss = 10;
+  none.run.taps = 999;
+  tap(none, 0);
+  assert.equal(none.owned.moss, 10);
+  assert.deepEqual(volunteerFor(none), []);
 });
 
 test('The heavy crop pays the lot on a windfall, and only on a windfall', () => {
