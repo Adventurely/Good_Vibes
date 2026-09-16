@@ -788,10 +788,15 @@ function replan(force = false){
      are a hair apart and the labels sit on top of each other — so it keeps
      neither. */
   const ic = prediction.intercept;
+  /* A thing nobody has found keeps its numbers and loses its name. The road
+     still runs into the Maw whether or not a ship can see it, and the crosshair
+     still says how close and how fast — it is called ??? until the sensors are
+     aboard, which is the whole of what they buy. */
+  const unknown = S.unseen(state);
   interceptLabel = ic
     ? (ic.grazes
-        ? `hits ${S.portName(ic.body)}`
-        : `${S.portName(ic.body)} ${fmtAu(ic.altitude)} · ${S.fmtKms(ic.speed)}${ic.inMouth ? ' · in docking range' : ''}`)
+        ? `hits ${S.nameFor(ic.body, unknown)}`
+        : `${S.nameFor(ic.body, unknown)} ${fmtAu(ic.altitude)} · ${S.fmtKms(ic.speed)}${ic.inMouth ? ' · in docking range' : ''}`)
     : null;
   /* The window in the corner already says whose encounter it is, so its line
      is the numbers only. */
@@ -983,7 +988,7 @@ function handleEvents(events){
     /* A change of reach re-frames the chart, re-draws the road and changes
        every number on the Plan card. The panel has to be told, or it sits
        there naming the world you just left. */
-    if(e.kind === 'soi'){ const to = world.get(e.to); toast(`Now in ${to.name}'s gravity.`); renderTab(); tutorialCheck(); }
+    if(e.kind === 'soi'){ toast(`Now in ${S.nameFor(e.to, S.unseen(state))}'s gravity.`); renderTab(); tutorialCheck(); }
     if(e.kind === 'story') toast(e.text, 'story', 9000);
     if(e.kind === 'toll'){ stopSkip(); showToll(e.pending); }
     if(e.kind === 'crash'){ stopSkip(); showCrash(e.body); }
@@ -1080,10 +1085,14 @@ function renderHud(docking){
      ship in a neat circle and of one falling past at four km/s, and those are
      not the same news. A closed path is one with a period. */
   const el = state.dockedAt ? null : elementsFromState(b.mu, state.ship.r, state.ship.v);
+  /* Whatever has hold of you, named only if you have found it. A ship can be in
+     the Maw's gravity without the instrument that says what the Maw is, and the
+     readout should say so rather than give the answer away. */
+  const whose = S.nameFor(state.ship.body, S.unseen(state));
   $('h-where').textContent = state.dockedAt
     ? `${S.isWreck(state.dockedAt) ? 'Alongside' : 'Docked at'} ${S.portName(state.dockedAt)}`
-    : Number.isFinite(el.period) ? `In orbit around ${b.name}`
-    : `Passing through ${b.name}'s gravity`;
+    : Number.isFinite(el.period) ? `In orbit around ${whose}`
+    : `Passing through ${whose}'s gravity`;
   const hint = $('dockhint');
   if(!docking){ hint.textContent = ''; return; }
   const pb = world.get(docking.port);
@@ -1630,7 +1639,7 @@ function lookAtEncounter(){
   if(!ic) return;
   chart.focus(ic.body, null, false);
   chart.frameBody(ic.body);
-  toast(`Looking at ${esc(S.portName(ic.body))}. Press f for your ship.`);
+  toast(`Looking at ${esc(S.nameFor(ic.body, S.unseen(state)))}. Press f for your ship.`);
 }
 
 /* Come home. Both halves matter: the lock goes back to the ship *and* the
@@ -2092,16 +2101,20 @@ function aheadList(){
       + `${fmtAu(now.distance)} off and closing at ${S.fmtKms(now.relSpeed)}. `
       + `Match its speed to ${S.fmtKms(now.dockSpeed)} or under and it will take you.</p>` });
   }else if(now && now.ok){
-    lines.push({ t: -Infinity, html: `<p class="up"><b>${esc(world.get(now.port).name)} will take you now.</b> Press the anchor, or <kbd>d</kbd>.</p>` });
+    lines.push({ t: -Infinity, html: `<p class="up"><b>${esc(S.nameFor(now.port, S.unseen(state)))} will take you now.</b> Press the anchor, or <kbd>d</kbd>.</p>` });
   }
+  /* Whatever the road runs into keeps its numbers and loses its name where the
+     player has not found it yet: the Maw is a door and a pass and a crossing
+     like anywhere else, called ??? until the sensors say otherwise. */
+  const unknown = S.unseen(state);
   for(const e of prediction.events){
     if(e.kind === 'soi'){
       const to = world.get(e.to), from = world.get(e.from);
-      lines.push({ t: e.t, html: `<p>${to.parent === from.id ? 'Into' : 'Out to'} ${esc(to.name)}'s gravity in ${S.fmtDays(e.t - state.t)}. ${skip(e.t)}</p>` });
+      lines.push({ t: e.t, html: `<p>${to.parent === from.id ? 'Into' : 'Out to'} ${esc(S.nameFor(e.to, unknown))}'s gravity in ${S.fmtDays(e.t - state.t)}. ${skip(e.t)}</p>` });
     }else if(e.kind === 'burn' && e.node.aero){
       lines.push({ t: e.t, html: `<p class="up">Air brake at ${esc(S.portName(e.node.body))}: shed ${S.fmtKms(e.magnitude)} in ${S.fmtDays(e.t - state.t)}. ${skip(e.t)}</p>` });
     }else if(e.kind === 'crash'){
-      lines.push({ t: e.t, html: `<p class="down">This path strikes ${esc(S.portName(e.body))} in ${S.fmtDays(e.t - state.t)}.</p>` });
+      lines.push({ t: e.t, html: `<p class="down">This path strikes ${esc(S.nameFor(e.body, unknown))} in ${S.fmtDays(e.t - state.t)}.</p>` });
     }
   }
   /* Every world the road passes, once each, in the order they happen.
@@ -2116,9 +2129,10 @@ function aheadList(){
     const verdict = !ic.inMouth ? ''
       : fast ? ` Inside the mouth, but ${S.fmtKms(ic.speed)} is too fast to tie up: match it to ${S.fmtKms(b.dockSpeed)} or under.`
       : ' That is inside docking range.';
+    const what = esc(S.nameFor(ic.body, unknown));
     lines.push({ t: ic.t, html: ic.grazes
-      ? `<p class="down">This path hits ${esc(S.portName(ic.body))} in ${S.fmtDays(ic.t - state.t)}.</p>`
-      : `<p class="${fast ? 'down' : ic.inMouth ? 'up' : ''}">Closest approach to ${esc(S.portName(ic.body))}: ${fmtAu(ic.altitude)} at ${S.fmtKms(ic.speed)}, in ${S.fmtDays(ic.t - state.t)}.${verdict} ${skip(ic.t)}</p>` });
+      ? `<p class="down">This path hits ${what} in ${S.fmtDays(ic.t - state.t)}.</p>`
+      : `<p class="${fast ? 'down' : ic.inMouth ? 'up' : ''}">Closest approach to ${what}: ${fmtAu(ic.altitude)} at ${S.fmtKms(ic.speed)}, in ${S.fmtDays(ic.t - state.t)}.${verdict} ${skip(ic.t)}</p>` });
   }
   lines.sort((a, b) => a.t - b.t);
   return '<h3>Ahead</h3>' + (lines.length

@@ -1971,9 +1971,20 @@ replaced "be inside this radius travelling under this speed", which asked for
 two numbers that were not the manoeuvre, and which let a ship on a wild
 ellipse tie up because it happened to be slow at the top of it.
 
-The Maw has no gravity at all, so there is no orbit to be in, and it keeps the
-near-enough-and-slow-enough rule that everywhere used to have. So do the seven
-wrecks, which is the whole of what salvage needed.
+The Maw keeps the near-enough-and-slow-enough rule that everywhere used to have,
+and it keeps it on purpose rather than by default: it is a black hole with
+thirty times Grumm's pull, and `harbour: "rendezvous"` says so, because five
+radii over the air describes a parking orbit and there is nothing here to park
+above. The seven wrecks keep it the old way, having no weight at all, which is
+the whole of what salvage needed.
+
+**The Maw is not on the chart** until a ship carries gravitational sensors — no
+dot, no rail, no reach, no name, and no harbour either: you cannot come
+alongside what you have not found. What you see instead is **the Dancer**, a
+small blue star of Grumm's size that laps it every 234 days and appears to be
+going round nothing at all. Where a road runs into the Maw the crossing and the
+pass are still marked, with the real distance and the real closing speed, under
+the name **???**.
 
 ### Salvage
 

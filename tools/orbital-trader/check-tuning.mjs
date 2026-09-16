@@ -26,7 +26,14 @@ const kmOf = au => Math.round(au * KM_PER_AU);
 const soiOf = b => (b.mu > 0 && b.a > 0 && by[b.parent]?.mu > 0) ? b.a * Math.pow(b.mu / by[b.parent].mu, 2 / 5) : null;
 /* And the mouth a size earns, mirrored the same way: five radii above the top
    of the air. A drifting haven has neither, and keeps its authored one. */
-const mouthOf = b => b.mu > 0 && b.radius > 0 ? Math.max(b.radius, b.atmo ?? b.radius) + 5 * b.radius : b.zoneRadius;
+/* Five radii over the air, for a world you park above. Anything you come
+   alongside keeps the mouth it was given: that number is a distance to close,
+   not a height to hold, so the mass it belongs to has no say in it. Same rule
+   as content.js, and the two have to agree or the checker is checking a sky
+   the game does not have. */
+const mouthOf = b => b.mu > 0 && b.radius > 0 && b.harbour !== 'rendezvous'
+  ? Math.max(b.radius, b.atmo ?? b.radius) + 5 * b.radius
+  : b.zoneRadius;
 for(const b of T.bodies){ b.soi = soiOf(b); b.zoneRadius = mouthOf(b); }
 const km = v => (v * KMS);
 let fails = 0;
@@ -45,6 +52,14 @@ function captureBurn(b, rp, vEdge, loose = false){
   const vp = Math.sqrt(Math.max(0, vEdge * vEdge - 2 * b.mu / b.soi) + 2 * b.mu / rp);
   const target = loose ? Math.sqrt(b.mu * (2 / rp - 1 / ((rp + 0.6 * b.soi) / 2))) : Math.sqrt(b.mu / rp);
   return Math.max(0, vp - target);
+}
+/* Coming alongside something with a well: fall from the edge to the mouth,
+ * then kill everything but the speed it will take you at. Not a capture — you
+ * are not going into orbit round it — but the well is real and the arrival is
+ * dearer for it. The Maw is the only harbour of this shape. */
+function alongsideBurn(b, vEdge){
+  const vMouth = Math.sqrt(Math.max(0, vEdge * vEdge - 2 * b.mu / b.soi) + 2 * b.mu / b.zoneRadius);
+  return Math.max(0, vMouth - b.dockSpeed);
 }
 /* Heliocentric Hohmann between two circular radii: the two deltas and the time. */
 function hohmann(mu, r1, r2){
@@ -100,7 +115,14 @@ check('C4 the inner worlds never nest', by.cinder.soi + by.veyra.soi < 0.2 && by
 // --- port geometry and speeds
 for(const b of T.bodies){
   if(!b.port) continue;
-  if(b.mu > 0){
+  /* Which kind of harbour, which is about the place rather than about the mass.
+     A rendezvous has no ground to clear and no parking orbit to sit in — its
+     mouth is how near you have to come, not how high you have to fly — so the
+     whole parking ladder below is asked only of a world you orbit. The Maw is
+     the reason this is not simply `mu > 0` any more: it is a black hole with
+     thirty times Grumm's pull and still a thing you come alongside. */
+  const alongside = b.harbour === 'rendezvous' || !(b.mu > 0);
+  if(b.mu > 0 && !alongside){
     /* The ordering that has to hold: the ground, then the parking orbit, then
        the harbour mouth, and all of it inside the world's own reach. The cap
        used to be a third of the reach, back when the mouth was a number
@@ -140,7 +162,20 @@ for(const b of T.bodies){
     const excess = vfall - vc;
     if(b.kind === 'moon' || b.kind === 'station') check(`C6 ${b.id} docking brake from a co-orbital fall`, excess <= b.dockSpeed * 1.6, `${km(excess).toFixed(2)} km/s over parked, limit ${km(b.dockSpeed).toFixed(2)}`);
   }else{
-    check(`C5 ${b.id} is a zone with a mouth`, b.zoneRadius > 0 && b.soi == null);
+    check(`C5 ${b.id} is a harbour you come alongside`, b.zoneRadius > 0 && b.dockSpeed > 0 && b.dockAlt == null,
+      `mouth ${kmOf(b.zoneRadius)} km at ${km(b.dockSpeed).toFixed(2)} km/s`);
+    /* With weight, the mouth has to sit inside the reach with room to spare, or
+       a ship is asked to come alongside from outside the thing's own gravity.
+       Without it there is no reach to be inside of, and nothing to check. */
+    if(b.mu > 0){
+      const frac = b.zoneRadius / soiOf(b);
+      check(`C5 ${b.id} mouth inside its reach`, frac <= 0.5, `mouth is ${(frac * 100).toFixed(0)}% of the reach`);
+      /* And falling in from the edge has to leave a ship slow enough to be met.
+         A black hole you cannot arrive at slowly is a black hole with no
+         harbour, whatever the table says. */
+      const vfall = Math.sqrt(2 * b.mu * (1 / b.zoneRadius - 1 / soiOf(b)));
+      check(`C6 ${b.id} can be met at the mouth`, km(vfall) < 40, `${km(vfall).toFixed(2)} km/s falling in from the edge`);
+    }
   }
 }
 
@@ -250,7 +285,7 @@ const table = [
   route('Tassel -> the Arc', by.arc.a, dv2 => dv2),
   route('Tassel -> Grumm (loose capture)', g.a, dv2 => captureBurn(g, by.haven.a, dv2, true)),
   route('Tassel -> Haven height, circular', g.a, dv2 => captureBurn(g, by.haven.a, dv2)),
-  route('Tassel -> the Maw', by.maw.a, dv2 => dv2),
+  route('Tassel -> the Maw', by.maw.a, dv2 => alongsideBurn(by.maw, dv2)),
 ];
 console.log('\nΔv table (km/s, patched-conic estimates from the Tassel docking orbit):');
 for(const r of table) console.log(`  ${r.route.padEnd(42)} ${String(r.dv_kms).padStart(6)}  ${String(r.days).padStart(6)} d${r.dep_kms != null ? `   (out ${r.dep_kms}, in ${r.arr_kms})` : ''}`);

@@ -129,7 +129,15 @@ test('every body has what the kernel and the chart read', () => {
          over them, which is a far bigger bite out of a small moon than out of
          a planet — Glass's harbour is most of Glass's gravity — so the ceiling
          is the physical one rather than a fraction somebody chose. */
-      if(b.mu > 0) assert.ok(b.radius < b.dockAlt && b.dockAlt < b.zoneRadius && b.zoneRadius <= b.soi * 0.92, `${w}: ground < parking < mouth < reach`);
+      /* Only for a world you park above. A rendezvous has no ground to clear
+         and no parking orbit to sit in — its mouth is how near you have to
+         come, not how high you have to fly — and the Maw is now both massive
+         and one of those. */
+      if(b.mu > 0 && !b.rendezvous) assert.ok(b.radius < b.dockAlt && b.dockAlt < b.zoneRadius && b.zoneRadius <= b.soi * 0.92, `${w}: ground < parking < mouth < reach`);
+      if(b.rendezvous){
+        assert.ok(b.dockAlt == null, `${w}: a rendezvous has a parking orbit`);
+        if(b.mu > 0) assert.ok(b.zoneRadius < b.soi * 0.5, `${w}: the mouth is most of the reach`);
+      }
       /* A rendezvous asks for speed rather than for an orbit, so it needs a
          speed to ask for; a world holds you and does not. */
       assert.equal(!!b.rendezvous, b.harbour === 'rendezvous' || !(b.mu > 0), `${w}: rendezvous`);
@@ -145,6 +153,11 @@ test('every body has what the kernel and the chart read', () => {
      theirs. */
   for(const b of BODIES){
     if(!(b.mu > 0) || !(b.radius > 0)) continue;
+    /* Not for a rendezvous. Its mouth is how near you have to come, not how
+       high you have to fly, so five radii over the air has nothing to say about
+       it — and the Maw's horizon is a hundred and fifty kilometres, which would
+       make a harbour nobody could find. */
+    if(b.rendezvous) continue;
     const want = Math.max(b.radius, b.atmo ?? b.radius) + 5 * b.radius;
     assert.ok(Math.abs(b.zoneRadius - want) < 1e-15, `${b.id}: mouth is ${b.zoneRadius}, five radii over the air is ${want}`);
     // And every harbour is inside the mouth it belongs to, or a ship undocks
@@ -164,7 +177,8 @@ test('every body has what the kernel and the chart read', () => {
      salvage job. Counted this way rather than as a magic total, so that adding
      a derelict does not read as a broken sky. */
   const wrecks = BODIES.filter(b => b.kind === 'wreck');
-  assert.equal(BODIES.length - wrecks.length, 17, 'the sixteen named bodies, and the one that is not');
+  assert.equal(BODIES.length - wrecks.length, 18,
+    'the sixteen named bodies, the one that is not, and the Dancer');
   assert.equal(wrecks.length, S.QUESTS.filter(q => q.type === 'salvage').length,
     'every wreck is a job and every salvage job is a wreck');
   assert.ok(world.get('croak').retrograde, 'Croak is retrograde');
@@ -1943,7 +1957,9 @@ test('zooming about a point keeps that point under the pointer, and keeps it the
  * moon is falling into it. */
 function parkAt(s, id){
   const b = world.get(id);
-  if(b.mu > 0){
+  /* A rendezvous has no parking orbit to be put in, whatever it weighs: you sit
+     beside it, in its parent's frame, moving with it. */
+  if(b.mu > 0 && !b.rendezvous){
     const st = O.circularState(b.mu, b.dockAlt, 0);
     s.ship = { body: id, r: st.r, v: st.v };
   }else{
@@ -2653,18 +2669,33 @@ test('the two big rocks in the Belt are worlds you orbit', () => {
 });
 
 test('the Maw is a rendezvous you need a navigator to finish', () => {
-  /* No mass, so no reach to fall into and nothing to catch a mistake: you
-     arrive by being in the same place going the same way, and holding a ship
-     there against nothing is the cat's trick the navigator's berth buys. */
+  /* A black hole with thirty times Grumm's pull, and still a thing you come
+     alongside rather than orbit: there is no ground to park above and nothing
+     to hold a ship steady at the mouth, so arriving means matching speeds, and
+     holding it there is the cat's trick the navigator's berth buys.
+
+     That is authored rather than derived — `harbour: "rendezvous"` — because it
+     is a fact about the harbour and not about the mass. It is the only body in
+     the sky that uses the override. */
   const b = world.get('maw');
-  assert.equal(b.mu, 0);
-  assert.equal(b.soi, null, 'no gravity well');
-  assert.ok(b.driftReach > b.zoneRadius * 2, 'but a reach for the axes, and a large one');
+  assert.ok(b.mu > world.get('grumm').mu, 'a black hole, and heavier than the gas giant');
+  assert.ok(b.soi > 0, 'so it has a reach of its own');
+  assert.equal(b.harbour, 'rendezvous', 'and keeps the harbour that says so');
+  assert.equal(b.rendezvous, true);
+  /* The mouth is the one it was given, not five radii over a hundred-and-fifty
+     kilometre horizon, which would be a harbour you could not find. */
+  assert.ok(b.zoneRadius > 100 * b.radius, 'the mouth got re-derived from the mass');
+  assert.equal(b.driftReach, undefined, 'a well of its own does what a drift reach was for');
   assert.ok(b.port && b.zoneRadius > 0 && b.dockSpeed > 0);
 
   const green = S.newGame(2);
   S.undock(green); green.t = 1000;
   parkAt(green, 'maw');
+  /* Nothing to come alongside until a ship can see it. Without the sensors the
+     Maw is not on the chart and is not offered as a harbour either — the same
+     rule, applied to the thing rather than to the picture of it. */
+  assert.equal(S.dockingStatus(green), null, 'a harbour nobody has found took the lines');
+  green.keys.gravSensors = true;
   const st = S.dockingStatus(green);
   assert.ok(st.inZone && st.slow, 'the approach itself is good');
   assert.equal(st.ok, false);
@@ -2680,20 +2711,24 @@ test('a rendezvous refuses on speed, and says so where the pilot is looking', ()
 
      Whisker is a rock you orbit now, so the guard moved to the Maw, which is
      the last rendezvous in the sky. The lesson it is guarding is the panel,
-     not the body. */
+     not the body. It has a well of its own these days — a black hole heavier
+     than Grumm — and none of that changes the harbour: it is still a distance
+     and a speed, because there is still nothing to park above. */
   const w = world.get('maw');
   const lamp = world.get('lamp');
   const auDayPerMs = 1 / 1731481.5;
   const at = (offKm, relMs) => {
     const s = S.newGame(1); S.undock(s); s.t = 1000;
     s.crew.navigator = { role: 'navigator' };   // the hands; the harbour is still the harbour
+    s.keys.gravSensors = true;                  // and the eyes, or there is no harbour to find
     const st = O.railState(w, lamp.mu, s.t);
     s.ship = { body: 'lamp', r: [st.r[0] + offKm / 1.496e8, st.r[1]], v: [st.v[0] + relMs * auDayPerMs, st.v[1]] };
     return S.dockingStatus(s);
   };
   const limit = w.dockSpeed / auDayPerMs;
   assert.ok(limit > 900 && limit < 1100, `the speed it asks for is about a km/s (${limit.toFixed(0)} m/s)`);
-  assert.equal(w.soi, null, 'and it has no reach at all, which is the point');
+  assert.ok(w.soi > 0, 'it has a reach now, and the harbour is unmoved by that');
+  assert.equal(w.rendezvous, true, 'which is the point');
 
   const mouthKm = w.zoneRadius * 1.496e8;
   const fast = at(mouthKm * 0.1, 5600);
@@ -2719,6 +2754,7 @@ test('a rendezvous refuses on speed, and says so where the pilot is looking', ()
   const far = S.newGame(2);
   S.undock(far); far.t = 1000;
   far.crew.navigator = { role: 'navigator' };
+  far.keys.gravSensors = true;                 // and something aboard that can find it
   parkAt(far, 'maw');
   const r = S.dock(far);
   assert.ok(r.ok && far.flags.mawArrival, 'the Maw had nothing to say');
@@ -3679,6 +3715,97 @@ test('a stock ship can capture at both rocks and get away again', () => {
   }
 });
 
+/* ------------------------------------------------- the Dancer and the Maw */
+
+test('the Dancer is a small blue star going round the Maw', () => {
+  const d = world.get('dancer'), maw = world.get('maw'), grumm = world.get('grumm');
+  assert.equal(d.kind, 'star');
+  assert.equal(d.parent, 'maw', 'it goes round the Maw');
+  assert.equal(d.radius, grumm.radius, 'about the size of Grumm');
+  assert.ok(d.mu > 0 && d.mu < maw.mu, 'a star beside a black hole is the light one');
+  assert.ok(!d.port, 'and nothing you can tie up to');
+  /* Blue, and its own colour rather than the palette's star, which is the
+     Lamp's orange. Two stars in the sky now and they do not match. */
+  const c = bodyColour(d);
+  assert.match(c, /^#[0-9a-f]{6}$/i);
+  const [r, g, b] = [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
+  assert.ok(b > r + 40 && b >= g, `${c} is not blue`);
+  assert.notEqual(bodyColour(d), bodyColour(world.get('lamp')), 'the two stars are the same colour');
+
+  /* Clear of the harbour at one end and well inside the reach at the other, so
+     the star is somewhere a ship can actually come and look at it. */
+  assert.ok(d.a * (1 - d.e) - d.soi > maw.zoneRadius, 'the Dancer overlaps the harbour mouth');
+  assert.ok(d.a * (1 + d.e) + d.soi < maw.soi * 0.8, 'the Dancer hangs off the edge of the reach');
+  /* And it moves: a star that sat still would be a decoration rather than a
+     thing with a name like that. */
+  const a = O.railState(d, maw.mu, 0).r, later = O.railState(d, maw.mu, 60).r;
+  assert.ok(O.dist(a, later) > d.a * 0.5, 'the Dancer does not dance');
+});
+
+test('the Maw is a black hole, and still a harbour you come alongside', () => {
+  const maw = world.get('maw'), grumm = world.get('grumm');
+  assert.ok(maw.mu > grumm.mu, 'heavier than the gas giant');
+  assert.ok(maw.soi > 0, 'so it has a reach');
+  assert.equal(maw.harbour, 'rendezvous', 'and an authored harbour that outranks the mass');
+  assert.equal(maw.rendezvous, true);
+  /* Inside its reach the frame is its own, so the readout is simply where you
+     are and how fast — the drift reach it used to carry did that job when it
+     had no gravity, and is gone. */
+  const s = S.newGame(6); S.undock(s); s.t = 2000;
+  s.ship = { body: 'maw', r: [0.05, 0], v: [-0.0008, 0.0005] };
+  s.nodes = [];
+  const rv = S.rendezvous(s);
+  assert.ok(rv, 'no rendezvous readout inside the Maw');
+  assert.equal(rv.target, 'maw');
+  assert.ok(Math.abs(rv.range - 0.05) < 1e-12, 'the range is where you are');
+  assert.ok(rv.closing, 'and it knows you are falling in');
+  assert.equal(rv.mouth, maw.zoneRadius);
+});
+
+test('the Maw is not there until a ship can measure it', () => {
+  const green = S.newGame(6);
+  assert.ok(S.unseen(green).has('maw'), 'the Maw is on the chart from the first day');
+  assert.ok(!S.unseen(green).has('dancer'), 'and the Dancer is not, which is the whole hook');
+  assert.equal(S.knowsMaw(green), false);
+
+  /* The instrument, not the person. A cat can tell you where the Knot is
+     because the cats have known for nine generations; nobody has come back
+     from the far edge to say what is out there. */
+  const cat = S.newGame(6);
+  cat.crew.navigator = { role: 'navigator' };
+  assert.ok(S.unseen(cat).has('maw'), 'a navigator found the Maw by asking around');
+  assert.ok(!S.unseen(cat).has('knot'), 'and she should still know about the Knot');
+
+  const kitted = S.newGame(6);
+  kitted.keys.gravSensors = true;
+  assert.ok(!S.unseen(kitted).has('maw'), 'the sensors did not find it');
+  assert.equal(S.knowsMaw(kitted), true);
+});
+
+test('a thing nobody has found keeps its numbers and loses its name', () => {
+  const green = S.newGame(6), hidden = S.unseen(green);
+  assert.equal(S.nameFor('maw', hidden), '???');
+  assert.equal(S.nameFor('dancer', hidden), 'The Dancer', 'the visible half says what it is');
+  assert.equal(S.nameFor('tassel', hidden), 'Tassel');
+  const kitted = S.newGame(6); kitted.keys.gravSensors = true;
+  assert.equal(S.nameFor('maw', S.unseen(kitted)), 'The Maw');
+  /* Nothing at all hidden is the ordinary case, and has to behave. */
+  assert.equal(S.nameFor('maw', null), 'The Maw');
+  assert.equal(S.nameFor('maw', new Set()), 'The Maw');
+
+  /* Every place the chart or the readouts put a body's name goes through it,
+     so an encounter with the Maw is marked and measured and called ???. */
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  const RENDER = readFileSync(new URL('../public/orbital-trader/render.js', import.meta.url), 'utf8');
+  assert.match(RENDER, /function labelFor\(b, chart\)\{ return chart\?\.hidden\?\.has\(b\.id\) \? '\?\?\?'/,
+    'the chart labels a hidden body by name');
+  assert.doesNotMatch(RENDER, /labelFor\(b\)|labelFor\(to\)/, 'a label site was left without the chart');
+  for(const call of ['S.nameFor(ic.body, unknown)', 'S.nameFor(e.to, unknown)', 'S.nameFor(e.body, unknown)']){
+    assert.ok(PLAY.includes(call), `the readouts still name a body directly: ${call}`);
+  }
+  assert.doesNotMatch(PLAY, /S\.portName\(ic\.body\)/, 'the intercept readout names it outright');
+});
+
 /* ----------------------------------------------------------- salvage */
 
 /* Come alongside the wreck, take what is aboard, carry it to the buyer. The
@@ -3913,21 +4040,28 @@ test('a wreck has no market, no yard and nobody to talk to', () => {
 /* ---------------------------------------------------- flying a rendezvous */
 
 test('a drifting thing has a reach that bends thrust and nothing else', () => {
+  /* The Maw had this and does not need it any more: it has a well, so inside
+     its reach the frame already is the Maw's. What still drifts with no weight
+     at all is a wreck, which is what the field is for now. */
   const maw = world.get('maw');
-  assert.equal(maw.mu, 0, 'no gravity');
-  assert.equal(maw.soi, null, 'and so no gravitational reach');
-  assert.ok(maw.driftReach > maw.zoneRadius, 'but a reach all the same, and a large one');
+  assert.equal(maw.driftReach, undefined, 'the Maw kept a drift reach it cannot use');
+
+  const drifter = BODIES.find(b => b.kind === 'wreck' && b.parent === 'lamp');
+  assert.ok(drifter, 'nothing weightless is left on a heliocentric rail');
+  assert.equal(drifter.mu, 0, 'no gravity');
+  assert.equal(drifter.soi, null, 'and so no gravitational reach');
+  assert.ok(drifter.driftReach > drifter.zoneRadius, 'but a reach all the same');
 
   const lamp = world.get('lamp');
   const t = 2000;
-  const m = O.railState(maw, lamp.mu, t);
-  const inside = [m.r[0] + maw.driftReach * 0.2, m.r[1]];
-  const outside = [m.r[0] + maw.driftReach * 2, m.r[1]];
+  const m = O.railState(drifter, lamp.mu, t);
+  const inside = [m.r[0] + drifter.driftReach * 0.2, m.r[1]];
+  const outside = [m.r[0] + drifter.driftReach * 2, m.r[1]];
   assert.ok(O.driftTargetAt(world, 'lamp', inside, t), 'inside the reach');
   assert.equal(O.driftTargetAt(world, 'lamp', outside, t), null, 'and outside it');
 
   /* The reach does nothing to the path: a ship coasting through it is on the
-     same conic it would be on if the Maw were not there. */
+     same conic it would be on if the wreck were not there. */
   const s = S.newGame(6); S.undock(s); s.t = t; s.nodes = [];
   s.ship = { body: 'lamp', r: inside, v: [m.v[0] + 0.002, m.v[1] + 0.001] };
   const before = O.elementsFromState(lamp.mu, s.ship.r, s.ship.v);
@@ -3938,9 +4072,13 @@ test('a drifting thing has a reach that bends thrust and nothing else', () => {
 });
 
 test('inside the reach, the axes are measured against the target', () => {
-  const lamp = world.get('lamp'), maw = world.get('maw'), t = 2000;
+  const lamp = world.get('lamp'), t = 2000;
+  /* A wreck, since the Maw has a well of its own now and does this the ordinary
+     way. Offsets are taken off the thing's own reach rather than written as au,
+     so the test says what it means at any scale. */
+  const maw = BODIES.find(b => b.kind === 'wreck' && b.parent === 'lamp');
   const m = O.railState(maw, lamp.mu, t);
-  const r = [m.r[0] + 0.004, m.r[1] + 0.002];
+  const r = [m.r[0] + maw.driftReach * 0.4, m.r[1] + maw.driftReach * 0.2];
   const v = [m.v[0] - 0.0005, m.v[1] + 0.0003];
 
   const f = O.frameAt(world, 'lamp', r, v, t);
@@ -3961,12 +4099,15 @@ test('inside the reach, the axes are measured against the target', () => {
 });
 
 test('the two marks do the two jobs a rendezvous needs', () => {
-  const lamp = world.get('lamp'), t = 2000;
-  const m = O.railState(world.get('maw'), lamp.mu, t);
+  /* Flown at the Maw, which is where a rendezvous actually happens: inside its
+     reach the ship is in its frame, so the two numbers are simply where you are
+     and how fast, with nothing to subtract. Well inside the sphere of influence
+     and well outside the mouth, on an ellipse falling in. */
+  const t = 2000;
   const make = () => {
     const s = S.newGame(6); S.undock(s); s.t = t; s.dv = s.tank;
     s.crew.navigator = { role: 'navigator' };
-    s.ship = { body: 'lamp', r: [m.r[0] + 0.004, m.r[1] + 0.002], v: [m.v[0] - 0.0005, m.v[1] + 0.0003] };
+    s.ship = { body: 'maw', r: [0.05, 0], v: [-0.0008, 0.0005] };
     s.nodes = [];
     return s;
   };
@@ -3987,19 +4128,18 @@ test('the two marks do the two jobs a rendezvous needs', () => {
 });
 
 test('the navigator is the instruments, not the physics', () => {
-  const lamp = world.get('lamp'), t = 2000;
-  const m = O.railState(world.get('maw'), lamp.mu, t);
+  const t = 2000;
   const at = nav => {
     const s = S.newGame(6); S.undock(s); s.t = t;
     if(nav) s.crew.navigator = { role: 'navigator' };
-    s.ship = { body: 'lamp', r: [m.r[0] + 0.004, m.r[1]], v: [m.v[0], m.v[1] + 0.0004] };
+    s.ship = { body: 'maw', r: [0.05, 0], v: [-0.0008, 0.0005] };
     s.nodes = [];
     return s;
   };
   const green = at(false), crewed = at(true);
-  /* The axes bend for everybody: she does not change how a ship flies. */
-  const f1 = O.frameAt(world, 'lamp', green.ship.r, green.ship.v, t);
-  const f2 = O.frameAt(world, 'lamp', crewed.ship.r, crewed.ship.v, t);
+  /* The axes are the same for everybody: she does not change how a ship flies. */
+  const f1 = O.frameAt(world, 'maw', green.ship.r, green.ship.v, t);
+  const f2 = O.frameAt(world, 'maw', crewed.ship.r, crewed.ship.v, t);
   assert.deepEqual(f1, f2, 'the frame is the same with or without her');
   /* What she brings is the two numbers, and the docking they make possible. */
   assert.equal(S.rendezvous(green).instruments, false);

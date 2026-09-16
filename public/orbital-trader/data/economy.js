@@ -1269,7 +1269,7 @@ export const ECONOMY = {
     "nail"
    ],
    "effect": "See gravitational phenomena on the chart.",
-   "unlocks": "Finds what bends a course and does not shine. There is one such thing out past Tassel."
+   "unlocks": "Finds what bends a course and does not shine. There are two such things: one between Tassel and the Belt, and one at the far edge, which is what the Dancer has been going round all this time."
   },
   {
    "id": "tempcontrol",

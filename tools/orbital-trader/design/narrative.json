@@ -305,7 +305,7 @@
    ]
   },
   "maw": {
-   "blurb": "Something at the edge of the system, eighteen astronomical units out, with a ring of glittering dust around a hole in the sky. A Builder station keeps station on it, aimed inward at nothing, and has done for longer than there have been people to notice. That is everything anyone knows.",
+   "blurb": "Something at the edge of the system, six astronomical units out, with a ring of glittering dust around a hole in the sky and a small blue star going round it. The star is all anybody has ever seen from here: it appears to circle nothing, and has done for as long as anyone has looked. A Builder station keeps station on the nothing, aimed inward, and has done for longer than there have been people to notice. That is everything anyone knows.",
    "arrival": [
     "There is no light out here except what is falling in, and it is falling in a circle.",
     "The station holds its distance exactly, and nothing is holding it there that you can find.",
@@ -420,7 +420,7 @@
   "firstAssist": "You fell past Grumm and came out faster than you went in, with the tank untouched. The frogs call that a slingshot. Grumm has not noticed.",
   "firstAerobrake": "The shield takes the heat, the clouds take the speed, and you come out the other side slower for free.",
   "bankDebt": "The Tassel harbour bank covers what you could not, at interest, with a copy of the paperwork for your records.",
-  "mawArrival": "You have come as far as anyone goes. The ring of dust is there, exactly where the Builders pointed their station, and at the middle of it there is nothing at all — a hole the size of a hill with a system's worth of light bending round it.\nThe station keeps its distance and does not drift. Nothing is holding it. You check three times.\nThe Builders put a silent thing out here and aimed it at a hole in the sky. They left no doors, no stairs, no seats, and no explanation. Why does anyone build a place to watch from, if not to tell somebody what they saw?",
+  "mawArrival": "You have come as far as anyone goes. The Dancer is overhead and enormous and the wrong colour for this far out, and it is going round something. The ring of dust is there, exactly where the Builders pointed their station, and at the middle of it there is nothing at all — a hole the size of a hill with a system's worth of light bending round it.\nThe station keeps its distance and does not drift. Nothing is holding it. You check three times.\nThe Builders put a silent thing out here and aimed it at a hole in the sky. They left no doors, no stairs, no seats, and no explanation. Why does anyone build a place to watch from, if not to tell somebody what they saw?",
   "skimDamage": [
    "Something lets go aft with a sound you feel through the deck. The shield held. The frame under it did not, quite, and there is a seam that was not there this morning.",
    "The second pass finds the seam and opens it. Nothing is venting and nothing is on fire, but the hull rings wrong when you knock on it now, and you will knock on it.",

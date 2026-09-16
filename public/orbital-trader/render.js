@@ -111,27 +111,39 @@ export const PALETTE = {
 export const speciesColour = s => PALETTE[s] ?? PALETTE.none;
 
 /* Body colours by kind and people, so the chart reads without labels. */
+/* The channels of a `#rrggbb`, or the old hard-coded violet for anything that
+ * is not one. Every colour on this chart is authored as hex, so this is the one
+ * place that has to know it. */
+const rgbCache = new Map();
+function rgbOf(colour){
+  let out = rgbCache.get(colour);
+  if(out) return out;
+  const hex = /^#([0-9a-f]{6})$/i.exec(colour);
+  out = hex ? [0, 2, 4].map(i => parseInt(hex[1].slice(i, i + 2), 16)) : [139, 107, 214];
+  rgbCache.set(colour, out);
+  return out;
+}
+export const rgba = (colour, alpha) => { const [r, g, b] = rgbOf(colour); return `rgba(${r},${g},${b},${alpha})`; };
+/* Towards white, for the bit of a star that is too bright to have a colour. */
+export function lighten(colour, k){
+  const [r, g, b] = rgbOf(colour);
+  const up = c => Math.round(c + (255 - c) * k);
+  return `rgb(${up(r)},${up(g)},${up(b)})`;
+}
+
 /* A body's colour at the weight air is drawn in: enough to read as weather over
  * black, faint enough that the road through it stays the brightest thing. One
  * number, so the four atmospheres are the same thickness of haze as each other
  * whatever colour they are. */
 const HAZE_ALPHA = 0.18;
-const hazeCache = new Map();
-export function haze(colour){
-  let out = hazeCache.get(colour);
-  if(out) return out;
-  const hex = /^#([0-9a-f]{6})$/i.exec(colour);
-  const [r, g, bl] = hex
-    ? [0, 2, 4].map(i => parseInt(hex[1].slice(i, i + 2), 16))
-    : [139, 107, 214];
-  out = `rgba(${r},${g},${bl},${HAZE_ALPHA})`;
-  hazeCache.set(colour, out);
-  return out;
-}
+export const haze = colour => rgba(colour, HAZE_ALPHA);
 
 export function bodyColour(body){
-  if(body.kind === 'star') return PALETTE.star;
+  /* A star's own colour wins where it has one: there are two of them now, and
+     one is blue. The palette's star is what the Lamp is, and the fallback for
+     anything that does not say. */
   if(body.colour) return body.colour;
+  if(body.kind === 'star') return PALETTE.star;
   return speciesColour(body.species ?? 'none');
 }
 
@@ -554,7 +566,10 @@ function drawSoiRings(chart, pos){
   }
 }
 
-function labelFor(b){ return b.name ?? b.id; }
+/* What to call a body on the chart. A thing the player has not found yet keeps
+ * its mark — the road still runs into it and the crosshair still says where —
+ * but not its name: that is the whole of what the instrument buys. */
+function labelFor(b, chart){ return chart?.hidden?.has(b.id) ? '???' : (b.name ?? b.id); }
 
 function drawBodies(chart, view, pos, t){
   const { ctx, world, camera } = chart;
@@ -570,17 +585,23 @@ function drawBodies(chart, view, pos, t){
     const rpx = Math.max(minPx, real);
     const colour = bodyColour(b);
 
-    // Skip a moon that would sit inside its parent's dot: it is not there yet.
-    if(b.parent && b.kind !== 'planet'){
+    /* Skip a moon that would sit inside its parent's dot: it is not there yet.
+       Never a star — the Dancer sits a thumb's width from a black hole nobody
+       can see, and at the zoom where the two land on the same pixel it is the
+       only thing marking the spot. */
+    if(b.parent && b.kind !== 'planet' && b.kind !== 'star'){
       const pp = chart.toScreen(pos.get(b.parent).r);
       const parent = world.get(b.parent);
       const prpx = Math.max(4.5, (parent.radius ?? 0) * zoom);
       if(dist(p, pp) < prpx + 2 && b.a * zoom < 6) continue;
     }
 
+    /* A star's halo, in the star's own colour. There are two now and the second
+       one is blue, so a gradient hard-coded to the Lamp's orange would have put
+       a sunset round it. */
     if(b.kind === 'star'){
       const glow = ctx.createRadialGradient(p[0], p[1], rpx, p[0], p[1], rpx * 5);
-      glow.addColorStop(0, PALETTE.starGlow); glow.addColorStop(1, 'rgba(245,154,46,0)');
+      glow.addColorStop(0, rgba(colour, 0.22)); glow.addColorStop(1, rgba(colour, 0));
       ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(p[0], p[1], rpx * 5, 0, Math.PI * 2); ctx.fill();
     }
     /* The band of air, when it is big enough to mean something. In the world's
@@ -657,7 +678,8 @@ function drawBodies(chart, view, pos, t){
       ctx.globalAlpha = alpha;
       ctx.beginPath(); ctx.arc(p[0], p[1], rpx, 0, Math.PI * 2);
       ctx.fillStyle = colour; ctx.fill();
-      if(b.kind === 'star'){ ctx.fillStyle = PALETTE.starCore; ctx.beginPath(); ctx.arc(p[0], p[1], rpx * 0.55, 0, Math.PI * 2); ctx.fill(); }
+      // And its core, which is the same colour with the colour burnt out of it.
+      if(b.kind === 'star'){ ctx.fillStyle = lighten(colour, 0.72); ctx.beginPath(); ctx.arc(p[0], p[1], rpx * 0.55, 0, Math.PI * 2); ctx.fill(); }
       ctx.globalAlpha = 1;
     }
     if((b.kind === 'zone' || b.mu === 0) && !drew && b.kind !== 'hole'){
@@ -678,7 +700,7 @@ function drawBodies(chart, view, pos, t){
     const wantLabel = b.kind === 'star' || b.kind === 'planet' || b.kind === 'hole' || camera.follow === b.id
       || (b.parent && b.a * zoom > 28);
     if(!wantLabel) continue;
-    const text = labelFor(b);
+    const text = labelFor(b, chart);
     ctx.font = (camera.follow === b.id ? '600 ' : '') + '12px ui-sans-serif, system-ui, sans-serif';
     const w = ctx.measureText(text).width + 8;
     const cand = [
@@ -926,7 +948,7 @@ function drawCrossings(chart, view, anchors, afterBurnAt){
     const to = c.to ? world.get(c.to) : null;
     if(!to) continue;
     ctx.fillStyle = PALETTE.text;
-    ctx.fillText(`${c.kind === 'exit' ? 'out to' : 'into'} ${labelFor(to)}`, p[0] + 12, p[1] + 4);
+    ctx.fillText(`${c.kind === 'exit' ? 'out to' : 'into'} ${labelFor(to, chart)}`, p[0] + 12, p[1] + 4);
   }
 }
 
@@ -985,7 +1007,7 @@ function drawRailCrossings(chart, view, anchors){
     const b = world.get(c.body);
     if(b && apart > 18 && !out(q)){
       ctx.fillStyle = PALETTE.textDim;
-      ctx.fillText(labelFor(b), q[0] + 9, q[1] + 4);
+      ctx.fillText(labelFor(b, chart), q[0] + 9, q[1] + 4);
     }
   }
 }
@@ -1335,7 +1357,7 @@ function drawEncounterInset(chart, view){
   // Its name at the top, its numbers along the bottom.
   ctx.fillStyle = PALETTE.text;
   ctx.font = '600 11px ui-sans-serif, system-ui, sans-serif';
-  ctx.fillText(labelFor(b), x0 + 9, y0 + 16);
+  ctx.fillText(labelFor(b, chart), x0 + 9, y0 + 16);
   /* The numbers along the bottom, wrapped rather than clipped: "in the
      mouth" is the half of that line a pilot most wants to read and it was
      the half falling off the edge. */

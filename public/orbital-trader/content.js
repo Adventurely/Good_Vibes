@@ -50,7 +50,7 @@ export const SPECIES = {
 /* Colours for the chart, by body. Peoples' worlds take their people's hue;
  * the rest are what they are: a violet giant, a glass-snow world, a lamp. */
 const BODY_COLOURS = {
-  lamp: '#ffd23f', cinder: '#e8683c', scorch: '#b58a5a', veyra: '#f2a65a',
+  lamp: '#ffd23f', dancer: '#6fb7ff', cinder: '#e8683c', scorch: '#b58a5a', veyra: '#f2a65a',
   tassel: '#3fa9dd', slate: '#cfc2a8', moss: '#6cc24a',
   nail: '#e9dcc0', whisker: '#8b8b9e', arc: '#d9c9a3',
   grumm: '#8b6bd6', brine: '#a8c48c', glass: '#cfe8ff', croak: '#9a8fa6',
@@ -97,10 +97,11 @@ export function soiRadius(mu, a, parentMu){
  * Grumm's approach is wide because Grumm is wide and has fourteen hundred
  * kilometres of cloud on top of that, not because somebody typed a number.
  *
- * The drifting havens keep theirs. Nail, Whisker and the Maw have no surface
- * to be five times of and no air over it — their radius is a dot on a chart,
- * not a ground — so the formula has nothing to act on and the authored mouth
- * stands. */
+ * A rendezvous keeps the mouth it was given, whatever it weighs. Five radii
+ * over the air describes a parking orbit, and a rendezvous harbour has none:
+ * the Maw is a hundred and fifty kilometres of black hole with a mouth a
+ * million and a half kilometres wide, because what that number measures is how
+ * near you have to come to be met, not how high you have to fly to be held. */
 export function dockRange(radius, atmo){
   if(!(radius > 0)) return null;
   return Math.max(radius, atmo ?? radius) + 5 * radius;
@@ -126,8 +127,9 @@ export const BODIES = TUNING.bodies.map(b => ({
   e: b.e ?? 0, omega: b.omega ?? 0, M0: b.M0 ?? 0, retrograde: !!b.retrograde,
   mu: b.mu ?? 0,
   soi: soiRadius(b.mu ?? 0, b.a ?? 0, rawMu[b.parent] ?? 0),
-  // A world's mouth comes from its size; a drifting haven keeps the one it was given.
-  zoneRadius: (b.mu ?? 0) > 0 ? dockRange(b.radius ?? 0, b.atmo) : b.zoneRadius,
+  /* A world's mouth comes from its size; anything you come alongside keeps the
+     one it was given, because that mouth is a distance rather than an orbit. */
+  zoneRadius: (b.mu ?? 0) > 0 && !isRendezvous(b) ? dockRange(b.radius ?? 0, b.atmo) : b.zoneRadius,
   rendezvous: isRendezvous(b),
   colour: BODY_COLOURS[b.id] ?? null,
 }));

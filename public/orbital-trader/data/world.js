@@ -365,17 +365,17 @@ export const TUNING = {
    "omega": 0,
    "M0": 2.6,
    "retrograde": false,
-   "mu": 0,
+   "mu": 9.02934e-8,
    "radius": 0.000001,
    "dockAlt": null,
    "zoneRadius": 0.01,
+   "harbour": "rendezvous",
    "dockSpeed": 0.000586,
    "port": true,
    "species": null,
    "climate": "cold",
-   "notes": "A miniature black hole on an orbit nothing explains, with a Builder station keeping station on it. The last question.",
-   "soi": null,
-   "driftReach": 0.04
+   "notes": "A black hole at the far edge, heavier than Grumm by thirty times and a hundred and fifty kilometres across. No ground, no air and nothing to orbit at: you come alongside it, which is why the harbour override is here rather than falling out of the mass. It wants no driftReach — that field exists to bend the burn axes towards something with no gravity of its own, and this has plenty; inside its reach the frame already is the Maw's. Invisible until a ship carries gravitational sensors, and the Dancer is the only thing that says it is there.",
+   "soi": 0.36121084577421525
   },
   {
    "id": "ashfall",
@@ -394,7 +394,8 @@ export const TUNING = {
    "port": true,
    "species": "none",
    "climate": "cold",
-   "notes": "An Emberkin ore hauler that lost its tank on the Veyra run and has been falling between the two worlds ever since, out at Cinder and back in at Veyra, once every twenty-one days."
+   "notes": "An Emberkin ore hauler that lost its tank on the Veyra run and has been falling between the two worlds ever since, out at Cinder and back in at Veyra, once every twenty-one days.",
+   "soi": null
   },
   {
    "id": "cutterjaw",
@@ -413,7 +414,8 @@ export const TUNING = {
    "port": true,
    "species": "none",
    "climate": "cold",
-   "notes": "An otter mining tender, still parked over the Slate yards it worked, with the rock it was cutting still in the hold. Near enough to home that the first salvage anybody tries is usually this one."
+   "notes": "An otter mining tender, still parked over the Slate yards it worked, with the rock it was cutting still in the hold. Near enough to home that the first salvage anybody tries is usually this one.",
+   "soi": null
   },
   {
    "id": "longsweet",
@@ -432,7 +434,8 @@ export const TUNING = {
    "port": true,
    "species": "none",
    "climate": "cold",
-   "notes": "A frog cider transport circling wide above Haven, high and slow and perfectly intact. Nobody has been able to say what happened to the crew, and the frogs have stopped asking."
+   "notes": "A frog cider transport circling wide above Haven, high and slow and perfectly intact. Nobody has been able to say what happened to the crew, and the frogs have stopped asking.",
+   "soi": null
   },
   {
    "id": "tinwhistle",
@@ -451,7 +454,8 @@ export const TUNING = {
    "port": true,
    "species": "none",
    "climate": "cold",
-   "notes": "A cat prospector at the inner edge of the Belt. It went quiet mid-sentence and the cats have left it alone since, which is a kind of respect and also a kind of superstition."
+   "notes": "A cat prospector at the inner edge of the Belt. It went quiet mid-sentence and the cats have left it alone since, which is a kind of respect and also a kind of superstition.",
+   "soi": null
   },
   {
    "id": "patience",
@@ -470,7 +474,8 @@ export const TUNING = {
    "port": true,
    "species": "none",
    "climate": "cold",
-   "notes": "An otter long-hauler a very long way from any water. She was named for somebody who is still alive and still asking after her."
+   "notes": "An otter long-hauler a very long way from any water. She was named for somebody who is still alive and still asking after her.",
+   "soi": null
   },
   {
    "id": "sixthforge",
@@ -489,7 +494,8 @@ export const TUNING = {
    "port": true,
    "species": "none",
    "climate": "cold",
-   "notes": "An Emberkin freighter carrying finished work out of Cinder, stopped between the two cat havens with everything aboard still crated and labelled."
+   "notes": "An Emberkin freighter carrying finished work out of Cinder, stopped between the two cat havens with everything aboard still crated and labelled.",
+   "soi": null
   },
   {
    "id": "hull41",
@@ -508,7 +514,25 @@ export const TUNING = {
    "port": true,
    "species": "none",
    "climate": "cold",
-   "notes": "A hull at the outer edge of the Belt with a yard number on it and no name. Nobody built it and nobody lost it, which are two different problems."
+   "notes": "A hull at the outer edge of the Belt with a yard number on it and no name. Nobody built it and nobody lost it, which are two different problems.",
+   "soi": null
+  },
+  {
+   "id": "dancer",
+   "name": "The Dancer",
+   "kind": "star",
+   "parent": "maw",
+   "a": 0.05,
+   "e": 0.06,
+   "omega": 1.37,
+   "M0": 0.55,
+   "mu": 6.01956e-9,
+   "radius": 0.00005,
+   "species": "none",
+   "climate": "cold",
+   "notes": "A small blue star going round the Maw, the size of Grumm and nothing like the weight of it. It is the visible half of the pair: a star that appears to orbit nothing until a ship can see what it is orbiting. Named for what it looks like from a long way off.",
+   "soi": 0.01692518797329136,
+   "zoneRadius": 0.00030000000000000003
   }
  ],
  "belt": {
@@ -630,9 +654,9 @@ export const TUNING = {
   },
   {
    "route": "Tassel -> the Maw",
-   "dv_kms": 15.1,
+   "dv_kms": 18,
    "dep_kms": 10.4,
-   "arr_kms": 4.7,
+   "arr_kms": 7.6,
    "days": 1757
   }
  ],
@@ -652,6 +676,14 @@ export const TUNING = {
   "glass": 6.65,
   "croak": 16.97,
   "haven": 36.9,
-  "maw": 9164.12
+  "maw": 9164.12,
+  "ashfall": 36.22,
+  "cutterjaw": 0.44,
+  "longsweet": 81.95,
+  "tinwhistle": 353.51,
+  "patience": 400.96,
+  "sixthforge": 417.21,
+  "hull41": 468.09,
+  "dancer": 233.78
  }
 };

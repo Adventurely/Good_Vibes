@@ -277,7 +277,7 @@ export function dockingStatus(state){
      are simply where we are and how fast. Without this a ship that crossed
      into Nail's reach found no harbour at all: Nail is not its own child, and
      the orbit test below would have asked it to orbit a thing it cannot. */
-  if(here.port && here.rendezvous && here.mu > 0 && state.justLeft !== here.id){
+  if(here.port && here.rendezvous && here.mu > 0 && state.justLeft !== here.id && !hidden.has(here.id)){
     take(rendezvousStatus(state, here, state.ship.r, state.ship.v));
   }
   // The world we are going round.
@@ -483,6 +483,12 @@ export const skimsAir = state => !!state?.keys?.heatShield;
  * other way, by looking, which is the phenomenon that key was always sold to
  * see. Either one puts it on the chart; neither changes the sky. */
 export const knowsKnot = state => !!(state?.crew?.navigator || state?.keys?.gravSensors);
+/* The Maw is the other one, and it takes the instrument rather than the person.
+ * A cat can tell you where the Knot is because the cats have known for nine
+ * generations; nobody has ever come back from the far edge to say what is out
+ * there, so the only way to know is to measure it. What a ship without the
+ * sensors sees is the Dancer: a small blue star going round nothing at all. */
+export const knowsMaw = state => !!state?.keys?.gravSensors;
 
 /* Wrecks: things with no weight, on rails, that you can tie up to and that
  * nobody lives on. They are bodies in the sky like anywhere else, but they are
@@ -491,12 +497,20 @@ export const knowsKnot = state => !!(state?.crew?.navigator || state?.keys?.grav
  * empty menus pretending otherwise. */
 const WRECK_IDS = new Set(BODIES.filter(b => b.kind === 'wreck').map(b => b.id));
 export const isWreck = id => WRECK_IDS.has(id);
+
+/* What to call a body to this player. Everything the chart and the readouts
+ * say about a thing nobody has found goes through here: the road still runs
+ * into it, the crosshair still marks the pass and the numbers are still real —
+ * it simply has no name yet. `hidden` is the set `unseen` builds, passed in
+ * because the page already has one per frame. */
+export const nameFor = (id, hidden) => hidden?.has(id) ? '???' : portName(id);
 export const WRECKS = [...WRECK_IDS];
 /* Bodies the chart should not draw for this player. Physics never consults
  * this: a thing nobody has told you about still has hold of you. */
 export function unseen(state){
   const hide = new Set();
   if(!knowsKnot(state)) hide.add('knot');
+  if(!knowsMaw(state)) hide.add('maw');
   /* A wreck is a rumour until somebody hands you the job that names it. Seven
      unexplained dots on the chart from the first day would be seven questions
      with no way to ask them; one that appears when a salvor tells you where to
@@ -531,7 +545,16 @@ export const canDockDrifting = state => !!state?.crew?.navigator;
 export function rendezvous(state){
   if(!state || state.dockedAt) return null;
   const here = world.get(state.ship.body);
-  const tgt = driftTargetAt(world, here.id, state.ship.r, state.t);
+  /* Two ways to be near one of these. A wreck drifts in somebody else's frame,
+     and a reach round it is what says you are close enough to be flying the
+     rendezvous rather than the orbit. The Maw has weight, so its own reach does
+     that job and the ship is simply *in* its frame — where the two numbers are
+     where you are and how fast, with nothing to subtract. Without this, giving
+     the Maw a well silently took its readout away: the drift reach sits inside
+     the sphere of influence and can never fire again. */
+  const tgt = here.port && here.rendezvous && here.mu > 0
+    ? { id: here.id, r: [0, 0], v: [0, 0], reach: here.soi }
+    : driftTargetAt(world, here.id, state.ship.r, state.t);
   if(!tgt) return null;
   const rel = sub(state.ship.r, tgt.r);
   const vRel = sub(state.ship.v, tgt.v);
