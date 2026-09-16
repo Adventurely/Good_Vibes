@@ -2156,19 +2156,23 @@ The four keys name the bench they come off:
 | --- | --- | --- | --- |
 | Temperature control | Cinder | Engineer | Carries the six goods that will not keep at hold temperature — riverfish, fire crystals, ancient cider, ice lenses, medicinal gel, smuggled medicine. Not all of them are cold: fire crystals are a thing you keep *steady* |
 | Gravitational sensors | Nail | — | *Nothing yet* |
-| Heat shielding | Cinder | Engineer | *Nothing yet* |
-| Cryo hull cooling | Cinder | Engineer, heat shielding | *Nothing yet* |
+| Heat shielding | Cinder | Engineer | Air braking: survive a pass through a world's air and let it slow you down |
+| Cryo hull cooling | Cinder | Engineer, heat shielding | The same pass, at no risk to the hull however deep it goes |
 
-**Three of them are sold and wired to nothing, and each says so on its own
-row** — "not fitted to anything yet". Selling somebody a box that does nothing
-without telling them is a swindle; holding the box back until the mechanic
-lands means the mechanic arrives with nowhere to be bought.
+**The ones that are sold and wired to nothing say so on their own row** — "not
+fitted to anything yet". Selling somebody a box that does nothing without
+telling them is a swindle; holding the box back until the mechanic lands means
+the mechanic arrives with nowhere to be bought.
 
-Aerobraking is the one that used to work, and is switched off: a risky skim and
-a safe one are two different manoeuvres, neither is built, so Grumm's clouds
-are lethal to everybody. The arithmetic is still in `effectiveNodes`, which
-takes a `skim` flag so a test can reach it rather than leaving it to rot behind
-a flag no caller can set.
+**Air braking is built.** Five worlds have weather — Veyra, Cinder, Tassel,
+Grumm and Brine — and without a shield the top of the air is the ground: fly
+into it and you are fished out and towed. With one, the band is a brake. How
+much it takes goes with the square of how deep the pass goes, so the top of it
+is a feather a pilot can walk an orbit down with over as many laps as they have
+days for, and the bottom of it is a wall that circularises you in one. What
+stops a deep pass being a crash is a floor in the arithmetic: a skim will never
+leave the far end of the orbit inside the air, so the worst it does is park you
+low with a hull that felt it. Cryo cooling is what makes the deep line free.
 
 ### Forgiveness, as built
 
