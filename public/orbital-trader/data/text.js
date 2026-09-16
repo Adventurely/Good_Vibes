@@ -439,8 +439,7 @@ export const NARRATIVE = {
  },
  "opening": {
   "title": "A crate for your Aunt Nellie",
-  "line": "Theo's writing again: \"She's at the dry docks on Slate. Don't shake it and don't open it.\"",
-  "briefing": "One crate, one moon, one aunt. Everything else can wait."
+  "line": "Theo's writing again: \"She's at the dry docks on Slate. Don't shake it and don't open it.\""
  },
  "tutorial": [
   {
@@ -518,12 +517,6 @@ export const NARRATIVE = {
   "Skipper"
  ],
  "captainLines": {
-  "onBurn": [
-   "Burn made. The far end of the path has moved; go and look at it.",
-   "That is spent. What is left is what is left.",
-   "Clean burn. The numbers agree with the plan, which is not always true.",
-   "Done. The sky has rearranged itself around the decision."
-  ],
   "onLongCoast": [
    "Nothing to do for a while but watch the worlds go round, which is not nothing.",
    "Coasting. The cargo is fine and the hull is quiet.",
@@ -554,7 +547,6 @@ export const NARRATIVE = {
   "questDone": "Finished {title}. Paid {pay}.",
   "skimDamage": "Hull damaged air braking at {body}.",
   "skimFuelCell": "Fuel cell lost air braking at {body}.",
-  "repaired": "Repaired at {port}: {cost}.",
   "questReady": "Finished {title}. There is something to collect."
  }
 };

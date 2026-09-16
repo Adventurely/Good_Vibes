@@ -148,8 +148,6 @@ export function usedUnits(state){
 }
 export function freeUnits(state){ return holdUnits(state) - usedUnits(state); }
 export const portName = id => world.get(id)?.name ?? id;
-export const portOf = id => PORTS[id];
-
 const aOrAn = w => `${/^[aeiou]/i.test(w) ? 'an' : 'a'} ${w.toLowerCase()}`;
 
 export function logLine(state, kind, template, vars = {}){
@@ -819,18 +817,16 @@ function flag(state, name, events){
 /* ---------------------------------------------------------------- quests */
 
 /* An errand somebody gave you, with a list of steps and the one you are on.
- * The words live in narrative.json like every other line the game says; what
- * lives here is the only part that cannot be written down as text — how the
- * game knows a step is finished. Keyed by quest id and step id, so the table
- * and the tests are read side by side.
+ * The words live in quests.json, which also says what kind of job each one is
+ * and names the places and the goods; what lives here is the only part that
+ * cannot be written down as text — how the game knows a step is finished.
  *
  * A quest is a reason to fly somewhere. The opening errand is one because
  * "fetch your aunt a pebble" is a thing a person does for a person, and
- * because it can teach the whole game on the way: it is the tutorial's
- * spine. */
-/* The five shapes a job comes in. A quest in narrative.json says what kind it
- * is and names the places and the goods; the steps are built from that rather
- * than written out, so a new quest is five lines of data and no code.
+ * because it can teach the whole game on the way: it is the tutorial's spine.
+ *
+ * The five shapes a job comes in. The steps are built from the type rather
+ * than written out, so a new quest is a few lines of data and no code.
  *
  *   retrieval  go and get the goods yourself, then take them to `to`
  *   delivery   the goods are handed to you when you accept, so you need the
@@ -845,14 +841,12 @@ function flag(state, name, events){
  * in the telling and not in the rules. Saying so here is cheaper than
  * inventing a mechanical distinction nobody asked for.
  *
- * Nothing shows any of this yet. There is no board to take a job from, so the
- * opening errand is still the only quest a player meets; the rest of the
- * catalogue sits there waiting for somewhere to be offered from. */
+ * A job is taken from the port that offers it: `questsAt` is the board, the
+ * Requests tab on the dock menu is where it is shown, and three is as many as
+ * anybody can hold in their head at once. */
 
 export const MAX_ACTIVE_QUESTS = 3;
 
-/* The catalogue comes out of quests.json now rather than out of the middle of
- * narrative.json. Nothing below cares which file it was in. */
 export const QUESTS = QUESTBOOK;
 export const questById = id => QUESTS.find(q => q.id === id);
 /* Where the chart should point when a job is taken: wherever the first step
@@ -1176,12 +1170,12 @@ export function addNodeAhead(state){
   const el = elementsFromState(b.mu, state.ship.r, state.ship.v);
   const ahead = Number.isFinite(el.period) ? el.period / 8 : 1;
   const last = state.nodes.length ? state.nodes[state.nodes.length - 1].t : state.t;
-  /* A floor of twenty-five real seconds at x1: enough to press the pad a few
+  /* A floor of twenty-five real seconds at x1: enough to pull the arrows a few
      times before the mark arrives and fires whatever it has by then. */
   const floor = Math.max(MIN_LEAD * 1.1, CONST.BASE_RATE_DAYS_PER_SEC * 25);
   return addNode(state, Math.max(state.t, last) + Math.max(floor, ahead));
 }
-/* What a burn *does*, in the words the four buttons use.
+/* What a burn *does*, in the words the four arrows use.
  *
  * The chart used to label a mark with the size of the burn and nothing else —
  * "0.12 km/s" — which is the fuel it will spend. Two playtesters read that as
@@ -2272,12 +2266,12 @@ export function transferWindows(state){
   return rows.sort((a, b) => a.cost - b.cost);
 }
 
+export const departureName = state => departure(state).body?.name ?? null;
+
 /* A crossing is a crossing whatever the paperwork says: a job whose route
  * leaves the sky it was handed to you in needs the instrument that reads the
  * sky. No harbourmaster hands out interplanetary work to a ship that cannot
  * tell a window from a whim. */
-export const departureName = state => departure(state).body?.name ?? null;
-
 export function questLeavesSystem(q){
   if(!q) return false;
   const home = helioOf(q.from ?? '')?.id ?? null;
@@ -2287,20 +2281,6 @@ export function questLeavesSystem(q){
 }
 
 /* ------------------------------------------------------------ markets */
-
-/* Nearest producer of a good to this port right now, in au. Alignment: a
- * market grows hungry as its supplier swings away across the sky. */
-export function supplierDistance(portId, goodId, t){
-  const g = goodById(goodId);
-  const here = absState(world, portId, t).r;
-  let best = Infinity;
-  for(const p of g.producedAt){
-    if(p === portId) return 0;
-    const d = dist(here, absState(world, p, t).r);
-    if(d < best) best = d;
-  }
-  return best;
-}
 
 /* Who wants a thing, in the words the goods table itself uses — sometimes a
  * port, sometimes a whole people, once "everyone". Two lists: the ones who
@@ -3102,15 +3082,6 @@ export function mouthOf(id){
   if(b.zoneRadius) return b.zoneRadius;
   if(b.soi) return b.soi * 0.1;
   return Math.max(b.radius * 3, 1e-6);
-}
-
-export function approachTo(state, prediction, targetId){
-  if(!targetId || !prediction) return null;
-  const tb = world.get(targetId);
-  const within = tb.soi ?? (tb.zoneRadius ? tb.zoneRadius * 40 : 0.5);
-  // The first pass that reaches the harbour mouth is the arrival; a nearer one
-  // three laps later is not what anybody means by "closest approach".
-  return closestApproach(world, prediction, targetId, Math.max(within, 0.05) * 3, mouthOf(targetId));
 }
 
 export { elementsFromState, propagate, absState, railState, predict, norm, sub, add, scale, unit, perp, dist, hohmann };

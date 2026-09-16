@@ -1052,175 +1052,120 @@ export const ECONOMY = {
  ],
  "ports": {
   "cinder": {
-   "name": "Cinder",
    "species": "emberkin",
    "climate": "hot",
-   "orbitAu": 0.3,
-   "parent": null,
    "region": "inner",
    "marketSize": 1.5,
    "fuelPricePerKms": 6,
    "shipyard": true
   },
   "scorch": {
-   "name": "Scorch",
    "species": "emberkin",
    "climate": "hot",
-   "orbitAu": 0.3,
-   "parent": "cinder",
    "region": "inner",
    "marketSize": 0.6,
    "fuelPricePerKms": 12,
    "shipyard": true
   },
   "veyra": {
-   "name": "Veyra",
    "species": "emberkin",
    "climate": "hot",
-   "orbitAu": 0.6,
-   "parent": null,
    "region": "inner",
    "marketSize": 1.6,
    "fuelPricePerKms": 11,
    "shipyard": true
   },
   "tassel": {
-   "name": "Tassel",
    "species": "otter",
    "climate": "temperate",
-   "orbitAu": 1,
-   "parent": null,
    "region": "home",
    "marketSize": 2,
    "fuelPricePerKms": 10,
    "shipyard": true
   },
   "slate": {
-   "name": "Slate",
    "species": "otter",
    "climate": "temperate",
-   "orbitAu": 1,
-   "parent": "tassel",
    "region": "home",
    "marketSize": 0.8,
    "fuelPricePerKms": 9,
    "shipyard": true
   },
   "moss": {
-   "name": "Moss",
    "species": "otter",
    "climate": "temperate",
-   "orbitAu": 1,
-   "parent": "tassel",
    "region": "home",
    "marketSize": 1,
    "fuelPricePerKms": 12,
    "shipyard": true
   },
   "nail": {
-   "name": "Nail",
    "species": "cat",
    "climate": "micro",
-   "orbitAu": 2.15,
-   "parent": null,
    "region": "belt",
    "marketSize": 0.8,
    "fuelPricePerKms": 20,
    "shipyard": true
   },
   "whisker": {
-   "name": "Whisker",
    "species": "cat",
    "climate": "micro",
-   "orbitAu": 2.38,
-   "parent": null,
    "region": "belt",
    "marketSize": 0.7,
    "fuelPricePerKms": 26,
    "shipyard": true
   },
   "arc": {
-   "name": "The Arc",
    "species": "cat",
    "climate": "micro",
-   "orbitAu": 2.7,
-   "parent": null,
    "region": "belt",
    "marketSize": 0.6,
    "fuelPricePerKms": null,
    "shipyard": false
   },
   "grumm": {
-   "name": "Grumm",
    "species": "frog",
    "climate": "cold",
-   "orbitAu": 5,
-   "parent": null,
    "region": "outer",
    "marketSize": 1,
    "fuelPricePerKms": 24,
    "shipyard": true
   },
   "brine": {
-   "name": "Brine",
    "species": "frog",
    "climate": "cold",
-   "orbitAu": 5,
-   "parent": "grumm",
    "region": "outer",
    "marketSize": 0.8,
    "fuelPricePerKms": 26,
    "shipyard": true
   },
   "glass": {
-   "name": "Glass",
    "species": "frog",
    "climate": "cold",
-   "orbitAu": 5,
-   "parent": "grumm",
    "region": "outer",
    "marketSize": 0.7,
    "fuelPricePerKms": 26,
    "shipyard": true
   },
   "croak": {
-   "name": "Croak",
    "species": "frog",
    "climate": "cold",
-   "orbitAu": 5,
-   "parent": "grumm",
    "region": "outer",
    "marketSize": 0.3,
    "fuelPricePerKms": 34,
-   "shipyard": true,
-   "retrograde": true
+   "shipyard": true
   },
   "haven": {
-   "name": "Haven",
    "species": "frog",
    "climate": "cold",
-   "orbitAu": 5,
-   "parent": "grumm",
    "region": "outer",
    "marketSize": 1.4,
    "fuelPricePerKms": 22,
-   "shipyard": true,
-   "gifts": {
-    "perVisitValue": 40,
-    "perRepPoint": 12,
-    "goods": [
-     "lanterns",
-     "dyes",
-     "incense"
-    ]
-   }
+   "shipyard": true
   },
   "maw": {
-   "name": "The Maw",
    "species": "none",
    "climate": "cold",
-   "orbitAu": 18,
-   "parent": null,
    "region": "deep",
    "marketSize": 0,
    "fuelPricePerKms": null,

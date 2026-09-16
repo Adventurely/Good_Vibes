@@ -1050,11 +1050,8 @@
  ],
  "ports": {
   "cinder": {
-   "name": "Cinder",
    "species": "emberkin",
    "climate": "hot",
-   "orbitAu": 0.3,
-   "parent": null,
    "region": "inner",
    "marketSize": 1.5,
    "fuelPricePerKms": 6,
@@ -1062,11 +1059,8 @@
    "notes": "Engine smiths; the cheapest fuel in the system straight from the refineries."
   },
   "scorch": {
-   "name": "Scorch",
    "species": "emberkin",
    "climate": "hot",
-   "orbitAu": 0.3,
-   "parent": "cinder",
    "region": "inner",
    "marketSize": 0.6,
    "fuelPricePerKms": 12,
@@ -1074,11 +1068,8 @@
    "notes": "Mining frontier. Cheap rock, dangerous work, and the Emberkin nobody at home writes to."
   },
   "veyra": {
-   "name": "Veyra",
    "species": "emberkin",
    "climate": "hot",
-   "orbitAu": 0.6,
-   "parent": null,
    "region": "inner",
    "marketSize": 1.6,
    "fuelPricePerKms": 11,
@@ -1086,11 +1077,8 @@
    "notes": "Auction houses and money. Everything is for sale and everybody is watching who buys it."
   },
   "tassel": {
-   "name": "Tassel",
    "species": "otter",
    "climate": "temperate",
-   "orbitAu": 1,
-   "parent": null,
    "region": "home",
    "marketSize": 2,
    "fuelPricePerKms": 10,
@@ -1098,11 +1086,8 @@
    "notes": "The gossip hub and starting port. Big market, honest prices, terrible secrets."
   },
   "slate": {
-   "name": "Slate",
    "species": "otter",
    "climate": "temperate",
-   "orbitAu": 1,
-   "parent": "tassel",
    "region": "home",
    "marketSize": 0.8,
    "fuelPricePerKms": 9,
@@ -1110,11 +1095,8 @@
    "notes": "Dry docks and cranes. Tanks and holds are fitted here, as they are anywhere with a pump, and here they come with commentary."
   },
   "moss": {
-   "name": "Moss",
    "species": "otter",
    "climate": "temperate",
-   "orbitAu": 1,
-   "parent": "tassel",
    "region": "home",
    "marketSize": 1,
    "fuelPricePerKms": 12,
@@ -1122,11 +1104,8 @@
    "notes": "Farming moon, green to the shoreline. Will sell you grain and fruit and ask where you bank."
   },
   "nail": {
-   "name": "Nail",
    "species": "cat",
    "climate": "micro",
-   "orbitAu": 2.15,
-   "parent": null,
    "region": "belt",
    "marketSize": 0.8,
    "fuelPricePerKms": 20,
@@ -1134,11 +1113,8 @@
    "notes": "Belt haven. Repairs, salvage and a bar. Match speeds and knock."
   },
   "whisker": {
-   "name": "Whisker",
    "species": "cat",
    "climate": "micro",
-   "orbitAu": 2.38,
-   "parent": null,
    "region": "belt",
    "marketSize": 0.7,
    "fuelPricePerKms": 26,
@@ -1146,11 +1122,8 @@
    "notes": "The shady end of the Belt. No questions, no paperwork, and a fitter who works in the dark."
   },
   "arc": {
-   "name": "The Arc",
    "species": "cat",
    "climate": "micro",
-   "orbitAu": 2.7,
-   "parent": null,
    "region": "belt",
    "marketSize": 0.6,
    "fuelPricePerKms": null,
@@ -1158,11 +1131,8 @@
    "notes": "Cat salvagers camped on the rim of a Builder ring, riding just beyond the Belt. No fuel; bring your own or beg."
   },
   "grumm": {
-   "name": "Grumm",
    "species": "frog",
    "climate": "cold",
-   "orbitAu": 5,
-   "parent": null,
    "region": "outer",
    "marketSize": 1,
    "fuelPricePerKms": 24,
@@ -1170,11 +1140,8 @@
    "notes": "Balloon cities in the cold upper clouds. The trade window for the whole frog system."
   },
   "brine": {
-   "name": "Brine",
    "species": "frog",
    "climate": "cold",
-   "orbitAu": 5,
-   "parent": "grumm",
    "region": "outer",
    "marketSize": 0.8,
    "fuelPricePerKms": 26,
@@ -1182,11 +1149,8 @@
    "notes": "Ammonia seas and floating apothecaries. Chemistry nobody else can read."
   },
   "glass": {
-   "name": "Glass",
    "species": "frog",
    "climate": "cold",
-   "orbitAu": 5,
-   "parent": "grumm",
    "region": "outer",
    "marketSize": 0.7,
    "fuelPricePerKms": 26,
@@ -1194,45 +1158,26 @@
    "notes": "Research station over an ocean under ice. They study the Builders and will talk your ear off."
   },
   "croak": {
-   "name": "Croak",
    "species": "frog",
    "climate": "cold",
-   "orbitAu": 5,
-   "parent": "grumm",
    "region": "outer",
    "marketSize": 0.3,
    "fuelPricePerKms": 34,
    "shipyard": true,
-   "retrograde": true,
    "notes": "Retrograde and austere. Barely a market. The approach is dear on purpose."
   },
   "haven": {
-   "name": "Haven",
    "species": "frog",
    "climate": "cold",
-   "orbitAu": 5,
-   "parent": "grumm",
    "region": "outer",
    "marketSize": 1.4,
    "fuelPricePerKms": 22,
    "shipyard": true,
-   "gifts": {
-    "perVisitValue": 40,
-    "perRepPoint": 12,
-    "goods": [
-     "lanterns",
-     "dyes",
-     "incense"
-    ]
-   },
    "notes": "The frog capital and the outer system’s great market. No haggling; prices are exchange rates and goodwill."
   },
   "maw": {
-   "name": "The Maw",
    "species": "none",
    "climate": "cold",
-   "orbitAu": 18,
-   "parent": null,
    "region": "deep",
    "marketSize": 0,
    "fuelPricePerKms": null,
@@ -1488,7 +1433,7 @@
    "days": 3,
    "dvKms": 0.6
   },
-  "notes": "orbitAu per port is the circular radius used for straight-line distance and Hohmann estimates; moons quote their parent’s radius."
+  "notes": "Reference figures the balance work was done against, kept here so a tuning change can be checked against what it was meant to be. Not read by the game: the build strips this block out."
  },
  "regions": {
   "inner": "The Emberkin worlds: Cinder, Scorch and Veyra.",

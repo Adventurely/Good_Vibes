@@ -485,27 +485,6 @@ export function shipAbs(world, ship, t){
   return { r: add(p.r, ship.r), v: add(p.v, ship.v) };
 }
 
-/* The smallest sphere of influence containing an absolute position. Used when
- * a ship is put somewhere by fiat: at the start, or after a tow. */
-export function soiAt(world, absPos, t){
-  let body = world.root;
-  for(;;){
-    let next = null;
-    for(const c of world.wells(body.id)){
-      const cp = absState(world, c.id, t).r;
-      if(dist(absPos, cp) < c.soi && (!next || c.soi < next.soi)) next = c;
-    }
-    if(!next) return body;
-    body = next;
-  }
-}
-
-/* Re-express an absolute state as a state in `body`'s frame. */
-export function toFrame(world, id, absR, absV, t){
-  const p = absState(world, id, t);
-  return { body: id, r: sub(absR, p.r), v: sub(absV, p.v) };
-}
-
 /* ------------------------------------------------ patched-conic stepping */
 
 const T_TOL = 1e-6;     // days; a twentieth of a second of game time
@@ -1424,16 +1403,6 @@ export function closestApproach(world, prediction, targetId, within = Infinity, 
   const t = (lo + hi) / 2;
   const at = f(t);
   return { t, distance: at.d, relSpeed: at.rel, shipAbs: at.shipR, targetAbs: at.tgR, body: seg.body };
-}
-
-/* The periapsis of a segment's conic, if the leg actually passes through it:
- * a marker the chart draws as "kissing distance". */
-export function segmentPeriapsis(seg, mu){
-  const el = seg.elements;
-  const dt = timeToAnomaly(mu, seg.r0, seg.v0, 0);
-  if(dt == null || dt > seg.t1 - seg.t0) return null;
-  const s = propagate(mu, seg.r0, seg.v0, dt);
-  return { t: seg.t0 + dt, r: s.r, distance: el.rp };
 }
 
 /* Both ends of a leg's conic: the low point and, if the conic closes and the

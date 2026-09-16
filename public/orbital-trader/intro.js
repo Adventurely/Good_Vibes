@@ -34,7 +34,6 @@
 /* ------------------------------------------------------------- the cut */
 
 export const DURATION = 6.4;    // the film itself
-export const FADE = 0.45;       // and the dissolve into the chart, done in CSS
 export const BREACH = 0.78;     // the moment the water breaks
 
 /* When the page's caption comes up over the film. It is not a beat: nothing

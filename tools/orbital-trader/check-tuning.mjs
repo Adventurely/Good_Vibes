@@ -129,9 +129,15 @@ for(const b of T.bodies){
 /* --- the orbit a new game opens in, and the clock that is tuned to it.
    Low means what a pilot means by it: the high point of the orbit sits less
    than one planet-diameter above the ground. The clock then has one job — a
-   lap of that orbit is ten real minutes at x1 — and the skip cap has to move
-   with it, or pointing at the Maw stops being ten seconds. */
-const START_LAP_SECONDS = 600;
+   lap of that orbit is about eleven real minutes at x1 — and the skip cap has
+   to move with it, or pointing at the Maw stops being ten seconds.
+
+   A band rather than a number, because the opening orbit is chosen for what it
+   looks like (150 km is clear of the planet on the chart; 100 km read as
+   sitting on it) and the rate is chosen once, for the whole sky. Ten to twelve
+   minutes is the range in which a lap is slow enough that nothing appears to
+   move and short enough that a player sees one happen. */
+const START_LAP_MIN = 600, START_LAP_MAX = 720;
 for(const b of T.bodies){
   if(b.startAlt == null) continue;
   const alt = b.startAlt - b.radius;
@@ -139,7 +145,7 @@ for(const b of T.bodies){
   check(`C12 ${b.id}'s start orbit clears the harbour it is under`, b.startAlt < b.dockAlt, `${b.startAlt} < ${b.dockAlt}`);
   const lap = period(b.mu, b.startAlt);
   const seconds = lap / T.constants.BASE_RATE_DAYS_PER_SEC;
-  check(`C12 a lap of ${b.id}'s start orbit is ten real minutes at x1`, Math.abs(seconds - START_LAP_SECONDS) < 0.5, `${seconds.toFixed(2)} s (${lap.toFixed(5)} d)`);
+  check(`C12 a lap of ${b.id}'s start orbit is ten to twelve real minutes at x1`, seconds >= START_LAP_MIN && seconds <= START_LAP_MAX, `${seconds.toFixed(2)} s = ${(seconds / 60).toFixed(1)} min (${lap.toFixed(5)} d)`);
 }
 const capRate = T.constants.MAX_WARP * T.constants.BASE_RATE_DAYS_PER_SEC;
 check('C12 the skip cap is still about 149 days a second', capRate > 120 && capRate < 180, `${capRate.toFixed(1)} d/s`);
