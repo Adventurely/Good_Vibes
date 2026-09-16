@@ -40,15 +40,6 @@
  *           always. This is purely what art.js draws: nothing below a
  *           column's surface height is ever solid to begin with (see
  *           groundAt again), so leaving it off changes no duckling's path.
- *   stairs  true to texture a rock face (`hard`) with a zigzag ribbon of
- *           treads climbing it — see art.js's drawStairTreads. Purely a
- *           rendering flag, the same footing as `floor`: a duckling still
- *           climbs a `stairs` wall exactly the way it climbs a plain one,
- *           straight up (see sim.js's stepClimbing). What "goes back and
- *           forth" here is the texture, not the crossing — the honest
- *           reason The Spire's design note gives for what Blocker actually
- *           does on that level, rather than claiming the switchbacks
- *           themselves are climbed.
  */
 
 export const SCENE_W = 320;
@@ -96,20 +87,15 @@ export const WALK_STEP = 4;
    bridge, a gentle staircase). */
 export const FALL_SAFE = 24;
 
-/* How long a Builder has, total, from the moment it is given — see sim.js's
-   assignSkill and stepWalking. The clock starts running right away, before
-   the duckling has even met the gap it is for, and keeps running while it
-   walks there; reaching a gap with none of this left over means the
-   assignment is simply spent, the same as never having found one at all.
-   Whatever is left over at the moment a gap actually appears is what the
-   bridge itself then has to be laid within (see sim.js's pitSpanAt), so a
-   Builder given right at a wide gap's edge can still complete it in full
-   while one given so early that most of the budget burns away just
-   walking there may run out of road mid-span. Stated as seconds, the same
+/* How long a Builder keeps laying deck before stopping on its own, whether
+   or not it has reached anywhere worth landing — see sim.js's assignSkill
+   and stepBuilding. A Builder starts the moment it is given, wherever that
+   duckling happens to be standing, so this is what stops one handed out on
+   ordinary ground, or over a gap wider than a duckling can usefully cross,
+   from just running to the edge of the level. Stated as seconds, the same
    way spawnInterval and timeLimit are, and converted once into ticks here
    rather than a bare number: one tick of building is one column, so this
-   number is a column cap on the bridge itself too, in effect, without
-   being written as one. */
+   number is a column cap too, in effect, without being written as one. */
 export const BUILD_SECONDS = 10;
 export const BUILD_MAX_STEPS = TICK_RATE * BUILD_SECONDS;
 
@@ -149,28 +135,24 @@ export const POOF_TICKS = 8;
  * a tunnel, a bridge, a wall — and only ever have to work once. Climber and
  * Flyer do not: they ride on the one duckling that holds them and have to be
  * given out again to the next one. But when a skill actually takes hold is
- * its own, separate axis:
+ * its own, separate axis, and the three sharing skills split right down the
+ * middle of it:
  *
- *   Digger, Climber, Flyer   deferred — waits, held, for the next wall or
- *                            drop it meets, and (Digger, Climber) stays
- *                            held afterward, ready for the next one too
- *   Builder                  deferred the same way, but one-shot rather than
- *                            reusable — spent the moment a gap actually
- *                            calls for it (see sim.js's stepWalking), and
- *                            running against its own clock the whole time it
- *                            is held, not only once it starts building (see
- *                            BUILD_SECONDS above) — held too long without
- *                            finding a gap and it simply expires, unused
- *   Blocker                  instant — plants that duckling for good, right
- *                            there, a wall nothing gets past — another
- *                            duckling or the goose alike, see sim.js's
- *                            stepWalking and stepGoose
+ *   Digger            deferred — waits, held, for the next wall it meets
+ *   Builder            instant — starts laying ground the moment it is
+ *                      given, wherever that duckling is already standing,
+ *                      for BUILD_SECONDS (content.js) and not a tick longer
+ *   Blocker            instant — plants that duckling for good, right there,
+ *                      a wall nothing gets past — another duckling or the
+ *                      goose alike, see sim.js's stepWalking and stepGoose
+ *   Climber, Flyer      deferred, and never shared — each carries one
+ *                      duckling past one obstacle, once, then is spent
  *
- * A Builder handed out early is not wasted the way an early Blocker click
- * would be pointless to warn about — it keeps walking, armed, toward
- * whatever gap it eventually meets, same as a Digger or Climber would; what
- * makes it worth aiming rather than just handing out on sight is that it
- * only ever gets the one gap, and only within its own ten seconds.
+ * That means Builder is the one skill in a genuinely different spot on both
+ * axes than everything around it: shared like a Digger's tunnel, but timed
+ * like a Blocker's plant rather than waiting for a hazard to ask for it. See
+ * sim.js's assignSkill for what that means in practice — it is the one skill
+ * where *when* you click matters as much as *who*.
  */
 export const SKILLS = ['digger', 'builder', 'blocker', 'climber', 'flyer'];
 
@@ -178,7 +160,7 @@ export const SKILL_INFO = {
   digger: { name: 'Digger', verb: 'Dig',
     blurb: 'Tunnels straight through the next wall, leaving a way through for the rest.' },
   builder: { name: 'Builder', verb: 'Build',
-    blurb: `Bridges the next gap it meets, within ${BUILD_SECONDS} seconds of being given — one gap only, then it's spent.` },
+    blurb: `Starts building right where it stands, for ${BUILD_SECONDS} seconds, then stops for good — aim before you click.` },
   blocker: { name: 'Blocker', verb: 'Block',
     blurb: 'Plants itself for good, turning back anything that meets it — another duckling, or the goose.' },
   climber: { name: 'Climber', verb: 'Climb',
@@ -598,43 +580,37 @@ export const LEVEL_5 = {
   goose: { x0: 240, x1: 279, y: 50, speed: 1.5, catchRadius: 1.5 },
 };
 
-/* "The Spire": the tallest wall in the game, and the first level where a
- * duckling can die two different ways, back to back, for two different
- * reasons that both come from the same climb.
+/* "The Spire": a real staircase, not a wall dressed up as one — every
+ * tread only four pixels taller than the last (see content.js's WALK_STEP),
+ * so a duckling just walks straight up it the same way it walks anything
+ * else, no Climber involved at all. Thirty of them, stacked two columns to
+ * a tread, are what turn a hundred-and-twenty-pixel rise into a hundred and
+ * twenty pixels a duckling never has to be handed a skill for. Digger has
+ * nothing to answer here either — there is no wall for it to meet, only a
+ * climb too gentle to ever count as one — so neither skill is on this
+ * level's page at all, honestly reflecting that neither does anything.
  *
- * The rock face past the second gap is the usual `hard` wall (see The
- * Aerie's note on rockAt) — a Digger cannot start into it, only Climber
- * gets a duckling up it — but it is a hundred and twenty pixels tall, twice
- * The Aerie's, and it is textured `stairs` (see art.js's drawStairTreads
- * and content.js's header note): a switchback ribbon climbing the face,
- * back and forth, the whole way up. That texture is honest about what it
- * is and is not — the climb itself is still one straight ascent, the same
- * as every other wall in this game (see sim.js's stepClimbing); what "goes
- * back and forth" is what the wall looks like, not the path a duckling
- * actually takes up it.
+ * What the stairs actually cost is time and the ledge waiting at the top:
+ * fifteen columns of flat stone, and then the ground drops the full climb
+ * back down in one column, far past FALL_SAFE, with nothing to answer it
+ * but a Flyer. A duckling that walked all the way up and off that ledge
+ * without one falls the entire height of the stairs it just climbed.
+ * Blocker is the tool this level is built to feature for it — planted on
+ * the last column of the ledge, it turns back anything that reaches it
+ * without wings yet, the same wall-nothing-gets-past behaviour every other
+ * level's Blocker already has (see sim.js's stepWalking and stepGoose) —
+ * but a turned-back duckling is not a saved one: it walks the stairs in
+ * reverse, back down to their foot, back over the first bridge, and off
+ * the far edge of the level, same as any duckling that never got a Flyer
+ * at all. Framed the same honest way every other level's Blocker is, then:
+ * present, does something real, worth reaching for, not literally provable
+ * as the difference between winning and losing in every playthrough.
  *
- * What is real is the ledge waiting at the top: fifteen columns of flat
- * stone, and then the ground drops the full hundred and twenty pixels back
- * down in one column, far past FALL_SAFE, with nothing to answer it but a
- * Flyer. A duckling that climbed the whole wall and walks off that ledge
- * without one falls the entire height of the climb it just made. Blocker is
- * the tool this level is built to feature for it — planted on the last
- * column of the ledge, it turns back anything that reaches it without
- * wings yet, the same wall-nothing-gets-past behaviour every other level's
- * Blocker already has (see sim.js's stepWalking and stepGoose) — but a
- * turned-back duckling is not a saved one: it walks the climb in reverse,
- * back down the wall's foot, back over the first bridge, and off the far
- * edge of the level, same as any duckling that never got a Climber at all.
- * Framed the same honest way every other level's Blocker is, then: present,
- * does something real, worth reaching for, not literally provable as the
- * difference between winning and losing in every playthrough.
- *
- * Both Climber and Flyer are close to fully supplied rather than rationed —
- * this is a level about the two dangers on the way up and down one wall,
- * not about the supply running thin — one short of the flock each, the
- * same margin The Park and The Aerie give their own mandatory skill.
- * Thirty hatch here, more than any level before it, so the quota does not
- * need every one of them, only most.
+ * Flyer alone carries the climb's real risk, so it is close to fully
+ * supplied rather than rationed — one short of the flock, the same margin
+ * The Park and The Aerie give their own mandatory skill. Thirty hatch here,
+ * more than any level before it, so the quota does not need every one of
+ * them, only most.
  */
 export const LEVEL_6 = {
   id: 'spire',
@@ -644,23 +620,53 @@ export const LEVEL_6 = {
 
   /* [0, 40)    flat ground out of the nest
      [40, 65)   the gap — 25 columns of pit, wants a Builder
-     [65, 120)  flat ground up to the rock
-     [120, 175) the rock — 55 columns, a hundred and twenty pixels of actual
-                rock (`hard`), textured with a switchback ribbon (`stairs`)
-                climbing it; Digger cannot start a tunnel into it at all
-     [175, 190) the ledge at the top — the fall past it wants a Flyer, or a
+     [65, 120)  flat ground up to the stairs
+     [120, 180) the stairs — thirty treads, two columns and four pixels of
+                rise each, a hundred and twenty pixels climbed by walking
+                alone; see rockAt for why the `hard` stone they are cut
+                from still refuses a Digger, for what little that answers
+     [180, 195) the ledge at the top — the fall past it wants a Flyer, or a
                 Blocker planted here turns a duckling without one back
                 rather than let it walk off
-     [190, 320) flat ground the rest of the way down at the wall's own foot,
-                the goose's beat somewhere inside it, and the pond at the
-                end of it */
+     [195, 320) flat ground the rest of the way down at the stairs' own
+                foot, the goose's beat somewhere inside it, and the pond at
+                the end of it */
   segments: [
     { from: 0, to: 40, y: 150 },
     { from: 40, to: 65, y: PIT_Y },
     { from: 65, to: 120, y: 150 },
-    { from: 120, to: 175, y: 30, hard: true, stairs: true },
-    { from: 175, to: 190, y: 30 },
-    { from: 190, to: 320, y: 150 },
+    { from: 120, to: 122, y: 146, hard: true },
+    { from: 122, to: 124, y: 142, hard: true },
+    { from: 124, to: 126, y: 138, hard: true },
+    { from: 126, to: 128, y: 134, hard: true },
+    { from: 128, to: 130, y: 130, hard: true },
+    { from: 130, to: 132, y: 126, hard: true },
+    { from: 132, to: 134, y: 122, hard: true },
+    { from: 134, to: 136, y: 118, hard: true },
+    { from: 136, to: 138, y: 114, hard: true },
+    { from: 138, to: 140, y: 110, hard: true },
+    { from: 140, to: 142, y: 106, hard: true },
+    { from: 142, to: 144, y: 102, hard: true },
+    { from: 144, to: 146, y: 98, hard: true },
+    { from: 146, to: 148, y: 94, hard: true },
+    { from: 148, to: 150, y: 90, hard: true },
+    { from: 150, to: 152, y: 86, hard: true },
+    { from: 152, to: 154, y: 82, hard: true },
+    { from: 154, to: 156, y: 78, hard: true },
+    { from: 156, to: 158, y: 74, hard: true },
+    { from: 158, to: 160, y: 70, hard: true },
+    { from: 160, to: 162, y: 66, hard: true },
+    { from: 162, to: 164, y: 62, hard: true },
+    { from: 164, to: 166, y: 58, hard: true },
+    { from: 166, to: 168, y: 54, hard: true },
+    { from: 168, to: 170, y: 50, hard: true },
+    { from: 170, to: 172, y: 46, hard: true },
+    { from: 172, to: 174, y: 42, hard: true },
+    { from: 174, to: 176, y: 38, hard: true },
+    { from: 176, to: 178, y: 34, hard: true },
+    { from: 178, to: 180, y: 30, hard: true },
+    { from: 180, to: 195, y: 30 },
+    { from: 195, to: 320, y: 150 },
   ],
 
   nestX: 6,
@@ -669,21 +675,21 @@ export const LEVEL_6 = {
   /* Thirty — the most of any level, per the level's own request. */
   duckCount: 30,
   spawnInterval: TICK_RATE * 2,
-  /* Six minutes — the climb alone is over a hundred ticks at CLIMB_SPEED for
-     every duckling that makes it, same as The Aerie's, but three times the
-     flock has to get through it one at a time. */
-  timeLimit: TICK_RATE * 360,
+  /* Five minutes — walking the stairs is half the time the old climb took
+     (WALK_SPEED against CLIMB_SPEED over the same rise), so the flock gets
+     through this level noticeably faster than The Aerie's own climb. */
+  timeLimit: TICK_RATE * 300,
   winRatio: 0.65,
 
-  /* Climber and Flyer: twenty-nine each, one short of the full flock — both
-     answer a danger every duckling that reaches it faces, so neither is
-     rationed the way a level with a real choice rations its supply.
-     Digger: a small honest supply, same reason The Aerie carries one —
-     rock refuses it, and the page should say so rather than leave it off.
+  /* No Digger, no Climber — neither has anything on this level to answer
+     (see the note above), so neither is on the page at all rather than
+     sitting at zero pretending otherwise. Flyer: twenty-nine, one short of
+     the flock — the one skill every duckling that reaches the ledge
+     actually needs, so it is not rationed the way a real choice would be.
      Builder: one spare over its one required bridge. Blocker: five, well
      past the usual two — the featured tool here, worth having enough of to
      actually try, not just one to prove it exists. */
-  supply: { digger: 2, builder: 2, blocker: 5, climber: 29, flyer: 29 },
+  supply: { digger: 0, builder: 2, blocker: 5, climber: 0, flyer: 29 },
 
   goose: { x0: 250, x1: 299, y: 150, speed: 1.5, catchRadius: 1.5 },
 };

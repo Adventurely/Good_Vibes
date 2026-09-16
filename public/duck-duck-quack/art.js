@@ -63,7 +63,8 @@ export const GOOSE_ART = [
  * grass, dirt and water alike rather than against whichever one it was
  * designed over. Blocker is in here for the legend on the page only — it
  * is never drawn over a duckling's head at all (see sim.js's assignSkill);
- * a planted one wears its own red bar instead.
+ * a planted one wears its own red bar instead. Builder is drawn, but not
+ * from a held trait the way the rest of BADGE_ORDER is — see drawDuck.
  */
 const SKILL_BADGE = {
   digger:  ['...', '..N', 'NNN', '..N'],   // straight ahead — tunnels through
@@ -75,12 +76,8 @@ const SKILL_BADGE = {
 
 /* Drawn in this order wherever more than one is held, so the same pair
    always reads the same way round rather than in whatever order they were
-   handed out in. Builder shows through this list while it is still armed
-   and waiting for a gap (sim.js's stepWalking) same as any other trait; see
-   drawDuck for the moment it stops being one — a held Builder still needs
-   its badge even once it has been spent starting the very bridge it is
-   drawn over. */
-const BADGE_ORDER = ['digger', 'builder', 'climber', 'flyer'];
+   handed out in. Builder is not here — see drawDuck. */
+const BADGE_ORDER = ['digger', 'climber', 'flyer'];
 
 const BADGE_W = 3, BADGE_H = 4, BADGE_PAD = 1, BADGE_GAP = 1;
 export const BADGE_PLATE_W = BADGE_W + BADGE_PAD * 2;
@@ -290,33 +287,6 @@ function drawStoneColumn(ctx, x, y, fillH){
   ctx.fillRect(x, y, 1, Math.min(2, fillH));
 }
 
-/* How many columns one visible "flight" of the zigzag spans before it
-   reverses — small enough that a run the width of The Spire's rock face
-   reads as several switchbacks, not one long diagonal. */
-const STAIR_FLIGHT = 14;
-
-/* A rock column textured with a switchback ribbon (content.js's segment
- * `stairs`) rather than left the flat slab drawStoneColumn draws on its
- * own — a tread mark whose height climbs steadily across one flight's
- * columns, then reverses for the next, the same triangle wave repeated
- * for as many flights as the segment is wide. This is texture only: a
- * duckling still climbs the wall straight up (see sim.js's stepClimbing),
- * the same as it would a plain rock face — see content.js's header note on
- * why the "back and forth" here is what is drawn, not what is crossed.
- */
-function drawStairTreads(ctx, x, segStart, y, fillH){
-  const period = STAIR_FLIGHT * 2;
-  const local = (x - segStart) % period;
-  const phase = local < STAIR_FLIGHT ? local : period - local;
-  const t = phase / STAIR_FLIGHT;
-  const band = Math.max(0, fillH - 4);
-  const treadY = y + 2 + Math.round(t * band);
-  ctx.fillStyle = hex('k');
-  ctx.fillRect(x, treadY, 1, 2);
-  ctx.fillStyle = hex('N');
-  ctx.fillRect(x, treadY - 1, 1, 1);
-}
-
 /* The cut edge under a floating segment (content.js's `floor`) — a slab
  * with open air under it, not a plateau standing on more ground the way
  * every other rise in this game is. A flat line of ink would read as the
@@ -356,9 +326,8 @@ const isPondAt = (level, x) => {
  * rectangle of the same flat green. A rock column (`hard`) skips all of that
  * for drawStoneColumn instead — see it for why.
  */
-export function drawGround(ctx, terrain, level, rock, floors, stairs){
+export function drawGround(ctx, terrain, level, rock, floors){
   const heading = goalHeading(level);
-  let stairStart = null;
   for(let x = 0; x < terrain.length; x++){
     const y = terrain[x];
     if(y >= SCENE_H) continue;
@@ -378,12 +347,6 @@ export function drawGround(ctx, terrain, level, rock, floors, stairs){
 
     if(rock && rock[x]){
       drawStoneColumn(ctx, x, y, fillH);
-      if(stairs && stairs[x]){
-        if(stairStart == null) stairStart = x;
-        drawStairTreads(ctx, x, stairStart, y, fillH);
-      } else {
-        stairStart = null;
-      }
       if(bottom < SCENE_H) drawFloatingEdge(ctx, x, bottom);
       continue;
     }
@@ -738,14 +701,13 @@ export function drawDuck(ctx, d, ticks = 0){
   /* Every state a duckling can be carrying something in, not just walking:
      the one currently climbing the wall or laying a bridge is exactly the
      one you most want to be able to pick out of the flock, and it was the
-     one showing nothing at all. A held Builder shows through the ordinary
-     `d.traits` filter below like Digger or Climber do, right up until the
-     moment it is actually spent starting a bridge (sim.js's stepWalking
-     removes it from `traits` that same tick) — the explicit check here is
-     what keeps its badge showing for the rest of the build too, once it is
-     no longer a held trait but an active state instead. */
+     one showing nothing at all. Builder is never in `d.traits` (see
+     sim.js's assignSkill) — it is drawn straight from the state itself,
+     for exactly as long as that duckling is actively building and not a
+     tick longer, which is the one badge here that is not saying "this is
+     held" but "this is happening right now". */
   const held = BADGE_ORDER.filter(skill => d.traits.has(skill));
-  if(d.state === 'building' && !held.includes('builder')) held.unshift('builder');
+  if(d.state === 'building') held.unshift('builder');
   if(!held.length) return;
 
   const total = held.length * BADGE_PLATE_W + (held.length - 1) * BADGE_GAP;
@@ -786,7 +748,7 @@ function drawPoof(ctx, p){
    nothing here mutates it. */
 export function paintScene(ctx, state){
   drawSky(ctx, state.ticks);
-  drawGround(ctx, state.terrain, state.level, state.rock, state.floors, state.stairs);
+  drawGround(ctx, state.terrain, state.level, state.rock, state.floors);
   drawRipples(ctx, state.terrain, state.level, state.ticks);
   drawTunnels(ctx, state);
   drawBridges(ctx, state);
