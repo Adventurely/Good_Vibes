@@ -23,8 +23,8 @@
    "lovedBy": [
     "veyra"
    ],
-   "blurb": "Grown in the shallow beds off the rafts and picked by hand. An otter wedding needs three; a Veyra house will pay for thirty.",
-   "nature": "Nacre laid down a layer a year. Warm on the skin and impossible to hurry, which is what ceremony and old money both pay for."
+   "blurb": "Beautiful deep-water pearls. Perfect for jewellery or a wedding gift.",
+   "nature": "Otters grow pearls in the shallow beds off Tassel's rafts and pick them by hand. A wedding needs three, so most of them never leave the water they grew in. Emberkin houses buy them thirty at a time."
   },
   {
    "id": "tideglass",
@@ -46,8 +46,8 @@
    "lovedBy": [
     "brine"
    ],
-   "blurb": "Otter glasswork that glows sea-green in the dark. The frogs hang it under the lily-terraces and sing to it.",
-   "nature": "Glass that will not crack under pressure and glows sea-green in the dark. Deep water and long nights each have a use for it."
+   "blurb": "Beautiful sea glass. Perfect for decoration or pressure vessels.",
+   "nature": "Otters forge tideglass in the volcanic trenches beneath Tassel's ocean. It is perfect for the underwater cities down in the cold depths. Other species simply find it beautiful."
   },
   {
    "id": "moonfishoil",
@@ -68,8 +68,8 @@
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Pressed from a fish that only rises on the dark of the moon. Burns clean, keeps forever, smells like a harbour.",
-   "nature": "Burns clean, keeps forever, smells of harbour. Light and heat where neither comes easily."
+   "blurb": "Clean-burning fish oil. Perfect for lamps, cooking or waterproofing.",
+   "nature": "Otters press it out of a fish that only surfaces on the dark of the moon, on Tassel's open water. It burns clean and keeps forever, which is most of why anybody carries it. It also smells so exactly of a harbour that homesick otters buy a jar simply to open it."
   },
   {
    "id": "coral",
@@ -91,8 +91,8 @@
    "lovedBy": [
     "otter"
    ],
-   "blurb": "A year of somebody's evenings, cut from living reef and finished with a thumb. Otters give them and otters keep them.",
-   "nature": "Living reef cut by hand and finished with a thumb. A year of somebody's evenings, small enough to hold."
+   "blurb": "Carved reef coral. Perfect for a gift, and otters give a great many gifts.",
+   "nature": "Otters cut it from the living reefs under Tassel and finish each piece with a thumb, which takes about a year of evenings. They are made to be given rather than sold. One that turns up in a market has usually come out of a household that broke up, and the buyers know it."
   },
   {
    "id": "pebble",
@@ -113,8 +113,8 @@
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Smooth grey pebbles off Slate's one beach, polished by a moon with no weather. Otters give them to each other and mean it.",
-   "nature": "Polished by a moon with no weather. Worth nothing and given anyway, which is the whole of it."
+   "blurb": "Smooth grey moon rocks. No otter can walk past one.",
+   "nature": "Otters have been picking up shiny rocks since long before they had ships, and leaving the water has not cured it. These are offcuts, tumbled smooth in the Slate yards and swept off the floor by the crate. Every otter who buys one knows that, and buys one anyway."
   },
   {
    "id": "ironore",
@@ -135,8 +135,8 @@
     "scorch"
    ],
    "lovedBy": [],
-   "blurb": "Crates of nickel-iron, dug and sorted and not much else. The engine smiths of Cinder melt it into things that go very fast.",
-   "nature": "Nickel-iron, dug and sorted and nothing else. Worthless until somebody with a furnace gets hold of it."
+   "blurb": "Heavy crates of nickel-iron. Perfect for anybody with a furnace.",
+   "nature": "Dug out of Slate and Scorch, sorted, and nothing else done to it at all. On its own it is worth almost nothing. Put it near a furnace and it becomes whatever the smith felt like making that week."
   },
   {
    "id": "masonry",
@@ -160,8 +160,8 @@
     "haven",
     "croak"
    ],
-   "blurb": "Cut stone with the old patterns on it. The frogs build their terraces out of it and will not be talked into anything lighter.",
-   "nature": "Cut stone carrying the old patterns. Heavy, permanent, and the only thing a terrace will stand on."
+   "blurb": "Heavy patterned stone. Perfect for terraces and anything built to last.",
+   "nature": "Quarried and carved on Slate, where the yards cut stone to the same tolerances they cut hulls. The old patterns go on every block, including the faces that will be buried. Nothing lighter will hold up a terrace, and a terrace is meant to outlast the argument that built it."
   },
   {
    "id": "herbs",
@@ -184,8 +184,8 @@
     "scorch",
     "cinder"
    ],
-   "blurb": "Cut green and bundled in the field. Half the remedies in the system start here, and the good ones do not travel slowly.",
-   "nature": "Cut green and bundled in the field. Half the remedies in the sky start as this."
+   "blurb": "Field-cut medicinal herbs. Perfect for a dispensary or a long voyage.",
+   "nature": "Cut green and bundled by hand on Moss, off terraces somebody's great-grandmother laid out. Half the remedies anyone takes anywhere start as this. A physician can tell a wet-cut bundle from a good one by the squeak, and will tell you so at length."
   },
   {
    "id": "starwine",
@@ -208,8 +208,8 @@
    "lovedBy": [
     "veyra"
    ],
-   "blurb": "Pale and faintly sharp. Moss makes it in small runs and Veyra buys it in whole small runs.",
-   "nature": "Pale and faintly sharp, made in runs too small to matter. Scarcity is most of the flavour."
+   "blurb": "Pale starfruit wine. Perfect for a celebration, or for showing off.",
+   "nature": "Grown and pressed on Moss in runs too small to go round, which is deliberate. It is pale, faintly sharp, and does not travel especially well. Scarcity is most of the flavour and the growers have understood that for six generations."
   },
   {
    "id": "glowmoss",
@@ -229,8 +229,8 @@
     "haven"
    ],
    "lovedBy": [],
-   "blurb": "A living lamp in a jar. Cats line their tunnels with it because it needs nothing and never goes out.",
-   "nature": "A living lamp in a jar. Needs nothing, never goes out, and does not mind being underground."
+   "blurb": "Living lamp-moss in a jar. Perfect for tunnels, holds and dark corners.",
+   "nature": "Grown on Moss in sheds nobody is allowed to open in daylight. It wants no fuel, no air and no attention, and it never goes out. Anyone who lives underground ends up with green corridors and stops noticing."
   },
   {
    "id": "riverfish",
@@ -253,8 +253,8 @@
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Silver, quick, and only in three rivers. Worth a fortune fresh and worth an apology otherwise.",
-   "nature": "Silver, quick, and out of three rivers only. Magnificent fresh and an apology otherwise.",
+   "blurb": "Rare silver riverfish. Needs a cold hold. Cats pay a great deal.",
+   "nature": "Out of three rivers on Moss and nowhere else, and quick enough that catching one is a story before it is a meal. Fresh, it is magnificent. Warm, it is an apology, which is why nobody ships it without a cold hold.",
    "needsTempControl": true
   },
   {
@@ -276,8 +276,8 @@
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Valves, seals and struts in oiled paper. Far from any dry dock, a crate of these is the difference between a ship and a wreck.",
-   "nature": "Valves, seals and struts in oiled paper. Far from a dry dock, the difference between a ship and a wreck."
+   "blurb": "Heavy crates of engine spares. Perfect for a refit, or an emergency.",
+   "nature": "Valves, seals and struts, packed in oiled paper by the Cinder forges that made them. Nobody has ever bought a crate of these excited. Far from a dry dock they are the difference between a ship and a wreck, and out there nobody asks the price twice."
   },
   {
    "id": "weapons",
@@ -299,8 +299,8 @@
    "lovedBy": [
     "emberkin"
    ],
-   "blurb": "Emberkin house arms, crated and sealed with somebody's mark. Nobody asks what they are for and everybody knows.",
-   "nature": "Crated house arms, sealed with somebody's mark. Nobody asks what they are for."
+   "blurb": "Heavy crated house arms. Emberkin houses buy them constantly.",
+   "nature": "Made on Cinder, crated, and sealed with the mark of whoever ordered them. The Emberkin are proud, competitive and extremely well armed. There are feuds running eleven years that have never fired a shot and have never once stopped buying."
   },
   {
    "id": "plating",
@@ -321,8 +321,8 @@
     "haven"
    ],
    "lovedBy": [],
-   "blurb": "Sheet that will sit in a cloud top all day and come out grumbling. Half the shielded hulls in the sky are wearing Cinder's.",
-   "nature": "Sheet that will sit in a cloud top all day and come out grumbling. Hulls that go somewhere hot are wearing it."
+   "blurb": "Heavy heat-resistant sheet. Perfect for hulls that go somewhere hot.",
+   "nature": "Rolled on Cinder, which has more experience of heat than anywhere else and mentions it often. It will sit in a cloud top all day and come out grumbling. Half the shielded hulls in the sky are wearing it, including, if you have one, yours."
   },
   {
    "id": "steel",
@@ -342,8 +342,8 @@
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Bar stock, graded and stamped. The dullest cargo in the system and the one everybody is always short of.",
-   "nature": "Bar stock, graded and stamped. The dullest cargo in the sky and the one everybody is short of."
+   "blurb": "Heavy graded bar stock. Perfect for absolutely anything.",
+   "nature": "Melted, rolled and stamped on Cinder, and the least interesting thing they make there. Every yard in the system is short of it, because nobody plans for steel and everybody uses steel. It is the dullest cargo you can carry and it always sells."
   },
   {
    "id": "coils",
@@ -366,8 +366,8 @@
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Wound by hand over nine days by somebody who will not tell you the order. A cat mechanic will trade a ship for one.",
-   "nature": "Wound by hand over nine days, in an order nobody will tell you. Nothing else will make a reactor behave."
+   "blurb": "Hand-wound reactor coils. Perfect for a refit or a failing reactor.",
+   "nature": "Emberkin smiths on Cinder wind each coil by hand over nine days, in an order they have never written down. Nothing else will make a reactor behave. Cats will trade a whole ship for a crate of them."
   },
   {
    "id": "firecrystals",
@@ -390,8 +390,8 @@
    "lovedBy": [
     "veyra"
    ],
-   "blurb": "Grown in the vents and cut cold. They hold a light for a week after you take them out of the sun.",
-   "nature": "Grown in the vents and cut cold. They hold a light for a week after the sun is off them.",
+   "blurb": "Bright fire crystals. Needs a cold hold. Perfect for lighting a grand room.",
+   "nature": "Grown in the vents on Scorch and cut cold by miners paid by the stone. Kept cold, one holds a light for a week after the sun comes off it. Let one warm and it gives the whole week back at once, which is spectacular and expensive.",
    "needsTempControl": true
   },
   {
@@ -414,8 +414,8 @@
     "haven"
    ],
    "lovedBy": [],
-   "blurb": "Sheets of black glass off the flows, packed in ash. Cheap on Scorch because there is nothing else on Scorch.",
-   "nature": "Black glass off the flows, packed in ash. Cheap where there is nothing else to sell."
+   "blurb": "Heavy sheets of black glass. Perfect for blades, windows or floors.",
+   "nature": "Cut off the lava flows on Scorch and packed in ash for the journey. It is cheap there because there is nothing else there. It is cheap everywhere else because everybody has already worked out that it cuts."
   },
   {
    "id": "emberstone",
@@ -438,8 +438,8 @@
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Warm to the hand a year after it comes out of the ground, and nobody on Scorch has ever explained why.",
-   "nature": "Still warm to the hand a year out of the ground, and nobody has ever explained why."
+   "blurb": "Warm emberstone. Perfect for a hearth, or for sleeping beside.",
+   "nature": "Dug out of Scorch, and still warm to the hand a year later. Nobody has ever explained why, and the official Scorch position is that it came out of the ground warm and will go back in warm. Cats buy them to sleep on, which is the most sensible use anyone has found."
   },
   {
    "id": "embersilk",
@@ -462,8 +462,8 @@
    "lovedBy": [
     "veyra"
    ],
-   "blurb": "Woven in a heated room by people who are paid not to talk about it. This season's colour is worth twice last season's.",
-   "nature": "Woven in a heated room by people paid not to discuss it. This season's colour is worth twice last season's."
+   "blurb": "This season's ember silk. Sells for double until the colour turns.",
+   "nature": "Woven on Veyra in a heated room, because it leaves the loom the colour of ash and will not take dye below ninety degrees. The season's colour changes four times a year. The dyers know the next one before anybody else does, and dress accordingly."
   },
   {
    "id": "medals",
@@ -484,8 +484,8 @@
     "haven"
    ],
    "lovedBy": [],
-   "blurb": "Struck in small numbers for houses settling scores in public. The metal is worth nothing; the name on it is worth a great deal.",
-   "nature": "The metal is worth nothing. The name struck into it settles an argument in public, which is worth a great deal."
+   "blurb": "Struck faction medals. Perfect for settling a score in public.",
+   "nature": "Struck on Veyra in small numbers, for houses with something to prove and an audience to prove it to. The metal is worth very little. The name struck into it ends an argument in the only way some houses accept that an argument can be ended."
   },
   {
    "id": "clocks",
@@ -507,8 +507,8 @@
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Good enough to navigate by and pretty enough to argue over. Otters buy them for the harbourmaster and then borrow them back.",
-   "nature": "Good enough to navigate by and pretty enough to argue over. The two are rarely the same object."
+   "blurb": "Precision clocks. Otters buy them by the raft and then argue.",
+   "nature": "Built on Veyra to a second a month, which is the difference between planning a launch window and guessing at one. Only two sorts of person need that: a ship's navigator, and an Emberkin, whose year runs fifty-six days. No otter household will admit to owning one alone, so a raft buys one together and argues all season about whose shelf it sits on."
   },
   {
    "id": "perfume",
@@ -530,8 +530,8 @@
     "croak"
    ],
    "lovedBy": [],
-   "blurb": "Small stoppered bottles in a padded case. Half the system finds them ridiculous and buys them anyway.",
-   "nature": "Small stoppered bottles in a padded case. Half the sky finds them ridiculous and buys them anyway."
+   "blurb": "Small bottles of perfume oil. Perfect for a gift, or an impression.",
+   "nature": "Distilled on Veyra a drop at a time, from flowers grown for nothing else. What costs money is not the scent but the sameness: it took four years to make the blend repeat. Half the system finds them ridiculous and buys them anyway."
   },
   {
    "id": "stormcrystals",
@@ -554,8 +554,8 @@
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Fished out of the cloud tops on a line, still ticking. A cat will hold one up to a lamp and go quiet.",
-   "nature": "Fished off a cloud top on a line, still ticking. Nobody is certain what they are."
+   "blurb": "Storm crystals, still ticking. Cats pay a great deal and go quiet.",
+   "nature": "Fished off Grumm's cloud tops on a line, out of weather that was running long before anyone arrived to watch it. They are still ticking when they reach you and nobody is certain what they are. Cats hold one up to a lamp and stop talking, which cats otherwise never do."
   },
   {
    "id": "filters",
@@ -577,8 +577,8 @@
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Frog-made, patient, and better than anything the inner worlds can build. They will not say how and you will not work it out.",
-   "nature": "Patient, fine, and better than anything the inner worlds can build. They will not say how."
+   "blurb": "Heavy frog-made air filters. Perfect anywhere people breathe indoors.",
+   "nature": "Built in the floating cities of Grumm, by people who have had a long time to think about air. They are better than anything the inner worlds can manage. The makers will explain exactly how, at length, twice, and you will still not be able to do it."
   },
   {
    "id": "cider",
@@ -602,8 +602,8 @@
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Laid down in a balloon city before anyone alive was hatched. Otters weep at it; the frogs think that is the point.",
-   "nature": "Laid down in a balloon city before anyone alive was hatched. Age is the whole of it, and it cannot be hurried.",
+   "blurb": "Ten-thousand-year-old cider. Needs a cold hold. Otters pay most.",
+   "nature": "Laid down in a balloon city over Grumm some fifty frog generations ago, for drinkers who had not hatched. The cellar has been moved four times and never once opened in a hurry. Otters weep at it, and the frogs consider weeping the correct response.",
    "needsTempControl": true
   },
   {
@@ -625,8 +625,8 @@
    "lovedBy": [
     "scorch"
    ],
-   "blurb": "Cold, clear, and it will close a wound that nothing else will. Scorch buys it by the crate and never haggles.",
-   "nature": "Cold, clear, and it will close a wound that nothing else will.",
+   "blurb": "Medicinal gel. Needs a cold hold. Closes wounds nothing else will.",
+   "nature": "Brewed on the apothecary rafts at Brine, where the chemistry does things it will not do on a warm world. Cold, it will close a wound nothing else will touch. Warm it once and it is soup, which has happened to enough pilots that there is a word for them.",
    "needsTempControl": true
   },
   {
@@ -647,8 +647,8 @@
     "haven"
    ],
    "lovedBy": [],
-   "blurb": "Ammonia-sea amber with something inside it that is not quite a leaf. The frogs sell it without explaining.",
-   "nature": "Ammonia-sea amber with something inside it that is not quite a leaf."
+   "blurb": "Brine amber with something inside it. Perfect for a collection.",
+   "nature": "Fished out of the ammonia sea at Brine with something set inside that is not a leaf: six arms, folded, and a seam down the middle that has been open and shut. Nothing in that sea has bones. Collectors pay for the pieces where you can see the seam."
   },
   {
    "id": "resin",
@@ -671,8 +671,8 @@
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Sets hard in vacuum and stays a little soft forever. A cat with a crate of this can fix almost anything.",
-   "nature": "Sets hard in vacuum and stays a little soft forever. A crate of it will fix almost anything."
+   "blurb": "Sea-foam resin. Perfect for repairs of very nearly any kind.",
+   "nature": "Skimmed off the foam at Brine and sold in tubs. It sets hard in vacuum and stays very slightly soft forever, so it holds where nothing rigid would. A crate of it will fix almost anything, and whoever does the fixing will do it in front of you, slowly, explaining."
   },
   {
    "id": "lenses",
@@ -694,8 +694,8 @@
    "lovedBy": [
     "veyra"
    ],
-   "blurb": "Ground from shell ice that has never melted. You can read a ship's name off it from further than you would believe.",
-   "nature": "Ground from shell ice that has never once melted. You can read a ship's name off it from further than you would believe.",
+   "blurb": "Ground ice lenses. Needs a cold hold. Perfect for charts or long looks.",
+   "nature": "Ground at Glass from shell ice that has never once melted, and will not survive meeting anything that has. You can read a ship's name off one from further than you would believe. The scholars who grind them are mildly embarrassed about what most buyers use them for.",
    "needsTempControl": true
   },
   {
@@ -716,8 +716,8 @@
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Drawn from under the ice and shipped in double-walled crates. Heavy, dull, and the outer system runs on it.",
-   "nature": "Drawn from under the ice and shipped double-walled. Heavy, dull, and everything cold runs on it."
+   "blurb": "Heavy bulk cryogenic fuel. Perfect for refrigeration or smelting.",
+   "nature": "Frogs draw it from under the ice shell at Glass and ship it out in double-walled crates. Everything cold in the system runs on it. They think it is the dullest thing they make and are frankly glad somebody wants it."
   },
   {
    "id": "incense",
@@ -739,8 +739,8 @@
    "lovedBy": [
     "haven"
    ],
-   "blurb": "Rolled in silence by people who chose to live somewhere expensive to reach. Haven burns it by the armful at festival.",
-   "nature": "Rolled in silence, burns slow, and travels badly. That is most of what it costs."
+   "blurb": "Slow-burning moon incense. Perfect for a festival or a long think.",
+   "nature": "Rolled in silence on Croak, by people who chose to live somewhere expensive to reach. It burns slowly and travels badly. Most of what it costs is the getting there, which the ascetics find funny and will not lower the price over."
   },
   {
    "id": "beads",
@@ -763,8 +763,8 @@
    "lovedBy": [
     "croak"
    ],
-   "blurb": "Strung one a day for a year. A pilgrim carries them out and a pilgrim carries them back, and the ones that come back cost more.",
-   "nature": "Strung one a day for a year. The ones that have been somewhere and come back cost more."
+   "blurb": "Strung pilgrim beads. Cheap, and worth more once they have travelled.",
+   "nature": "Strung one bead a day for a year on Croak, which is the whole of the making. A pilgrim carries a string out and carries it back again. The ones that have been somewhere cost more than the ones that have not, which is the only honest price anybody puts on distance."
   },
   {
    "id": "frogtea",
@@ -787,8 +787,8 @@
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Pressed into bricks longer ago than the records go. Otters have started a fashion for it, which the ascetics find funny.",
-   "nature": "Pressed into bricks longer ago than the records go, and better for the keeping."
+   "blurb": "Ancient pressed tea. Otters pay most, and pay a great deal.",
+   "nature": "Pressed into bricks on Croak longer ago than the records go, and the frogs keep excellent records. A brick is broken for a guest and not otherwise. Having one broken for you when you are only passing through is a considerable thing, and you will not be allowed to refuse."
   },
   {
    "id": "lanterns",
@@ -810,8 +810,8 @@
    "lovedBy": [
     "croak"
    ],
-   "blurb": "Paper, wire and a wish. They go up over the terraces at the turn of the year and Croak buys them all year round.",
-   "nature": "Paper, wire and a wish. They go up over water at the turn of the year."
+   "blurb": "Paper prayer lanterns. Perfect for the turn of the year.",
+   "nature": "Folded on Haven from paper and wire, with a wish written inside where nobody reads it. They all go up at once at the year's turn. For about an hour the sky over the terraces is unusable, and every pilot within range knows to wait."
   },
   {
    "id": "dyes",
@@ -832,8 +832,8 @@
     "veyra"
    ],
    "lovedBy": [],
-   "blurb": "Ground pigment in twists of waxed cloth. Cheap here, and in the wrong month worth whatever you say it is.",
-   "nature": "Ground pigment in twists of waxed cloth. Cheap here, and in the wrong month worth whatever you say it is."
+   "blurb": "Bright festival dyes. Perfect for cloth, banners or a very good party.",
+   "nature": "Ground on Haven into twists of waxed cloth, for a festival that has never once been cancelled. They cost almost nothing where they are made, because everyone has some. Somewhere else, somebody has worked out what else they will colour, and pays accordingly."
   },
   {
    "id": "instruments",
@@ -856,8 +856,8 @@
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Cut from a wood that only grows on one terrace, and tuned over a frog lifetime. An otter crew will fight over one.",
-   "nature": "Cut from a wood that grows on one terrace and tuned over a lifetime. Nothing else sounds like it."
+   "blurb": "Heavy frogwood instruments. Perfect for a hall, or a very good raft.",
+   "nature": "Built on Haven from wood that grows on one terrace, and tuned over a lifetime — the maker's, and then whoever gets it next. They are heavy, slow to make, and worth what is asked for them. An otter who hears one played properly stops talking, which otters otherwise do not do."
   },
   {
    "id": "hullplate",
@@ -878,8 +878,8 @@
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Cut off whatever came in last, straightened, and stacked by thickness. Nobody on Nail asks what it used to be.",
-   "nature": "Cut off whatever came in last, straightened, and stacked by thickness."
+   "blurb": "Heavy salvaged hull plate. Perfect for a repair on a budget.",
+   "nature": "Cut off whatever came into Nail last, straightened, and stacked by thickness. Every sheet of it was somebody's ship. The cats who sell it do not mention whose, which they say is manners rather than superstition."
   },
   {
    "id": "thrusters",
@@ -902,8 +902,8 @@
    "lovedBy": [
     "otter"
    ],
-   "blurb": "Stripped, cleaned and put back together better than new by somebody who did it for the argument.",
-   "nature": "Stripped, cleaned and put back together better than new by somebody who did it for the argument."
+   "blurb": "Heavy rebuilt thrusters. Perfect for a refit at half the price.",
+   "nature": "Stripped, cleaned and rebuilt at Nail by somebody who mainly wanted to settle an argument about how they ought to have been built. They generally come back better than they left the factory. The cat who did it will want to know how it flew, and will remember your answer for years."
   },
   {
    "id": "sensorsalvage",
@@ -926,8 +926,8 @@
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Working, mostly. The ones that came off the Arc see further than they are supposed to and nobody sells those cheap.",
-   "nature": "Working, mostly. The good ones see rather further than they are supposed to."
+   "blurb": "Salvaged sensor arrays. Working, mostly. Cats pay most.",
+   "nature": "Pulled out of wrecks and off the ring by the salvagers at Nail, and tested about as carefully as you would expect. Most of them work. The ones cut out of the ring see a great deal further than they are supposed to, and those do not go to just anybody."
   },
   {
    "id": "arcshard",
@@ -951,8 +951,8 @@
     "veyra",
     "frog"
    ],
-   "blurb": "A hand's length of seamless Builder metal. It hums when you tap it, and the frogs will hear you coming.",
-   "nature": "A hand's length of seamless metal that hums when you tap it, and nobody alive can read it."
+   "blurb": "A fragment of Builder metal. The dearest cargo there is. Frogs pay well.",
+   "nature": "Cut off the ring and brought in through Nail, where the cats have been quietly taking it apart for generations. It has no join, no tooling mark, and no way to tell which way up it is meant to go. Tap it and it hums — and so does every other piece ever cut off the ring, at exactly the same note."
   },
   {
    "id": "hotweapons",
@@ -974,8 +974,8 @@
    "lovedBy": [
     "cat"
    ],
-   "blurb": "House arms with the marks taken off badly. Worth a great deal to the wrong people and a great deal of trouble to the right ones.",
-   "nature": "House arms with the marks taken off badly. Trouble in both directions."
+   "blurb": "Heavy crates of Emberkin arms, marks filed off. Cats pay most.",
+   "nature": "House arms that came through Whisker without paperwork, with the crest filed off by somebody in a hurry; a thumb still finds it. Nobody at Whisker asks where they came from and nobody expects to be told. Most of them go home again at a markup, bought back by the houses that lost them."
   },
   {
    "id": "fakemedals",
@@ -996,8 +996,8 @@
     "cat"
    ],
    "lovedBy": [],
-   "blurb": "Struck this morning, aged this afternoon. Good enough for a dock and not good enough for a house.",
-   "nature": "Struck this morning and aged this afternoon. Good enough for a dock and not for a house."
+   "blurb": "Counterfeit faction medals. Cheap, and extremely convincing.",
+   "nature": "Struck at Whisker this morning and aged this afternoon by a cat who takes real pride in the work. They are good enough that the houses named on them buy them. Whether that is funny or a little sad depends entirely on which house you ask."
   },
   {
    "id": "greymeds",
@@ -1020,8 +1020,8 @@
    "lovedBy": [
     "scorch"
    ],
-   "blurb": "The same gel Brine makes, in the wrong crates, at half the price and twice the risk. Scorch does not care.",
-   "nature": "The same gel, in the wrong crates, at half the price and twice the risk.",
+   "blurb": "Unlabelled medicine. Needs a cold hold. Worth most where the real thing is priced out.",
+   "nature": "The same crates as the legitimate ones, routed through Whisker and sold at half of what they should cost. The apothecaries who brewed it know exactly where it ends up and have never once complained. Everybody involved regards this as a public service conducted slightly sideways.",
    "needsTempControl": true
   },
   {
@@ -1044,17 +1044,14 @@
    "lovedBy": [
     "cat"
    ],
-   "blurb": "Hands, eyes and a spine or two, packed in gel. Whisker will fit them as well as sell them and asks for cash.",
-   "nature": "Hands, eyes and a spine or two, packed in gel. Fitted as readily as sold."
+   "blurb": "Replacement hands, eyes and spines. Cats pay most.",
+   "nature": "Made to order and sold through Whisker, because the inner worlds have strong opinions about who should be allowed to sell them. A cat who has lost something to vacuum would rather not discuss it with a licensing board. They cost a fortune, and nobody who needs one haggles."
   }
  ],
  "ports": {
   "cinder": {
-   "name": "Cinder",
    "species": "emberkin",
    "climate": "hot",
-   "orbitAu": 0.3,
-   "parent": null,
    "region": "inner",
    "marketSize": 1.5,
    "fuelPricePerKms": 6,
@@ -1062,11 +1059,8 @@
    "notes": "Engine smiths; the cheapest fuel in the system straight from the refineries."
   },
   "scorch": {
-   "name": "Scorch",
    "species": "emberkin",
    "climate": "hot",
-   "orbitAu": 0.3,
-   "parent": "cinder",
    "region": "inner",
    "marketSize": 0.6,
    "fuelPricePerKms": 12,
@@ -1074,11 +1068,8 @@
    "notes": "Mining frontier. Cheap rock, dangerous work, and the Emberkin nobody at home writes to."
   },
   "veyra": {
-   "name": "Veyra",
    "species": "emberkin",
    "climate": "hot",
-   "orbitAu": 0.6,
-   "parent": null,
    "region": "inner",
    "marketSize": 1.6,
    "fuelPricePerKms": 11,
@@ -1086,11 +1077,8 @@
    "notes": "Auction houses and money. Everything is for sale and everybody is watching who buys it."
   },
   "tassel": {
-   "name": "Tassel",
    "species": "otter",
    "climate": "temperate",
-   "orbitAu": 1,
-   "parent": null,
    "region": "home",
    "marketSize": 2,
    "fuelPricePerKms": 10,
@@ -1098,11 +1086,8 @@
    "notes": "The gossip hub and starting port. Big market, honest prices, terrible secrets."
   },
   "slate": {
-   "name": "Slate",
    "species": "otter",
    "climate": "temperate",
-   "orbitAu": 1,
-   "parent": "tassel",
    "region": "home",
    "marketSize": 0.8,
    "fuelPricePerKms": 9,
@@ -1110,11 +1095,8 @@
    "notes": "Dry docks and cranes. Tanks and holds are fitted here, as they are anywhere with a pump, and here they come with commentary."
   },
   "moss": {
-   "name": "Moss",
    "species": "otter",
    "climate": "temperate",
-   "orbitAu": 1,
-   "parent": "tassel",
    "region": "home",
    "marketSize": 1,
    "fuelPricePerKms": 12,
@@ -1122,11 +1104,8 @@
    "notes": "Farming moon, green to the shoreline. Will sell you grain and fruit and ask where you bank."
   },
   "nail": {
-   "name": "Nail",
    "species": "cat",
    "climate": "micro",
-   "orbitAu": 2.15,
-   "parent": null,
    "region": "belt",
    "marketSize": 0.8,
    "fuelPricePerKms": 20,
@@ -1134,11 +1113,8 @@
    "notes": "Belt haven. Repairs, salvage and a bar. Match speeds and knock."
   },
   "whisker": {
-   "name": "Whisker",
    "species": "cat",
    "climate": "micro",
-   "orbitAu": 2.38,
-   "parent": null,
    "region": "belt",
    "marketSize": 0.7,
    "fuelPricePerKms": 26,
@@ -1146,11 +1122,8 @@
    "notes": "The shady end of the Belt. No questions, no paperwork, and a fitter who works in the dark."
   },
   "arc": {
-   "name": "The Arc",
    "species": "cat",
    "climate": "micro",
-   "orbitAu": 2.7,
-   "parent": null,
    "region": "belt",
    "marketSize": 0.6,
    "fuelPricePerKms": null,
@@ -1158,23 +1131,17 @@
    "notes": "Cat salvagers camped on the rim of a Builder ring, riding just beyond the Belt. No fuel; bring your own or beg."
   },
   "grumm": {
-   "name": "Grumm",
    "species": "frog",
    "climate": "cold",
-   "orbitAu": 5,
-   "parent": null,
    "region": "outer",
-   "marketSize": 1.0,
+   "marketSize": 1,
    "fuelPricePerKms": 24,
    "shipyard": true,
    "notes": "Balloon cities in the cold upper clouds. The trade window for the whole frog system."
   },
   "brine": {
-   "name": "Brine",
    "species": "frog",
    "climate": "cold",
-   "orbitAu": 5,
-   "parent": "grumm",
    "region": "outer",
    "marketSize": 0.8,
    "fuelPricePerKms": 26,
@@ -1182,11 +1149,8 @@
    "notes": "Ammonia seas and floating apothecaries. Chemistry nobody else can read."
   },
   "glass": {
-   "name": "Glass",
    "species": "frog",
    "climate": "cold",
-   "orbitAu": 5,
-   "parent": "grumm",
    "region": "outer",
    "marketSize": 0.7,
    "fuelPricePerKms": 26,
@@ -1194,45 +1158,26 @@
    "notes": "Research station over an ocean under ice. They study the Builders and will talk your ear off."
   },
   "croak": {
-   "name": "Croak",
    "species": "frog",
    "climate": "cold",
-   "orbitAu": 5,
-   "parent": "grumm",
    "region": "outer",
    "marketSize": 0.3,
    "fuelPricePerKms": 34,
    "shipyard": true,
-   "retrograde": true,
    "notes": "Retrograde and austere. Barely a market. The approach is dear on purpose."
   },
   "haven": {
-   "name": "Haven",
    "species": "frog",
    "climate": "cold",
-   "orbitAu": 5,
-   "parent": "grumm",
    "region": "outer",
    "marketSize": 1.4,
    "fuelPricePerKms": 22,
    "shipyard": true,
-   "gifts": {
-    "perVisitValue": 40,
-    "perRepPoint": 12,
-    "goods": [
-     "lanterns",
-     "dyes",
-     "incense"
-    ]
-   },
    "notes": "The frog capital and the outer system’s great market. No haggling; prices are exchange rates and goodwill."
   },
   "maw": {
-   "name": "The Maw",
    "species": "none",
    "climate": "cold",
-   "orbitAu": 18,
-   "parent": null,
    "region": "deep",
    "marketSize": 0,
    "fuelPricePerKms": null,
@@ -1336,9 +1281,8 @@
    "soldAt": [
     "nail"
    ],
-   "pending": true,
    "effect": "See gravitational phenomena on the chart.",
-   "unlocks": "Nothing yet: the phenomena are not in the sky so far."
+   "unlocks": "Finds what bends a course and does not shine. There are two such things: one between Tassel and the Belt, and one at the far edge, which is what the Dancer has been going round all this time."
   },
   {
    "id": "tempcontrol",
@@ -1389,9 +1333,8 @@
     "cinder"
    ],
    "requiresCrew": "engineer",
-   "pending": true,
-   "effect": "Survive an atmosphere skim, at a risk.",
-   "unlocks": "Nothing yet: risky aerobraking is not built."
+   "effect": "Survive a skim through a world’s air, and let it slow you down.",
+   "unlocks": "Air braking at Veyra, Cinder, Tassel, Grumm and Brine — everywhere there is air to brake in. The deeper the pass, the more it shakes the hull."
   },
   {
    "id": "cryocooling",
@@ -1404,9 +1347,8 @@
    ],
    "requiresCrew": "engineer",
    "requiresUpgrade": "heatshield",
-   "pending": true,
-   "effect": "Carries the heat of a skim away, so the skim is safe.",
-   "unlocks": "Nothing yet: safe aerobraking is not built."
+   "effect": "Carries the heat of a skim away as fast as the air makes it.",
+   "unlocks": "Air braking with no risk to the hull at all, however deep you go."
   }
  ],
  "formulas": {
@@ -1462,6 +1404,23 @@
    "unwanted": 0.6,
    "tempControlMul": 1.5,
    "resaleCap": 0.75
+  },
+  "aerobrake": {
+   "k": 1.4,
+   "depthPower": 2,
+   "maxFraction": 0.9,
+   "floorApo": 1.25,
+   "freeKms": 0.35,
+   "riskPerKms2": 0.5,
+   "maxRisk": 0.85,
+   "fuelCellShare": 0.25,
+   "fuelCellCap": 0.8,
+   "repair": {
+    "1": 350,
+    "2": 1100,
+    "3": 2800,
+    "fuelCell": 800
+   }
   }
  },
  "sim": {
@@ -1474,7 +1433,7 @@
    "days": 3,
    "dvKms": 0.6
   },
-  "notes": "orbitAu per port is the circular radius used for straight-line distance and Hohmann estimates; moons quote their parent’s radius."
+  "notes": "Reference figures the balance work was done against, kept here so a tuning change can be checked against what it was meant to be. Not read by the game: the build strips this block out."
  },
  "regions": {
   "inner": "The Emberkin worlds: Cinder, Scorch and Veyra.",

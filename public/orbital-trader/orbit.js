@@ -18,11 +18,22 @@
  * predicted path is the path you actually fly.
  *
  * The one place a search happens is finding *when* the conic leaves one sphere
- * of influence or enters another. That is done by conservative advancement:
- * each step is bounded by (distance to the nearest boundary) / (fastest either
- * side can close it), which is a rigorous lower bound on the crossing time, so
- * a boundary can never be skipped, and the crossing itself is then bisected to
- * a millionth of a day. No fixed timestep, no tunnelling through a small moon.
+ * of influence or enters another. Most of the time there is nothing to find,
+ * and that is decided before anything is searched: a conic's low and high
+ * points say at once whether it can reach the ground, the edge of the reach,
+ * or the band a moon's rail sweeps, and leaving the reach or hitting the
+ * ground are crossings of a fixed distance, solved with one arccosine. Only a
+ * moon needs a search, because only a moon moves. That search is conservative
+ * advancement: each step is bounded by (distance to the nearest boundary) /
+ * (fastest either side can close it), which is a rigorous lower bound on the
+ * crossing time, so a boundary can never be skipped, and the crossing itself
+ * is then bisected to a millionth of a day. On a closed orbit whole laps in
+ * which no moon can come within reach are skipped at once. No fixed timestep,
+ * no tunnelling through a small moon.
+ *
+ * The road is made of legs (`predictLegs`): one conic in one frame, ending at
+ * a burn, a change of reach, the ground, or the proof that nothing ends it.
+ * The chart draws legs and the flight flies them, so the two are one thing.
  */
 
 export const TAU = Math.PI * 2;
@@ -51,6 +62,11 @@ export const perp = a => [-a[1], a[0]];
  * range; a long cometary ellipse at e = 0.94 is the case that punishes a lazy start. */
 export function solveKepler(M, e){
   M = ((M % TAU) + TAU) % TAU;
+  /* A circle has nothing to solve: E is M. Most of the rails in this sky are
+     circles, and this is the most-called function in the kernel, so the two
+     Newton steps and four transcendentals it took to learn that were the
+     single largest cost of asking where anything is. */
+  if(e === 0) return M;
   let E = e < 0.8 ? M : Math.PI;
   for(let i = 0; i < 50; i++){
     const f = E - e * Math.sin(E) - M;
@@ -75,20 +91,35 @@ export const period = (mu, a) => TAU / meanMotion(mu, a);
  */
 export function railState(el, mu, t){
   const { a, e = 0, omega = 0, M0 = 0, retrograde = false } = el;
-  const n = meanMotion(mu, a);
+  /* The parts of a rail that never change, worked out once per body: the
+     shape factor and the orientation. `railConst` stashes them on the element
+     the first time it sees it, so a body from makeWorld and a bare literal in
+     a test are both served. */
+  const c = el._rail ?? railConst(el);
+  const n = c.mu === mu ? c.n : meanMotion(mu, a);
   const E = solveKepler(M0 + n * t, e);
   const cosE = Math.cos(E), sinE = Math.sin(E);
   const r = a * (1 - e * cosE);
-  const b = a * Math.sqrt(1 - e * e);
+  const b = a * c.sq;
   // Perifocal frame: periapsis on +x.
   const xp = a * (cosE - e), yp = b * sinE;
   const k = Math.sqrt(mu * a) / r;
-  const vxp = -k * sinE, vyp = k * Math.sqrt(1 - e * e) * cosE;
-  const co = Math.cos(omega), so = Math.sin(omega);
+  const vxp = -k * sinE, vyp = k * c.sq * cosE;
+  const co = c.co, so = c.so;
   let x = co * xp - so * yp, y = so * xp + co * yp;
   let vx = co * vxp - so * vyp, vy = so * vxp + co * vyp;
   if(retrograde){ y = -y; vy = -vy; }
   return { r: [x, y], v: [vx, vy] };
+}
+
+/* Per-rail constants. `n` is left out here because mean motion needs the
+ * parent's mu, which makeWorld knows and a bare element does not; it fills
+ * it in when it builds the world. */
+function railConst(el){
+  const e = el.e ?? 0, omega = el.omega ?? 0;
+  const c = { sq: Math.sqrt(1 - e * e), co: Math.cos(omega), so: Math.sin(omega), n: null, mu: null };
+  try{ Object.defineProperty(el, '_rail', { value: c, enumerable: false, writable: true }); }catch{ /* frozen: recompute each call */ }
+  return c;
 }
 
 /* The fastest a body on these rails ever moves: its speed at periapsis. Used
@@ -147,6 +178,16 @@ export function elementsFromState(mu, r, v, floor = 0){
     ? Math.sqrt(Math.max(0, vn * vn + 2 * mu * (1 / rMin - 1 / rn)))
     : Infinity;
   return { a, e, rp, ra, omega, nu, period: T, energy, h, dir: h >= 0 ? 1 : -1, vmax, p, bound };
+}
+
+/* Where a conic is at a given true anomaly, in the frame the elements are in.
+ * `nu` is measured the way elementsFromState reports it — increasing with
+ * time whichever way round the ship is going — so a retrograde orbit is read
+ * back the same way it was written. */
+export function conicPointAt(el, nu){
+  const r = el.p / (1 + el.e * Math.cos(nu));
+  const th = el.omega + (el.dir >= 0 ? nu : -nu);
+  return [r * Math.cos(th), r * Math.sin(th)];
 }
 
 /* Time from now until the ship next reaches periapsis (or apoapsis), on an
@@ -270,7 +311,7 @@ export function propagate(mu, r0, v0, dt){
     out = tof(chi);
   }
 
-  const { c2, c3, psi, rr } = out;
+  const { c2, c3, psi } = out;
   const f = 1 - (chi * chi / r0n) * c2;
   const g = dt - (chi * chi * chi / sqmu) * c3;
   const r = [f * r0[0] + g * v0[0], f * r0[1] + g * v0[1]];
@@ -278,7 +319,6 @@ export function propagate(mu, r0, v0, dt){
   const gdot = 1 - (chi * chi / rn) * c2;
   const fdot = (sqmu / (rn * r0n)) * chi * (psi * c3 - 1);
   const v = [fdot * r0[0] + gdot * v0[0], fdot * r0[1] + gdot * v0[1]];
-  void rr;
   return { r, v };
 }
 
@@ -332,9 +372,10 @@ export function lambert(mu, r1, r2, tof, ccw = true){
       psiLow = psi;
       continue;
     }
-    const [k2, k3] = stumpff(psi);
-    chi = Math.sqrt(y / k2);
-    const t = (chi * chi * chi * k3 + A * Math.sqrt(y)) / sqmu;
+    // The guard above always goes round again when it moves psi, so c2 and
+    // c3 are still for this psi here.
+    chi = Math.sqrt(y / c2);
+    const t = (chi * chi * chi * c3 + A * Math.sqrt(y)) / sqmu;
     if(Math.abs(t - tof) < 1e-9 * Math.max(1, tof)){ solved = true; break; }
     if(t <= tof) psiLow = psi; else psiHigh = psi;
     psi = (psiLow + psiHigh) / 2;
@@ -401,7 +442,12 @@ export function makeWorld(bodies){
   const vmax = new Map();
   for(const b of bodies){
     if(b.parent == null){ vmax.set(b.id, 0); continue; }
-    vmax.set(b.id, railMaxSpeed(b, byId.get(b.parent).mu));
+    const mu = byId.get(b.parent).mu;
+    vmax.set(b.id, railMaxSpeed(b, mu));
+    // Rail constants, mean motion included, so railState never takes a root
+    // it could have been handed.
+    const c = b._rail ?? railConst(b);
+    c.n = meanMotion(mu, b.a); c.mu = mu;
   }
   const root = bodies.find(b => b.parent == null);
   return {
@@ -439,27 +485,6 @@ export function shipAbs(world, ship, t){
   return { r: add(p.r, ship.r), v: add(p.v, ship.v) };
 }
 
-/* The smallest sphere of influence containing an absolute position. Used when
- * a ship is put somewhere by fiat: at the start, or after a tow. */
-export function soiAt(world, absPos, t){
-  let body = world.root;
-  for(;;){
-    let next = null;
-    for(const c of world.wells(body.id)){
-      const cp = absState(world, c.id, t).r;
-      if(dist(absPos, cp) < c.soi && (!next || c.soi < next.soi)) next = c;
-    }
-    if(!next) return body;
-    body = next;
-  }
-}
-
-/* Re-express an absolute state as a state in `body`'s frame. */
-export function toFrame(world, id, absR, absV, t){
-  const p = absState(world, id, t);
-  return { body: id, r: sub(absR, p.r), v: sub(absV, p.v) };
-}
-
 /* ------------------------------------------------ patched-conic stepping */
 
 const T_TOL = 1e-6;     // days; a twentieth of a second of game time
@@ -486,16 +511,170 @@ function boundaries(world, body, r, v, t, opts){
   return list;
 }
 
+/* One boundary's clearance on its own, for the searches that have already
+ * decided which one they are closing in on. */
+function boundaryGap(world, body, b, r, t, floor){
+  const rn = norm(r);
+  if(b.kind === 'exit') return body.soi - rn;
+  if(b.kind === 'surface') return rn - floor;
+  return dist(r, railState(b.into, body.mu, t).r) - b.into.soi;
+}
+
+/* The distances a rail sweeps: the nearest and farthest a moon ever is from
+ * the world it goes round. A circle is one number twice. */
+function railBand(c){
+  const e = c.e ?? 0;
+  return [c.a * (1 - e), c.a * (1 + e)];
+}
+
+/* The true anomaly, in [0, π], at which a conic is at distance `rad`: the
+ * outbound crossing, whose mirror is the inbound one. Null when the conic
+ * never gets there, or is a straight fall with no anomaly worth the name. */
+function anomalyAtRadius(el, rad){
+  if(!(el.e > 1e-12) || !(el.p > 0)) return null;
+  const c = (el.p / rad - 1) / el.e;
+  if(c < -1 || c > 1) return null;
+  return Math.acos(c);
+}
+
+/* When a conic next passes distance `rad`, going out or coming in, solved
+ * rather than searched: the anomaly of the crossing is one arccosine and the
+ * time to reach it is Kepler's equation. Returned as a bracket [lo, hi] a hair
+ * either side of the answer, checked against the real clearance at both ends,
+ * so that the bisection that follows lands exactly where the stepping search
+ * would have. Null whenever the check fails, and the caller steps instead —
+ * slower, and never wrong.
+ *
+ * One trap is guarded against by name. A ship a rounding error past a
+ * crossing reads as having just missed it, and the solve then hands back the
+ * *next* pass, a whole lap on. If the clearance is already gone a small step
+ * ahead, the crossing is now, whatever the anomaly says. */
+function crossingTime(mu, el, r0, v0, rad, outward, gapAt){
+  const nu = anomalyAtRadius(el, rad);
+  if(nu == null) return null;
+  const dt = timeToAnomaly(mu, r0, v0, outward ? nu : TAU - nu);
+  if(dt == null || !Number.isFinite(dt)) return null;
+  const scale = Number.isFinite(el.period) ? el.period : Math.max(1, dt);
+  const d = Math.max(4 * T_TOL, scale * 1e-7);
+  const lo = Math.max(0, dt - d), hi = dt + d;
+  if(!(gapAt(lo) > 0) || !(gapAt(hi) <= 0)) return null;
+  if(lo > H_MIN && !(gapAt(H_MIN) > 0)) return null;
+  return { lo, hi };
+}
+
+/* Anticlockwise distance round the circle from one angle to another. */
+const ccwFrom = (from, to) => (((to - from) % TAU) + TAU) % TAU;
+
+/* The smallest angle between any point of one arc and any point of another,
+ * each given as a start and a signed sweep. Zero when they overlap or when
+ * either is a whole turn. */
+function arcGap(a0, la, b0, lb){
+  const fix = (s, l) => l >= 0 ? [ccwFrom(0, s), l] : [ccwFrom(0, s + l), -l];
+  const [as, al] = fix(a0, la), [bs, bl] = fix(b0, lb);
+  if(al >= TAU || bl >= TAU) return 0;
+  if(ccwFrom(as, bs) <= al || ccwFrom(bs, as) <= bl) return 0;
+  return Math.min(ccwFrom(as + al, bs), ccwFrom(bs + bl, as));
+}
+
+/* Whether a whole lap of a closed orbit can be skipped: true only when it is
+ * certain that no moon in `moons` comes within reach of the ship during the
+ * lap that starts now at (r, v). The ship's own orbit repeats exactly, so the
+ * question is entirely about where the moons will be.
+ *
+ * The test is geometric and conservative. The ship can only be within a
+ * moon's reach while its distance from the world is inside the moon's band,
+ * widened by that reach; that happens on at most two arcs of the orbit, at
+ * times that are known. Over each of those arcs the ship sweeps a known range
+ * of angle and the moon sweeps at most its fastest rate times the duration.
+ * If the two ranges stay further apart than the angle a reach subtends at
+ * that distance, no meeting was possible. Anything less certain than that
+ * returns false and the careful search does its job. */
+function lapClear(world, body, el, r, v, tLap, moons){
+  const P = el.period, mu = body.mu;
+  for(const c of moons){
+    const [cmin, cmax] = railBand(c);
+    const lo = Math.max(el.rp, cmin - c.soi), hi = Math.min(el.ra, cmax + c.soi);
+    if(lo > hi) continue;
+    if(!(lo > c.soi) || !(cmin > c.soi)) return false;
+    /* Two points at radii ≥ lo and ≥ cmin, an angle Δ apart, are at least
+       2·sqrt(lo·cmin)·sin(Δ/2) from one another. */
+    const dStar = 2 * Math.asin(Math.min(1, c.soi / (2 * Math.sqrt(lo * cmin))));
+    let arcs;
+    if(!(el.e > 1e-12)){
+      arcs = [[0, TAU]];
+    }else{
+      const cLo = Math.min(1, Math.max(-1, (el.p / lo - 1) / el.e));   // r ≥ lo  ⇔  cos ν ≤ cLo
+      const cHi = Math.min(1, Math.max(-1, (el.p / hi - 1) / el.e));   // r ≤ hi  ⇔  cos ν ≥ cHi
+      const nuA = Math.acos(cLo), nuB = Math.acos(cHi);
+      const fromPe = nuA <= 1e-12, toAp = nuB >= Math.PI - 1e-12;
+      if(fromPe && toAp) arcs = [[0, TAU]];
+      else if(fromPe) arcs = [[TAU - nuB, TAU + nuB]];
+      else if(toAp) arcs = [[nuA, TAU - nuA]];
+      else arcs = [[nuA, nuB], [TAU - nuB, TAU - nuA]];
+    }
+    const ce = c.e ?? 0;
+    const moonRate = Math.sqrt(mu * c.a * (1 - ce * ce)) / (c.a * (1 - ce)) ** 2;   // h / rp², its fastest
+    const moonDir = c.retrograde ? -1 : 1;
+    for(const [nuA, nuB] of arcs){
+      if(nuB - nuA >= TAU - 1e-9) return false;
+      const tA = timeToAnomaly(mu, r, v, ccwFrom(0, nuA));
+      if(tA == null) return false;
+      const dur = arcDuration(el, nuA, nuB);
+      /* The arc happens once a lap; the copy that began before this lap did
+         may still be running when the lap starts. */
+      for(const start of [tA, tA - P]){
+        const w0 = Math.max(0, start), w1 = Math.min(P, start + dur);
+        if(w1 - w0 <= 0) continue;
+        if(w1 - w0 >= P - 1e-9) return false;
+        const s0 = propagate(mu, r, v, w0), s1 = propagate(mu, r, v, w1);
+        const th0 = Math.atan2(s0.r[1], s0.r[0]);
+        const sweep = ccwFrom(0, elementsFromState(mu, s1.r, s1.v).nu - elementsFromState(mu, s0.r, s0.v).nu);
+        const m0 = railState(c, mu, tLap + w0).r;
+        const ph0 = Math.atan2(m0[1], m0[0]);
+        const mSweep = (w1 - w0) * moonRate;
+        if(mSweep >= TAU) return false;
+        if(arcGap(th0, el.dir * sweep, ph0, moonDir * mSweep) < dStar) return false;
+      }
+    }
+  }
+  return true;
+}
+
+/* Time along a closed orbit from one true anomaly to a later one. */
+function arcDuration(el, nuA, nuB){
+  const M = nu => { const E = nuToE(nu, el.e); return E - el.e * Math.sin(E); };
+  return ccwFrom(M(nuA), M(nuB)) / (TAU / el.period);
+}
+
 /* Find the first boundary crossing within `span` days of `t`, or null.
  *
- * Conservative advancement: at each sample the clearance to every boundary
- * divided by the fastest possible closing speed bounds how soon it can be
- * reached, and the step is the smallest such bound (never below H_MIN, or the
- * search would creep). Because the bound is rigorous a boundary is never
- * jumped over, so when a sample lands past one, the crossing is bracketed by
- * the last two samples and bisected.
+ * Three things happen before any stepping, all of them exact:
+ *
+ *   1. Boundaries the conic cannot reach are dropped. Its low and high points
+ *      are known, so a floor below the low point, a reach above the high
+ *      point, and a moon whose rail never comes within its own reach of the
+ *      band the ship sweeps are all ruled out in one comparison each. A
+ *      parking orbit answers "nothing, ever" here and the search never runs.
+ *   2. Exit and surface, being crossings of a fixed distance, are solved
+ *      rather than searched (crossingTime). Only a moon needs a search,
+ *      because only a moon moves.
+ *   3. On a closed orbit the ship's state repeats every lap, so a lap in
+ *      which no moon can come within reach is skipped whole (lapClear).
+ *
+ * What is left is the search as it always was — conservative advancement: at
+ * each sample the clearance to every boundary divided by the fastest possible
+ * closing speed bounds how soon it can be reached, and the step is the
+ * smallest such bound (never below H_MIN, or the search would creep). Because
+ * the bound is rigorous a boundary is never jumped over, so when a sample
+ * lands past one, the crossing is bracketed by the last two samples and
+ * bisected. `opts.exhaustive` turns the three shortcuts off, for checking
+ * them against it.
  */
-export function nextEvent(world, body, r0, v0, t0, span, opts){
+/* Everything nextEvent decides before it steps: the conic, its speed ceiling,
+ * every boundary sorted into dropped / solved / to-be-watched, and whether
+ * whole laps may be skipped. Shared with coastStable, which wants only the
+ * verdict. */
+function classify(world, body, r0, v0, t0, opts){
   /* The fastest the ship can possibly be going during this step. It is the
      only thing keeping the search honest: the bound below divides a clearance
      by a closing speed, and if that speed can be exceeded the search can step
@@ -505,30 +684,88 @@ export function nextEvent(world, body, r0, v0, t0, span, opts){
   const floor = Math.max(body.radius ?? 0, (opts?.atmosphere && body.atmo) ? body.atmo : 0);
   const el = elementsFromState(body.mu, r0, v0, floor);
   const vship = Number.isFinite(el.vmax) ? el.vmax : Math.sqrt(Math.max(0, norm(v0) ** 2 + 2 * body.mu / Math.max(floor, 1e-9)));
-  let t = 0;
-  let r = r0, v = v0;
-  let prev = boundaries(world, body, r, v, t0, opts);
+  const mu = body.mu;
+  const all = boundaries(world, body, r0, v0, t0, opts);
   // Something can start already inside a boundary (a graze that the tolerance
   // put a hair over). Report nothing for that one until it comes clear.
-  const armed = prev.map(b => b.gap > 0);
+  const armed = all.map(b => b.gap > 0);
+  const shortcuts = !opts?.exhaustive;
+  const bound = el.bound;
+  const rp = el.rp, ra = bound ? el.ra : Infinity;
+  const floorGap = opts?.atmosphere && body.atmo ? body.atmo : body.radius;
+
+  /* Sort the boundaries: dropped, solved, or kept for the search. */
+  const watch = [];          // indices into `all` the stepping search must watch
+  let solved = null;         // the earliest solved crossing, { i, lo, hi }
+  let lapsOk = shortcuts && bound && Number.isFinite(el.period) && el.period > 0;
+  for(let i = 0; i < all.length; i++){
+    const b = all[i];
+    if(!shortcuts){ watch.push(i); continue; }
+    if(!armed[i]){ watch.push(i); lapsOk = false; continue; }
+    const gapAt = dt => boundaryGap(world, body, b, propagate(mu, r0, v0, dt).r, t0 + dt, floorGap);
+    if(b.kind === 'exit'){
+      if(bound && ra < body.soi) continue;
+      const c = crossingTime(mu, el, r0, v0, body.soi, true, gapAt);
+      if(c){ if(!solved || c.lo < solved.lo) solved = { i, ...c }; continue; }
+      watch.push(i); lapsOk = false; continue;
+    }
+    if(b.kind === 'surface'){
+      if(rp > floorGap) continue;
+      const c = crossingTime(mu, el, r0, v0, floorGap, false, gapAt);
+      if(c){ if(!solved || c.lo < solved.lo) solved = { i, ...c }; continue; }
+      watch.push(i); lapsOk = false; continue;
+    }
+    const [cmin, cmax] = railBand(b.into);
+    if(ra + b.into.soi < cmin || rp - b.into.soi > cmax) continue;
+    watch.push(i);
+  }
+  const moons = lapsOk ? watch.map(i => all[i].into) : null;
+  return { el, vship, all, armed, watch, solved, lapsOk, moons, floorGap };
+}
+
+/* Whether a coast from this state goes on for ever: a closed orbit that can
+ * reach no boundary at all. This is what makes a parking orbit a single leg
+ * rather than an endless search, and it is exact — the same tests the search
+ * itself trusts, with nothing left over for it to do. */
+export function coastStable(world, body, r0, v0, t0, opts){
+  const c = classify(world, body, r0, v0, t0, opts);
+  return c.el.bound && !c.watch.length && !c.solved;
+}
+
+export function nextEvent(world, body, r0, v0, t0, span, opts){
+  const mu = body.mu;
+  const { el, vship, all, armed, watch, solved, lapsOk, moons, floorGap } = classify(world, body, r0, v0, t0, opts);
+
+  /* The search need not look past a crossing already solved. */
+  let cap = span;
+  if(solved && solved.lo < cap) cap = solved.lo;
+
+  let t = 0;
+  let r = r0, v = v0;
+  let prev = all;
   let guard = 0;
-  while(t < span && guard++ < 20000){
-    let h = span - t;
-    for(let i = 0; i < prev.length; i++){
+  while(watch.length && t < cap && guard++ < 20000){
+    if(lapsOk && cap - t >= el.period && lapClear(world, body, el, r, v, t0 + t, moons)){
+      t += el.period;
+      prev = boundaries(world, body, r, v, t0 + t, opts);
+      continue;
+    }
+    let h = cap - t;
+    for(const i of watch){
       if(!armed[i]) continue;
       const b = prev[i];
       const speed = vship + b.closing;
-      const bound = b.gap / speed;
-      if(bound < h) h = bound;
+      const bnd = b.gap / speed;
+      if(bnd < h) h = bnd;
     }
     h = Math.max(h, H_MIN);
-    if(t + h > span) h = span - t;
+    if(t + h > cap) h = cap - t;
     if(h <= 0) break;
-    const next = propagate(body.mu, r, v, h);
+    const next = propagate(mu, r, v, h);
     const tn = t + h;
     const now = boundaries(world, body, next.r, next.v, t0 + tn, opts);
     let hit = -1;
-    for(let i = 0; i < now.length; i++){
+    for(const i of watch){
       if(armed[i] && now[i].gap <= 0){ hit = i; break; }
       if(!armed[i] && now[i].gap > 0) armed[i] = true;
     }
@@ -537,12 +774,12 @@ export function nextEvent(world, body, r0, v0, t0, span, opts){
       let lo = 0, hi = h;
       for(let i = 0; i < 60 && hi - lo > T_TOL; i++){
         const mid = (lo + hi) / 2;
-        const s = propagate(body.mu, r, v, mid);
-        const g = boundaries(world, body, s.r, s.v, t0 + t + mid, opts)[hit].gap;
+        const s = propagate(mu, r, v, mid);
+        const g = boundaryGap(world, body, now[hit], s.r, t0 + t + mid, floorGap);
         if(g <= 0) hi = mid; else lo = mid;
       }
       // Land just on the far side, so the next frame agrees we have crossed.
-      const s = propagate(body.mu, r, v, hi);
+      const s = propagate(mu, r, v, hi);
       const b = now[hit];
       return { kind: b.kind, into: b.into ?? null, dt: t + hi, r: s.r, v: s.v };
     }
@@ -551,7 +788,18 @@ export function nextEvent(world, body, r0, v0, t0, span, opts){
   /* Out of steps rather than out of span. Saying "nothing happens here" would
      be a lie, and the caller would coast serenely through whatever was coming;
      saying where the search got to lets it pick up from there. */
-  if(t < span) return { kind: 'timeout', into: null, dt: t, r, v };
+  if(watch.length && t < cap) return { kind: 'timeout', into: null, dt: t, r, v };
+  if(solved && solved.hi <= span){
+    const b = all[solved.i];
+    let lo = solved.lo, hi = solved.hi;
+    for(let i = 0; i < 60 && hi - lo > T_TOL; i++){
+      const mid = (lo + hi) / 2;
+      const g = boundaryGap(world, body, b, propagate(mu, r0, v0, mid).r, t0 + mid, floorGap);
+      if(g <= 0) hi = mid; else lo = mid;
+    }
+    const s = propagate(mu, r0, v0, hi);
+    return { kind: b.kind, into: null, dt: hi, r: s.r, v: s.v };
+  }
   return null;
 }
 
@@ -628,7 +876,7 @@ export function advance(world, ship, t, dt, nodes = [], opts = {}){
       r = s.r; v = s.v; now += span;
     }
     if(nodeNext && Math.abs(now - nodeNext.t) <= T_TOL + 1e-12){
-      const burn = burnVector(r, v, nodeNext, opts.dvAvailable);
+      const burn = burnVector(r, v, nodeNext, opts.dvAvailable, frameAt(world, body.id, r, v, now));
       v = add(v, burn.dv);
       events.push({ kind: 'burn', t: now, node: nodeNext, dv: burn.dv, magnitude: burn.magnitude, short: burn.short, body: body.id });
       if(opts.dvAvailable != null) opts.dvAvailable = Math.max(0, opts.dvAvailable - burn.magnitude);
@@ -662,11 +910,56 @@ export function burnFrame(r, v){
   return dot(out, r) < 0 ? { pro, out: scale(out, -1) } : { pro, out };
 }
 
+/* Something with no gravity still gets a reach — it just does nothing to your
+ * path. Inside it the burn axes stop being about the world you are going round
+ * and start being about the thing you are trying to come alongside: forward is
+ * along your speed *relative to it*, and out is away from it. That is the whole
+ * of the effect, and it is the whole of what a rendezvous is.
+ *
+ * The reach is deliberately far larger than the object, because the object is
+ * a dot and the flying is done a long way off it.
+ *
+ * Note this is `burnFrame` again, handed relative position and relative
+ * velocity instead of absolute ones. Doing it that way rather than inventing a
+ * "toward the target" axis keeps the two axes at right angles, which is what
+ * makes a mark cost the hypotenuse of its own two numbers — see the note above
+ * burnFrame for the three bugs that invariant was bought with. */
+export function driftTargetAt(world, bodyId, r, t){
+  const parent = world.get(bodyId);
+  if(!parent) return null;
+  let best = null;
+  for(const c of world.children(bodyId)){
+    /* Keyed on the harbour rather than the mass: a rock can carry enough pull
+       to have a reach and still be a thing you come alongside, and that one
+       should fly relative too. */
+    if(!c.rendezvous || !(c.driftReach > 0)) continue;
+    const st = railState(c, parent.mu, t);
+    const d = norm(sub(r, st.r));
+    if(d > c.driftReach) continue;
+    if(!best || d < best.distance) best = { id: c.id, r: st.r, v: st.v, distance: d, reach: c.driftReach };
+  }
+  return best;
+}
+
+/* The frame a burn at (r, v) is actually written in: relative to a drifting
+ * thing when the ship is inside one's reach, and to the world it is going
+ * round otherwise. */
+export function frameAt(world, bodyId, r, v, t){
+  const tgt = world && bodyId ? driftTargetAt(world, bodyId, r, t) : null;
+  if(!tgt) return burnFrame(r, v);
+  const vRel = sub(v, tgt.v);
+  /* Speeds already matched: there is no relative forward to measure from, so
+     fall back rather than hand back a basis made of NaN. A ship this still is
+     one that should be tying up, not burning. */
+  if(!(norm(vRel) > 1e-12)) return burnFrame(r, v);
+  return burnFrame(sub(r, tgt.r), vRel);
+}
+
 /* A node's burn as a vector in the current frame. If the tank cannot cover it,
  * the burn is scaled down to what there is and flagged: the design says a
  * short tank costs time, never the save. */
-export function burnVector(r, v, node, dvAvailable){
-  const { pro, out } = burnFrame(r, v);
+export function burnVector(r, v, node, dvAvailable, frame){
+  const { pro, out } = frame ?? burnFrame(r, v);
   let dv = add(scale(pro, node.prograde || 0), scale(out, node.radial || 0));
   let magnitude = norm(dv);
   let short = false;
@@ -703,9 +996,9 @@ export const nodeMagnitude = node => Math.hypot(node.prograde || 0, node.radial 
  *
  * The one thing with no answer is a ship with no velocity, which has no
  * forward to measure from. Callers still check. */
-export function nodeFromVector(r, v, dv){
+export function nodeFromVector(r, v, dv, frame){
   if(!(norm(v) > 0)) return null;
-  const { pro, out } = burnFrame(r, v);
+  const { pro, out } = frame ?? burnFrame(r, v);
   return { prograde: dot(dv, pro), radial: dot(dv, out) };
 }
 
@@ -734,7 +1027,6 @@ export function predict(world, ship, t0, nodes = [], horizon = 720, opts = {}){
   let guard = 0;
   let crashed = false;
   let dvTotal = 0;
-  let periapsisMarks = [];
   while(end - t > 0 && guard++ < 48){
     const step = advanceOne(world, body, r, v, t, end, nodes, ni, o);
     // Close the current segment at whatever ended it.
@@ -755,7 +1047,7 @@ export function predict(world, ship, t0, nodes = [], horizon = 720, opts = {}){
     }
     if(step.reason === 'burn'){
       const node = nodes[ni];
-      const burn = burnVector(step.r, step.v, node, o.dvAvailable);
+      const burn = burnVector(step.r, step.v, node, o.dvAvailable, frameAt(world, body.id, step.r, step.v, step.t));
       const vNew = add(step.v, burn.dv);
       if(o.dvAvailable != null) o.dvAvailable = Math.max(0, o.dvAvailable - burn.magnitude);
       dvTotal += burn.magnitude;
@@ -778,8 +1070,140 @@ export function predict(world, ship, t0, nodes = [], horizon = 720, opts = {}){
     t = step.t;
     segStart = { body: body.id, t, r, v };
   }
-  void periapsisMarks;
   return { segments, events, crashed, dvTotal, end: t, dvLeft: o.dvAvailable };
+}
+
+/* The road as legs rather than as days.
+ *
+ * A leg is a coast on one conic in one frame. It ends at the first of: a mark
+ * firing (`burn`), the bottom of a dive through the air (`burn` again, with an
+ * `aero` mark the caller's `skimAt` priced), a change of reach (`exit`,
+ * `enter`), the ground (`crash`), or nothing at all — which comes in two
+ * kinds. `stable` is a closed orbit the search has proved can reach no
+ * boundary, so the leg is drawn as one lap and the walk stops there: the
+ * ship will go round that lap until a mark is written. `partial` is a leg cut
+ * short because the search looked as far as it is allowed on one leg and saw
+ * nothing; the next leg carries on from where it stopped.
+ *
+ * `stop(segments)` is asked after every leg whether that is enough. A chart
+ * wants the orbit you are on and the one thing that happens next; a solver
+ * wants everything up to a horizon; the flight wants exactly one leg. All
+ * three are one walk with a different answer to that question.
+ */
+export function predictLegs(world, ship, t0, nodes = [], opts = {}){
+  const maxLegs = opts.maxLegs ?? 24;
+  const end = t0 + (opts.maxTime ?? 6000);
+  const stop = opts.stop ?? null;
+  const segments = [];
+  const events = [];
+  let body = world.get(ship.body);
+  let r = ship.r, v = ship.v;
+  let t = t0;
+  const o = { atmosphere: opts.atmosphere, dvAvailable: opts.dvAvailable };
+  let ni = 0;
+  while(ni < nodes.length && nodes[ni].t < t - T_TOL) ni++;
+  let crashed = false;
+  let dvTotal = 0;
+  let stable = false;
+  for(let guard = 0; guard < maxLegs && end - t > 0; guard++){
+    const start = { body: body.id, t, r, v };
+    const el = elementsFromState(body.mu, r, v);
+    // Where this leg can end: the next mark, or the far edge of the look.
+    let span = end - t, ending = 'horizon';
+    let node = null;
+    if(ni < nodes.length && nodes[ni].t <= end){ span = Math.max(0, nodes[ni].t - t); ending = 'burn'; node = nodes[ni]; }
+    /* A skim ends a leg at the bottom of the dive. The guard on `tp` keeps a
+       leg that begins at a periapsis — the one after a skim — from skimming
+       the same periapsis again at once. */
+    if(opts.skimAt && body.atmo && !o.atmosphere && el.rp < body.atmo && el.rp > body.radius){
+      const tp = timeToAnomaly(body.mu, r, v, 0);
+      if(tp != null && tp > 1e-3 && tp > (Number.isFinite(el.period) ? el.period * 1e-3 : 0) && tp <= span + 1e-9){
+        const at = propagate(body.mu, r, v, tp);
+        const shed = opts.skimAt(body, el, at);
+        if(shed > 0){
+          node = { t: t + tp, prograde: -shed, radial: 0, aero: true, free: true, body: body.id };
+          span = tp; ending = 'burn';
+        }
+      }
+    }
+    /* Nothing can happen and nothing is written down: one lap, and stop. */
+    const quiet = Number.isFinite(el.period) && coastStable(world, body, r, v, t, o);
+    if(ending === 'horizon' && quiet){
+      const t1 = t + el.period;
+      const s = propagate(body.mu, r, v, el.period);
+      segments.push(finishSegment(world, start, body, t1, s.r, s.v, 'stable', opts));
+      stable = true;
+      break;
+    }
+    /* The search, bounded: a closed orbit is looked at for a few dozen laps,
+       an open one for a couple of years; past that the leg is cut and the
+       next one carries on. An orbit that can reach nothing needs no bound —
+       there is nothing to look for between here and the mark. */
+    const look = quiet ? Infinity
+      : Number.isFinite(el.period) ? Math.max(2, el.period * (opts.lapsLooked ?? 60))
+      : (opts.openLegDays ?? 720);
+    const cut = Math.min(span, look);
+    const ev = cut > 0 ? nextEvent(world, body, r, v, t, cut, o) : null;
+    if(ev && ev.kind === 'timeout'){
+      if(ev.dt <= 0) break;
+      segments.push(finishSegment(world, start, body, t + ev.dt, ev.r, ev.v, 'partial', opts));
+      r = ev.r; v = ev.v; t += ev.dt;
+      if(stop && stop(segments)) break;
+      continue;
+    }
+    if(ev){
+      const t1 = t + ev.dt;
+      if(ev.kind === 'surface'){
+        segments.push(finishSegment(world, start, body, t1, ev.r, ev.v, 'crash', opts));
+        events.push({ kind: 'crash', body: body.id, t: t1 });
+        crashed = true;
+        break;
+      }
+      segments.push(finishSegment(world, start, body, t1, ev.r, ev.v, ev.kind, opts));
+      if(ev.kind === 'exit'){
+        const parent = world.get(body.parent);
+        const local = railState(body, parent.mu, t1);
+        events.push({ kind: 'soi', from: body.id, to: parent.id, t: t1 });
+        r = add(ev.r, local.r); v = add(ev.v, local.v); body = parent;
+      }else{
+        const local = railState(ev.into, body.mu, t1);
+        events.push({ kind: 'soi', from: body.id, to: ev.into.id, t: t1 });
+        r = sub(ev.r, local.r); v = sub(ev.v, local.v); body = ev.into;
+      }
+      t = t1;
+      if(stop && stop(segments)) break;
+      continue;
+    }
+    // No boundary before the end of this leg: coast to it.
+    const s = cut > 0 ? propagate(body.mu, r, v, cut) : { r, v };
+    const t1 = t + cut;
+    if(cut < span - 1e-12){
+      // Looked as far as one leg may; carry on from here.
+      segments.push(finishSegment(world, start, body, t1, s.r, s.v, 'partial', opts));
+      r = s.r; v = s.v; t = t1;
+      if(stop && stop(segments)) break;
+      continue;
+    }
+    if(ending === 'burn'){
+      segments.push(finishSegment(world, start, body, t1, s.r, s.v, 'burn', opts));
+      const burn = burnVector(s.r, s.v, node, o.dvAvailable, frameAt(world, body.id, s.r, s.v, t1));
+      const vNew = add(s.v, burn.dv);
+      if(o.dvAvailable != null) o.dvAvailable = Math.max(0, o.dvAvailable - burn.magnitude);
+      dvTotal += burn.magnitude;
+      events.push({ kind: 'burn', t: t1, node, body: body.id, magnitude: burn.magnitude, short: burn.short, r: s.r, v: vNew });
+      r = s.r; v = vNew; t = t1;
+      if(!node.aero) ni++;
+      if(stop && stop(segments)) break;
+      continue;
+    }
+    segments.push(finishSegment(world, start, body, t1, s.r, s.v, 'horizon', opts));
+    r = s.r; v = s.v; t = t1;
+    break;
+  }
+  /* `next` is the ship after the last leg and whatever ended it — the state
+     the flight actually continues from, which is not the leg's own end when
+     the leg ended at a door or a burn. */
+  return { segments, events, crashed, dvTotal, end: t, dvLeft: o.dvAvailable, stable, next: { body: body.id, r, v, t } };
 }
 
 /* One leg of the prediction: coast from (t, r, v) in `body` until the next
@@ -821,8 +1245,43 @@ function finishSegment(world, start, body, t1, r1, v1, reason, opts){
      `lapped` says so. */
   const lapped = Number.isFinite(el.period) && el.period > 0 && dur > el.period * 1.001;
   const span = lapped ? el.period : dur;
+  /* The flight wants the leg and nothing drawn on it. */
+  if(opts.noSamples){
+    return { body: body.id, t0: start.t, t1, r0: start.r, v0: start.v, r1, v1, elements: el, points: [], times: [], scan: [], scanTimes: [], reason, lapped };
+  }
+  /* Sampled evenly in angle, not evenly in time.
+   *
+   * On anything eccentric the ship covers most of its arc in a small part of
+   * its time: a fast flyby spends two days crawling in and a few minutes
+   * whipping round the bottom. Equal steps of time therefore put almost no
+   * points at the periapsis — which is the one part of the path that bends,
+   * and the one a pilot aims. Measured on a flyby of Grumm: twenty-five points
+   * over sixty-six hours, and the two either side of the low point a hundred
+   * and sixty thousand kilometres apart, across a periapsis eight thousand
+   * kilometres up. The chart drew a straight line through the manoeuvre and
+   * nudging the burn moved it by nothing anyone could see.
+   *
+   * Equal steps of true anomaly put the points where the corner is. Position
+   * comes straight off the conic — no Newton iteration per point — and the
+   * time each one happens at is Kepler's equation, which is what
+   * `timeToAnomaly` already answers. */
+  const span0 = elementsFromState(mu, start.r, start.v);
+  const usable = span0.p > 0 && span0.e >= 0 && Number.isFinite(span0.e) && Math.abs(span0.h) > 1e-15;
+  let sweep = 0;
+  if(usable){
+    if(lapped) sweep = TAU;
+    else{
+      const nu1 = elementsFromState(mu, r1, v1).nu;
+      sweep = ((nu1 - span0.nu) % TAU + TAU) % TAU;
+      // A leg that has barely moved, or one that has gone right round.
+      if(!(sweep > 1e-9)) sweep = dur > 0 ? TAU : 0;
+    }
+  }
   let n;
-  if(Number.isFinite(el.period)){
+  if(usable && sweep > 0){
+    // Enough points that a degree or so of arc separates them, within the cap.
+    n = Math.round(Math.min(cap, Math.max(24, 240 * sweep / TAU)));
+  }else if(Number.isFinite(el.period)){
     n = Math.round(Math.min(cap, Math.max(24, 240 * span / el.period)));
   }else{
     n = Math.round(Math.min(cap, Math.max(24, span / (opts.hyperbolicStep ?? 0.25))));
@@ -831,11 +1290,25 @@ function finishSegment(world, start, body, t1, r1, v1, reason, opts){
   const times = new Array(n + 1);
   for(let i = 0; i <= n; i++){
     const f = i / n;
+    if(usable && sweep > 0){
+      const nu = span0.nu + sweep * f;
+      points[i] = conicPointAt(span0, nu);
+      /* The clock at that angle. Only the drawn lap is sampled, so a moment is
+         never more than one turn ahead and the first answer is the right one;
+         where the conic cannot say (an asymptote on the way past), fall back to
+         spreading the leg's own duration evenly, which is what this did all
+         along. */
+      const dt = i === 0 ? 0 : timeToAnomaly(mu, start.r, start.v, nu);
+      times[i] = start.t + (dt == null || !Number.isFinite(dt) ? span * f : Math.min(dt, span));
+      continue;
+    }
     const dt = span * f;
     const s = (!lapped && i === n) ? { r: r1 } : propagate(mu, start.r, start.v, dt);
     points[i] = s.r;
     times[i] = start.t + dt;
   }
+  // The leg ends exactly where it ends, whatever the last sample rounded to.
+  if(!lapped){ points[n] = r1; times[n] = t1; }
   /* A second, coarser set over the *whole* leg, for the searches rather than
      the drawing. closestApproach hunts for the nearest pass to a world, and a
      leg that laps fifty times may only line up with a moon on the fortieth —
@@ -882,6 +1355,8 @@ export function closestApproach(world, prediction, targetId, within = Infinity, 
     const own = seg.body === targetId;
     // Or a direct child of it? Then work in the segment's frame directly.
     const child = target.parent === seg.body;
+    // Or a sibling — the same parent — so both are one rail each from the frame.
+    const sibling = !own && !child && target.parent != null && target.parent === segBody.parent;
     // The full-duration samples, not the one lap the chart draws.
     const pts = seg.scan ?? seg.points, ts = seg.scanTimes ?? seg.times;
     for(let i = 0; i < pts.length; i++){
@@ -889,6 +1364,10 @@ export function closestApproach(world, prediction, targetId, within = Infinity, 
       let d;
       if(own) d = norm(pts[i]);
       else if(child) d = dist(pts[i], railState(target, segBody.mu, t).r);
+      else if(sibling){
+        const pmu = world.get(target.parent).mu;
+        d = dist(add(railState(segBody, pmu, t).r, pts[i]), railState(target, pmu, t).r);
+      }
       else d = dist(add(absState(world, seg.body, t).r, pts[i]), absState(world, targetId, t).r);
       /* Carry the bracket, not the index: the samples searched and the
          samples drawn are different arrays now, and an index into one is
@@ -907,8 +1386,9 @@ export function closestApproach(world, prediction, targetId, within = Infinity, 
   const segBody = world.get(seg.body);
   const f = t => {
     const s = propagate(segBody.mu, seg.r0, seg.v0, t - seg.t0);
-    const shipR = add(absState(world, seg.body, t).r, s.r);
-    const shipV = add(absState(world, seg.body, t).v, s.v);
+    const fr = absState(world, seg.body, t);
+    const shipR = add(fr.r, s.r);
+    const shipV = add(fr.v, s.v);
     const tg = absState(world, targetId, t);
     return { d: dist(shipR, tg.r), rel: norm(sub(shipV, tg.v)), shipR, tgR: tg.r };
   };
@@ -923,16 +1403,6 @@ export function closestApproach(world, prediction, targetId, within = Infinity, 
   const t = (lo + hi) / 2;
   const at = f(t);
   return { t, distance: at.d, relSpeed: at.rel, shipAbs: at.shipR, targetAbs: at.tgR, body: seg.body };
-}
-
-/* The periapsis of a segment's conic, if the leg actually passes through it:
- * a marker the chart draws as "kissing distance". */
-export function segmentPeriapsis(seg, mu){
-  const el = seg.elements;
-  const dt = timeToAnomaly(mu, seg.r0, seg.v0, 0);
-  if(dt == null || dt > seg.t1 - seg.t0) return null;
-  const s = propagate(mu, seg.r0, seg.v0, dt);
-  return { t: seg.t0 + dt, r: s.r, distance: el.rp };
 }
 
 /* Both ends of a leg's conic: the low point and, if the conic closes and the

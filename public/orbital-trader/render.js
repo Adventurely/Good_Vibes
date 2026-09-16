@@ -21,7 +21,7 @@
  *    SOI rings, docking zones) are in au and grow with the zoom.
  */
 
-import { absState, railState, meanMotion, unit, norm, add, sub, scale, perp, dist, propagate } from './orbit.js';
+import { absState, railState, meanMotion, unit, norm, add, sub, scale, perp, dist, propagate, burnFrame } from './orbit.js';
 import { drawSprite } from './sprites.js';
 
 /* The palette: a star chart drawn on paper. The same paper as every page on
@@ -82,6 +82,7 @@ export const PALETTE = {
   shipEdge:   '#000000',
   shipHalo:   'rgba(255,255,255,0.22)',
   node:       '#ffd23f',
+  flame:      '#ff7a2e',   // the body of a burn's flame; node is its core and its words
   nodeRing:   'rgba(255,210,63,0.7)',
   /* Where the road cuts across a world's rail, and where that world will be
      when it does. Orange, because every other mark on this chart is already
@@ -98,7 +99,6 @@ export const PALETTE = {
   text:       '#f5ead6',
   textDim:    'rgba(245,234,214,0.6)',
   crash:      '#ff5f5f',
-  atmo:       'rgba(139,107,214,0.18)',
   emberkin:   '#ff8c42',
   otter:      '#6cc24a',
   cat:        '#e9dcc0',
@@ -111,9 +111,39 @@ export const PALETTE = {
 export const speciesColour = s => PALETTE[s] ?? PALETTE.none;
 
 /* Body colours by kind and people, so the chart reads without labels. */
+/* The channels of a `#rrggbb`, or the old hard-coded violet for anything that
+ * is not one. Every colour on this chart is authored as hex, so this is the one
+ * place that has to know it. */
+const rgbCache = new Map();
+function rgbOf(colour){
+  let out = rgbCache.get(colour);
+  if(out) return out;
+  const hex = /^#([0-9a-f]{6})$/i.exec(colour);
+  out = hex ? [0, 2, 4].map(i => parseInt(hex[1].slice(i, i + 2), 16)) : [139, 107, 214];
+  rgbCache.set(colour, out);
+  return out;
+}
+export const rgba = (colour, alpha) => { const [r, g, b] = rgbOf(colour); return `rgba(${r},${g},${b},${alpha})`; };
+/* Towards white, for the bit of a star that is too bright to have a colour. */
+export function lighten(colour, k){
+  const [r, g, b] = rgbOf(colour);
+  const up = c => Math.round(c + (255 - c) * k);
+  return `rgb(${up(r)},${up(g)},${up(b)})`;
+}
+
+/* A body's colour at the weight air is drawn in: enough to read as weather over
+ * black, faint enough that the road through it stays the brightest thing. One
+ * number, so the four atmospheres are the same thickness of haze as each other
+ * whatever colour they are. */
+const HAZE_ALPHA = 0.18;
+export const haze = colour => rgba(colour, HAZE_ALPHA);
+
 export function bodyColour(body){
-  if(body.kind === 'star') return PALETTE.star;
+  /* A star's own colour wins where it has one: there are two of them now, and
+     one is blue. The palette's star is what the Lamp is, and the fallback for
+     anything that does not say. */
   if(body.colour) return body.colour;
+  if(body.kind === 'star') return PALETTE.star;
   return speciesColour(body.species ?? 'none');
 }
 
@@ -121,6 +151,10 @@ export function bodyColour(body){
    has to frame both, so the ceiling is set by the smallest moon rather than
    by the biggest orbit. */
 const MIN_ZOOM = 8, MAX_ZOOM = 2e7;
+
+/* One clock for the whole file, and one that does not throw where there is no
+   window: the chart is also drawn on the title screen and in tests. */
+const nowMs = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
 
 export function createChart(canvas, world, opts = {}){
   const ctx = canvas.getContext('2d', { alpha: false });
@@ -161,15 +195,51 @@ export function createChart(canvas, world, opts = {}){
     belt: null,
   };
 
+  /* How many real pixels the chart is painted into, and why that is not one
+   * number.
+   *
+   * Every frame repaints the whole sky: a gradient over the ground, four
+   * hundred stars, the Scatter, every rail, the road, the worlds. Nothing is
+   * cached and nothing needs to be, because the cost is almost exactly linear
+   * in the size of the backing store — measured at 1600x1000, a pan costs 13
+   * ms at one device pixel per point, 25 at one and a half, 37 at two. On a
+   * retina screen that last one is twenty-seven frames a second, and dragging
+   * the chart visibly stutters.
+   *
+   * So the resolution follows the gesture. Still, it paints at the full ratio
+   * and the art is as sharp as the screen can show it. Moving — a drag, a
+   * wheel, a pinch — it drops to half of that until a fifth of a second after
+   * the last of it, which on a retina screen is a third of the work and takes
+   * the drag back under ten milliseconds. Nobody can see the difference in
+   * pixel art that is sliding under their finger, and everybody can see
+   * twenty-seven frames a second.
+   *
+   * The switch happens between frames, never inside one: resizing the canvas
+   * throws away its contents and resets the context, and the only places that
+   * ask for it are the event handlers and the top of a draw. */
+  const MOTION_SETTLE_MS = 200;
+  let liveDpr = 0, movingUntil = -1e9;
+  const fullDpr = () => Math.min(2, window.devicePixelRatio || 1);
+  const applyDpr = dpr => {
+    if(dpr === liveDpr) return;
+    liveDpr = dpr;
+    chart.dpr = dpr;
+    canvas.width = Math.round(chart.width * dpr);
+    canvas.height = Math.round(chart.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  };
+  /* Say that the view is moving. Anything that shifts the camera by hand
+     calls this; the clock moving the ship does not, because the chart is
+     locked to the ship and the sky under it barely stirs. */
+  chart.stir = () => { movingUntil = nowMs() + MOTION_SETTLE_MS; };
+  chart.syncDpr = now => applyDpr((now ?? nowMs()) < movingUntil ? Math.max(1, fullDpr() / 2) : fullDpr());
+
   chart.resize = () => {
     const rect = canvas.getBoundingClientRect();
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    chart.dpr = dpr;
     chart.width = Math.max(1, Math.round(rect.width));
     chart.height = Math.max(1, Math.round(rect.height));
-    canvas.width = Math.round(rect.width * dpr);
-    canvas.height = Math.round(rect.height * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    liveDpr = 0;                       // the store is the wrong size whatever it was
+    applyDpr(fullDpr());
   };
 
   chart.toScreen = p => [
@@ -196,6 +266,7 @@ export function createChart(canvas, world, opts = {}){
     const cam = chart.camera;
     cam.pan[0] -= dxPx / cam.zoom;
     cam.pan[1] += dyPx / cam.zoom;
+    chart.stir();
     chart.settle();
   };
   /* Back to the middle of whatever is being followed, keeping the scale. */
@@ -220,6 +291,7 @@ export function createChart(canvas, world, opts = {}){
        one and the sky jumps back under the pointer. */
     cam.pan[0] += before[0] - after[0];
     cam.pan[1] += before[1] - after[1];
+    chart.stir();
     chart.settle();
   };
   /* Lock onto a body and pick a zoom that frames its reach. Focusing is also
@@ -243,6 +315,7 @@ export function createChart(canvas, world, opts = {}){
   chart.draw = view => draw(chart, view);
   chart.hitTest = (x, y) => hitTest(chart, x, y);
   chart.nearestPathPoint = (x, y, prediction, t) => nearestPathPoint(chart, x, y, prediction, t);
+  chart.nearestNode = (x, y, within) => nearestNode(chart, x, y, within);
   chart.nearestRailPoint = (x, y, t) => nearestRailPoint(chart, x, y, t);
   chart.dragNodeTime = (x, y, prediction, t, nodes, index) => dragNodeTime(chart, x, y, prediction, t, nodes, index);
   chart.resize();
@@ -269,6 +342,13 @@ function makeStars(seed){
 
 function draw(chart, view){
   const { ctx, world, camera } = chart;
+  /* Before anything is painted, and never after: the resolution this frame is
+     going into. See the note on chart.resize. */
+  chart.syncDpr(view.now);
+  /* What this ship has not been told about. The sky is the same either way —
+     the kernel never reads this — but a body nobody has mentioned draws no
+     dot, no rail, no reach and no label, and cannot be tapped. */
+  chart.hidden = view.hidden instanceof Set ? view.hidden : EMPTY_HIDDEN;
   const W = chart.width, H = chart.height;
   const t = view.t;
   chart.hits = { bodies: [], nodes: [], handles: [], pathSegs: [], rails: [], inset: chart.hits?.inset ?? null };
@@ -297,10 +377,18 @@ function draw(chart, view){
   drawOrbits(chart, pos, t);
   drawSoiRings(chart, pos);
   drawBodies(chart, view, pos, t);
-  if(view.prediction) drawPrediction(chart, view, pos);
-  drawShip(chart, view);
-  if(view.prediction && view.nodes) drawNodes(chart, view, pos);
-  if(view.tapMark) drawTapMark(chart, view, pos);
+  /* Where each leg of the road is pinned on the screen, worked out once and
+     handed to everything that puts a mark on the road. It used to be worked
+     out inside drawPrediction and nowhere else, so the road knew that a leg
+     in a moon's frame is drawn where the moon *will be* and the marks did
+     not: a burn written inside a moon's reach, and the ring showing which
+     bit of road you just tapped, were both drawn against where the moon is
+     now — fifteen hundred pixels off the line they belong to. */
+  const anchors = view.prediction ? pathAnchors(view.prediction, pos) : null;
+  if(view.prediction) drawPrediction(chart, view, pos, anchors);
+  drawShip(chart, view, pos);
+  if(view.prediction && view.nodes) drawNodes(chart, view, pos, anchors);
+  if(view.tapMark) drawTapMark(chart, view, pos, anchors);
   if(view.prediction) drawEncounterInset(chart, view);
   if(chart.showScale) drawScaleBar(chart);
 }
@@ -388,12 +476,15 @@ function ellipsePath(ctx, chart, centreAbs, el){
   ctx.ellipse(c[0], c[1], a * z, b * z, -rot, 0, Math.PI * 2);
 }
 
+const EMPTY_HIDDEN = new Set();
+
 function drawOrbits(chart, pos, t){
   const { ctx, world, camera } = chart;
   void t;
   const diag = Math.hypot(chart.width, chart.height);
   for(const b of world.bodies){
     if(b.parent == null) continue;
+    if(chart.hidden.has(b.id)) continue;
     const px = b.a * camera.zoom;
     // Too small to be a shape, or so large that all you see of it is a line
     // drawn across the whole chart. Neither is worth the ink.
@@ -447,12 +538,13 @@ export function railLead(chart, el, centre, mu, t){
   const length = 22;
   const arc = [];
   const N = 6;
+  let end = null;
   for(let i = 0; i <= N; i++){
     const along = clear + (length * i) / N;
-    const st = railState(el, mu, t + along / pxPerDay);
-    arc.push(chart.toScreen(add(centre, st.r)));
+    end = railState(el, mu, t + along / pxPerDay);
+    arc.push(chart.toScreen(add(centre, end.r)));
   }
-  const end = railState(el, mu, t + (clear + length) / pxPerDay);
+  // The last sample is the head: no second solve for the same moment.
   const angle = Math.atan2(-end.v[1], end.v[0]);    // screen y is down
   return { arc, head: arc[N], angle };
 }
@@ -461,6 +553,7 @@ function drawSoiRings(chart, pos){
   const { ctx, world, camera } = chart;
   for(const b of world.bodies){
     if(b.soi == null || b.mu <= 0) continue;
+    if(chart.hidden.has(b.id)) continue;
     const px = b.soi * camera.zoom;
     if(px < 10 || px > 6000) continue;
     const p = chart.toScreen(pos.get(b.id).r);
@@ -473,7 +566,10 @@ function drawSoiRings(chart, pos){
   }
 }
 
-function labelFor(b){ return b.name ?? b.id; }
+/* What to call a body on the chart. A thing the player has not found yet keeps
+ * its mark — the road still runs into it and the crosshair still says where —
+ * but not its name: that is the whole of what the instrument buys. */
+function labelFor(b, chart){ return chart?.hidden?.has(b.id) ? '???' : (b.name ?? b.id); }
 
 function drawBodies(chart, view, pos, t){
   const { ctx, world, camera } = chart;
@@ -481,6 +577,7 @@ function drawBodies(chart, view, pos, t){
   const placed = [];   // label boxes already used, for collision avoidance
   const bodies = [...world.bodies].sort((x, y) => (y.radius ?? 0) - (x.radius ?? 0));
   for(const b of bodies){
+    if(chart.hidden.has(b.id)) continue;
     const p = chart.toScreen(pos.get(b.id).r);
     if(p[0] < -60 || p[1] < -60 || p[0] > chart.width + 60 || p[1] > chart.height + 60) continue;
     const real = (b.radius ?? 0) * zoom;
@@ -488,23 +585,33 @@ function drawBodies(chart, view, pos, t){
     const rpx = Math.max(minPx, real);
     const colour = bodyColour(b);
 
-    // Skip a moon that would sit inside its parent's dot: it is not there yet.
-    if(b.parent && b.kind !== 'planet'){
+    /* Skip a moon that would sit inside its parent's dot: it is not there yet.
+       Never a star — the Dancer sits a thumb's width from a black hole nobody
+       can see, and at the zoom where the two land on the same pixel it is the
+       only thing marking the spot. */
+    if(b.parent && b.kind !== 'planet' && b.kind !== 'star'){
       const pp = chart.toScreen(pos.get(b.parent).r);
       const parent = world.get(b.parent);
       const prpx = Math.max(4.5, (parent.radius ?? 0) * zoom);
       if(dist(p, pp) < prpx + 2 && b.a * zoom < 6) continue;
     }
 
+    /* A star's halo, in the star's own colour. There are two now and the second
+       one is blue, so a gradient hard-coded to the Lamp's orange would have put
+       a sunset round it. */
     if(b.kind === 'star'){
       const glow = ctx.createRadialGradient(p[0], p[1], rpx, p[0], p[1], rpx * 5);
-      glow.addColorStop(0, PALETTE.starGlow); glow.addColorStop(1, 'rgba(245,154,46,0)');
+      glow.addColorStop(0, rgba(colour, 0.22)); glow.addColorStop(1, rgba(colour, 0));
       ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(p[0], p[1], rpx * 5, 0, Math.PI * 2); ctx.fill();
     }
-    // Grumm's atmosphere band, when it is big enough to mean something.
+    /* The band of air, when it is big enough to mean something. In the world's
+       own colour: four worlds have weather now and a violet haze round all of
+       them said Grumm about every one. A disc rather than a ring, because what
+       it marks is a place you can be *inside* — the one circle on this chart
+       that is an amount of something rather than a boundary. */
     if(b.atmo && b.atmo * zoom > 8){
       ctx.beginPath(); ctx.arc(p[0], p[1], b.atmo * zoom, 0, Math.PI * 2);
-      ctx.fillStyle = PALETTE.atmo; ctx.fill();
+      ctx.fillStyle = haze(bodyColour(b)); ctx.fill();
     }
     // Docking zone, when near enough to be about to use it.
     if(b.port && b.zoneRadius && view.nearPort === b.id){
@@ -540,6 +647,23 @@ function drawBodies(chart, view, pos, t){
        a low orbit visibly inside the ground it was clearing. The clip also
        keeps rings and sparks off the sky around the body. */
     let drew = false;
+    if(b.kind === 'hole'){
+      /* Nothing is the point. A disc of the background with a lensed ring
+         round it reads as a hole at every zoom, where a black dot on black
+         reads as nothing at all — and a hole is what it is. */
+      const r = Math.max(3.5, rpx);
+      ctx.beginPath(); ctx.arc(p[0], p[1], r, 0, Math.PI * 2);
+      ctx.fillStyle = PALETTE.space; ctx.fill();
+      const halo = ctx.createRadialGradient(p[0], p[1], r, p[0], p[1], r * 3.2);
+      halo.addColorStop(0, 'rgba(255,210,63,.80)');
+      halo.addColorStop(0.35, 'rgba(245,154,46,.30)');
+      halo.addColorStop(1, 'rgba(245,154,46,0)');
+      ctx.fillStyle = halo;
+      ctx.beginPath(); ctx.arc(p[0], p[1], r * 3.2, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,225,140,.95)'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.arc(p[0], p[1], r * 1.5, 0, Math.PI * 2); ctx.stroke();
+      drew = true;
+    }
     if(rpx >= 3.5){
       ctx.save();
       ctx.beginPath(); ctx.arc(p[0], p[1], rpx, 0, Math.PI * 2); ctx.clip();
@@ -554,10 +678,11 @@ function drawBodies(chart, view, pos, t){
       ctx.globalAlpha = alpha;
       ctx.beginPath(); ctx.arc(p[0], p[1], rpx, 0, Math.PI * 2);
       ctx.fillStyle = colour; ctx.fill();
-      if(b.kind === 'star'){ ctx.fillStyle = PALETTE.starCore; ctx.beginPath(); ctx.arc(p[0], p[1], rpx * 0.55, 0, Math.PI * 2); ctx.fill(); }
+      // And its core, which is the same colour with the colour burnt out of it.
+      if(b.kind === 'star'){ ctx.fillStyle = lighten(colour, 0.72); ctx.beginPath(); ctx.arc(p[0], p[1], rpx * 0.55, 0, Math.PI * 2); ctx.fill(); }
       ctx.globalAlpha = 1;
     }
-    if((b.kind === 'zone' || b.mu === 0) && !drew){
+    if((b.kind === 'zone' || b.mu === 0) && !drew && b.kind !== 'hole'){
       // Gravity-less things are hollow: the belt havens and the Maw.
       ctx.strokeStyle = colour; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(p[0], p[1], rpx + 3, 0, Math.PI * 2); ctx.stroke();
@@ -572,10 +697,10 @@ function drawBodies(chart, view, pos, t){
 
     // Labels: planets always; moons when their orbit is drawn; zones when
     // they are more than a dot. Never over another label.
-    const wantLabel = b.kind === 'star' || b.kind === 'planet' || camera.follow === b.id
+    const wantLabel = b.kind === 'star' || b.kind === 'planet' || b.kind === 'hole' || camera.follow === b.id
       || (b.parent && b.a * zoom > 28);
     if(!wantLabel) continue;
-    const text = labelFor(b);
+    const text = labelFor(b, chart);
     ctx.font = (camera.follow === b.id ? '600 ' : '') + '12px ui-sans-serif, system-ui, sans-serif';
     const w = ctx.measureText(text).width + 8;
     const cand = [
@@ -640,7 +765,38 @@ function crosshair(ctx, p, r){
  * anchored at that body's position now. Colour changes at each burn so the
  * plan reads as "this, then that"; a leg after a burn the tank cannot pay for
  * is drawn grey. */
-function drawPrediction(chart, view, pos){
+/* Where each leg is pinned on the screen. The first is pinned to its world
+ * where that world is now; every leg after it continues from where the last
+ * one stopped:
+ *
+ *     anchor(n) = anchor(n-1) + end(n-1) - start(n)
+ *
+ * which is the same point in space written in two frames, so the road joins
+ * up exactly at every change of reach. Pinning a moon's leg to where the moon
+ * is *now* instead draws the swing past Slate in one corner of the chart and
+ * the door into Slate's reach in another, because the encounter happens where
+ * Slate will be, not where it is.
+ */
+export function pathAnchors(pred, pos){
+  const anchors = [];
+  for(let i = 0; i < pred.segments.length; i++){
+    const seg = pred.segments[i];
+    if(i === 0){ anchors.push(pos.get(seg.body)?.r ?? [0, 0]); continue; }
+    const prev = pred.segments[i - 1];
+    anchors.push(prev.body === seg.body
+      ? anchors[i - 1]
+      : sub(add(anchors[i - 1], prev.r1), seg.r0));
+  }
+  return anchors;
+}
+
+/* The anchor a moment on the road is drawn against: the one belonging to the
+ * leg it falls on. `at` is anything locateOnPrediction returned. */
+function anchorAt(anchors, at, pos){
+  return anchors?.[at.segIndex] ?? pos.get(at.body)?.r ?? [0, 0];
+}
+
+function drawPrediction(chart, view, pos, anchorList){
   const { ctx } = chart;
   const pred = view.prediction;
   const burns = pred.events.filter(e => e.kind === 'burn');
@@ -653,26 +809,8 @@ function drawPrediction(chart, view, pos){
      your presses are moving is the bright, continuous one. */
   const editing = !!view.editing;
   const afterBurnAt = si => pred.segments.slice(0, si).some(sg => sg.reason === 'burn');
-  /* Where each leg is pinned on the screen. The first is pinned to its world
-     where that world is now; every leg after it continues from where the last
-     one stopped:
-     
-         anchor(n) = anchor(n-1) + end(n-1) - start(n)
-     
-     which is the same point in space written in two frames, so the road joins
-     up exactly at every change of reach. Pinning a moon's leg to where the
-     moon is *now* instead — which is what this did — drew the swing past Slate
-     in one corner of the chart and the door into Slate's reach in another,
-     because the encounter happens where Slate will be, not where it is. */
-  const anchors = [];
-  for(let i = 0; i < pred.segments.length; i++){
-    const seg = pred.segments[i];
-    if(i === 0){ anchors.push(pos.get(seg.body)?.r ?? [0, 0]); continue; }
-    const prev = pred.segments[i - 1];
-    anchors.push(prev.body === seg.body
-      ? anchors[i - 1]
-      : sub(add(anchors[i - 1], prev.r1), seg.r0));
-  }
+  // Worked out once for the whole frame; see pathAnchors.
+  const anchors = anchorList ?? pathAnchors(pred, pos);
   for(let si = 0; si < pred.segments.length; si++){
     const seg = pred.segments[si];
     const anchor = anchors[si];
@@ -709,10 +847,14 @@ function drawPrediction(chart, view, pos){
       ctx.stroke();
     }
   }
-  drawApses(chart, view, anchors, afterBurnAt);
+  /* One list of what the frame has already spoken for, filled in the order the
+     marks matter: the burn being worked on, then the apses and their numbers,
+     and the encounter crosshair last because it duplicates one of them. */
+  const taken = burnBoxes(chart, view, pos, anchors);
+  drawApses(chart, view, anchors, afterBurnAt, taken);
   drawCrossings(chart, view, anchors, afterBurnAt);
   drawRailCrossings(chart, view, anchors);
-  drawIntercept(chart, view, anchors, afterBurnAt);
+  drawIntercepts(chart, view, anchors, afterBurnAt, taken);
 }
 
 /* The marks on a road, each one a shape you can name without a legend:
@@ -722,21 +864,56 @@ function drawPrediction(chart, view, pos){
  *   crossing     a chevron in a ring — a door out of one world into another
  *   burn         a ring with the four directions round it (drawNodes)
  */
-function drawApses(chart, view, anchors, afterBurnAt){
+/* The boxes the burns take up on the screen this frame. A closed burn is its
+ * flame and the name beside it; an open one is the whole editor, which is most
+ * of a hand's width across. Nothing else is drawn inside one of these. */
+function burnBoxes(chart, view, pos, anchors){
+  const { ctx } = chart;
+  const out = [];
+  const nodes = view.nodes ?? [];
+  for(let i = 0; i < nodes.length; i++){
+    const where = view.nodePositions?.[i];
+    if(!where || !pos.has(where.body)) continue;
+    const p = chart.toScreen(add(anchorAt(anchors, where, pos), where.r));
+    if(view.selectedNode === i){
+      // The arrows reach HANDLE_OFFSET out and the scrap cross further still.
+      out.push([p[0] - 80, p[1] - 80, p[0] + 80, p[1] + 80]);
+    }else{
+      ctx.font = '600 12px ui-sans-serif, system-ui, sans-serif';
+      out.push([p[0] - 11, p[1] - 15, p[0] + 15 + ctx.measureText(`Burn ${i + 1}`).width, p[1] + 12]);
+    }
+  }
+  return out;
+}
+const boxesOverlap = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+
+function drawApses(chart, view, anchors, afterBurnAt, takenBoxes){
   const { ctx } = chart;
   if(!view.apses) return;
+  /* A low point and a burn land on the same stretch of road constantly — the
+     cheapest place to burn *is* the low point — and two marks and two labels
+     on one pixel is a pile. The burn is the one being worked on, so the apsis
+     is the one that stands down.
+
+     Apses pile up on each other too: a burn splits the road in two and both
+     halves have a high point, which sit on the same pixel whenever the burn is
+     a small one. Whatever is drawn first keeps its place — the legs come in
+     the order they are flown, so that is the road you are on now, and the
+     plan's mark appears as soon as the burn is big enough to move it. */
+  const taken = takenBoxes;
   ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
   for(const a of view.apses){
     const seg = view.prediction.segments[a.segIndex];
     const anchor = anchors[a.segIndex];
     if(!seg || !anchor) continue;
-    /* The leg the intercept is on already has a labelled crosshair at its low
-       point; a second mark and a second number on the same pixel is a pile,
-       not a chart. */
-    if(a.segIndex === view.prediction.intercept?.segIndex) continue;
     const afterBurn = afterBurnAt(a.segIndex);
     const p = chart.toScreen(add(anchor, a.r));
     if(p[0] < -60 || p[1] < -30 || p[0] > chart.width + 60 || p[1] > chart.height + 30) continue;
+    // The mark is its disc and the words beside it; either one clashing is a clash.
+    const label = a.label ?? '';
+    const box = [p[0] - 6, p[1] - 7, p[0] + 9 + (label ? ctx.measureText(label).width : 0), p[1] + 8];
+    if(taken.some(b => boxesOverlap(box, b))) continue;
+    taken.push(box);
     const colour = afterBurn ? PALETTE.pathPlan : PALETTE.apsis;
     ctx.lineWidth = 2;
     ctx.strokeStyle = ctx.fillStyle = colour;
@@ -771,7 +948,7 @@ function drawCrossings(chart, view, anchors, afterBurnAt){
     const to = c.to ? world.get(c.to) : null;
     if(!to) continue;
     ctx.fillStyle = PALETTE.text;
-    ctx.fillText(`${c.kind === 'exit' ? 'out to' : 'into'} ${labelFor(to)}`, p[0] + 12, p[1] + 4);
+    ctx.fillText(`${c.kind === 'exit' ? 'out to' : 'into'} ${labelFor(to, chart)}`, p[0] + 12, p[1] + 4);
   }
 }
 
@@ -830,25 +1007,39 @@ function drawRailCrossings(chart, view, anchors){
     const b = world.get(c.body);
     if(b && apart > 18 && !out(q)){
       ctx.fillStyle = PALETTE.textDim;
-      ctx.fillText(labelFor(b), q[0] + 9, q[1] + 4);
+      ctx.fillText(labelFor(b, chart), q[0] + 9, q[1] + 4);
     }
   }
 }
 
-/* The intercept: the nearest the road comes to the world it has just entered.
- * This is the question a pilot is actually asking while they push a burn
- * around — not "does this reach Slate" but "how close, and how fast" — so it is
- * marked wherever the chart is zoomed, even when the whole encounter is a few
- * pixels wide, and it carries its own numbers. */
-function drawIntercept(chart, view, anchors, afterBurnAt){
+/* The intercepts: the nearest the road comes to each world it passes, once
+ * per world and at the first pass. This is the question a pilot is actually
+ * asking while they push a burn around — not "does this reach Slate" but "how
+ * close, and how fast" — so they are marked wherever the chart is zoomed, even
+ * when the whole encounter is a few pixels wide.
+ *
+ * It used to draw exactly one, for the world whose reach the road crossed
+ * into. A road out of Tassel to the Belt goes past both of Tassel's moons and
+ * then meets a haven that has no reach at all, and none of that was marked. */
+function drawIntercepts(chart, view, anchors, afterBurnAt, taken){
+  for(const ic of view.prediction?.intercepts ?? []) drawIntercept(chart, view, anchors, afterBurnAt, ic, taken);
+}
+function drawIntercept(chart, view, anchors, afterBurnAt, ic, taken){
   const { ctx } = chart;
-  const ic = view.prediction?.intercept;
   if(!ic) return;
   const seg = view.prediction.segments[ic.segIndex];
   const anchor = anchors[ic.segIndex];
   if(!seg || !anchor) return;
   const p = chart.toScreen(add(anchor, ic.r));
   if(p[0] < -80 || p[1] < -40 || p[0] > chart.width + 80 || p[1] > chart.height + 40) return;
+  /* An encounter is the low point of the leg that falls into the world, so the
+     apsis mark is already on this pixel — and that one carries the altitude,
+     which is the number a pilot lining up an aerobrake is reading. The
+     crosshair stands down rather than covering it, and is left for the case it
+     is the only mark there: a leg cut short by a burn before it ever reaches
+     its low point. */
+  const box = [p[0] - 10, p[1] - 10, p[0] + 10, p[1] + 10];
+  if((taken ?? []).some(b => boxesOverlap(box, b))) return;
   const colour = ic.grazes ? PALETTE.crash : afterBurnAt(ic.segIndex) ? PALETTE.pathPlan : PALETTE.apsis;
   ctx.strokeStyle = colour; ctx.fillStyle = colour; ctx.lineWidth = 1.5;
   // Crosshair on a ring, which is not a shape any other mark on this chart uses.
@@ -864,7 +1055,34 @@ function drawIntercept(chart, view, anchors, afterBurnAt){
      numbers live in the encounter window instead, where there is room. */
 }
 
-function drawShip(chart, view){
+/* The same short lead-and-arrowhead every world wears on its rail, on the
+ * ship's own path. The nose already points the right way, but a nose is a
+ * shape and the arrow is a mark: at the zooms where a parking orbit is a
+ * circle of grey the two read very differently, and "which way am I going
+ * round" is the question the whole game is asked in. Built from the ship's
+ * own state rather than from the drawn road, so it is the same arithmetic the
+ * rails use and it exists before any road has been solved. */
+function shipLead(chart, view, pos){
+  const zoom = chart.camera.zoom;
+  if(!view.shipAbs || view.docked) return null;
+  const parent = view.shipBody && pos.has(view.shipBody) ? pos.get(view.shipBody) : null;
+  const mu = view.shipBody ? (chart.world.get(view.shipBody)?.mu ?? 0) : 0;
+  if(!(mu > 0) || !parent) return null;
+  const rLocal = sub(view.shipAbs.r, parent.r);
+  const vLocal = view.shipLocalV ?? sub(view.shipAbs.v, parent.v);
+  const pxPerDay = norm(vLocal) * zoom;
+  if(!(pxPerDay > 0)) return null;
+  const clear = 17, length = 20, N = 6;   // start outside the ship's own halo
+  const arc = [];
+  for(let i = 0; i <= N; i++){
+    const st = propagate(mu, rLocal, vLocal, (clear + (length * i) / N) / pxPerDay);
+    arc.push(chart.toScreen(add(parent.r, st.r)));
+  }
+  const end = propagate(mu, rLocal, vLocal, (clear + length) / pxPerDay);
+  return { arc, head: arc[N], angle: Math.atan2(-end.v[1], end.v[0]) };
+}
+
+function drawShip(chart, view, pos){
   const { ctx } = chart;
   if(!view.shipAbs) return;
   const p = chart.toScreen(view.shipAbs.r);
@@ -893,6 +1111,21 @@ function drawShip(chart, view){
     ctx.strokeStyle = PALETTE.zone; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(p[0], p[1], 12, 0, Math.PI * 2); ctx.stroke();
   }
+  const lead = pos ? shipLead(chart, view, pos) : null;
+  if(lead){
+    ctx.strokeStyle = PALETTE.ship; ctx.lineWidth = 1.5;
+    ctx.lineJoin = ctx.lineCap = 'round';
+    ctx.beginPath();
+    lead.arc.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]));
+    ctx.stroke();
+    const [hx, hy] = lead.head, a = lead.angle;
+    ctx.beginPath();
+    ctx.moveTo(hx - 5 * Math.cos(a - 0.6), hy - 5 * Math.sin(a - 0.6));
+    ctx.lineTo(hx, hy);
+    ctx.lineTo(hx - 5 * Math.cos(a + 0.6), hy - 5 * Math.sin(a + 0.6));
+    ctx.stroke();
+    ctx.lineJoin = ctx.lineCap = 'butt';
+  }
 }
 
 /* The point that was just tapped, while the card asking what to do with it
@@ -902,11 +1135,11 @@ function drawShip(chart, view){
  * before they pressed anything on it. So: a ring on the road at that moment,
  * breathing so it is not mistaken for a mark already written down, and it
  * goes when the card does. */
-function drawTapMark(chart, view, pos){
+function drawTapMark(chart, view, pos, anchors){
   const { ctx } = chart;
   const m = view.tapMark;
   if(!m || !pos.has(m.body)) return;
-  const p = chart.toScreen(add(pos.get(m.body).r, m.r));
+  const p = chart.toScreen(add(anchorAt(anchors, m, pos), m.r));
   const breath = chart.reducedMotion ? 0 : Math.sin((view.now ?? 0) / 180);
   ctx.strokeStyle = PALETTE.pathNow; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.arc(p[0], p[1], 9 + 2 * breath, 0, Math.PI * 2); ctx.stroke();
@@ -914,34 +1147,77 @@ function drawTapMark(chart, view, pos){
   ctx.beginPath(); ctx.arc(p[0], p[1], 3, 0, Math.PI * 2); ctx.fill();
 }
 
-/* Maneuver nodes. A ring on the road at the moment the burn fires; when it is
- * open, four arrows around it and a cross beside it. That is the whole
- * editor — no panel, no card over the sky, nothing to cover a phone. The
- * arrows are buttons: one tap is one press, and holding one repeats. They are
- * drawn in pixels, so they are the same size to hit at any zoom, and their
- * hit radius is bigger than the glyph.
+/* Maneuver nodes. A flame on the road at the moment the burn fires — the
+ * engine lit, which is what a burn is — named "Burn 1", "Burn 2" while it is
+ * closed; when it is open, four arrows around it and a cross beside it. That
+ * is the whole editor — no panel, no card over the sky, nothing to cover a
+ * phone. The arrows are buttons: one tap is one press, and holding one
+ * repeats. They are drawn in pixels, so they are the same size to hit at any
+ * zoom, each sits on a disc so it reads as a thing to press, and the hit
+ * radius is bigger than the glyph.
  */
-const HANDLE_OFFSET = 34;
-function drawNodes(chart, view, pos){
+const HANDLE_OFFSET = 54;
+const NODE_HIT = 26;
+/* How near a tap on the road or a rail has to land to a burn to be taken as
+ * a tap on the burn: a finger going for the flame that lands on the line it
+ * sits on should open the burn, not plan another one on top of it. */
+export const NODE_SNAP = 44;
+
+/* A flame, tip up, drawn about (0, 0) at scale `s`. */
+function flamePath(ctx, s){
+  ctx.beginPath();
+  ctx.moveTo(0, -13 * s);
+  ctx.bezierCurveTo(4 * s, -8 * s, 9 * s, -3 * s, 8 * s, 4 * s);
+  ctx.bezierCurveTo(7 * s, 10 * s, -7 * s, 10 * s, -8 * s, 4 * s);
+  ctx.bezierCurveTo(-9 * s, -3 * s, -4 * s, -8 * s, 0, -13 * s);
+  ctx.closePath();
+}
+function drawFlame(ctx, x, y, s, selected){
+  ctx.save(); ctx.translate(x, y);
+  ctx.fillStyle = PALETTE.flame;
+  flamePath(ctx, s); ctx.fill();
+  ctx.strokeStyle = selected ? '#fff' : PALETTE.node; ctx.lineWidth = selected ? 2 : 1.25;
+  ctx.stroke();
+  // The hot core.
+  ctx.fillStyle = PALETTE.node;
+  ctx.translate(0, 3 * s);
+  flamePath(ctx, s * 0.5); ctx.fill();
+  ctx.restore();
+}
+
+function drawNodes(chart, view, pos, anchors){
   const { ctx } = chart;
   const nodes = view.nodes;
   for(let i = 0; i < nodes.length; i++){
     const n = nodes[i];
     const where = view.nodePositions?.[i];
     if(!where || !pos.has(where.body)) continue;
-    const anchor = pos.get(where.body).r;
-    const p = chart.toScreen(add(anchor, where.r));
+    const p = chart.toScreen(add(anchorAt(anchors, where, pos), where.r));
     const selected = view.selectedNode === i;
-    ctx.strokeStyle = PALETTE.node; ctx.lineWidth = selected ? 2.5 : 1.5;
-    ctx.beginPath(); ctx.arc(p[0], p[1], selected ? 12 : 8, 0, Math.PI * 2); ctx.stroke();
-    ctx.fillStyle = PALETTE.node;
-    ctx.beginPath(); ctx.arc(p[0], p[1], 3, 0, Math.PI * 2); ctx.fill();
-    chart.hits.nodes.push({ index: i, x: p[0], y: p[1], r: 18 });
-    if(!selected) continue;
+    if(selected){
+      ctx.strokeStyle = PALETTE.node; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(p[0], p[1], 20, 0, Math.PI * 2); ctx.stroke();
+    }
+    drawFlame(ctx, p[0], p[1], selected ? 1.25 : 1, selected);
+    chart.hits.nodes.push({ index: i, x: p[0], y: p[1], r: NODE_HIT });
+    if(!selected){
+      // Its name, so two burns on one road can be told apart and talked about.
+      ctx.font = '600 12px ui-sans-serif, system-ui, sans-serif';
+      ctx.fillStyle = PALETTE.node;
+      ctx.fillText(`Burn ${i + 1}`, p[0] + 13, p[1] + 5);
+      continue;
+    }
 
-    const vdir = unit(where.v);
-    const pro = [vdir[0], -vdir[1]];            // screen y is down
-    const rad = unit(where.r); const radS = [rad[0], -rad[1]];
+    /* The same frame the burn is actually flown in — forward along the
+       velocity, out square across it — rather than forward along the velocity
+       and out along the position vector, which is where these arrows used to
+       point. Those two agree on a circle and nowhere else, so the legend drew
+       a right angle at Tassel's docking orbit and an obviously wrong one the
+       moment a ship arrived on anything eccentric. A legend that disagrees
+       with the buttons it is a legend for is worse than no legend. */
+    const { pro: proW, out: outW } = burnFrame(where.r, where.v);
+    const pro = [proW[0], -proW[1]];            // screen y is down
+    const radS = [outW[0], -outW[1]];
     const arrows = [
       ['pro',   pro,                   PALETTE.prograde,   n.prograde],
       ['retro', [-pro[0], -pro[1]],    PALETTE.retrograde, -n.prograde],
@@ -951,33 +1227,42 @@ function drawNodes(chart, view, pos){
     for(const [axis, d, colour, amount] of arrows){
       const h = [p[0] + d[0] * HANDLE_OFFSET, p[1] + d[1] * HANDLE_OFFSET];
       const lit = amount > 1e-12;
-      ctx.strokeStyle = colour; ctx.lineWidth = lit ? 2 : 1.25;
-      ctx.globalAlpha = lit ? 1 : 0.55;
-      ctx.beginPath(); ctx.moveTo(p[0] + d[0] * 16, p[1] + d[1] * 16); ctx.lineTo(h[0], h[1]); ctx.stroke();
-      ctx.fillStyle = colour;
+      ctx.globalAlpha = lit ? 1 : 0.7;
+      // The stem, from the ring out to the button.
+      ctx.strokeStyle = colour; ctx.lineWidth = lit ? 3 : 2;
+      ctx.beginPath(); ctx.moveTo(p[0] + d[0] * 24, p[1] + d[1] * 24); ctx.lineTo(p[0] + d[0] * (HANDLE_OFFSET - 18), p[1] + d[1] * (HANDLE_OFFSET - 18)); ctx.stroke();
+      // The button: a disc, brighter when the axis is in use, with the arrow on it.
+      ctx.fillStyle = colour; ctx.globalAlpha = lit ? 0.35 : 0.18;
+      ctx.beginPath(); ctx.arc(h[0], h[1], 19, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = lit ? 1 : 0.85;
+      ctx.strokeStyle = colour; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(h[0], h[1], 19, 0, Math.PI * 2); ctx.stroke();
       ctx.save(); ctx.translate(h[0], h[1]); ctx.rotate(Math.atan2(d[1], d[0]));
-      ctx.beginPath(); ctx.moveTo(7, 0); ctx.lineTo(-4, 5.5); ctx.lineTo(-4, -5.5); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(11, 0); ctx.lineTo(-7, 9); ctx.lineTo(-3, 0); ctx.lineTo(-7, -9); ctx.closePath(); ctx.fill();
       ctx.restore();
       ctx.globalAlpha = 1;
-      chart.hits.handles.push({ index: i, axis, x: h[0], y: h[1], r: 22 });
+      chart.hits.handles.push({ index: i, axis, x: h[0], y: h[1], r: 30 });
     }
 
-    /* Scrap it: a cross beside the ring, set far enough out that a thumb
-       going for the ring cannot catch it. */
-    const x = [p[0] + 40, p[1] - 40];
-    ctx.strokeStyle = PALETTE.crash; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(x[0], x[1], 9, 0, Math.PI * 2); ctx.stroke();
+    /* Scrap it: a cross beside the flame, set far enough out that a thumb
+       going for the flame or an arrow cannot catch it. */
+    const x = [p[0] + 58, p[1] - 58];
+    ctx.fillStyle = PALETTE.crash; ctx.globalAlpha = 0.18;
+    ctx.beginPath(); ctx.arc(x[0], x[1], 14, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = PALETTE.crash; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x[0], x[1], 14, 0, Math.PI * 2); ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(x[0] - 3.5, x[1] - 3.5); ctx.lineTo(x[0] + 3.5, x[1] + 3.5);
-    ctx.moveTo(x[0] + 3.5, x[1] - 3.5); ctx.lineTo(x[0] - 3.5, x[1] + 3.5);
+    ctx.moveTo(x[0] - 5, x[1] - 5); ctx.lineTo(x[0] + 5, x[1] + 5);
+    ctx.moveTo(x[0] + 5, x[1] - 5); ctx.lineTo(x[0] - 5, x[1] + 5);
     ctx.stroke();
-    chart.hits.handles.push({ index: i, axis: 'delete', x: x[0], y: x[1], r: 18 });
+    chart.hits.handles.push({ index: i, axis: 'delete', x: x[0], y: x[1], r: 24 });
 
     // What it costs, in a word, where the eye already is.
     if(view.nodeLabel){
       ctx.font = '600 12px ui-sans-serif, system-ui, sans-serif';
       ctx.fillStyle = PALETTE.node;
-      ctx.fillText(view.nodeLabel, p[0] + 16, p[1] + 26);
+      ctx.fillText(`Burn ${i + 1} · ${view.nodeLabel}`, p[0] + 24, p[1] + HANDLE_OFFSET + 34);
     }
   }
 }
@@ -1072,7 +1357,7 @@ function drawEncounterInset(chart, view){
   // Its name at the top, its numbers along the bottom.
   ctx.fillStyle = PALETTE.text;
   ctx.font = '600 11px ui-sans-serif, system-ui, sans-serif';
-  ctx.fillText(labelFor(b), x0 + 9, y0 + 16);
+  ctx.fillText(labelFor(b, chart), x0 + 9, y0 + 16);
   /* The numbers along the bottom, wrapped rather than clipped: "in the
      mouth" is the half of that line a pilot most wants to read and it was
      the half falling off the edge. */
@@ -1149,6 +1434,18 @@ function hitTest(chart, x, y){
   }
   if(best) return best;
   return null;
+}
+
+/* The nearest burn to a screen point, if one is within `within` pixels. A
+ * tap that misses the flame but lands on the road or rail it sits on means
+ * the flame, not a new burn on top of it. */
+function nearestNode(chart, x, y, within = NODE_SNAP){
+  let best = null;
+  for(const n of chart.hits.nodes){
+    const d = Math.hypot(n.x - x, n.y - y);
+    if(d <= within && (!best || d < best.d)) best = { index: n.index, d };
+  }
+  return best;
 }
 
 /* Nearest point on the drawn path to a screen point, with the time it stands
@@ -1305,21 +1602,47 @@ export function railCrossings(world, prediction, tNow, opts = {}){
     for(const b of world.bodies){
       if(b.parent !== seg.body || !(b.a > 0)) continue;
       const gap = r => norm(r) - railRadiusAt(b, Math.atan2(r[1], r[0]));
-      let prevGap = gap(pts[0]);
+      const at = t => gap(propagate(mu, seg.r0, seg.v0, t - seg.t0).r);
+      const gaps = pts.map(gap);
       for(let i = 1; i < pts.length; i++){
-        const g = gap(pts[i]);
-        const crossed = (prevGap < 0) !== (g < 0);
-        prevGap = g;
-        if(!crossed) continue;
-        const at = t => gap(propagate(mu, seg.r0, seg.v0, t - seg.t0).r);
-        let lo = times[i - 1], hi = times[i];
-        const loInside = at(lo) < 0;
-        for(let k = 0; k < 40; k++){
-          const mid = (lo + hi) / 2;
-          if((at(mid) < 0) === loInside) lo = mid; else hi = mid;
+        const crossed = (gaps[i - 1] < 0) !== (gaps[i] < 0);
+        /* A transfer that *touches* a rail rather than cutting it is the whole
+           point of a Hohmann: the apsis grazes the orbit being aimed at and
+           turns back. There is no change of sign to find at a tangent, so a
+           genuine local minimum of the gap counts too — but only when the road
+           really does reach the rail, within a millionth of its radius. Looser
+           than that and a road merely heading the right way gets a mark, which
+           is how a pass a hundred thousand kilometres short of Cinder's orbit
+           came to be labelled as being on it. */
+        const dip = !crossed && i + 1 < pts.length
+          && Math.abs(gaps[i]) < Math.abs(gaps[i - 1]) && Math.abs(gaps[i]) <= Math.abs(gaps[i + 1]);
+        if(!crossed && !dip) continue;
+        let t;
+        if(crossed){
+          let lo = times[i - 1], hi = times[i];
+          const loInside = at(lo) < 0;
+          for(let k = 0; k < 40; k++){
+            const mid = (lo + hi) / 2;
+            if((at(mid) < 0) === loInside) lo = mid; else hi = mid;
+          }
+          t = (lo + hi) / 2;
+        }else{
+          // No sign to chase: close in on the smallest gap there is.
+          let lo = times[i - 1], hi = times[i + 1];
+          const phi = (Math.sqrt(5) - 1) / 2;
+          let x = hi - phi * (hi - lo), y = lo + phi * (hi - lo);
+          let fx = Math.abs(at(x)), fy = Math.abs(at(y));
+          for(let k = 0; k < 60 && hi - lo > 1e-9; k++){
+            if(fx < fy){ hi = y; y = x; fy = fx; x = hi - phi * (hi - lo); fx = Math.abs(at(x)); }
+            else{ lo = x; x = y; fx = fy; y = lo + phi * (hi - lo); fy = Math.abs(at(y)); }
+          }
+          t = (lo + hi) / 2;
+          const here = propagate(mu, seg.r0, seg.v0, t - seg.t0).r;
+          if(Math.abs(gap(here)) > railRadiusAt(b, Math.atan2(here[1], here[0])) * 1e-6) continue;
         }
-        const t = (lo + hi) / 2;
         if(t <= tNow + minLead) continue;
+        // One mark per touch, however many samples noticed it.
+        if(out.some(c => c.body === b.id && Math.abs(c.t - t) < 1e-3)) continue;
         out.push({
           segIndex: si, body: b.id, t,
           r: propagate(mu, seg.r0, seg.v0, t - seg.t0).r,
@@ -1337,28 +1660,19 @@ export function railCrossings(world, prediction, tNow, opts = {}){
 
 /* Where a node sits on the plan: the ship's state at the node's time in the
  * frame it will be in. Computed from the prediction so it agrees with the path. */
+/* `segIndex` comes back with it, because which leg a moment falls on is what
+ * decides where on the screen it is drawn — a leg in a moon's frame is pinned
+ * to where the moon will be, not to where it is. See pathAnchors. */
 export function locateOnPrediction(world, prediction, t){
-  for(const seg of prediction.segments){
+  for(let i = 0; i < prediction.segments.length; i++){
+    const seg = prediction.segments[i];
     if(t >= seg.t0 - 1e-9 && t <= seg.t1 + 1e-9){
       const mu = world.get(seg.body).mu;
       const s = propagate(mu, seg.r0, seg.v0, t - seg.t0);
-      return { body: seg.body, r: s.r, v: s.v };
+      return { body: seg.body, r: s.r, v: s.v, segIndex: i };
     }
   }
   return null;
-}
-
-/* The target's ghost at closest approach, expressed in the frame of the leg
- * it happens on, ready for the chart. */
-export function approachForChart(world, prediction, ca, targetId){
-  if(!ca) return null;
-  const seg = prediction.segments.find(s => ca.t >= s.t0 - 1e-9 && ca.t <= s.t1 + 1e-9);
-  if(!seg) return null;
-  const mu = world.get(seg.body).mu;
-  const s = propagate(mu, seg.r0, seg.v0, ca.t - seg.t0);
-  const segAbs = absState(world, seg.body, ca.t).r;
-  const tgAbs = absState(world, targetId, ca.t).r;
-  return { segBody: seg.body, shipLocal: s.r, targetLocal: sub(tgAbs, segAbs), t: ca.t, distance: ca.distance, relSpeed: ca.relSpeed };
 }
 
 export { railState, norm, sub, scale, perp };

@@ -88,6 +88,10 @@
   #where b{ color:var(--dim); font-weight:500; }
   #dockhint{ color:var(--mint); font-size:.85rem; }
   #dockhint.far{ color:var(--dim); }
+  /* Inside the mouth and only the speed is wrong. That is not "nowhere near
+     it", which is what the dim grey says; it is the one thing the pilot can
+     act on, and it wants to be read. */
+  #dockhint.near{ color:var(--gold); }
 
   /* ---- Warp controls: bottom left ------------------------------------ */
   /* The ×1 clock has no controls but one: a hold. Time is skipped by pointing
@@ -131,6 +135,56 @@
      back is the one that lights up, so "where am I" and "get me back" are the
      same place on the screen. */
   #v-fit.off{ color:var(--gold-ink); border-color:var(--gold-2); }
+  #v-far[hidden]{ display:none; }
+  #v-far.off{ opacity:.55; }
+  /* A job finished and waiting to be collected. The log lives behind the ship
+     button, so the ship button is what says so — the same slow breath the
+     mooring ring uses, because it is the same kind of news: there is something
+     here worth pressing. It stops under the pointer, and it stops altogether
+     once the log is open, having said what it had to say. */
+  #m-ship.owed{ color:var(--gold-ink); border-color:var(--gold-2); animation:owedflash 1.8s ease-in-out infinite; }
+  @keyframes owedflash{
+    0%, 100%{ box-shadow:0 0 0 0 transparent; }
+    50%{ box-shadow:0 0 12px -1px var(--gold-2); }
+  }
+  #m-ship.owed:hover, #m-ship.owed:focus-visible{ animation:none; box-shadow:0 0 12px -1px var(--gold-2); }
+
+  /* ---- Settings: a gear at the end of the strip ----------------------- */
+  /* The one control that is about the game rather than about the ship or the
+     sky, so it sits apart from both, at the far end of the top strip where a
+     gear is the first place anybody looks for one. */
+  #m-gear{
+    width:34px; height:34px; border-radius:9px; border:1px solid var(--line);
+    background:var(--glass); color:var(--dim); cursor:pointer; backdrop-filter:blur(8px);
+    display:flex; align-items:center; justify-content:center; padding:0; line-height:1;
+    margin-left:auto; flex:0 0 auto;
+  }
+  #m-gear svg{
+    display:block; width:19px; height:19px;
+    fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;
+  }
+  #m-gear:hover{ color:var(--ink); border-color:var(--line-2); }
+  #m-gear[aria-expanded="true"]{ color:var(--gold-ink); border-color:var(--gold-2); }
+  /* Fixed and placed when it opens, rather than hung off the button: the HUD
+     is a stacking context underneath the panel, so a menu drawn inside it
+     would open behind the panel it has to cover. */
+  /* Built like the side panel rather than like a dropdown, because it is one:
+     a tab row and a body under it. There is one tab today and room for the
+     next without moving anything. */
+  #gearmenu{
+    position:fixed; z-index:9; width:230px; overflow:hidden;
+    background:var(--glass-2); border:1px solid var(--line); border-radius:var(--radius);
+    backdrop-filter:blur(10px); display:flex; flex-direction:column;
+    box-shadow:0 10px 30px -12px rgba(0,0,0,.7);
+  }
+  #gearmenu[hidden]{ display:none; }
+  #gear-tabs{ display:flex; gap:2px; padding:.4rem .4rem 0; border-bottom:1px solid var(--line); }
+  /* Tabs start at the left and are as wide as their word. The panel's own tabs
+     share the row out between them, which for a row of one means a lone tab
+     stretched across the whole menu with its label stranded in the middle. */
+  #gear-tabs .tab{ flex:0 0 auto; padding:.45rem .7rem; }
+  #gear-body{ padding:.55rem; display:flex; flex-direction:column; gap:.35rem; }
+  #gear-body .btn{ width:100%; text-align:left; }
 
   /* ---- The panel: right column on wide screens, a sheet on narrow ---- */
   #panel{
@@ -212,6 +266,29 @@
   .crew .who b{ display:block; }
   .crew .who small{ display:block; color:var(--faint); }
   .crew .who p{ margin:.25rem 0 0; font-size:.84rem; }
+  /* Pressing a face. The crew menu is the only place everybody aboard is on
+     screen at once, so it is where they get to say something: a line about
+     wherever the ship is tied up, and whoever answers it. The portrait is the
+     button — there is nothing else it could sensibly be — so it keeps the
+     picture and loses everything a button would otherwise bring with it. */
+  .crew .face{
+    flex:0 0 64px; padding:0; border:0; background:none; line-height:0;
+    border-radius:10px; cursor:pointer;
+  }
+  .crew .face img{ display:block; transition:border-color .15s ease; }
+  .crew .face:hover img{ border-color:var(--gold-2); }
+  .crew .face:focus-visible{ outline:2px solid var(--gold-2); outline-offset:2px; }
+  .talk{ margin:.45rem 0 0; display:flex; flex-direction:column; gap:.35rem; }
+  .talk p{
+    margin:0; font-size:.86rem; font-style:italic; color:var(--ink);
+    border-left:2px solid var(--gold-2); padding-left:.6rem;
+  }
+  /* Who is speaking, above what they said, because an exchange is two or three
+     people and a wall of italics is nobody. */
+  .talk p small{
+    display:block; font-style:normal; color:var(--faint);
+    font-size:.68rem; letter-spacing:.1em; text-transform:uppercase;
+  }
   /* The Astrolabe's rows: a world, what it costs today, and one word for
      whether today is the day. */
   .win{ display:flex; align-items:baseline; gap:.6rem; border-top:1px solid var(--line); padding-top:.4rem; margin-top:.4rem; }
@@ -235,42 +312,6 @@
   ol.steps li.ok::before{ content:'✓'; color:var(--leaf-soft, var(--mint)); }
   ol.steps li.now{ color:var(--ink); font-weight:600; }
   ol.steps li.now::before{ content:'▸'; color:var(--gold-2); }
-  .node.sel{ border-color:var(--gold-2); }
-  .node .val{ font-variant-numeric:tabular-nums; text-align:right; min-width:72px; }
-  .step{ display:flex; gap:2px; }
-  .step .btn{ min-width:34px; }
-
-  /* ---- The burn pad: four buttons, two axes ---------------------------- */
-  .pad{ margin-top:.5rem; }
-  .padgrid{
-    display:grid; grid-template-columns:1fr 1fr 1fr; grid-template-rows:auto auto auto;
-    gap:.3rem; align-items:stretch; justify-items:stretch; max-width:340px; margin:0 auto;
-  }
-  .padcell.up{ grid-area:1 / 2; } .padcell.left{ grid-area:2 / 1; }
-  .padcell.mid{ grid-area:2 / 2; } .padcell.right{ grid-area:2 / 3; }
-  .padcell.down{ grid-area:3 / 2; }
-  .padcell.mid{
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    text-align:center; border:1px dashed var(--line-2); border-radius:12px; padding:.2rem;
-  }
-  .padcell.mid b{ font-variant-numeric:tabular-nums; font-size:.95rem; }
-  .padcell.mid small{ color:var(--faint); font-size:.66rem; line-height:1.2; }
-  .pv{
-    width:100%; min-height:64px; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    gap:.1rem; border-radius:12px; border:1px solid var(--line-2); background:var(--gv-sunk); color:var(--ink);
-    cursor:pointer; font:inherit; font-size:.72rem; letter-spacing:.02em;
-    touch-action:manipulation; -webkit-user-select:none; user-select:none;
-  }
-  .pv svg{ width:30px; height:30px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
-  .pv.pro{ color:var(--leaf); border-color:color-mix(in srgb, var(--leaf) 45%, transparent); }
-  .pv.retro{ color:var(--gold-2); border-color:color-mix(in srgb, var(--gold-2) 45%, transparent); }
-  .pv.out, .pv.in{ color:var(--sky); border-color:color-mix(in srgb, var(--sky) 45%, transparent); }
-  .pv:hover{ border-color:currentColor; background:color-mix(in srgb, currentColor 10%, var(--gv-sunk)); }
-  .pv:active{ transform:translateY(1px); background:color-mix(in srgb, currentColor 18%, var(--gv-sunk)); }
-  .pv span{ color:var(--dim); }
-  .padout{ display:grid; grid-template-columns:auto 1fr; gap:.1rem .8rem; margin:.5rem 0 .4rem; font-variant-numeric:tabular-nums; }
-  .padout dt{ color:var(--dim); font-size:.78rem; } .padout dd{ margin:0; text-align:right; }
-  @media (prefers-reduced-motion: reduce){ .pv:active{ transform:none; } }
   .empty{ color:var(--faint); font-style:italic; }
   select{ font:inherit; background:var(--gv-sunk); color:var(--ink); border:1px solid var(--line-2); border-radius:8px; padding:.35rem .5rem; width:100%; }
 
@@ -324,176 +365,6 @@
   #dock-go:hover{ background:var(--gold); color:#1a1310; }
   #dock-go[hidden], #m-dock[hidden]{ display:none; }
 
-  /* ---- The panel: right column on wide screens, a sheet on narrow ---- */
-  #panel{
-    position:fixed; top:64px; right:.8rem; bottom:64px; width:min(var(--panel-w), calc(100vw - 5.5rem)); z-index:6;
-    display:flex; flex-direction:column;
-    background:var(--glass-2); border:1px solid var(--line); border-radius:var(--radius);
-    backdrop-filter:blur(10px); overflow:hidden;
-    transition:transform .2s ease, opacity .2s ease;
-  }
-  #panel.closed{ transform:translateX(calc(100% + 1rem)); opacity:0; pointer-events:none; }
-  #tabs{ display:flex; gap:2px; padding:.4rem .4rem 0; border-bottom:1px solid var(--line); overflow-x:auto; scrollbar-width:none; }
-  .tab{
-    /* Six tabs is the widest this row ever gets — the flight row once the
-       Astrolabe is fitted — and it overran the panel by thirteen pixels at
-       .45rem a side. Tabs are short words and they do not need the room, and
-       `flex:1 0 auto` hands the slack back whenever there are fewer of them,
-       so a narrower tab is only narrower when it has to be. */
-    flex:1 0 auto; padding:.5rem .34rem; border:0; border-bottom:2px solid transparent; background:none;
-    color:var(--dim); cursor:pointer; font-size:.82rem; letter-spacing:.04em; white-space:nowrap;
-  }
-  .tab[aria-selected="true"]{ color:var(--gold-ink); border-bottom-color:var(--gold-2); }
-  #tabbody{ flex:1; overflow-y:auto; padding:.75rem .85rem 1rem; }
-  #tabbody h2{ margin:0 0 .25rem; font-size:1.05rem; }
-  #tabbody h3{ margin:1rem 0 .35rem; font-size:.72rem; letter-spacing:.14em; text-transform:uppercase; color:var(--faint); }
-  #tabbody p{ margin:.3rem 0; color:var(--dim); }
-  #tabbody p.say{ color:var(--ink); font-style:italic; border-left:2px solid var(--line-2); padding-left:.6rem; }
-  .sp-emberkin{ color:var(--emberkin); } .sp-otter{ color:var(--otter); } .sp-cat{ color:var(--cat); } .sp-frog{ color:var(--frog); } .sp-builders{ color:var(--chorus); } .sp-mixed{ color:var(--gold-ink); }
-  #grab{ display:none; }
-
-  /* Two lines, always: name and price on the first, the description and the
-     buttons on the second. A one-line row looked tidier until a good with a
-     sentence of flavour squeezed the price into a column one word wide. */
-  .row{ display:grid; grid-template-columns:1fr auto; gap:.15rem .5rem; padding:.5rem 0; border-bottom:1px solid var(--line); }
-  .row:last-child{ border-bottom:0; }
-  .row .name{ min-width:0; }
-  .row .name b{ display:block; font-weight:600; }
-  .row .name small{ display:block; color:var(--dim); font-size:.78rem; margin-top:.1rem; }
-  .row .price{ font-variant-numeric:tabular-nums; white-space:nowrap; text-align:right; align-self:start; }
-  .row .price small{ display:block; color:var(--dim); font-size:.74rem; }
-  .row .btns{ grid-column:1 / -1; justify-content:flex-end; margin-top:.2rem; }
-  .up{ color:var(--leaf); } .down{ color:var(--rose); } .flat{ color:var(--dim); }
-  /* The "i" beside a good: small, quiet, and the same size as the text it
-     sits in, so a row of them does not read as a row of buttons. */
-  .inspect{
-    display:inline-flex; align-items:center; justify-content:center;
-    width:1.15em; height:1.15em; margin-left:.35em; padding:0; vertical-align:baseline;
-    border:1px solid var(--line-2); border-radius:50%; background:transparent;
-    color:var(--dim); font-size:.72rem; font-style:italic; line-height:1; cursor:pointer;
-  }
-  .inspect:hover, .inspect:focus-visible{ color:var(--gold-ink); border-color:var(--gold-2); }
-  .btns{ display:flex; gap:.3rem; flex-wrap:wrap; }
-  .btn{
-    min-height:32px; padding:.25rem .6rem; border-radius:8px; border:1px solid var(--line-2);
-    background:var(--gv-sunk); color:var(--ink); cursor:pointer; font-size:.82rem;
-  }
-  .btn:hover{ border-color:var(--gold-2); }
-  .btn.primary{ background:var(--gold); color:#1a1310; border-color:var(--gold); font-weight:700; }
-  .btn.primary:hover{ filter:brightness(1.06); }
-  .btn.danger{ border-color:var(--gv-bad); color:var(--gv-bad); }
-  .btn:disabled{ opacity:.4; cursor:default; }
-  .btn.sm{ min-height:28px; padding:.1rem .45rem; font-size:.76rem; }
-  .btn.wide{ width:100%; margin-top:.4rem; }
-  .kv{ display:grid; grid-template-columns:auto 1fr; gap:.15rem .8rem; font-variant-numeric:tabular-nums; }
-  .kv dt{ color:var(--dim); } .kv dd{ margin:0; text-align:right; }
-  .lock{ color:var(--faint); font-size:.78rem; }
-  .node{ border:1px solid var(--line); border-radius:10px; padding:.5rem .6rem; margin:.4rem 0; }
-  /* A quest reads as a list with a place in it, so the step you are on is the
-     only one that is fully lit: the ones behind are ticked and dimmed, the
-     ones ahead are waiting. */
-  /* ---- Crew: a portrait, a name, and three berths with nobody in them -- */
-  .crew{ display:flex; gap:.7rem; align-items:flex-start; padding:.6rem 0; border-top:1px solid var(--line); }
-  .crew:first-of-type{ border-top:0; }
-  .crew img{
-    width:64px; height:64px; flex:0 0 64px; border-radius:10px;
-    image-rendering:pixelated; background:var(--gv-sunk); border:1px solid var(--line-2);
-  }
-  .crew.open img{ opacity:.8; }
-  .crew .who{ min-width:0; }
-  .crew .who b{ display:block; }
-  .crew .who small{ display:block; color:var(--faint); }
-  .crew .who p{ margin:.25rem 0 0; font-size:.84rem; }
-  /* The Astrolabe's rows: a world, what it costs today, and one word for
-     whether today is the day. */
-  .win{ display:flex; align-items:baseline; gap:.6rem; border-top:1px solid var(--line); padding-top:.4rem; margin-top:.4rem; }
-  .win:first-of-type{ border-top:0; }
-  .win .name{ flex:1 1 auto; min-width:0; }
-  .win .name small{ display:block; color:var(--faint); font-size:.8rem; }
-  .win .band{ flex:0 0 auto; text-align:right; font-size:.78rem; letter-spacing:.04em; text-transform:uppercase; }
-  .win .band small{ display:block; color:var(--faint); letter-spacing:0; text-transform:none; }
-  .win.perfect .band{ color:var(--leaf); }
-  .win.good .band{ color:var(--mint); }
-  .win.bad .band{ color:var(--gold); }
-  .win.impossible .band{ color:var(--rose); }
-  .quest{ border-top:1px solid var(--line); padding-top:.6rem; margin-top:.6rem; }
-  .quest:first-of-type{ border-top:0; padding-top:0; margin-top:0; }
-  .quest h3{ margin:0 0 .1rem; }
-  .quest.done h3{ color:var(--dim); }
-  ol.steps{ list-style:none; margin:.5rem 0 .3rem; padding:0; display:flex; flex-direction:column; gap:.3rem; }
-  ol.steps li{ color:var(--dim); font-size:.88rem; padding-left:1.4rem; position:relative; }
-  ol.steps li::before{ content:'○'; position:absolute; left:0; color:var(--line-2); }
-  ol.steps li.ok{ color:var(--faint); }
-  ol.steps li.ok::before{ content:'✓'; color:var(--leaf-soft, var(--mint)); }
-  ol.steps li.now{ color:var(--ink); font-weight:600; }
-  ol.steps li.now::before{ content:'▸'; color:var(--gold-2); }
-  .node.sel{ border-color:var(--gold-2); }
-  .node .val{ font-variant-numeric:tabular-nums; text-align:right; min-width:72px; }
-  .step{ display:flex; gap:2px; }
-  .step .btn{ min-width:34px; }
-
-  /* ---- The burn pad: four buttons, two axes ---------------------------- */
-  .pad{ margin-top:.5rem; }
-  .padgrid{
-    display:grid; grid-template-columns:1fr 1fr 1fr; grid-template-rows:auto auto auto;
-    gap:.3rem; align-items:stretch; justify-items:stretch; max-width:340px; margin:0 auto;
-  }
-  .padcell.up{ grid-area:1 / 2; } .padcell.left{ grid-area:2 / 1; }
-  .padcell.mid{ grid-area:2 / 2; } .padcell.right{ grid-area:2 / 3; }
-  .padcell.down{ grid-area:3 / 2; }
-  .padcell.mid{
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    text-align:center; border:1px dashed var(--line-2); border-radius:12px; padding:.2rem;
-  }
-  .padcell.mid b{ font-variant-numeric:tabular-nums; font-size:.95rem; }
-  .padcell.mid small{ color:var(--faint); font-size:.66rem; line-height:1.2; }
-  .pv{
-    width:100%; min-height:64px; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    gap:.1rem; border-radius:12px; border:1px solid var(--line-2); background:var(--gv-sunk); color:var(--ink);
-    cursor:pointer; font:inherit; font-size:.72rem; letter-spacing:.02em;
-    touch-action:manipulation; -webkit-user-select:none; user-select:none;
-  }
-  .pv svg{ width:30px; height:30px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
-  .pv.pro{ color:var(--leaf); border-color:color-mix(in srgb, var(--leaf) 45%, transparent); }
-  .pv.retro{ color:var(--gold-2); border-color:color-mix(in srgb, var(--gold-2) 45%, transparent); }
-  .pv.out, .pv.in{ color:var(--sky); border-color:color-mix(in srgb, var(--sky) 45%, transparent); }
-  .pv:hover{ border-color:currentColor; background:color-mix(in srgb, currentColor 10%, var(--gv-sunk)); }
-  .pv:active{ transform:translateY(1px); background:color-mix(in srgb, currentColor 18%, var(--gv-sunk)); }
-  .pv span{ color:var(--dim); }
-  .padout{ display:grid; grid-template-columns:auto 1fr; gap:.1rem .8rem; margin:.5rem 0 .4rem; font-variant-numeric:tabular-nums; }
-  .padout dt{ color:var(--dim); font-size:.78rem; } .padout dd{ margin:0; text-align:right; }
-  @media (prefers-reduced-motion: reduce){ .pv:active{ transform:none; } }
-  .empty{ color:var(--faint); font-style:italic; }
-  select{ font:inherit; background:var(--gv-sunk); color:var(--ink); border:1px solid var(--line-2); border-radius:8px; padding:.35rem .5rem; width:100%; }
-
-  /* ---- Toasts, modal, tutorial ---------------------------------------- */
-  #toasts{ position:fixed; left:50%; top:72px; transform:translateX(-50%); z-index:8; display:flex; flex-direction:column; gap:.4rem; align-items:center; pointer-events:none; width:min(92vw, 520px); }
-  .toast{ background:var(--glass-2); border:1px solid var(--line-2); border-radius:10px; padding:.5rem .8rem; color:var(--ink); font-size:.88rem; box-shadow:var(--gv-shadow); animation:toast .25s ease; max-width:100%; }
-  .toast.story{ border-color:var(--gold-2); }
-  .toast.bad{ border-color:var(--bad); }
-  @keyframes toast{ from{ opacity:0; transform:translateY(-6px);} }
-
-  /* A popup over a chart should not put the chart away. These sit on the sky
-     at three-quarters opacity with a blur behind them, so the road you tapped
-     is still visible under the question you are being asked. */
-  dialog{
-    background:rgba(12,15,22,.72); color:var(--ink); border:1px solid var(--line-2); border-radius:14px;
-    padding:1.1rem 1.25rem; width:min(92vw, 420px); backdrop-filter:blur(14px) saturate(1.1);
-    box-shadow:0 18px 50px -18px #000;
-    /* Down at the bottom, near the thumb and clear of the sky you just
-       tapped: a question about a point on the chart should not sit on top of
-       the point. */
-    margin:auto auto max(1rem, env(safe-area-inset-bottom));
-  }
-  dialog::backdrop{ background:rgba(0,0,0,.28); backdrop-filter:blur(1px); }
-  .btn.ghost{ background:transparent; border-color:transparent; color:var(--dim); }
-  .btn.ghost:hover{ color:var(--ink); border-color:var(--line-2); }
-  dialog h2{ margin:0 0 .5rem; font-size:1.15rem; }
-  dialog p{ color:var(--dim); margin:.4rem 0; }
-  dialog p.say{ color:var(--ink); font-style:italic; border-left:2px solid var(--gold-2); padding-left:.7rem; }
-  dialog .btns{ margin-top:1rem; justify-content:flex-end; }
-
-
   /* Centred on the chart rather than on the window, so that with the panel
      open they do not slide under it. */
   body.panel-open #tut{
@@ -531,9 +402,6 @@
   #tut.min h3{ font-size:.86rem; margin:.1rem 0 0; }
   #tut.min p, #tut.min .btns{ display:none; }
 
-  #back{ position:fixed; left:.8rem; top:calc(46px + env(safe-area-inset-top)); z-index:5; color:var(--faint); font-size:.78rem; text-decoration:none; }
-  #back:hover{ color:var(--ink); }
-
   /* Phone. The chart is the point, so nothing may stack on top of it: the HUD
      is two tight rows, the clock and the view buttons share one strip
      under them, the panel is a sheet that starts closed, and the cards that
@@ -546,8 +414,21 @@
     #dvbar{ width:64px; height:4px; }
     #where{ flex:1 1 8rem; text-align:left; }
     #where b, #dockhint{ font-size:.78rem; }
-    /* Two rows is the budget; the back link moves into the Shipyard tab. */
-    #back{ display:none; }
+    /* The gear comes out of the flex row on a phone. The strip is two tight
+       rows here and the gear was being carried along by the wrap, landing at
+       the end of whichever row had space — under the readouts, three pixels
+       to the left of the view buttons it then sat directly above, and six
+       narrower than them. Pinned to the corner it is the top of that column
+       instead of a stray fourth thing: same gutter, same edge, wherever the
+       text happens to break. */
+    #m-gear{
+      position:absolute; top:max(.3rem, env(safe-area-inset-top)); right:.4rem; margin:0;
+      /* The same size as the buttons it is now the top of, or the column has a
+         step in it. */
+      width:40px; height:40px; border-radius:10px;
+    }
+    /* And the readouts keep clear of it, since it is no longer in their row. */
+    #hud{ padding-right:calc(.4rem + 40px + .4rem); }
 
     #view{
       top:calc(74px + env(safe-area-inset-top)); bottom:auto; right:.4rem;
@@ -621,6 +502,90 @@
     /* The mooring ring still has to be noticed, so it keeps the brightness the
        flash was carrying it to and drops the breathing. */
     #dock-go{ animation:none; opacity:1; }
+    /* Same bargain for the ship button: keep the glow, lose the breath. */
+    #m-ship.owed{ animation:none; box-shadow:0 0 12px -1px var(--gold-2); }
+  }
+  /* The hazard marks. Amber is "this will happen and it will hurt a bit";
+     red is the colour the chart already uses for ground, so the corner and
+     the cross on the road say the same thing in the same voice. */
+  #hud .warn{
+    display:flex; align-items:center; gap:.4rem;
+    padding:.3rem .6rem; border-radius:.5rem;
+    border:1px solid currentColor; background:rgba(0,0,0,.35);
+    color:var(--gold-deep); font-size:.82rem; font-weight:600;
+  }
+  #hud .warn.bad{ color:var(--gv-bad); }
+  #hud .warn svg{ width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  #hud .warn[hidden]{ display:none; }
+  @media (prefers-reduced-motion: no-preference){
+    #hud .warn.bad{ animation:hazpulse 1.6s ease-in-out infinite; }
+    @keyframes hazpulse{ 0%,100%{ opacity:1 } 50%{ opacity:.55 } }
+  }
+  @media (max-width: 560px){ #hud .warn b{ display:none; } }
+  /* A save written out. Monospace so a mistyped character is findable, and
+     breaking anywhere because it is one very long word. */
+  .hexbox{
+    width:100%; margin-top:.5rem;
+    font:12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+    background:var(--sunk, rgba(0,0,0,.35)); color:inherit;
+    border:1px solid var(--line); border-radius:.4rem; padding:.5rem;
+    word-break:break-all; resize:vertical;
+  }
+  /* Collecting a job. The card is the animation: a gold edge, a lift, and the
+     things you were owed climbing out of it.
+
+     A quest is otherwise just a rule and some text under it, so the gold ring
+     had nothing to stand off from and was drawn hard against the words on
+     every side. Given its own padding it reads as a card that has been picked
+     out, which is what it is. The top padding matches what .quest already had,
+     so nothing jumps when a job finishes. */
+  .quest.owed{
+    position:relative;
+    /* The grey rule a quest normally wears on top would run straight through
+       a rounded card, so the ring is the whole of the edge and the border is
+       only there to give it somewhere to sit. */
+    border:1px solid transparent; border-radius:.55rem;
+    padding:.6rem .7rem; margin-bottom:.2rem;
+    background:color-mix(in srgb, var(--gold-2) 7%, transparent);
+    box-shadow:0 0 0 1px var(--gold-2) inset;
+  }
+  .quest.owed .btns{ margin-top:.5rem; }
+  .quest.collecting{
+    position:relative; overflow:visible;
+    animation:collect-lift .55s cubic-bezier(.2,.9,.25,1) both;
+  }
+  @keyframes collect-lift{
+    0%{ transform:translateY(0) scale(1); box-shadow:0 0 0 1px var(--gold-2) inset; }
+    35%{ transform:translateY(-4px) scale(1.015); box-shadow:0 0 18px 2px var(--gold-2); }
+    100%{ transform:translateY(0) scale(1); box-shadow:0 0 0 1px transparent inset; opacity:.55; }
+  }
+  .reward-fly{
+    position:absolute; left:50%; top:45%;
+    transform:translate(-50%,0);
+    font-weight:700; font-size:1rem; color:var(--gold);
+    text-shadow:0 1px 6px rgba(0,0,0,.8);
+    pointer-events:none; white-space:nowrap;
+    animation:reward-climb .8s ease-out both;
+  }
+  @keyframes reward-climb{
+    0%{ opacity:0; transform:translate(-50%,6px) scale(.9); }
+    25%{ opacity:1; transform:translate(-50%,-6px) scale(1.06); }
+    100%{ opacity:0; transform:translate(-50%,-42px) scale(1); }
+  }
+  /* A berth filled gets a face rather than a line of text. */
+  .joined{ text-align:center; }
+  .joined-face{
+    display:block; margin:0 auto .6rem;
+    width:96px; height:96px; image-rendering:pixelated;
+    border-radius:.6rem; border:1px solid var(--gold-2);
+    background:var(--sunk, rgba(0,0,0,.3));
+    animation:joined-in .5s cubic-bezier(.2,.9,.25,1) both;
+  }
+  @keyframes joined-in{ 0%{ opacity:0; transform:scale(.8) translateY(8px); } 100%{ opacity:1; transform:none; } }
+  .joined .say{ text-align:left; }
+  @media (prefers-reduced-motion: reduce){
+    .quest.collecting, .reward-fly, .joined-face{ animation:none; }
+    .reward-fly{ opacity:0; }
   }
 </style>
 </head>
@@ -629,13 +594,36 @@
 <canvas id="chart" aria-label="The navigation chart: the Lamp, its worlds, and your ship's predicted path." role="img"></canvas>
 
 <header id="hud" aria-live="off">
+  <!-- Two different pictures because they want two different answers: a skim
+       is "brace and let it happen", the ground is "move the burn". -->
+  <div class="warn" id="h-hazard" hidden role="status">
+    <svg id="haz-skim" viewBox="0 0 24 24" aria-hidden="true" hidden><path d="M3 15 h18"/><path d="M5 18.5 h14"/><path d="M12 3.5 c2.6 3 3.6 6 3.6 8.4 L12 14.4 8.4 11.9 C8.4 9.5 9.4 6.5 12 3.5z"/></svg>
+    <svg id="haz-crash" viewBox="0 0 24 24" aria-hidden="true" hidden><path d="M12 3.2 L22 20.5 H2 z"/><path d="M12 9.5 V14"/><path d="M12 17 v.4"/></svg>
+    <b id="haz-text">—</b>
+  </div>
   <div class="stat" id="h-dv-wrap"><small>Fuel</small><b id="h-dv">—</b><div id="dvbar"><i id="h-dvfill"></i><i id="h-dvplan"></i></div></div>
   <div class="stat"><small>Coin</small><b id="h-money">—</b></div>
   <div class="stat"><small>Hold</small><b id="h-hold">—</b></div>
   <div class="stat" id="clock-stat" hidden><small>Clock</small><b id="h-warp">—</b></div>
+  <!-- What a cat navigator is for: not the range now, which says nothing about
+       whether you arrive, but how close the path actually comes and how fast
+       you are closing. Only drawn with her aboard and only near a drift. -->
+  <div class="stat" id="rv-stat" hidden><small>Rendezvous</small><b id="h-rv">—</b></div>
   <div class="stat" id="where"><small>Where</small><b id="h-where">—</b><span id="dockhint"></span></div>
+  <!-- A cog: one ring, one hub, eight teeth on the spokes of a compass. Drawn
+       from the middle out so it is symmetric by construction — the hand-written
+       bezier cog it replaces sat a pixel high and to the left of its own
+       button, which is exactly the sort of thing a gear icon cannot get away
+       with when it is the only round object in a row of text. -->
+  <button id="m-gear" title="Settings" aria-label="Settings" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6.4"/><circle cx="12" cy="12" r="2.5"/><path d="M12 5.6V2.4M12 18.4v3.2M5.6 12H2.4M18.4 12h3.2M7.47 7.47 5.2 5.2M16.53 16.53l2.27 2.27M16.53 7.47 18.8 5.2M7.47 16.53 5.2 18.8"/></svg></button>
 </header>
-<a id="back" href="./">&larr; title</a>
+<!-- Not inside the strip: see the note by #gearmenu in the stylesheet. -->
+<div id="gearmenu" role="dialog" aria-label="Settings" hidden>
+  <div id="gear-tabs" role="tablist" aria-label="Settings sections">
+    <button class="tab" role="tab" data-gtab="game" aria-selected="true" aria-controls="gear-body">Game</button>
+  </div>
+  <div id="gear-body" role="tabpanel"></div>
+</div>
 
 <div id="act">
   <button id="dock-go" hidden title="Dock (d)" aria-label="Dock here">
@@ -646,6 +634,8 @@
 
 <div id="view">
   <button id="v-fit" title="Back to your ship, and frame it (f)">&#9678;</button>
+  <!-- Only a ship with a navigator aboard has this at all: it is what she does. -->
+  <button id="v-far" hidden title="Show the path past the next flyby (v)" aria-pressed="true" aria-label="Show the path past the next flyby"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 17 c5 0 7-10 12-10 c4 0 6 3 8 5"/><circle cx="14" cy="7" r="1.6"/><path d="M18.5 10.5 L22 12 L20.5 8.4"/></svg></button>
   <button id="m-dock" hidden title="The port (p)" aria-label="Open the port menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20 h16"/><path d="M8 20 V5"/><path d="M8 5 h10"/><path d="M15 5 V9"/><path d="M13 9 h4 v4 h-4 z"/></svg></button>
   <button id="m-ship" title="Your ship (p)" aria-pressed="true" aria-label="Open the ship menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 c3 3.4 4.2 7 4.2 10.2 L12 16.5 7.8 13.2 C7.8 10 9 6.4 12 3z"/><path d="M7.8 12 L4.8 16.4 7.8 15.2"/><path d="M16.2 12 L19.2 16.4 16.2 15.2"/><circle cx="12" cy="9.4" r="1.7"/></svg></button>
 </div>
@@ -689,22 +679,21 @@ import { playIntro } from './intro.js';
 const world = S.world;
 const $ = id => document.getElementById(id);
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const SAVE_KEY = 'ot:save:v1';
-
 /* ------------------------------------------------------------- state */
 
 const params = new URLSearchParams(location.search);
+/* Which of the three this window is playing. The title screen puts it in the
+   address; opening play.html directly picks up wherever the player was last,
+   and an old save from before there were slots becomes slot one on the way. */
+S.migrateLegacy();
+const SLOT = S.isSlot(params.get('slot')) ? Number(params.get('slot')) : S.activeSlot();
+S.setActiveSlot(SLOT);
+
 let state = null;
-function loadSave(){
-  try{
-    const raw = localStorage.getItem(SAVE_KEY);
-    if(raw) return S.restore(raw);
-  }catch(e){ console.warn('Save could not be read:', e); }
-  return null;
-}
+const loadSave = () => S.readSlot(SLOT);
 function save(){
   if(!state) return;
-  try{ localStorage.setItem(SAVE_KEY, S.serialize(state)); }catch{ /* private window, full disk: play on */ }
+  S.writeSlot(SLOT, state);   // a private window or a full disk simply does not stick
 }
 /* A seed can be named in the address. It decides the ship's name and every
    roll the game will ever make, so two people with the same seed see the same
@@ -747,11 +736,15 @@ const belt = { inner: CONST.BELT.inner, outer: CONST.BELT.outer, rocks: BELT_ROC
 addEventListener('resize', () => chart.resize());
 
 let prediction = null, nodePositions = [], apses = [], crossedRails = [], predictedAt = -1, predictedReal = -1e9;
+let hazard = { skim: null, crash: null };
 /* The moment on the road that was just tapped, while the card about it is
    up: drawn as a breathing ring so the player can see which line they hit
    before choosing what to do with it. Gone when the card closes. */
 let tapMark = null;
 let selectedNode = -1;
+/* Whether the clock is stopped because a burn is open, as opposed to because
+   the player stopped it. Only a hold we put on do we take off again. */
+let heldForPlan = false;
 let panelOpen = innerWidth > 760;
 let tab = null;
 
@@ -770,7 +763,7 @@ function horizonFor(){
 }
 
 function replan(force = false){
-  if(state.dockedAt){ prediction = null; nodePositions = []; apses = []; crossedRails = []; return; }
+  if(state.dockedAt){ prediction = null; nodePositions = []; apses = []; crossedRails = []; hazard = { skim: null, crash: null }; return; }
   /* Re-solving the whole road is the most expensive thing this page does, so
      it happens on a real-time budget rather than a game-time one: at most a few
      times a second, whatever the warp. Measuring it in game days got it wrong
@@ -786,7 +779,8 @@ function replan(force = false){
      the white road runs up to it and the yellow road carries on from it. With
      nothing written down at all there is one road, a whole lap of the orbit
      the ship is actually on. */
-  prediction = S.planImmediate(state);
+  prediction = S.planImmediate(state, true, { farSight: S.seesPast(state) });
+  hazard = S.hazards(state, prediction);
   if(!prediction){ nodePositions = []; apses = []; crossedRails = []; return; }
   nodePositions = state.nodes.map(n => locateOnPrediction(world, prediction, n.t));
   /* The low point and the high point of every closed leg on the drawn road.
@@ -794,10 +788,15 @@ function replan(force = false){
      are a hair apart and the labels sit on top of each other — so it keeps
      neither. */
   const ic = prediction.intercept;
+  /* A thing nobody has found keeps its numbers and loses its name. The road
+     still runs into the Maw whether or not a ship can see it, and the crosshair
+     still says how close and how fast — it is called ??? until the sensors are
+     aboard, which is the whole of what they buy. */
+  const unknown = S.unseen(state);
   interceptLabel = ic
     ? (ic.grazes
-        ? `hits ${S.portName(ic.body)}`
-        : `${S.portName(ic.body)} ${fmtAu(ic.altitude)} · ${S.fmtKms(ic.speed)}${ic.inMouth ? ' · in docking range' : ''}`)
+        ? `hits ${S.nameFor(ic.body, unknown)}`
+        : `${S.nameFor(ic.body, unknown)} ${fmtAu(ic.altitude)} · ${S.fmtKms(ic.speed)}${ic.inMouth ? ' · in docking range' : ''}`)
     : null;
   /* The window in the corner already says whose encounter it is, so its line
      is the numbers only. */
@@ -834,10 +833,21 @@ let nodeLabel = null, nodeLabelKey = '', interceptLabel = null, insetLabel = nul
 /* The Astrolabe is the one tab that goes stale on its own: every other one
    reads the ship, and this one reads the sky moving. It is also the most
    expensive thing the panel draws — a Lambert sweep per world — so it is
-   redrawn on a real-time budget rather than every frame, and only while the
-   clock is actually running and the tab is actually up. */
-const WINDOWS_REDRAW_MS = 500;
-let windowsDrawnAt = -1e9;
+   redrawn on a budget rather than every frame, and only while the clock is
+   actually running and the tab is actually up.
+
+   The budget is in *game* time, which is the thing it reads. It used to be
+   half a second of real time, and at ×1 that is four ten-thousandths of a day:
+   the sweep ran twice a second and produced the same characters every time,
+   because the coarsest figure on a row moves by one digit every forty-five
+   real minutes at that rate. Two Lambert sweeps a second to redraw nothing.
+   Budgeted on the sky instead, it recomputes when there is something to
+   recompute — rarely at ×1, smoothly under warp — and the real-time floor is
+   left in so that a fast skip cannot make it thrash. */
+const WINDOWS_REDRAW_MS = 250;
+const WINDOWS_STEP_DAYS = 0.05;      // the resolution of the coarsest figure shown
+let windowsDrawnAt = -1e9, windowsDrawnT = null;
+let dockLineKey = null, dockLineAt = -1e9;
 /* What every mark written down will take out of the tank, drawn on the gauge. */
 let plannedSpend = 0;
 /* What the selected mark says on the chart, and what the whole plan will
@@ -855,7 +865,8 @@ function refreshNodeLabel(){
   /* Direction words, not a length. "0.12 km/s" is the fuel this will burn,
      and two playtesters braking at Slate read it as their speed and were
      baffled that pressing Back made it climb. The fuel is on the gauge. */
-  nodeLabel = n ? `${S.burnWords(n)} · in ${S.fmtDays(n.t - state.t)}` : null;
+  const rvNow = S.rendezvous(state);
+  nodeLabel = n ? `${S.burnWords(n, rvNow ? S.portName(rvNow.target) : null)} · in ${S.fmtDays(n.t - state.t)}` : null;
 }
 function frame(now){
   const real = Math.min(0.1, (now - last) / 1000);
@@ -865,7 +876,10 @@ function frame(now){
     const wasDocked = state.dockedAt;
     const events = S.tick(state, dt);
     handleEvents(events);
-    if(!wasDocked && state.dockedAt) replan(true);
+    /* Arriving ends a skip. A tow or a distress call can land a ship at a
+       harbour in the middle of one, and the clock should not carry on running
+       past the thing it was sent to. Pressing dock does this for itself. */
+    if(!wasDocked && state.dockedAt){ stopSkip(); replan(true); }
     else if(events.length) replan(true);
     else replan(false);
   }
@@ -891,10 +905,9 @@ function frame(now){
   /* A harbour in sight ends a skip once, so you are awake for the arrival —
      but only a harbour somewhere other than where the skip set off from. A
      change of reach already ends a skip on its own, so what this is really
-     for is the things with no reach to cross: the Arc, Claw Rock, the comet. */
+     for is a harbour with no reach to cross: the Maw. */
   if(docking && docking.port !== skipHome && (docking.ok || docking.inZone) && state.warp > 1 && !state.flags.zoneWarpDropped){ stopSkip(); state.flags.zoneWarpDropped = true; }
   if(!docking) state.flags.zoneWarpDropped = false;
-  if(state.dockedAt) warpTarget = null;
   if(warpTarget != null && state.t >= warpTarget) stopSkip();
   const shipAbs = state.dockedAt ? { r: absState(world, state.dockedAt, state.t).r, v: absState(world, state.dockedAt, state.t).v } : { r: S.shipAbsPos(state), v: S.shipAbsVel(state) };
   chart.draw({
@@ -905,10 +918,23 @@ function frame(now){
     shipLocalV: state.dockedAt ? null : state.ship.v,
     nodeLabel, interceptLabel, insetLabel,
     belt, nearPort: docking?.port ?? null, docking,
+    hidden: S.unseen(state),
   });
-  if(dt > 0 && panelOpen && tab === 'windows' && now - windowsDrawnAt > WINDOWS_REDRAW_MS){
+  if(dt > 0 && panelOpen && tab === 'windows'
+     && now - windowsDrawnAt > WINDOWS_REDRAW_MS
+     && (windowsDrawnT == null || Math.abs(state.t - windowsDrawnT) >= WINDOWS_STEP_DAYS)){
     windowsDrawnAt = now;
+    windowsDrawnT = state.t;
     renderTab();
+  }
+  /* The Ahead panel now leads with the harbour you are inside, and that line
+     is a number the pilot is actively burning down — so it has to move. Keyed
+     on what it says rather than on the state behind it, so a steady coast
+     rebuilds nothing and a burn rebuilds it a few times a second. */
+  if(panelOpen && tab === 'ship' && dt > 0){
+    const key = docking && docking.kind === 'zone' && (docking.inZone || docking.ok)
+      ? `${docking.port}:${docking.ok}:${Math.round(S.kms(docking.relSpeed) * 100)}` : '';
+    if(key !== dockLineKey && now - dockLineAt > 200){ dockLineKey = key; dockLineAt = now; renderTab(); }
   }
   renderHud(docking);
   renderDockCard(docking);
@@ -924,6 +950,21 @@ function frame(now){
 /* Somebody signing on is the one reward that does not show up in the purse,
    and finishing a quest is otherwise silent — the Quests card just quietly
    ticks over. Without this a berth fills and nothing says so. */
+/* A berth filled is the one reward with a face, so it gets shown rather than
+   mentioned: the portrait, who they are, and the line their card carries. */
+function showCrewPortrait(role, quest){
+  const r = (TEXT.crew?.roles ?? []).find(x => x.id === role);
+  const name = r?.person?.name ?? 'Somebody';
+  const url = portraitURL(role);
+  openModal(`<div class="joined">
+      ${url ? `<img class="joined-face" src="${url}" alt="" width="96" height="96">` : ''}
+      <h2>${esc(name)} signs on</h2>
+      <p class="lock">Your ${esc((r?.name ?? role).toLowerCase())}${quest ? ` · ${esc(quest.title)}` : ''}</p>
+      <p class="say">${esc(r?.person?.line ?? '')}</p>
+      <div class="btns"><button class="btn primary" id="m-ok">Welcome aboard</button></div>
+    </div>`, m => m.querySelector('#m-ok').addEventListener('click', closeModal));
+}
+
 function noteCrew(events){
   for(const e of events ?? []){
     if(e.kind !== 'crewJoined') continue;
@@ -942,42 +983,87 @@ function handleEvents(events){
        a skip is anything the plan did not promise: a change of reach, a burn
        the tank could not pay for, a toll, a crash, a dry tank. */
     if(e.kind === 'soi') stopSkip();
-    if(e.kind === 'burn') { save(); toast(`Burned ${S.fmtKms(e.magnitude)}.`); if(tab === 'plan') renderTab(); }
+    if(e.kind === 'burn') { save(); toast(`Burned ${S.fmtKms(e.magnitude)}.`); if(tab === 'ship') renderTab(); }
     if(e.kind === 'short'){ stopSkip(); toast(`The tank ran short: ${S.fmtKms(e.got)} of ${S.fmtKms(e.wanted)}.`, 'bad'); }
     /* A change of reach re-frames the chart, re-draws the road and changes
        every number on the Plan card. The panel has to be told, or it sits
        there naming the world you just left. */
-    if(e.kind === 'soi'){ const to = world.get(e.to); toast(`Now in ${to.name}'s gravity.`); renderTab(); tutorialCheck(); }
+    if(e.kind === 'soi'){ toast(`Now in ${S.nameFor(e.to, S.unseen(state))}'s gravity.`); renderTab(); tutorialCheck(); }
     if(e.kind === 'story') toast(e.text, 'story', 9000);
     if(e.kind === 'toll'){ stopSkip(); showToll(e.pending); }
     if(e.kind === 'crash'){ stopSkip(); showCrash(e.body); }
-    if(e.kind === 'dry'){ stopSkip(); toast(`${TEXT.captainLines.onStranded[1] ?? 'The tank is dry.'} Burns has the distress call.`, 'bad', 9000); if(tab === 'plan') renderTab(); }
-    if(e.kind === 'missed'){ toast(e.count > 1 ? `${e.count} burns went by unspent.` : 'That burn went by unspent.', 'bad'); if(tab === 'plan') renderTab(); }
+    if(e.kind === 'dry'){ stopSkip(); toast(`${TEXT.captainLines.onStranded[1] ?? 'The tank is dry.'} The ship menu has the distress call.`, 'bad', 9000); if(tab === 'ship') renderTab(); }
+    if(e.kind === 'missed'){ toast(e.count > 1 ? `${e.count} burns went by unspent.` : 'That burn went by unspent.', 'bad'); if(tab === 'ship') renderTab(); }
     /* A handover takes the crates out of the hold and puts the pay in the
        purse, and both of those are on the panel. Without this the Ship card
        went on listing Nellie's pebble after Nellie had it — the HUD said the
        hold was empty and the panel underneath disagreed, in the same frame. */
+    if(e.kind === 'salvaged'){
+      toast(`Off ${S.portName(e.wreck)}: ${e.goods.map(g => `${g.qty} × ${S.goodById(g.good)?.name ?? g.good}`).join(', ')}.`, 'story', 7000);
+    }
     if(e.kind === 'questStep' || e.kind === 'questDone'){ renderTab(); save(); }
   }
 }
 
 /* ------------------------------------------------------------- HUD */
 
+/* Distance at intercept and relative speed, which are the two numbers a
+   rendezvous is actually flown on. Without a navigator the ship is still in
+   the reach and the axes still point at the target — she is the instruments,
+   not the physics — so the readout is hers and the flying is not. */
+function showRendezvous(){
+  const box = $('rv-stat');
+  const rv = S.rendezvous(state);
+  if(!rv || !rv.instruments){ box.hidden = true; return; }
+  box.hidden = false;
+  const miss = rv.closing ? fmtAu(rv.atIntercept) : fmtAu(rv.range) + ' (opening)';
+  $('h-rv').textContent = `${miss} · ${S.fmtKms(rv.speed)}`;
+  box.title = `Closest the path comes to ${S.portName(rv.target)}, and how fast you are closing.`
+    + (rv.timeToIntercept != null ? ` Nearest in ${S.fmtDays(rv.timeToIntercept)}.` : '');
+}
+
+function showHazard(){
+  const box = $('h-hazard'), skim = $('haz-skim'), crash = $('haz-crash');
+  const ground = hazard.crash, air = hazard.skim;
+  /* Ground beats air for the corner. Both can be true — a dive that sheds too
+     little still ends on the rocks — and of the two, only one of them is worth
+     interrupting the player for. */
+  box.hidden = !(ground || air);
+  if(box.hidden) return;
+  box.classList.toggle('bad', !!ground);
+  crash.hidden = !ground;
+  skim.hidden = !!ground;
+  if(ground){
+    box.setAttribute('aria-label', `Warning: this path meets ${S.portName(ground.body)}`);
+    $('haz-text').textContent = `Hits ${S.portName(ground.body)}`;
+  }else{
+    const risky = air.risk > 0;
+    box.setAttribute('aria-label', `Air braking at ${S.portName(air.body)} ahead`);
+    $('haz-text').textContent = `Air brake · ${S.fmtKms(air.dv)}`
+      + (risky ? ` · ${Math.round(air.risk * 100)}% risk` : ' · safe');
+  }
+}
+
 function renderHud(docking){
+  showHazard();
+  refreshFarButton();
+  showRendezvous();
+  refreshOwedFlash();
   /* The tank, and what the plan will take out of it. The cost of a burn is
      shown here and nowhere near the burn itself: it is a length of fuel, and
      next to a mark it read as a speed — which made pressing Back to slow down
      look like it was speeding the ship up. */
   const spend = Math.min(plannedSpend, state.dv);
-  $('h-dv').textContent = `${S.fmtKms(state.dv)} / ${S.fmtKms(state.tank)}`
+  $('h-dv').textContent = `${S.fmtKms(state.dv)} / ${S.fmtKms(S.usableTank(state))}`
     + (plannedSpend > 1e-12 ? ` · ${S.fmtKms(plannedSpend)} planned` : '');
   const fill = $('h-dvfill');
-  const frac = state.tank > 0 ? state.dv / state.tank : 0;
+  const cap = S.usableTank(state);
+  const frac = cap > 0 ? state.dv / cap : 0;
   fill.style.width = `${Math.round(frac * 100)}%`;
   fill.classList.toggle('low', frac < 0.15);
   const planBar = $('h-dvplan');
   planBar.style.right = `${Math.round((1 - frac) * 100)}%`;
-  planBar.style.width = `${Math.round((state.tank > 0 ? spend / state.tank : 0) * 100)}%`;
+  planBar.style.width = `${Math.round((cap > 0 ? spend / cap : 0) * 100)}%`;
   $('h-dv-wrap').classList.toggle('warn', frac < 0.15);
   $('h-money').textContent = S.fmtMoney(state.money) + (state.debt > 0 ? ` (owe ${S.fmtMoney(state.debt)})` : '');
   $('h-hold').textContent = `${S.usedUnits(state)} / ${S.holdUnits(state)}`;
@@ -999,9 +1085,14 @@ function renderHud(docking){
      ship in a neat circle and of one falling past at four km/s, and those are
      not the same news. A closed path is one with a period. */
   const el = state.dockedAt ? null : elementsFromState(b.mu, state.ship.r, state.ship.v);
-  $('h-where').textContent = state.dockedAt ? `Docked at ${S.portName(state.dockedAt)}`
-    : Number.isFinite(el.period) ? `In orbit around ${b.name}`
-    : `Passing through ${b.name}'s gravity`;
+  /* Whatever has hold of you, named only if you have found it. A ship can be in
+     the Maw's gravity without the instrument that says what the Maw is, and the
+     readout should say so rather than give the answer away. */
+  const whose = S.nameFor(state.ship.body, S.unseen(state));
+  $('h-where').textContent = state.dockedAt
+    ? `${S.isWreck(state.dockedAt) ? 'Alongside' : 'Docked at'} ${S.portName(state.dockedAt)}`
+    : Number.isFinite(el.period) ? `In orbit around ${whose}`
+    : `Passing through ${whose}'s gravity`;
   const hint = $('dockhint');
   if(!docking){ hint.textContent = ''; return; }
   const pb = world.get(docking.port);
@@ -1016,6 +1107,7 @@ function renderHud(docking){
       : !docking.clear ? ` · ${pb.name}: that orbit goes through it`
       : ` · ${pb.name}: bring the high point inside ${fmtAu(docking.mouth)}`;
   }else{
+    if(docking.inZone) hint.className = 'near';
     hint.textContent = docking.inZone
       ? ` · ${pb.name}: ${S.fmtKms(docking.over)} too fast`
       : ` · ${pb.name} ${fmtAu(docking.distance)} off`;
@@ -1147,8 +1239,8 @@ function askAtPath(t){
       /* The chart is the editor, so writing a burn down leaves the panel
          exactly as it was: shoving the side menu open over the sky is the
          opposite of what somebody who just tapped the sky wanted. */
-      selectedNode = ix; holdForPlanning(ix); replan(true);
-      if(tab === 'plan') renderTab();
+      selectNode(ix); replan(true);
+      if(tab === 'ship') renderTab();
       tutorialCheck(); save();
     });
     m.querySelector('#m-skip').addEventListener('click', () => { closeModal(); skipTo(t); });
@@ -1158,8 +1250,89 @@ function askAtPath(t){
 /* ------------------------------------------------------------- view */
 
 $('v-fit').addEventListener('click', () => backToShip(true));
+function setFarSight(on){
+  state.farSight = on;
+  const b = $('v-far');
+  b.setAttribute('aria-pressed', String(on));
+  b.classList.toggle('off', !on);
+  b.title = on ? 'Showing the path past the next flyby (v)' : 'Show the path past the next flyby (v)';
+  replan(true); draw(); save();
+}
+$('v-far').addEventListener('click', () => setFarSight(state.farSight === false));
+function refreshFarButton(){
+  const can = S.canSeePast(state);
+  $('v-far').hidden = !can;
+  if(can){
+    const on = state.farSight !== false;
+    $('v-far').setAttribute('aria-pressed', String(on));
+    $('v-far').classList.toggle('off', !on);
+  }
+}
 $('m-ship').addEventListener('click', () => openMenu('ship'));
 $('m-dock').addEventListener('click', () => openMenu('dock'));
+
+/* ---------------------------------------------------------- settings */
+
+/* The gear. What is in it is about the game rather than about the ship or the
+   sky, which is why it is not another tab in the panel: leaving is not a thing
+   you do to your ship.
+
+   The clock stops while it is up, the way it does for every other menu here,
+   and starts again exactly as it was — not simply running — so that opening
+   the gear while paused and closing it again does not quietly set the ship
+   moving. */
+/* The sections, and what is in each. One today; the shape is here so the next
+   one is a line rather than a rebuild. */
+const GEAR_TABS = {
+  game: () => `<button class="btn sm" id="gear-quit">&larr; Quit to title screen</button>`,
+};
+let gearTab = 'game';
+function renderGearTab(){
+  $('gear-body').innerHTML = (GEAR_TABS[gearTab] ?? GEAR_TABS.game)();
+  for(const b of $('gear-tabs').querySelectorAll('[data-gtab]')){
+    b.setAttribute('aria-selected', String(b.dataset.gtab === gearTab));
+  }
+  /* It saves as you play, but not necessarily in the last few seconds of it,
+     so the way out writes the game down before it takes it. */
+  $('gear-quit')?.addEventListener('click', () => { save(); location.href = './'; });
+}
+$('gear-tabs').addEventListener('click', e => {
+  const b = e.target.closest('[data-gtab]');
+  if(!b) return;
+  gearTab = b.dataset.gtab;
+  renderGearTab();
+  $('gear-body').querySelector('button')?.focus();
+});
+
+let gearOpen = false;
+let gearWasPaused = false;
+function openGear(on = !gearOpen){
+  if(on === gearOpen) return;
+  gearOpen = on;
+  const menu = $('gearmenu'), btn = $('m-gear');
+  btn.setAttribute('aria-expanded', String(on));
+  menu.hidden = !on;
+  if(!on){ setPaused(gearWasPaused); return; }
+  gearWasPaused = !!state.paused;
+  setPaused(true);
+  renderGearTab();
+  /* Placed off the button rather than pinned to the corner: the strip wraps
+     to two rows on a phone, and a menu nailed to the top right would open
+     somewhere the gear is not. */
+  const r = btn.getBoundingClientRect();
+  menu.style.top = `${Math.round(r.bottom + 6)}px`;
+  menu.style.right = `${Math.round(innerWidth - r.right)}px`;
+  $('gear-body').querySelector('button')?.focus();
+}
+$('m-gear').addEventListener('click', () => openGear());
+/* Anywhere else is a dismissal, and only a dismissal: caught on the way down
+   so the tap that closes the menu does not also land on the chart under it
+   and pan the sky or plan a burn. */
+addEventListener('pointerdown', e => {
+  if(!gearOpen || e.target.closest('#gearmenu, #m-gear')) return;
+  openGear(false);
+  e.stopPropagation();
+}, true);
 /* The view is locked; there is nothing to keep in sync but the panel. */
 function syncView(){}
 /* `quiet` is for the times the layout moves the panel on its own — the first
@@ -1225,7 +1398,7 @@ canvas.addEventListener('pointerdown', e => {
   if(hit?.kind === 'inset'){ lookAtEncounter(); drag = null; return; }
   if(hit?.kind === 'handle'){
     if(hit.axis === 'delete'){
-      S.removeNode(state, hit.index); selectedNode = -1; replan(true); renderTab(); save();
+      S.removeNode(state, hit.index); selectNode(-1); replan(true); renderTab(); save();
       drag = null; return;
     }
     drag = { kind: 'arrow' };
@@ -1234,9 +1407,9 @@ canvas.addEventListener('pointerdown', e => {
     return;
   }
   if(hit?.kind === 'node'){
-    selectedNode = selectedNode === hit.index ? -1 : hit.index;
+    selectNode(selectedNode === hit.index ? -1 : hit.index);
     drag = { kind: 'node', index: hit.index, x: e.clientX, y: e.clientY, moved: false };
-    replan(true); if(tab === 'plan') renderTab();
+    replan(true); if(tab === 'ship') renderTab();
     return;
   }
   /* Empty sky is a pan. It stays a tap until the finger has actually gone
@@ -1279,7 +1452,7 @@ canvas.addEventListener('pointermove', e => {
     const t = chart.dragNodeTime(e.clientX, e.clientY, prediction, state.t, state.nodes, drag.index);
     if(t != null){
       state.nodes[drag.index].t = t;
-      replan(true); if(tab === 'plan') renderTab();
+      replan(true); if(tab === 'ship') renderTab();
     }
   }
 });
@@ -1295,6 +1468,15 @@ function endPointer(e){
        forty pixels across for fingers and at the zoom you cast off at, the
        whole parking orbit fits inside Tassel's — which made lesson two
        impossible to follow by tapping the road it names. */
+    /* A burn first. A tap on the road or a rail within reach of a flame is a
+       tap on the flame — a finger that lands on the line a burn sits on
+       wants that burn opened, not a second one written on top of it. */
+    const nb = prediction && !state.dockedAt ? chart.nearestNode(e.clientX, e.clientY) : null;
+    if(nb && state.nodes[nb.index]){
+      selectNode(nb.index);
+      replan(true); if(tab === 'ship') renderTab();
+      return;
+    }
     const p = prediction && !state.dockedAt ? chart.nearestPathPoint(e.clientX, e.clientY, prediction, state.t) : null;
     const onBody = d.hit?.kind === 'body';
     const insideDrawn = onBody && d.hit.d <= (d.hit.drawn ?? 0) + 2;
@@ -1306,13 +1488,20 @@ function endPointer(e){
        until now nothing on the chart would tell you when anybody else would
        be anywhere. A rail runs through its own world, so the world has to
        win that tie or a planet could not be tapped at all. */
-    /* Not while tied up. A skip started at a dock sets the rate and then
-       never stops — the loop drops `warpTarget` the moment it sees a docked
-       ship — so the clock would run away at a hundred days a second on a
-       promise of ten seconds. The same reason the road is not tappable here. */
-    const rail = state.dockedAt ? null : chart.nearestRailPoint(e.clientX, e.clientY, state.t);
+    /* Tied up as well as adrift. This used to be refused at a dock, because
+       the loop dropped `warpTarget` the moment it saw a docked ship and a skip
+       started there set the rate and then never stopped — the clock ran away
+       at nine days a second on a promise of ten. That was a bug in the loop
+       rather than a fact about harbours: waiting at a mooring for a world to
+       come round is exactly what a pilot does at one. */
+    /* Not while the lesson is running. Waiting for a world to come round is a
+       real move and the chart offers it everywhere, but it is not the move any
+       card is asking for, and a beginner who taps a ring while reading about
+       their own orbit gets a confirmation about Grumm and a clock that runs
+       off with them. It comes back the moment the lesson is done or waved off. */
+    const rail = S.tutorialRunning(state) ? null : chart.nearestRailPoint(e.clientX, e.clientY, state.t);
     if(rail){ askSkip(rail.t, `${S.portName(rail.id)} reaching that point`); return; }
-    selectedNode = -1; if(tab === 'plan') renderTab();
+    selectedNode = -1; if(tab === 'ship') renderTab();
   }
   if(d.kind === 'node'){ tutorialCheck(); save(); }
 }
@@ -1339,17 +1528,22 @@ function keyPan(dx, dy){ chart.panBy(dx, dy); noteLook('chartPanned'); }
 addEventListener('keydown', e => {
   if(typing(e) || e.ctrlKey || e.metaKey || e.altKey) return;
   if($('modal').open) return;
-  const fine = e.shiftKey ? 0.2 : 1;   // a fraction of one press of the pad
+  const fine = e.shiftKey ? 0.2 : 1;   // a fraction of one pull of an arrow
   switch(e.key){
     case ' ': e.preventDefault(); setPaused(!state.paused); break;
     case '+': case '=': chart.zoomBy(1.4); noteLook('chartPanned'); break;
     case '-': case '_': chart.zoomBy(1 / 1.4); noteLook('chartPanned'); break;
     case 'f': backToShip(); break;
+    case 'v': if(S.canSeePast(state)) setFarSight(state.farSight === false); break;
     /* One key for both: it opens the ship, and at a port it steps on to the
        dock and then shuts, which is the whole cycle in one thumb. */
     case 'p': openMenu(state.dockedAt && panelOpen && panelMenu === 'ship' ? 'dock' : 'ship'); break;
-    case 'Escape': if(selectedNode >= 0){ selectedNode = -1; renderTab(); } else togglePanel(false); break;
-    case 'Delete': case 'Backspace': if(state.nodes[selectedNode]){ S.removeNode(state, selectedNode); selectedNode = -1; replan(true); renderTab(); } break;
+    case 'Escape':
+      if(gearOpen) openGear(false);
+      else if(selectedNode >= 0){ selectNode(-1); renderTab(); }
+      else togglePanel(false);
+      break;
+    case 'Delete': case 'Backspace': if(state.nodes[selectedNode]){ S.removeNode(state, selectedNode); selectNode(-1); replan(true); renderTab(); } break;
     /* The arrows push the selected burn; with nothing selected they are the
        keyboard's pan, so the chart can be walked around without a pointer.
        Shift makes both of them fine. */
@@ -1360,23 +1554,39 @@ addEventListener('keydown', e => {
   }
 });
 
-/* Planning is free, and it should not be a race. A mark written down for a
-   moment that is nearly here stops the clock, so the pad can be pressed
-   before it arrives; anything further off leaves the clock alone. The
-   threshold is in real seconds, not game days — at the top warp a fortnight
-   goes by while you look at it, and at ×1 a day is the better part of three
-   hours. */
-const PLAN_HOLD_SECONDS = 25;
-function realSecondsTo(t){
-  return (t - state.t) / Math.max(1e-12, CONST.BASE_RATE_DAYS_PER_SEC * S.warpRate(state));
+/* Planning is free, and it should not be a race: a burn that is open stops the
+   clock, whether it is due in a minute or next spring. */
+/* Closing the burn gives the clock back, but only if it was this that stopped
+   it: a player who pressed space to stop time and then poked a mark should not
+   have time start again when they put the mark away. */
+function releasePlanHold(){
+  if(!heldForPlan) return;
+  heldForPlan = false;
+  if(state.paused) setPaused(false);
 }
+/* Every way of opening a burn holds the clock; every way of closing one lets
+   it go. Selection is the one thing that says which, so it goes through here. */
+function selectNode(ix){
+  const open = ix >= 0 && !!state.nodes[ix];
+  selectedNode = open ? ix : -1;
+  if(open) holdForPlanning(ix); else releasePlanHold();
+}
+
 function holdForPlanning(ix){
   const n = state.nodes[ix];
   if(!n || state.paused) return;
-  if(realSecondsTo(n.t) > PLAN_HOLD_SECONDS) return;
+  /* The clock stops whenever a burn is open, not only when the burn is nearly
+     due. The old rule held it inside twenty-five seconds and let it run
+     otherwise, which is backwards: a mark months out is the one you are going
+     to sit and nudge, and having the sky move under the arrows while you do it
+     is the thing that made a careful pass into a chase.
+
+     It used to say so in a toast every time. It did not need to: the Clock
+     stat in the strip says "held" for as long as it is, which is the same
+     news without a card over the sky every time a burn is opened and closed. */
   state.paused = true;
+  heldForPlan = true;
   setRate(1);
-  toast('Clock held while you plan. Press space to start it again.');
 }
 
 /* Frame what the chart is drawing. The view is locked to the world the ship
@@ -1429,7 +1639,7 @@ function lookAtEncounter(){
   if(!ic) return;
   chart.focus(ic.body, null, false);
   chart.frameBody(ic.body);
-  toast(`Looking at ${esc(S.portName(ic.body))}. Press f for your ship.`);
+  toast(`Looking at ${esc(S.nameFor(ic.body, S.unseen(state)))}. Press f for your ship.`);
 }
 
 /* Come home. Both halves matter: the lock goes back to the ship *and* the
@@ -1468,26 +1678,53 @@ function lookAt(id){
 
    The dock menu is the port: what the yard will fit, what the stalls have,
    who is looking for a ship, and who will talk to you. */
-const TABS_SHIP_FLIGHT = [['orbit', 'Orbit'], ['plan', 'Burns'], ['ship', 'Ship'], ['quests', 'Quests'], ['crew', 'Crew']];
-const TABS_SHIP_DOCKED = [['ship', 'Ship'], ['quests', 'Quests'], ['crew', 'Crew']];
+/* The ship menu reads the same tied up or adrift. It used to grow two more
+   while flying — Orbit, which recited the low point, the high point and the
+   lap of an orbit the chart was already drawing, and Burns, which listed marks
+   you set and move on the chart and could not touch either. Two panels of
+   numbers about a picture, beside the picture. The one thing in them worth
+   keeping was what the road runs into next, and the distress call under it,
+   and those are here, on the tab that is always open. */
+const TABS_SHIP = [['ship', 'Ship'], ['quests', 'Quests'], ['crew', 'Crew']];
 const TABS_DOCK = [['shipyard', 'Shipyard'], ['market', 'Trading'], ['requests', 'Requests'], ['talk', 'Talk']];
+/* A wreck has no stall, no pump, no board and nobody to talk to, so it gets
+   none of those four. What it has is what is aboard it. */
+const TABS_WRECK = [['salvage', 'Salvage']];
 let panelMenu = 'ship';
+/* Which face was last pressed, where the ship was when it was, and how far
+   through that person's lines we have got. Deliberately not in the save: a
+   conversation changes nothing, and a game that remembered them would have to
+   version its saves every time somebody wrote another one. Cleared when the
+   menu changes or the ship moves, so a line about Cinder never survives the
+   trip to Moss. */
+let talking = null;
+
 let lastTabsKey = null;
 /* The Astrolabe is a tab because it is an instrument: it is not on the ship
-   until it is bought, and then it is. Slotted next to Burns, which is the
-   thing it is for. */
+   until it is bought, and then it is. Next to Ship, which is where the rest of
+   what is fitted to the ship is listed. */
 function tabsFor(){
-  if(panelMenu === 'dock' && state.dockedAt) return TABS_DOCK;
-  const base = state.dockedAt ? TABS_SHIP_DOCKED : TABS_SHIP_FLIGHT;
-  if(!state.keys?.astrolabe) return base;
-  const at = base.findIndex(([id]) => id === 'plan');
-  const out = [...base];
-  out.splice(at < 0 ? 1 : at + 1, 0, ['windows', 'Windows']);
+  if(panelMenu === 'dock' && state.dockedAt) return S.isWreck(state.dockedAt) ? TABS_WRECK : TABS_DOCK;
+  if(!state.keys?.astrolabe) return TABS_SHIP;
+  const out = [...TABS_SHIP];
+  out.splice(1, 0, ['windows', 'Windows']);
   return out;
 }
 /* Open one of the two, or shut the panel if it is already showing that one. */
 function openMenu(which){
+  // One menu at a time: the gear stands down for the ship and the port.
+  openGear(false);
   if(which === 'dock' && !state.dockedAt) which = 'ship';
+  /* While a reward is sitting uncollected the ship button is flashing, and a
+     button that flashes has made a promise about what pressing it does. It
+     keeps the promise by opening the log rather than whichever tab you happened
+     to leave open — and once the log is up it is an ordinary toggle again. */
+  if(which === 'ship' && !onOwedLog() && S.unclaimedQuests(state).length){
+    panelMenu = 'ship'; tab = 'quests';
+    renderTabs(); setTab('quests');
+    refreshMenuButtons();
+    return;
+  }
   if(panelOpen && panelMenu === which){ togglePanel(false); return; }
   panelMenu = which;
   renderTabs();
@@ -1498,6 +1735,17 @@ function refreshMenuButtons(){
   $('m-dock').hidden = !state.dockedAt;
   $('m-ship').setAttribute('aria-pressed', String(panelOpen && panelMenu === 'ship'));
   $('m-dock').setAttribute('aria-pressed', String(panelOpen && panelMenu === 'dock'));
+  refreshOwedFlash();
+}
+/* The log is already on screen: the flash has nothing left to point at. */
+function onOwedLog(){ return panelOpen && panelMenu === 'ship' && tab === 'quests'; }
+/* Called every frame, because a job can finish mid-coast with no menu open and
+   nothing else on the page to notice it. The button's own class is the record
+   of what was last drawn, so a steady state writes nothing. */
+function refreshOwedFlash(){
+  const btn = $('m-ship');
+  const owed = !onOwedLog() && S.unclaimedQuests(state).length > 0;
+  if(owed !== btn.classList.contains('owed')) btn.classList.toggle('owed', owed);
 }
 function renderTabs(){
   // Casting off takes the port menu with it; there is nothing left in it.
@@ -1518,6 +1766,8 @@ function renderTabs(){
   refreshMenuButtons();
 }
 function setTab(id, open = true){
+  // Nobody is mid-sentence across a change of menu.
+  if(id !== tab) talking = null;
   tab = id;
   [...$('tabs').children].forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === id)));
   if(open && !panelOpen) togglePanel(true);
@@ -1533,7 +1783,7 @@ function renderTab(){
      was and put it back. */
   const active = document.activeElement;
   const was = body.contains(active) ? (active.dataset?.act ?? active.id ?? null) : null;
-  const fn = { market, shipyard: shipyardTab, requests: requestsTab, talk, plan, quests: questsTab, crew: crewTab, orbit: orbitTab, ship: shipTab, windows: astrolabeTab }[tab];
+  const fn = { market, shipyard: shipyardTab, requests: requestsTab, talk, quests: questsTab, crew: crewTab, ship: shipTab, windows: astrolabeTab, salvage: salvageTab }[tab];
   body.innerHTML = fn ? fn() : '';
   wire(body);
   if(was){
@@ -1651,7 +1901,7 @@ function market(){
   if(rest.length){
     out += '<h3>They want</h3><p>' + rest.map(r => listed(r, 'lock')).join(' · ') + '</p>';
   }
-  if(!priced) out += '<p class="lock">What they would pay is a matter of opinion, and there is nobody aboard whose opinion is worth having.</p>';
+  if(!priced) out += '<p class="lock">No appraiser aboard, so these are worth whatever they turn out to be worth. Sign one on and you will see the price before you sell.</p>';
   return out;
 }
 
@@ -1666,7 +1916,7 @@ function shipyardTab(){
   let out = `<h2>${esc(S.portName(port))} <small class="lock">${p.shipyard ? 'shipyard' : 'dock'}</small></h2>`;
   out += '<h3>Fuel</h3>';
   const fp = S.fuelPrice(state);
-  const room = S.kms(state.tank - state.dv);
+  const room = S.kms(S.usableTank(state) - state.dv);
   if(fp == null) out += '<p class="empty">No fuel sold here.</p>';
   else{
     out += `<p>${S.fmtMoney(fp)} per km/s · ${room.toFixed(1)} km/s of room.</p><div class="btns">
@@ -1675,6 +1925,26 @@ function shipyardTab(){
       <button class="btn primary" data-act="fuel|999" ${room >= 0.05 && state.money >= fp ? '' : 'disabled'}>Fill (${S.fmtMoney(Math.min(room, state.money / fp) * fp)})</button></div>`;
   }
   const ups = S.upgradesFor(port);
+  /* The repair bay. It only exists when there is something to repair, so a
+     sound ship never reads a row telling it that it is sound. Neither repair
+     is compulsory and neither blocks undocking: a battered ship that cannot
+     pay must still be able to leave and go and earn it. */
+  const hull = S.hullLevel(state), cell = S.hasFuelCellFault(state);
+  if(hull > 0 || cell){
+    out += '<h3>Repairs</h3>';
+    if(hull > 0){
+      const c = S.canRepair(state, 'hull'), cost = S.repairCost(state, 'hull');
+      out += `<div class="row"><div class="name"><b>${esc(S.hullWord(state))}</b><small>The frame wants straightening before it wants anything else.</small></div>
+        <div class="price">${S.fmtMoney(cost)}</div>
+        <div class="btns"><button class="btn sm primary" data-act="repair|hull" ${c.ok ? '' : 'disabled title="' + esc(c.reason) + '"'}>Mend</button></div></div>`;
+    }
+    if(cell){
+      const c = S.canRepair(state, 'fuelCell'), cost = S.repairCost(state, 'fuelCell');
+      out += `<div class="row"><div class="name"><b>Burnt fuel cell</b><small>The tank fills to ${Math.round(S.FUEL_CELL_CAP * 100)}% and stops. A new cell is a morning's work.</small></div>
+        <div class="price">${S.fmtMoney(cost)}</div>
+        <div class="btns"><button class="btn sm primary" data-act="repair|fuelCell" ${c.ok ? '' : 'disabled title="' + esc(c.reason) + '"'}>Replace</button></div></div>`;
+    }
+  }
   out += '<h3>On offer</h3>';
   if(!ups.length) out += `<p class="empty">${p.shipyard ? 'Nothing on the rack today.' : 'Nobody fits anything here.'}</p>`;
   for(const u of ups){
@@ -1723,17 +1993,18 @@ function talk(){
 }
 function repWord(v){ return v >= 8 ? 'old friends' : v >= 4 ? 'a known name' : v >= 1.5 ? 'a familiar face' : v <= -2 ? 'unwelcome' : v < 0 ? 'a story going round' : 'a stranger'; }
 
-/* ---------------------------------------------------------- the burn pad */
+/* ------------------------------------------------------ editing a burn */
 
-/* One press of one of the four buttons. `scale` lets the keyboard ask for a
-   smaller one (Shift) without inventing a second set of numbers. */
+/* One nudge along one of the four axes — the chart's arrows and the keyboard
+   both come through here. `scale` lets the keyboard ask for a smaller one
+   (Shift) without inventing a second set of numbers. */
 function pushAxis(i, k, scale = 1){
   const n = state.nodes[i];
   const a = AXES[k];
   if(!n || !a) return;
   n[a.axis] += a.sign * scale * S.auDay(stepFor(i) / 1000);
   replan(true);
-  if(tab === 'plan') renderTab();
+  if(tab === 'ship') renderTab();
   tutorialCheck();
   save();
 }
@@ -1788,38 +2059,14 @@ function stepFor(i){
   return Math.max(1, Math.min(500, nice));
 }
 
-/* The Plan tab reads; it does not edit. A burn is set on the chart, where
- * the road it changes is in front of you — a panel of numbers beside a
- * picture of the thing the numbers are about is a worse place to work than
- * the picture. So this lists what is written down and what is coming. */
-function plan(){
-  let out = '<h2>Planned burns</h2>';
-  const marks = state.nodes.length ? S.markStates(state, horizonFor()) : [];
-  const cost = marks.reduce((a, m) => a + m.cost, 0);
-  const short = cost > state.dv + 1e-9;
-  if(!state.nodes.length){
-    out += '<p class="say">Nothing written down. Tap your path on the chart and choose <b>Plan a burn</b>.</p>';
-  }else{
-    out += `<p>These cost <b class="${short ? 'down' : ''}">${S.fmtKms(cost)}</b> of your ${S.fmtKms(state.dv)}.${short ? ' <span class="down">The tank will not cover it.</span>' : ''}</p>`;
-    state.nodes.forEach((n, i) => {
-      const where = nodePositions[i];
-      const frame = where ? world.get(where.body).name : '?';
-      const fwd = Math.round(S.kms(n.prograde) * 1000), side = Math.round(S.kms(n.radial) * 1000);
-      out += `<div class="node ${i === selectedNode ? 'sel' : ''}" data-act="selnode|${i}">
-        <b>Burn ${i + 1}</b>
-        <small>in ${S.fmtDays(n.t - state.t)} · ${esc(frame)}'s gravity</small>
-        <small>${fwd >= 0 ? 'forward' : 'back'} ${Math.abs(fwd)} m/s · ${side >= 0 ? 'out' : 'in'} ${Math.abs(side)} m/s</small>
-        <small class="lock">uses ${S.fmtKms(marks[i]?.cost ?? 0)} of fuel</small>
-      </div>`;
-    });
-    out += '<p class="lock">A burn fires by itself the moment the clock reaches it. Tap one here, or its ring on the chart, to open it: four arrows and a cross appear round the ring, and tapping the ring again puts them away.</p>';
-  }
-  out += aheadList();
+/* The last resort, which has to live somewhere a stranded pilot can find it:
+ * an empty tank is the one hole a tow cannot always dig you out of, because a
+ * tow has a price and a purse can be empty. The distress call is the floor
+ * under that — half of whatever you have, and the dock you last tied up at
+ * comes and gets you. */
+function strandedBlock(){
+  let out = '';
   if(state.dv <= 1e-9){
-    /* A dead tank is the one hole a tow cannot always dig you out of, because
-       a tow has a price and a purse can be empty. The distress call is the
-       floor under that: half of whatever you have, and the dock you last tied
-       up at comes and gets you. */
     const d = S.distressQuote(state);
     out += `<h3>Dry tank</h3><p>${esc(TEXT.captainLines.onStranded[2] ?? '')}</p>`;
     if(d){
@@ -1840,67 +2087,81 @@ function aheadList(){
   if(!prediction) return '';
   const skip = t => `<button class="btn sm" data-act="skipto|${t}">Skip to it</button>`;
   const lines = [];
+  /* Before anything ahead: the harbour you are inside this second, and what it
+     is still waiting for. A rendezvous has no gravity to finish the job — you
+     are not captured, you are merely nearby — so a ship can sit in the middle
+     of Whisker's mouth at five kilometres a second with nothing on this panel
+     mentioning Whisker at all. The corner of the HUD said "4.55 km/s too fast"
+     in grey, and the reasonable thing to conclude from the rest of the screen
+     was that the place was broken. */
+  const now = state.dockedAt ? null : S.dockingStatus(state);
+  if(now && now.kind === 'zone' && now.inZone && !now.ok){
+    const pb = world.get(now.port);
+    lines.push({ t: -Infinity, html: `<p class="down"><b>${esc(pb.name)} is right here</b>, and there is nothing to fall into: `
+      + `${fmtAu(now.distance)} off and closing at ${S.fmtKms(now.relSpeed)}. `
+      + `Match its speed to ${S.fmtKms(now.dockSpeed)} or under and it will take you.</p>` });
+  }else if(now && now.ok){
+    lines.push({ t: -Infinity, html: `<p class="up"><b>${esc(S.nameFor(now.port, S.unseen(state)))} will take you now.</b> Press the anchor, or <kbd>d</kbd>.</p>` });
+  }
+  /* Whatever the road runs into keeps its numbers and loses its name where the
+     player has not found it yet: the Maw is a door and a pass and a crossing
+     like anywhere else, called ??? until the sensors say otherwise. */
+  const unknown = S.unseen(state);
   for(const e of prediction.events){
     if(e.kind === 'soi'){
       const to = world.get(e.to), from = world.get(e.from);
-      lines.push({ t: e.t, html: `<p>${to.parent === from.id ? 'Into' : 'Out to'} ${esc(to.name)}'s gravity in ${S.fmtDays(e.t - state.t)}. ${skip(e.t)}</p>` });
+      lines.push({ t: e.t, html: `<p>${to.parent === from.id ? 'Into' : 'Out to'} ${esc(S.nameFor(e.to, unknown))}'s gravity in ${S.fmtDays(e.t - state.t)}. ${skip(e.t)}</p>` });
     }else if(e.kind === 'burn' && e.node.aero){
       lines.push({ t: e.t, html: `<p class="up">Air brake at ${esc(S.portName(e.node.body))}: shed ${S.fmtKms(e.magnitude)} in ${S.fmtDays(e.t - state.t)}. ${skip(e.t)}</p>` });
     }else if(e.kind === 'crash'){
-      lines.push({ t: e.t, html: `<p class="down">This path strikes ${esc(S.portName(e.body))} in ${S.fmtDays(e.t - state.t)}.</p>` });
+      lines.push({ t: e.t, html: `<p class="down">This path strikes ${esc(S.nameFor(e.body, unknown))} in ${S.fmtDays(e.t - state.t)}.</p>` });
     }
   }
-  const ic = prediction.intercept;
-  if(ic) lines.push({ t: ic.t, html: ic.grazes
-    ? `<p class="down">This path hits ${esc(S.portName(ic.body))} in ${S.fmtDays(ic.t - state.t)}.</p>`
-    : `<p class="${ic.inMouth ? 'up' : ''}">Closest approach to ${esc(S.portName(ic.body))}: ${fmtAu(ic.altitude)} at ${S.fmtKms(ic.speed)}, in ${S.fmtDays(ic.t - state.t)}.${ic.inMouth ? ' That is inside docking range.' : ''} ${skip(ic.t)}</p>` });
+  /* Every world the road passes, once each, in the order they happen.
+     Two numbers, not one, because at a place with no gravity worth the name
+     they are both the job: being inside the mouth of a rock you cannot fall
+     into is no use whatever at five kilometres a second, and a line that says
+     "inside docking range" and stops there sends a pilot 146 days down a road
+     to find that out on arrival. */
+  for(const ic of prediction.intercepts ?? []){
+    const b = world.get(ic.body);
+    const fast = ic.inMouth && b.rendezvous && ic.speed > b.dockSpeed;
+    const verdict = !ic.inMouth ? ''
+      : fast ? ` Inside the mouth, but ${S.fmtKms(ic.speed)} is too fast to tie up: match it to ${S.fmtKms(b.dockSpeed)} or under.`
+      : ' That is inside docking range.';
+    const what = esc(S.nameFor(ic.body, unknown));
+    lines.push({ t: ic.t, html: ic.grazes
+      ? `<p class="down">This path hits ${what} in ${S.fmtDays(ic.t - state.t)}.</p>`
+      : `<p class="${fast ? 'down' : ic.inMouth ? 'up' : ''}">Closest approach to ${what}: ${fmtAu(ic.altitude)} at ${S.fmtKms(ic.speed)}, in ${S.fmtDays(ic.t - state.t)}.${verdict} ${skip(ic.t)}</p>` });
+  }
   lines.sort((a, b) => a.t - b.t);
   return '<h3>Ahead</h3>' + (lines.length
     ? lines.map(l => l.html).join('')
     : '<p class="lock">Nothing changes before this orbit comes round again.</p>');
 }
 
-function orbitTab(){
-  const b = world.get(state.ship.body);
-  const el = elementsFromState(b.mu, state.ship.r, state.ship.v);
-  const alt = d => fmtAu(Math.max(0, d - (b.radius ?? 0)));
-  const shape = !Number.isFinite(el.period) ? 'an escape' :
-    el.e < 0.02 ? 'a circle' : el.e < 0.3 ? 'a gentle ellipse' :
-    el.e < 0.7 ? 'a long ellipse' : 'a very long ellipse';
-  let out = `<h2>Your orbit</h2>`;
-  out += `<p>You are going round <b>${esc(b.name)}</b> on ${shape}.</p>`;
-  out += `<dl class="kv"><dt>Low point</dt><dd>${alt(el.rp)}</dd>`;
-  out += Number.isFinite(el.ra) ? `<dt>High point</dt><dd>${alt(el.ra)}</dd>` : `<dt>High point</dt><dd>none — you are leaving</dd>`;
-  out += `<dt>Height now</dt><dd>${alt(norm(state.ship.r))}</dd>`;
-  out += `<dt>Speed</dt><dd>${S.fmtKms(norm(state.ship.v))}</dd>`;
-  if(Number.isFinite(el.period)) out += `<dt>A lap takes</dt><dd>${S.fmtDays(el.period)}</dd>`;
-  out += `</dl>`;
-  if(el.rp <= (b.radius ?? 0)) out += `<p class="down">The low point of this orbit is inside ${esc(b.name)}. Burn forward before it arrives.</p>`;
-  else if(b.atmo && el.rp < b.atmo) out += `<p class="up">The low point dips into ${esc(b.name)}'s air. With a heat shield that is free braking; without one it is a bad day.</p>`;
-  out += aheadList();
-  out += `<h3>What is out here</h3>`;
-  const kin = world.children(b.id).filter(c => c.port || c.kind === 'moon');
-  if(kin.length) out += `<p class="lock">${kin.map(c => esc(c.name)).join(' · ')} go round ${esc(b.name)} too. Tap one on the chart to look at it.</p>`;
-  else out += `<p class="lock">Nothing else goes round ${esc(b.name)}.</p>`;
-  return out;
-}
+/* The ship: where it is going, what is bolted to it, what is in the hold, and
+   what it has done. Readable tied up or adrift, because none of it stops being
+   true when you throw a line.
 
-/* The ship: what is bolted to it, what is in the hold, and what it has done.
-   Readable tied up or adrift, because none of it stops being true when you
-   throw a line. It used to open with the whole of the Orbit tab repeated —
-   low point, high point, speed, lap — which was two places for one set of
-   numbers, and only one of them was right when you were moored. */
+   Ahead comes first while flying, above everything the ship is made of,
+   because it is the only thing in here the chart cannot say better. It matters
+   most at the places with no gravity to speak of — Nail, Whisker, the Maw.
+   There is nothing to fall into at one of those, so arriving is a matter of
+   being in the same place at the same speed, and the line that says how close
+   this road comes and how fast it is going past is the whole instrument. */
 function shipTab(){
   const flying = !state.dockedAt;
   let out = `<h2>${esc(state.shipName)}</h2>`;
   out += `<p class="lock">${flying ? `In ${esc(world.get(state.ship.body).name)}'s gravity` : `Tied up at ${esc(S.portName(state.dockedAt))}`}</p>`;
+  if(flying) out += aheadList();
 
   out += '<h3>Fitted</h3>';
   const t = state.tiers;
   /* The fitted list reads the rack rather than naming the keys itself, so a
      new one appears here the moment it exists in the tables. */
   const fittedKeys = UPGRADES.filter(u => u.kind === 'key' && state.keys[u.key]);
-  out += `<dl class="kv"><dt>Tank</dt><dd>${esc(S.tiers('tank')[t.tank].name)} · ${S.fmtKms(state.dv)} of ${S.fmtKms(state.tank)}</dd>
+  out += `<dl class="kv"><dt>Tank</dt><dd>${esc(S.tiers('tank')[t.tank].name)} · ${S.fmtKms(state.dv)} of ${S.fmtKms(S.usableTank(state))}</dd>
     <dt>Hold</dt><dd>${esc(S.tiers('hold')[t.hold].name)} · ${S.usedUnits(state)} of ${S.holdUnits(state)} units</dd>
     <dt>Systems</dt><dd>${fittedKeys.map(u => esc(u.name)).join(', ') || '<span class="lock">nothing yet</span>'}</dd></dl>`;
 
@@ -1919,40 +2180,102 @@ function shipTab(){
     const line = TEXT.captainLines.onLongCoast[Math.floor(S.hash(Math.floor(state.t / 20)) * TEXT.captainLines.onLongCoast.length)];
     out += `<p class="say">${esc(line)}</p>`;
   }
+  if(flying) out += strandedBlock();
+  /* Which of the three this is, and the two ways a game leaves the browser it
+     was played in. The title screen has the same pair; both go through sim.js
+     so there is one idea of what a save is. */
+  out += `<h3>This game</h3><p class="lock">Saved in slot ${SLOT}. It saves itself as you play.</p>`;
+  out += `<div class="btns"><button class="btn sm" data-act="exportsave">Copy this game out</button><button class="btn sm" data-act="importsave">Paste a game in</button></div>`;
   out += `<div class="btns"><button class="btn sm danger" data-act="newgame">New game</button><a class="btn sm" href="./">&larr; Title screen</a></div>`;
   return out;
 }
 
-/* What somebody has asked you to do, and how far along it is. Quests are the
-   only jobs in the game now that the contract board is gone: there is no clock
-   on one and nothing in the hold belongs to anybody else — a quest is a reason
-   to go somewhere, with the steps written out so the chart is never the only
-   thing telling you what to do next. */
-/* Who is aboard. The captain, and three berths that are empty because the
-   three jobs that fill them pay in a person and there is nowhere yet to take
-   one on. An empty berth says what the job is and who does it, so the menu
-   reads as a crew you have not met rather than as a menu that is broken. */
 /* Who is aboard. The captain, and three berths. An empty one says only that
    it is empty and which job it is: naming the people who do that work, and
    where you would have to go to ask, was the whole of it explained before
-   anybody had been anywhere. The mystery is the point. */
+   anybody had been anywhere. The mystery is the point.
+
+   Everybody who is actually aboard has a face you can press, which is the
+   other half of this menu — see talkBlock and dialog.json. */
+function talkBlock(who){
+  if(talking?.who !== who || talking.at !== (state.dockedAt ?? null)) return '';
+  const x = S.exchangeFor(state, who, talking.nth);
+  if(!x) return '';
+  return '<div class="talk">' + x.lines.map(l =>
+    `<p><small>${esc(S.speaker(l.who).name)}</small>${esc(l.say)}</p>`).join('') + '</div>';
+}
+
+/* A portrait you can press, for somebody who is actually aboard. An empty
+   berth keeps the plain picture: there is nobody in it to answer. */
+function face(who, name){
+  const url = portraitURL(who);
+  const open = talking?.who === who && talkBlock(who) !== '';
+  return `<button class="face" data-act="say|${who}" aria-expanded="${open}"`
+    + ` title="Ask ${esc(name)} what they make of it"`
+    + ` aria-label="What does ${esc(name)} have to say?">`
+    + `<img src="${url}" alt="" width="24" height="24"></button>`;
+}
+
 function crewTab(){
   const c = TEXT.crew;
   let out = '<h2>Crew</h2>';
   out += '<div class="crew">'
-    + `<img src="${portraitURL('captain')}" alt="" width="24" height="24">`
+    + face('captain', c.captain.name)
     + `<div class="who"><b>${esc(c.captain.name)}</b><small>${esc(c.captain.role)} · ${sp(c.captain.species)}</small>`
-    + `<p class="say">${esc(c.captain.line)}</p></div></div>`;
+    + `<p class="say">${esc(c.captain.line)}</p>${talkBlock('captain')}</div></div>`;
   out += `<p class="lock">${esc(state.shipName)} · ${state.stats.docks} docking${state.stats.docks === 1 ? '' : 's'} · ${S.fmtKms(state.stats.dvSpent)} burned</p>`;
   out += '<h3>Berths</h3>';
   for(const r of c.roles ?? []){
     const aboard = state.crew?.[r.id] ?? null;
+    const name = r.person?.name ?? r.name;
     out += aboard
-      ? `<div class="crew"><img src="${portraitURL(r.id)}" alt="" width="24" height="24">`
-        + `<div class="who"><b>${esc(r.person?.name ?? r.name)}</b><small>${esc(r.name)} · ${sp(r.species)}</small>`
-        + `<p class="say">${esc(r.person?.line ?? r.does)}</p></div></div>`
+      ? `<div class="crew">${face(r.id, name)}`
+        + `<div class="who"><b>${esc(name)}</b><small>${esc(r.name)} · ${sp(r.species)}</small>`
+        + `<p class="say">${esc(r.person?.line ?? r.does)}</p>${talkBlock(r.id)}</div></div>`
       : `<div class="crew open"><img src="${portraitURL('berth')}" alt="" width="24" height="24">`
         + `<div class="who"><b>Missing ${esc(r.name)}</b></div></div>`;
+  }
+  return out;
+}
+
+/* Tied up to a wreck. The one stop in the game with nobody in it, so the menu
+   is not four empty rooms pretending otherwise: it is what is aboard, whose job
+   it is, and whether it has come across yet.
+
+   A wreck with no job attached is a thing you found by flying into it, which is
+   allowed and says so. */
+function salvageTab(){
+  const id = state.dockedAt;
+  const b = world.get(id);
+  let out = `<h2>${esc(b.name)}</h2>`;
+  const mine = (state.quests ?? [])
+    .map(l => ({ live: l, q: S.questById(l.id) }))
+    .filter(x => x.q?.wreck === id);
+
+  if(!mine.length){
+    return out + '<p class="say">Nothing aboard is yours, and nobody asked you to come. '
+      + 'You are tied to a hull that has been going round this path a long time, and it will go on going round it.</p>'
+      + '<p class="lock">A salvor somewhere is holding the paperwork for this one.</p>';
+  }
+
+  for(const { live, q } of mine){
+    const steps = S.questSteps(q);
+    const recovered = live.step > 0;
+    const load = S.salvageLoad(q);
+    const short = load - S.freeUnits(state);
+    out += `<p class="say">${esc(q.aboard ?? '')}</p>`;
+    out += '<h3>The haul</h3>';
+    for(const g of q.goods ?? []){
+      const good = S.goodById(g.good);
+      out += `<div class="row"><div class="name"><b>${g.qty} × ${esc(good?.name ?? g.good)}</b>`
+        + `<small>${esc(good?.blurb ?? good?.category ?? '')}</small></div>`
+        + `<div class="price">${recovered ? '<span class="up">aboard</span>' : `${(good?.units ?? 1) * g.qty} unit${(good?.units ?? 1) * g.qty === 1 ? '' : 's'}`}</div></div>`;
+    }
+    out += recovered
+      ? `<p class="lock">Off her and into your hold. ${esc(steps[steps.length - 1]?.text ?? '')}.</p>`
+      : short > 0
+        ? `<p class="down">No room for it: ${short} unit${short === 1 ? '' : 's'} short. Sell something or put something down, and it comes across — she is not going anywhere.</p>`
+        : '<p class="lock">Coming across now.</p>';
   }
   return out;
 }
@@ -1971,9 +2294,15 @@ function requestsTab(){
   for(const q of open){
     const can = S.canAcceptQuest(state, q);
     const load = S.questLoad(q);
+    /* A delivery takes the hold here and now; a salvage takes it at the far
+       end, which is still a number somebody deciding needs in front of them. */
+    const later = S.salvageLoad(q);
+    const room = load ? `${load} unit${load === 1 ? '' : 's'} of hold`
+      : later ? `${later} unit${later === 1 ? '' : 's'} of hold, out there`
+      : '';
     out += `<div class="quest">`;
     out += `<h3>${esc(q.title)}</h3>`;
-    out += `<p class="lock">${esc(q.giver)}${load ? ` · ${load} unit${load === 1 ? '' : 's'} of hold` : ''}</p>`;
+    out += `<p class="lock">${esc(q.giver)}${room ? ` · ${room}` : ''}</p>`;
     out += `<p class="say">${esc(q.blurb)}</p>`;
     out += '<ol class="steps">' + S.questSteps(q).map(st => `<li>${esc(st.text)}</li>`).join('') + '</ol>';
     out += `<div class="row"><div class="name"><small>${q.pay ? `Pays ${S.fmtMoney(q.pay)}` : ''}</small></div>
@@ -1997,12 +2326,37 @@ function questsTab(){
   let out = '<h2>Quests</h2>';
   const held = (state.quests ?? []).map(l => ({ l, q: S.questById(l.id) })).filter(x => x.q);
   if(!held.length) return out + '<p class="say">Nobody has asked you for anything yet.</p>';
+  /* Three groups, in the order a player wants them: something owed to you,
+     then what you are doing, then what is behind you. */
+  const owed = held.filter(x => x.l.done && !x.l.claimed)
+    .sort((a, b) => (a.l.doneAt ?? 0) - (b.l.doneAt ?? 0));
   const live = held.filter(x => !x.l.done);
-  const done = held.filter(x => x.l.done)
-    .sort((a, b) => (b.l.doneAt ?? b.l.takenAt ?? 0) - (a.l.doneAt ?? a.l.takenAt ?? 0));
+  const done = held.filter(x => x.l.done && x.l.claimed)
+    .sort((a, b) => (b.l.claimedAt ?? b.l.doneAt ?? 0) - (a.l.claimedAt ?? a.l.doneAt ?? 0));
 
-  out += `<p class="lock">${live.length} of ${S.MAX_ACTIVE_QUESTS} in hand${done.length ? ` · ${done.length} finished, which cost you nothing` : ''}.</p>`;
-  if(!live.length) out += '<p class="say">Nothing in hand. A port\'s Requests tab is where the next one comes from.</p>';
+  out += `<p class="lock">${live.length} of ${S.MAX_ACTIVE_QUESTS} in hand`
+    + `${owed.length ? ` · <b class="up">${owed.length} to collect</b>` : ''}`
+    + `${done.length ? ` · ${done.length} finished` : ''}.</p>`;
+
+  if(owed.length){
+    out += '<h3>Ready to collect</h3>';
+    for(const { l, q } of owed){
+      void l;
+      const pays = [];
+      if(q.pay) pays.push(S.fmtMoney(q.pay));
+      if(q.rep) pays.push(`standing with the ${sp(q.rep)}`);
+      if(q.crew) pays.push('somebody for a berth');
+      out += `<div class="quest owed" id="owed-${esc(q.id)}">`
+        + `<h3>${esc(q.title)}</h3>`
+        + `<p class="lock">${esc(q.giver)} · the work is done</p>`
+        + `<p class="say">${esc(q.done ?? q.blurb)}</p>`
+        + `<p>Owed: ${pays.length ? pays.join(' · ') : 'the thanks of the person who asked'}.</p>`
+        + `<div class="btns"><button class="btn primary collect" data-act="claim|${esc(q.id)}">Collect</button></div>`
+        + '</div>';
+    }
+  }
+
+  if(!live.length && !owed.length) out += '<p class="say">Nothing in hand. A port\'s Requests tab is where the next one comes from.</p>';
   for(const { l, q } of live){
     out += '<div class="quest">';
     out += `<h3>${esc(q.title)}</h3>`;
@@ -2043,15 +2397,30 @@ function astrolabeTab(){
   let out = '<h2>Transfer windows</h2>';
   if(!state.keys?.astrolabe) return out + '<p class="say">No Astrolabe fitted.</p>';
   const rows = S.transferWindows(state);
-  out += `<p class="lock">From ${esc(S.departureName(state) ?? 'here')} · tank ${S.fmtKms(state.tank)}</p>`;
+  out += `<p class="lock">From ${esc(S.departureName(state) ?? 'here')} · tank ${S.fmtKms(S.usableTank(state))}</p>`;
   if(!rows.length) return out + '<p class="empty">Nothing else goes round the Lamp from here.</p>';
   for(const r of rows){
     /* No countdown where waiting cannot help: the crossing is past this tank
        at every phase, and a date would be a promise the ship cannot keep. */
-    const ever = r.best <= state.tank && r.days != null;
+    const ever = r.best <= S.usableTank(state) && r.days != null;
+    /* And a way to be there when it happens. The Astrolabe knew the date and
+       could do nothing about it, which is most of why it reads as dead: at ×1
+       the numbers are right and will not visibly move for the better part of
+       an hour. Everywhere else in the game you skip by pointing at the thing
+       you are waiting for, so you can point at a window too. */
+    /* A window you are standing in does not get a countdown to the next one.
+       The clock lands on the window, the band turns perfect — and the row used
+       to say "103 d" beside it, because that is when the *next* one comes
+       round. Read together those say the instrument is wrong, which is how it
+       read to everybody who waited for a window and then looked at it. */
+    const open = r.band === 'perfect';
+    const wait = !open && ever && r.days > 0.05
+      ? ` <button class="btn sm" data-act="skipto|${state.t + r.days}|${esc(r.name)}'s window">Wait for it</button>`
+      : '';
+    const when = open ? 'now' : ever ? S.fmtDays(r.days) : '—';
     out += `<div class="win ${r.band}">`
       + `<div class="name"><b>${esc(r.name)}</b><small>${S.fmtKms(r.cost)} · ${S.fmtDays(r.tof)}</small></div>`
-      + `<div class="band">${BAND_WORD[r.band]}<small>${ever ? S.fmtDays(r.days) : '—'}</small></div>`
+      + `<div class="band">${BAND_WORD[r.band]}<small>${when}</small>${wait}</div>`
       + '</div>';
   }
   return out;
@@ -2060,6 +2429,82 @@ function astrolabeTab(){
 /* ------------------------------------------------------------- actions */
 
 const actions = {
+  /* Collecting a job. The card is the animation: it lights, lifts, and the
+     things you were owed fly up out of it one after another, and only then
+     does the log redraw with the card moved down to Finished. A reward that
+     appears in a corner while you are looking at the chart is not a reward. */
+  claim(id){
+    const r = S.claimQuest(state, id);
+    if(!r.ok){ toast(r.reason, 'bad'); return; }
+    const card = document.getElementById(`owed-${id}`);
+    const bits = [];
+    if(r.pay) bits.push(`+${S.fmtMoney(r.pay)}`);
+    if(r.rep) bits.push('+ standing');
+    if(r.crew) bits.push('+ a berth filled');
+    if(card){
+      card.classList.add('collecting');
+      bits.forEach((text, i) => {
+        const fly = document.createElement('div');
+        fly.className = 'reward-fly';
+        fly.textContent = text;
+        fly.style.animationDelay = `${i * 160}ms`;
+        card.appendChild(fly);
+      });
+    }
+    renderHud();
+    save();
+    const settle = () => {
+      renderTab();
+      if(r.crew) showCrewPortrait(r.crew, r.quest);
+      else toast(TEXT.events.questCollected ?? 'Collected.', 'story', 5000);
+    };
+    /* Long enough for the last chip to finish its climb, and short enough that
+       nobody presses anything twice. Reduced motion skips straight to the end. */
+    const motion = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if(card && motion) setTimeout(settle, 640 + bits.length * 160);
+    else settle();
+  },
+  exportsave(){
+    const hex = S.exportSave(state);
+    openModal(`<h2>This game, written out</h2>
+      <p>Keep this anywhere. Pasting it into a slot on any machine brings this ship back exactly as it is — same day, same hold, same purse.</p>
+      <textarea id="m-hex" class="hexbox" rows="5" readonly spellcheck="false" aria-label="The save, written out">${esc(hex)}</textarea>
+      <div class="btns"><button class="btn" id="m-copy">Copy</button><button class="btn primary" id="m-ok">Done</button></div>`, m => {
+      const box = m.querySelector('#m-hex');
+      box.addEventListener('focus', () => box.select());
+      m.querySelector('#m-copy').addEventListener('click', async () => {
+        box.select();
+        try{ await navigator.clipboard.writeText(hex); toast('Copied.'); }
+        catch{ toast('Press Ctrl or Cmd and C to copy.', 'bad', 5000); }
+      });
+      m.querySelector('#m-ok').addEventListener('click', closeModal);
+    });
+  },
+  importsave(){
+    openModal(`<h2>Paste a game in</h2>
+      <p>This replaces the ship you are flying with the one in the save. Spaces and line breaks do not matter.</p>
+      <textarea id="m-hex" class="hexbox" rows="5" spellcheck="false" autocomplete="off" aria-label="Paste a save here"></textarea>
+      <div class="btns"><button class="btn" id="m-no">Not now</button><button class="btn primary" id="m-go">Load it</button></div>`, m => {
+      m.querySelector('#m-no').addEventListener('click', closeModal);
+      m.querySelector('#m-go').addEventListener('click', () => {
+        let loaded;
+        try{ loaded = S.importSave(m.querySelector('#m-hex').value); }
+        catch(err){ toast(err.message, 'bad', 6000); return; }
+        if(!confirm('Replace the ship you are flying with the one in that save?')) return;
+        closeModal();
+        state = loaded;
+        selectedNode = -1; lastDockedMode = null;
+        replan(true); renderTabs(); renderHud(); backToShip(true); save();
+        toast('Loaded.', 'story', 5000);
+      });
+    });
+  },
+  repair(what){
+    const r = S.repair(state, what);
+    if(!r.ok){ toast(r.reason, 'bad'); return; }
+    toast(what === 'fuelCell' ? 'New cell fitted.' : 'Hull made good.', 'story', 5000);
+    renderTab(); renderHud(); save();
+  },
   buy(gid, q){ const r = S.buy(state, gid, Number(q)); if(!r.ok) toast(r.reason, 'bad'); renderTab(); save(); },
   sell(gid, q){ const r = S.sell(state, gid, Number(q)); if(!r.ok) toast(r.reason, 'bad'); else toast(`Sold for ${S.fmtMoney(r.total)} (${r.profit >= 0 ? '+' : ''}${S.fmtMoney(r.profit)}).`); renderTab(); save(); },
   takequest(id){
@@ -2070,6 +2515,17 @@ const actions = {
     renderTab(); save(); tutorialCheck();
   },
   look(gid){ showAppraisal(gid); },
+  /* Pressing a face: they say their piece. Pressing it again gets the next
+     thing they have to say about this place, and once they are out of lines the
+     block goes away rather than looping — a portrait that will not stop talking
+     is a portrait you stop pressing. */
+  say(who){
+    const n = S.exchangesFor(state, who).length;
+    if(!n || (talking?.who === who && talking.at === (state.dockedAt ?? null) && talking.nth >= n - 1)) talking = null;
+    else if(talking?.who === who && talking.at === (state.dockedAt ?? null)) talking = { ...talking, nth: talking.nth + 1 };
+    else talking = { who, nth: 0, at: state.dockedAt ?? null };
+    renderTab();
+  },
   fuel(k){ const r = S.refuel(state, Number(k)); if(!r.ok) toast(r.reason, 'bad'); renderTab(); save(); },
   upgrade(id){ const r = S.buyUpgrade(state, id); if(!r.ok) toast(r.reason, 'bad'); else toast(`${S.upgradeById(id).name} fitted.`); renderTab(); save(); },
   wait(d){ const days = Number(d); S.wait(state, days); toast(`${S.fmtDays(days)} pass. ${S.calendar(state.t).text}.`); renderTab(); save(); },
@@ -2079,11 +2535,10 @@ const actions = {
     selectedNode = -1; replan(true); renderTabs(); backToShip(true); tutorialCheck(); save();
   },
   dock(){ doDock(); },
-  closenode(){ selectedNode = -1; replan(true); renderTab(); save(); },
-  selnode(i){ selectedNode = selectedNode === Number(i) ? -1 : Number(i); replan(true); renderTab(); },
-  delnode(i){ S.removeNode(state, Number(i)); selectedNode = -1; replan(true); renderTab(); save(); },
+  closenode(){ selectNode(-1); replan(true); renderTab(); save(); },
+  delnode(i){ S.removeNode(state, Number(i)); selectNode(-1); replan(true); renderTab(); save(); },
   warpnode(i){ const n = state.nodes[Number(i)]; if(n) askSkip(n.t - 0.05, `Burn ${Number(i) + 1}`); },
-  skipto(t){ askSkip(Number(t)); },
+  skipto(t, what){ askSkip(Number(t), typeof what === 'string' ? what : undefined); },
   push(i, k){ pushAxis(Number(i), k); },
   zeronode(i){ const n = state.nodes[Number(i)]; if(!n) return; n.prograde = 0; n.radial = 0; replan(true); renderTab(); save(); },
   shift(i, d){ const n = state.nodes[Number(i)]; n.t = Math.max(state.t + 1e-3, n.t + Number(d)); state.nodes.sort((a, b) => a.t - b.t); selectedNode = state.nodes.indexOf(n); replan(true); renderTab(); },
@@ -2092,21 +2547,25 @@ const actions = {
   newgame(){ confirmNew(); },
 };
 
-/* Tapping a burn card in the Burns tab used to be handled twice, and the two
-   cancelled out. A listener on `document` in the *capture* phase selected the
-   card and re-rendered the panel; the card's own `selnode` action then ran in
-   the bubble phase on the element it had just replaced, and toggled the
-   selection straight back off. So the card never opened: the panel's own line
-   — "tap one here, or its ring on the chart" — was a lie, and a player
-   following card nine to brake at Slate could only get at the arrows through
-   the chart. The capture listener was doing nothing the action does not, and
-   its one extra job (a button inside the card should not also select it) is
-   already the innermost-wins rule in `wire`. Gone, and the card toggles like
-   the ring does. */
-
 function doDock(){
   const r = S.dock(state);
-  if(!r.ok){ toast(r.reason === 'too fast' ? 'Too fast to dock. Kill some speed first.' : 'No port nearby.', 'bad'); return; }
+  if(!r.ok){
+    /* Every refusal says the next thing to do. This used to answer "too fast"
+       and call everything else "No port nearby", which was survivable while
+       the only orbital harbours were worlds you already knew; now that the two
+       big rocks are docked at by orbiting, a player meets "not in orbit" and
+       "that orbit goes through it" early and often. */
+    const WHY = {
+      'too fast': 'Too fast to come alongside. Match its speed first.',
+      'too far': 'Not close enough yet.',
+      'not in orbit': 'Get into an orbit round it first.',
+      'that orbit goes through it': 'That orbit goes through the ground. Raise the low point.',
+      'too far out': 'The high point is outside docking range. Bring it in.',
+      'no navigator': 'Nothing here is holding still, and nobody aboard can hold the ship against it. A cat navigator can.',
+    };
+    toast(WHY[r.reason] ?? 'No port nearby.', 'bad', r.reason === 'no navigator' ? 7000 : 4000);
+    return;
+  }
   stopSkip();
   selectedNode = -1; replan(true); panelMenu = 'dock'; tab = 'market'; renderTabs(); setTab('market');
   const txt = TEXT.ports[r.port];
@@ -2159,9 +2618,10 @@ function showToll(p){
 function showCrash(bodyId){
   const b = world.get(bodyId);
   const atmo = state.pending?.atmosphere;
+  const wrecked = state.pending?.wrecked;
   const q = S.towQuote(state);
-  openModal(`<h2>${atmo ? 'Too deep' : 'Hard landing'}</h2><p class="say">${esc(atmo ? TEXT.events.towAtmosphere : TEXT.events.towCrash[0])}</p>
-    <p>${atmo ? `${esc(b.name)}'s clouds took the ship without a heat shield.` : `The ship met ${esc(b.name)} faster than it should have.`} A tow to ${esc(S.portName(q.port))} will cost ${S.fmtMoney(Math.round(q.cost * 1.5))} and ${S.fmtDays(q.days)}. The cargo rides along.</p>
+  openModal(`<h2>${wrecked ? 'The hull gives out' : atmo ? 'Too deep' : 'Hard landing'}</h2><p class="say">${esc(wrecked ? TEXT.events.skimWrecked : atmo ? TEXT.events.towAtmosphere : TEXT.events.towCrash[0])}</p>
+    <p>${wrecked ? `The shield did its job for longer than the frame under it did.` : atmo ? `${esc(b.name)}'s clouds took the ship without a heat shield.` : `The ship met ${esc(b.name)} faster than it should have.`} A tow to ${esc(S.portName(q.port))} will cost ${S.fmtMoney(Math.round(q.cost * 1.5))} and ${S.fmtDays(q.days)}. The cargo rides along.</p>
     <div class="btns"><button class="btn primary" id="m-tow">Call for a tow</button></div>`, m => {
     m.querySelector('#m-tow').addEventListener('click', () => { const r = S.callTow(state, atmo ? 'atmosphere' : 'crash'); closeModal(); afterTow(r); });
   });
@@ -2491,6 +2951,11 @@ $('grab').addEventListener('keydown', e => { if(e.key === 'Enter' || e.key === '
 renderTabs();
 togglePanel(panelOpen, true);
 replan(true);
+/* Again, now that there is a road to read. The panel is built before the first
+   solve — it has to be, the solve wants a drawn chart — and Ahead is the first
+   thing in it, so on the opening frame it would otherwise be missing from the
+   one tab the game starts on. */
+renderTab();
 backToShip(true);
 syncView();
 setRate(state.warp ?? 1);

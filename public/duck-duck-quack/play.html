@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../theme.css">
+<title>Duck Duck Quack</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%234fc4d3'/%3E%3Ccircle cx='9' cy='7' r='4' fill='%23ffd34e'/%3E%3Cpath d='M12 7h2l-1 1z' fill='%23f08c33'/%3E%3C/svg%3E">
+<meta name="description" content="A duckling hatches and walks on its own. Give it a skill before it wanders into something — a gap, a wall, a drop, or the goose — and get enough of the hatch to the pond.">
+<style>
+  :root{
+    --type: var(--gv-type);
+    --ink: var(--gv-paper);
+    --panel: var(--gv-paper-2);
+    --sunk: var(--gv-sunk);
+    --line: var(--gv-line);
+    --text: var(--gv-text);
+    --muted: var(--gv-muted);
+    --accent: var(--gv-leaf);
+    --sun: var(--gv-sun);
+    --bad: var(--gv-bad);
+  }
+  *{ box-sizing: border-box; }
+  body{
+    margin: 0;
+    padding: 0.6rem clamp(0.5rem, 3vw, 1.2rem) 2rem;
+    background: var(--ink);
+    background-image: var(--gv-ground);
+    color: var(--text);
+    font-family: var(--type);
+    line-height: 1.5;
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Wide enough that a desktop or tablet screen can actually grow the play
+     area past a phone-sized canvas — fitCanvas (../good-vibes/pixel.js)
+     only ever scales up to whatever room this gives it, in whole multiples
+     of the scene's own 320x180, so a tighter cap here was the thing
+     quietly capping the game's size on every screen roomy enough to ask
+     for more. `96vw` is the floor under it on anything narrower. */
+  .wrap{ max-width: min(84rem, 96vw); margin: 0 auto; }
+
+  /* A phone held upright: shown only there (see the media query below),
+     hidden everywhere the game already has the room a landscape hold would
+     free up. A CSS-drawn glyph rather than an image — two arcs and an
+     arrowhead read as "rotate" at this size without a font's worth of emoji
+     support riding on it. */
+  .rotate-hint{
+    display: none;
+    align-items: center; gap: 0.5rem;
+    margin: 0 0 0.6rem; padding: 0.5rem 0.7rem;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+    font-size: 0.82rem; color: var(--muted);
+  }
+  .rotate-hint svg{ flex: none; width: 1.3rem; height: 1.3rem; }
+  @media (orientation: portrait) and (max-width: 640px){
+    .rotate-hint{ display: flex; }
+  }
+
+  header{ display: flex; align-items: baseline; gap: 0.9rem; flex-wrap: wrap; padding-bottom: 0.5rem; }
+  header h1{ margin: 0; font-size: 1.2rem; font-weight: 800; }
+  header .level-name{ color: var(--muted); font-weight: 600; }
+  header .crumb{ color: var(--muted); font-size: 0.82rem; text-decoration: none; margin-left: auto; }
+  header .crumb:hover{ color: var(--text); }
+
+  /* One column normally: the screen, then the sidebar (skills, status,
+     controls) stacked under it full-width. `.screen-col` exists only so
+     there is something with a real, non-shrink-wrapped width to measure the
+     canvas against — `.screen` itself is `width: max-content`, sized to
+     whatever the canvas already is, which is no use as a ruler for how big
+     the canvas is allowed to become. See the script's `fitScene`. */
+  .layout{ display: grid; grid-template-columns: 1fr; gap: 0.7rem; align-items: start; }
+  .screen-col{ width: 100%; min-width: 0; }
+  .sidebar{ width: 100%; }
+
+  .screen{
+    position: relative;
+    width: max-content; max-width: 100%; margin: 0 auto;
+    border: 2px solid var(--line);
+    border-radius: 6px;
+    background: #14304a;
+    box-shadow: 0 0 0 4px #e6dcc7, 0 14px 34px rgb(74 51 32 / 0.18);
+    overflow: hidden;
+    line-height: 0;
+  }
+  canvas{ display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
+  #scene{
+    cursor: pointer; touch-action: none; margin: 0 auto;
+    max-width: 100%; height: auto;
+    user-select: none; -webkit-user-select: none;
+    -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+  }
+  #scene:focus-visible{ outline: 3px solid var(--sun); outline-offset: -3px; }
+
+  .hud{
+    position: absolute; inset: 0.4rem 0.5rem auto 0.5rem;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 0.5rem; pointer-events: none; font-size: 0.7rem;
+    /* `.screen` sets `line-height: 0` to collapse whitespace around the
+       canvas, and that inherits into every descendant unless it is set again
+       — without this the HUD's two stacked lines land on top of each other. */
+    line-height: 1.35;
+    text-shadow: 0 1px 0 rgba(0,0,0,0.6);
+    color: #fdf6e3;
+  }
+  .hud b{ font-size: 0.95rem; }
+  .hud .right{ text-align: right; }
+  .hud .hint{ font-size: 0.62rem; letter-spacing: 0.02em; opacity: 0.85; }
+  .hud b.at-risk{ color: #ff8a7a; }
+  .hud .hint.at-risk{ color: #ff8a7a; opacity: 1; font-weight: 700; }
+
+  .count-num{
+    font-size: 4.5rem; font-weight: 800; line-height: 1;
+    color: #fdf6e3; text-shadow: 0 2px 0 rgba(0,0,0,0.5);
+  }
+
+  .overlay{
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(13, 11, 31, 0.72); color: #fdf6e3; text-align: center;
+    flex-direction: column; gap: 0.6rem; padding: 1rem;
+  }
+  /* The plain UA rule for [hidden] loses to the class rule above on
+     specificity order, not strength, so it has to be said again here — an
+     author style always wins over the default stylesheet regardless of which
+     was written first. Without this the overlay stayed visible (and kept
+     eating clicks meant for the scene) the entire time it was "hidden". */
+  .overlay[hidden]{ display: none; }
+  .overlay h2{ margin: 0; font-size: 1.5rem; }
+  .overlay p{ margin: 0; font-size: 0.9rem; max-width: 22rem; }
+  .overlay-actions{ display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; }
+  .overlay-actions .btn{ text-decoration: none; }
+
+  /* Auto-fit rather than a fixed count: the number of skills is whatever
+     content.js says it is, and a fifth one should wrap onto a second row
+     rather than squeeze four columns into five. */
+  .skills{
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
+    gap: 0.5rem; margin-top: 0.6rem;
+  }
+  .skill{
+    font: inherit; cursor: pointer; text-align: left;
+    background: var(--panel); border: 2px solid var(--line); border-radius: 6px;
+    padding: 0.5rem 0.6rem;
+  }
+  .skill .head{ display: flex; align-items: center; gap: 0.35rem; }
+  .skill .badge{ image-rendering: pixelated; image-rendering: crisp-edges; flex: none; }
+  .skill:disabled .badge{ opacity: 0.6; }
+  .skill .name{ font-weight: 800; display: block; }
+  .skill .count{ font-variant-numeric: tabular-nums; color: var(--muted); font-size: 0.82rem; }
+  .skill:hover:not(:disabled){ border-color: var(--accent); }
+  .skill[aria-pressed='true']{ background: #eef7e9; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+  .skill:disabled{ opacity: 0.45; cursor: not-allowed; }
+  .skill .blurb{ display: block; font-size: 0.74rem; color: var(--muted); margin-top: 0.15rem; }
+
+  .status{ min-height: 1.4em; margin: 0.5rem 0 0; font-size: 0.84rem; color: var(--muted); }
+  .status[data-bad='true']{ color: var(--bad); font-weight: 700; }
+
+  .controls{ display: flex; gap: 0.5rem; margin-top: 0.6rem; flex-wrap: wrap; }
+  .btn{
+    font: inherit; font-size: 0.84rem; padding: 0.4rem 0.9rem; cursor: pointer;
+    background: var(--sunk); border: 1px solid var(--line); border-radius: 5px; color: var(--text);
+  }
+  .btn:hover{ background: #fffdf6; }
+  .btn-go{ background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+  .btn-go:hover{ background: #256b28; }
+
+  /* A landscape phone: wide enough for the screen and a sidebar side by
+     side, short enough that stacking them the normal way leaves the canvas
+     a postage stamp under a wall of skill cards. Keyed to height rather than
+     to `orientation` alone so a landscape tablet or a wide desktop window —
+     both plenty tall — keep the roomier stacked layout instead of being
+     squeezed into a phone's.
+
+     This has to be the last thing in the sheet. Every selector in it repeats
+     one from above at the same specificity, and a media query does not
+     raise that on its own — the rule that is later in the file still wins a
+     tie. Placed where the rest of this stylesheet was, right after
+     `.layout`, it lost silently to `.skills` and `.screen` further down and
+     the sidebar rendered as four illegible columns regardless of viewport. */
+  /* Anywhere with the width to spare — a tablet, a landscape phone, an
+     ordinary desktop window — the screen and a slim sidebar sit side by
+     side instead of stacked, so the play area gets almost the whole width
+     of the page rather than sharing a column with a full-width skill grid
+     underneath it. 640px is comfortably past a portrait phone (see
+     `.rotate-hint` above, gated at the same width) and comfortably short of
+     needing the sidebar's own room measured first. The sidebar itself
+     borrows the short-phone-landscape layout's own compact styling below —
+     one skill per row, no blurb — rather than a second copy of it, since
+     "reduce how much room the sidebar takes" is the same ask at any width. */
+  @media (min-width: 640px){
+    .layout{ grid-template-columns: minmax(0, 1fr) 11rem; gap: 0.6rem; }
+    .sidebar{
+      display: flex; flex-direction: column; gap: 0.5rem;
+    }
+    .skills{ grid-template-columns: 1fr; gap: 0.3rem; margin-top: 0; }
+    .skill{ padding: 0.35rem 0.5rem; }
+    .skill .head{ display: inline-flex; vertical-align: middle; }
+    .skill .name{ display: inline; }
+    .skill .count{ display: inline; margin-left: 0.35rem; }
+    .skill .blurb{ display: none; }
+    .status{ margin-top: 0; font-size: 0.78rem; }
+    .controls{ flex-direction: column; margin-top: 0; }
+    .controls .btn{ width: 100%; }
+  }
+
+  @media (orientation: landscape) and (max-height: 560px){
+    body{ padding-top: 0.35rem; padding-bottom: 0.5rem; }
+    header{ padding-bottom: 0.3rem; }
+    header h1{ font-size: 1rem; }
+
+    .layout{ grid-template-columns: minmax(0, 1fr) 10.5rem; gap: 0.6rem; }
+
+    /* fitCanvas only scales by whole numbers, which is right everywhere else
+       in this repo — the alternative is pixels of uneven size, which reads
+       as a rendering fault. But on a phone in landscape, height is what runs
+       out first, and a 320x180 scene only needs about 640x360 to satisfy
+       that budget at 2x; the rest of a screen that is 900+ wide goes to
+       margin on both sides of a canvas visibly smaller than the room it has.
+
+       No height is set here on purpose. This layout used `100vh`, which on a
+       phone is the viewport with the browser's own chrome collapsed — room
+       the page does not actually have while that chrome is showing, so the
+       scene was sized past the bottom of the screen and the bottom of the
+       park went with it. What is actually available is measured in
+       `fitScene` instead, from `visualViewport` and the canvas's own
+       position, which are the real numbers; the script sets the size. */
+    .screen-col{ display: flex; justify-content: center; align-items: flex-start; }
+
+    .sidebar{
+      max-height: 100dvh; overflow-y: auto;
+      display: flex; flex-direction: column; gap: 0.5rem;
+    }
+
+    /* One skill per row instead of four across, and the blurb dropped —
+       there isn't a 10rem-wide sidebar's worth of room for both a name and
+       three lines about what it does, and the name plus the count still
+       says enough to play from. */
+    .skills{ grid-template-columns: 1fr; gap: 0.3rem; margin-top: 0; }
+    .skill{ padding: 0.35rem 0.5rem; }
+    /* Inline-flex rather than flex here so the name keeps its badge beside
+       it while the count still sits on the same line, the way it does in
+       the roomier layout's own two-line card. */
+    .skill .head{ display: inline-flex; vertical-align: middle; }
+    .skill .name{ display: inline; }
+    .skill .count{ display: inline; margin-left: 0.35rem; }
+    .skill .blurb{ display: none; }
+
+    .status{ margin-top: 0; font-size: 0.78rem; }
+    .controls{ flex-direction: column; margin-top: 0; }
+    .controls .btn{ width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Duck Duck Quack <span class="level-name" id="level-name"></span></h1>
+    <a class="crumb" href="/duck-duck-quack/">&larr; levels</a>
+  </header>
+
+  <p class="rotate-hint" role="note">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+      <rect x="7" y="2" width="10" height="16" rx="1.5"></rect>
+      <path d="M20 8a8 8 0 0 1-11 7.6"></path>
+      <path d="M20 8l-3-1 1-3"></path>
+    </svg>
+    Turn your phone sideways — landscape gives the flock a lot more room.
+  </p>
+
+  <div class="layout">
+    <div class="screen-col">
+      <div class="screen">
+        <canvas id="scene" width="320" height="180" tabindex="0" role="application"
+                aria-label="Arm a skill below, then click a walking duckling to give it that skill."></canvas>
+        <div class="hud" aria-hidden="true">
+          <div>
+            Saved <b id="hud-saved">0 / 0</b> <span class="hint" id="hud-hint">needed</span><br>
+            Lost <b id="hud-lost">0</b>
+          </div>
+          <div class="right">
+            Hatched <b id="hud-hatched">0 / 0</b><br>
+            Time <b id="hud-time">0:00</b>
+          </div>
+        </div>
+        <div class="overlay" id="countdown" hidden aria-hidden="true">
+          <div class="count-num" id="countdown-num">3</div>
+        </div>
+        <div class="overlay" id="overlay" hidden>
+          <h2 id="overlay-title"></h2>
+          <p id="overlay-body"></p>
+          <div class="overlay-actions">
+            <button class="btn btn-go" id="again" type="button">Play again</button>
+            <a class="btn" id="next-level" href="#" hidden></a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="sidebar">
+      <div class="skills" role="group" aria-label="Skills to arm">
+        <!-- Filled in by script from SKILLS / SKILL_INFO, so a skill added
+             here needs no second copy of its name and blurb in the page. -->
+      </div>
+      <p class="status" id="status" role="status"></p>
+
+      <div class="controls">
+        <button class="btn" id="pause" type="button">Pause</button>
+        <button class="btn" id="restart" type="button">Restart level</button>
+        <button class="btn" id="sound" type="button" aria-pressed="false">Music off</button>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script type="module">
+  import { LEVELS, SKILLS, SKILL_INFO, TICK_RATE, winCount, formatTime } from './content.js';
+  import { newGame, tick, assignSkill, assignRefusal, duckNear } from './sim.js';
+  import { paintScene, drawSkillBadge, BADGE_PLATE_W, BADGE_PLATE_H } from './art.js';
+  import { createAudio } from './audio.js';
+  import { fitCanvas, context2d } from '../good-vibes/pixel.js';
+
+  // How much bigger the badge on a skill button is than the one a duckling
+  // wears. Whole-number, so it stays a pixel drawing rather than a blur.
+  const BADGE_SCALE = 4;
+
+  // Which level this page is: ?level=<id>, or the first one if that's
+  // missing or doesn't match anything — a bad or old link should still
+  // open a level, not a blank page.
+  const requestedId = new URLSearchParams(location.search).get('level');
+  const LEVEL = LEVELS.find(l => l.id === requestedId) || LEVELS[0];
+  const nextLevel = LEVELS[LEVELS.indexOf(LEVEL) + 1] || null;
+  document.getElementById('level-name').textContent = `— ${LEVEL.name}`;
+  document.title = `Duck Duck Quack — ${LEVEL.name}`;
+
+  const els = id => document.getElementById(id);
+  const ui = {
+    scene: els('scene'), hudSaved: els('hud-saved'), hudLost: els('hud-lost'),
+    hudHatched: els('hud-hatched'), hudTime: els('hud-time'),
+    overlay: els('overlay'), overlayTitle: els('overlay-title'), overlayBody: els('overlay-body'),
+    again: els('again'), nextLevel: els('next-level'), status: els('status'), pause: els('pause'), restart: els('restart'),
+    sound: els('sound'), skills: document.querySelector('.skills'),
+    countdown: els('countdown'), countdownNum: els('countdown-num'), hudHint: els('hud-hint'),
+  };
+  const ctx = context2d(ui.scene);
+
+  /* ---- the music ---------------------------------------------------- */
+
+  const audio = createAudio();
+  const syncSound = () => {
+    const on = !audio.isMuted();
+    ui.sound.textContent = on ? 'Music on' : 'Music off';
+    ui.sound.setAttribute('aria-pressed', String(on));
+  };
+  audio.play(LEVEL.id);
+  syncSound();
+
+  /* iOS Safari's Web Audio autoplay unlock is pickier than the video/audio
+     element autoplay policy — a page where a <video> plays fine can still
+     leave a freshly-made AudioContext stuck `suspended` after a gesture, and
+     it is specifically `touchend`/`click` that Safari has always honoured
+     most reliably, `pointerdown` being the newer, less certain one. Listening
+     for all of them costs nothing extra: `unlock()` no-ops once the context
+     is already running.
+     And attempts are not one-shot — the first gesture's `resume()` can fail
+     silently, so the listeners stay attached until `isRunning()` actually
+     confirms it worked, rather than being torn down after a single try that
+     may or may not have landed. */
+  const UNLOCK_EVENTS = ['pointerdown', 'touchend', 'mousedown', 'click', 'keydown'];
+  const tryUnlock = () => {
+    audio.unlock();
+    if(!audio.isRunning()) return;
+    for(const type of UNLOCK_EVENTS) removeEventListener(type, tryUnlock);
+  };
+  for(const type of UNLOCK_EVENTS) addEventListener(type, tryUnlock);
+
+  ui.sound.addEventListener('click', () => {
+    audio.setMuted(!audio.isMuted());
+    audio.unlock();
+    syncSound();
+  });
+
+  addEventListener('pagehide', () => audio.stop());
+
+  let state = newGame(LEVEL);
+  let armed = null;
+  let paused = false;
+
+  /* --- the skill palette ---------------------------------------------- */
+
+  const skillButtons = new Map();
+  for(const skill of SKILLS){
+    const info = SKILL_INFO[skill];
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'skill';
+    btn.dataset.skill = skill;
+    btn.setAttribute('aria-pressed', 'false');
+    btn.innerHTML = `<span class="head"><span class="name">${info.name}</span></span>`
+      + `<span class="count" id="count-${skill}"></span>`
+      + `<span class="blurb">${info.blurb}</span>`;
+
+    /* The same badge the duckling wears, drawn from the same code at three
+       times the size (see art.js) — so "what is that thing over its head"
+       is answered by the button you armed it from, rather than by a second
+       legend somewhere that could drift out of step with the scene. */
+    const badge = document.createElement('canvas');
+    badge.className = 'badge';
+    badge.width = BADGE_PLATE_W * BADGE_SCALE;
+    badge.height = BADGE_PLATE_H * BADGE_SCALE;
+    badge.setAttribute('aria-hidden', 'true');
+    const bctx = badge.getContext('2d');
+    bctx.imageSmoothingEnabled = false;
+    drawSkillBadge(bctx, skill, 0, 0, BADGE_SCALE);
+    btn.querySelector('.head').prepend(badge);
+    btn.addEventListener('click', () => {
+      armed = armed === skill ? null : skill;
+      say(armed ? `${info.name} armed — click a walking duckling.` : '');
+      refreshSkills();
+    });
+    ui.skills.append(btn);
+    skillButtons.set(skill, btn);
+  }
+
+  function refreshSkills(){
+    for(const skill of SKILLS){
+      const btn = skillButtons.get(skill);
+      const left = state.supply[skill];
+      btn.querySelector(`#count-${skill}`).textContent = `${left} left`;
+      btn.disabled = left <= 0 || Boolean(state.ended);
+      btn.setAttribute('aria-pressed', String(armed === skill));
+      if(btn.disabled && armed === skill) armed = null;
+    }
+  }
+
+  function say(text, bad = false){
+    ui.status.textContent = text;
+    ui.status.dataset.bad = String(bad);
+  }
+
+  /* --- clicking a duckling --------------------------------------------- */
+
+  function sceneXY(event){
+    const box = ui.scene.getBoundingClientRect();
+    return {
+      x: (event.clientX - box.left) / box.width * LEVEL.width,
+      y: (event.clientY - box.top) / box.height * LEVEL.height,
+    };
+  }
+
+  /* Clicking a duckling with nothing armed is a question, not an order —
+     it answers what that one is already carrying. The badges over its head
+     say the same thing at a glance; this is the version you can read. */
+  function describeDuck(d){
+    if(d.state === 'blocking') return 'That one is planted as a Blocker.';
+    const held = SKILLS.filter(s => s !== 'blocker' && d.traits.has(s));
+    if(!held.length) return 'That one is carrying nothing yet.';
+    return `That one has: ${held.map(s => SKILL_INFO[s].name).join(', ')}.`;
+  }
+
+  ui.scene.addEventListener('pointerdown', event => {
+    event.preventDefault();
+    ui.scene.focus({ preventScroll: true });
+    const at = sceneXY(event);
+    if(!armed){
+      const asked = duckNear(state, at.x, at.y, 12);
+      return say(asked ? describeDuck(asked) : 'Arm a skill first, then click a duckling.');
+    }
+    const { x, y } = at;
+    const duck = duckNear(state, x, y, 12);
+    if(!duck) return say('No duckling there.');
+    const refusal = assignRefusal(state, duck.id, armed);
+    if(refusal) return say(refusal, true);
+    assignSkill(state, duck.id, armed);
+    say(`${SKILL_INFO[armed].name} given.`);
+    refreshSkills();
+  });
+
+  /* --- the loop ---------------------------------------------------------- */
+
+  const STEP = 1 / TICK_RATE;
+  let acc = 0, last = null;
+
+  // Ids already credited with a quack or a loss, so a duckling sitting
+  // saved in the pond — or one already gone — does not retrigger its sound
+  // on every subsequent frame, only the tick it actually happened on.
+  let quacked = new Set();
+  let mourned = new Set();
+
+  function quackNewArrivals(){
+    for(const d of state.ducks){
+      if(d.state !== 'saved' || quacked.has(d.id)) continue;
+      quacked.add(d.id);
+      audio.sfx('quack');
+    }
+  }
+
+  // Plays alongside the poof (see art.js/sim.js), on the same tick a
+  // duckling actually goes down rather than on every frame it stays lost.
+  function sfxNewLosses(){
+    for(const d of state.ducks){
+      if(d.state !== 'lost' || mourned.has(d.id)) continue;
+      mourned.add(d.id);
+      audio.sfx('lost');
+    }
+  }
+
+  // The countdown that carries a won run on to the next level on its own.
+  // Kept cancellable rather than just a bare `setTimeout` to `location.href`,
+  // because "Play again" during those few seconds has to mean replay this
+  // level, not get yanked into the next one a moment later anyway.
+  let autoAdvanceTimer = null;
+  function cancelAutoAdvance(){
+    if(autoAdvanceTimer){ clearInterval(autoAdvanceTimer); autoAdvanceTimer = null; }
+  }
+
+  function endMessage(){
+    const won = state.ended === 'won';
+    ui.overlayTitle.textContent = won ? 'The flock made it!' : 'Out of time';
+    ui.overlayBody.textContent = `${state.saved} of ${LEVEL.duckCount} saved`
+      + ` — needed ${winCount(LEVEL)}. ${state.lost} lost.`;
+    // A next level to go to only means anything once this one is actually
+    // won — offering it on a loss would read as skipping past the level
+    // that just beat you.
+    cancelAutoAdvance();
+    if(won && nextLevel){
+      const href = `./play.html?level=${nextLevel.id}`;
+      ui.nextLevel.href = href;
+      ui.nextLevel.hidden = false;
+      let secondsLeft = 4;
+      const countdown = () => {
+        ui.nextLevel.textContent = `Next: ${nextLevel.name} (${secondsLeft})`;
+        if(secondsLeft <= 0){ cancelAutoAdvance(); location.href = href; return; }
+        secondsLeft -= 1;
+      };
+      countdown();
+      autoAdvanceTimer = setInterval(countdown, 1000);
+    } else {
+      ui.nextLevel.hidden = true;
+    }
+    ui.overlay.hidden = false;
+  }
+
+  /* Whether more ducklings could still be saved than have already been lost
+     leaves room for — the moment `lost` alone rules out ever reaching the
+     quota, the run is a loss in every way but the clock and the overlay
+     admitting it yet. Surfacing that the instant it becomes true is most of
+     what "clear about the status of the goal" means while a level is still
+     running rather than only once it ends. */
+  function refreshHud(){
+    const need = winCount(LEVEL);
+    const maxPossible = LEVEL.duckCount - state.lost;
+    const atRisk = state.saved < need && maxPossible < need;
+    ui.hudSaved.textContent = `${state.saved} / ${need}`;
+    ui.hudSaved.classList.toggle('at-risk', atRisk);
+    ui.hudHint.textContent = atRisk ? "can't reach" : 'needed';
+    ui.hudHint.classList.toggle('at-risk', atRisk);
+    ui.hudLost.textContent = String(state.lost);
+    ui.hudHatched.textContent = `${state.hatched} / ${LEVEL.duckCount}`;
+    ui.hudTime.textContent = formatTime(Math.max(0, LEVEL.timeLimit - state.ticks));
+  }
+
+  /* --- the starting countdown ------------------------------------------- */
+
+  // Three full seconds on the clock in the middle of the screen before a
+  // level actually starts moving — real wall-clock time, not sim ticks,
+  // since nothing has hatched yet for ticks to matter to. `at` is set from
+  // the first frame's own timestamp rather than `performance.now()` here,
+  // so it is always measured against the same clock `frame`'s `now` is.
+  const COUNTDOWN_SECONDS = 3;
+  let starting = true;
+  let countdownAt = null;
+
+  function beginCountdown(){
+    starting = true;
+    countdownAt = null;
+    ui.countdown.hidden = false;
+  }
+
+  function frame(now){
+    requestAnimationFrame(frame);
+    if(last === null) last = now;
+    const dt = Math.min(0.25, (now - last) / 1000);
+    last = now;
+
+    if(starting){
+      if(countdownAt === null) countdownAt = now;
+      const remaining = COUNTDOWN_SECONDS - (now - countdownAt) / 1000;
+      if(remaining <= 0){
+        starting = false;
+        ui.countdown.hidden = true;
+      } else {
+        ui.countdownNum.textContent = String(Math.ceil(remaining));
+      }
+    } else if(!paused && !state.ended){
+      acc += dt;
+      while(acc >= STEP){ tick(state); acc -= STEP; }
+      quackNewArrivals();
+      sfxNewLosses();
+      if(state.ended){ refreshSkills(); endMessage(); }
+    }
+
+    paintScene(ctx, state);
+    refreshHud();
+  }
+
+  ui.pause.addEventListener('click', () => {
+    paused = !paused;
+    ui.pause.textContent = paused ? 'Resume' : 'Pause';
+  });
+
+  function restart(){
+    cancelAutoAdvance();
+    state = newGame(LEVEL);
+    armed = null;
+    paused = false;
+    quacked = new Set();
+    mourned = new Set();
+    ui.pause.textContent = 'Pause';
+    ui.overlay.hidden = true;
+    say('');
+    refreshSkills();
+    beginCountdown();
+  }
+  ui.restart.addEventListener('click', restart);
+  ui.again.addEventListener('click', restart);
+
+  /* `.screen` is `width: max-content`, sized to whatever the canvas already
+     is — a container fitCanvas cannot measure against without also being the
+     thing it is trying to size. `.screen-col`, a level up, is sized by the
+     grid track instead: full width in the normal stacked layout, or
+     whatever is left of the row after the sidebar's fixed column in the
+     landscape layout below — either way a real, content-independent number,
+     which is what every other canvas in this repo measures against (see
+     Sunward's `#lot` and Good Vibes' own canvases). Without this the scale
+     was stuck at 1x everywhere, phone and desktop alike. */
+  const screenWrap = ui.scene.parentElement.parentElement;
+
+  /* The compact landscape layout (see the media query above) sizes the
+     canvas itself, with `height: 100%` and `width: auto` — fitCanvas's
+     whole-number scale would otherwise win the size fight anyway, since it
+     sets an inline style and an inline style beats any stylesheet rule that
+     is not `!important`. Skipping it here, rather than fighting it with
+     `!important`, is what lets a phone in landscape actually use the height
+     it has instead of stepping down to the next whole multiple of 180 and
+     leaving margin on every side. Any leftover inline size from a fit made
+     in the other layout — a load in portrait, then a rotation — has to be
+     cleared explicitly, or it would keep the CSS from taking effect too. */
+  const compactLandscape = matchMedia('(orientation: landscape) and (max-height: 560px)');
+
+  /* In the compact landscape layout the scene is sized to whichever of the
+     two dimensions actually runs out first, measured rather than assumed:
+     `visualViewport.height` is what the viewport really shows right now
+     (`innerHeight` counts room behind the browser's own chrome), and the
+     canvas's own top edge is where the header and padding above it have
+     already ended. The whole scene fits inside both, or it is not a fit. */
+  const GUTTER = 10;
+  function fitScene(){
+    if(compactLandscape.matches){
+      const top = screenWrap.getBoundingClientRect().top;
+      const viewH = (window.visualViewport && window.visualViewport.height) || innerHeight;
+      const availH = Math.max(60, viewH - top - GUTTER);
+      const availW = Math.max(60, screenWrap.clientWidth);
+      const scale = Math.min(availW / LEVEL.width, availH / LEVEL.height);
+      ui.scene.style.width = `${Math.floor(LEVEL.width * scale)}px`;
+      ui.scene.style.height = `${Math.floor(LEVEL.height * scale)}px`;
+      return;
+    }
+    ui.scene.style.width = '';
+    ui.scene.style.height = '';
+    fitCanvas(ui.scene, LEVEL.width, LEVEL.height, { container: screenWrap, maxHeightFraction: 0.85 });
+  }
+  fitScene();
+  addEventListener('resize', fitScene);
+  // The visual viewport changes without a `resize` when the browser's own
+  // chrome slides in or out, which is exactly when this needs redoing.
+  if(window.visualViewport) window.visualViewport.addEventListener('resize', fitScene);
+  // iOS Safari can report the old innerHeight for a moment after a rotation,
+  // so the fit right after `resize` fires is sometimes the stale one.
+  addEventListener('orientationchange', () => setTimeout(fitScene, 120));
+
+  refreshSkills();
+  beginCountdown();
+  requestAnimationFrame(frame);
+</script>
+
+<noscript>
+  <p style="max-width:40rem;margin:2rem auto">Duck Duck Quack runs in the browser and needs JavaScript.
+  Nothing is saved and nothing leaves this device.</p>
+</noscript>
+</body>
+</html>

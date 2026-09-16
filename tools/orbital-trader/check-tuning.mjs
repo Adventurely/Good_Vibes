@@ -19,10 +19,21 @@ const by = Object.fromEntries(T.bodies.map(b => [b.id, b]));
 const TAU = Math.PI * 2;
 const period = (mu, a) => TAU * Math.sqrt(a ** 3 / mu);
 /* The reach a mass earns, mirrored from content.js: no body carries one. */
+/* Distances read in kilometres, because that is what the game's own labels say.
+   KM_PER_AU is the sky's own yardstick, not the physical au. */
+const KM_PER_AU = 147400000;
+const kmOf = au => Math.round(au * KM_PER_AU);
 const soiOf = b => (b.mu > 0 && b.a > 0 && by[b.parent]?.mu > 0) ? b.a * Math.pow(b.mu / by[b.parent].mu, 2 / 5) : null;
 /* And the mouth a size earns, mirrored the same way: five radii above the top
    of the air. A drifting haven has neither, and keeps its authored one. */
-const mouthOf = b => b.mu > 0 && b.radius > 0 ? Math.max(b.radius, b.atmo ?? b.radius) + 5 * b.radius : b.zoneRadius;
+/* Five radii over the air, for a world you park above. Anything you come
+   alongside keeps the mouth it was given: that number is a distance to close,
+   not a height to hold, so the mass it belongs to has no say in it. Same rule
+   as content.js, and the two have to agree or the checker is checking a sky
+   the game does not have. */
+const mouthOf = b => b.mu > 0 && b.radius > 0 && b.harbour !== 'rendezvous'
+  ? Math.max(b.radius, b.atmo ?? b.radius) + 5 * b.radius
+  : b.zoneRadius;
 for(const b of T.bodies){ b.soi = soiOf(b); b.zoneRadius = mouthOf(b); }
 const km = v => (v * KMS);
 let fails = 0;
@@ -41,6 +52,14 @@ function captureBurn(b, rp, vEdge, loose = false){
   const vp = Math.sqrt(Math.max(0, vEdge * vEdge - 2 * b.mu / b.soi) + 2 * b.mu / rp);
   const target = loose ? Math.sqrt(b.mu * (2 / rp - 1 / ((rp + 0.6 * b.soi) / 2))) : Math.sqrt(b.mu / rp);
   return Math.max(0, vp - target);
+}
+/* Coming alongside something with a well: fall from the edge to the mouth,
+ * then kill everything but the speed it will take you at. Not a capture — you
+ * are not going into orbit round it — but the well is real and the arrival is
+ * dearer for it. The Maw is the only harbour of this shape. */
+function alongsideBurn(b, vEdge){
+  const vMouth = Math.sqrt(Math.max(0, vEdge * vEdge - 2 * b.mu / b.soi) + 2 * b.mu / b.zoneRadius);
+  return Math.max(0, vMouth - b.dockSpeed);
 }
 /* Heliocentric Hohmann between two circular radii: the two deltas and the time. */
 function hohmann(mu, r1, r2){
@@ -96,7 +115,14 @@ check('C4 the inner worlds never nest', by.cinder.soi + by.veyra.soi < 0.2 && by
 // --- port geometry and speeds
 for(const b of T.bodies){
   if(!b.port) continue;
-  if(b.mu > 0){
+  /* Which kind of harbour, which is about the place rather than about the mass.
+     A rendezvous has no ground to clear and no parking orbit to sit in — its
+     mouth is how near you have to come, not how high you have to fly — so the
+     whole parking ladder below is asked only of a world you orbit. The Maw is
+     the reason this is not simply `mu > 0` any more: it is a black hole with
+     thirty times Grumm's pull and still a thing you come alongside. */
+  const alongside = b.harbour === 'rendezvous' || !(b.mu > 0);
+  if(b.mu > 0 && !alongside){
     /* The ordering that has to hold: the ground, then the parking orbit, then
        the harbour mouth, and all of it inside the world's own reach. The cap
        used to be a third of the reach, back when the mouth was a number
@@ -108,6 +134,20 @@ for(const b of T.bodies){
        how much of an arrival is left. */
     const frac = b.zoneRadius / b.soi;
     check(`C5 ${b.id} ground < parking < mouth < reach`, b.radius < b.dockAlt && b.dockAlt < b.zoneRadius && frac <= 0.92, `mouth is ${(frac * 100).toFixed(0)}% of the reach`);
+    /* And where there is air, it goes under all of that. A parking orbit inside
+       the band is not a harbour, it is a slow crash — and to a ship without a
+       shield the top of the air *is* the ground, so the ordering that matters
+       is the one a pilot flies, not the one the rock draws. Five worlds have
+       weather now; this is what stops the sixth being given some without
+       anybody checking what it sits under. */
+    if(b.atmo){
+      const air = (b.atmo - b.radius) / b.radius;
+      check(`C5 ${b.id} air < parking`, b.atmo < b.dockAlt, `air to ${kmOf(b.atmo - b.radius)} km, parking at ${kmOf(b.dockAlt - b.radius)} km up`);
+      /* A band between a twentieth and a third of the radius. Below that a pass
+         is a coin toss at the precision a burn can be aimed to; above it the
+         world is more air than world and the shed stops meaning anything. */
+      check(`C5 ${b.id} air is a band, not a skin or a shell`, air >= 0.05 && air <= 0.33, `${(air * 100).toFixed(0)}% of the radius, ${kmOf(b.atmo - b.radius)} km`);
+    }
     const vc = Math.sqrt(b.mu / b.dockAlt);
     check(`C6 ${b.id} parked speed`, km(vc) < 20, `${km(vc).toFixed(2)} km/s`);
     const esc = Math.sqrt(b.mu * (2 / b.dockAlt - 1 / ((b.dockAlt + b.soi) / 2))) - vc;
@@ -122,16 +162,69 @@ for(const b of T.bodies){
     const excess = vfall - vc;
     if(b.kind === 'moon' || b.kind === 'station') check(`C6 ${b.id} docking brake from a co-orbital fall`, excess <= b.dockSpeed * 1.6, `${km(excess).toFixed(2)} km/s over parked, limit ${km(b.dockSpeed).toFixed(2)}`);
   }else{
-    check(`C5 ${b.id} is a zone with a mouth`, b.zoneRadius > 0 && b.soi == null);
+    check(`C5 ${b.id} is a harbour you come alongside`, b.zoneRadius > 0 && b.dockSpeed > 0 && b.dockAlt == null,
+      `mouth ${kmOf(b.zoneRadius)} km at ${km(b.dockSpeed).toFixed(2)} km/s`);
+    /* With weight, the mouth has to sit inside the reach with room to spare, or
+       a ship is asked to come alongside from outside the thing's own gravity.
+       Without it there is no reach to be inside of, and nothing to check. */
+    if(b.mu > 0){
+      const frac = b.zoneRadius / soiOf(b);
+      check(`C5 ${b.id} mouth inside its reach`, frac <= 0.5, `mouth is ${(frac * 100).toFixed(0)}% of the reach`);
+      /* And falling in from the edge has to leave a ship slow enough to be met.
+         A black hole you cannot arrive at slowly is a black hole with no
+         harbour, whatever the table says. */
+      const vfall = Math.sqrt(2 * b.mu * (1 / b.zoneRadius - 1 / soiOf(b)));
+      check(`C6 ${b.id} can be met at the mouth`, km(vfall) < 40, `${km(vfall).toFixed(2)} km/s falling in from the edge`);
+    }
+  }
+}
+
+/* --- wrecks: things with no weight, on rails, that a ship can tie up to.
+   Nothing holds a ship beside one, so the geometry has to be right rather than
+   forgiving. Three rules, and they are all about not standing on somebody
+   else's toes. */
+for(const b of T.bodies){
+  if(b.kind !== 'wreck') continue;
+  const p = by[b.parent];
+  check(`C13 ${b.id} has no weight`, b.mu === 0 && b.port === true, `mu ${b.mu}`);
+  check(`C13 ${b.id} mouth < drift reach`, b.zoneRadius > 0 && b.driftReach > b.zoneRadius,
+    `mouth ${kmOf(b.zoneRadius)} km, reach ${kmOf(b.driftReach)} km`);
+  if(p.soi){
+    /* Inside the parent's reach with room to spare, the same margin a moon
+       gets: a harbour you can only reach by hanging off the edge of a sphere
+       of influence is one arrival in three that goes wrong. */
+    check(`C13 ${b.id} stays inside ${p.id}`, b.a * (1 + b.e) + b.zoneRadius <= 0.8 * p.soi,
+      `${kmOf(b.a * (1 + b.e) + b.zoneRadius)} km <= ${kmOf(0.8 * p.soi)} km`);
+    /* And clear of the harbour it is parked over, by more than the reach that
+       bends the burn axes — or a pilot tying up at the world would find
+       forward and back suddenly measured against a derelict. */
+    check(`C13 ${b.id} keeps out of ${p.id}'s harbour`, b.a * (1 - b.e) - b.driftReach > p.zoneRadius,
+      `${kmOf(b.a * (1 - b.e) - b.driftReach)} km clear of a ${kmOf(p.zoneRadius)} km mouth`);
+  }
+  /* A wreck in the Belt is in the Belt: the whole orbit, not the average of it. */
+  if(b.parent === 'lamp' && b.a > T.belt.inner && b.a < T.belt.outer){
+    check(`C13 ${b.id} keeps to the Belt`, b.a * (1 - b.e) >= T.belt.inner && b.a * (1 + b.e) <= T.belt.outer,
+      `${(b.a * (1 - b.e)).toFixed(4)}-${(b.a * (1 + b.e)).toFixed(4)} in ${T.belt.inner}-${T.belt.outer}`);
+    /* And out of the way of the two rocks people actually live on. */
+    for(const c of [by.nail, by.whisker]){
+      const gap = Math.abs(b.a - c.a) - (b.a * b.e + c.a * c.e);
+      check(`C13 ${b.id} clear of ${c.id}`, gap >= 2 * c.soi, `${gap.toFixed(4)} >= ${(2 * c.soi).toFixed(4)}`);
+    }
   }
 }
 
 /* --- the orbit a new game opens in, and the clock that is tuned to it.
    Low means what a pilot means by it: the high point of the orbit sits less
    than one planet-diameter above the ground. The clock then has one job — a
-   lap of that orbit is ten real minutes at x1 — and the skip cap has to move
-   with it, or pointing at the Maw stops being ten seconds. */
-const START_LAP_SECONDS = 600;
+   lap of that orbit is about eleven real minutes at x1 — and the skip cap has
+   to move with it, or pointing at the Maw stops being ten seconds.
+
+   A band rather than a number, because the opening orbit is chosen for what it
+   looks like (150 km is clear of the planet on the chart; 100 km read as
+   sitting on it) and the rate is chosen once, for the whole sky. Ten to twelve
+   minutes is the range in which a lap is slow enough that nothing appears to
+   move and short enough that a player sees one happen. */
+const START_LAP_MIN = 600, START_LAP_MAX = 720;
 for(const b of T.bodies){
   if(b.startAlt == null) continue;
   const alt = b.startAlt - b.radius;
@@ -139,7 +232,7 @@ for(const b of T.bodies){
   check(`C12 ${b.id}'s start orbit clears the harbour it is under`, b.startAlt < b.dockAlt, `${b.startAlt} < ${b.dockAlt}`);
   const lap = period(b.mu, b.startAlt);
   const seconds = lap / T.constants.BASE_RATE_DAYS_PER_SEC;
-  check(`C12 a lap of ${b.id}'s start orbit is ten real minutes at x1`, Math.abs(seconds - START_LAP_SECONDS) < 0.5, `${seconds.toFixed(2)} s (${lap.toFixed(5)} d)`);
+  check(`C12 a lap of ${b.id}'s start orbit is ten to twelve real minutes at x1`, seconds >= START_LAP_MIN && seconds <= START_LAP_MAX, `${seconds.toFixed(2)} s = ${(seconds / 60).toFixed(1)} min (${lap.toFixed(5)} d)`);
 }
 const capRate = T.constants.MAX_WARP * T.constants.BASE_RATE_DAYS_PER_SEC;
 check('C12 the skip cap is still about 149 days a second', capRate > 120 && capRate < 180, `${capRate.toFixed(1)} d/s`);
@@ -166,7 +259,6 @@ const turn = 2 * Math.asin(1 / (1 + rp * hg.dv2 * hg.dv2 / g.mu));
    place you fly *through* — is about proportion. */
 check('C8 Grumm reach is at least 0.8% of its orbit', g.soi >= 0.008 * g.a, `${g.soi.toFixed(4)} au, ${(100 * g.soi / g.a).toFixed(2)}% of ${g.a} au`);
 check('C8 Grumm turns a Hohmann arrival >= 60 deg', turn * 180 / Math.PI >= 60, `${(turn * 180 / Math.PI).toFixed(0)} deg`);
-check('C8 Grumm atmosphere band', g.atmo > 1.05 * g.radius && g.atmo < 1.3 * g.radius);
 for(const id of ['brine', 'glass', 'croak', 'haven']) check(`C10 ${id} period`, periods[id] > 2 && periods[id] < 60, `${periods[id]} d`);
 check('C10 Croak retrograde', by.croak.retrograde === true);
 check('C10 frog moons ordered outward', by.brine.a < by.glass.a && by.glass.a < by.croak.a && by.croak.a < by.haven.a);
@@ -193,7 +285,7 @@ const table = [
   route('Tassel -> the Arc', by.arc.a, dv2 => dv2),
   route('Tassel -> Grumm (loose capture)', g.a, dv2 => captureBurn(g, by.haven.a, dv2, true)),
   route('Tassel -> Haven height, circular', g.a, dv2 => captureBurn(g, by.haven.a, dv2)),
-  route('Tassel -> the Maw', by.maw.a, dv2 => dv2),
+  route('Tassel -> the Maw', by.maw.a, dv2 => alongsideBurn(by.maw, dv2)),
 ];
 console.log('\nΔv table (km/s, patched-conic estimates from the Tassel docking orbit):');
 for(const r of table) console.log(`  ${r.route.padEnd(42)} ${String(r.dv_kms).padStart(6)}  ${String(r.days).padStart(6)} d${r.dep_kms != null ? `   (out ${r.dep_kms}, in ${r.arr_kms})` : ''}`);

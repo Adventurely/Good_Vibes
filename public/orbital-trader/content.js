@@ -16,6 +16,8 @@
 import { TUNING } from './data/world.js';
 import { ECONOMY } from './data/economy.js';
 import { NARRATIVE } from './data/text.js';
+import { QUESTBOOK } from './data/quests.js';
+import { DIALOGUE } from './data/dialog.js';
 
 /* ------------------------------------------------------------ constants */
 
@@ -45,14 +47,10 @@ export const SPECIES = {
   none:     { name: 'Nobody', plural: 'Nobody', adjective: '', colour: '#9a948a', animal: 'nobody at all' },
 };
 
-/* The four peoples who trade, remember and hold grudges. The Builders are gone
- * and nobody lives at the Maw, so neither keeps a reputation. */
-export const PEOPLES = ['emberkin', 'otter', 'cat', 'frog'];
-
 /* Colours for the chart, by body. Peoples' worlds take their people's hue;
  * the rest are what they are: a violet giant, a glass-snow world, a lamp. */
 const BODY_COLOURS = {
-  lamp: '#ffd23f', cinder: '#e8683c', scorch: '#b58a5a', veyra: '#f2a65a',
+  lamp: '#ffd23f', dancer: '#6fb7ff', cinder: '#e8683c', scorch: '#b58a5a', veyra: '#f2a65a',
   tassel: '#3fa9dd', slate: '#cfc2a8', moss: '#6cc24a',
   nail: '#e9dcc0', whisker: '#8b8b9e', arc: '#d9c9a3',
   grumm: '#8b6bd6', brine: '#a8c48c', glass: '#cfe8ff', croak: '#9a8fa6',
@@ -99,14 +97,28 @@ export function soiRadius(mu, a, parentMu){
  * Grumm's approach is wide because Grumm is wide and has fourteen hundred
  * kilometres of cloud on top of that, not because somebody typed a number.
  *
- * The drifting havens keep theirs. Nail, Whisker and the Maw have no surface
- * to be five times of and no air over it — their radius is a dot on a chart,
- * not a ground — so the formula has nothing to act on and the authored mouth
- * stands. */
+ * A rendezvous keeps the mouth it was given, whatever it weighs. Five radii
+ * over the air describes a parking orbit, and a rendezvous harbour has none:
+ * the Maw is a hundred and fifty kilometres of black hole with a mouth a
+ * million and a half kilometres wide, because what that number measures is how
+ * near you have to come to be met, not how high you have to fly to be held. */
 export function dockRange(radius, atmo){
   if(!(radius > 0)) return null;
   return Math.max(radius, atmo ?? radius) + 5 * radius;
 }
+
+/* Two kinds of harbour, and which one a place has is about the place rather
+ * than about its mass. Most worlds pull hard enough that tying up means being
+ * in orbit round them: the mouth is a circle your whole orbit has to fit
+ * inside, and gravity holds you there while you trade.
+ *
+ * A rendezvous is the other kind. The Maw has no weight at all, so there is no
+ * orbit round it to wait in: you come alongside instead — near enough, slow
+ * enough, and somebody throws you a line. Anything weightless is one of these
+ * whether or not a table says so, and `harbour: "rendezvous"` is there to make
+ * one of a world that does have a little pull, should a yard ever be built
+ * somewhere too small to orbit. Nothing uses that today. */
+export const isRendezvous = b => b?.harbour === 'rendezvous' || !((b?.mu ?? 0) > 0);
 
 const rawMu = Object.fromEntries(TUNING.bodies.map(b => [b.id, b.mu ?? 0]));
 export const BODIES = TUNING.bodies.map(b => ({
@@ -115,8 +127,10 @@ export const BODIES = TUNING.bodies.map(b => ({
   e: b.e ?? 0, omega: b.omega ?? 0, M0: b.M0 ?? 0, retrograde: !!b.retrograde,
   mu: b.mu ?? 0,
   soi: soiRadius(b.mu ?? 0, b.a ?? 0, rawMu[b.parent] ?? 0),
-  // A world's mouth comes from its size; a drifting haven keeps the one it was given.
-  zoneRadius: (b.mu ?? 0) > 0 ? dockRange(b.radius ?? 0, b.atmo) : b.zoneRadius,
+  /* A world's mouth comes from its size; anything you come alongside keeps the
+     one it was given, because that mouth is a distance rather than an orbit. */
+  zoneRadius: (b.mu ?? 0) > 0 && !isRendezvous(b) ? dockRange(b.radius ?? 0, b.atmo) : b.zoneRadius,
+  rendezvous: isRendezvous(b),
   colour: BODY_COLOURS[b.id] ?? null,
 }));
 
@@ -175,7 +189,6 @@ export const GOODS = ECONOMY.goods.map(g => ({
   buyers: g.buyers ?? [],
   lovedBy: g.lovedBy ?? [],
 }));
-const goodIds = new Set(GOODS.map(g => g.id));
 const goodIndex = new Map(GOODS.map(g => [g.id, g]));
 export const goodById = id => goodIndex.get(id);
 
@@ -225,7 +238,6 @@ export const PORTS = Object.fromEntries(Object.entries(ECONOMY.ports).map(([id, 
        is rolled per visit and lives in the save, not here. */
     sells: GOODS.filter(g => g.producedAt.includes(id)).map(g => ({ good: g.id, priceMul: 1 })),
     buys: GOODS.filter(g => wantsGood(id, g.id)).map(g => ({ good: g.id, priceMul: 1 })),
-    gifts: p.gifts ?? null,
     openWithin: p.openWhen?.rAuBelow ?? null,
     towAllowed: id !== 'maw',
   }];
@@ -261,14 +273,19 @@ export const FORMULAS = {
   haggle: F.haggle ?? { spread: 0.07 },
   volatility: F.volatility ?? { bySpecies: {} },
   /* Aerobraking. The shed is a fraction of the speed at the bottom of the
-     dive, scaled by how deep into the air the dive goes — and the fraction has
-     to be small, because the design sells skimming as *free braking*, not as a
-     free crash landing. At half the periapsis speed a single pass dumped the
-     ship into a circle just above the cloud tops, which costs more to climb
-     out of than capturing would have cost in the first place. A few per cent a
-     pass lets a pilot walk an orbit down over several passes and stop where
-     they want to be, which is the technique the design is describing. */
-  aerobrake: { k: 0.04, maxFraction: 0.12, floorApo: 1.25 },
+     dive, and the fraction goes with the square of how deep the dive goes, so
+     the band of air is not one thing but two. The top of it is a feather: a
+     graze takes a per cent or two, costs nothing, and a pilot can walk an
+     orbit down over as many laps as they have days for. The bottom of it is a
+     wall: aim a few kilometres over the ground and the planet takes nearly
+     everything in a single lap, which is the maneuver a heat shield is for.
+     What stops that from being a crash is the floor below — the pass will
+     never leave the far end of the orbit inside the air — so the worst a deep
+     dive does is park you low, in an orbit you must burn to climb out of, with
+     a hull that probably felt it. That is the trade: fuel and risk against
+     days. The risk and repair figures live beside these in the design table,
+     and they are what makes the deep line cost something. */
+  aerobrake: { k: 1.4, depthPower: 2, maxFraction: 0.9, floorApo: 1.25, ...(F.aerobrake ?? {}) },
   toll: { ...F.toll, cooldownDays: 30, maxCargoFraction: 0.4, giftRep: 3, giftChance: 0.35 },
   tow: { ...F.tow, minDays: 3, crashMul: 1.5 },
 };
@@ -277,6 +294,19 @@ export const FORMULAS = {
 
 export const GLOSSARY = NARRATIVE.glossary ?? [];
 export const TEXT = NARRATIVE;
+
+/* The errands, and what the crew say. Both used to be keys in narrative.json,
+ * which was fine while there were three of one and none of the other and is
+ * not fine now: a quest is a record with a dozen fields and rules about them,
+ * and a table of records wants a file where its shape can be written down at
+ * the top and checked at build time. They are their own tables now, and
+ * quests.json and dialog.json each open with the format they hold.
+ *
+ * Nothing but the shape changed. `quests` and `dialog` are read here so that
+ * the rest of the game keeps asking content.js for content and never has to
+ * know how many files it came out of. */
+export const QUESTS = QUESTBOOK.quests ?? [];
+export const DIALOG = DIALOGUE.exchanges ?? [];
 TEXT.logTemplates ??= {};
 TEXT.logTemplates.aerobrake ??= 'Air braked at {body}: {dv} shed to the clouds.';
 TEXT.events ??= {};

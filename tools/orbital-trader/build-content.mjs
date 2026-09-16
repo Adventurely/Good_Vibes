@@ -4,11 +4,20 @@
  *   tools/orbital-trader/design/tuning.json     the sky: bodies, rails, spheres of influence
  *   tools/orbital-trader/design/economy.json    goods, ports, prices, upgrades, formulas
  *   tools/orbital-trader/design/narrative.json  every line of in-world text
+ *   tools/orbital-trader/design/quests.json     every errand, in one standard shape
+ *   tools/orbital-trader/design/dialog.json     what the crew say, and where
  *
- * become public/orbital-trader/data/{world,economy,text}.js, each a single
- * `export const` of the same object. The game never fetches JSON: a module is
- * cacheable, importable by the tests under Node, and cannot 404 into a page
- * that draws nothing. The JSON is what a person edits; this is what ships.
+ * become public/orbital-trader/data/{world,economy,text,quests,dialog}.js, each
+ * a single `export const` of the same object. The game never fetches JSON: a
+ * module is cacheable, importable by the tests under Node, and cannot 404 into
+ * a page that draws nothing. The JSON is what a person edits; this is what
+ * ships.
+ *
+ * The quest and dialog tables are checked on the way through — not for taste,
+ * which is not a machine's business, but for the things a typo breaks quietly:
+ * a missing field, a type nothing handles, a port or a good that does not
+ * exist, two records sharing an id. A table with a standard shape is only
+ * standard if something insists.
  *
  * Usage: node tools/orbital-trader/build-content.mjs
  */
@@ -32,11 +41,99 @@ function emit(file, name, value, note){
 const tuning = read('tuning.json');
 const economy = read('economy.json');
 const narrative = read('narrative.json');
+const questbook = read('quests.json');
+const dialogue = read('dialog.json');
+
+/* ------------------------------------------------------------- checking */
+
+const problems = [];
+const need = (ok, where, what) => { if(!ok) problems.push(`${where}: ${what}`); };
+
+const portIds = new Set(Object.keys(economy.ports));
+const goodIds = new Set(economy.goods.map(g => g.id));
+const berths = new Set((narrative.crew?.roles ?? []).map(r => r.id));
+const speakers = new Set(['captain', ...berths]);
+const peoples = new Set(['emberkin', 'otter', 'cat', 'frog']);
+const QUEST_TYPES = new Set(['retrieval', 'delivery', 'shopping', 'chain', 'message', 'salvage']);
+/* Bodies with no mass that a ship can tie up to. They are not in the price
+   list — a derelict has no stall — so a salvage job's `wreck` is checked
+   against the sky rather than against the ports. */
+const wreckIds = new Set(tuning.bodies.filter(b => b.kind === 'wreck' && b.port).map(b => b.id));
+
+/* The quest format, as quests.json describes it. Everything here is something
+ * that would otherwise fail at the far end of a flight, in a save, or not at
+ * all — a job whose `to` is a port that was renamed simply stops completing. */
+const questIds = new Set();
+for(const [i, q] of (questbook.quests ?? []).entries()){
+  const at = `quest ${q?.id ?? `#${i}`}`;
+  for(const k of ['id', 'title', 'giver', 'type', 'from', 'to', 'blurb', 'done']){
+    need(typeof q?.[k] === 'string' && q[k].length > 0, at, `${k} is required`);
+  }
+  need(!questIds.has(q?.id), at, 'two quests share an id');
+  questIds.add(q?.id);
+  need(QUEST_TYPES.has(q?.type), at, `type ${q?.type} is not one of ${[...QUEST_TYPES].join(', ')}`);
+  for(const k of ['from', 'to']) if(q?.[k]) need(portIds.has(q[k]), at, `${k} names no port: ${q[k]}`);
+  for(const id of q?.stops ?? []) need(portIds.has(id), at, `stops names no port: ${id}`);
+  need(q?.type === 'chain' || !q?.stops, at, 'stops belongs to a chain');
+  if(q?.type === 'salvage'){
+    need(wreckIds.has(q?.wreck), at, `wreck names no derelict in the sky: ${q?.wreck}`);
+    need((q?.goods ?? []).length > 0, at, 'a salvage with nothing aboard is a trip for nothing');
+    need(typeof q?.aboard === 'string' && q.aboard.length > 0, at, 'aboard is required: it is all there is to read at a wreck');
+  }else{
+    need(!q?.wreck, at, 'only a salvage names a wreck');
+    need(!q?.aboard, at, 'only a salvage has an aboard');
+  }
+  need(Array.isArray(q?.goods), at, 'goods is required, empty if there are none');
+  for(const g of q?.goods ?? []){
+    need(goodIds.has(g?.good), at, `wants a good that does not exist: ${g?.good}`);
+    need(Number.isInteger(g?.qty) && g.qty > 0, at, `${g?.good}: qty must be a whole number above zero`);
+  }
+  need(q?.type !== 'message' || !(q?.goods ?? []).length, at, 'a message carries nothing');
+  need(Number.isInteger(q?.pay) && q.pay > 0, at, 'pay must be a whole number above zero');
+  need(peoples.has(q?.rep), at, `rep names no people: ${q?.rep}`);
+  if(q?.crew) need(berths.has(q.crew), at, `crew names no berth: ${q.crew}`);
+  for(const st of q?.steps ?? []) need(st?.id && st?.text, at, 'a written step needs an id and text');
+}
+
+/* The dialog format, as dialog.json describes it. */
+const exchangeIds = new Set();
+for(const [i, x] of (dialogue.exchanges ?? []).entries()){
+  const at = `exchange ${x?.id ?? `#${i}`}`;
+  need(typeof x?.id === 'string' && x.id.length > 0, at, 'id is required');
+  need(!exchangeIds.has(x?.id), at, 'two exchanges share an id');
+  exchangeIds.add(x?.id);
+  need(x?.at === '*' || portIds.has(x?.at), at, `at names no port: ${x?.at}`);
+  need(speakers.has(x?.who), at, `who names nobody aboard: ${x?.who}`);
+  for(const id of x?.needs ?? []) need(berths.has(id), at, `needs names no berth: ${id}`);
+  need(Array.isArray(x?.lines) && x.lines.length > 0, at, 'an exchange with no lines says nothing');
+  for(const l of x?.lines ?? []){
+    need(speakers.has(l?.who), at, `a line is spoken by nobody aboard: ${l?.who}`);
+    need(typeof l?.say === 'string' && l.say.length > 0, at, `${l?.who} has nothing to say`);
+  }
+  /* Somebody has to be there to say their half of it. The speaker counts as
+     needed whether or not `needs` bothers to mention them. */
+  const mustBeAboard = new Set([x?.who, ...(x?.needs ?? []), ...(x?.lines ?? []).map(l => l?.who)]);
+  mustBeAboard.delete('captain');
+  for(const id of mustBeAboard) need(berths.has(id), at, `nobody fills the berth ${id}`);
+}
+
+if(problems.length){
+  console.error(`${problems.length} problem${problems.length === 1 ? '' : 's'} in the design tables:`);
+  for(const p of problems) console.error(`  ${p}`);
+  process.exit(1);
+}
+
+/* -------------------------------------------------------------- writing */
 
 // The simulator's private assumptions are not content.
 delete economy.sim;
 for(const p of Object.values(economy.ports)) delete p.notes;
+// The format is written down for whoever edits the table, not for the game.
+delete questbook.notes;
+delete dialogue.notes;
 
 emit('world.js', 'TUNING', tuning, 'tuning.json');
 emit('economy.js', 'ECONOMY', economy, 'economy.json');
 emit('text.js', 'NARRATIVE', narrative, 'narrative.json');
+emit('quests.js', 'QUESTBOOK', questbook, 'quests.json');
+emit('dialog.js', 'DIALOGUE', dialogue, 'dialog.json');

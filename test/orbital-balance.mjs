@@ -12,7 +12,7 @@
  * grind, which the design document is explicit about wanting to avoid.
  *
  *   node test/orbital-balance.mjs            # a few hundred days
- *   node test/orbital-balance.mjs 3600       # ten Tessel years
+ *   node test/orbital-balance.mjs 3600       # ten Tassel years
  *   node test/orbital-balance.mjs 3600 7     # ... with a different seed
  *
  * What it is not: a player. Its autopilot writes one mark, aims it, and flies;

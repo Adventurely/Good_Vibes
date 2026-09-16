@@ -44,6 +44,11 @@
    "term": "docking range",
    "plain": "docking zone",
    "tip": "Get into a steady orbit whose high point is inside this and you can dock. Generous, on purpose."
+  },
+  {
+   "term": "coming alongside",
+   "plain": "rendezvous",
+   "tip": "Some things out here have no pull at all, so there is no orbit to fall into: you arrive by being in the same place going the same speed. Near one of those, forward and back are measured against it rather than against the world you are going round, and out and in become away and toward."
   }
  ],
  "ports": {
@@ -84,7 +89,7 @@
    ]
   },
   "veyra": {
-   "blurb": "The wealthy Emberkin world, and the nearest of them to the Lamp: bright enough that shade is bought and sold here like anything else. Houses measure each other in public, and the measuring is done at auction. Nothing is bought here quietly and nothing is sold here cheap.",
+   "blurb": "The wealthy Emberkin world, and close enough to the Lamp that shade is property: a house is worth what its awnings cover. Everything changes hands at auction and in public, because a price nobody witnessed settles nothing.",
    "arrival": [
     "A steward meets you at the lock with a list of who is in port and who is not speaking to whom.",
     "The dock is swept. You had not realised a dock could be swept.",
@@ -300,7 +305,7 @@
    ]
   },
   "maw": {
-   "blurb": "Something at the edge of the system, eighteen astronomical units out, with a ring of glittering dust around a hole in the sky. A Builder station keeps station on it, aimed inward at nothing, and has done for longer than there have been people to notice. That is everything anyone knows.",
+   "blurb": "Something at the edge of the system, six astronomical units out, with a ring of glittering dust around a hole in the sky and a small blue star going round it. The star is all anybody has ever seen from here: it appears to circle nothing, and has done for as long as anyone has looked. A Builder station keeps station on the nothing, aimed inward, and has done for longer than there have been people to notice. That is everything anyone knows.",
    "arrival": [
     "There is no light out here except what is falling in, and it is falling in a circle.",
     "The station holds its distance exactly, and nothing is holding it there that you can find.",
@@ -350,18 +355,18 @@
     "species": "emberkin",
     "does": "Keeps the burn honest and the tank from lying to you.",
     "person": {
-     "name": "Brikka",
-     "line": "Eleven years at the Ninth Forge and nothing left there she has not taken apart. She has opinions about your tank and will share them."
+     "name": "Kiran",
+     "line": "Eleven years at the Ninth Forge and nothing left there he has not taken apart. He has opinions about your tank and will share them."
     }
    },
    {
     "id": "navigator",
     "name": "Navigator",
     "species": "cat",
-    "does": "Reads a rock an au off and tells you which way it is going.",
+    "does": "Reads a rock an au off, and can hold a ship still beside one.",
     "person": {
-     "name": "Celia",
-     "line": "Can read a rock an au off and tell you which way it is going. Says almost nothing and is always already looking at the thing you are about to point at."
+     "name": "Tsuki",
+     "line": "Can read a rock an au off and tell you which way it is going. Says almost nothing, and is always already looking at the thing you are about to point at. On her second day aboard she marks a point of empty sky between Tassel and the Belt and says: go round that one, not past it. She can also put a ship alongside something that is not holding still, which is a thing almost nobody can do."
     }
    },
    {
@@ -379,15 +384,15 @@
  "events": {
   "tollOffer": [
    {
-    "captain": "Captain Sixstring",
+    "captain": "Captain Haru",
     "line": "Easy now. The belt is ours and the rate is the rate. Coin or crates, your choice, and you keep the rest."
    },
    {
-    "captain": "Captain Ashgrin",
+    "captain": "Captain Kaede",
     "line": "Nicely flown. That costs you nothing. Crossing our belt does. Pick what you would rather lose."
    },
    {
-    "captain": "Captain Weft",
+    "captain": "Captain Rin",
     "line": "We take a share, never the hold. Yield and nobody has a bad day, least of all you."
    }
   ],
@@ -415,12 +420,25 @@
   "firstAssist": "You fell past Grumm and came out faster than you went in, with the tank untouched. The frogs call that a slingshot. Grumm has not noticed.",
   "firstAerobrake": "The shield takes the heat, the clouds take the speed, and you come out the other side slower for free.",
   "bankDebt": "The Tassel harbour bank covers what you could not, at interest, with a copy of the paperwork for your records.",
-  "mawArrival": "You have come as far as anyone goes. The ring of dust is there, exactly where the Builders pointed their station, and at the middle of it there is nothing at all — a hole the size of a hill with a system's worth of light bending round it.\nThe station keeps its distance and does not drift. Nothing is holding it. You check three times.\nThe Builders put a silent thing out here and aimed it at a hole in the sky. They left no doors, no stairs, no seats, and no explanation. Why does anyone build a place to watch from, if not to tell somebody what they saw?"
+  "mawArrival": "You have come as far as anyone goes. The Dancer is overhead and enormous and the wrong colour for this far out, and it is going round something. The ring of dust is there, exactly where the Builders pointed their station, and at the middle of it there is nothing at all — a hole the size of a hill with a system's worth of light bending round it.\nThe station keeps its distance and does not drift. Nothing is holding it. You check three times.\nThe Builders put a silent thing out here and aimed it at a hole in the sky. They left no doors, no stairs, no seats, and no explanation. Why does anyone build a place to watch from, if not to tell somebody what they saw?",
+  "skimDamage": [
+   "Something lets go aft with a sound you feel through the deck. The shield held. The frame under it did not, quite, and there is a seam that was not there this morning.",
+   "The second pass finds the seam and opens it. Nothing is venting and nothing is on fire, but the hull rings wrong when you knock on it now, and you will knock on it.",
+   "A whole plate goes. You spend an hour in the lock with resin and a lamp, and it holds, and you both know what it is holding. One more of those and there is nothing to patch."
+  ],
+  "skimWrecked": "The hull comes apart at the seam it has been threatening to come apart at. The air goes, the lights go, and the clouds have you. Somebody is already on their way out — the frogs watch that band of air precisely because people do this.",
+  "skimFuelCell": "A cell cooks off in the heat and takes itself out of the circuit. The tank still fills; it stops filling sooner than it should, and there is nothing aboard that will persuade it otherwise.",
+  "repairHull": "They put the ship on a cradle, walk round it twice, and tell you what it will cost before they tell you what is wrong. Then they fix it properly, which takes longer and is the reason you came here.",
+  "repairFuelCell": "The cell comes out in one piece, which surprises everybody, and the new one goes in while you wait. The gauge goes back to telling the truth.",
+  "knotRevealed": "Tsuki puts a finger on a stretch of chart with nothing in it and waits for you to stop arguing. There is something there a kilometre across with Grumm's pull in it, and the cats have known for nine generations. Fly close enough and it will turn you most of the way round for nothing. She does not say why nobody mentions it, and from the way she says nothing, it is not a secret so much as a courtesy.",
+  "firstKnotPass": "You go round the outside of nothing at all and come out pointed somewhere else entirely, faster, with the tank exactly as full as it was. Behind you the Knot goes on not being there.",
+  "firstRendezvous": "Tsuki takes the numbers off the board without being asked: how close the path actually comes, and how fast you are closing. Neither is the range, which she says is the number people watch when they want to be reassured rather than informed. You match speed with a thing that has no pull at all and hold there, and the hold is the whole trick.",
+  "questCollected": "Signed for, counted, and put away. That is the job done.",
+  "firstSalvage": "Nothing is holding you here. Tsuki matches the thing's drift without being asked, holds the ship a few hundred metres off it, and says nothing at all while somebody gets a line across. The hull you are tied to has been going round this same path since before you could fly, and it will go round it again after you have gone."
  },
  "opening": {
   "title": "A crate for your Aunt Nellie",
-  "line": "Theo's writing again: \"She's at the dry docks on Slate. Don't shake it and don't open it.\"",
-  "briefing": "One crate, one moon, one aunt. Everything else can wait."
+  "line": "Theo's writing again: \"She's at the dry docks on Slate. Don't shake it and don't open it.\""
  },
  "tutorial": [
   {
@@ -446,12 +464,12 @@
   {
    "step": "mark",
    "title": "Plan a burn",
-   "body": "Good. Let's get that present. Tap the white line you are riding and choose 'Plan a burn'.\n\nA planned burn is a point on your path where the engine will fire and change your speed. Nothing happens yet: you keep coasting until the clock reaches it, and until then you can move it or change it as much as you like.\n\nDon't worry about where you put it. We'll fix that next."
+   "body": "Good. Let's get that present. The white line is your planned route: the path you are flying now. Tap it and choose 'Plan a burn'.\n\nA burn is firing the engine to speed up, slow down or change direction. A planned burn is a point on your path where that happens. Nothing fires yet: you coast until the clock gets there, and can change it until then.\n\nDon't worry where it goes. We'll fix that next."
   },
   {
    "step": "push",
    "title": "Push it out to Slate's height",
-   "body": "Four arrows appeared around the burn. Green adds speed. Orange takes it back.\n\nGreen pushes the far side of your orbit outward. Press green until the yellow line reaches Slate's circle. Within a tenth is close enough.\n\nThe label by the burn says what the engine will do, like 'forward 120 m/s'. What it costs you comes off the Fuel gauge at the top."
+   "body": "Four arrow buttons appeared around the flame. Green adds speed. Orange takes it back.\n\nGreen pushes the far side of your orbit outward. Press green until the yellow line reaches Slate's circle. Within a tenth is close enough.\n\nThe label by the burn says what the engine will do, like 'forward 120 m/s'. What it costs you comes off the Fuel gauge at the top."
   },
   {
    "step": "aim",
@@ -476,7 +494,7 @@
   {
    "step": "buy",
    "title": "One pebble, mind the price",
-   "body": "The Market has beach pebbles on the shelf — the cheapest thing here. Theo left you just enough for one.\n\nBuy it."
+   "body": "The Market has moon pebbles on the shelf — the cheapest thing here. Theo left you just enough for one.\n\nBuy it."
   },
   {
    "step": "leave",
@@ -498,12 +516,6 @@
   "Skipper"
  ],
  "captainLines": {
-  "onBurn": [
-   "Burn made. The far end of the path has moved; go and look at it.",
-   "That is spent. What is left is what is left.",
-   "Clean burn. The numbers agree with the plan, which is not always true.",
-   "Done. The sky has rearranged itself around the decision."
-  ],
   "onLongCoast": [
    "Nothing to do for a while but watch the worlds go round, which is not nothing.",
    "Coasting. The cargo is fine and the hull is quiet.",
@@ -531,323 +543,10 @@
   "refuelled": "Took on {amount} at {port} for {price}.",
   "upgraded": "Fitted {name} at {port}.",
   "questTaken": "Took on {title}.",
-  "questDone": "Finished {title}. Paid {pay}."
- },
- "quests": [
-  {
-   "id": "pebble",
-   "title": "A pebble for Aunt Nellie",
-   "giver": "Uncle Theo",
-   "type": "retrieval",
-   "from": "slate",
-   "to": "tassel",
-   "goods": [
-    {
-     "good": "pebble",
-     "qty": 1
-    }
-   ],
-   "pay": 630,
-   "rep": "otter",
-   "blurb": "Nellie's birthday is coming and Theo has left it late, as Theo does. There is a beach on Slate — the only one — and the pebbles off it are worth going for. He has put what he has in your purse. It is enough for one.",
-   "steps": [
-    {
-     "id": "buy",
-     "text": "Buy a moon pebble at Slate"
-    },
-    {
-     "id": "home",
-     "text": "Bring it home to Tassel"
-    }
-   ],
-   "done": "Nellie takes one look and shrieks. She holds it up to the light, and announces she is wearing it as a necklace to the Full Moons Festival, and tells three more people so before you have got your coat off. Theo settles up, looking pleased."
-  },
-  {
-   "id": "tasteofhome",
-   "title": "A Taste of Home",
-   "giver": "Harbourmaster Wren",
-   "type": "delivery",
-   "from": "tassel",
-   "to": "moss",
-   "goods": [
-    {
-     "good": "moonfishoil",
-     "qty": 4
-    }
-   ],
-   "pay": 270,
-   "rep": "otter",
-   "blurb": "Four jars of moonfish oil for a farm on Moss that has not smelled the sea in two generations. Wren has already had them carried aboard; she says they will not ask what it cost and you are not to tell them.",
-   "done": "They open one jar on the step and stand there with it. Nobody says anything for a while, which on Moss is a compliment."
-  },
-  {
-   "id": "greenmedicine",
-   "title": "Green Medicine",
-   "giver": "The harbour physician",
-   "type": "retrieval",
-   "from": "moss",
-   "to": "tassel",
-   "goods": [
-    {
-     "good": "herbs",
-     "qty": 6
-    }
-   ],
-   "pay": 510,
-   "rep": "otter",
-   "blurb": "The Tassel rafts are short of cut herbs and the physician is short of patience. Moss has them by the bundle. Buy six and get them back before they are hay.",
-   "done": "She checks one bundle, smells it, and looks at you with something like respect. The rest goes straight into the dispensary."
-  },
-  {
-   "id": "slatemessage",
-   "title": "A Message for Slate",
-   "giver": "Uncle Theo",
-   "type": "message",
-   "from": "tassel",
-   "to": "slate",
-   "goods": [],
-   "pay": 230,
-   "rep": "otter",
-   "blurb": "A sealed note for the yard foreman on Slate. Theo will not say what is in it and has gone slightly pink about the ears. It weighs nothing and it is not to be opened.",
-   "done": "The foreman reads it twice, laughs once, and writes something on the back. She does not offer to show you."
-  },
-  {
-   "id": "heavystuff",
-   "title": "The Heavy Stuff",
-   "giver": "The Slate yard foreman",
-   "type": "delivery",
-   "from": "slate",
-   "to": "cinder",
-   "goods": [
-    {
-     "good": "ironore",
-     "qty": 4
-    }
-   ],
-   "pay": 900,
-   "rep": "emberkin",
-   "blurb": "Four crates of ore for the engine smiths, loaded before you agreed to it. It is heavy and it is dull and the Emberkin are waiting on it, which is the whole job.",
-   "done": "A smith signs for it without looking up, then looks up, then asks where you learned to fly an approach like that."
-  },
-  {
-   "id": "enginetrouble",
-   "title": "Engine Trouble",
-   "giver": "Brikka of the Ninth Forge",
-   "type": "retrieval",
-   "from": "cinder",
-   "to": "slate",
-   "goods": [
-    {
-     "good": "engineparts",
-     "qty": 3
-    }
-   ],
-   "pay": 1050,
-   "rep": "emberkin",
-   "crew": "engineer",
-   "blurb": "Three crates of spare parts for the Slate yards, and Brikka wants to ride along and see them fitted. She has been at the Ninth Forge eleven years and has run out of things there she has not already taken apart.",
-   "done": "She watches the Slate shipwrights work for about four minutes, says one sentence nobody enjoys, and fixes it herself. Then she asks what your tank is rated at, and does not get off the ship."
-  },
-  {
-   "id": "engineerfavour",
-   "title": "A Favor for an Engineer",
-   "giver": "Sath of the Ninth Forge",
-   "type": "message",
-   "from": "cinder",
-   "to": "scorch",
-   "goods": [],
-   "pay": 300,
-   "rep": "emberkin",
-   "blurb": "A sealed note for somebody on Scorch, from a smith who will not say who they are to her. She has written the name in a hand that took a long time. It weighs nothing, and she would like it to go quickly.",
-   "done": "The woman on the dock reads it standing up, puts it inside her coat, and asks you to say that she is well. She is not well, and you both know you will say it anyway."
-  },
-  {
-   "id": "emberkinluxury",
-   "title": "Emberkin Luxury",
-   "giver": "A Veyra buying agent",
-   "type": "retrieval",
-   "from": "scorch",
-   "to": "veyra",
-   "goods": [
-    {
-     "good": "firecrystals",
-     "qty": 3
-    }
-   ],
-   "pay": 2250,
-   "rep": "emberkin",
-   "blurb": "Three fire crystals, cut cold on Scorch, wanted on Veyra before the month turns. The agent does not say which house wants them and looks faintly pained when you ask.",
-   "done": "The three go under a lamp and hold the light for a long moment. The agent settles up without haggling, which on Veyra is nearly a compliment."
-  },
-  {
-   "id": "collector",
-   "title": "The Collector",
-   "giver": "House Ahl of Veyra",
-   "type": "shopping",
-   "from": "veyra",
-   "to": "veyra",
-   "goods": [
-    {
-     "good": "pearls",
-     "qty": 1
-    },
-    {
-     "good": "coral",
-     "qty": 1
-    },
-    {
-     "good": "clocks",
-     "qty": 1
-    }
-   ],
-   "pay": 3600,
-   "rep": "emberkin",
-   "blurb": "A list, not a cargo: one string of Tassel pearls, one coral carving, one precision clock. House Ahl wants all three on the table at once and does not care where you get them. The clock is made on Veyra, which they appear to find funny.",
-   "done": "The three go on a velvet board in that order and a steward writes the sum out longhand. You are not told what it is for."
-  },
-  {
-   "id": "factionbusiness",
-   "title": "Faction Business",
-   "giver": "A steward of House Ahl",
-   "type": "message",
-   "from": "veyra",
-   "to": "cinder",
-   "goods": [],
-   "pay": 600,
-   "rep": "emberkin",
-   "blurb": "Confidential, the steward says, twice. It goes to a name on Cinder and into that person's hand and nobody else's. You are being paid for the part where you do not ask.",
-   "done": "The hand it goes into belongs to somebody who was clearly expecting it and clearly hoping not to get it. Nobody explains anything. The money is already arranged."
-  },
-  {
-   "id": "intothebelt",
-   "title": "Into the Belt",
-   "giver": "The Ninth Forge",
-   "type": "delivery",
-   "from": "cinder",
-   "to": "nail",
-   "goods": [
-    {
-     "good": "coils",
-     "qty": 2
-    }
-   ],
-   "pay": 3400,
-   "rep": "cat",
-   "blurb": "Two reactor coils for the cats at Nail, crated and aboard before the paperwork was finished. The Forge would like it known that these are a favour and not a precedent.",
-   "done": "Half the rock comes out to watch the crates open. Somebody says a word in cat that Ashgrin declines to translate, and you are bought drinks for the rest of the evening."
-  },
-  {
-   "id": "somethingshiny",
-   "title": "Something Shiny",
-   "giver": "A Veyra buying agent",
-   "type": "retrieval",
-   "from": "nail",
-   "to": "veyra",
-   "goods": [
-    {
-     "good": "sensorsalvage",
-     "qty": 2
-    }
-   ],
-   "pay": 1050,
-   "rep": "cat",
-   "blurb": "Two sets of salvaged sensors off Nail, for a client on Veyra who wants to see further than they are supposed to. Buy them honestly. The agent is very keen that you buy them honestly.",
-   "done": "They are unpacked, powered up, and pointed at something outside. Whatever the client sees, they do not mention it, and you are paid on the spot."
-  },
-  {
-   "id": "catsrequest",
-   "title": "A Cat's Request",
-   "giver": "Captain Ashgrin",
-   "type": "chain",
-   "from": "nail",
-   "to": "nail",
-   "stops": [
-    "nail",
-    "whisker",
-    "arc"
-   ],
-   "goods": [],
-   "pay": 1350,
-   "rep": "cat",
-   "crew": "navigator",
-   "blurb": "Ashgrin wants you to go and be seen. Nail, then Whisker, then the Arc, in that order, and come back and tell her who was where. She will not say why, and it is rude to ask a cat twice.",
-   "done": "She hears you out, nods once, and introduces you to Celia, who has been sitting behind you the entire time and who apparently already knows what your ship is called."
-  },
-  {
-   "id": "medicinerun",
-   "title": "Medicine Run",
-   "giver": "Captain Ashgrin",
-   "type": "delivery",
-   "from": "nail",
-   "to": "brine",
-   "goods": [
-    {
-     "good": "greymeds",
-     "qty": 4
-    }
-   ],
-   "pay": 2100,
-   "rep": "frog",
-   "blurb": "Four cases of medicine that came through Whisker and did not come with paperwork. Ashgrin wants them on Brine, cold, and soon. The apothecaries there will know exactly what they are and will not say so.",
-   "done": "A frog with very old hands checks each case, says nothing about where it came from, and gives you a jar of something for the journey home."
-  },
-  {
-   "id": "ambercollector",
-   "title": "The Amber Collector",
-   "giver": "A Veyra buying agent",
-   "type": "retrieval",
-   "from": "brine",
-   "to": "veyra",
-   "goods": [
-    {
-     "good": "amber",
-     "qty": 2
-    }
-   ],
-   "pay": 1350,
-   "rep": "emberkin",
-   "blurb": "Two pieces of brine amber, the kind with something inside that is not quite a leaf. Veyra has a collector and the collector has an opinion about which two.",
-   "done": "The collector turns each piece for a long time without speaking. Then they thank you, precisely, and you are shown out of a room you were never really in."
-  },
-  {
-   "id": "frogsquestion",
-   "title": "A Frog's Question",
-   "giver": "A Brine apothecary",
-   "type": "message",
-   "from": "brine",
-   "to": "glass",
-   "goods": [],
-   "pay": 530,
-   "rep": "frog",
-   "blurb": "A question for the scholars under the ice on Glass. It is one sentence long and the apothecary has been working on it for eleven years. She would like an answer, eventually, and is in no hurry.",
-   "done": "A scholar reads it, sits down, and reads it again. She says the answer will take some time. She seems delighted about that."
-  },
-  {
-   "id": "appraisal",
-   "title": "Appraisal",
-   "giver": "Wicket of the deep shelf",
-   "type": "shopping",
-   "from": "brine",
-   "to": "brine",
-   "goods": [
-    {
-     "good": "arcshard",
-     "qty": 1
-    },
-    {
-     "good": "stormcrystals",
-     "qty": 1
-    },
-    {
-     "good": "coils",
-     "qty": 1
-    }
-   ],
-   "pay": 4800,
-   "rep": "frog",
-   "crew": "appraiser",
-   "blurb": "Wicket would like to look at three things at once: a piece of the Arc off Nail, a storm crystal fished out of Grumm's cloud tops, and one of Cinder's reactor coils. She is not buying them. She wants them on the same table under the same lamp, and she has wanted that for some while.",
-   "done": "She puts all three under the same lamp, is quiet for a long time, and then says something that is not an answer. Then she asks where you are going next, and starts packing."
-  }
- ]
+  "questDone": "Finished {title}. Paid {pay}.",
+  "skimDamage": "Hull damaged air braking at {body}.",
+  "skimFuelCell": "Fuel cell lost air braking at {body}.",
+  "questReady": "Finished {title}. There is something to collect.",
+  "salvaged": "Taken off {wreck}: {what}."
+ }
 }

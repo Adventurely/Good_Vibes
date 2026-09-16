@@ -76,7 +76,6 @@
     -webkit-background-clip:text; background-clip:text; color:transparent;
   }
   .tag{ margin:.9rem auto 0; max-width:36rem; color:var(--muted); font-size:clamp(.95rem, 2.6vw, 1.08rem); }
-  .actions{ margin-top:clamp(1.4rem, 4vw, 2.2rem); display:flex; flex-wrap:wrap; gap:.8rem; justify-content:center; align-items:center; }
   .enter{
     display:inline-block; padding:.85rem 2.4rem; border:0; border-radius:999px;
     background:linear-gradient(180deg, var(--gold) 0%, var(--gold-deep) 100%); color:#1a1310;
@@ -101,7 +100,6 @@
      blocks, not any of the words. */
   @media (max-width: 560px){
     .tag{ margin-top:.6rem; }
-    .actions{ margin-top:1.1rem; gap:.6rem; }
     /* Narrow enough that Continue and New game stay on one row at 360px,
        which is where a saved game used to push them onto two and shove the
        rest of the page off the bottom. */
@@ -115,8 +113,49 @@
      in. Nothing needs hiding now that the cards are gone. */
   @media (max-height: 600px){
     .tag{ margin-top:.5rem; }
-    .actions{ margin-top:1rem; }
   }
+  /* Three slots. A card each, stacked on a phone and in a row when there is
+     room for one — and every card the same height whether or not it has a
+     game in it, so the row does not jump about as slots fill up. */
+  .slots{
+    margin-top:clamp(1.2rem, 4vw, 2rem);
+    display:grid; gap:.7rem;
+    grid-template-columns:repeat(auto-fit, minmax(13.5rem, 1fr));
+    text-align:left;
+  }
+  .slot{
+    display:flex; flex-direction:column; gap:.45rem;
+    padding:.85rem .95rem; border-radius:.7rem;
+    border:1px solid var(--gv-line-2); background:var(--gv-glass-2);
+  }
+  .slot h2{ margin:0; font-size:.72rem; letter-spacing:.18em; text-transform:uppercase; color:var(--gold-deep); font-weight:700; }
+  .slot .who{ margin:0; font-weight:600; font-size:1rem; color:var(--ink); }
+  .slot .when{ margin:0; font-size:.82rem; color:var(--muted); min-height:1.2em; }
+  .slot .row{ display:flex; flex-wrap:wrap; gap:.4rem; margin-top:auto; padding-top:.4rem; }
+  .slot button{
+    font:inherit; font-size:.82rem; font-weight:600; cursor:pointer;
+    padding:.4rem .7rem; border-radius:999px;
+    border:1px solid var(--gv-line-2); background:transparent; color:var(--ink);
+  }
+  .slot button.go{ background:linear-gradient(180deg, var(--gold) 0%, var(--gold-deep) 100%); color:#1a1310; border:0; }
+  .slot button:hover{ filter:brightness(1.12); }
+  .slot button:focus-visible{ outline:3px solid var(--mint); outline-offset:2px; }
+  .slot.empty .who{ color:var(--faint); font-weight:500; }
+  #carry{
+    border:1px solid var(--gv-line-2); border-radius:.8rem; padding:1.1rem;
+    background:var(--gv-glass-2); color:var(--ink); max-width:34rem; width:92vw;
+  }
+  #carry::backdrop{ background:rgba(0,0,0,.72); }
+  #carry h2{ margin:0 0 .4rem; font-size:1.05rem; }
+  .carry-note{ margin:0 0 .6rem; font-size:.85rem; color:var(--muted); }
+  #carry-text{
+    width:100%; font:12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+    background:var(--gv-sunk); color:var(--ink);
+    border:1px solid var(--gv-line); border-radius:.5rem; padding:.55rem; resize:vertical;
+    word-break:break-all;
+  }
+  .carry-btns{ display:flex; gap:.5rem; margin-top:.7rem; flex-wrap:wrap; }
+  .carry-btns .enter{ padding:.5rem 1.1rem; font-size:.85rem; text-transform:none; letter-spacing:0; }
 </style>
 </head>
 <body>
@@ -131,11 +170,27 @@
     <p class="tag">A small merchant ship, a warm orange star, and four peoples who each want what
        the others make.</p>
 
-    <div class="actions">
-      <a class="enter" id="continue" href="./play.html" hidden>Continue</a>
-      <a class="enter quiet" id="new" href="./play.html?new">New game</a>
+    <!-- The slots are drawn by script, because only script can read them. The
+         link inside is what is there before that happens and what is there if
+         it never does: a page that cannot list your saves can still start a
+         game. renderSlots() replaces it. -->
+    <div class="slots" id="slots">
+      <noscript><p class="saved">Saved games need JavaScript to list. You can still start a new one.</p></noscript>
+      <a class="enter" href="./play.html?new">New game</a>
     </div>
     <p class="saved" id="saved"></p>
+
+    <dialog id="carry">
+      <h2 id="carry-title">Carry a game</h2>
+      <p id="carry-note" class="carry-note"></p>
+      <textarea id="carry-text" rows="5" spellcheck="false" autocomplete="off"
+        aria-label="The save, written out"></textarea>
+      <div class="carry-btns">
+        <button class="enter quiet" id="carry-copy" type="button">Copy</button>
+        <button class="enter quiet" id="carry-load" type="button" hidden>Load it</button>
+        <button class="enter quiet" id="carry-close" type="button">Close</button>
+      </div>
+    </dialog>
 
     <span class="wip">Single player &middot; early build</span>
   </div>
@@ -147,31 +202,120 @@
 import { createChart } from './render.js';
 import { BODIES, CONST, BELT_ROCKS, ARC_DEBRIS } from './content.js';
 import { makeWorld } from './orbit.js';
-import { restore } from './sim.js';
+import * as S from './sim.js';
 
 /* Continue only if there is something to continue. localStorage can throw
    in a private window; the page must render fine having learned nothing. */
 /* Offer Continue only for a save the game will actually take. Checking the
    version alone offered it for saves play.html then threw away, which is a
    worse welcome than no button at all. */
-const SAVE_KEY = 'ot:save:v1';
-let save = null;
-try{
-  const raw = localStorage.getItem(SAVE_KEY);
-  if(raw) save = restore(raw);
-}catch{ save = null; }
-if(save){
-  const cont = document.getElementById('continue');
-  cont.hidden = false;
-  const y = Math.floor(save.t / CONST.YEAR_DAYS) + 1, d = Math.floor(save.t % CONST.YEAR_DAYS) + 1;
-  document.getElementById('saved').textContent = `${save.shipName ?? 'Your ship'} · year ${y}, day ${d} · ${save.dockedAt ? 'docked at ' + (BODIES.find(b => b.id === save.dockedAt)?.name ?? save.dockedAt) : 'under way'}`;
-  document.getElementById('new').classList.add('quiet');
-}else{
-  document.getElementById('new').classList.remove('quiet');
+/* Three slots, and a save you can carry. Everything about how a save is
+   stored, written out and read back lives in sim.js, so this page and the game
+   page cannot come to disagree about what a save is. */
+S.migrateLegacy();
+
+const slotsEl = document.getElementById('slots');
+const savedEl = document.getElementById('saved');
+const dlg = document.getElementById('carry');
+
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+function renderSlots(){
+  let any = false;
+  slotsEl.innerHTML = S.SLOTS.map(n => {
+    const state = S.readSlot(n);
+    const sum = S.slotSummary(state);
+    if(sum) any = true;
+    return `<div class="slot${sum ? '' : ' empty'}">
+      <h2>Slot ${n}</h2>
+      <p class="who">${sum ? esc(sum.shipName) : 'Empty'}</p>
+      <p class="when">${sum ? `Year ${sum.year}, day ${sum.day}<br>${sum.where ? 'Docked at ' + esc(sum.where) : 'Under way'}` : 'No game here yet'}</p>
+      <div class="row">
+        ${sum
+          ? `<button class="go" data-act="play" data-slot="${n}">Continue</button>
+             <button data-act="export" data-slot="${n}">Copy out</button>
+             <button data-act="new" data-slot="${n}">New</button>
+             <button data-act="delete" data-slot="${n}">Delete</button>`
+          : `<button class="go" data-act="new" data-slot="${n}">New game</button>
+             <button data-act="import" data-slot="${n}">Paste in</button>`}
+      </div>
+    </div>`;
+  }).join('');
+  savedEl.textContent = any ? '' : 'Three saves live in this browser. Copy one out to carry it somewhere else.';
 }
-document.getElementById('new').addEventListener('click', e => {
-  if(save && !confirm('Start over? The saved ship at ' + (save.dockedAt ?? 'sea') + ' is replaced.')) e.preventDefault();
+
+function openCarry({ title, note, text, readonly, onLoad }){
+  document.getElementById('carry-title').textContent = title;
+  document.getElementById('carry-note').textContent = note;
+  const box = document.getElementById('carry-text');
+  box.value = text ?? '';
+  box.readOnly = !!readonly;
+  const copy = document.getElementById('carry-copy');
+  const load = document.getElementById('carry-load');
+  copy.hidden = !readonly;
+  load.hidden = !onLoad;
+  load.onclick = onLoad ? () => onLoad(box.value) : null;
+  copy.onclick = async () => {
+    box.select();
+    /* The clipboard API needs a secure context and a permission; selecting the
+       text is the fallback that always works, and is what the note says to do
+       if the button cannot. */
+    try{ await navigator.clipboard.writeText(box.value); copy.textContent = 'Copied'; }
+    catch{ copy.textContent = 'Press ⌘/Ctrl+C'; }
+    setTimeout(() => { copy.textContent = 'Copy'; }, 1800);
+  };
+  dlg.showModal();
+  if(!readonly) box.focus();
+}
+document.getElementById('carry-close').addEventListener('click', () => dlg.close());
+
+slotsEl.addEventListener('click', e => {
+  const btn = e.target.closest('button[data-act]');
+  if(!btn) return;
+  const n = Number(btn.dataset.slot);
+  const act = btn.dataset.act;
+  const state = S.readSlot(n);
+  const sum = S.slotSummary(state);
+
+  if(act === 'play'){ S.setActiveSlot(n); location.href = `./play.html?slot=${n}`; return; }
+  if(act === 'new'){
+    if(sum && !confirm(`Start over in slot ${n}? ${sum.text} is replaced.`)) return;
+    S.setActiveSlot(n);
+    location.href = `./play.html?slot=${n}&new`;
+    return;
+  }
+  if(act === 'delete'){
+    if(!confirm(`Delete slot ${n}? ${sum ? sum.text : 'It is empty'}. This cannot be undone.`)) return;
+    S.clearSlot(n); renderSlots(); return;
+  }
+  if(act === 'export'){
+    if(!state) return;
+    openCarry({
+      title: `Slot ${n}, written out`,
+      note: 'Copy this and keep it anywhere. Pasting it into an empty slot on any machine brings this game back exactly as it is.',
+      text: S.exportSave(state),
+      readonly: true,
+    });
+    return;
+  }
+  if(act === 'import'){
+    openCarry({
+      title: `Paste a game into slot ${n}`,
+      note: 'Paste a save you copied out earlier. Spaces and line breaks do not matter.',
+      text: '',
+      readonly: false,
+      onLoad: hex => {
+        let loaded;
+        try{ loaded = S.importSave(hex); }
+        catch(err){ alert(err.message); return; }
+        if(S.readSlot(n) && !confirm(`Slot ${n} already has a game. Replace it?`)) return;
+        if(!S.writeSlot(n, loaded)){ alert('This browser would not store it — the save is too large, or site data is blocked.'); return; }
+        dlg.close(); renderSlots();
+      },
+    });
+  }
 });
+renderSlots();
 
 /* The sky: the real chart, at a slow warp, looking at the inner system so
    the moons of Tassel and the Belt havens both read. */
@@ -203,7 +347,10 @@ function fit(){
 fit();
 addEventListener('resize', fit);
 // Start the clock somewhere in the save, or at a day that spreads the sky out.
-let t = save?.t ?? 140;
+/* Start the sky wherever the newest game is, so the title screen looks
+   like the game the player is most likely to press Continue on. */
+const newest = S.SLOTS.map(n => S.readSlot(n)).filter(Boolean).sort((a, b) => b.t - a.t)[0];
+let t = newest?.t ?? 140;
 let last = performance.now();
 function frame(now){
   const dt = Math.min(0.1, (now - last) / 1000); last = now;
