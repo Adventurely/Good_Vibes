@@ -13,7 +13,8 @@ import { test } from 'node:test';
 
 import {
   SCENE_W, SCENE_H, WALK_STEP, FALL_SAFE, FALL_SPEED, FLY_SPEED, TICK_RATE,
-  SKILLS, SKILL_INFO, LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVELS, buildTerrain, winCount, formatTime,
+  SKILLS, SKILL_INFO, LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5, LEVELS,
+  buildTerrain, buildLayer, winCount, formatTime,
 } from '../public/duck-duck-quack/content.js';
 
 import { newGame, tick, assignSkill, assignRefusal, duckNear, hasTrait } from '../public/duck-duck-quack/sim.js';
@@ -84,6 +85,12 @@ test('buildTerrain fills only the columns a segment claims', () => {
   const row = buildTerrain([{ from: 2, to: 5, y: 9 }], 6);
   assert.equal(row.length, 6);
   assert.deepEqual([...row].map(v => v ?? null), [null, null, 9, 9, 9, null]);
+});
+
+test('buildLayer expands a segment\'s own field and leaves the fallback everywhere else', () => {
+  const segments = [{ from: 0, to: 6, y: 50 }, { from: 2, to: 4, y: 50, hard: true }];
+  const row = buildLayer(segments, 'hard', false, 6);
+  assert.deepEqual(row, [false, false, true, true, false, false]);
 });
 
 /* -------------------------------------------------------------- walking */
@@ -220,6 +227,54 @@ test('a digger only answers a wall — facing a gap instead, it still just falls
   // And it dug nothing — a digger that never triggered has nothing to
   // have dug.
   for(let x = 10; x < 20; x++) assert.equal(state.tunnelY[x], null);
+});
+
+/* ----------------------------------------------------------------- rock */
+
+test('a digger cannot start a tunnel into rock — it just turns back, over and over', () => {
+  const level = miniLevel({
+    segments: [{ from: 0, to: 10, y: 50 }, { from: 10, to: SCENE_W, y: 0, hard: true }],
+    goalX: 40, supply: { digger: 5, builder: 0, blocker: 0, climber: 0, flyer: 0 },
+  });
+  const state = newGame(level);
+  for(let i = 0; i < 200 && !state.ended; i++){
+    for(const d of state.ducks){
+      if(d.state === 'walking' && !hasTrait(d, 'digger')) assignSkill(state, d.id, 'digger');
+    }
+    tick(state);
+  }
+  assert.notEqual(state.ducks[0].state, 'saved');
+  assert.equal(state.tunnelY[10], null, 'rock is never cut, however many diggers are handed out');
+});
+
+test('a climber scales rock exactly the way it scales an ordinary wall', () => {
+  const level = miniLevel({
+    segments: [{ from: 0, to: 10, y: 50 }, { from: 10, to: SCENE_W, y: 0, hard: true }],
+    goalX: 40, supply: { digger: 0, builder: 0, blocker: 0, climber: 1, flyer: 0 },
+  });
+  const state = run(newGame(level), 1);
+  const duck = state.ducks[0];
+  assert.equal(assignSkill(state, duck.id, 'climber'), duck);
+  run(state, 120);
+  assert.equal(duck.state, 'saved');
+});
+
+test('a tunnel already under way stops cold at rock, rather than cutting through it', () => {
+  const level = miniLevel({
+    segments: [
+      { from: 0, to: 10, y: 50 },
+      { from: 10, to: 20, y: 0 },          // ordinary wall — a dig can start here
+      { from: 20, to: SCENE_W, y: 0, hard: true }, // rock right behind it
+    ],
+    goalX: 40, supply: { digger: 1, builder: 0, blocker: 0, climber: 0, flyer: 0 },
+  });
+  const state = run(newGame(level), 1);
+  const duck = state.ducks[0];
+  assert.equal(assignSkill(state, duck.id, 'digger'), duck);
+  run(state, 30);
+  assert.notEqual(duck.state, 'saved');
+  assert.equal(state.tunnelY[19], 50, 'the ordinary wall in front of the rock was cut');
+  assert.equal(state.tunnelY[20], null, 'the rock behind it was not');
 });
 
 /* --------------------------------------------------------------- flying */
@@ -670,6 +725,65 @@ test('The Grove cannot be won without a Digger — the wall has no other way thr
     tick(state);
   }
   assert.equal(state.saved, 0, 'nothing should get past the wall without a Digger');
+  assert.notEqual(state.ended, 'won');
+});
+
+/* ----------------------------------------------------------------- The Aerie, played */
+
+/* A greedy bot for The Aerie: bridge the first gap, climb the rock, bridge
+ * the second gap onto the island. No Digger branch — the level's whole
+ * point is that rock refuses one (see content.js), so a bot that only
+ * knows Builder and Climber should still be enough to clear it.
+ */
+function playLevel5(){
+  const state = newGame(LEVEL_5);
+  let builder1Used = false, builder2Used = false;
+  for(let i = 0; i < LEVEL_5.timeLimit && !state.ended; i++){
+    for(const d of state.ducks){
+      if(d.state !== 'walking') continue;
+      if(!builder1Used && d.x === 39 && assignSkill(state, d.id, 'builder')){ builder1Used = true; continue; }
+      if(!hasTrait(d, 'climber') && d.x >= 100 && d.x < 120) assignSkill(state, d.id, 'climber');
+      if(!builder2Used && d.x === 179 && assignSkill(state, d.id, 'builder')){ builder2Used = true; continue; }
+    }
+    tick(state);
+  }
+  return state;
+}
+
+test('The Aerie can be won by a simple bot', () => {
+  const state = playLevel5();
+  assert.equal(state.ended, 'won');
+  assert.ok(state.saved >= winCount(LEVEL_5), `only ${state.saved} saved, needed ${winCount(LEVEL_5)}`);
+});
+
+test('The Aerie cannot be won with Digger alone — the rock refuses it', () => {
+  // Same bot as above, Climber swapped for Digger: both gaps get bridged
+  // perfectly and nothing ever gets past the rock.
+  const state = newGame(LEVEL_5);
+  let builder1Used = false, builder2Used = false;
+  for(let i = 0; i < LEVEL_5.timeLimit && !state.ended; i++){
+    for(const d of state.ducks){
+      if(d.state !== 'walking') continue;
+      if(!builder1Used && d.x === 39 && assignSkill(state, d.id, 'builder')){ builder1Used = true; continue; }
+      if(!hasTrait(d, 'digger') && d.x >= 100 && d.x < 120) assignSkill(state, d.id, 'digger');
+      if(!builder2Used && d.x === 179 && assignSkill(state, d.id, 'builder')){ builder2Used = true; continue; }
+    }
+    tick(state);
+  }
+  assert.equal(state.saved, 0, 'nothing should get past the rock with only a Digger');
+  assert.notEqual(state.ended, 'won');
+});
+
+test('The Aerie cannot be won without a Builder — neither gap has any other answer', () => {
+  const state = newGame(LEVEL_5);
+  for(let i = 0; i < LEVEL_5.timeLimit && !state.ended; i++){
+    for(const d of state.ducks){
+      if(d.state !== 'walking') continue;
+      if(!hasTrait(d, 'climber') && d.x >= 100 && d.x < 120) assignSkill(state, d.id, 'climber');
+    }
+    tick(state);
+  }
+  assert.equal(state.saved, 0, 'nothing should get past the first gap without a Builder');
   assert.notEqual(state.ended, 'won');
 });
 

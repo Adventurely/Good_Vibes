@@ -10,7 +10,7 @@
 
 import { SCENE_H, FALL_SAFE, WALK_STEP, FALL_SPEED, FLY_SPEED, CLIMB_SPEED,
   BUILD_MAX_STEPS, BRIDGE_ARCH_HEIGHT, DIG_MAX_STEPS, SKILLS, GOOSE_FLEE_SPEED,
-  GOOSE_FLEE_LIFT, POOF_TICKS, buildTerrain, winCount } from './content.js';
+  GOOSE_FLEE_LIFT, POOF_TICKS, buildTerrain, buildLayer, winCount } from './content.js';
 
 /* ----------------------------------------------------------------- a duck */
 
@@ -57,6 +57,13 @@ export function newGame(level){
     // overwriting it. null everywhere nothing has been dug or bridged yet.
     tunnelY: new Array(level.width).fill(null),
     bridgeY: new Array(level.width).fill(null),
+    // Where a wall is rock rather than dirt — see rockAt below and
+    // content.js's header note on segments' `hard` field. `floors` (art.js's
+    // drawGround) is not read anywhere in this file at all — nothing below a
+    // column's surface is ever solid to begin with — but it is built here
+    // rather than recomputed every frame, the same reasoning `terrain` is.
+    rock: buildLayer(level.segments, 'hard', false, level.width),
+    floors: buildLayer(level.segments, 'floor', SCENE_H, level.width),
     ticks: 0,
     hatched: 0,
     nextHatch: 0,
@@ -95,6 +102,13 @@ const groundAt = (state, x) => {
 
 const setTunnelAt = (state, x, y) => { state.tunnelY[columnAt(state, x)] = y; };
 const setBridgeAt = (state, x, y) => { state.bridgeY[columnAt(state, x)] = y; };
+
+/* Whether the wall at this column is rock rather than dirt — see
+   content.js's header note on segments' `hard` field. A Digger already
+   tunnelling never re-checks this on its own (see stepDigging), so a level
+   that ever put rock right behind a diggable wall would need the tunnel to
+   run into it, not just start against it — this is what lets it. */
+const rockAt = (state, x) => state.rock[columnAt(state, x)];
 
 /* How many columns of open pit start at `x` — read once, the moment a
    Builder starts, so its bridge can be given a shape (see stepBuilding)
@@ -255,9 +269,16 @@ function stepWalking(state, d){
   /* A wall: ground that rises faster than a duckling can step up. Two skills
    * answer it, and a duckling holding both digs, because tunnelling leaves a
    * way through for everyone behind it while climbing only ever gets the one
-   * duckling over. Given neither, it turns around, which costs nothing. */
+   * duckling over. Given neither, it turns around, which costs nothing.
+   *
+   * Rock (content.js's segment `hard`) takes Digger out of that choice
+   * entirely — a Digger reaching one never even starts, the same as not
+   * holding the trait at all. Climbing is not answered here at all, on
+   * purpose: rock is still a wall, not a different hazard, so a Climber
+   * scales it exactly the way it would anything else.
+   */
   if(delta < -WALK_STEP){
-    if(hasTrait(d, 'digger')){ d.state = 'digging'; d.digLeft = DIG_MAX_STEPS; return; }
+    if(!rockAt(state, nextX) && hasTrait(d, 'digger')){ d.state = 'digging'; d.digLeft = DIG_MAX_STEPS; return; }
     if(hasTrait(d, 'climber')){ d.state = 'climbing'; d.x = nextX; return; }
     d.dir = -d.dir;
     return;
@@ -328,11 +349,18 @@ function stepFalling(state, d){
  * rules get to decide what that ground is — flat to walk onto, or a drop to
  * fall down. A digger that stepped out on its own could walk itself off a
  * cliff the walking code would have handled properly.
+ *
+ * It stops the same way, cold, at the first column of actual rock (see
+ * rockAt) — stepWalking already refuses to start a tunnel into rock, but a
+ * tunnel already under way does not re-check that on its own, so this is
+ * what stops one that started in ordinary wall from running straight
+ * through rock behind it.
  */
 function stepDigging(state, d){
   const level = state.level;
   const nextX = d.x + d.dir;
   if(nextX < 0 || nextX >= level.width){ d.state = 'walking'; return; }
+  if(rockAt(state, nextX)){ d.state = 'walking'; return; }
 
   if(groundAt(state, nextX) >= d.y){ d.state = 'walking'; return; }
 

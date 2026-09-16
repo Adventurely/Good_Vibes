@@ -17,12 +17,29 @@
  * never touched once a level starts — a Digger and a Builder each write into
  * their own second layer instead (`tunnelY`, `bridgeY` in sim.js's game
  * state), one number per column same as `terrain`, consulted first wherever
- * it is not null. That is what lets a dig leave the wall standing — a hole
- * bored through it, rock still overhead — instead of quietly bulldozing the
- * whole column down to head height, and what lets a bridge leave the gap
+ * it is not null. That is what lets a dig leave the wall standing — a bored
+ * hole through it, the wall still overhead — instead of quietly bulldozing
+ * the whole column down to head height, and what lets a bridge leave the gap
  * still open underneath the deck instead of the pit just filling in with
  * dirt. See sim.js's groundAt for the one place all three ever get read
  * together.
+ *
+ * A segment can carry two more things besides its height, both optional and
+ * both expanded the same way `y` is (see buildLayer):
+ *
+ *   hard    true for a stretch of actual rock rather than dirt — a wall a
+ *           Digger cannot start a tunnel into at all (see sim.js's rockAt).
+ *           Climbing it works exactly as it would anywhere else; only
+ *           digging is refused. Nothing about a plain wall changes when
+ *           this is left off, which is every wall before The Aerie.
+ *   floor   how far down a segment's own ground actually reaches, for a
+ *           stretch that does not go all the way to the bottom of the scene
+ *           the way every other column does — an island sitting in open air
+ *           rather than a plateau standing on more ground underneath it.
+ *           Left off, a segment fills to the bottom of the scene same as
+ *           always. This is purely what art.js draws: nothing below a
+ *           column's surface height is ever solid to begin with (see
+ *           groundAt again), so leaving it off changes no duckling's path.
  */
 
 export const SCENE_W = 320;
@@ -142,6 +159,26 @@ export function buildTerrain(segments, width = SCENE_W){
     for(let x = Math.max(0, from); x < Math.min(width, to); x++) terrain[x] = y;
   }
   return terrain;
+}
+
+/* The same column-by-column expansion buildTerrain does for `y`, generalised
+ * to any other per-segment field a level wants to carry — `hard` for a
+ * segment of rock (see sim.js's rockAt) and `floor` for a segment that does
+ * not reach all the way to the bottom of the scene (see art.js's drawGround)
+ * both ride on this rather than getting their own copy of the same loop.
+ * A segment that does not set the field at all leaves `fallback` standing
+ * for every column it claims — unlike buildTerrain's `y`, which every
+ * segment always sets, most segments have nothing to say about `hard` or
+ * `floor`, and a plain wall or a plain gap should not have to write
+ * `hard: false` just to say so.
+ */
+export function buildLayer(segments, field, fallback, width = SCENE_W){
+  const layer = new Array(width).fill(fallback);
+  for(const seg of segments){
+    if(!(field in seg)) continue;
+    for(let x = Math.max(0, seg.from); x < Math.min(width, seg.to); x++) layer[x] = seg[field];
+  }
+  return layer;
 }
 
 /* --------------------------------------------------------------- the level */
@@ -427,7 +464,83 @@ export const LEVEL_4 = {
   goose: { x0: 200, x1: 239, y: 150, speed: 1.5, catchRadius: 1.5 },
 };
 
-export const LEVELS = [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4];
+/* "The Aerie": the pond is not on the ground at all. Past the usual gap, a
+ * rock face — not a wall of dirt, actual rock (segments' `hard`, see
+ * content.js's header note) — stands a hundred pixels tall, and a Digger
+ * cannot start a tunnel into it no matter how many are handed out. Climbing
+ * it works exactly the way climbing anything else does; digging is the one
+ * thing rock refuses, confirmed by actually running a digger-only flock
+ * into it rather than just reasoning about it (see
+ * test/duck-duck-quack.test.js) — every one of them turns back at the face
+ * and none ever reach the pond.
+ *
+ * The far side of that climb is not a landing, it is a ledge: a second gap,
+ * with nothing under it but the rest of the drawn scene, wants a second
+ * Builder the same way the first one did. What is on the other side of that
+ * one is a floating island — a segment with a `floor` (see content.js's
+ * header note again), a slab of ground with open air under it rather than
+ * more ground standing on more ground the way every rise in every other
+ * level here does — and the pond sits on top of it.
+ *
+ * The goose keeps its usual beat, just moved up onto the island with
+ * everything else: it was never the thing guarding the height, the rock
+ * was, and a hazard that cannot be reached until the real climb is already
+ * behind a duckling is not adding anything by also being up there guarding
+ * the last stretch. It works exactly the way it does everywhere else —
+ * present, one bite, done.
+ */
+export const LEVEL_5 = {
+  id: 'aerie',
+  name: 'The Aerie',
+  width: SCENE_W,
+  height: SCENE_H,
+
+  /* [0, 40)    flat ground out of the nest
+     [40, 65)   the gap — 25 columns of pit, wants a Builder
+     [65, 120)  flat ground up to the rock
+     [120, 165) the rock — 45 columns, a hundred pixels of actual rock
+                (`hard`); Digger cannot start a tunnel into it at all
+     [165, 180) a short ledge at the top of the climb
+     [180, 200) the second gap — open air over the rest of the scene, wants
+                a second Builder
+     [200, 320) the floating island (`floor: 85`, open air under the slab)
+                the goose's beat somewhere inside it, and the pond at the
+                end of it */
+  segments: [
+    { from: 0, to: 40, y: 150 },
+    { from: 40, to: 65, y: PIT_Y },
+    { from: 65, to: 120, y: 150 },
+    { from: 120, to: 165, y: 50, hard: true },
+    { from: 165, to: 180, y: 50 },
+    { from: 180, to: 200, y: PIT_Y },
+    { from: 200, to: 320, y: 50, floor: 85 },
+  ],
+
+  nestX: 6,
+  goalX: 280,
+
+  duckCount: 10,
+  spawnInterval: TICK_RATE * 2,
+  /* Five minutes rather than the usual three and a half to four — the climb
+     alone is a hundred ticks at CLIMB_SPEED for every duckling that makes
+     it, on top of everything else, and that time is spent once per
+     duckling, not once for the whole flock the way a dig or a bridge is. */
+  timeLimit: TICK_RATE * 300,
+  winRatio: 0.7,
+
+  /* Climber: nine for ten hatchlings, the same margin The Park gives its own
+     mandatory Climber. Digger: a small honest supply rather than zero — it
+     is on the page so a player who reaches for it out of habit discovers
+     rock refuses it, rather than never getting the chance to find out.
+     Builder: one spare over its two required bridges. Flyer: zero, nothing
+     here falls. Blocker: present, without a winning use, same as
+     everywhere else. */
+  supply: { digger: 2, builder: 3, blocker: 2, climber: 9, flyer: 0 },
+
+  goose: { x0: 240, x1: 279, y: 50, speed: 1.5, catchRadius: 1.5 },
+};
+
+export const LEVELS = [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5];
 
 export const winCount = level => Math.ceil(level.duckCount * level.winRatio);
 

@@ -257,25 +257,65 @@ const GRASS_DEPTH = 11;
    fixed depth would swallow the whole dirt band. */
 const SOIL_SHARE = 0.55;
 
-/* The terrain height array, filled column by column from its surface to the
- * bottom of the scene. A gap's columns sit far below SCENE_H (see content.js's
- * PIT_Y), so they simply paint nothing at all — an open chasm is the absence
- * of ground, not a colour of its own.
+/* A column of actual rock (content.js's segment `hard`) reads nothing like a
+ * column of dirt — no grass cap, no seam, nothing grown on it — flat slate
+ * the whole way down but for a paler top edge catching the light, plainer
+ * than the strata a dirt wall's face gets because there is only the one
+ * material here to show. */
+function drawStoneColumn(ctx, x, y, fillH){
+  ctx.fillStyle = hex('s');
+  ctx.fillRect(x, y, 1, fillH);
+  ctx.fillStyle = hex('v');
+  ctx.fillRect(x, y, 1, Math.min(2, fillH));
+}
+
+/* The cut edge under a floating segment (content.js's `floor`) — a slab
+ * with open air under it, not a plateau standing on more ground the way
+ * every other rise in this game is. A flat line of ink would read as the
+ * bottom just being clipped off-screen; a root hanging past it here and
+ * there, sparse the same way the tufts and flowers are scattered, is what
+ * says "this is where the island actually ends" instead of "the drawing
+ * ran out". */
+function drawFloatingEdge(ctx, x, bottom){
+  ctx.fillStyle = hex('k');
+  ctx.fillRect(x, bottom - 1, 1, 1);
+  const h = Math.imul(x + 2917, 2246822519) >>> 0;
+  if(h % 5 !== 0) return;
+  ctx.fillStyle = hex('N');
+  ctx.fillRect(x, bottom, 1, 1 + (h >>> 29));
+}
+
+/* The terrain height array, filled column by column from its surface down to
+ * either the bottom of the scene or, for a floating segment, no further than
+ * its own `floor` (see content.js's header note) — open air below that is
+ * the absence of ground, exactly the way a gap's columns already are. A
+ * gap's columns sit far below SCENE_H (see content.js's PIT_Y), so they
+ * simply paint nothing at all either way.
  *
- * Every column short of a pit gets the same cross-section: a shallow cap of
- * grass, a seam, then dirt the rest of the way down. That is what turns the
- * wall — one column with fifty pixels of fill instead of thirty — into
- * something that reads as a cliff with exposed dirt on its face, rather
- * than a taller rectangle of the same flat green.
+ * Every ordinary column gets the same cross-section: a shallow cap of grass,
+ * a seam, then dirt the rest of the way down. That is what turns the wall —
+ * one column with fifty pixels of fill instead of thirty — into something
+ * that reads as a cliff with exposed dirt on its face, rather than a taller
+ * rectangle of the same flat green. A rock column (`hard`) skips all of that
+ * for drawStoneColumn instead — see it for why.
  */
-export function drawGround(ctx, terrain, level){
+export function drawGround(ctx, terrain, level, rock, floors){
   for(let x = 0; x < terrain.length; x++){
     const y = terrain[x];
     if(y >= SCENE_H) continue;
-    const fillH = SCENE_H - y;
+    const bottom = Math.min(floors ? floors[x] : SCENE_H, SCENE_H);
+    const fillH = bottom - y;
+    if(fillH <= 0) continue;
 
     if(x >= level.goalX){
       drawWaterColumn(ctx, x, y, fillH);
+      if(bottom < SCENE_H) drawFloatingEdge(ctx, x, bottom);
+      continue;
+    }
+
+    if(rock && rock[x]){
+      drawStoneColumn(ctx, x, y, fillH);
+      if(bottom < SCENE_H) drawFloatingEdge(ctx, x, bottom);
       continue;
     }
 
@@ -297,10 +337,11 @@ export function drawGround(ctx, terrain, level){
       ctx.fillStyle = hex('k');
       ctx.fillRect(x, y + grassH, 1, 1);
     }
+    if(bottom < SCENE_H) drawFloatingEdge(ctx, x, bottom);
   }
-  drawTufts(ctx, terrain, level);
-  drawFlowers(ctx, terrain, level);
-  drawRockSpeckle(ctx, terrain, level);
+  drawTufts(ctx, terrain, level, rock);
+  drawFlowers(ctx, terrain, level, rock);
+  drawRockSpeckle(ctx, terrain, level, rock, floors);
   drawNest(ctx, level, terrain);
   drawCattails(ctx, level, terrain);
   drawLilyPads(ctx, terrain, level);
@@ -397,12 +438,12 @@ function drawWaterColumn(ctx, x, y, fillH){
    lawn instead. */
 const TUFT_COUNT = 90;
 
-function drawTufts(ctx, terrain, level){
+function drawTufts(ctx, terrain, level, rock){
   for(let i = 0; i < TUFT_COUNT; i++){
     const h = Math.imul(i + 7, 2246822519) >>> 0;
     const x = h % terrain.length;
     const y = terrain[x];
-    if(y >= SCENE_H || x >= level.goalX) continue;
+    if(y >= SCENE_H || x >= level.goalX || (rock && rock[x])) continue;
     ctx.fillStyle = hex((h >>> 17) & 1 ? 't' : 'g');
     ctx.fillRect(x, y - 1, 1, 1);
   }
@@ -416,32 +457,36 @@ function drawTufts(ctx, terrain, level){
 const FLOWER_COUNT = 22;
 const FLOWER_COLOURS = ['r', 'p', 'y'];
 
-function drawFlowers(ctx, terrain, level){
+function drawFlowers(ctx, terrain, level, rock){
   for(let i = 0; i < FLOWER_COUNT; i++){
     const h = Math.imul(i + 401, 2654435761) >>> 0;
     const x = h % terrain.length;
     const y = terrain[x];
-    if(y >= SCENE_H || x >= level.goalX) continue;
+    if(y >= SCENE_H || x >= level.goalX || (rock && rock[x])) continue;
     ctx.fillStyle = hex(FLOWER_COLOURS[(h >>> 13) % FLOWER_COLOURS.length]);
     ctx.fillRect(x, y - 1, 1, 1);
   }
 }
 
-/* A scatter of dark flecks in the rock band — the same fixed-count hash
-   technique as the tufts and flowers, seeded a third way, so the slate
-   below the soil reads as stone grain rather than a second flat fill. Only
-   ever a few dozen pixels regardless of how much rock is on screen, same as
-   every other scatter here. */
+/* A scatter of dark flecks in the rock band under ordinary dirt — the same
+   fixed-count hash technique as the tufts and flowers, seeded a third way,
+   so the slate below the soil reads as stone grain rather than a second
+   flat fill. Only ever a few dozen pixels regardless of how much rock is on
+   screen, same as every other scatter here. Skipped on an actual rock
+   column (`hard`) — drawStoneColumn already has its own top edge and does
+   not have the grass-then-soil-then-rock band this is speckling. */
 const SPECKLE_COUNT = 40;
 
-function drawRockSpeckle(ctx, terrain, level){
+function drawRockSpeckle(ctx, terrain, level, rock, floors){
   ctx.fillStyle = hex('k');
   for(let i = 0; i < SPECKLE_COUNT; i++){
     const h = Math.imul(i + 1109, 2246822519) >>> 0;
     const x = h % terrain.length;
     const y = terrain[x];
-    if(y >= SCENE_H || x >= level.goalX) continue;
-    const fillH = SCENE_H - y;
+    if(y >= SCENE_H || x >= level.goalX || (rock && rock[x])) continue;
+    const bottom = Math.min(floors ? floors[x] : SCENE_H, SCENE_H);
+    const fillH = bottom - y;
+    if(fillH <= 0) continue;
     const grassH = Math.min(GRASS_DEPTH, fillH);
     const dirtH = fillH - grassH;
     if(dirtH <= 0) continue;
@@ -600,7 +645,7 @@ function drawPoof(ctx, p){
    nothing here mutates it. */
 export function paintScene(ctx, state){
   drawSky(ctx, state.ticks);
-  drawGround(ctx, state.terrain, state.level);
+  drawGround(ctx, state.terrain, state.level, state.rock, state.floors);
   drawTunnels(ctx, state);
   drawBridges(ctx, state);
   drawGoose(ctx, state);

@@ -15,11 +15,12 @@
  * syncopated pattern that repeats under every chord, and the lead is one
  * riff transposed to whichever root is under it rather than four different
  * melodies — which is exactly the trick a two-channel tracker used to make
- * eight bars feel like one idea instead of four. WARREN_SONG, ORCHARD_SONG
- * and GROVE_SONG below follow the same eight-bar, call-and-response shape,
- * but differ in tempo, swing, register and waveform on purpose: a tunnel is
- * not a park, an orchard is not either of them, and a level with a goose
- * that does not give up is not any of the three.
+ * eight bars feel like one idea instead of four. WARREN_SONG, ORCHARD_SONG,
+ * GROVE_SONG and AERIE_SONG below follow the same eight-bar, call-and-response
+ * shape, but differ in tempo, swing, register and waveform on purpose: a
+ * tunnel is not a park, an orchard is not either of them, a level with a
+ * goose that does not give up is not any of the three, and a floating
+ * island is not on the ground at all.
  *
  * Nothing plays until a user gesture, because autoplay policy decides that,
  * not us. The mute choice persists per browser, under its own key so it
@@ -260,7 +261,59 @@ export const GROVE_SONG = {
   openHatAt: [15],
 };
 
-export const SONGS = { park: PARK_SONG, warren: WARREN_SONG, orchard: ORCHARD_SONG, grove: GROVE_SONG };
+/* The Aerie: open and unhurried where the other three are busy — a slower
+ * tempo, a sparser bass (root and fifth only, each held out rather than
+ * chopped into a pattern), and a sine lead in place of every other song's
+ * triangle, square or sawtooth. A sine carries only its own note, no
+ * harmonics riding along with it, which is what a chiptune waveform never
+ * quite manages and what a wide-open sky sounds like next to a tunnel or an
+ * orchard. Extra open hi-hats rather than extra kicks or snares, for the
+ * same reason — air moving, not a beat landing.
+ */
+export const AERIE_SONG = {
+  bpm: 108,
+  swing: 0.15,
+  bars: [
+    { chord: [53, 'maj'] },  { chord: [60, 'maj'] },
+    { chord: [62, 'min7'] }, { chord: [58, 'maj'] },
+    { chord: [53, 'maj'], lead: 'response' },  { chord: [60, 'maj'], lead: 'response' },
+    { chord: [62, 'min7'], lead: 'response' }, { chord: [58, 'maj'], lead: 'response', fill: true },
+  ],
+
+  // Root, then the fifth, each held for half a bar — open space between the
+  // two hits rather than a pattern filling every step.
+  bass: [
+    [0, 0, 4], [8, 7, 4],
+  ],
+  bassType: 'triangle',
+  bassCut: 1800,
+  bassLevel: 0.13,
+
+  // A slow rise and fall, sustained notes rather than a riff of short ones —
+  // the other three songs' leads move about; this one drifts.
+  lead: [
+    [0, 19, 3], [4, 22, 2], [8, 24, 3], [12, 22, 2],
+  ],
+  leadResponse: [
+    [2, 22, 2], [6, 26, 3], [10, 24, 2], [13, 19, 3],
+  ],
+  leadType: 'sine',
+  leadLevel: 0.09,
+
+  stabAt: [7, 15],
+  stabType: 'triangle',
+  stabCut: 2500,
+  stabLevel: 0.035,
+
+  kickAt: [0, 8],
+  snareAt: [4, 12],
+  hatAt: [2, 10],
+  openHatAt: [6, 14],
+};
+
+export const SONGS = {
+  park: PARK_SONG, warren: WARREN_SONG, orchard: ORCHARD_SONG, grove: GROVE_SONG, aerie: AERIE_SONG,
+};
 
 /* ------------------------------------------------------------------ engine --- */
 
