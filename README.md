@@ -1642,7 +1642,7 @@ grower improved exactly once, and a test that fails the moment two rows do the
 same thing to the same target.
 
 **The hand has to keep up, and for a week it did not.** The question was how
-long the first replant takes, and the harness answered it for eight ways of
+long the first season takes, and the harness answered it for eight ways of
 playing: between an hour and nine minutes (eight taps a second, never
 stopping) and an hour and forty-nine (thirty taps and a closed lid). Tapping
 was worth forty minutes over an hour and three quarters, because a tap was
@@ -1659,7 +1659,7 @@ flurry is; and *Windfall*, every tenth tap of the run paying ten, counted off
 the run rather than rolled so the same tap is the tenth in the browser and in
 the test. Over a hundred taps Windfall is worth a doubling, but it is not
 shaped like one — it gives the hand a beat. The harness now reads: at four
-taps a second and not stopping, the first replant at forty-nine minutes; at
+taps a second and not stopping, the first season ending at forty-nine minutes; at
 eight, twenty-five; tapping for the first quarter hour and leaving, an hour
 and twenty-four, with the hand making two thirds of the energy while it is
 at the desk. The idle path is untouched, which is the point: the lever that
@@ -1668,7 +1668,7 @@ moved was the one the player is holding.
 **The lot is the page.** The frame around it is one thin row — the name, a
 way back, a way to start over — the four numbers that never go away, and the
 panel. The tagline and the footer are gone; what the game is, the title screen
-says. Replanting lives in a *Seeds* tab rather than as a block under the
+says. The season's end lives in a *Seeds* tab rather than as a block under the
 picture, with a dot on the tab for the one moment it needs attention, and the
 lot takes up to three quarters of the window's height.
 
@@ -1681,31 +1681,120 @@ not see land. Under `prefers-reduced-motion` the number holds still, the burst
 is a still shape, and the canopy still swells, because a single ease is not a
 repeated motion.
 
-**Replanting is three named numbers and one sentence.** Seeds held, and what
-they are worth; seeds ready to bank, and what banking them would add; the
-lifetime total the next seed lands at, with a bar climbing to it. The button
-says what it will do — *Replant · bank 2* — and the confirmation says what is
-kept (seeds, medals, the all-time record) and what starts again (the energy,
-the growers and the upgrades on the lot). The first cut was one sentence that
-changed shape with the state — sometimes a count, sometimes a percentage,
+**The Seeds tab is two named numbers, one sentence and a ladder.** Seeds
+earned, the lifetime total the next one lands at, and a bar climbing to it;
+then every rung of the seed tree, the shut ones drawn as well as the open, so
+the next one is a thing you can see and aim at. The button says what it will
+do — *End the season · +1 seed* — and the confirmation says what is kept
+(seeds, the rows bought with them, medals, the record and the tree's size) and
+what starts again (the energy and the growers). The first cut was one sentence
+that changed shape with the state — sometimes a count, sometimes a percentage,
 sometimes a threshold — and a player could not tell which of the three they
 were being told.
 
-**The tree ages with each winter.** A replanting is a winter the tree has
-stood through: the lot goes back to bare ground, the seeds stay, and the tree
-comes back a year older — and drawn bigger and grander, with a design of its
-own for each of the first seven winters (stouter, with its roots showing;
-forked low; a knot hole and moss; broad, with a swing; buttress roots and
-blossom; lanterns and a bench; twin trunks and vines, with the crown clipping
-the top of the picture) and a slow swelling after that. `TREE_STAGES` in `art.js` is the table; the
-age is the save's replant count, read through `winters` in `content.js`, and
-the tap target grows with it. Each of the first ten winters is its own medal,
-and the ladder goes on to a hundred. The word on the page is "winter" and
-never "reset", because a reset is a thing that makes the lot smaller and this
-is the one thing on it that a replanting makes bigger.
+**A seed is a season.** One number, three ways of saying it, and for a
+fortnight they were three different numbers. Ending a season gives the lot back
+and pays exactly one seed, however long you waited; the lifetime energy the
+next seed wants is four times the last — a million, four, sixteen, sixty-four —
+measured against a lifetime total nothing ever clears, so you never re-earn
+what you had, you add three times it again from bare ground.
+
+**What a seed buys is nothing. What it opens is a row.** Forty of them
+written out by hand in `PRESTIGE`, one a seed, each paid for in energy inside
+a run and then kept through every season afterwards. That carrying-across is
+what the loop was missing: the lot went back to nothing while the next seed
+wanted four times as much, so without it every season was harder than the last
+and the loop stopped paying.
+
+**No two rungs do the same thing**, which is the owner's rule and the reason
+the ladder is written rather than generated. Nineteen of the levers under it
+did not exist before: a windfall every fifth tap rather than every tenth, a
+price curve that climbs at 13% a copy instead of 15% and another that stops
+climbing past the hundredth, a fifth off a crate of ten, two growers in the
+ground for every one paid for, a tenth of the lot living through the season
+and five of every kind standing at the start of the next, a season that opens
+with the five cheapest shop rows already bought and another that opens with a
+hundredth of what the last one earned, interest on energy in hand and a
+ceiling on that interest, a windfall that pays the whole lot a second of its
+own income, a free grower every thousandth tap, a percent for every medal on
+the record and five for every kind standing and five for every seed ever
+earned, a percent per hundred taps and a tenth of one per minute, a still hand
+that still counts as two a second, and a shut tab that out-earns an open one.
+A test folds each rung onto a bare save and fails if the numbers do not move;
+another asserts that a save with nothing rooted folds to exactly the game as
+it was.
+
+Three of them change what something costs, which is the dangerous kind. A shop
+that quotes one number and charges another is a shop that refuses a button it
+had just greyed in, so `growerCost`, `bulkCost` and `affordable` take the curve
+and its ceiling as arguments, `upgradeCost` is a function rather than a field
+read, and every call site on the page passes the same bonus the purchase will
+use. A test buys at seven counts either side of the cap and asserts the quote
+and the charge agree to the penny.
+
+**Past the fortieth the ladder grows itself**, one ring a season, for ever,
+because the season's toast says another row is open every season and it has to
+be true on the four hundredth as well as the first. Each ring is two percent
+better than the one below it: the seed above always wants four times the
+lifetime energy of the one below, so a flat tail would mean every season past
+the last written row was worth less than the one before it, which is a ladder
+that has stopped.
+
+Two of the rungs were dead when the owner read them back, which is what
+reading them back is for. *The high sun* raised the peak of the day, and
+*Around the clock* had flattened the day away, so the first did nothing once
+the second was bought. Then it turned out the second did nothing either:
+flattening the sky is worth exactly zero, because the swing already averages
+to one and all a flat day does is take the peaks away with the troughs. The
+two are one row now, holding the whole lot at the top of the arc — including
+the all-hours kinds, which are the three biggest earners on the lot and were
+being skipped by a sky upgrade sold in the late game.
+
+Simulated against the real module, with a player who ends a season on sight and
+buys whatever they can afford: six seeds in the first day, at 1h24m, 3h21m,
+6h21m, 9h39m, 13h54m and 19h36m; thirteen in a week; the whole tree standing
+by day six; fifteen in a month. The medal ladder was rebuilt to match — it ran
+to a hundred, which a cube root could reach and this cannot — and now runs 1
+to 10, then 12, 15, 20, 25, 30 and 40, the last of them landing on the same
+season as the last written rung.
+
+**The tree ages with each season, and never gets smaller.** The lot goes back
+to bare ground and the tree comes back a year older, drawn bigger and grander,
+with a design of its own for each of the first seven (stouter, with its roots
+showing; forked low; a knot hole and moss; broad, with a swing; buttress roots
+and blossom; lanterns and a bench; twin trunks and vines, with the crown
+clipping the top of the picture) and a slow swelling after that.
+`TREE_STAGES` in `art.js` is the table; the age is the seed count, read
+through `seedsEarned`, and the tap target grows with it.
+
+Its size is a second number, and the one that stops the picture lying. Size
+comes off the grower count, and a season clears the growers — so for a
+fortnight a tree seven years old came back drawn as a seedling, which is the
+opposite of what seven years is supposed to mean. `state.grown` is the most
+growers that have ever stood at once, it is what the drawing reads, and
+nothing clears it. The energy is still really spent and the shelf is still
+really empty; it is only the tree that refuses to shrink. A save written
+before it existed takes its mark from the lot standing on it, which is the
+best evidence that file has.
+
+**The words "replant" and "rooted" are gone from the page.** The act is
+*ending a season* and a row you have paid for reads *Bought*, because a player
+who has just been told a season is a year of growth should not then be told
+the tree is being dug up and put back. Both words survive as identifiers —
+`state.rooted`, `root()`, `SEEDS_PER_REPLANT` — since renaming a save key is
+how a save stops loading, and a test walks every blurb, name and refusal in
+the tables to make sure neither has crept back into something a player reads.
+
+The word **winter** is gone. It named all of this for a fortnight — the tree's
+ages, the medals, a board column — and then a seed became the same thing a
+winter was, and two names for one number is how a page and a table start
+disagreeing. `winters` and `winterMedal` survive in `content.js` as aliases
+onto the new names, because removing an export is how a save or a page stops
+loading, and the leaderboard still reads a `winters` figure posted by a tab
+that has not reloaded.
 
 **The board is opt-in, and joining sends a name and four numbers.** Nothing
-else leaves the device. Four lists — most taps, most winters, most energy
+else leaves the device. Four lists — most taps, most seeds, most energy
 earned all told, fastest hands — behind one Durable Object and one HTTP route,
 the first on this site that is not a socket. The id that goes with a name is random and
 made in the browser; whoever holds it can update the row and nobody else can,
@@ -1717,7 +1806,7 @@ themselves are capped only where JavaScript stops holding them exactly, after
 a cap pitched at what the game "could" produce turned away the first real
 player on the first evening. The board is
 fetched only while its tab is open, and a joined player's row goes up every
-few minutes while they play, after a replanting, and on the way out by
+few minutes while they play, at the end of a season, and on the way out by
 `sendBeacon`.
 
 **Upgrades unlock on the run, medals on all time.** Upgrades are spent at a

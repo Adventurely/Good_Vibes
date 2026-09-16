@@ -15,7 +15,7 @@ import {
   BOARD_KEYS, LIMITS, INTEGER_KEYS, LABELS,
   NAME_MIN, NAME_MAX, cleanName, ID_RE,
   MIN_INTERVAL, MAX_PLAYERS, TOP, MAX_TOP, MAX_BODY, TOO_LARGE, BAD_JSON,
-  validate, merge, rank, boards, serve,
+  validate, merge, rank, boards, serve, migrateStore, WAS_CALLED,
 } from '../src/sunward-board.js';
 
 /* A UUID-shaped id from a small number, so a test can name five thousand of
@@ -24,18 +24,18 @@ const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
 const entry = (n, stats = {}, name = `Player ${n}`) => ({
   id: id(n), name,
-  stats: { taps: 0, winters: 0, earned: 0, peakTaps: 0, ...stats },
+  stats: { taps: 0, seeds: 0, earned: 0, peakTaps: 0, ...stats },
 });
 
 /* ---------------------------------------------------------------- constants */
 
 test('the four boards and their caps are the ones the client was written against', () => {
-  assert.deepEqual(BOARD_KEYS, ['taps', 'winters', 'earned', 'peakTaps']);
+  assert.deepEqual(BOARD_KEYS, ['taps', 'seeds', 'earned', 'peakTaps']);
   assert.deepEqual(LIMITS, {
-    taps: Number.MAX_SAFE_INTEGER, winters: Number.MAX_SAFE_INTEGER,
+    taps: Number.MAX_SAFE_INTEGER, seeds: Number.MAX_SAFE_INTEGER,
     earned: Number.MAX_VALUE, peakTaps: Number.MAX_VALUE,
   });
-  assert.deepEqual(INTEGER_KEYS, ['taps', 'winters']);
+  assert.deepEqual(INTEGER_KEYS, ['taps', 'seeds']);
   for(const key of BOARD_KEYS) assert.equal(typeof LABELS[key], 'string', `no label for ${key}`);
   assert.equal(NAME_MIN, 2);
   assert.equal(NAME_MAX, 16);
@@ -56,7 +56,7 @@ test('a player can take their own row off, and the id is the authority', () => {
      The id does the same work here it does for writing: whoever holds it holds
      the row. */
   const store = { players: {} };
-  const row = (n, name) => ({ id: id(n), name, stats: { taps: 100 * n, winters: n, earned: 0, peakTaps: 0 } });
+  const row = (n, name) => ({ id: id(n), name, stats: { taps: 100 * n, seeds: n, earned: 0, peakTaps: 0 } });
   serve(store, 'POST', row(1, 'Finn'), {}, 1000);
   serve(store, 'POST', row(2, 'Brikka'), {}, 1000);
   assert.equal(Object.keys(store.players).length, 2);
@@ -176,9 +176,9 @@ test('cleanName counts characters, not UTF-16 units', () => {
 /* ----------------------------------------------------------------- validate */
 
 test('validate accepts a good body and hands back a clean entry', () => {
-  const v = validate({ id: id(1).toUpperCase(), name: '  Finn  ', stats: { taps: 120, winters: 2, earned: 1.5e30, peakTaps: 8.25 } });
+  const v = validate({ id: id(1).toUpperCase(), name: '  Finn  ', stats: { taps: 120, seeds: 2, earned: 1.5e30, peakTaps: 8.25 } });
   assert.equal(v.ok, true);
-  assert.deepEqual(v.entry, { id: id(1), name: 'Finn', stats: { taps: 120, winters: 2, earned: 1.5e30, peakTaps: 8.25 } });
+  assert.deepEqual(v.entry, { id: id(1), name: 'Finn', stats: { taps: 120, seeds: 2, earned: 1.5e30, peakTaps: 8.25 } });
 });
 
 test('validate refuses a body that is not a score', () => {
@@ -217,7 +217,7 @@ test('the ceiling on a figure is the machine\'s, not a guess at the game', () =>
   assert.equal(tryStats({ peakTaps: 250 }).ok, true);
   assert.equal(tryStats({ taps: 5e7 + 1 }).ok, true, 'the old fifty-million cap must be gone');
 
-  for(const key of ['taps', 'winters']){
+  for(const key of ['taps', 'seeds']){
     assert.equal(LIMITS[key], Number.MAX_SAFE_INTEGER, `${key} is a count, so it stops where counting does`);
     // Number.isInteger says yes to 1e16, and 1e16 + 1 is 1e16, so a record
     // that "only goes up" would stop being able to.
@@ -247,7 +247,7 @@ test('validate refuses figures that are broken rather than big', () => {
   }
 });
 
-test('validate wants whole numbers for taps and winters and not for the rest', () => {
+test('validate wants whole numbers for taps and seeds and not for the rest', () => {
   const tryStats = stats => validate({ id: id(1), name: 'Finn', stats });
   for(const key of INTEGER_KEYS){
     const v = tryStats({ [key]: 1.5 });
@@ -261,7 +261,7 @@ test('validate wants whole numbers for taps and winters and not for the rest', (
 });
 
 test('validate fills missing stats with zero and drops keys it does not know', () => {
-  const zeros = { taps: 0, winters: 0, earned: 0, peakTaps: 0 };
+  const zeros = { taps: 0, seeds: 0, earned: 0, peakTaps: 0 };
   assert.deepEqual(validate({ id: id(1), name: 'Finn' }).entry.stats, zeros);
   assert.deepEqual(validate({ id: id(1), name: 'Finn', stats: {} }).entry.stats, zeros);
   assert.deepEqual(validate({ id: id(1), name: 'Finn', stats: null }).entry.stats, zeros);
@@ -280,17 +280,17 @@ test('merge writes a new row and stamps it', () => {
   const r = merge(players, entry(1, { taps: 10 }), 1000);
   assert.deepEqual(r, { ok: true });
   assert.deepEqual(players[id(1)], {
-    name: 'Player 1', stats: { taps: 10, winters: 0, earned: 0, peakTaps: 0 }, at: 1000, since: 1000,
+    name: 'Player 1', stats: { taps: 10, seeds: 0, earned: 0, peakTaps: 0 }, at: 1000, since: 1000,
   });
 });
 
 test('merge never lets a figure go down, and lets the name change', () => {
   const players = {};
-  merge(players, entry(1, { taps: 100, winters: 3, earned: 5e6, peakTaps: 9 }, 'Finn'), 0);
-  const r = merge(players, entry(1, { taps: 50, winters: 4, earned: 1e6, peakTaps: 12 }, 'Finn the Hand'), MIN_INTERVAL);
+  merge(players, entry(1, { taps: 100, seeds: 3, earned: 5e6, peakTaps: 9 }, 'Finn'), 0);
+  const r = merge(players, entry(1, { taps: 50, seeds: 4, earned: 1e6, peakTaps: 12 }, 'Finn the Hand'), MIN_INTERVAL);
   assert.equal(r.ok, true);
   const row = players[id(1)];
-  assert.deepEqual(row.stats, { taps: 100, winters: 4, earned: 5e6, peakTaps: 12 }, 'max per key, not per row');
+  assert.deepEqual(row.stats, { taps: 100, seeds: 4, earned: 5e6, peakTaps: 12 }, 'max per key, not per row');
   assert.equal(row.name, 'Finn the Hand');
   assert.equal(row.at, MIN_INTERVAL);
   assert.equal(row.since, 0, 'since is when they first appeared, not when they last posted');
@@ -324,17 +324,17 @@ test('merge prunes the forgotten first and keeps every board intact', () => {
   for(let n = 1; n <= MAX_PLAYERS; n++){
     players[id(n)] = {
       name: `P${n}`, at: n * 1000, since: n * 1000,
-      stats: { taps: n === 1 ? 1e6 : 1, winters: 0, earned: 0, peakTaps: 0 },
+      stats: { taps: n === 1 ? 1e6 : 1, seeds: 0, earned: 0, peakTaps: 0 },
     };
   }
-  // Rows 2..101 are the top hundred on winters, so they are safe too, however old.
-  for(let n = 2; n <= 101; n++) players[id(n)].stats.winters = 200 - n;
+  // Rows 2..101 are the top hundred on seeds, so they are safe too, however old.
+  for(let n = 2; n <= 101; n++) players[id(n)].stats.seeds = 200 - n;
 
   const r = merge(players, entry(MAX_PLAYERS + 1, { earned: 5 }), (MAX_PLAYERS + 1) * 1000);
   assert.equal(r.ok, true);
   assert.equal(Object.keys(players).length, MAX_PLAYERS, 'pruned back to the cap');
   assert.ok(players[id(1)], 'the oldest row is in the top hundred of taps and stays');
-  for(let n = 2; n <= 101; n++) assert.ok(players[id(n)], `row ${n} is in the top hundred of winters and stays`);
+  for(let n = 2; n <= 101; n++) assert.ok(players[id(n)], `row ${n} is in the top hundred of seeds and stays`);
   assert.ok(players[id(MAX_PLAYERS + 1)], 'the row just merged stays');
   assert.equal(players[id(102)], undefined, 'the oldest row on no board goes');
   assert.ok(players[id(103)], 'and only that one');
@@ -344,7 +344,7 @@ test('merge never drops the row it just wrote, even when it is the oldest and on
   const players = {};
   // Nobody here is on any board, so nothing protects anyone but recency.
   for(let n = 1; n <= MAX_PLAYERS; n++){
-    players[id(n)] = { name: `P${n}`, at: 1e9 + n, since: 1e9 + n, stats: { taps: 0, winters: 0, earned: 0, peakTaps: 0 } };
+    players[id(n)] = { name: `P${n}`, at: 1e9 + n, since: 1e9 + n, stats: { taps: 0, seeds: 0, earned: 0, peakTaps: 0 } };
   }
   // A brand-new row with nothing on it, stamped with a time before everyone else.
   const r = merge(players, entry(MAX_PLAYERS + 1), 5);
@@ -357,7 +357,7 @@ test('merge never drops the row it just wrote, even when it is the oldest and on
 test('merge does not prune under the cap', () => {
   const players = {};
   for(let n = 1; n < MAX_PLAYERS; n++){
-    players[id(n)] = { name: `P${n}`, at: n, since: n, stats: { taps: 0, winters: 0, earned: 0, peakTaps: 0 } };
+    players[id(n)] = { name: `P${n}`, at: n, since: n, stats: { taps: 0, seeds: 0, earned: 0, peakTaps: 0 } };
   }
   merge(players, entry(MAX_PLAYERS), 1e9);
   assert.equal(Object.keys(players).length, MAX_PLAYERS, 'exactly the cap is not over it');
@@ -367,11 +367,11 @@ test('merge does not prune under the cap', () => {
 
 test('rank leaves zeros off, sorts longest first, and breaks ties by since then id', () => {
   const players = {
-    [id(3)]: { name: 'C', at: 0, since: 300, stats: { taps: 50, winters: 0, earned: 0, peakTaps: 0 } },
-    [id(1)]: { name: 'A', at: 0, since: 100, stats: { taps: 50, winters: 0, earned: 0, peakTaps: 0 } },
-    [id(2)]: { name: 'B', at: 0, since: 100, stats: { taps: 50, winters: 0, earned: 0, peakTaps: 0 } },
-    [id(4)]: { name: 'D', at: 0, since: 0,   stats: { taps: 0,  winters: 9, earned: 0, peakTaps: 0 } },
-    [id(5)]: { name: 'E', at: 0, since: 0,   stats: { taps: 70, winters: 0, earned: 0, peakTaps: 0 } },
+    [id(3)]: { name: 'C', at: 0, since: 300, stats: { taps: 50, seeds: 0, earned: 0, peakTaps: 0 } },
+    [id(1)]: { name: 'A', at: 0, since: 100, stats: { taps: 50, seeds: 0, earned: 0, peakTaps: 0 } },
+    [id(2)]: { name: 'B', at: 0, since: 100, stats: { taps: 50, seeds: 0, earned: 0, peakTaps: 0 } },
+    [id(4)]: { name: 'D', at: 0, since: 0,   stats: { taps: 0,  seeds: 9, earned: 0, peakTaps: 0 } },
+    [id(5)]: { name: 'E', at: 0, since: 0,   stats: { taps: 70, seeds: 0, earned: 0, peakTaps: 0 } },
   };
   assert.deepEqual(rank(players, 'taps'), [
     { id: id(5), name: 'E', value: 70 },
@@ -379,7 +379,7 @@ test('rank leaves zeros off, sorts longest first, and breaks ties by since then 
     { id: id(2), name: 'B', value: 50 },   // same since as A; lower id
     { id: id(3), name: 'C', value: 50 },
   ]);
-  assert.deepEqual(rank(players, 'winters'), [{ id: id(4), name: 'D', value: 9 }]);
+  assert.deepEqual(rank(players, 'seeds'), [{ id: id(4), name: 'D', value: 9 }]);
   assert.deepEqual(rank(players, 'earned'), []);
   assert.deepEqual(rank(players, 'taps', 2).map(r => r.name), ['E', 'A'], 'limit cuts the tail');
   assert.equal(rank(players, 'taps').length, 4, 'the default limit is TOP, and there are fewer than that');
@@ -387,7 +387,7 @@ test('rank leaves zeros off, sorts longest first, and breaks ties by since then 
 
 test('rank copes with a row missing the key', () => {
   const players = { [id(1)]: { name: 'A', at: 0, since: 0, stats: { taps: 3 } } };
-  assert.deepEqual(rank(players, 'winters'), []);
+  assert.deepEqual(rank(players, 'seeds'), []);
   assert.deepEqual(rank(players, 'taps'), [{ id: id(1), name: 'A', value: 3 }]);
 });
 
@@ -396,30 +396,30 @@ test('rank copes with a row missing the key', () => {
 test('boards carries no ids and ranks you over everyone, not just the top', () => {
   const players = {};
   for(let n = 1; n <= 15; n++){
-    players[id(n)] = { name: `P${n}`, at: n, since: n, stats: { taps: 100 - n, winters: n === 15 ? 0 : 1, earned: 0, peakTaps: 0 } };
+    players[id(n)] = { name: `P${n}`, at: n, since: n, stats: { taps: 100 - n, seeds: n === 15 ? 0 : 1, earned: 0, peakTaps: 0 } };
   }
   const out = boards(players, { you: id(13) });
   assert.equal(out.players, 15);
   assert.equal(out.boards.taps.length, TOP);
   assert.deepEqual(out.boards.taps[0], { name: 'P1', value: 99 });
   assert.deepEqual(out.boards.earned, []);
-  assert.deepEqual(out.you, { taps: 13, winters: 13, earned: null, peakTaps: null });
+  assert.deepEqual(out.you, { taps: 13, seeds: 13, earned: null, peakTaps: null });
   assert.doesNotMatch(JSON.stringify(out), /0000-4000-8000/, 'an id leaked into the public shape');
   assert.deepEqual(Object.keys(out).sort(), ['boards', 'players', 'you']);
   assert.deepEqual(Object.keys(out.boards), BOARD_KEYS);
 });
 
 test('boards with nobody asking gives every rank as null', () => {
-  const players = { [id(1)]: { name: 'A', at: 0, since: 0, stats: { taps: 3, winters: 0, earned: 0, peakTaps: 0 } } };
-  assert.deepEqual(boards(players).you, { taps: null, winters: null, earned: null, peakTaps: null });
-  assert.deepEqual(boards(players, { you: id(2) }).you, { taps: null, winters: null, earned: null, peakTaps: null });
-  assert.deepEqual(boards({}), { boards: { taps: [], winters: [], earned: [], peakTaps: [] }, players: 0, you: { taps: null, winters: null, earned: null, peakTaps: null } });
+  const players = { [id(1)]: { name: 'A', at: 0, since: 0, stats: { taps: 3, seeds: 0, earned: 0, peakTaps: 0 } } };
+  assert.deepEqual(boards(players).you, { taps: null, seeds: null, earned: null, peakTaps: null });
+  assert.deepEqual(boards(players, { you: id(2) }).you, { taps: null, seeds: null, earned: null, peakTaps: null });
+  assert.deepEqual(boards({}), { boards: { taps: [], seeds: [], earned: [], peakTaps: [] }, players: 0, you: { taps: null, seeds: null, earned: null, peakTaps: null } });
 });
 
 test('boards honours a limit', () => {
   const players = {};
   for(let n = 1; n <= 120; n++){
-    players[id(n)] = { name: `P${n}`, at: n, since: n, stats: { taps: n, winters: 0, earned: 0, peakTaps: 0 } };
+    players[id(n)] = { name: `P${n}`, at: n, since: n, stats: { taps: n, seeds: 0, earned: 0, peakTaps: 0 } };
   }
   assert.equal(boards(players).boards.taps.length, TOP);
   assert.equal(boards(players, { limit: 3 }).boards.taps.length, 3);
@@ -433,9 +433,9 @@ test('serve GET on an empty board', () => {
   const r = serve(store, 'GET', null, {}, 12345);
   assert.equal(r.status, 200);
   assert.deepEqual(r.body, {
-    boards: { taps: [], winters: [], earned: [], peakTaps: [] },
+    boards: { taps: [], seeds: [], earned: [], peakTaps: [] },
     players: 0,
-    you: { taps: null, winters: null, earned: null, peakTaps: null },
+    you: { taps: null, seeds: null, earned: null, peakTaps: null },
     updated: 12345,
   });
 });
@@ -446,14 +446,14 @@ test('serve POST then GET shows the row, and tells the poster where they stand',
   assert.equal(posted.status, 200);
   assert.deepEqual(posted.body.boards.taps, [{ name: 'Finn', value: 40 }]);
   assert.deepEqual(posted.body.boards.peakTaps, [{ name: 'Finn', value: 6.5 }]);
-  assert.deepEqual(posted.body.boards.winters, []);
-  assert.deepEqual(posted.body.you, { taps: 1, winters: null, earned: null, peakTaps: 1 });
+  assert.deepEqual(posted.body.boards.seeds, []);
+  assert.deepEqual(posted.body.you, { taps: 1, seeds: null, earned: null, peakTaps: 1 });
   assert.equal(posted.body.players, 1);
   assert.equal(posted.body.updated, 1000);
 
   const got = serve(store, 'GET', null, {}, 2000);
   assert.deepEqual(got.body.boards.taps, [{ name: 'Finn', value: 40 }]);
-  assert.deepEqual(got.body.you, { taps: null, winters: null, earned: null, peakTaps: null });
+  assert.deepEqual(got.body.you, { taps: null, seeds: null, earned: null, peakTaps: null });
   assert.equal(got.body.updated, 2000);
 
   // Asking as yourself, in either case, gets your ranks back.
@@ -465,7 +465,7 @@ test('serve POST then GET shows the row, and tells the poster where they stand',
 test('serve clamps the limit', () => {
   const store = { players: {} };
   for(let n = 1; n <= 120; n++){
-    store.players[id(n)] = { name: `P${n}`, at: n, since: n, stats: { taps: n, winters: 0, earned: 0, peakTaps: 0 } };
+    store.players[id(n)] = { name: `P${n}`, at: n, since: n, stats: { taps: n, seeds: 0, earned: 0, peakTaps: 0 } };
   }
   assert.equal(serve(store, 'GET', null, {}, 0).body.boards.taps.length, TOP);
   assert.equal(serve(store, 'GET', null, { limit: '5' }, 0).body.boards.taps.length, 5);
@@ -509,4 +509,34 @@ test('serve makes the store its own if handed an empty one', () => {
   const store = {};
   assert.equal(serve(store, 'GET', null, undefined, 0).status, 200);
   assert.deepEqual(store.players, {});
+});
+
+test('rows written when the fourth board was called winters still rank', () => {
+  /* The board shipped with a column called winters, and rows were written to
+     it before a replant became a seed. Those rows must not drop off the board
+     they are on, and a client that has not reloaded must still be able to
+     post — it is the same figure under both names. */
+  const store = { players: {
+    [id(1)]: { name: 'Early', at: 1000, since: 1000,
+      stats: { taps: 400, winters: 3, earned: 5e6, peakTaps: 6 } },
+    [id(2)]: { name: 'Later', at: 2000, since: 2000,
+      stats: { taps: 100, seeds: 1, earned: 1e6, peakTaps: 2 } },
+  } };
+  assert.equal(migrateStore(store), true, 'it should say it moved something');
+  assert.equal(store.players[id(1)].stats.seeds, 3, 'the figure keeps its value under the new name');
+  assert.equal(store.players[id(1)].stats.winters, undefined, 'and loses the old one');
+  assert.equal(store.players[id(2)].stats.seeds, 1, 'a row already in the new shape is untouched');
+
+  assert.deepEqual(rank(store.players, 'seeds').map(r => r.name), ['Early', 'Later']);
+  assert.equal(migrateStore(store), false, 'running it again moves nothing');
+  assert.equal(migrateStore({}), false, 'and an empty store is not an error');
+  assert.equal(migrateStore({ players: { x: null, y: { stats: 7 } } }), false, 'nor is a row full of rubbish');
+
+  // A client from before the rename posts `winters`, and it lands on seeds.
+  const old = validate({ id: id(3), name: 'Stale Tab', stats: { taps: 9, winters: 4, earned: 1, peakTaps: 1 } });
+  assert.equal(old.ok, true);
+  assert.equal(old.entry.stats.seeds, 4);
+  // And when a client sends both, the name this file uses wins.
+  const both = validate({ id: id(3), name: 'Both', stats: { seeds: 2, winters: 9 } });
+  assert.equal(both.entry.stats.seeds, 2);
 });

@@ -51,12 +51,12 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 /* ------------------------------------------------------------- the stages */
 
-test('there is a stage for each of the first eight winters, in order', () => {
-  assert.ok(TREE_STAGES.length >= 8, 'eight winters at least');
+test('there is a stage for each of the first eight seeds, in order', () => {
+  assert.ok(TREE_STAGES.length >= 8, 'eight seeds at least');
   const ids = new Set();
   for(let i = 0; i < TREE_STAGES.length; i++){
     const s = TREE_STAGES[i];
-    assert.equal(s.winters, i, `stage ${i} says it is winter ${s.winters}`);
+    assert.equal(s.seeds, i, `stage ${i} says it is season ${s.seeds}`);
     assert.match(s.id, /^[a-z][a-z0-9-]*$/, `stage ${i} id "${s.id}" is not kebab-case`);
     assert.ok(!ids.has(s.id), `stage id "${s.id}" is used twice`);
     ids.add(s.id);
@@ -75,7 +75,7 @@ test('an older tree is never thinner or barer than a younger one', () => {
     assert.ok(now.leaf >= was.leaf, `"${now.id}" has smaller leaves than "${was.id}"`);
     assert.ok(now.spread >= was.spread, `"${now.id}" is narrower than "${was.id}"`);
     assert.ok(now.depthBonus >= was.depthBonus, `"${now.id}" is sparser than "${was.id}"`);
-    // Features accumulate: everything the last winter added is still there.
+    // Features accumulate: everything the last season added is still there.
     for(const f of was.features) assert.ok(now.features.includes(f), `"${now.id}" lost "${f}"`);
     assert.ok(now.features.length > was.features.length, `"${now.id}" adds nothing to "${was.id}"`);
     for(const f of now.features) assert.ok(now.has[f], `"${now.id}" lists "${f}" but has.${f} is not set`);
@@ -92,7 +92,7 @@ test('stageFor clamps, floors, and survives a save that reads as nothing', () =>
   assert.equal(stageFor(0), TREE_STAGES[0]);
   assert.equal(stageFor(-1), TREE_STAGES[0]);
   assert.equal(stageFor(-0.5), TREE_STAGES[0]);
-  assert.equal(stageFor(2.7), TREE_STAGES[2], 'a fraction of a winter is not a winter');
+  assert.equal(stageFor(2.7), TREE_STAGES[2], 'a fraction of a season is not a season');
   assert.equal(stageFor(TREE_STAGES.length - 1), last);
   assert.equal(stageFor(1e9), last);
   assert.equal(stageFor(Infinity), last);
@@ -101,7 +101,7 @@ test('stageFor clamps, floors, and survives a save that reads as nothing', () =>
   assert.equal(stageFor('3'), TREE_STAGES[3], 'a save that stored a string still counts');
 });
 
-test('past the last stage the tree thickens a little a winter and then stops', () => {
+test('past the last stage the tree thickens a little a season and then stops', () => {
   const last = TREE_STAGES.length - 1;
   assert.equal(agedScale(0), 1);
   assert.equal(agedScale(last), 1);
@@ -148,18 +148,18 @@ test('the same tree draws the same on every frame', () => {
   }
 });
 
-/* --------------------------------------------------------- the winters */
+/* --------------------------------------------------------- the seeds */
 
-test('every winter draws a different tree, and more of it', () => {
+test('every season draws a different tree, and more of it', () => {
   for(const g of [0, 0.3, 1]){
     let last = null;
     for(let age = 0; age < TREE_STAGES.length; age++){
       const calls = draw(g, { age });
       if(last){
-        assert.ok(!same(calls, last.calls), `growth ${g}: winters ${age - 1} and ${age} draw the same picture`);
+        assert.ok(!same(calls, last.calls), `growth ${g}: seeds ${age - 1} and ${age} draw the same picture`);
         if(g === 1){
           const now = extents(calls).pixels, was = extents(last.calls).pixels;
-          assert.ok(now > was, `growth 1: winter ${age} paints ${now} pixels, winter ${age - 1} painted ${was}`);
+          assert.ok(now > was, `growth 1: season ${age} paints ${now} pixels, season ${age - 1} painted ${was}`);
         }
       }
       last = { calls };
@@ -171,23 +171,23 @@ test('beyond the last stage the tree keeps growing, and then holds', () => {
   const last = TREE_STAGES.length - 1;
   const atLast = extents(draw(1, { age: last })).pixels;
   const after = extents(draw(1, { age: last + 1 })).pixels;
-  assert.ok(after > atLast, 'one winter past the last stage should draw more tree');
-  // The cap: past it, every winter is the same tree.
+  assert.ok(after > atLast, 'one season past the last stage should draw more tree');
+  // The cap: past it, every season is the same tree.
   const capped = last + Math.ceil((AGED_CAP - 1) / AGED_STEP);
   assert.ok(same(draw(1, { age: capped }), draw(1, { age: capped + 20 })), 'the cap does not hold');
   assert.deepEqual(treeBounds(1, capped), treeBounds(1, capped + 20));
 });
 
-test('what the fifth winter adds glows at night, and nothing before it does', () => {
+test('what the fifth season adds glows at night, and nothing before it does', () => {
   /* At light -0.7 every gold in the palette has been shaded to ember or rose,
      so a fill that is still gold is a light source drawn unshaded on purpose:
-     the knot hole from the fifth winter, the lanterns from the sixth. */
+     the knot hole from the fifth season, the lanterns from the sixth. */
   const gold = hex('y');
   const golds = (age, light) => draw(1, { age, light }).filter(c => c[0] === gold).length;
-  for(let age = 0; age < 5; age++) assert.equal(golds(age, -0.7), 0, `winter ${age} has a light on at night`);
-  assert.ok(golds(5, -0.7) > 0, 'the knot hole should glow from the fifth winter');
+  for(let age = 0; age < 5; age++) assert.equal(golds(age, -0.7), 0, `season ${age} has a light on at night`);
+  assert.ok(golds(5, -0.7) > 0, 'the knot hole should glow from the fifth season');
   assert.ok(golds(6, -0.7) > golds(5, -0.7), 'the lanterns should add to it from the sixth');
-  // And by day the knot hole is a hole: the fifth winter paints no more gold
+  // And by day the knot hole is a hole: the fifth season paints no more gold
   // than the fourth did (what gold there is by day is fallen leaves).
   assert.equal(golds(5, 1), golds(4, 1));
 });
@@ -205,9 +205,9 @@ test('nothing is drawn under the ground or off the sides, at any age', () => {
         for(const shake of [-2, 2]){
           const calls = draw(g, { age, sway, shake, pulse: sway === 0 ? 1 : 0 });
           for(const [key, x, y, w, h] of calls){
-            assert.ok(x >= 0 && x + w <= SCENE_W, `winter ${age} growth ${g}: a fill at x ${x} w ${w} leaves the frame`);
-            assert.ok(y + h <= floor, `winter ${age} growth ${g}: a ${key} fill at y ${y} h ${h} is under the ground`);
-            assert.ok(w >= 1 && h >= 1, `winter ${age}: an empty fill`);
+            assert.ok(x >= 0 && x + w <= SCENE_W, `season ${age} growth ${g}: a fill at x ${x} w ${w} leaves the frame`);
+            assert.ok(y + h <= floor, `season ${age} growth ${g}: a ${key} fill at y ${y} h ${h} is under the ground`);
+            assert.ok(w >= 1 && h >= 1, `season ${age}: an empty fill`);
           }
           assert.ok(extents(calls).y1 <= SCENE_H);
         }
@@ -222,28 +222,28 @@ test('the tap target stays in the frame, only ever grows, and covers the crown',
     let was = null;
     for(let age = 0; age <= 30; age++){
       const box = treeBounds(g, age);
-      assert.ok(box.x >= 0 && box.x + box.w <= SCENE_W, `growth ${g} winter ${age}: box leaves the frame sideways`);
-      assert.ok(box.y >= 0 && box.y + box.h <= SCENE_H, `growth ${g} winter ${age}: box leaves the frame vertically`);
+      assert.ok(box.x >= 0 && box.x + box.w <= SCENE_W, `growth ${g} season ${age}: box leaves the frame sideways`);
+      assert.ok(box.y >= 0 && box.y + box.h <= SCENE_H, `growth ${g} season ${age}: box leaves the frame vertically`);
       assert.ok(box.x < TREE_X && box.x + box.w > TREE_X, 'the trunk must be inside its own hit box');
       assert.ok(box.y < TREE_Y && box.y + box.h > TREE_Y, 'and the box must straddle the ground line');
       if(was){
-        assert.ok(box.x <= was.x && box.y <= was.y, `growth ${g}: the box shrinks between winters ${age - 1} and ${age}`);
+        assert.ok(box.x <= was.x && box.y <= was.y, `growth ${g}: the box shrinks between seeds ${age - 1} and ${age}`);
         assert.ok(box.x + box.w >= was.x + was.w && box.y + box.h >= was.y + was.h,
-          `growth ${g}: the box shrinks between winters ${age - 1} and ${age}`);
+          `growth ${g}: the box shrinks between seeds ${age - 1} and ${age}`);
       }
       was = box;
     }
   }
 
-  // From the first winter on, the box covers everything the tree draws — what
+  // From the first season on, the box covers everything the tree draws — what
   // the frame shows of it. The first-year box is left exactly as it was.
   for(let age = 1; age <= 10; age++){
     for(const g of [0, 0.2, 0.5, 0.8, 1]){
       const box = treeBounds(g, age);
       const e = extents(draw(g, { age }));
       assert.ok(box.x <= e.x0 && box.x + box.w >= e.x1,
-        `winter ${age} growth ${g}: the crown spans ${e.x0}..${e.x1} and the box ${box.x}..${box.x + box.w}`);
-      assert.ok(box.y <= Math.max(0, e.y0), `winter ${age} growth ${g}: the crown reaches y ${e.y0}, the box ${box.y}`);
+        `season ${age} growth ${g}: the crown spans ${e.x0}..${e.x1} and the box ${box.x}..${box.x + box.w}`);
+      assert.ok(box.y <= Math.max(0, e.y0), `season ${age} growth ${g}: the crown reaches y ${e.y0}, the box ${box.y}`);
     }
   }
   assert.deepEqual(treeBounds(1), treeBounds(1, 0));

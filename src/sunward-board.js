@@ -43,14 +43,20 @@
 /* Which counters have a board. Four rather than the record's ten, because the
    others are either derived from these or are only interesting to the player
    who made them — nobody wants a leaderboard of energy spent. */
-export const BOARD_KEYS = ['taps', 'winters', 'earned', 'peakTaps'];
+export const BOARD_KEYS = ['taps', 'seeds', 'earned', 'peakTaps'];
+
+/* What the fourth board was called for the first fortnight, when a replant was
+   a winter rather than a seed. Rows written then hold `winters`, and a client
+   that has not reloaded still posts it, so it is read as `seeds` on the way in
+   and on the way out of storage. Nothing about the game calls it that now. */
+export const WAS_CALLED = { winters: 'seeds' };
 
 /* How the board names them in a refusal. Not imported from content.js: this
    module runs inside the Worker, and the client's tables are 400 KB of shop
    the board has no use for. Four strings is cheaper than the coupling. */
 export const LABELS = {
   taps: 'Taps',
-  winters: 'Winters',
+  seeds: 'Seeds earned',
   earned: 'Energy earned',
   peakTaps: 'Best taps per second',
 };
@@ -83,7 +89,7 @@ export const LABELS = {
  * number, not finite, below zero, or a count with a fraction in it. */
 export const LIMITS = {
   taps: Number.MAX_SAFE_INTEGER,
-  winters: Number.MAX_SAFE_INTEGER,
+  seeds: Number.MAX_SAFE_INTEGER,
   earned: Number.MAX_VALUE,
   peakTaps: Number.MAX_VALUE,
 };
@@ -91,7 +97,7 @@ export const LIMITS = {
 /* Which of the four are counts. A count with a fraction in it is a client
    that has gone wrong, and the honest answer to that is a refusal it can read
    rather than a Math.floor that hides it. */
-export const INTEGER_KEYS = ['taps', 'winters'];
+export const INTEGER_KEYS = ['taps', 'seeds'];
 
 /* ----------------------------------------------------------------- the name */
 
@@ -202,9 +208,14 @@ export function validate(body){
   const name = cleanName(body.name);
   if(name === null) return { ok: false, error: NAME_RULE };
 
-  const raw = body.stats ?? {};
-  if(typeof raw !== 'object' || Array.isArray(raw)){
+  const posted = body.stats ?? {};
+  if(typeof posted !== 'object' || Array.isArray(posted)){
     return { ok: false, error: 'Those stats did not look right.' };
+  }
+  // A client that has not reloaded since the rename still posts `winters`.
+  const raw = { ...posted };
+  for(const [was, is] of Object.entries(WAS_CALLED)){
+    if(raw[is] === undefined && raw[was] !== undefined) raw[is] = raw[was];
   }
   const stats = {};
   for(const key of BOARD_KEYS){
@@ -284,10 +295,37 @@ function prune(players, keep){
   }
 }
 
+/* ------------------------------------------------------------------ the past */
+
+/* Bring stored rows up to the names this file uses now. Called once, where the
+ * rows are loaded, rather than on every read: five thousand rows walked per
+ * request to rename a key that four of them have is work for nothing.
+ *
+ * It mutates and returns the same store it was given, and it is safe to run
+ * over rows that have already been through it. Returns whether anything moved,
+ * so the caller knows whether the result is worth writing back.
+ */
+export function migrateStore(store){
+  const players = store?.players;
+  if(!players || typeof players !== 'object') return false;
+  let moved = false;
+  for(const row of Object.values(players)){
+    const stats = row?.stats;
+    if(!stats || typeof stats !== 'object') continue;
+    for(const [was, is] of Object.entries(WAS_CALLED)){
+      if(stats[was] === undefined) continue;
+      if(stats[is] === undefined) stats[is] = stats[was];
+      delete stats[was];
+      moved = true;
+    }
+  }
+  return moved;
+}
+
 /* ---------------------------------------------------------------------- rank */
 
 /* One board, longest first. Zero is not on a board: a player who has never
- * replanted is not in last place on winters, they are simply not on it, and a
+ * replanted is not in last place on seeds, they are simply not on it, and a
  * board of five thousand zeros would say nothing. Ties go to whoever got
  * there first, then to the id, so the order is the same on every read and
  * two players with the same figure do not swap places on refresh. */
