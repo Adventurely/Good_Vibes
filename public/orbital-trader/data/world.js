@@ -48,14 +48,15 @@ export const TUNING = {
    "retrograde": false,
    "mu": 9.63129e-11,
    "radius": 0.000003,
+   "atmo": 0.00000354,
    "dockAlt": 0.000015,
    "dockSpeed": 0.000293,
    "port": true,
    "species": "emberkin",
    "climate": "hot",
-   "notes": "The Emberkin homeworld. Industrial, volcanic, crowded; cities in the twilight band.",
+   "notes": "The Emberkin homeworld. Industrial, volcanic, crowded; cities in the twilight band. The thickest air on any rock out here, and not weather so much as plumbing: the molten face boils it off, the frozen back condenses it, and the twilight band lives in the draught between. 80 km of it, and a shielded ship can lean on it.",
    "soi": 0.0007795624440749096,
-   "zoneRadius": 0.000018
+   "zoneRadius": 0.000018540000000000002
   },
   {
    "id": "scorch",
@@ -90,14 +91,15 @@ export const TUNING = {
    "retrograde": false,
    "mu": 1.44469e-10,
    "radius": 0.000003,
+   "atmo": 0.0000033,
    "dockAlt": 0.000015,
    "dockSpeed": 0.000293,
    "port": true,
    "species": "emberkin",
    "climate": "hot",
-   "notes": "The wealthy Emberkin world. Luxury, auctions and houses that measure each other in public.",
+   "notes": "The wealthy Emberkin world. Luxury, auctions and houses that measure each other in public. Nearest the Lamp of anywhere anybody lives, and the air is pressed thin and close by the weight of the place — 44 km, with no haze in it to take the edge off the light, which is why shade is property.",
    "soi": 0.00045841307438006826,
-   "zoneRadius": 0.000018
+   "zoneRadius": 0.0000183
   },
   {
    "id": "tassel",
@@ -280,14 +282,15 @@ export const TUNING = {
    "retrograde": false,
    "mu": 1.80587e-13,
    "radius": 0.0000011,
+   "atmo": 0.000001276,
    "dockAlt": 0.00000273123,
    "dockSpeed": 0.000293,
    "port": true,
    "species": "frog",
    "climate": "cold",
-   "notes": "Ammonia seas and floating settlements. Pharmaceuticals, chemicals and biology nobody else can read.",
+   "notes": "Ammonia seas and floating settlements. Pharmaceuticals, chemistry and biology nobody else can read. A thin sky over the sea — 26 km of it, the shallowest band in the system and the twitchiest to aim a pass through.",
    "soi": 0.000013924179243748983,
-   "zoneRadius": 0.0000065999999999999995
+   "zoneRadius": 0.000006776
   },
   {
    "id": "glass",

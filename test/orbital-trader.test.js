@@ -9,7 +9,7 @@ import {
   QUESTS, DIALOG,
 } from '../public/orbital-trader/content.js';
 import * as S from '../public/orbital-trader/sim.js';
-import { createChart, railCrossings, railLead, locateOnPrediction, pathAnchors, KM_PER_AU, PALETTE } from '../public/orbital-trader/render.js';
+import { createChart, railCrossings, railLead, locateOnPrediction, pathAnchors, KM_PER_AU, PALETTE, haze, bodyColour } from '../public/orbital-trader/render.js';
 import { DURATION, BREACH, BEATS, CAPTION_AT, beatAt, ascent, skyAt, ROCKET } from '../public/orbital-trader/intro.js';
 
 /* Orbital Trader has no server: everything it knows is in public/ and is
@@ -3245,6 +3245,106 @@ test('the chart warns before the air and before the ground, and differently', ()
   const h = S.hazards(s);
   assert.ok(h.crash, 'a path into the ground raises the ground mark');
   assert.equal(h.crash.body, b.id);
+});
+
+/* ------------------------------------------------------------- the air */
+
+const WITH_AIR = ['veyra', 'cinder', 'tassel', 'grumm', 'brine'];
+
+/* Five worlds have weather: two that always did, and Veyra, Cinder and Brine,
+   which were rock with a sea and floating rafts drawn on them and nothing in
+   between. Brine's own blurb has always said "an ammonia sea under a thin
+   sky" — the sky is in the table now. */
+test('the worlds with air are the worlds that say they have air', () => {
+  assert.deepEqual(BODIES.filter(b => b.atmo).map(b => b.id).sort(), [...WITH_AIR].sort());
+  for(const id of WITH_AIR){
+    const b = BODIES.find(x => x.id === id);
+    const air = (b.atmo - b.radius) / b.radius;
+    assert.ok(b.atmo > b.radius, `${id}: the air is under the ground`);
+    assert.ok(air >= 0.05 && air <= 0.33, `${id}: a band of ${(air * 100).toFixed(0)}% is a skin or a shell, not weather`);
+    /* The one ordering a pilot actually flies: to a ship with no shield the top
+       of the air is the ground, so a harbour inside it would be a slow crash. */
+    assert.ok(b.atmo < b.dockAlt, `${id}: the harbour is inside the air`);
+    assert.ok(b.dockAlt < b.zoneRadius, `${id}: the harbour is outside its own mouth`);
+  }
+  /* The mouth is measured from the top of the air, so giving a world weather
+     moves its harbour out. Nothing authored that; it falls out of dockRange. */
+  const cinder = BODIES.find(b => b.id === 'cinder');
+  assert.equal(cinder.zoneRadius, cinder.atmo + 5 * cinder.radius);
+  const airless = BODIES.find(b => b.id === 'moss');
+  assert.ok(Math.abs(airless.zoneRadius - 6 * airless.radius) < 1e-15, 'a world with no air measures from the ground');
+});
+
+/* The shield's card names where it can be used, and a player buying it at
+   Cinder for 4,600 is buying that list. It is written down rather than built,
+   so this is what notices when a world gains or loses its air. */
+test('the heat shield says where there is air to brake in', () => {
+  const shield = UPGRADES.find(u => u.id === 'heatshield');
+  for(const id of WITH_AIR){
+    const name = S.portName(id);
+    assert.ok(shield.unlocks.includes(name), `the shield never mentions ${name}`);
+  }
+  for(const b of BODIES){
+    if(b.atmo || !b.port) continue;
+    assert.ok(!shield.unlocks.includes(S.portName(b.id)), `the shield promises air at ${b.name}, which has none`);
+  }
+});
+
+/* An ellipse dropped into the band, flown from the far end so the pass is
+   ahead of the ship rather than under it. What comes back is the manoeuvre:
+   a shielded ship is offered a brake, an unshielded one is warned of the
+   ground, and the ground in question is the top of the air. */
+function intoTheAir(id, depth, shield){
+  const b = S.world.get(id);
+  const rp = b.atmo - depth * (b.atmo - b.radius);
+  const ra = b.zoneRadius * 0.9, a = (rp + ra) / 2;
+  const va = Math.sqrt(b.mu * (2 / ra - 1 / a));
+  const s = S.newGame(1);
+  S.undock(s);
+  s.keys.heatShield = shield;
+  s.ship = { body: id, r: [-ra, 0], v: [0, -va] };
+  s.nodes = [];
+  return { state: s, vp: Math.sqrt(b.mu * (2 / rp - 1 / a)) };
+}
+
+test('every world with air can actually be braked in, and drowns a ship without a shield', () => {
+  for(const id of WITH_AIR){
+    const deep = intoTheAir(id, 0.6, true);
+    const h = S.hazards(deep.state);
+    assert.ok(h.skim, `${id}: a shielded pass through the band offers no brake`);
+    assert.equal(h.skim.body, id);
+    /* Worth the trip: a real pass takes a tenth of the speed at the bottom of
+       it or better, or nobody would fly one. */
+    assert.ok(h.skim.dv > deep.vp * 0.1, `${id}: a deep pass sheds only ${S.fmtKms(h.skim.dv)}`);
+
+    /* And the top of the band is the feather it is meant to be, so an orbit
+       can be walked down over laps rather than dropped in one. */
+    const graze = intoTheAir(id, 0.05, true);
+    const g = S.hazards(graze.state);
+    assert.ok(!g.skim || g.skim.dv < deep.vp * 0.02, `${id}: a graze is not a graze`);
+
+    /* No shield, same dive: the air is the floor, and it is the world's floor
+       rather than somebody else's. */
+    const bare = S.hazards(intoTheAir(id, 0.6, false).state);
+    assert.ok(bare.crash, `${id}: an unshielded ship flies through the air unharmed`);
+    assert.equal(bare.crash.body, id);
+    assert.equal(bare.skim, null, 'no shield, no brake');
+  }
+});
+
+/* The haze is drawn in the world's own colour. It used to be one violet for
+   everything, which was Grumm's, and read as Grumm wherever it appeared. */
+test('a world wears its own weather', () => {
+  const seen = new Set();
+  for(const id of WITH_AIR){
+    const b = BODIES.find(x => x.id === id);
+    const h = haze(bodyColour(b));
+    assert.match(h, /^rgba\(\d+,\d+,\d+,0\.18\)$/, `${id}: ${h}`);
+    assert.ok(!seen.has(h), `${id} shares its haze with another world`);
+    seen.add(h);
+  }
+  assert.equal(haze(bodyColour(BODIES.find(b => b.id === 'grumm'))), 'rgba(139,107,214,0.18)',
+    'Grumm keeps the violet the one hard-coded haze always was');
 });
 
 test('the skim look-ahead is bounded once the orbit closes', () => {

@@ -1321,7 +1321,7 @@ export const ECONOMY = {
    ],
    "requiresCrew": "engineer",
    "effect": "Survive a skim through a world’s air, and let it slow you down.",
-   "unlocks": "Air braking at Tassel and Grumm. The deeper the pass, the more it shakes the hull."
+   "unlocks": "Air braking at Veyra, Cinder, Tassel, Grumm and Brine — everywhere there is air to brake in. The deeper the pass, the more it shakes the hull."
   },
   {
    "id": "cryocooling",

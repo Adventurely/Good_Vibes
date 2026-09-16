@@ -99,7 +99,6 @@ export const PALETTE = {
   text:       '#f5ead6',
   textDim:    'rgba(245,234,214,0.6)',
   crash:      '#ff5f5f',
-  atmo:       'rgba(139,107,214,0.18)',
   emberkin:   '#ff8c42',
   otter:      '#6cc24a',
   cat:        '#e9dcc0',
@@ -112,6 +111,24 @@ export const PALETTE = {
 export const speciesColour = s => PALETTE[s] ?? PALETTE.none;
 
 /* Body colours by kind and people, so the chart reads without labels. */
+/* A body's colour at the weight air is drawn in: enough to read as weather over
+ * black, faint enough that the road through it stays the brightest thing. One
+ * number, so the four atmospheres are the same thickness of haze as each other
+ * whatever colour they are. */
+const HAZE_ALPHA = 0.18;
+const hazeCache = new Map();
+export function haze(colour){
+  let out = hazeCache.get(colour);
+  if(out) return out;
+  const hex = /^#([0-9a-f]{6})$/i.exec(colour);
+  const [r, g, bl] = hex
+    ? [0, 2, 4].map(i => parseInt(hex[1].slice(i, i + 2), 16))
+    : [139, 107, 214];
+  out = `rgba(${r},${g},${bl},${HAZE_ALPHA})`;
+  hazeCache.set(colour, out);
+  return out;
+}
+
 export function bodyColour(body){
   if(body.kind === 'star') return PALETTE.star;
   if(body.colour) return body.colour;
@@ -566,10 +583,14 @@ function drawBodies(chart, view, pos, t){
       glow.addColorStop(0, PALETTE.starGlow); glow.addColorStop(1, 'rgba(245,154,46,0)');
       ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(p[0], p[1], rpx * 5, 0, Math.PI * 2); ctx.fill();
     }
-    // Grumm's atmosphere band, when it is big enough to mean something.
+    /* The band of air, when it is big enough to mean something. In the world's
+       own colour: four worlds have weather now and a violet haze round all of
+       them said Grumm about every one. A disc rather than a ring, because what
+       it marks is a place you can be *inside* — the one circle on this chart
+       that is an amount of something rather than a boundary. */
     if(b.atmo && b.atmo * zoom > 8){
       ctx.beginPath(); ctx.arc(p[0], p[1], b.atmo * zoom, 0, Math.PI * 2);
-      ctx.fillStyle = PALETTE.atmo; ctx.fill();
+      ctx.fillStyle = haze(bodyColour(b)); ctx.fill();
     }
     // Docking zone, when near enough to be about to use it.
     if(b.port && b.zoneRadius && view.nearPort === b.id){

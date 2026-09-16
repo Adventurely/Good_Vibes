@@ -19,6 +19,10 @@ const by = Object.fromEntries(T.bodies.map(b => [b.id, b]));
 const TAU = Math.PI * 2;
 const period = (mu, a) => TAU * Math.sqrt(a ** 3 / mu);
 /* The reach a mass earns, mirrored from content.js: no body carries one. */
+/* Distances read in kilometres, because that is what the game's own labels say.
+   KM_PER_AU is the sky's own yardstick, not the physical au. */
+const KM_PER_AU = 147400000;
+const kmOf = au => Math.round(au * KM_PER_AU);
 const soiOf = b => (b.mu > 0 && b.a > 0 && by[b.parent]?.mu > 0) ? b.a * Math.pow(b.mu / by[b.parent].mu, 2 / 5) : null;
 /* And the mouth a size earns, mirrored the same way: five radii above the top
    of the air. A drifting haven has neither, and keeps its authored one. */
@@ -108,6 +112,20 @@ for(const b of T.bodies){
        how much of an arrival is left. */
     const frac = b.zoneRadius / b.soi;
     check(`C5 ${b.id} ground < parking < mouth < reach`, b.radius < b.dockAlt && b.dockAlt < b.zoneRadius && frac <= 0.92, `mouth is ${(frac * 100).toFixed(0)}% of the reach`);
+    /* And where there is air, it goes under all of that. A parking orbit inside
+       the band is not a harbour, it is a slow crash — and to a ship without a
+       shield the top of the air *is* the ground, so the ordering that matters
+       is the one a pilot flies, not the one the rock draws. Five worlds have
+       weather now; this is what stops the sixth being given some without
+       anybody checking what it sits under. */
+    if(b.atmo){
+      const air = (b.atmo - b.radius) / b.radius;
+      check(`C5 ${b.id} air < parking`, b.atmo < b.dockAlt, `air to ${kmOf(b.atmo - b.radius)} km, parking at ${kmOf(b.dockAlt - b.radius)} km up`);
+      /* A band between a twentieth and a third of the radius. Below that a pass
+         is a coin toss at the precision a burn can be aimed to; above it the
+         world is more air than world and the shed stops meaning anything. */
+      check(`C5 ${b.id} air is a band, not a skin or a shell`, air >= 0.05 && air <= 0.33, `${(air * 100).toFixed(0)}% of the radius, ${kmOf(b.atmo - b.radius)} km`);
+    }
     const vc = Math.sqrt(b.mu / b.dockAlt);
     check(`C6 ${b.id} parked speed`, km(vc) < 20, `${km(vc).toFixed(2)} km/s`);
     const esc = Math.sqrt(b.mu * (2 / b.dockAlt - 1 / ((b.dockAlt + b.soi) / 2))) - vc;
@@ -172,7 +190,6 @@ const turn = 2 * Math.asin(1 / (1 + rp * hg.dv2 * hg.dv2 / g.mu));
    place you fly *through* — is about proportion. */
 check('C8 Grumm reach is at least 0.8% of its orbit', g.soi >= 0.008 * g.a, `${g.soi.toFixed(4)} au, ${(100 * g.soi / g.a).toFixed(2)}% of ${g.a} au`);
 check('C8 Grumm turns a Hohmann arrival >= 60 deg', turn * 180 / Math.PI >= 60, `${(turn * 180 / Math.PI).toFixed(0)} deg`);
-check('C8 Grumm atmosphere band', g.atmo > 1.05 * g.radius && g.atmo < 1.3 * g.radius);
 for(const id of ['brine', 'glass', 'croak', 'haven']) check(`C10 ${id} period`, periods[id] > 2 && periods[id] < 60, `${periods[id]} d`);
 check('C10 Croak retrograde', by.croak.retrograde === true);
 check('C10 frog moons ordered outward', by.brine.a < by.glass.a && by.glass.a < by.croak.a && by.croak.a < by.haven.a);
