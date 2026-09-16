@@ -806,6 +806,23 @@ than anything a generator would produce. Adding a quest is a few lines in
 `quests.json` and no code — the file opens with the record format, and the
 build step refuses a record that does not keep to it.
 
+**Every job is written three times**, because a job has three moments and only
+one of them is a card in a list:
+
+| | | |
+|---|---|---|
+| `blurb` | on the board, before you take it | the pitch, to a stranger |
+| `taken` | a scene, the moment you agree | the handshake, and the thing they only mention now |
+| `done` | a scene, the moment you are paid | what happened when you handed it over |
+
+The two scenes are modals rather than lines in the corner: one is an answer to
+a button that was just pressed, and the other is the point of the whole trip. A
+job that pays in a person goes on from its payoff to their face, which is one
+press rather than two modals racing. In hand, the card carries `taken` rather
+than `blurb` — you are not being sold it any more. Salvage adds a fourth,
+`aboard`, for the one stop in the game with nobody in it to say anything. None
+of the three may repeat another, and the build step checks that too.
+
 | Type | Steps it earns | Built |
 |---|---|---|
 | Retrieval | one *acquire* per good, then *handover* at the destination | yes |

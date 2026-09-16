@@ -965,6 +965,21 @@ function showCrewPortrait(role, quest){
     </div>`, m => m.querySelector('#m-ok').addEventListener('click', closeModal));
 }
 
+/* A job has three things written for it and this is where two of them land.
+   The board carries the pitch; these are the moment you agree and the moment
+   you are paid, which are the two beats a card in a list cannot do — one is an
+   answer to something you just pressed, and the other is the point of the whole
+   trip. Both are the same shape so they read as a pair. */
+function showQuestScene(q, { kind, say, foot, then }){
+  openModal(`<div class="joined">
+      <h2>${esc(q.title)}</h2>
+      <p class="lock">${esc(q.giver)}${kind ? ` · ${esc(kind)}` : ''}</p>
+      <p class="say">${esc(say)}</p>
+      ${foot ? `<p>${foot}</p>` : ''}
+      <div class="btns"><button class="btn primary" id="m-ok">${then ? 'Go on' : 'Right you are'}</button></div>
+    </div>`, m => m.querySelector('#m-ok').addEventListener('click', () => { closeModal(); then?.(); }));
+}
+
 function noteCrew(events){
   for(const e of events ?? []){
     if(e.kind !== 'crewJoined') continue;
@@ -2358,10 +2373,12 @@ function questsTab(){
 
   if(!live.length && !owed.length) out += '<p class="say">Nothing in hand. A port\'s Requests tab is where the next one comes from.</p>';
   for(const { l, q } of live){
+    /* In hand, the card carries what was said when you agreed rather than the
+       pitch off the board: you are not being sold this one any more. */
     out += '<div class="quest">';
     out += `<h3>${esc(q.title)}</h3>`;
     out += `<p class="lock">${esc(q.giver)}</p>`;
-    out += `<p class="say">${esc(q.blurb)}</p>`;
+    out += `<p class="say">${esc(q.taken ?? q.blurb)}</p>`;
     out += '<ol class="steps">';
     S.questSteps(q).forEach((st, i) => {
       const state_ = i < l.step ? 'ok' : i === l.step ? 'now' : '';
@@ -2455,8 +2472,16 @@ const actions = {
     save();
     const settle = () => {
       renderTab();
-      if(r.crew) showCrewPortrait(r.crew, r.quest);
-      else toast(TEXT.events.questCollected ?? 'Collected.', 'story', 5000);
+      /* The payoff is the point of the trip, so it gets the scene rather than a
+         line in the corner: what happened when you handed it over, and what you
+         were given for it. A job that pays in a person goes on to their face
+         from here, which is one press rather than two modals racing. */
+      showQuestScene(r.quest, {
+        kind: 'collected',
+        say: r.quest.done,
+        foot: bits.length ? bits.join(' · ') : esc(TEXT.events.questCollected ?? 'Collected.'),
+        then: r.crew ? () => showCrewPortrait(r.crew, r.quest) : null,
+      });
     };
     /* Long enough for the last chip to finish its climb, and short enough that
        nobody presses anything twice. Reduced motion skips straight to the end. */
@@ -2510,9 +2535,17 @@ const actions = {
   takequest(id){
     const r = S.acceptQuest(state, id);
     if(!r.ok){ toast(r.reason, 'bad'); return; }
-    toast(`Took on ${r.quest.title}.`, 'story', 6000);
     if(!state.target) state.target = S.questTarget(r.quest);
     renderTab(); save(); tutorialCheck();
+    const load = S.questLoad(r.quest);
+    showQuestScene(r.quest, {
+      kind: 'taken on',
+      say: r.quest.taken,
+      foot: [
+        load ? `${load} unit${load === 1 ? '' : 's'} of your hold, now` : '',
+        r.quest.pay ? `Pays ${S.fmtMoney(r.quest.pay)} when it is done.` : '',
+      ].filter(Boolean).join(' · '),
+    });
   },
   look(gid){ showAppraisal(gid); },
   /* Pressing a face: they say their piece. Pressing it again gets the next
@@ -2838,16 +2871,19 @@ function tutorialCheck(){
   const s = TUT[Math.min(step, TUT.length - 1)];
   if(!s){ $('tut').hidden = true; return; }
   const last = step >= TUT.length - 1;
-  /* The pebble is home: Nellie gets her scene in a toast, Theo gets the last
-     card, and neither of them says it twice. The goodbye belongs to the trip
-     that has just been made, so a save that finished this errand before the
-     card existed — tutorialDone set, and no goodbye owed — gets neither: Theo
-     congratulating somebody on their first trade forty jobs later is worse
-     than saying nothing. */
+  /* The pebble is home: Theo gets the last card, and Nellie gets her scene when
+     the errand is collected, which is where every job's payoff lives now. This
+     used to spend her paragraph here as a toast, and then the collect scene
+     said the same words over again a minute later. So this is a nudge towards
+     the tab and nothing else. The goodbye belongs to the trip that has just
+     been made, so a save that finished this errand before the card existed —
+     tutorialDone set, and no goodbye owed — gets neither: Theo congratulating
+     somebody on their first trade forty jobs later is worse than saying
+     nothing. */
   if(last && !state.flags.tutorialDone){
     state.flags.tutorialDone = true;
     state.flags.tutorialGoodbye = true;
-    toast(S.questById('pebble')?.done ?? 'Nellie has her pebble.', 'story', 9000);
+    toast('The pebble is home. Theo is waiting to settle up — the Quests tab has it.', 'story', 9000);
     save();
   }
   if(last && !state.flags.tutorialGoodbye){ $('tut').hidden = true; return; }

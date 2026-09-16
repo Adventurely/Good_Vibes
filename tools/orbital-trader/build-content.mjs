@@ -66,7 +66,7 @@ const wreckIds = new Set(tuning.bodies.filter(b => b.kind === 'wreck' && b.port)
 const questIds = new Set();
 for(const [i, q] of (questbook.quests ?? []).entries()){
   const at = `quest ${q?.id ?? `#${i}`}`;
-  for(const k of ['id', 'title', 'giver', 'type', 'from', 'to', 'blurb', 'done']){
+  for(const k of ['id', 'title', 'giver', 'type', 'from', 'to', 'blurb', 'taken', 'done']){
     need(typeof q?.[k] === 'string' && q[k].length > 0, at, `${k} is required`);
   }
   need(!questIds.has(q?.id), at, 'two quests share an id');

@@ -439,7 +439,15 @@ test('the text has every line the game asks for', () => {
   }
   assert.ok(QUESTS.length >= 1, 'there is an opening quest');
   for(const q of QUESTS){
-    assert.ok(q.id && q.title && q.giver && q.blurb && q.done, `quest ${q.id} has its words`);
+    /* Three scenes, and every job has all three: the pitch on the board, what
+       is said once you agree, and what happens when you hand it over. */
+    assert.ok(q.id && q.title && q.giver && q.blurb && q.taken && q.done, `quest ${q.id} has its words`);
+    for(const [k, floor] of [['blurb', 20], ['taken', 20], ['done', 20]]){
+      assert.ok(q[k].trim().split(/\s+/).length >= floor, `quest ${q.id}: ${k} is ${q[k].trim().split(/\s+/).length} words`);
+    }
+    /* And `taken` is not the blurb again. The board sells it to a stranger;
+       this is said to somebody who has already said yes. */
+    assert.notEqual(q.taken.trim(), q.blurb.trim(), `quest ${q.id}: taken repeats the blurb`);
     assert.ok(['retrieval', 'delivery', 'shopping', 'chain', 'message', 'salvage'].includes(q.type), `quest ${q.id}: type ${q.type}`);
     /* Steps are built from the type, not written out — so what the words have
        to supply is only the wording a generator would do worse, and it has to
@@ -725,7 +733,7 @@ test('the quests are one table in one standard shape', () => {
   /* The documented field order, which is also the order they read in: who is
      asking and what kind of job, then the places, then what it is worth, then
      the words. A record that wanders is a record somebody wrote from memory. */
-  const ORDER = ['id', 'title', 'giver', 'type', 'from', 'to', 'stops', 'wreck', 'goods', 'pay', 'rep', 'crew', 'blurb', 'aboard', 'steps', 'done'];
+  const ORDER = ['id', 'title', 'giver', 'type', 'from', 'to', 'stops', 'wreck', 'goods', 'pay', 'rep', 'crew', 'blurb', 'taken', 'aboard', 'steps', 'done'];
   for(const q of book.quests){
     const keys = Object.keys(q);
     for(const k of keys) assert.ok(ORDER.includes(k), `quest ${q.id}: ${k} is not a field of the format`);
@@ -3713,6 +3721,43 @@ test('a stock ship can capture at both rocks and get away again', () => {
     /* And the mouth is wide enough to aim at: several times the ground. */
     assert.ok(b.zoneRadius / b.radius >= 5, `${id}: mouth is ${(b.zoneRadius / b.radius).toFixed(1)} radii`);
   }
+});
+
+/* ------------------------------------------------ the three quest scenes */
+
+/* A job is written three times over: the pitch a stranger reads off the board,
+   what the giver says once you have agreed, and what happens when you hand it
+   over. Two of those are moments rather than cards — one answers a button you
+   just pressed, the other is the point of the whole trip — so both are shown as
+   a scene, and neither is allowed to be the other one again. */
+test('every job is written three times, and no two of them are the same', () => {
+  for(const q of S.QUESTS){
+    for(const k of ['blurb', 'taken', 'done']) assert.ok(q[k]?.trim(), `${q.id}: no ${k}`);
+    const three = ['blurb', 'taken', 'done'].map(k => q[k].trim());
+    assert.equal(new Set(three).size, 3, `${q.id} says the same thing twice`);
+  }
+  /* Enough of it to be worth a scene. Below about twenty words a modal is an
+     interruption rather than a beat. */
+  const words = t => t.trim().split(/\s+/).length;
+  for(const q of S.QUESTS) assert.ok(words(q.taken) >= 20 && words(q.taken) <= 90, `${q.id}: taken is ${words(q.taken)} words`);
+});
+
+test('the page shows the two moments a card in a list cannot', () => {
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.match(PLAY, /function showQuestScene\(q, \{ kind, say, foot, then \}\)/, 'there is no scene to show');
+  /* Taking one on shows what was said when you agreed... */
+  const take = PLAY.slice(PLAY.indexOf('takequest(id){'), PLAY.indexOf('look(gid){'));
+  assert.match(take, /showQuestScene\(r\.quest, \{/, 'accepting says nothing');
+  assert.match(take, /say: r\.quest\.taken/, 'accepting does not use the line written for it');
+  /* ...and collecting shows what happened, then goes on to a face if the job
+     paid in one, rather than two modals racing each other. */
+  const claim = PLAY.slice(PLAY.indexOf('claim(id){'), PLAY.indexOf('exportsave(){'));
+  assert.match(claim, /say: r\.quest\.done/, 'collecting does not use the line written for it');
+  assert.match(claim, /then: r\.crew \? \(\) => showCrewPortrait/, 'a berth filled races the payoff');
+  assert.doesNotMatch(claim, /toast\(TEXT\.events\.questCollected/, 'the payoff is still a line in the corner');
+  /* And the card in hand stops repeating the sales pitch. */
+  const tab = PLAY.slice(PLAY.indexOf('function questsTab()'), PLAY.indexOf('/* ------------------------------------------------------------- actions */'));
+  assert.match(tab, /esc\(q\.taken \?\? q\.blurb\)/, 'a job in hand is still being sold to you');
 });
 
 /* ------------------------------------------------- the Dancer and the Maw */

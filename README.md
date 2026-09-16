@@ -1986,6 +1986,25 @@ going round nothing at all. Where a road runs into the Maw the crossing and the
 pass are still marked, with the real distance and the real closing speed, under
 the name **???**.
 
+### What a job says
+
+Every job is written **three times over**, because a job has three moments and
+only one of them is a card in a list. `blurb` is the pitch on the board, read by
+a stranger deciding. `taken` is what the giver says once you have agreed — the
+handshake, and the thing they only mention now. `done` is what happened when you
+handed it over. Salvage adds a fourth, `aboard`, for the one stop in the game
+with nobody in it to say anything.
+
+The middle and last are shown as scenes rather than as lines in the corner: one
+is an answer to a button that was just pressed, and the other is the point of
+the whole trip. A job that pays in a person goes on from its payoff to their
+face, which is one press rather than two modals racing each other. In hand, the
+card carries `taken` rather than `blurb` — you are not being sold it any more.
+No two of the three may be the same text, and the build step checks it.
+
+That is about 3,800 words across twenty-four jobs, which is most of the writing
+in the game.
+
 ### Salvage
 
 **Seven derelicts drift on their own rails**, and tying up to one is the Maw's
