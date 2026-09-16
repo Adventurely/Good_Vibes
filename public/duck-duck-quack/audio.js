@@ -15,10 +15,11 @@
  * syncopated pattern that repeats under every chord, and the lead is one
  * riff transposed to whichever root is under it rather than four different
  * melodies — which is exactly the trick a two-channel tracker used to make
- * eight bars feel like one idea instead of four. WARREN_SONG and
- * ORCHARD_SONG below follow the same eight-bar, call-and-response shape,
- * but differ in tempo, swing, register and waveform on purpose: a tunnel
- * is not a park, and an orchard is not either of them.
+ * eight bars feel like one idea instead of four. WARREN_SONG, ORCHARD_SONG
+ * and GROVE_SONG below follow the same eight-bar, call-and-response shape,
+ * but differ in tempo, swing, register and waveform on purpose: a tunnel is
+ * not a park, an orchard is not either of them, and a level with a goose
+ * that does not give up is not any of the three.
  *
  * Nothing plays until a user gesture, because autoplay policy decides that,
  * not us. The mute choice persists per browser, under its own key so it
@@ -209,7 +210,57 @@ export const ORCHARD_SONG = {
   openHatAt: [7, 15],
 };
 
-export const SONGS = { park: PARK_SONG, warren: WARREN_SONG, orchard: ORCHARD_SONG };
+/* The Grove: a goose that does not give up, so the music does not relax
+ * either. Sawtooth rather than triangle or square, for the grittiest edge
+ * of the four, and the fastest tempo with the tightest swing — driving
+ * rather than funky or bouncy or mechanical. i-VII-VI-V7 instead of a plain
+ * walk-down: that last chord is real dominant tension aimed back at the
+ * first, which the other three songs never reach for, and it is what makes
+ * the loop feel like it is chasing something instead of strolling past it.
+ */
+export const GROVE_SONG = {
+  bpm: 140,
+  swing: 0.06,
+  bars: [
+    { chord: [52, 'min7'] }, { chord: [50, 'dom7'] },
+    { chord: [48, 'maj'] },  { chord: [47, 'dom7'] },
+    { chord: [52, 'min7'], lead: 'response' }, { chord: [50, 'dom7'], lead: 'response' },
+    { chord: [48, 'maj'],  lead: 'response' }, { chord: [47, 'dom7'], lead: 'response', fill: true },
+  ],
+
+  // A driving eighth-note pulse, root and fifth only — urgency, not funk.
+  bass: [
+    [0, 0, 1], [2, 0, 1], [4, 7, 1], [6, 0, 1],
+    [8, 0, 1], [10, 0, 1], [12, 7, 1], [14, 0, 1],
+  ],
+  bassType: 'sawtooth',
+  bassCut: 900,
+  bassLevel: 0.13,
+
+  // Short, repeated alarm-calls rather than a melody that resolves —
+  // a lead that keeps circling back on itself instead of going anywhere.
+  lead: [
+    [0, 14, 1], [1, 14, 1], [6, 17, 1], [7, 17, 1], [11, 19, 2],
+  ],
+  leadResponse: [
+    [2, 17, 1], [3, 17, 1], [8, 19, 1], [9, 19, 1], [12, 22, 2],
+  ],
+  leadType: 'sawtooth',
+  leadCut: 2400,
+  leadLevel: 0.06,
+
+  stabAt: [5, 9, 13],
+  stabType: 'sawtooth',
+  stabCut: 1300,
+  stabLevel: 0.04,
+
+  kickAt: [0, 3, 6, 8, 11, 14],
+  snareAt: [4, 12],
+  hatAt: [2, 6, 10, 14],
+  openHatAt: [15],
+};
+
+export const SONGS = { park: PARK_SONG, warren: WARREN_SONG, orchard: ORCHARD_SONG, grove: GROVE_SONG };
 
 /* ------------------------------------------------------------------ engine --- */
 
