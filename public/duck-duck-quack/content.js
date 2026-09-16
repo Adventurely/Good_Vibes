@@ -694,7 +694,98 @@ export const LEVEL_6 = {
   goose: { x0: 250, x1: 299, y: 150, speed: 1.5, catchRadius: 1.5 },
 };
 
-export const LEVELS = [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5, LEVEL_6];
+/* "The Falls": the nest sits in the upper right, the pond down in the lower
+ * left, and the whole walk between them is one long descent — a hundred
+ * and thirty-five pixels lower at the end than at the start — rather than
+ * the roughly flat corridor every level before it shares. That alone
+ * changes what a duckling meets along the way: three separate drops, not
+ * one, each its own moment a Flyer either answers or doesn't, plus the two
+ * gaps and the one wall this game's vocabulary already has words for.
+ * Reversed the same way The Orchard is (content.js's goalHeading is -1
+ * here too), and the nest sits well clear of the right edge for the same
+ * reason The Orchard's does.
+ *
+ * Two of the three drops are real — past FALL_SAFE, lethal without a
+ * Flyer — and one is not: a twenty-pixel step partway down that a
+ * duckling just walks off of, the same as any ordinary ground. It is left
+ * in on purpose, not cut: a level that made every single elevation change
+ * dangerous would be teaching "always fall," which is not the same lesson
+ * as "check before you step." Flyer answers both real drops with the one
+ * assignment, since the trait rides the duckling rather than the moment
+ * — the same reason it is worth giving early here more than almost
+ * anywhere else in the game.
+ *
+ * Between the two drops sits the one wall, a rise breaking the descent
+ * rather than a fall continuing it — Digger and Climber both answer it,
+ * a real choice the way The Orchard's own wall is, not a rationed one.
+ * The goose keeps its usual beat on the terrace just past it, a hazard
+ * with nothing special asked of it here, same as most of the levels
+ * before this one.
+ *
+ * What makes this level hard to navigate is not any one piece of it —
+ * every hazard here already has a name and an answer somewhere else in
+ * this game — it is that four different answers are all live across one
+ * run, in an order that never repeats a beat: bridge, drop, wall, drop,
+ * step, bridge, drop, pond. Confirmed by actually running it: a bot with
+ * Flyer and Climber wins, the same bot with Digger in place of Climber
+ * wins too, and pulling any one of Flyer, Builder, or a way past the wall
+ * out from under it loses the whole flock.
+ */
+export const LEVEL_7 = {
+  id: 'falls',
+  name: 'The Falls',
+  width: SCENE_W,
+  height: SCENE_H,
+
+  /* [0, 100)    the pond and the flat approach to it, goalX well inside it
+     [100, 120)  flat ground at the foot of the second gap
+     [120, 140)  the second gap — 20 columns of pit, wants a Builder
+     [140, 170)  flat ground below the last drop
+     [170, 210)  the goose's terrace, seventy pixels up from the base —
+                 the drop up to here from the wall's plateau is real,
+                 wants a Flyer
+     [210, 230)  the plateau on top of the one wall — fifteen pixels up
+                 is the level's highest point
+     [230, 260)  flat ground below the wall — the rise up to the plateau
+                 wants a Digger or a Climber
+     [260, 280)  a twenty-pixel step down from the nest's own height —
+                 within FALL_SAFE, just an ordinary step
+     [280, 300)  the first gap — 20 columns of pit, wants a Builder
+     [300, 320)  flat ground out of the nest, well short of the right edge */
+  segments: [
+    { from: 0, to: 100, y: 150 },
+    { from: 100, to: 120, y: 90 },
+    { from: 120, to: 140, y: PIT_Y },
+    { from: 140, to: 170, y: 90 },
+    { from: 170, to: 210, y: 70 },
+    { from: 210, to: 230, y: 15 },
+    { from: 230, to: 260, y: 55 },
+    { from: 260, to: 280, y: 20 },
+    { from: 280, to: 300, y: PIT_Y },
+    { from: 300, to: 320, y: 20 },
+  ],
+
+  nestX: 310,
+  goalX: 25,
+
+  duckCount: 20,
+  spawnInterval: TICK_RATE * 2,
+  timeLimit: TICK_RATE * 300,       // five minutes
+  winRatio: 0.6,
+
+  /* Climber and Digger: both fully supplied, a real choice for the one
+     wall, the same margin The Orchard gives its own. Flyer: nineteen, one
+     short of the flock — it answers every real drop on this level, all
+     three of them, off the one assignment, so it is not rationed the way
+     a level with a real choice rations its supply. Builder: one spare
+     over its two required bridges. Blocker: present, same as most levels,
+     with nothing here that calls for it specially. */
+  supply: { digger: 3, builder: 3, blocker: 2, climber: 19, flyer: 19 },
+
+  goose: { x0: 175, x1: 205, y: 70, speed: 1.5, catchRadius: 1.5 },
+};
+
+export const LEVELS = [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5, LEVEL_6, LEVEL_7];
 
 export const winCount = level => Math.ceil(level.duckCount * level.winRatio);
 
