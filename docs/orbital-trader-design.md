@@ -138,9 +138,11 @@ Moons kept their distance from their planets, Scorch included: it had to move in
 | **Veyra** | 0.1 au | 18.5 km/s | 31 d | 24 d | 20 d |
 | **Cinder** | 0.2 au | 6.5 km/s | 43 d | 104 d | 56 d |
 
-**The sky is built at KSP's scale.** Every body is a tenth of the size a real one would be and many times denser, which is the trick that makes a world a place rather than a backdrop: Tassel is 498 km across, has 9.25 m/s² at the ground, air to 70 km, and a reach of 116,500 km — a Kerbin. A new game opens at 100 km, thirty above the air, on an orbit that takes thirty-two minutes of game time. Local flying is correspondingly cheap: the first lesson is a quarter of a km/s. Interplanetary flying is *not*, because a small world gives almost no gravity assist on departure or arrival, and that trade is deliberate.
+**The sky is built at KSP's scale.** Every body is a tenth of the size a real one would be and many times denser, which is the trick that makes a world a place rather than a backdrop: Tassel is 498 km across, has 9.25 m/s² at the ground, air to 70 km, and a reach of 116,500 km — a Kerbin. A new game opens at 150 km, eighty above the air, on an orbit that takes thirty-six minutes of game time — high enough that the chart shows daylight between the ship and the ocean rather than a lighter apparently skimming it. Local flying is correspondingly cheap: the first lesson is a quarter of a km/s. Interplanetary flying is *not*, because a small world gives almost no gravity assist on departure or arrival, and that trade is deliberate.
 
-**The clock is slow on purpose.** At ×1, one lap of that opening orbit takes **ten real minutes**. That is the fastest thing in the sky and everything else is slower still, so at ×1 almost nothing else appears to move. That is the intended reading: an orbit is a place you are, not an animation you watch. Watching the sky turn is what skipping is for.
+**The clock is slow on purpose.** At ×1, one lap of that opening orbit takes **about eleven real minutes**. That is the fastest thing in the sky and everything else is slower still, so at ×1 almost nothing else appears to move.
+
+It was tuned to exactly ten when the opening orbit was a hundred kilometres up. Raising that orbit to a hundred and fifty stretched the lap to eleven and a quarter rather than speeding the clock up to keep the round number, because the clock is the thing every *other* body's motion is read against: winding it on twelve per cent to preserve a figure nobody can time would have set the whole sky moving faster at ×1, which is the one thing this decision exists to prevent. That is the intended reading: an orbit is a place you are, not an animation you watch. Watching the sky turn is what skipping is for.
 
 **There is no ladder of warp speeds.** A strip of ×1 / ×10 / ×100 buttons asks the player to answer a question they do not have — *how fast should time go?* — when the question they actually have is *when do I want to be there?* So time is skipped by pointing at a place:
 
@@ -738,7 +740,7 @@ each of the three crew members is the reward for the stretch that introduces
 their people.
 
 **Seventeen of the twenty are built** — every one that is not salvage. They
-are written out in `narrative.json`, they work, and a player meets them: the
+are written out in `quests.json`, they work, and a player meets them: the
 Requests tab on the dock menu lists whatever jobs the port you are tied up at
 is offering, and you can hold three at once.
 
@@ -786,7 +788,8 @@ A quest is written as data — its type, the ports it names, the goods it wants
 — and the steps are generated from that. Authored wording wins where a quest
 supplies it, so the opening errand still says "Bring it home to Tassel" rather
 than anything a generator would produce. Adding a quest is a few lines in
-`narrative.json` and no code.
+`quests.json` and no code — the file opens with the record format, and the
+build step refuses a record that does not keep to it.
 
 | Type | Steps it earns | Built |
 |---|---|---|
@@ -1015,6 +1018,6 @@ A fully hand-drawn navigation chart was considered and ruled out as unrealistic 
 
 ### 7.7 Open Technical Questions
 
-**Decided since the first draft**, and recorded above rather than here: burns are instantaneous impulses (2.2); the control is four buttons on two axes, reached by tapping the road (2.2); there is no landing and the game starts in orbit (2.3); the clock runs at ten real minutes to a lap of the low orbit the game opens in, with no warp ladder and skipping by pointing at a place (2.6); the chart is locked to the body the ship orbits and draws only the immediate orbit plus the next crossing (2.6.1); the opening mission is a single errand to Slate.
+**Decided since the first draft**, and recorded above rather than here: burns are instantaneous impulses (2.2); the control is four buttons on two axes, reached by tapping the road (2.2); there is no landing and the game starts in orbit (2.3); the clock is tuned to a lap of the low orbit the game opens in, about eleven real minutes, with no warp ladder and skipping by pointing at a place (2.6); the chart is locked to the body the ship orbits and draws only the immediate orbit plus the next crossing (2.6.1); the opening mission is a single errand to Slate.
 
 **Still open.** Distance compression beyond the inner system needs prototyping. Docking-zone size and speed thresholds need tuning for the right level of forgiveness. The representation of belts and debris fields (Section 6) is settled; what a player can *do* in the Belt beyond docking at the two havens is not. Whether landing is ever added — and if so, whether it is a third control scheme or a cutscene over an orbital rendezvous — is deferred, not refused.

@@ -28,3 +28,11 @@ flight model, and read its numbers as a shape rather than a pass or a fail.
 `tools/orbital-trader/design/` and run `node tools/orbital-trader/build-content.mjs`.
 Editing the generated module directly gets overwritten by the next build, and
 a test checks that the two agree.
+
+The design tables are one per subject: `tuning.json` (the sky), `economy.json`
+(goods, ports, prices), `narrative.json` (in-world text), `quests.json` (the
+errands) and `dialog.json` (what the crew say, and where). The last two each
+open with a `notes` block describing their record format, and the build step
+checks every record against it and refuses to write anything if one is wrong —
+so a table that does not keep to its own shape fails loudly rather than
+shipping.

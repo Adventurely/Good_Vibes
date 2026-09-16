@@ -6,9 +6,10 @@ import * as O from '../public/orbital-trader/orbit.js';
 import { PORTRAITS, PORTRAIT_SIZE, portraitURL } from '../public/orbital-trader/sprites.js';
 import {
   CONST, BODIES, GOODS, PORTS, UPGRADES, FORMULAS, TEXT, GLOSSARY, SPECIES, BELT_ROCKS,
+  QUESTS, DIALOG,
 } from '../public/orbital-trader/content.js';
 import * as S from '../public/orbital-trader/sim.js';
-import { createChart, railCrossings, railLead, locateOnPrediction, PALETTE } from '../public/orbital-trader/render.js';
+import { createChart, railCrossings, railLead, locateOnPrediction, pathAnchors, KM_PER_AU, PALETTE } from '../public/orbital-trader/render.js';
 import { DURATION, BREACH, BEATS, CAPTION_AT, beatAt, ascent, skyAt, ROCKET } from '../public/orbital-trader/intro.js';
 
 /* Orbital Trader has no server: everything it knows is in public/ and is
@@ -409,8 +410,8 @@ test('the text has every line the game asks for', () => {
     assert.ok(t.body.length <= 400, `${t.step}: ${t.body.length} characters is more card than screen`);
     assert.ok(t.title.length <= 44, `${t.step}: the title is too long for the card`);
   }
-  assert.ok(TEXT.quests?.length >= 1, 'there is an opening quest');
-  for(const q of TEXT.quests){
+  assert.ok(QUESTS.length >= 1, 'there is an opening quest');
+  for(const q of QUESTS){
     assert.ok(q.id && q.title && q.giver && q.blurb && q.done, `quest ${q.id} has its words`);
     assert.ok(['retrieval', 'delivery', 'shopping', 'chain', 'message'].includes(q.type), `quest ${q.id}: type ${q.type}`);
     /* Steps are built from the type, not written out — so what the words have
@@ -667,6 +668,120 @@ test('the page offers the distress call when the tank is dead', () => {
   assert.match(PLAY, /data-act="distress"/, 'there is no button to press');
   assert.match(PLAY, /distress\(\)\s*\{\s*showDistress\(\)/, 'and nothing listening for it');
   assert.match(PLAY, /S\.callDistress\(state\)/, 'the button never reaches the game');
+});
+
+/* ------------------------------------------------- the design tables */
+
+const design = name => JSON.parse(readFileSync(new URL(`../tools/orbital-trader/design/${name}`, import.meta.url), 'utf8'));
+
+/* The JSON under tools/ is what a person edits; the modules under data/ are
+   what the browser loads, and a build step stands between them. Forgetting to
+   run it is the one mistake that cannot be seen in a diff — the game simply
+   goes on shipping last week's words. */
+test('the modules the game ships say what the design tables say', () => {
+  assert.deepEqual(QUESTS, design('quests.json').quests, 'data/quests.js was not rebuilt');
+  assert.deepEqual(DIALOG, design('dialog.json').exchanges, 'data/dialog.js was not rebuilt');
+  assert.deepEqual(TEXT.glossary, design('narrative.json').glossary, 'data/text.js was not rebuilt');
+  assert.deepEqual(BODIES.map(b => b.id), design('tuning.json').bodies.map(b => b.id), 'data/world.js was not rebuilt');
+});
+
+/* Every errand in one file, in one shape. The shape is the point: a quest is a
+   record with a dozen fields and rules about them, and a table of records that
+   each please themselves is a table nothing can check. */
+test('the quests are one table in one standard shape', () => {
+  const book = design('quests.json');
+  assert.ok(Array.isArray(book.notes) && book.notes.length, 'the format is not written down at the top of the file');
+  for(const word of ['retrieval', 'delivery', 'shopping', 'chain', 'message']){
+    assert.ok(book.notes.join('\n').includes(word), `the notes never mention ${word}`);
+  }
+  assert.equal(TEXT.quests, undefined, 'narrative.json is still carrying the quests around');
+  /* The documented field order, which is also the order they read in: who is
+     asking and what kind of job, then the places, then what it is worth, then
+     the words. A record that wanders is a record somebody wrote from memory. */
+  const ORDER = ['id', 'title', 'giver', 'type', 'from', 'to', 'stops', 'goods', 'pay', 'rep', 'crew', 'blurb', 'steps', 'done'];
+  for(const q of book.quests){
+    const keys = Object.keys(q);
+    for(const k of keys) assert.ok(ORDER.includes(k), `quest ${q.id}: ${k} is not a field of the format`);
+    assert.deepEqual(keys, ORDER.filter(k => keys.includes(k)), `quest ${q.id}: the fields are out of the standard order`);
+  }
+  assert.equal(new Set(book.quests.map(q => q.id)).size, book.quests.length, 'two quests share an id');
+});
+
+/* ------------------------------------------------------- crew dialog */
+
+/* Pressing a face in the crew menu is the one thing in the game that changes
+   nothing at all, which is exactly why it is a table: a line is written, not
+   coded, and the machinery that finds the right one is twenty lines. */
+test('there is something for everybody aboard to say, everywhere there is to be', () => {
+  const book = design('dialog.json');
+  assert.ok(Array.isArray(book.notes) && book.notes.length, 'the format is not written down at the top of the file');
+  const speakers = ['captain', ...TEXT.crew.roles.map(r => r.id)];
+  for(const who of speakers){
+    assert.ok(DIALOG.some(x => x.at === '*' && x.who === who),
+      `${who} has nothing to say away from a port`);
+    for(const port of Object.keys(PORTS)){
+      assert.ok(DIALOG.some(x => x.at === port && x.who === who), `${who} has nothing to say at ${port}`);
+    }
+  }
+  for(const x of DIALOG){
+    assert.ok(x.id && (x.at === '*' || PORTS[x.at]) && speakers.includes(x.who), `exchange ${x.id} is malformed`);
+    assert.ok(x.lines?.length, `exchange ${x.id} says nothing`);
+    for(const l of x.lines) assert.ok(speakers.includes(l.who) && l.say, `exchange ${x.id}: a line belongs to nobody`);
+  }
+  assert.equal(new Set(DIALOG.map(x => x.id)).size, DIALOG.length, 'two exchanges share an id');
+});
+
+test('a line is found by where the ship is and who is aboard to say it', () => {
+  const s = S.newGame(1);
+  assert.deepEqual(S.aboard(s), ['captain'], 'a new ship is one otter and three empty berths');
+  assert.equal(S.exchangesFor(s, 'navigator').length, 0, 'an empty berth answered');
+
+  // Out in the black there is no port to have an opinion about.
+  s.dockedAt = null;
+  const away = S.exchangesFor(s, 'captain');
+  assert.ok(away.length && away.every(x => x.at === '*'), 'a port line came up out in the black');
+
+  // Tied up, what is written about this port wins outright.
+  s.dockedAt = 'cinder';
+  const here = S.exchangesFor(s, 'captain');
+  assert.ok(here.length && here.every(x => x.at === 'cinder'), 'a line about anywhere beat a line about Cinder');
+  s.dockedAt = 'whisker';
+  assert.ok(S.exchangesFor(s, 'captain').every(x => x.at === 'whisker'), 'the ship moved and the words did not');
+
+  // A berth filled is a berth with a voice, and somebody to answer it.
+  s.crew.navigator = { role: 'navigator', from: 'test', joinedAt: 0 };
+  assert.deepEqual(S.aboard(s), ['captain', 'navigator']);
+  const nav = S.exchangesFor(s, 'navigator');
+  assert.ok(nav.length, 'the navigator signed on and stayed silent');
+  for(const x of nav) for(const l of x.lines){
+    assert.ok(S.isAboard(s, l.who), `exchange ${x.id} gives a line to ${l.who}, who is not aboard`);
+  }
+});
+
+test('pressing the same face again gets the next thing, and then comes round', () => {
+  const s = S.newGame(1);
+  s.dockedAt = 'moss';
+  const list = S.exchangesFor(s, 'captain');
+  assert.ok(list.length, 'nothing to say at Moss');
+  assert.equal(S.exchangeFor(s, 'captain', 0), list[0]);
+  assert.equal(S.exchangeFor(s, 'captain', list.length), list[0], 'the last line is the end of the road');
+  assert.equal(S.exchangeFor(s, 'captain', list.length - 1), list[list.length - 1]);
+  assert.equal(S.exchangeFor(s, 'appraiser', 0), null, 'an empty berth had an opinion');
+  // The label the page puts above a line comes from the crew table, by name.
+  assert.equal(S.speaker('captain').name, TEXT.crew.captain.name);
+  assert.equal(S.speaker('navigator').name, 'Tsuki');
+});
+
+test('the crew menu turns a portrait into a question', () => {
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.match(PLAY, /class="face" data-act="say\|\$\{who\}"/, 'the portraits are not buttons');
+  assert.match(PLAY, /\bsay\(who\)\{/, 'nothing is listening for a pressed face');
+  assert.match(PLAY, /S\.exchangeFor\(state, who, talking\.nth\)/, 'the page never asks for the line');
+  assert.match(PLAY, /S\.speaker\(l\.who\)\.name/, 'the lines are not labelled with who said them');
+  /* A conversation is not a thing a save remembers, so the only record of one
+     is a page-local variable that the next menu clears. */
+  assert.match(PLAY, /if\(id !== tab\) talking = null;/, 'a line survives a change of menu');
+  assert.doesNotMatch(PLAY, /state\.talking/, 'talking got into the save');
 });
 
 test('the crew menu has a captain to show and three berths to leave empty', () => {
@@ -1570,40 +1685,23 @@ test('only the first crossing is marked, however many the road makes', () => {
   assert.equal(railCrossings(world, S.planImmediate(wide), wide.t, { minLead: S.MIN_LEAD }).length, 1);
 });
 
-test('every world the road passes is marked once, at the first pass', () => {
-  /* The chart marked exactly one encounter: the world whose reach the road
-     crossed into. Two things fell through that. Nail and Whisker have no reach
-     at all — they are rendezvous points, matched rather than fallen into — so
-     flying straight at one was marked with nothing whatever. And a road that
-     goes past one world on the way to another is ordinary out here, with only
-     the far end of it marked. */
+test('a road past a dozen worlds wears one crosshair at most, and only for an arrival', () => {
+  /* The chart used to sweep every world in the sky at every sample of the
+     drawn road and mark any the road happened to pass near. It cost a quarter
+     of every road solved, and what it mostly produced was a crosshair sitting
+     on a parking orbit reporting how far below the planet was. What a pilot
+     steers an approach by is where a world will be when the road cuts its
+     rail — which the chart draws separately — and what the road does once it
+     arrives, which is the one mark left here. */
   const s = S.newGame(7);
   s.dockedAt = 'tassel'; S.undock(s);
   s.dv = s.tank = S.auDay(60);
   assert.ok(S.trimToTarget(s, 'nail', 6000)?.ok, 'could not plot the road this test is about');
   const pred = S.planImmediate(s, true, { farSight: true });
-  const byBody = new Map((pred.intercepts ?? []).map(ic => [ic.body, ic]));
-
-  /* The one that was missing: a rendezvous, which has no reach to cross into.
-     Nail's mouth is 2400 km and this road is still half a million wide of it,
-     which is exactly the case the mark exists for — a pilot closing that gap
-     is steering by this number and nothing else. So it has to be here while
-     the road is still crooked, and it has to say how far off it is. */
-  const nail = byBody.get('nail');
-  assert.ok(nail, 'the Belt haven the road is aimed at is not marked');
-  assert.ok(nail.distance > world.get('nail').zoneRadius, 'this road has not arrived yet');
-  assert.ok(nail.speed > 0, 'and the mark says what speed the pass is at, which is the other half of a rendezvous');
-
-  // And the moons it goes past on the way out, which were never marked either.
-  assert.ok(byBody.has('slate') && byBody.has('moss'), 'the moons the road passes are not marked');
-
-  // Once each, and in the order they happen.
   const ids = (pred.intercepts ?? []).map(ic => ic.body);
-  assert.equal(new Set(ids).size, ids.length, `a world is marked twice: ${ids.join(', ')}`);
-  const times = pred.intercepts.map(ic => ic.t);
-  assert.deepEqual(times, [...times].sort((a, b) => a - b), 'the marks are not in the order they happen');
-  // The readouts take the next one, so it has to be the first.
-  assert.equal(pred.intercept, pred.intercepts[0]);
+  assert.ok(ids.length <= 1, `a road out of Tassel wears ${ids.length} crosshairs: ${ids.join(', ')}`);
+  assert.ok(!(pred.intercepts ?? []).some(ic => ic.passing), 'a sampled close pass is marked again');
+  assert.equal(pred.intercept, pred.intercepts[0] ?? null);
 });
 
 test('the world you are leaving is not an encounter with anything', () => {
@@ -1897,7 +1995,7 @@ test('a new game starts in orbit above Tassel, full, with an errand from Uncle T
   assert.deepEqual(back, JSON.parse(JSON.stringify(s)));
 });
 
-test('the game opens in a low orbit, and the clock is tuned so a lap of it is ten real minutes', () => {
+test('the game opens in a low orbit, clear of the air, and a lap of it is about eleven real minutes', () => {
   const s = S.newGame(5);
   const b = world.get('tassel');
   const el = O.elementsFromState(b.mu, s.ship.r, s.ship.v);
@@ -1905,24 +2003,37 @@ test('the game opens in a low orbit, and the clock is tuned so a lap of it is te
 
   /* Low means what a pilot means by it and not what a chart does: the high
      point of the orbit is an altitude over the ground, and it sits under one
-     planet-diameter of it. At Tassel that is 0.000075 au over a world 0.00008
-     au across — close enough in that the ocean fills the chart. */
+     planet-diameter of it — close enough in that the ocean fills the chart. */
   const apoapsisAltitude = el.ra - b.radius;
   assert.ok(apoapsisAltitude > 0, 'and above the ocean, not through it');
   assert.ok(apoapsisAltitude < 2 * b.radius, `apoapsis altitude ${apoapsisAltitude} is not below the diameter ${2 * b.radius}`);
   assert.ok(el.ra < world.get('tassel').zoneRadius, 'inside the harbour mouth, so Tassel can still be tied up at');
   assert.ok(el.ra < b.dockAlt, 'and below the harbour, which is where undocking puts you');
 
-  /* The clock has exactly one job: a lap of this orbit, at ×1, is ten real
-     minutes. Everything else in the sky is slower, so this is the fastest the
-     game ever looks. */
-  const lapSeconds = el.period / S.dtForFrame(s, 1);
-  assert.ok(Math.abs(lapSeconds - 600) < 0.5, `a lap takes ${lapSeconds.toFixed(2)} real seconds, not 600`);
+  /* But clear of it, which is the other half of "low". The opening orbit used
+     to sit a hundred kilometres up with only thirty of those above the air,
+     and the chart opened on a ship apparently touching the ocean. A hundred
+     and fifty leaves daylight between the two. */
+  const km = au => au * KM_PER_AU;          // the game's own scale, which the sky was authored at
+  assert.ok(km(el.rp - b.radius) > 140, `the low point is only ${km(el.rp - b.radius).toFixed(0)} km up`);
+  assert.ok(km(el.rp - b.atmo) > 70, `the low point is only ${km(el.rp - b.atmo).toFixed(0)} km above the air`);
 
-  // And flying it for those ten minutes really does come back round.
+  /* The clock has exactly one job: at ×1, a lap of this orbit is the fastest
+     thing in the sky, and everything else is slower still. It was tuned to ten
+     real minutes when the orbit was a hundred kilometres up; raising it to a
+     hundred and fifty stretched the lap rather than the clock, because the
+     clock is what every *other* body's speed is read against and speeding it
+     up to keep a round number would have set the whole sky moving faster. */
+  const lapSeconds = el.period / S.dtForFrame(s, 1);
+  assert.ok(Math.abs(lapSeconds - 677) < 2, `a lap takes ${lapSeconds.toFixed(2)} real seconds, not about 677`);
+
+  /* And flying it for those eleven minutes really does come back round. The
+     lap is no longer a whole number of seconds, so the last frame is a short
+     one — a run of 673 one-second frames stops three tenths of a second shy
+     of the lap, which is two kilometres of ocean at this speed. */
   const r0 = [...s.ship.r];
-  for(let i = 0; i < 600; i++) S.tick(s, S.dtForFrame(s, 1));
-  assert.ok(O.dist(s.ship.r, r0) < el.ra * 1e-6, 'ten real minutes of ×1 is one lap, back where it started');
+  for(let left = lapSeconds; left > 0; left -= 1) S.tick(s, S.dtForFrame(s, Math.min(1, left)));
+  assert.ok(O.dist(s.ship.r, r0) < el.ra * 1e-6, 'one lap of ×1 is back where it started');
 });
 
 test('undocking puts the ship in a prograde parking orbit at the docking altitude', () => {
@@ -2624,48 +2735,6 @@ test('falling through a world\'s door leaves something to point the clock at', (
   assert.ok(!own, 'a parking orbit marks the world it is parked at');
 });
 
-test('the crosshair is there while the burn is still wrong, which is when it is wanted', () => {
-  /* The mark is not a rosette for arriving. There is no aim helper on the
-     chart: every road is flown by pushing a burn around and watching this one
-     number come down, so the number has to exist through the whole range the
-     pilot pushes it through. Measured against a reach alone it did not —
-     fifty metres a second off a five kilometre burn to Nail leaves the pass
-     1,480 Mm out, inside one per cent of the answer and still nowhere near
-     twice Nail's reach, so the chart stayed blank until the road was already
-     right and the mark only ever confirmed what the pilot had guessed. */
-  const s = S.newGame(7);
-  s.dockedAt = 'tassel'; S.undock(s);
-  s.dv = s.tank = S.auDay(60);
-  assert.ok(S.trimToTarget(s, 'nail', 6000).ok);
-  let guard = 0;
-  while(s.ship.body !== 'lamp' && guard++ < 40000){ S.tick(s, 0.05); if(s.pending) break; }
-  assert.ok(S.trimToTarget(s, 'nail', 6000).ok, 'could not lay the road this test is about');
-  const good = s.nodes[0].prograde;
-  const markAt = off => {
-    s.nodes[0].prograde = good + S.auDay(off / 1000);
-    return (S.planImmediate(s, true).intercepts ?? []).find(i => i.body === 'nail');
-  };
-  let last = 0;
-  for(const off of [0, 20, 50, 100, 200, 400]){
-    const ic = markAt(off);
-    assert.ok(ic, `${off} m/s off the answer and the chart says nothing about Nail`);
-    assert.ok(ic.distance >= last, 'and a worse burn should read as a wider miss');
-    last = ic.distance;
-  }
-  /* And it is still a signal rather than a decoration: a road that is not
-     going to Nail at all does not wear Nail's crosshair. */
-  assert.equal(markAt(4000), undefined, 'a road nowhere near Nail is marked for it anyway');
-
-  /* One more thing it must not become: a chart of crosshairs. A road only
-     sweeps past the worlds between its low point and its high one, so even a
-     badly aimed one carries very few. */
-  for(const off of [0, 100, 400]){
-    s.nodes[0].prograde = good + S.auDay(off / 1000);
-    const all = S.planImmediate(s, true).intercepts ?? [];
-    assert.ok(all.length <= 3, `${off} m/s off: ${all.length} crosshairs (${all.map(i => i.body).join(', ')})`);
-  }
-  s.nodes[0].prograde = good;
-});
 
 test('Nail is a rock you orbit, and the road to it is flown on the mark', () => {
   /* Nail used to be a three-hundred-thousand-kilometre bubble in the Belt: fly
@@ -2683,17 +2752,15 @@ test('Nail is a rock you orbit, and the road to it is flown on the mark', () => 
   assert.ok(n.soi > n.zoneRadius, 'its reach still contains its own harbour');
   assert.ok(n.zoneRadius * KM < 5000, `the mouth is a harbour mouth now (${(n.zoneRadius * KM).toFixed(0)} km)`);
 
-  /* The two-step the mouth forces, and the reason the mark matters. Out of a
-     Tassel parking orbit the helper can only set the road up — one mark inside
-     a planet's reach cannot also thread a few-thousand-kilometre window most
-     of an AU away — and what the pilot steers by in between is the crosshair.
+  /* The two-step the mouth forces. Out of a Tassel parking orbit the helper can
+     only set the road up — one mark inside a planet's reach cannot also thread
+     a few-thousand-kilometre window most of an AU away — and what the pilot
+     steers by in between is where Nail will be when the road cuts its rail.
      Once the ship is out in the Lamp's frame the same helper closes it. */
   const s = S.newGame(7);
   s.dockedAt = 'tassel'; S.undock(s);
   s.dv = s.tank = S.auDay(60);
   assert.ok(S.trimToTarget(s, 'nail', 6000).ok, 'could not set the road up at all');
-  const rough = (S.planImmediate(s, true, { farSight: true }).intercepts ?? []).find(i => i.body === 'nail');
-  assert.ok(rough, 'the road is aimed at Nail and the chart says nothing about it');
 
   let guard = 0;
   while(s.ship.body !== 'lamp' && guard++ < 40000){ S.tick(s, 0.05); if(s.pending) break; }
@@ -3844,4 +3911,156 @@ test('a world\'s ring cannot be tapped to wait while the lesson is running', () 
      Warp here" is a card in the lesson, so that one has to keep working. */
   assert.match(PLAY, /const p = prediction && !state\.dockedAt \? chart\.nearestPathPoint\(/,
     'the path tap should be untouched');
+});
+
+/* ------------------------------------------- marks land on the road they mark */
+
+test('a mark on the road is drawn on the road, in every frame the road crosses', () => {
+  /* The ring that shows which bit of road you just tapped, and the flame for a
+     burn, are placed against the leg they fall on. A leg inside a moon's reach
+     is drawn where the moon *will be* when the ship gets there, not where the
+     moon is now — the road has always known that and the marks did not, so
+     tapping the planned road past a crossing put the ring fifteen hundred
+     pixels off the line it belonged to. */
+  const chart = stubChart(900, 700);
+  try{
+    /* Moss rather than Slate: the road to Moss crosses into its reach on the
+       lap the chart draws, and the chart only ever draws what happens on the
+       lap in front of you — see CHART_LAPS. */
+    const s = S.newGame(1); S.undock(s); s.dv = s.tank = 0.01;
+    assert.ok(S.trimToTarget(s, 'moss').ok, 'could not aim at Moss');
+    const pred = S.planImmediate(s, true, {});
+    const frames = new Set(pred.segments.map(sg => sg.body));
+    assert.ok(frames.size > 1, `this road never leaves ${[...frames]} — it proves nothing`);
+
+    chart.camera.follow = 'tassel'; chart.camera.zoom = 3e7;
+    chart.camera.anchor = [...O.absState(world, 'tassel', s.t).r]; chart.settle();
+    chart.draw({ t: s.t, now: 0, shipAbs: { r: S.shipAbsPos(s), v: S.shipAbsVel(s) }, shipBody: s.ship.body,
+      prediction: pred, nodes: s.nodes, nodePositions: s.nodes.map(n => locateOnPrediction(world, pred, n.t)),
+      selectedNode: -1, apses: [], railCrossings: [] });
+
+    const pos = new Map(world.bodies.map(b => [b.id, O.absState(world, b.id, s.t)]));
+    const anchors = pathAnchors(pred, pos);
+    let checked = 0;
+    for(const { seg, screenPts } of chart.hits.pathSegs){
+      const i = Math.floor(screenPts.length / 2);
+      const at = locateOnPrediction(world, pred, seg.times[i]);
+      assert.ok(at, 'a moment on a drawn leg is not on the road');
+      // Exactly the sum drawTapMark and drawNodes do.
+      const mark = chart.toScreen(O.add(anchors[at.segIndex] ?? pos.get(at.body).r, at.r));
+      const miss = Math.hypot(mark[0] - screenPts[i][0], mark[1] - screenPts[i][1]);
+      assert.ok(miss < 1, `${seg.body}/${seg.reason}: the mark is ${miss.toFixed(0)} px off the line it marks`);
+      checked++;
+    }
+    assert.ok(checked >= 3, `only ${checked} legs were drawn`);
+  }finally{ chart.restore(); }
+});
+
+/* ------------------------------------- the road only shows the lap in front */
+
+test('an orbit that overlaps a moon\'s rail is not marked with a meeting laps away', () => {
+  /* An orbit whose high point is out past Slate's rail crosses that rail twice
+     a lap, and meets Slate itself on some later lap. A leg is drawn as one lap
+     however many it runs for — fifty turns of the same ellipse on top of one
+     another is a scribble, not a road — so the door and the crosshair for a
+     meeting four laps out were being painted onto the single lap the chart
+     drew. The picture said "just there" and the clock said four days; a warp
+     tapped beside the mark went to the first lap and nothing happened, and one
+     tapped on the mark went most of a year. */
+  const b = world.get('tassel'), slate = world.get('slate');
+  const s = S.newGame(1); S.undock(s); s.dv = s.tank = 0.02;
+  const rp = b.dockAlt, ra = slate.a * 1.35, a = (rp + ra) / 2;
+  s.ship = { body: 'tassel', r: [rp, 0], v: [0, Math.sqrt(b.mu * (2 / rp - 1 / a))] };
+  const el = O.elementsFromState(b.mu, s.ship.r, s.ship.v);
+  assert.ok(el.rp < slate.a && el.ra > slate.a, 'this orbit does not overlap Slate after all');
+
+  const pred = S.planImmediate(s, true, {});
+  const road = pred.end - s.t;
+  assert.ok(road <= el.period * 2.5, `the drawn road runs ${(road / el.period).toFixed(1)} laps`);
+  for(const e of pred.events){
+    assert.ok(e.t - s.t <= road + 1e-9, `${e.kind} is marked at +${(e.t - s.t).toFixed(1)} d, past the end of the road`);
+  }
+  assert.equal(pred.intercept, null, 'a meeting several laps away is marked as though it were this lap');
+
+  /* What is left is the thing a pilot actually lines one of these up with: the
+     rail crossings, on the lap in front of them. */
+  const rc = railCrossings(world, pred, s.t, { minLead: S.MIN_LEAD, limit: 8 });
+  assert.ok(rc.length > 0, 'and nothing is left to line the meeting up with');
+  for(const c of rc) assert.ok(c.t - s.t <= road + 1e-9, 'a rail crossing is off the end of the drawn road');
+});
+
+test('but a moon the road reaches on the lap in front of you still is', () => {
+  // The other half: the bound above must not have thrown the real ones away.
+  const s = S.newGame(1); S.undock(s); s.dv = s.tank = 0.01;
+  assert.ok(S.trimToTarget(s, 'moss').ok);
+  const pred = S.planImmediate(s, true, {});
+  assert.ok(pred.events.some(e => e.kind === 'soi' && e.to === 'moss'), 'the door into Moss is gone');
+  assert.ok(pred.intercept && pred.intercept.body === 'moss', 'the encounter at Moss is gone');
+});
+
+/* ------------------------------------------- what the drawn line is made of */
+
+test('a fast flyby is drawn finely where it bends, not where it is slow', () => {
+  /* The chart sampled a leg at equal steps of *time*. On anything eccentric
+     the ship covers most of its arc in a small part of its time — a flyby
+     spends two days crawling in and minutes whipping round the bottom — so
+     equal time steps put almost no points at the periapsis, which is the only
+     part that bends and the one a pilot aims. Measured on this very flyby: two
+     points either side of the low point a hundred and sixty thousand
+     kilometres apart, across a periapsis eight thousand kilometres up. The
+     chart drew a straight line through the manoeuvre. */
+  const g = world.get('grumm');
+  const s = S.newGame(4); S.undock(s); s.nodes = []; s.keys.heatShield = true;
+  const rp = g.radius + (g.atmo - g.radius) * 0.55, r0 = g.soi * 0.95;
+  const vInf = 1.2 * Math.sqrt(g.mu / rp), vp = Math.sqrt(vInf * vInf + 2 * g.mu / rp);
+  const h = rp * vp, v0 = Math.sqrt(vInf * vInf + 2 * g.mu / r0), vt = h / r0;
+  s.ship = { body: 'grumm', r: [r0, 0], v: [-Math.sqrt(Math.max(0, v0 * v0 - vt * vt)), vt] };
+  const seg = S.planImmediate(s, true, {}).segments[0];
+  assert.ok(!Number.isFinite(seg.elements.period), 'this leg is meant to be a hyperbola');
+
+  const pts = seg.points, ts = seg.times;
+  // Every sample is on the real path, not near it.
+  for(let i = 0; i < pts.length; i++){
+    const truth = O.propagate(g.mu, seg.r0, seg.v0, ts[i] - seg.t0).r;
+    assert.ok(O.dist(pts[i], truth) < seg.elements.rp * 1e-6, `sample ${i} is off the path`);
+  }
+  // And the line between them does not cut the corner at the bottom.
+  let worst = 0;
+  for(let i = 1; i < pts.length; i++){
+    const tm = (ts[i - 1] + ts[i]) / 2;
+    const mid = [(pts[i - 1][0] + pts[i][0]) / 2, (pts[i - 1][1] + pts[i][1]) / 2];
+    const truth = O.propagate(g.mu, seg.r0, seg.v0, tm - seg.t0).r;
+    worst = Math.max(worst, O.dist(mid, truth) / O.norm(truth));
+  }
+  assert.ok(worst < 0.01, `the drawn line strays ${(worst * 100).toFixed(2)}% of the way to the world it is bending round`);
+
+  /* The point of all that: the low point is drawn where it really is, so a
+     burn nudged against it moves something a player can see. */
+  let closest = Infinity;
+  for(const p of pts) closest = Math.min(closest, O.norm(p));
+  assert.ok(Math.abs(closest - seg.elements.rp) < seg.elements.rp * 1e-4,
+    `the drawn low point is ${((closest - seg.elements.rp) * 1.474e8).toFixed(0)} km off the real one`);
+});
+
+test('a transfer that just touches a rail is marked where it touches', () => {
+  /* A Hohmann does not cut the orbit it is aimed at, it grazes it: the apsis
+     touches and turns back, so there is no change of sign to find. The mark
+     was only ever appearing by floating-point luck in the old coarse sampling,
+     and sampling the curve properly took the luck away. */
+  const g = S.newGame(5);
+  g.dockedAt = null; g.justLeft = null; g.t = 0;
+  const from = O.absState(world, 'tassel', 0), mu = world.get('lamp').mu;
+  const r1 = O.norm(from.r), toR = world.get('veyra').a;
+  g.ship = { body: 'lamp', r: [...from.r],
+    v: O.scale(O.unit(from.v), Math.sqrt(mu / r1) * Math.sqrt(2 * toR / (r1 + toR))) };
+  const list = railCrossings(world, S.planImmediate(g), g.t, { minLead: S.MIN_LEAD, limit: 8 });
+  const veyra = list.filter(c => c.body === 'veyra');
+  assert.equal(veyra.length, 1, `the graze is marked ${veyra.length} times, not once`);
+  assert.ok(Math.abs(O.norm(veyra[0].r) - toR) < toR * 1e-6, 'and the mark is not on the rail it grazes');
+  // And nothing is marked for a rail the road never reaches.
+  for(const c of list){
+    const b = world.get(c.body);
+    const railR = b.e ? b.a * (1 - b.e * b.e) / (1 + b.e * Math.cos(Math.atan2(c.r[1], c.r[0]) - (b.omega ?? 0))) : b.a;
+    assert.ok(Math.abs(O.norm(c.r) - railR) < Math.max(1e-9, railR * 1e-6), `${b.name}: the mark is not on its rail`);
+  }
 });
