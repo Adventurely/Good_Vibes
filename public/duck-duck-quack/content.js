@@ -84,12 +84,15 @@ export const WALK_STEP = 4;
 /* The longest drop a duckling walks away from. Past this and a fall the level
    otherwise leaves alone is a duckling lost, so a platform's far edge always
    has to be either shorter than this or handled some other way (a dig, a
-   bridge, a gentle staircase). */
+   bridge, a gentle staircase). Also, not by coincidence, about four times a
+   duckling's own height — art.js's DUCK_ART is six rows drawn four pixels
+   apart — which is what makes it the right number to also cap how high a
+   Builder's own ramp is allowed to climb; see BUILD_RISE_HEIGHT below. */
 export const FALL_SAFE = 24;
 
-/* How long a Builder keeps laying deck before stopping on its own, whether
-   or not it has reached anywhere worth landing — see sim.js's assignSkill
-   and stepBuilding. A Builder starts the moment it is given, wherever that
+/* How long a Builder keeps climbing before stopping on its own, whether or
+   not it has reached anywhere worth landing — see sim.js's assignSkill and
+   stepBuilding. A Builder starts the moment it is given, wherever that
    duckling happens to be standing, so this is what stops one handed out on
    ordinary ground, or over a gap wider than a duckling can usefully cross,
    from just running to the edge of the level. Stated as seconds, the same
@@ -99,18 +102,20 @@ export const FALL_SAFE = 24;
 export const BUILD_SECONDS = 10;
 export const BUILD_MAX_STEPS = TICK_RATE * BUILD_SECONDS;
 
+/* How high a Builder's ramp climbs over the full BUILD_MAX_STEPS, if it
+   never meets anything to land on first — see sim.js's stepBuilding. Kept
+   at exactly FALL_SAFE on purpose: run the whole ten seconds out over
+   ground that never needed a bridge at all, and the worst that happens
+   stepping off the end of it is still exactly the tallest drop a duckling
+   already walks away from, never more — a Builder given nowhere useful
+   costs the click and nothing else. */
+export const BUILD_RISE_HEIGHT = FALL_SAFE;
+
 /* How many columns a Digger will cut before giving up — a safety cap, not a
    number any level here is tuned to reach. It stops the moment the ground
    ahead makes it unnecessary, so one assigned right at the wall's edge stops
    well short of this. */
 export const DIG_MAX_STEPS = 60;
-
-/* How far a Builder's deck rises at the crest of its arch — see sim.js's
-   stepBuilding. Well under WALK_STEP even spread over a short gap, so the
-   climb to the crest is never itself a "wall" a walking duckling without
-   the trait would refuse: the whole point is a bridge everyone can just
-   walk across once it's there. */
-export const BRIDGE_ARCH_HEIGHT = 10;
 
 /* Once the goose has caught its one duckling (see sim.js's `goose.fed`) it
    has nothing left to threaten, so rather than leave it patrolling the same
@@ -139,9 +144,10 @@ export const POOF_TICKS = 8;
  * middle of it:
  *
  *   Digger            deferred — waits, held, for the next wall it meets
- *   Builder            instant — starts laying ground the moment it is
- *                      given, wherever that duckling is already standing,
- *                      for BUILD_SECONDS (content.js) and not a tick longer
+ *   Builder            instant — starts climbing the moment it is given,
+ *                      wherever that duckling is already standing, gap or
+ *                      no gap, for BUILD_SECONDS (content.js) and not a
+ *                      tick longer
  *   Blocker            instant — plants that duckling for good, right there,
  *                      a wall nothing gets past — another duckling or the
  *                      goose alike, see sim.js's stepWalking and stepGoose
@@ -151,8 +157,9 @@ export const POOF_TICKS = 8;
  * That means Builder is the one skill in a genuinely different spot on both
  * axes than everything around it: shared like a Digger's tunnel, but timed
  * like a Blocker's plant rather than waiting for a hazard to ask for it. See
- * sim.js's assignSkill for what that means in practice — it is the one skill
- * where *when* you click matters as much as *who*.
+ * sim.js's assignSkill for what that means in practice — a Builder never
+ * needs the click lined up with anything; it works from wherever it is
+ * clicked, no aiming required.
  */
 export const SKILLS = ['digger', 'builder', 'blocker', 'climber', 'flyer'];
 
@@ -160,7 +167,7 @@ export const SKILL_INFO = {
   digger: { name: 'Digger', verb: 'Dig',
     blurb: 'Tunnels straight through the next wall, leaving a way through for the rest.' },
   builder: { name: 'Builder', verb: 'Build',
-    blurb: `Starts building right where it stands, for ${BUILD_SECONDS} seconds, then stops for good — aim before you click.` },
+    blurb: `Starts climbing right where it stands, gap or no gap, for ${BUILD_SECONDS} seconds, then stops for good and walks on from wherever that leaves it.` },
   blocker: { name: 'Blocker', verb: 'Block',
     blurb: 'Plants itself for good, turning back anything that meets it — another duckling, or the goose.' },
   climber: { name: 'Climber', verb: 'Climb',
@@ -793,9 +800,10 @@ export const winCount = level => Math.ceil(level.duckCount * level.winRatio);
    pond, the way every level before The Orchard's reversal reads, -1 for one
    built the other way round. Nothing about a duckling's own rules cares
    which — sim.js's hatchling and stepWalking read this once to know which
-   direction counts as "toward the pond", and pitSpanAt reads a duckling's
-   own `dir` instead, already set from this. art.js reads it too, to know
-   which side of `goalX` the water actually sits on (see drawGround). The
+   direction counts as "toward the pond", and every duckling's own `dir` is
+   set from it at the moment it hatches, including which way a Builder's
+   ramp climbs. art.js reads it too, to know which side of `goalX` the water
+   actually sits on (see drawGround). The
    `|| 1` only ever matters for a degenerate level where nestX and goalX are
    the same column, which no real level does. */
 export const goalHeading = level => Math.sign(level.goalX - level.nestX) || 1;

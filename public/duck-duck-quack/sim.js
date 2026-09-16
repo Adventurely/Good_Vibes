@@ -9,7 +9,7 @@
  */
 
 import { SCENE_H, FALL_SAFE, WALK_STEP, FALL_SPEED, FLY_SPEED, CLIMB_SPEED,
-  BUILD_MAX_STEPS, BRIDGE_ARCH_HEIGHT, DIG_MAX_STEPS, SKILLS, GOOSE_FLEE_SPEED,
+  BUILD_MAX_STEPS, BUILD_RISE_HEIGHT, DIG_MAX_STEPS, SKILLS, GOOSE_FLEE_SPEED,
   GOOSE_FLEE_LIFT, POOF_TICKS, buildTerrain, buildLayer, winCount, goalHeading } from './content.js';
 
 /* ----------------------------------------------------------------- a duck */
@@ -33,10 +33,8 @@ function hatchling(level, groundY){
     // waiting to be checked for later — see assignSkill again.
     traits: new Set(),
     fallFrom: 0,
-    buildLeft: 0,
-    buildSpan: 0,       // set when building starts — see stepWalking, stepBuilding
-    buildBaseY: 0,
-    buildStep: 0,
+    buildBaseY: 0,      // the height building started from — see stepBuilding
+    buildStep: 0,       // ticks spent building so far, counting up to BUILD_MAX_STEPS
     digLeft: 0,
     cause: null,        // set when lost: 'fell' | 'edge' | 'goosed'
   };
@@ -107,27 +105,26 @@ const groundAt = (state, x) => {
 const setTunnelAt = (state, x, y) => { state.tunnelY[columnAt(state, x)] = y; };
 const setBridgeAt = (state, x, y) => { state.bridgeY[columnAt(state, x)] = y; };
 
+/* The ground a Builder itself is actually building over — the same as
+   groundAt, except it never reads its own bridgeY back. A column already
+   over open pit reads the same either way, but a Builder mid-climb has
+   already written a run of columns below its own rising deck, and asking
+   groundAt there would just answer with the climb's own height instead of
+   what is actually underneath it — see stepBuilding, which needs the real
+   terrain to decide whether it has reached a wall or open ground, not the
+   deck it is laying over either one. */
+const rawGroundAt = (state, x) => {
+  const col = columnAt(state, x);
+  if(state.tunnelY[col] != null) return state.tunnelY[col];
+  return state.terrain[col];
+};
+
 /* Whether the wall at this column is rock rather than dirt — see
    content.js's header note on segments' `hard` field. A Digger already
    tunnelling never re-checks this on its own (see stepDigging), so a level
    that ever put rock right behind a diggable wall would need the tunnel to
    run into it, not just start against it — this is what lets it. */
 const rockAt = (state, x) => state.rock[columnAt(state, x)];
-
-/* How many columns of open pit start at `x`, scanning the same direction the
-   builder is actually walking — read once, the moment a Builder starts, so
-   its bridge can be given a shape (see stepBuilding) that is guaranteed to
-   land back at the far bank rather than guessed a column at a time. Capped
-   at BUILD_MAX_STEPS same as the build itself. `dir` is the duckling's own
-   `d.dir`, not the level's heading — a builder always walks toward the
-   pond, but on a reversed level (content.js's goalHeading) that is -1, and
-   scanning the wrong way here would count solid ground behind the gap
-   instead of the gap itself. */
-const pitSpanAt = (state, x, cap, dir) => {
-  let span = 0;
-  while(span < cap && groundAt(state, x + span * dir) >= SCENE_H) span++;
-  return Math.max(1, span);
-};
 
 const blockerAt = (state, x) =>
   state.ducks.some(d => d.state === 'blocking' && Math.round(d.x) === Math.round(x));
@@ -376,50 +373,76 @@ function stepDigging(state, d){
   if(d.digLeft <= 0) d.state = 'walking';
 }
 
-/* A builder doesn't lay a flat plank — it angles the deck up, cresting over
- * the middle of the gap and back down to meet the far bank, the shape an
- * actual bridge takes rather than a raft towed across at one fixed height.
- * `d.buildSpan` (set once, the moment the skill is given — see assignSkill)
- * is how many columns of open pit there are to cross, read ahead of time so
- * the rise can be shaped to come back down to `d.buildBaseY` exactly at the
- * far edge, landing correctly however wide the gap turns out to be, rather
- * than guessed a column at a time and left to hang short or fly past the
- * bank. Given nowhere near a gap at all, that span comes back as 1 (see
- * pitSpanAt) and this stops on its very first step, onto ground that was
- * already there — a Builder spent on ordinary ground is not a mistake this
- * function catches, only one it does not compound.
+/* A builder doesn't scan ahead for a gap to shape a bridge to — it just
+ * starts climbing, right where it stands, the moment it is given (see
+ * assignSkill), and keeps climbing for BUILD_MAX_STEPS ticks whether or not
+ * there was ever a gap under it at all. That is what makes it safe to give
+ * out at the very edge of a gap without lining the click up with anything —
+ * the old shape had to know the gap's far bank to arch back down onto it,
+ * which only worked if it started exactly there; this one never needs to
+ * know, because it never comes back down on its own.
+ *
+ * `d.buildBaseY` is the height it started from and `d.buildStep` counts the
+ * ticks spent so far; the deck's height at each one is a straight line from
+ * `d.buildBaseY` up to `d.buildBaseY - BUILD_RISE_HEIGHT` (content.js) by
+ * the time the full BUILD_MAX_STEPS is spent. BUILD_RISE_HEIGHT is kept at
+ * FALL_SAFE on purpose: the worst case — ten full seconds of climbing over
+ * ground that never needed a bridge at all, then walking straight off the
+ * end of it — is still never more than the tallest drop a duckling walks
+ * away from unhurt, so running out the full clock over ordinary ground costs
+ * a wasted Builder, never a lost duckling, by itself.
+ *
+ * Whether to keep climbing is decided against the *terrain*, not against how
+ * high the deck itself has already risen — see rawGroundAt above. Real
+ * ground within WALK_STEP of `d.buildBaseY`, the height the climb started
+ * from, means whatever the hazard was is behind it: ordinary ground has
+ * come back, and this lands there directly, however high the deck had
+ * climbed to get there. Real ground *above* `d.buildBaseY` by more than
+ * WALK_STEP is a genuine wall — this stops right where it is and hands
+ * back to stepWalking's own wall rules (Digger, Climber, or turning back)
+ * rather than climbing through it or landing on top of it for free, which
+ * is what keeps rock and a real climb still needing a Digger or a Climber
+ * the same as they always did. Comparing against the deck's own height
+ * instead would let a long enough run-up climb higher than a wall well
+ * before ever reaching it, and glide clean over the top — this is what
+ * stops that. Anything else — real ground still well below where the climb
+ * started, a pit or an ordinary drop either one — is still a hazard, and
+ * the deck keeps climbing over it.
  *
  * `bridgeY` is its own layer over the same column `tunnelY` uses for a dig
  * — see groundAt above — so a bridged gap still shows as open air below the
  * deck in art.js rather than the gap itself quietly filling in with dirt.
- * BUILD_MAX_STEPS (content.js) caps how long this runs even over a gap that
- * never resolves — the one place that number is spent is here, one tick at
- * a time, whether or not any of them actually lay anything down.
  */
 function stepBuilding(state, d){
   const level = state.level;
   const nextX = d.x + d.dir;
   if(nextX < 0 || nextX >= level.width){ d.state = 'walking'; return; }
 
-  const progress = Math.min(1, (d.buildStep + 1) / d.buildSpan);
-  const rise = Math.round(Math.sin(progress * Math.PI) * BRIDGE_ARCH_HEIGHT);
-  const y = d.buildBaseY - rise;
-
-  const ahead = groundAt(state, nextX);
-  if(ahead <= y){
-    // Solid ground already at or above the deck: step onto it and stop.
+  const ahead = rawGroundAt(state, nextX);
+  const rel = ahead - d.buildBaseY;
+  if(rel < -WALK_STEP){
+    // A real wall relative to where the climb started. Stop right here,
+    // still at this tick's own height, and let stepWalking's own wall rules
+    // decide what happens next.
+    d.state = 'walking';
+    return;
+  }
+  if(rel <= WALK_STEP){
+    // Ordinary ground, back within reach of where the climb started:
+    // whatever the hazard was, it is behind now. Step onto it and stop.
     d.x = nextX;
     d.y = ahead;
     d.state = 'walking';
     return;
   }
 
+  const step = d.buildStep + 1;
+  const y = d.buildBaseY - Math.round(step * BUILD_RISE_HEIGHT / BUILD_MAX_STEPS);
   setBridgeAt(state, nextX, y);
   d.x = nextX;
   d.y = y;
-  d.buildStep += 1;
-  d.buildLeft -= 1;
-  if(d.buildLeft <= 0) d.state = 'walking';
+  d.buildStep = step;
+  if(d.buildStep >= BUILD_MAX_STEPS) d.state = 'walking';
 }
 
 function stepClimbing(state, d){
@@ -481,10 +504,7 @@ export function assignSkill(state, duckId, skill){
 
   if(skill === 'blocker'){ d.state = 'blocking'; return d; }
   if(skill === 'builder'){
-    const nextX = d.x + d.dir;
     d.state = 'building';
-    d.buildLeft = BUILD_MAX_STEPS;
-    d.buildSpan = pitSpanAt(state, nextX, BUILD_MAX_STEPS, d.dir);
     d.buildBaseY = d.y;
     d.buildStep = 0;
     return d;
