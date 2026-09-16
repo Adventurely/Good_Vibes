@@ -543,8 +543,8 @@
       import {
         newGame, fromSave, toSave, tick, tap, plant, plantRefusal, study, studyRefusal,
         prestige, prestigeRefusal, pendingSeeds, energyForSeeds, MAX_TICK,
-        seedsEarned, seedMedal, PRESTIGE, rootRefusal, root,
-        catchUp, GROWERS, GROWER_BY_ID, GROWER_IDS,
+        seedsEarned, seedMedal, prestigeUpTo, rootRefusal, root,
+        catchUp, GROWERS, GROWER_BY_ID, GROWER_IDS, upgradeCost,
         bulkCost, affordable, bonuses, totalRate, steadyRate, averageFactor,
         tapValue, momentum, isWindfall, STREAK_CAP, WINDFALL_EVERY,
         snapshot, offered, award, breakdown, note, sample, tapRate,
@@ -767,9 +767,13 @@
 
       /* ---- buying -------------------------------------------------------- */
 
+      /* Every price on this page goes through the same bonus the purchase
+         will: a shop that quotes one number and charges another is a shop that
+         refuses a button it had just greyed in. */
       function howMany(grower){
         if(bulk !== 'max') return bulk;
-        return Math.max(1, affordable(grower, state.owned[grower.id] || 0, state.light));
+        return Math.max(1, affordable(grower, state.owned[grower.id] || 0, state.light,
+          bonuses(state).costGrowth));
       }
 
       function buyGrower(id){
@@ -885,7 +889,7 @@
             row.style.gridTemplateColumns = 'minmax(0, 1fr) auto';
             row.innerHTML = `<span><span class="name">${up.name}</span>`
               + `<span class="note">${describe(up)}</span></span>`
-              + `<span class="cost">${formatEnergy(up.cost)}</span>`;
+              + `<span class="cost">${formatEnergy(upgradeCost(up, bonuses(state)))}</span>`;
             row.addEventListener('click', () => buyUpgrade(up.id));
             ui.upgrades.append(row);
           }
@@ -921,7 +925,7 @@
           const { row, note, cost } = growerRows.get(g.id);
           const owned = state.owned[g.id] || 0;
           const count = howMany(g);
-          const price = bulkCost(g, owned, count);
+          const price = bulkCost(g, owned, count, bonus.costGrowth);
           const afford = state.light >= price;
           row.dataset.afford = String(afford);
           row.setAttribute('aria-disabled', String(!afford));
@@ -942,11 +946,14 @@
         for(const up of list){
           const row = ui.upgrades.querySelector(`[data-up="${up.id}"]`);
           if(!row) continue;
-          const afford = state.light >= up.cost;
+          const price = upgradeCost(up, bonus);
+          const afford = state.light >= price;
           row.dataset.afford = String(afford);
           row.setAttribute('aria-disabled', String(!afford));
+          const cell = row.querySelector('.cost');
+          if(cell) cell.textContent = formatEnergy(price);
         }
-        ui.studyDot.hidden = !list.some(up => state.light >= up.cost);
+        ui.studyDot.hidden = !list.some(up => state.light >= upgradeCost(up, bonus));
         ui.seedsDot.hidden = pendingSeeds(state) < 1;
       }
 
@@ -1116,11 +1123,14 @@
 
       /* ---- the reset ------------------------------------------------------ */
 
-      /* One row a rung, built once. Shut rungs are drawn too, greyed, because
-         the next one is what a player is saving towards. */
+      /* One row a rung, built once and kept. Shut rungs are drawn too, greyed,
+         because the next one is what a player is saving towards — and past the
+         written rows the ladder grows a ring a season for ever, so the list is
+         topped up rather than built once and finished with. */
       const rootRows = new Map();
       function buildRoots(){
-        for(const up of PRESTIGE){
+        for(const up of prestigeUpTo(seedsEarned(state) + 1)){
+          if(rootRows.has(up.id)) continue;
           const row = document.createElement('button');
           row.type = 'button';
           row.className = 'row root';
@@ -1145,6 +1155,11 @@
             note(state, `Bought ${up.name}.`);
             drawSeeds();
             drawShop();
+            /* Written down straight away rather than left to the ten-second
+               autosave. Every other purchase can wait, because every other
+               purchase is minutes of income; a rung is a season of it, and
+               losing one to a closed lid is losing the season. */
+            writeSave();
           });
           ui.roots.append(row);
           rootRows.set(up.id, { row, cost });
@@ -1153,6 +1168,8 @@
 
       function drawSeeds(){
         const earned = seedsEarned(state);
+        // A new season can have grown a ring since the last draw.
+        buildRoots();
         const pending = pendingSeeds(state);
         const from = energyForSeeds(earned);
         const want = energyForSeeds(earned + 1);
@@ -1161,11 +1178,12 @@
         ui.reset.disabled = pending < 1;
         ui.reset.textContent = pending >= 1 ? 'End the season · +1 seed' : 'End the season';
 
-        const medal = seedMedal(earned + 1);
         if(pending >= 1){
-          ui.seedLine.textContent = `A seed is waiting. Ending the season takes the lot back to bare ground and pays it`
-            + `${medal ? `, and the ${medal.name} medal` : ''}. The seeds, the rows below, the record and the`
-            + ` tree's size all stay.`;
+          /* The medal is not named here. It announces itself when it lands, and
+             a line that has to splice a medal's name into a sentence about
+             seeds ends up reading as though the season pays that many. */
+          ui.seedLine.textContent = `A seed is waiting. Ending the season takes the lot back to bare ground and`
+            + ` pays it. The seeds, the rows below, the record and the tree's size all stay.`;
         } else {
           ui.seedLine.textContent = `The next seed lands at ${formatEnergy(want)} energy earned, all told —`
             + ` you are at ${formatEnergy(state.life.earned)}.`;
@@ -1173,7 +1191,7 @@
         const span = Math.max(1, want - from);
         ui.seedMeter.style.width = `${Math.max(0, Math.min(1, (state.life.earned - from) / span)) * 100}%`;
 
-        for(const up of PRESTIGE){
+        for(const up of prestigeUpTo(earned + 1)){
           const { row, cost } = rootRows.get(up.id);
           const mine = Boolean(state.rooted[up.id]);
           const open = up.seed <= earned;
@@ -1206,19 +1224,18 @@
         prestige(state);
         const now = seedsEarned(state);
         note(state, `Season ${now}. The lot goes back to bare ground, and you gained a seed.`);
-        /* The one toast a season, and it has to be true on the four hundredth
-           season as well as the first: the ladder of rows stops at twelve
-           seeds, so past that there is no new row to announce and the toast
-           says the other true thing instead. */
+        /* The one toast a season, and true on the four hundredth season as well
+           as the first: every seed opens a row, because past the written ones
+           the ladder grows a ring a season for ever.
+
+           It speaks for the medal only when it would otherwise be saying the
+           same words twice — "Sixth seed" over "Sixth seed". The medals further
+           up are named differently enough to be worth their own toast, and the
+           one at the top of the ladder certainly is. */
         const title = `${ordinalWord(now)} seed`;
-        const opened = PRESTIGE.some(up => up.seed === now);
-        /* And it speaks for the medal only when it would otherwise be saying
-           the same words twice — "Sixth seed" over "Sixth seed". The medals
-           further up are named differently enough to be worth their own toast,
-           and the one at the top of the ladder certainly is. */
         const medalWon = seedMedal(now);
         if(medalWon && medalWon.name === title) quiet = medalWon.id;
-        say(opened ? 'Another row of upgrades is open.' : 'The tree stands taller.', title);
+        say('Another row of upgrades is open.', title);
         shopKey = null;
         drawShop();
         drawSeeds();

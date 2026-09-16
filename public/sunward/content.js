@@ -153,28 +153,33 @@ export const GROWER_BY_ID = Object.fromEntries(GROWERS.map(g => [g.id, g]));
 export const COST_GROWTH = 1.15;
 
 /* What the nth one costs, given you already have `owned`. */
-export const growerCost = (grower, owned) =>
-  Math.ceil(grower.cost * Math.pow(COST_GROWTH, owned));
+/* `growth` is COST_GROWTH unless a seed row has flattened it. It is a
+   parameter rather than a state read because these three are called from the
+   shop's draw loop, once a row, once a frame, and they have no state to hand —
+   but every caller that HAS a state must pass the same number the purchase
+   will use, or the button says a price the till refuses. */
+export const growerCost = (grower, owned, growth = COST_GROWTH) =>
+  Math.ceil(grower.cost * Math.pow(growth, owned));
 
 /* What `count` more cost in one go. The closed form of the sum, because the
    bulk buttons ask for a hundred at a time and a loop of a hundred pows to
    grey out one button is a loop that runs on every frame. */
-export function bulkCost(grower, owned, count){
+export function bulkCost(grower, owned, count, growth = COST_GROWTH){
   if(count <= 0) return 0;
-  const first = grower.cost * Math.pow(COST_GROWTH, owned);
-  return Math.ceil(first * (Math.pow(COST_GROWTH, count) - 1) / (COST_GROWTH - 1));
+  const first = grower.cost * Math.pow(growth, owned);
+  return Math.ceil(first * (Math.pow(growth, count) - 1) / (growth - 1));
 }
 
 /* How many you could afford at once, which is what the "max" button needs.
    Solved rather than counted, for the same reason. */
-export function affordable(grower, owned, light){
-  if(light < growerCost(grower, owned)) return 0;
-  const first = grower.cost * Math.pow(COST_GROWTH, owned);
-  const n = Math.log(1 + (light * (COST_GROWTH - 1)) / first) / Math.log(COST_GROWTH);
+export function affordable(grower, owned, light, growth = COST_GROWTH){
+  if(light < growerCost(grower, owned, growth)) return 0;
+  const first = grower.cost * Math.pow(growth, owned);
+  const n = Math.log(1 + (light * (growth - 1)) / first) / Math.log(growth);
   let count = Math.max(1, Math.floor(n));
   // The logarithm is right to about a part in 1e15, and being one over is a
   // button that spends money the player does not have. Walk it back if so.
-  while(count > 1 && bulkCost(grower, owned, count) > light) count--;
+  while(count > 1 && bulkCost(grower, owned, count, growth) > light) count--;
   return count;
 }
 
@@ -354,20 +359,136 @@ export const PRESTIGE = [
     blurb: 'Everything makes twice as much. The lot you come back to is a different lot.' },
   { id: 'heartwood', name: 'Heartwood', seed: 11, cost: 3e11, effect: { clickMult: 5 },
     blurb: 'A tap is worth five times as much again.' },
-  { id: 'whole-valley', name: 'The whole valley', seed: 12, cost: 1.2e12, effect: { allMult: 2 },
-    blurb: 'Everything makes twice as much again. There is nothing after this one yet.' },
+  { id: 'whole-valley', name: 'The whole valley', seed: 12, cost: 1.2e12, effect: { allMult: 2.5 },
+    blurb: 'Everything makes two and a half times as much.' },
+  { id: 'often-enough', name: 'Often enough', seed: 13, cost: 5e12, effect: { windfallEvery: 5 },
+    blurb: 'A windfall every fifth tap instead of every tenth.' },
+  { id: 'quick-hands', name: 'Quick hands', seed: 14, cost: 2e13, effect: { streakCap: 16 },
+    blurb: 'A fast hand keeps paying up to sixteen taps a second instead of stopping at eight.' },
+  { id: 'cheap-ground', name: 'Cheap ground', seed: 15, cost: 8e13, effect: { costGrowth: 0.02 },
+    blurb: "Every grower's price climbs 13% a copy instead of 15%. By the fortieth one that is half the price." },
+  { id: 'long-view', name: 'The long view', seed: 16, cost: 3.2e14, effect: { startEnergy: 5e6 },
+    blurb: 'Every season starts with 5 million energy. The tree gathers energy in the winter for use in the spring.' },
+  { id: 'thrift', name: 'Thrift', seed: 17, cost: 1.3e15, effect: { spendBack: 0.05 },
+    blurb: 'A twentieth of everything you spend on growers comes straight back.' },
+  { id: 'what-overwinters', name: 'What overwinters', seed: 18, cost: 5.2e15, effect: { keepGrowers: 0.1 },
+    blurb: 'A tenth of every kind lives through the season instead of going back to bare ground.' },
+  { id: 'night-shift', name: 'Night shift', seed: 19, cost: 2.1e16, effect: { alwaysOn: true },
+    blurb: 'Day growers work through the night and night growers through the day. Nothing on the lot keeps hours any more.' },
+  { id: 'still-hands', name: 'Still hands', seed: 20, cost: 8.2e16, effect: { offlineTaps: true },
+    blurb: 'Time away also pays what your hands usually make, as though somebody had kept tapping.' },
+  { id: 'high-sun', name: 'The high sun', seed: 21, cost: 3.3e17, effect: { sunUp: 0.25 },
+    blurb: 'The best hours of the day get better still, and the worst ones are no worse for it.' },
+  { id: 'half-price', name: 'Half price', seed: 22, cost: 1.3e18, effect: { upgradeCost: 0.5 },
+    blurb: 'Every upgrade in the shop costs half what it says.' },
+  { id: 'standing-start', name: 'A standing start', seed: 23, cost: 5.3e18, effect: { startGrowers: 5 },
+    blurb: 'Every season begins with five of every kind already standing.' },
+  { id: 'long-count', name: 'The long count', seed: 24, cost: 2.1e19, effect: { medalMult: 0.01 },
+    blurb: 'Everything makes 1% more for every medal on the record.' },
+  { id: 'many-hands', name: 'Many hands', seed: 25, cost: 8.4e19, effect: { varietyMult: 0.05 },
+    blurb: 'Everything makes 5% more for every kind of grower standing on the lot.' },
+  { id: 'moss-beds', name: 'The moss beds', seed: 26, cost: 3.4e20, effect: { grower: 'moss', mult: 3 },
+    blurb: 'Moss beds make three times as much, for good.' },
+  { id: 'fern-banks', name: 'The fern banks', seed: 27, cost: 1.4e21, effect: { grower: 'fern', mult: 3 },
+    blurb: 'Fern banks make three times as much, for good.' },
+  { id: 'leaf-panels', name: 'The leaf panels', seed: 28, cost: 5.4e21, effect: { grower: 'panel', mult: 3 },
+    blurb: 'Leaf panels make three times as much, for good.' },
+  { id: 'the-beehives', name: 'The beehives', seed: 29, cost: 2.2e22, effect: { grower: 'hive', mult: 3 },
+    blurb: 'Beehives make three times as much, for good.' },
+  { id: 'mushroom-vaults', name: 'The mushroom vaults', seed: 30, cost: 8.6e22, effect: { grower: 'mushroom', mult: 3 },
+    blurb: 'Mushroom vaults make three times as much, for good.' },
+  { id: 'orchard-rows', name: 'The orchard rows', seed: 31, cost: 3.5e23, effect: { grower: 'orchard', mult: 3 },
+    blurb: 'Orchard rows make three times as much, for good.' },
+  { id: 'wind-turbines', name: 'The wind turbines', seed: 32, cost: 1.4e24, effect: { grower: 'turbine', mult: 3 },
+    blurb: 'Wind turbines make three times as much, for good.' },
+  { id: 'the-glasshouses', name: 'The glasshouses', seed: 33, cost: 5.5e24, effect: { grower: 'glasshouse', mult: 3 },
+    blurb: 'Glasshouses make three times as much, for good.' },
+  { id: 'canopy-towers', name: 'The canopy towers', seed: 34, cost: 2.2e25, effect: { grower: 'canopy', mult: 3 },
+    blurb: 'Canopy towers make three times as much, for good.' },
+  { id: 'seed-for-seed', name: 'A seed for a seed', seed: 35, cost: 8.9e25, effect: { seedGain: 0.05 },
+    blurb: 'Everything makes 5% more for every seed you have ever earned.' },
+  { id: 'never-a-pause', name: 'Never a pause', seed: 36, cost: 3.5e26, effect: { streakFloor: 2 },
+    blurb: 'Your hands never count as slower than two taps a second, even when they have stopped.' },
+  { id: 'deep-sleep', name: 'Deep sleep', seed: 37, cost: 1.4e27, effect: { offlineRate: 1.5 },
+    blurb: 'The lot makes half again as much while the tab is shut as it does while you watch it.' },
+  { id: 'practice', name: 'Practice', seed: 38, cost: 5.7e27, effect: { practice: 0.01 },
+    blurb: 'Everything makes 1% more for every hundred taps this season, up to three times as much.' },
+  { id: 'slow-season', name: 'The slow season', seed: 39, cost: 2.3e28, effect: { patience: 0.001 },
+    blurb: 'Everything makes a tenth of a percent more for every minute this season has run, up to twice as much.' },
+  { id: 'hundred-summers', name: 'A hundred summers', seed: 40, cost: 9.1e28, effect: { allMult: 8 },
+    blurb: 'Everything makes eight times as much. This is the last row anyone sat down and wrote.' },
 ];
 
 export const PRESTIGE_BY_ID = Object.fromEntries(PRESTIGE.map(u => [u.id, u]));
 
+/* Past the written rows the ladder goes on by itself, one ring a season, for
+ * ever. A written ladder ends, and the season's own toast says another row is
+ * open every season — it has to be true on the four hundredth season as well
+ * as on the thirteenth. A ring is what a tree puts on in a year, so it is the
+ * honest thing to call them, and each is worth what the plainest written row
+ * was worth: everything twice over.
+ */
+export const RING_FROM = PRESTIGE.length + 1;
+export const RING_MULT = 2;
+
+/* What a row costs: about three tenths of the lifetime energy its own seed
+   wanted. Every written row is priced at that, and it is what makes a row
+   affordable inside the season that opens it without it buying itself. Cut to
+   two figures, because a price nobody can read is a price nobody can plan
+   against. */
+export const prestigeCost = n => {
+  const raw = seedAt(n) * 0.3;
+  if(!(raw > 0) || !Number.isFinite(raw)) return Infinity;
+  const place = Math.pow(10, Math.floor(Math.log10(raw)) - 1);
+  return Math.round(raw / place) * place;
+};
+
+/* One object a ring, made once and kept. The page redraws the seeds tab while
+   it is open, and a fresh object a row a frame is a garbage collector doing
+   work nobody asked for. */
+const RINGS = new Map();
+export function ringFor(n){
+  if(!Number.isInteger(n) || n < RING_FROM) return null;
+  if(!RINGS.has(n)){
+    RINGS.set(n, Object.freeze({
+      id: 'ring-' + n, name: 'Ring ' + n, seed: n, cost: prestigeCost(n),
+      effect: { allMult: RING_MULT },
+      blurb: 'Another ring of growth. Everything makes twice as much.',
+    }));
+  }
+  return RINGS.get(n);
+}
+
+/* The row a given seed opens, written or grown. */
+export const prestigeAt = n =>
+  Number.isInteger(n) && n >= 1 ? (PRESTIGE[n - 1] || ringFor(n)) : null;
+
+/* Every row up to and including seed `n`, which is what the page lists. Always
+   at least the written ones, so the ladder still reads as a ladder on a save
+   that has never had a seed. */
+export const prestigeUpTo = n => {
+  const top = Math.max(PRESTIGE.length, Number.isInteger(n) && n > 0 ? n : 0);
+  const out = [];
+  for(let i = 1; i <= top; i++) out.push(prestigeAt(i));
+  return out;
+};
+
+/* By id, rings included. PRESTIGE_BY_ID above is the written map and stays
+   exactly what it was, because it is exported and something reads it. */
+export function prestigeById(id){
+  if(PRESTIGE_BY_ID[id]) return PRESTIGE_BY_ID[id];
+  const m = /^ring-(\d+)$/.exec(String(id));
+  return m ? ringFor(Number(m[1])) : undefined;
+}
+
 /* Which of them this save has earned the seeds for. Ordered, because the tree
    is read as a ladder and a gap in it is the next thing to aim at. */
 export const prestigeOffered = state =>
-  PRESTIGE.filter(u => u.seed <= state.seeds);
+  prestigeUpTo(state.seeds).filter(u => u.seed <= state.seeds);
 
 /* Why that one cannot be rooted, or null. */
 export function rootRefusal(state, id){
-  const up = PRESTIGE_BY_ID[id];
+  const up = prestigeById(id);
   if(!up) return 'There is no such upgrade.';
   if(state.rooted[id]) return 'You have that one already.';
   if(state.seeds < up.seed){
@@ -381,7 +502,7 @@ export function rootRefusal(state, id){
 /* Root it: pay the energy and keep it forever. */
 export function root(state, id){
   if(rootRefusal(state, id)) return null;
-  const up = PRESTIGE_BY_ID[id];
+  const up = prestigeById(id);
   state.light -= up.cost;
   state.rooted[id] = true;
   score(state, 'spent', up.cost);
@@ -711,20 +832,52 @@ export function bonuses(state){
     startEnergy: 0,
     offlineRate: OFFLINE_RATE,
     offlineCap: OFFLINE_CAP,
+    /* The rest of what a seed row can move. Every one of these is a default
+       meaning "nothing bought", so a lot with an empty `rooted` folds to
+       exactly the game as it was before any of them existed. */
+    windfallEvery: WINDFALL_EVERY,  // smallest wins: sooner is kinder
+    streakCap: STREAK_CAP,          // largest wins
+    streakFloor: 0,                 // what your hands count as at rest
+    costGrowth: COST_GROWTH,        // how fast a grower's price climbs
+    spendBack: 0,                   // share of grower spending handed back
+    keepGrowers: 0,                 // share of each kind kept through a season
+    startGrowers: 0,                // of each kind, standing at the start of one
+    alwaysOn: false,                // every grower counts as working all hours
+    offlineTaps: false,             // time away pays for the hands too
+    upgradeCost: 1,                 // what the shop charges, as a share
   };
 
   /* The seed upgrades first, and through the same keys as the run's own, so
      that a multiplier is a multiplier wherever it was bought and nothing
      downstream has to know which shelf a bonus came off. */
   for(const id of Object.keys(state.rooted || {})){
-    const up = PRESTIGE_BY_ID[id];
+    const up = prestigeById(id);
     if(!up || !state.rooted[id]) continue;
     const e = up.effect;
     if(e.clickMult) out.clickMult *= e.clickMult;
     if(e.allMult) out.allMult *= e.allMult;
     if(e.fingers) out.fingers += e.fingers;
+    if(e.streak) out.streak += e.streak;
+    if(e.windfall) out.windfall *= e.windfall;
     if(e.steady) out.lift = Math.min(out.swing, out.lift + e.steady);
     if(e.grower && out.grower[e.grower] !== undefined) out.grower[e.grower] *= e.mult;
+    // Sooner, faster, cheaper: whichever bought row is kindest wins, rather
+    // than whichever happened to be folded last.
+    if(e.windfallEvery) out.windfallEvery = Math.min(out.windfallEvery, e.windfallEvery);
+    if(e.streakCap) out.streakCap = Math.max(out.streakCap, e.streakCap);
+    if(e.streakFloor) out.streakFloor = Math.max(out.streakFloor, e.streakFloor);
+    if(e.costGrowth) out.costGrowth = Math.max(1.01, out.costGrowth - e.costGrowth);
+    if(e.spendBack) out.spendBack = Math.min(0.9, out.spendBack + e.spendBack);
+    if(e.keepGrowers) out.keepGrowers = Math.max(out.keepGrowers, e.keepGrowers);
+    if(e.startGrowers) out.startGrowers = Math.max(out.startGrowers, e.startGrowers);
+    if(e.alwaysOn) out.alwaysOn = true;
+    if(e.offlineTaps) out.offlineTaps = true;
+    if(e.upgradeCost) out.upgradeCost = Math.min(out.upgradeCost, e.upgradeCost);
+    /* The sun goes up and the shade comes up with it. Raising the swing alone
+       would deepen the trough as it lifted the peak, which is an upgrade that
+       makes your nights worse, so the lift rises by the same amount and the
+       bad hours end up no worse than they were. */
+    if(e.sunUp){ out.swing += e.sunUp; out.lift += e.sunUp; }
     // Begin each run with this much: the biggest one wins rather than the sum,
     // because they are the same promise made larger and not two promises.
     if(e.startEnergy) out.startEnergy = Math.max(out.startEnergy, e.startEnergy);
@@ -745,6 +898,29 @@ export function bonuses(state){
     if(e.fingers) out.fingers += e.fingers;
     if(e.steady) out.lift = Math.min(out.swing, out.lift + e.steady);
     if(e.grower && out.grower[e.grower] !== undefined) out.grower[e.grower] *= e.mult;
+  }
+
+  /* Last, the five that are not a fixed number but a count of something the
+   * save is already keeping: medals won, kinds standing, seeds earned, and how
+   * hard and how long this season has been worked. They fold into `allMult`,
+   * because that is the key every rate and every tap already reads, and the
+   * two that grow without bound as a season runs are capped — a tab left open
+   * for a week should not be worth a thousand times one left open for an hour.
+   */
+  const rows = state.rooted || {};
+  for(const id of Object.keys(rows)){
+    const up = prestigeById(id);
+    if(!up || !rows[id]) continue;
+    const e = up.effect;
+    if(e.medalMult) out.allMult *= 1 + e.medalMult * Object.keys(state.medals || {}).length;
+    if(e.varietyMult){
+      let kinds = 0;
+      for(const g of GROWER_IDS) if(state.owned[g] > 0) kinds++;
+      out.allMult *= 1 + e.varietyMult * kinds;
+    }
+    if(e.seedGain) out.allMult *= 1 + e.seedGain * Math.max(0, state.seeds);
+    if(e.practice) out.allMult *= Math.min(3, 1 + e.practice * Math.floor(Math.max(0, state.run.taps) / 100));
+    if(e.patience) out.allMult *= Math.min(2, 1 + e.patience * Math.max(0, state.run.seconds) / 60);
   }
   return out;
 }
@@ -791,7 +967,7 @@ export function rateOf(state, id, bonus = bonuses(state)){
   const owned = state.owned[id] || 0;
   if(!owned) return 0;
   return owned * g.rate * bonus.grower[id] * bonus.allMult * bonus.seedMult
-    * phaseFactor(g.phase, state.elapsed, bonus.swing, bonus.lift);
+    * phaseFactor(bonus.alwaysOn ? 'any' : g.phase, state.elapsed, bonus.swing, bonus.lift);
 }
 
 /* The whole lot, per second, right now. */
@@ -815,7 +991,7 @@ export function steadyRate(state, bonus = bonuses(state)){
     // upgrade is bought the day really does come out ahead of the rated
     // number, and this figure is what pays for time away.
     sum += owned * g.rate * bonus.grower[id] * bonus.allMult * bonus.seedMult
-      * averageFactor(g.phase, bonus.lift, bonus.swing);
+      * averageFactor(bonus.alwaysOn ? 'any' : g.phase, bonus.lift, bonus.swing);
   }
   return sum;
 }
@@ -836,7 +1012,8 @@ export const STREAK_CAP = 8;
 /* How much more a tap is worth for the speed the hand is going: 1 with no
    Momentum, or at a standstill. */
 export const momentum = (rate, bonus) =>
-  1 + bonus.streak * Math.max(0, Math.min(STREAK_CAP, rate || 0));
+  1 + bonus.streak * Math.max(bonus.streakFloor || 0,
+    Math.min(bonus.streakCap || STREAK_CAP, Math.max(0, rate || 0)));
 
 /* Every tenth tap of the run is the windfall, once Windfall is bought. Counted
    off the run rather than off all time so that a replant starts the count
@@ -845,7 +1022,7 @@ export const momentum = (rate, bonus) =>
 export const WINDFALL_EVERY = 10;
 
 export const isWindfall = (state, bonus = bonuses(state)) =>
-  bonus.windfall > 1 && (state.run.taps + 1) % WINDFALL_EVERY === 0;
+  bonus.windfall > 1 && (state.run.taps + 1) % (bonus.windfallEvery || WINDFALL_EVERY) === 0;
 
 /* What the NEXT tap will actually pay: the resting worth, times the momentum
    for the speed the hand is going, times the windfall if this is the tenth.
@@ -984,23 +1161,27 @@ export function tap(state, rate = 0){
    the way the other games do it, so the shop row and the click handler cannot
    disagree about what is wrong — the row prints exactly what the handler
    refused with. */
-export function plantRefusal(state, id, count = 1){
+export function plantRefusal(state, id, count = 1, bonus = bonuses(state)){
   const g = GROWER_BY_ID[id];
   if(!g) return 'There is no such grower.';
   if(!Number.isInteger(count) || count < 1) return 'One at a time, at least.';
   const owned = state.owned[id] || 0;
-  const cost = bulkCost(g, owned, count);
+  const cost = bulkCost(g, owned, count, bonus.costGrowth);
   if(state.light < cost) return `Not enough energy — ${formatEnergy(cost - state.light)} short.`;
   return null;
 }
 
 /* Plant them. Returns the cost, or null if it was refused and nothing changed. */
 export function plant(state, id, count = 1){
-  if(plantRefusal(state, id, count)) return null;
+  const bonus = bonuses(state);
+  if(plantRefusal(state, id, count, bonus)) return null;
   const g = GROWER_BY_ID[id];
-  const cost = bulkCost(g, state.owned[id] || 0, count);
+  const cost = bulkCost(g, state.owned[id] || 0, count, bonus.costGrowth);
   state.light -= cost;
   state.owned[id] = (state.owned[id] || 0) + count;
+  /* Thrift hands part of it straight back. Counted as spent all the same: the
+     record is what the lot cost you, and a rebate is not an unspent pound. */
+  if(bonus.spendBack > 0) state.light += cost * bonus.spendBack;
   score(state, 'spent', cost);
   score(state, 'planted', count);
   // Here rather than at the call site: this is the only function in the game
@@ -1011,21 +1192,29 @@ export function plant(state, id, count = 1){
   return cost;
 }
 
-export function studyRefusal(state, id){
+/* What the shop is actually charging for one, which is its printed price
+   unless Half price is bought. */
+export const upgradeCost = (up, bonus) =>
+  Math.ceil(up.cost * (bonus ? bonus.upgradeCost : 1));
+
+export function studyRefusal(state, id, bonus = bonuses(state)){
   const up = UPGRADE_BY_ID[id];
   if(!up) return 'There is no such upgrade.';
   if(state.bought[id]) return 'You have that already.';
   if(!meets(up.need, snapshot(state))) return 'Not yet.';
-  if(state.light < up.cost) return `Not enough energy — ${formatEnergy(up.cost - state.light)} short.`;
+  const cost = upgradeCost(up, bonus);
+  if(state.light < cost) return `Not enough energy — ${formatEnergy(cost - state.light)} short.`;
   return null;
 }
 
 export function study(state, id){
-  if(studyRefusal(state, id)) return null;
+  const bonus = bonuses(state);
+  if(studyRefusal(state, id, bonus)) return null;
   const up = UPGRADE_BY_ID[id];
-  state.light -= up.cost;
+  const cost = upgradeCost(up, bonus);
+  state.light -= cost;
   state.bought[id] = true;
-  score(state, 'spent', up.cost);
+  score(state, 'spent', cost);
   score(state, 'studied', 1);
   return up;
 }
@@ -1139,9 +1328,21 @@ export function prestige(state){
   state.prestiges = state.seeds;
   // The head start a seed upgrade bought, if any: read before the run is
   // cleared, since it is the seed upgrades that carry it and those stay.
-  state.light = bonuses(state).startEnergy;
+  const bonus = bonuses(state);
+  state.light = bonus.startEnergy;
   state.elapsed = DAY_START;
+  /* Bare ground, unless a seed row says otherwise. What overwinters keeps a
+     share of what was standing; A standing start plants a flat number of each
+     kind. They are two answers to the same question, so the kinder one wins
+     rather than both applying. */
+  const before = { ...state.owned };
   state.owned = freshOwned();
+  if(bonus.keepGrowers > 0 || bonus.startGrowers > 0){
+    for(const id of GROWER_IDS){
+      const kept = Math.floor((before[id] || 0) * bonus.keepGrowers);
+      state.owned[id] = Math.max(kept, Math.floor(bonus.startGrowers));
+    }
+  }
   state.earnedBy = freshOwned();
   state.bought = {};
   // state.rooted is deliberately not touched. It is the only thing besides the
@@ -1173,7 +1374,17 @@ export function offlineGain(state, seconds){
   const bonus = bonuses(state);
   const cap = bonus.offlineCap;
   const away = Math.max(0, Math.min(seconds, cap));
-  return { seconds: away, capped: seconds > cap, light: steadyRate(state, bonus) * bonus.offlineRate * away };
+  let light = steadyRate(state, bonus) * bonus.offlineRate * away;
+  /* Still hands pays for the tapping as well, at the rate you have actually
+     been tapping this season — taps over seconds, not your best burst, because
+     a line that pays a whole night at your fastest ten seconds is a line that
+     rewards putting the lid down. Nothing is owed on a season with no seconds
+     in it yet. */
+  if(bonus.offlineTaps && state.run.seconds > 0){
+    const hand = Math.min(bonus.streakCap, state.run.taps / state.run.seconds);
+    if(hand > 0) light += tapPays(state, hand, bonus) * hand * away;
+  }
+  return { seconds: away, capped: seconds > cap, light };
 }
 
 /* Pay it in. Advances the sky by the real time away — the world kept turning
@@ -1302,7 +1513,7 @@ export function fromSave(raw){
     if(UPGRADE_BY_ID[id] && raw.bought[id]) state.bought[id] = true;
   }
   for(const id of Object.keys(raw.rooted || {})){
-    if(PRESTIGE_BY_ID[id] && raw.rooted[id]) state.rooted[id] = true;
+    if(prestigeById(id) && raw.rooted[id]) state.rooted[id] = true;
   }
   for(const id of Object.keys(raw.medals || {})){
     if(ACHIEVEMENT_BY_ID[id] && raw.medals[id]) state.medals[id] = true;
