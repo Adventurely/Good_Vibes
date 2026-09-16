@@ -9,8 +9,8 @@
  */
 
 import { SCENE_H, FALL_SAFE, WALK_STEP, FALL_SPEED, FLY_SPEED, CLIMB_SPEED,
-  BUILD_MAX_STEPS, DIG_MAX_STEPS, SKILLS, GOOSE_FLEE_SPEED, GOOSE_FLEE_LIFT,
-  POOF_TICKS, buildTerrain, winCount } from './content.js';
+  BUILD_MAX_STEPS, BRIDGE_ARCH_HEIGHT, DIG_MAX_STEPS, SKILLS, GOOSE_FLEE_SPEED,
+  GOOSE_FLEE_LIFT, POOF_TICKS, buildTerrain, winCount } from './content.js';
 
 /* ----------------------------------------------------------------- a duck */
 
@@ -30,6 +30,9 @@ function hatchling(level, groundY){
     traits: new Set(),
     fallFrom: 0,
     buildLeft: 0,
+    buildSpan: 0,       // set when building starts — see stepWalking, stepBuilding
+    buildBaseY: 0,
+    buildStep: 0,
     digLeft: 0,
     cause: null,        // set when lost: 'fell' | 'edge' | 'goosed'
   };
@@ -92,6 +95,16 @@ const groundAt = (state, x) => {
 
 const setTunnelAt = (state, x, y) => { state.tunnelY[columnAt(state, x)] = y; };
 const setBridgeAt = (state, x, y) => { state.bridgeY[columnAt(state, x)] = y; };
+
+/* How many columns of open pit start at `x` — read once, the moment a
+   Builder starts, so its bridge can be given a shape (see stepBuilding)
+   that is guaranteed to land back at the far bank rather than guessed a
+   column at a time. Capped at BUILD_MAX_STEPS same as the build itself. */
+const pitSpanAt = (state, x, cap) => {
+  let span = 0;
+  while(span < cap && groundAt(state, x + span) >= SCENE_H) span++;
+  return Math.max(1, span);
+};
 
 const blockerAt = (state, x) =>
   state.ducks.some(d => d.state === 'blocking' && Math.round(d.x) === Math.round(x));
@@ -231,6 +244,11 @@ function stepWalking(state, d){
   const nextX = d.x + d.dir;
   if(nextX < 0 || nextX >= level.width){ loseDuckling(state, d, 'edge'); return; }
 
+  // A planted Blocker is a wall nothing gets past — the goose included, see
+  // stepGoose — so any other duckling that steps into its column turns
+  // around exactly the way it would at a wall it cannot climb.
+  if(blockerAt(state, nextX)){ d.dir = -d.dir; return; }
+
   const nextY = groundAt(state, nextX);
   const delta = nextY - d.y;   // positive: ground drops away; negative: ground rises
 
@@ -261,6 +279,9 @@ function stepWalking(state, d){
     if(hasTrait(d, 'builder') && nextY >= SCENE_H){
       d.state = 'building';
       d.buildLeft = BUILD_MAX_STEPS;
+      d.buildSpan = pitSpanAt(state, nextX, BUILD_MAX_STEPS);
+      d.buildBaseY = d.y;
+      d.buildStep = 0;
       return;
     }
     d.x = nextX;
@@ -321,28 +342,41 @@ function stepDigging(state, d){
   if(d.digLeft <= 0) d.state = 'walking';
 }
 
-/* A builder lays a bridge at the height it started from, one column at a
- * time, until solid ground meets it on the far side. `bridgeY` is its own
- * layer over the same column `tunnelY` uses for a dig — see groundAt above
- * — so a bridged gap still shows as open air below the deck in art.js
- * rather than the gap itself quietly filling in with dirt.
+/* A builder doesn't lay a flat plank — it angles the deck up, cresting over
+ * the middle of the gap and back down to meet the far bank, the shape an
+ * actual bridge takes rather than a raft towed across at one fixed height.
+ * `d.buildSpan` (set once, the moment building starts — see stepWalking) is
+ * how many columns of open pit there are to cross, read ahead of time so the
+ * rise can be shaped to come back down to `d.buildBaseY` exactly at the far
+ * edge, landing correctly however wide the gap turns out to be, rather than
+ * guessed a column at a time and left to hang short or fly past the bank.
+ *
+ * `bridgeY` is its own layer over the same column `tunnelY` uses for a dig
+ * — see groundAt above — so a bridged gap still shows as open air below the
+ * deck in art.js rather than the gap itself quietly filling in with dirt.
  */
 function stepBuilding(state, d){
   const level = state.level;
   const nextX = d.x + d.dir;
   if(nextX < 0 || nextX >= level.width){ d.state = 'walking'; return; }
 
+  const progress = Math.min(1, (d.buildStep + 1) / d.buildSpan);
+  const rise = Math.round(Math.sin(progress * Math.PI) * BRIDGE_ARCH_HEIGHT);
+  const y = d.buildBaseY - rise;
+
   const ahead = groundAt(state, nextX);
-  if(ahead <= d.y){
-    // Solid ground already at or above the bridge: step onto it and stop.
+  if(ahead <= y){
+    // Solid ground already at or above the deck: step onto it and stop.
     d.x = nextX;
     d.y = ahead;
     d.state = 'walking';
     return;
   }
 
-  setBridgeAt(state, nextX, d.y);
+  setBridgeAt(state, nextX, y);
   d.x = nextX;
+  d.y = y;
+  d.buildStep += 1;
   d.buildLeft -= 1;
   if(d.buildLeft <= 0) d.state = 'walking';
 }

@@ -77,6 +77,13 @@ export const FALL_SAFE = 24;
 export const BUILD_MAX_STEPS = 60;
 export const DIG_MAX_STEPS = 60;
 
+/* How far a Builder's deck rises at the crest of its arch — see sim.js's
+   stepBuilding. Well under WALK_STEP even spread over a short gap, so the
+   climb to the crest is never itself a "wall" a walking duckling without
+   the trait would refuse: the whole point is a bridge everyone can just
+   walk across once it's there. */
+export const BRIDGE_ARCH_HEIGHT = 10;
+
 /* Once the goose has caught its one duckling (see sim.js's `goose.fed`) it
    has nothing left to threaten, so rather than leave it patrolling the same
    stretch forever as an empty prop, it flies off — the same direction it was
@@ -102,8 +109,9 @@ export const POOF_TICKS = 8;
  * level plays than what it does:
  *
  *   Digger, Builder   cut or lay ground, and every duckling after walks it
- *   Blocker           plants one duckling for good, and turns the goose
- *                     back if it ever comes near — see sim.js's stepGoose
+ *   Blocker           plants one duckling for good, a wall nothing gets
+ *                     past — another duckling or the goose alike, see
+ *                     sim.js's stepWalking and stepGoose
  *   Climber, Flyer     carry one duckling past one obstacle, once
  */
 export const SKILLS = ['digger', 'builder', 'blocker', 'climber', 'flyer'];
@@ -114,7 +122,7 @@ export const SKILL_INFO = {
   builder: { name: 'Builder', verb: 'Build',
     blurb: 'Bridges the next gap, leaving the bridge for the rest.' },
   blocker: { name: 'Blocker', verb: 'Block',
-    blurb: 'Plants itself for good, and stares down the goose — the only skill that fights back.' },
+    blurb: 'Plants itself for good, turning back anything that meets it — another duckling, or the goose.' },
   climber: { name: 'Climber', verb: 'Climb',
     blurb: 'Scales the next wall instead of turning back from it. One duckling only.' },
   flyer: { name: 'Flyer', verb: 'Fly',
@@ -224,9 +232,10 @@ export const LEVEL_1 = {
  * threatens the one duckling unlucky enough to be near it when it catches
  * someone (see sim.js's goosedAt), and this level's quota already has slack
  * to spare that one. It is on this level for the same reason it is on The
- * Park: a duckling can be planted, and it will turn the goose back if
- * planted in its path (see stepGoose), even though nothing here needs it
- * to. The Grove is the level built around that actually mattering.
+ * Park: a duckling can be planted, and whatever meets it — a sibling or the
+ * goose alike (see sim.js's stepWalking and stepGoose) — turns back. Worth
+ * being careful with, not just generous with: planted anywhere on the one
+ * road out of the nest, it is a wall for the rest of the flock too.
  */
 export const LEVEL_2 = {
   id: 'warren',
@@ -296,6 +305,16 @@ export const LEVEL_2 = {
  * its own two feet, at a height only Flyer answers. Confirmed by actually
  * running it four ways: digger-and-flyer, climber-and-flyer, no-builder,
  * and no-flyer-at-all all come out exactly as their names say they should.
+ *
+ * And the pond itself sits apart from everything before it — a second gap,
+ * right at the end, with the pond on the far side of it rather than just
+ * more of the same ground. Bridged the same way the first one is, with the
+ * same Builder, so the level's one new idea is not a new skill, just the
+ * same one asked for twice: the last thing standing between a duckling and
+ * the water is not the goose, it is one more span of open air. The goose's
+ * beat ends right at that gap's edge rather than reaching over it — a
+ * hazard that guarded a rock its patrol could not stand on would be
+ * guarding something it can never actually threaten.
  */
 export const LEVEL_3 = {
   id: 'orchard',
@@ -310,16 +329,21 @@ export const LEVEL_3 = {
                 room to spare, but Climber answers it just as well
      [130, 165) flat ground the far side of the wall — long enough that a
                 dig started at column 85 always runs out inside it
-     [165, 300) a real drop, 25 columns past where any wall-tunnel could
+     [165, 290) a real drop, 25 columns past where any wall-tunnel could
                 possibly still be cutting, and the goose's beat after it
-     [300, 320) the pond */
+     [290, 300) the second gap — 10 columns of open air with nothing below,
+                same as the first, wants a second Builder
+     [300, 320) the floating rock the pond sits on, its own island the far
+                side of that gap */
   segments: [
     { from: 0, to: 35, y: 150 },
     { from: 35, to: 55, y: PIT_Y },
     { from: 55, to: 85, y: 150 },
     { from: 85, to: 130, y: 100 },
     { from: 130, to: 165, y: 150 },
-    { from: 165, to: 320, y: 175 },
+    { from: 165, to: 290, y: 175 },
+    { from: 290, to: 300, y: PIT_Y },
+    { from: 300, to: 320, y: 175 },
   ],
 
   nestX: 6,
@@ -337,46 +361,30 @@ export const LEVEL_3 = {
   /* Climber and Digger both fully supplied — a real choice for the wall,
      not a rationed one. Flyer generous too: it is needed regardless of
      that choice (see the note above), so there is no reason to make it
-     scarce on top of being mandatory. Builder: one spare over its one
-     required bridge. Blocker: present, same as everywhere else, with
-     nothing on this level that calls for it. */
-  supply: { digger: 3, builder: 2, blocker: 2, climber: 11, flyer: 11 },
+     scarce on top of being mandatory. Builder: two required bridges now,
+     not one, so the spare moves with it — one over two, same margin as
+     everywhere else, not the same raw number. Blocker: present, same as
+     everywhere else, with nothing on this level that calls for it. */
+  supply: { digger: 3, builder: 3, blocker: 2, climber: 11, flyer: 11 },
 
-  goose: { x0: 260, x1: 299, y: 175, speed: 1.5, catchRadius: 1.5 },
+  goose: { x0: 250, x1: 289, y: 175, speed: 1.5, catchRadius: 1.5 },
 };
 
 /* "The Grove": nest and pond both sit somewhere new — the first level not
- * built around the same 6-to-300 walk every other one shares — and the
- * goose is not the same goose. `goose.relentless` (see sim.js's stepWalking
- * and stepGoose) turns off the one-catch-and-it-flees rule every other
- * level relies on: here, every sweep is live, and it will take every
- * duckling that ever lines up with it, not just the first. A Blocker still
- * turns it back exactly the way it always could — see content.js's
- * SKILL_INFO — but on a level where the hunt itself never calls off on its
- * own, that is the only thing that ever does.
+ * built around the same 6-to-300 walk every other one shares. Otherwise the
+ * same vocabulary as The Warren: a gap wants a bridge, a wall wants a
+ * tunnel, and both are solved-once obstacles the whole flock walks through
+ * behind whichever duckling answers them first.
  *
- * That makes Blocker the one skill nothing else here substitutes for. The
- * gap gets a bridge and the wall gets a tunnel, same vocabulary as The
- * Warren, and both are solved-once obstacles like everywhere else — but
- * left alone, the goose does not miss. Run the flock through with every
- * other skill in hand and nothing to plant against it, and it takes every
- * duckling that ever reaches it: confirmed by actually running it, not just
- * reasoning about it (see test/duck-duck-quack.test.js) — the whole flock,
- * not just one.
- *
- * Planting a Blocker calls the hunt off entirely, the same fed-and-fleeing
- * exit every level's goose already has, just reached a different way. It
- * does not have to land in the goose's face to work: a duckling planted
- * anywhere in its beat is a wall it cannot cross, so watching where the
- * goose currently is and planting into its path — rather than the instant a
- * duckling first reaches the beat — is what actually closes the hunt before
- * anyone else reaches it. There is real room in that timing: nothing about
- * it has to land on a single tick.
- *
- * The one duckling that plants itself never reaches the pond either, which
- * is why the hatch here runs one over the quota rather than level with it —
- * everywhere else, that margin is slack; here, it is the seat the Blocker
- * sits in.
+ * Blocker is present, same as everywhere else, and genuinely does two
+ * things now rather than one (see content.js's SKILL_INFO) — but that is
+ * exactly why it is worth being careful with here rather than reached for:
+ * this level is one straight road from nest to pond with nothing beside it,
+ * so a duckling planted anywhere on it, to hold the goose off, is a wall
+ * for the rest of the flock too. Turning the goose back is real, but the
+ * honest use of it on a level shaped like this one is the same as The
+ * Warren's — a duckling can be planted, without anything here actually
+ * asking for it.
  */
 export const LEVEL_4 = {
   id: 'grove',
@@ -389,8 +397,8 @@ export const LEVEL_4 = {
      [78, 130)  flat ground up to the wall
      [130, 175) the wall — 45 columns, tunnelled the same way The Warren's
                 are; there is no Climber supply on this level either
-     [175, 320) flat ground the rest of the way, the goose's whole beat
-                somewhere inside it, and the pond at the end of it */
+     [175, 320) flat ground the rest of the way, the goose's beat somewhere
+                inside it, and the pond at the end of it */
   segments: [
     { from: 0, to: 50, y: 150 },
     { from: 50, to: 78, y: PIT_Y },
@@ -399,30 +407,24 @@ export const LEVEL_4 = {
     { from: 175, to: 320, y: 150 },
   ],
 
-  /* Neither number reused from The Park, The Warren or The Orchard — see
-     the note above. */
+  /* Neither number reused from The Park, The Warren or The Orchard. */
   nestX: 16,
   goalX: 288,
 
-  /* One over the quota, not the usual two or three — see the note above on
-     why the margin here is spoken for rather than spare. */
-  duckCount: 11,
+  /* Twelve hatch, nine needed — the same margin The Warren carries for the
+     same shape of level. */
+  duckCount: 12,
   spawnInterval: TICK_RATE * 2,
   timeLimit: TICK_RATE * 240,       // four minutes
-  winRatio: 10 / 11,
+  winRatio: 0.75,
 
-  /* Digger and Builder: one spare apiece over their one required use,
-     same margin as everywhere else. Climber and Flyer: zero — the wall is
-     tunnelled, not climbed, and nothing here falls. Blocker: exactly one.
-     Not two — a second one planted after the first has already called the
-     hunt off would only plant a second duckling for nothing, and this
-     level's quota has no spare seat for that mistake to sit in. */
-  supply: { digger: 3, builder: 2, blocker: 1, climber: 0, flyer: 0 },
+  /* Digger and Builder: one spare apiece over their one required use, same
+     margin as everywhere else. Climber and Flyer: zero — the wall is
+     tunnelled, not climbed, and nothing here falls. Blocker: present,
+     without a winning use, same as The Warren. */
+  supply: { digger: 3, builder: 2, blocker: 2, climber: 0, flyer: 0 },
 
-  /* Set inside the flat run past the wall — see the segments above. Same
-     speed and catchRadius as every other level's goose; `relentless` is the
-     one thing that is not. */
-  goose: { x0: 200, x1: 239, y: 150, speed: 1.5, catchRadius: 1.5, relentless: true },
+  goose: { x0: 200, x1: 239, y: 150, speed: 1.5, catchRadius: 1.5 },
 };
 
 export const LEVELS = [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4];

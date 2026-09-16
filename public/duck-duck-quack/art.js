@@ -344,32 +344,32 @@ const BRIDGE_DECK_H = 2;
 const BRIDGE_POST_GAP = 8;
 const BRIDGE_POST_H = 5;
 
-/* A deck laid over open air, one run per bridged span — see sim.js's
- * stepBuilding and content.js's header note. `terrain` under a bridged
- * column is still PIT_Y (see buildTerrain), so drawGround has already
- * painted nothing at all there; this is what turns that absence into a
- * crossing instead of leaving it looking like an unfinished level.
+/* A deck laid over open air, drawn one column at a time rather than one flat
+ * run — see sim.js's stepBuilding, which angles the deck up toward a crest
+ * over the middle of the gap and back down to meet the far bank, so each
+ * column's own height is its own point on that arch rather than a shared
+ * flat plank. `terrain` under a bridged column is still PIT_Y (see
+ * buildTerrain), so drawGround has already painted nothing at all there;
+ * this is what turns that absence into a crossing instead of leaving it
+ * looking like an unfinished level.
  */
 function drawBridges(ctx, state){
   const { bridgeY } = state;
-  let runStart = -1;
-  const flushPosts = (from, to, y) => {
-    for(let x = from; x <= to; x += BRIDGE_POST_GAP){
+  for(let x = 0; x < bridgeY.length; x++){
+    const y = bridgeY[x];
+    if(y == null) continue;
+    ctx.fillStyle = hex('N');
+    ctx.fillRect(x, y, 1, BRIDGE_DECK_H);
+    ctx.fillStyle = hex('k');
+    ctx.fillRect(x, y, 1, 1);
+    // A post every few columns rather than one per column — the same
+    // "suggest it, do not render every plank" economy the grass tufts and
+    // rock speckle use elsewhere in this file — hung from this column's own
+    // height, which is what keeps the posts themselves tracing the arch
+    // rather than fanning out from underneath a flat deck.
+    if(x % BRIDGE_POST_GAP === 0){
       ctx.fillStyle = hex('n');
       ctx.fillRect(x, y + BRIDGE_DECK_H, 1, BRIDGE_POST_H);
-    }
-  };
-  for(let x = 0; x <= bridgeY.length; x++){
-    const y = x < bridgeY.length ? bridgeY[x] : null;
-    if(y != null && runStart < 0) runStart = x;
-    if(y == null && runStart >= 0){
-      const deckY = bridgeY[runStart];
-      ctx.fillStyle = hex('N');
-      ctx.fillRect(runStart, deckY, x - runStart, BRIDGE_DECK_H);
-      ctx.fillStyle = hex('k');
-      ctx.fillRect(runStart, deckY, x - runStart, 1);
-      flushPosts(runStart, x - 1, deckY);
-      runStart = -1;
     }
   }
 }

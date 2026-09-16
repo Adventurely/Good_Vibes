@@ -483,11 +483,19 @@ export function createAudio(){
    * backing track instead of landing as a payoff.
    */
   const SFX = {
+    // "Quack quack" — one call on its own reads as a blip; a duck actually
+    // says it twice, the second call close on the heel of the first rather
+    // than evenly spaced, and a little quieter and shorter — an echo of the
+    // first, not a repeat of it.
     quack(t){
       // A short puff of breath on the attack, under the note rather than
       // in front of it — this is the air, not the voice.
       hit(t, 0.03, 0.05, 1400, 'bandpass');
-      quackSyllable(t, 0.22, 0.6);
+      quackSyllable(t, 0.18, 0.6);
+
+      const t2 = t + 0.19;
+      hit(t2, 0.025, 0.04, 1400, 'bandpass');
+      quackSyllable(t2, 0.15, 0.48);
     },
 
     /* The duckling that didn't — two sounds, not one, matching the poof it

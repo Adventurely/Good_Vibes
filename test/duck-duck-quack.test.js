@@ -281,7 +281,7 @@ test('a flyer over a gap still drifts past the bottom of the world — there is 
 
 /* -------------------------------------------------------------- building */
 
-test('a builder bridges a gap and the bridge is still there for later use', () => {
+test('a builder bridges a gap with a deck that arches up and back down, and it is still there for later use', () => {
   const level = miniLevel({
     segments: [
       { from: 0, to: 10, y: 50 },
@@ -301,10 +301,13 @@ test('a builder bridges a gap and the bridge is still there for later use', () =
   assert.equal(duck.state, 'saved');
   // The pit itself is untouched — see content.js's header note — it is
   // `bridgeY` that carries the deck, so the gap is still open beneath it.
-  for(let x = 10; x < 20; x++){
-    assert.equal(state.terrain[x], 500, `column ${x}'s terrain should still be open pit`);
-    assert.equal(state.bridgeY[x], 50, `column ${x} was not bridged`);
-  }
+  for(let x = 10; x < 20; x++) assert.equal(state.terrain[x], 500, `column ${x}'s terrain should still be open pit`);
+  // The deck itself: a crest in the middle, meeting the near and far banks
+  // (both at 50) at the two ends — see sim.js's stepBuilding for the shape.
+  assert.deepEqual(
+    [...state.bridgeY.slice(10, 20)],
+    [47, 44, 42, 40, 40, 40, 42, 44, 47, 50],
+  );
 });
 
 test('a builder given the skill right at the nest still bridges the gap later', () => {
@@ -341,9 +344,9 @@ test('a builder given to a duckling that meets a real drop first just falls, rat
 
 /* --------------------------------------------------------------- blocking */
 
-test('a blocker plants itself for good, and other ducklings walk straight past it', () => {
+test('a blocker plants itself for good and turns other ducklings back', () => {
   const level = miniLevel({
-    duckCount: 2, spawnInterval: 5, goalX: 20, timeLimit: 300,
+    duckCount: 2, spawnInterval: 5, timeLimit: 300,
     supply: { digger: 0, builder: 0, blocker: 1, climber: 0 },
   });
   const state = run(newGame(level), 1);
@@ -351,15 +354,12 @@ test('a blocker plants itself for good, and other ducklings walk straight past i
   run(state, 4); // give it a few steps before it plants
   assert.equal(assignSkill(state, first.id, 'blocker'), first);
   const plantedAt = first.x;
-  run(state, 40);
+  run(state, 20); // second duckling has hatched and should have reached it by now
   assert.equal(first.state, 'blocking');
   assert.equal(first.x, plantedAt, 'a blocker must not move once planted');
   const second = state.ducks[1];
   assert.ok(second, 'the second duckling should have hatched');
-  // A planted blocker is no longer a wall to its own flock — see sim.js's
-  // header note on stepWalking — so the second duckling walks straight past
-  // it and on to the goal rather than bouncing off it forever.
-  assert.equal(second.state, 'saved');
+  assert.ok(second.x <= plantedAt, 'the second duckling should never pass the blocker');
 });
 
 /* ------------------------------------------------------------------ goose */
@@ -423,12 +423,13 @@ test('a relentless goose keeps hunting after a catch, unless a blocker calls it 
 });
 
 test('blocking a relentless goose calls the hunt off for good, same as a catch would', () => {
-  // Slow spawning on purpose: the point here is the goose staying dealt
-  // with once blocked, for ducklings that have not even hatched yet when
-  // the block goes up — not a race against the flock's own timing, which
-  // is what LEVEL_4's own tests exercise instead.
+  // A single duckling: the point here is the goose itself giving up once
+  // blocked (state.goose.fed), not what happens to the rest of the flock —
+  // a planted Blocker is a wall for its own flock too (see the test above),
+  // so a duckling planted anywhere on the one road out of the nest calls
+  // off the hunt for whoever has not reached it yet right along with it.
   const level = miniLevel({
-    duckCount: 3, spawnInterval: 60, nestX: 1, goalX: 40, timeLimit: 300,
+    duckCount: 1, nestX: 1, goalX: 40, timeLimit: 300,
     supply: { digger: 0, builder: 0, blocker: 1, climber: 0 },
     goose: { x0: 10, x1: 30, y: 50, speed: 1, catchRadius: 1, relentless: true },
   });
@@ -436,11 +437,10 @@ test('blocking a relentless goose calls the hunt off for good, same as a catch w
   const first = state.ducks[0];
   tickUntilAt(state, first, 15); // partway into the beat, well before it is caught
   assert.equal(assignSkill(state, first.id, 'blocker'), first);
-  run(state, 300);
-  const goosed = state.ducks.filter(d => d.cause === 'goosed');
-  assert.equal(goosed.length, 0, 'the blocker should call the hunt off before it ever catches anyone');
-  const others = state.ducks.filter(d => d !== first);
-  assert.ok(others.every(d => d.state === 'saved'), 'everyone but the blocker itself should get through');
+  assert.equal(state.goose.fed, false, 'the goose has not reached the block yet');
+  run(state, 40); // enough for the goose to swing back around to column 15
+  assert.equal(state.goose.fed, true, 'turning the goose back calls the hunt off, same as a catch would');
+  assert.equal(first.cause, null, 'the blocker itself was never caught');
 });
 
 /* --------------------------------------------------------------- assigning */
@@ -557,11 +557,12 @@ test('The Warren cannot be won without a Digger — neither wall has any other w
  */
 function playLevel3Climbing(){
   const state = newGame(LEVEL_3);
-  let builderUsed = false;
+  let builder1Used = false, builder2Used = false;
   for(let i = 0; i < LEVEL_3.timeLimit && !state.ended; i++){
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
-      if(!builderUsed && d.x === 34 && assignSkill(state, d.id, 'builder')){ builderUsed = true; continue; }
+      if(!builder1Used && d.x === 34 && assignSkill(state, d.id, 'builder')){ builder1Used = true; continue; }
+      if(!builder2Used && d.x === 289 && assignSkill(state, d.id, 'builder')){ builder2Used = true; continue; }
       if(!hasTrait(d, 'flyer') && d.x < 10) assignSkill(state, d.id, 'flyer');
       if(!hasTrait(d, 'climber') && d.x >= 75 && d.x < 85) assignSkill(state, d.id, 'climber');
     }
@@ -581,12 +582,13 @@ test('The Orchard can be won by climbing the wall instead of digging it', () => 
  * tunnel it for the whole flock, needing no Climber at all. */
 function playLevel3Digging(){
   const state = newGame(LEVEL_3);
-  let builderUsed = false, diggerUsed = false;
+  let builder1Used = false, builder2Used = false, diggerUsed = false;
   for(let i = 0; i < LEVEL_3.timeLimit && !state.ended; i++){
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
-      if(!builderUsed && d.x === 34 && assignSkill(state, d.id, 'builder')){ builderUsed = true; continue; }
+      if(!builder1Used && d.x === 34 && assignSkill(state, d.id, 'builder')){ builder1Used = true; continue; }
       if(!diggerUsed && d.x === 84 && assignSkill(state, d.id, 'digger')){ diggerUsed = true; continue; }
+      if(!builder2Used && d.x === 289 && assignSkill(state, d.id, 'builder')){ builder2Used = true; continue; }
       if(!hasTrait(d, 'flyer') && d.x < 10) assignSkill(state, d.id, 'flyer');
     }
     tick(state);
@@ -630,45 +632,14 @@ test('The Orchard cannot be won without a Flyer, whichever way the wall was cros
   assert.equal(state.saved, 0, 'nothing should survive the drop without a Flyer');
 });
 
-/* -------------------------------------------------------------- The Grove, played */
+/* ---------------------------------------------------------------- The Grove, played */
 
-/* A bot for The Grove: dig the wall, bridge the gap, same as The Warren's —
- * and, once a duckling is inside the goose's own beat, plant it as a
- * Blocker the moment the goose is close enough that the block will actually
- * land on its next pass, rather than the instant the duckling enters (see
- * content.js's design note on why "the instant it enters" is not the same
- * thing). This is the one skill the rest of the file never exercises this
- * way — everywhere else a bot answers a fixed column, but the goose is
- * moving, so the bot has to watch where it actually is.
+/* A greedy bot for The Grove, the same shape as The Warren's: bridge the
+ * one gap, dig through the one wall. Neither Climber nor Blocker gets a
+ * branch here — the level supplies no Climber at all, and nothing about a
+ * single straight road calls for a Blocker (see content.js).
  */
 function playLevel4(){
-  const state = newGame(LEVEL_4);
-  let builderUsed = false, diggerUsed = false, blockerUsed = false;
-  const g = LEVEL_4.goose;
-  for(let i = 0; i < LEVEL_4.timeLimit && !state.ended; i++){
-    for(const d of state.ducks){
-      if(d.state !== 'walking') continue;
-      if(!builderUsed && d.x === 49 && assignSkill(state, d.id, 'builder')){ builderUsed = true; continue; }
-      if(!diggerUsed && d.x === 129 && assignSkill(state, d.id, 'digger')){ diggerUsed = true; continue; }
-      if(!blockerUsed && d.x >= g.x0 && d.x <= g.x1 && Math.abs(d.x - state.goose.x) <= 6){
-        if(assignSkill(state, d.id, 'blocker')) blockerUsed = true;
-      }
-    }
-    tick(state);
-  }
-  return state;
-}
-
-test('The Grove can be won by digging, bridging, and blocking the goose in time', () => {
-  const state = playLevel4();
-  assert.equal(state.ended, 'won');
-  assert.ok(state.saved >= winCount(LEVEL_4), `only ${state.saved} saved, needed ${winCount(LEVEL_4)}`);
-});
-
-test('The Grove cannot be won without a Blocker — the goose there never calls off its own hunt', () => {
-  // Same bot as above, minus the blocker branch: dig and bridge every
-  // hazard perfectly, and the goose still takes the flock, because
-  // goose.relentless (see content.js) means only a Blocker ends the hunt.
   const state = newGame(LEVEL_4);
   let builderUsed = false, diggerUsed = false;
   for(let i = 0; i < LEVEL_4.timeLimit && !state.ended; i++){
@@ -679,7 +650,26 @@ test('The Grove cannot be won without a Blocker — the goose there never calls 
     }
     tick(state);
   }
-  assert.ok(state.saved < winCount(LEVEL_4), `${state.saved} saved without a Blocker — the goose should have stopped that`);
+  return state;
+}
+
+test('The Grove can be won by a simple bot', () => {
+  const state = playLevel4();
+  assert.equal(state.ended, 'won');
+  assert.ok(state.saved >= winCount(LEVEL_4), `only ${state.saved} saved, needed ${winCount(LEVEL_4)}`);
+});
+
+test('The Grove cannot be won without a Digger — the wall has no other way through', () => {
+  const state = newGame(LEVEL_4);
+  let builderUsed = false;
+  for(let i = 0; i < LEVEL_4.timeLimit && !state.ended; i++){
+    for(const d of state.ducks){
+      if(d.state !== 'walking') continue;
+      if(!builderUsed && d.x === 49 && assignSkill(state, d.id, 'builder')){ builderUsed = true; continue; }
+    }
+    tick(state);
+  }
+  assert.equal(state.saved, 0, 'nothing should get past the wall without a Digger');
   assert.notEqual(state.ended, 'won');
 });
 
