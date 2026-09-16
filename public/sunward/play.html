@@ -906,12 +906,19 @@
         refreshShop();
       }
 
+      /* The shop's own words, and they have to read off the save rather than
+         off the module's constants: Quick hands moves where the speed bonus
+         stops counting and Often enough moves which tap is the windfall, and a
+         row still saying "up to 8 a second" or "every 10th tap" after one of
+         those is bought is the game contradicting itself on the same screen. */
       function describe(up){
         const e = up.effect;
+        const bonus = bonuses(state);
         if(e.clickMult) return `A tap is worth ${e.clickMult}&times; as much.`;
         if(e.streak) return `A tap is worth ${Math.round(e.streak * 100)}% more for every tap a second`
-          + ` you are making, up to ${STREAK_CAP} a second — ${1 + e.streak * STREAK_CAP}&times; flat out.`;
-        if(e.windfall) return `Every ${WINDFALL_EVERY}th tap pays ${e.windfall}&times; over.`;
+          + ` you are making, up to ${bonus.streakCap} a second`
+          + ` — ${(1 + e.streak * bonus.streakCap).toFixed(2).replace(/\.?0+$/, '')}&times; flat out.`;
+        if(e.windfall) return `Every ${ordinal(bonus.windfallEvery)} tap pays ${e.windfall}&times; over.`;
         if(e.allMult) return `Everything makes ${Math.round((e.allMult - 1) * 100)}% more.`;
         if(e.fingers) return `A tap also pays ${(e.fingers * 100).toFixed(0)}% of your energy per second.`;
         if(e.steady) return `The off hours stop costing anything: nothing marked day or night ever makes`
@@ -933,7 +940,14 @@
           // Through averageFactor, so a row moves when the trough is lifted:
           // without it, Night bloom bought and every row unchanged read as an
           // upgrade that did nothing.
-          const each = g.rate * bonus.grower[g.id] * bonus.allMult * bonus.seedMult
+          /* Including the depth bonus, which `rateOf` and `steadyRate` both
+             apply: without it a lot with Deep beds bought reads every row as
+             making less than it does, and the row for the kind you have most
+             of reads furthest wrong. Counted at what is standing now, so the
+             "+x/s" underneath is what the next `count` would add at today's
+             depth rather than tomorrow's. */
+          const depth = bonus.deepBeds > 0 ? 1 + bonus.deepBeds * Math.floor(owned / 10) : 1;
+          const each = g.rate * bonus.grower[g.id] * bonus.allMult * bonus.seedMult * depth
             * averageFactor(g.phase, bonus.lift, bonus.swing, bonus.alwaysOn);
           // The figures when there are figures, and the description under
           // them either way.
@@ -1658,7 +1672,11 @@
       /* What the growers made while the tab was shut. Announced rather than
          silently added: a number that goes up by a million between one look and
          the next, with no explanation, reads as a bug. */
-      if(boot.away > 60 && steadyRate(state) > 0){
+      /* Not gated on the growers alone any more. Still hands pays for the
+         tapping while the tab is shut, and a season that has just started has
+         no growers on it at all — the one moment that rung is worth most is
+         the one the old guard skipped. */
+      if(boot.away > 60 && (steadyRate(state) > 0 || bonuses(state).offlineTaps)){
         const gain = catchUp(state, boot.away);
         if(gain.light > 0){
           /* Read off the save rather than off the module constants. Still air

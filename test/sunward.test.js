@@ -30,7 +30,7 @@ import {
   prestigeRefusal, prestige, winters, winterMedal, seedsEarned, seedMedal,
   PRESTIGE, PRESTIGE_BY_ID, prestigeOffered, rootRefusal, root, growerCount, markGrown,
   upgradeCost, CRATE, halfNeed, volunteerFor,
-  RING_FROM, RING_MULT, RING_STEP, ringMult, ringFor, prestigeAt, prestigeUpTo, prestigeById, prestigeCost,
+  RING_FROM, RING_LAST, RING_MULT, RING_STEP, ringMult, ringFor, prestigeAt, prestigeUpTo, prestigeById, prestigeCost,
   OFFLINE_RATE, OFFLINE_CAP, offlineGain, catchUp,
   toSave, fromSave, formatLight, formatTime, formatStat, breakdown,
 } from '../public/sunward/content.js';
@@ -340,10 +340,20 @@ test('there is a medal for every one of the first ten seeds, and the ladder stop
   assert.deepEqual(counts, [...counts].sort((a, b) => a - b), 'the ladder must be in order');
   assert.equal(new Set(counts).size, counts.length, 'no two medals for the same seed');
   /* The simulation reaches six seeds in a day, thirteen in a week and fifteen
-     in a month, so the top rung has to be a long way past that and still
-     inside the world: a rung nobody can ever stand on is a joke, not a goal. */
-  const top = counts[counts.length - 1];
-  assert.ok(top >= 20 && top <= 40, `the ladder tops out at ${top}, which is not a stretch a player could make`);
+     in a month, so the rung the ladder is BUILT around has to be a long way
+     past that and still inside the world: one nobody can ever stand on is a
+     joke, not a goal. That rung is the one carrying the marvel line, and it is
+     the fortieth, which is also where the written upgrades stop.
+
+     The two above it are not goals at all. They are ids from the deployed
+     table — fifty and a hundred winters — kept because `fromSave` drops a
+     medal whose id it does not know, and deleting the row would delete the
+     record off somebody's real save. */
+  const crown = ACHIEVEMENT_BY_ID['hundred-seeds'];
+  assert.equal(crown.need.seeds, 40, 'the marvel line sits where the written ladder ends');
+  for(const id of ['fifty-winters', 'hundred-winters', 'thirty-winters', 'twenty-winters', 'fifteen-winters']){
+    assert.ok(ACHIEVEMENT_BY_ID[id], `medal id "${id}" is in deployed saves and cannot be dropped`);
+  }
   for(const a of ladder){
     assert.ok(Object.keys(a.need).length === 1, `seed medal "${a.id}" should be won by the seed alone`);
   }
@@ -1165,9 +1175,10 @@ test('the ladder reaches forty, in order, with the ids it has always had', () =>
   const rungs = ACHIEVEMENTS.filter(a => a.need.seeds !== undefined);
   const needs = rungs.map(a => a.need.seeds);
   assert.deepEqual(needs, [...needs].sort((a, b) => a - b), 'the seed medals must read as a ladder');
-  assert.deepEqual(needs, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20, 25, 30, 40]);
+  assert.deepEqual(needs, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20, 25, 30, 40, 50, 100]);
   assert.equal(new Set(needs).size, needs.length, 'two medals for one seed count');
-  for(const id of ['first-seed', 'five-seeds', 'twelve-seeds', 'hundred-seeds']){
+  for(const id of ['first-seed', 'five-seeds', 'twelve-seeds', 'hundred-seeds',
+    'thirty-winters', 'fifty-winters', 'hundred-winters']){
     assert.ok(ACHIEVEMENT_BY_ID[id], `medal id "${id}" is in saves and cannot be renamed`);
   }
 });
@@ -1956,4 +1967,50 @@ test('the max button is exact and finishes, at every price curve and every purse
     }
   }
   assert.ok(checked > 10000, 'the sweep has to actually sweep');
+});
+
+test('a night away is not worth ten times a different night for the sake of one tap', () => {
+  /* offlineGain paid the whole absence through tapPays, which asks whether the
+     NEXT tap is the windfall. So the same night away was worth ten times as
+     much or a tenth as much depending on where the run's tap counter happened
+     to be sitting when the lid came down. */
+  // The seconds move with the taps so the HAND is the same two a second in
+  // every one of these; the only thing that differs is where in the run of ten
+  // the counter is sitting.
+  const build = (taps, windfall = true) => {
+    const s = newGame();
+    s.rooted['still-hands'] = true;
+    if(windfall) s.bought['windfall'] = true;    // every tenth tap pays 10x
+    s.owned.moss = 10;
+    s.run.taps = taps; s.run.seconds = taps / 2;
+    return s;
+  };
+  const values = [];
+  for(let t = 1000; t < 1020; t++) values.push(offlineGain(build(t), 3600).light);
+  const lo = Math.min(...values), hi = Math.max(...values);
+  assert.ok(Math.abs(hi - lo) < 1e-6, `the same night away ranged from ${lo} to ${hi}`);
+
+  // And the windfall is still worth something over a long absence.
+  assert.ok(offlineGain(build(1000), 3600).light > offlineGain(build(1000, false), 3600).light,
+    'a bought Windfall has to raise what an absence pays');
+});
+
+test('a forged save cannot hand the tick an Infinity to walk towards', () => {
+  // `ring-999999999` used to be a row with an allMult of Infinity. One tick
+  // later the lifetime total was Infinity, and seedsFrom walked towards it for
+  // ever with the tab frozen.
+  assert.equal(ringFor(RING_LAST), ringFor(RING_LAST), 'the last ring is a ring');
+  assert.ok(ringFor(RING_LAST).effect.allMult > 0 && Number.isFinite(ringFor(RING_LAST).effect.allMult));
+  assert.equal(ringFor(RING_LAST + 1), null, 'and there is nothing past it');
+  assert.equal(prestigeById('ring-999999999'), null);
+  assert.equal(prestigeById('ring-' + (RING_LAST + 1)), null);
+
+  const forged = toSave(newGame());
+  forged.rooted['ring-999999999'] = true;
+  const state = fromSave(forged);
+  assert.equal(state.rooted['ring-999999999'], undefined, 'it must not load at all');
+  assert.ok(Number.isFinite(bonuses(state).allMult));
+
+  // And the counter refuses a lifetime total that is not a number either way.
+  for(const junk of [Infinity, -Infinity, NaN, undefined, null, 'lots']) assert.equal(seedsFrom(junk), 0);
 });

@@ -484,6 +484,12 @@ export const PRESTIGE_BY_ID = Object.fromEntries(PRESTIGE.map(u => [u.id, u]));
  * was worth: everything twice over.
  */
 export const RING_FROM = PRESTIGE.length + 1;
+/* Where the rings stop being rows at all. A save is a text file a person can
+   edit, and `ring-999999999` used to make an allMult of Infinity, which the
+   next tick turned into a lifetime total of Infinity, which `seedsFrom` walks
+   towards for ever. Ten thousand seasons is past any play and inside every
+   float. */
+export const RING_LAST = RING_FROM + 10000;
 export const RING_MULT = 2;
 /* And each ring a little more than the one below it. A tail of identical rows
    is a tail that stops mattering: the seed above always costs four times the
@@ -511,7 +517,7 @@ export const prestigeCost = n => {
    work nobody asked for. */
 const RINGS = new Map();
 export function ringFor(n){
-  if(!Number.isInteger(n) || n < RING_FROM) return null;
+  if(!Number.isInteger(n) || n < RING_FROM || n > RING_LAST) return null;
   if(!RINGS.has(n)){
     const mult = ringMult(n);
     // Two figures, and no trailing zeroes on a round one: "twice as much" and
@@ -807,10 +813,20 @@ export const ACHIEVEMENTS = [
     blurb: 'Twenty seasons stood through.' },
   { id: 'twenty-five-seeds', name: 'Twenty-five seeds', need: { seeds: 25 },
     blurb: 'Twenty-five seasons stood through.' },
-  { id: 'thirty-seeds', name: 'Thirty seeds', need: { seeds: 30 },
+  { id: 'thirty-winters', name: 'Thirty seeds', need: { seeds: 30 },
     blurb: 'Thirty seasons stood through.' },
   { id: 'hundred-seeds', name: 'Seed bank', need: { seeds: 40 },
     blurb: 'A tree older than most humans. It\'s truly a marvel.' },
+  /* These two have nothing to say that the rungs below have not said already.
+     They are here because they are in the deployed table and somebody may hold
+     them, and `fromSave` drops a medal whose id it does not know: delete the
+     row and you delete the record of it off a real save. The counts are the
+     ones they were won at, read as seasons rather than as winters, which is
+     the same number. */
+  { id: 'fifty-winters', name: 'Fifty seeds', need: { seeds: 50 },
+    blurb: 'Fifty seasons stood through.' },
+  { id: 'hundred-winters', name: 'A hundred seeds', need: { seeds: 100 },
+    blurb: 'A hundred seasons stood through.' },
   { id: 'an-hour', name: 'An afternoon', need: { seconds: 3600 },
     blurb: 'An hour of tending, all told.' },
   { id: 'a-full-day', name: 'Round the clock', need: { days: 12 },
@@ -1407,7 +1423,7 @@ export const SEED_RATIO = 4;
 export const seedAt = n => n < 1 ? 0 : SEED_SCALE * Math.pow(SEED_RATIO, n - 1);
 
 export const seedsFrom = lifetime => {
-  if(!(lifetime >= SEED_SCALE)) return 0;
+  if(!Number.isFinite(lifetime) || !(lifetime >= SEED_SCALE)) return 0;
   // Counted with a logarithm rather than a loop, and then walked back onto the
   // exact threshold: at 4^25 a float has drifted far enough that the log alone
   // can say a seed is earned a hair before seedAt() agrees, and the bar on the
@@ -1548,7 +1564,18 @@ export function offlineGain(state, seconds){
      in it yet. */
   if(bonus.offlineTaps && state.run.seconds > 0){
     const hand = Math.min(bonus.streakCap, state.run.taps / state.run.seconds);
-    if(hand > 0) light += tapPays(state, hand, bonus) * hand * away;
+    if(hand > 0){
+      /* The ordinary value of a tap, plus the windfall's share of a long run of
+         them. Going through `tapPays` paid the whole absence at the windfall
+         rate, or at none of it, depending on where the run's tap counter
+         happened to be sitting when the lid came down — the same night away
+         worth ten times as much for having stopped one tap earlier. */
+      const each = tapValue(state, bonus) * momentum(hand, bonus);
+      const every = bonus.windfallEvery || WINDFALL_EVERY;
+      const share = bonus.windfall > 1 ? (bonus.windfall - 1) / every : 0;
+      const extra = bonus.windfallAll ? totalRate(state, bonus) / every : 0;
+      light += (each * (1 + share) + extra) * hand * away;
+    }
   }
   return { seconds: away, capped: seconds > cap, light };
 }
@@ -1568,7 +1595,12 @@ export function catchUp(state, seconds){
         const g = GROWER_BY_ID[id];
         const owned = state.owned[id] || 0;
         if(!owned) continue;
-        const mine = owned * g.rate * bonus.grower[id] * bonus.allMult * bonus.seedMult;
+        /* The same shape as `steadyRate`, which is what `share` below is: a
+           split that leaves out the depth bonus or the day's average hands one
+           kind another kind's earnings in the breakdown table. */
+        const depth = bonus.deepBeds > 0 ? 1 + bonus.deepBeds * Math.floor(owned / 10) : 1;
+        const mine = owned * g.rate * bonus.grower[id] * bonus.allMult * bonus.seedMult * depth
+          * averageFactor(g.phase, bonus.lift, bonus.swing, bonus.alwaysOn);
         state.earnedBy[id] += gain.light * (mine / share);
       }
     }
