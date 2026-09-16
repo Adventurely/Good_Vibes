@@ -686,6 +686,50 @@ export function createAudio(){
       // rather than for the feathers.
       voice(150, t, 0.12, 'sine', 0.14, 62, 300);
     },
+
+    /* The goose actually catching one — its own sound, not the generic
+     * `lost` above, because losing one to a wall or a gap is a mistake and
+     * this is a hunt landing. A honk first, harsher and lower than
+     * anything `quackSyllable` makes (a plain sawtooth through one narrow
+     * band, none of the quack's three-formant throat), then the caught
+     * duckling's own startled cry close behind it rather than under it —
+     * two distinct voices, the same reason the hunt and the catch are two
+     * different things in sim.js. At most once a run (see sim.js's
+     * `goose.fed`), so this can afford to be the loudest thing here.
+     */
+    goosed(t){
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(220, t);
+      o.frequency.exponentialRampToValueAtTime(130, t + 0.17);
+      const band = ctx.createBiquadFilter();
+      band.type = 'bandpass';
+      band.frequency.setValueAtTime(480, t);
+      band.frequency.exponentialRampToValueAtTime(300, t + 0.17);
+      band.Q.value = 2.4;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.24, t + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.19);
+      o.connect(band).connect(g).connect(bus);
+      o.start(t); o.stop(t + 0.2);
+
+      // The catch, hard on the honk's heel — short and sharp rather than
+      // the two full, rounded syllables a safe arrival gets.
+      quackSyllable(t + 0.1, 0.09, 0.55);
+    },
+
+    /* A new duckling, right as it steps out of the nest — quick and light,
+     * because this is the one sound here that can fire thirty times in a
+     * single run (see content.js's duckCount) and still has to sit under
+     * everything else, not on top of it. A crack for the shell first, then
+     * one short peep gliding up rather than down — an entrance, the
+     * opposite shape from `lost`'s falling puff.
+     */
+    hatch(t){
+      hit(t, 0.02, 0.05, 3200, 'bandpass');
+      voice(950, t + 0.008, 0.08, 'triangle', 0.045, 1500, 5000);
+    },
   };
 
   function sfx(name){

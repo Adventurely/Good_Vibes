@@ -481,11 +481,24 @@
   const STEP = 1 / TICK_RATE;
   let acc = 0, last = null;
 
-  // Ids already credited with a quack or a loss, so a duckling sitting
-  // saved in the pond — or one already gone — does not retrigger its sound
-  // on every subsequent frame, only the tick it actually happened on.
+  // Ids already credited with a hatch, a quack or a loss, so a duckling
+  // sitting saved in the pond — or one already gone — does not retrigger
+  // its sound on every subsequent frame, only the tick it actually
+  // happened on.
+  let hatchedSfxed = new Set();
   let quacked = new Set();
   let mourned = new Set();
+
+  // Every duckling gets exactly one of these, the tick it first appears in
+  // `state.ducks` — see sim.js's hatch, which is the only place one is
+  // ever added to that array.
+  function sfxNewHatchlings(){
+    for(const d of state.ducks){
+      if(hatchedSfxed.has(d.id)) continue;
+      hatchedSfxed.add(d.id);
+      audio.sfx('hatch');
+    }
+  }
 
   function quackNewArrivals(){
     for(const d of state.ducks){
@@ -497,11 +510,13 @@
 
   // Plays alongside the poof (see art.js/sim.js), on the same tick a
   // duckling actually goes down rather than on every frame it stays lost.
+  // A goose's catch gets its own sound (see audio.js's SFX.goosed) rather
+  // than the generic one every other cause of loss shares.
   function sfxNewLosses(){
     for(const d of state.ducks){
       if(d.state !== 'lost' || mourned.has(d.id)) continue;
       mourned.add(d.id);
-      audio.sfx('lost');
+      audio.sfx(d.cause === 'goosed' ? 'goosed' : 'lost');
     }
   }
 
@@ -595,6 +610,7 @@
     } else if(!paused && !state.ended){
       acc += dt;
       while(acc >= STEP){ tick(state); acc -= STEP; }
+      sfxNewHatchlings();
       quackNewArrivals();
       sfxNewLosses();
       if(state.ended){ refreshSkills(); endMessage(); }
@@ -614,6 +630,7 @@
     state = newGame(LEVEL);
     armed = null;
     paused = false;
+    hatchedSfxed = new Set();
     quacked = new Set();
     mourned = new Set();
     ui.pause.textContent = 'Pause';
