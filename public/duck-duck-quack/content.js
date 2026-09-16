@@ -42,6 +42,13 @@
  *           groundAt again), so leaving it off changes no duckling's path.
  */
 
+/* Shown on the page itself (play.html's header, index.html's footer) so a
+   player — or anyone checking that a change actually shipped — can read
+   straight off the page whether they have the latest build, rather than
+   having to guess from behavior alone. Bump it on every change that ships,
+   however small. */
+export const GAME_VERSION = '1.0';
+
 export const SCENE_W = 320;
 export const SCENE_H = 180;
 
@@ -90,25 +97,26 @@ export const WALK_STEP = 4;
    Builder's own ramp is allowed to climb; see BUILD_RISE_HEIGHT below. */
 export const FALL_SAFE = 24;
 
-/* How long a Builder keeps climbing before stopping on its own, whether or
-   not it has reached anywhere worth landing — see sim.js's assignSkill and
-   stepBuilding. A Builder starts the moment it is given, wherever that
-   duckling happens to be standing, so this is what stops one handed out on
-   ordinary ground, or over a gap wider than a duckling can usefully cross,
-   from just running to the edge of the level. Stated as seconds, the same
-   way spawnInterval and timeLimit are, and converted once into ticks here
-   rather than a bare number: one tick of building is one column, so this
-   number is a column cap too, in effect, without being written as one. */
+/* How long a held Builder's own clock runs before it gives up unused — see
+   sim.js's stepWalking, which counts this down on every tick from the
+   moment it is given, whether the duckling is still walking toward a
+   hazard or already climbing one. That single clock is what stops a
+   Builder given right at the nest from climbing forever once it finally
+   reaches a gap, and also what can leave a duckling that spent most of it
+   just walking there with too little left to finish a wide one. Stated as
+   seconds, the same way spawnInterval and timeLimit are, and converted
+   once into ticks here rather than a bare number: one tick of climbing is
+   one column, so this number is a column cap too, in effect, without being
+   written as one. */
 export const BUILD_SECONDS = 10;
 export const BUILD_MAX_STEPS = TICK_RATE * BUILD_SECONDS;
 
-/* How high a Builder's ramp climbs over the full BUILD_MAX_STEPS, if it
-   never meets anything to land on first — see sim.js's stepBuilding. Kept
-   at exactly FALL_SAFE on purpose: run the whole ten seconds out over
-   ground that never needed a bridge at all, and the worst that happens
-   stepping off the end of it is still exactly the tallest drop a duckling
-   already walks away from, never more — a Builder given nowhere useful
-   costs the click and nothing else. */
+/* How high a Builder's climb rises over its own d.buildCap ticks, if it
+   never meets ordinary ground to land on first — see sim.js's stepBuilding.
+   Kept at exactly FALL_SAFE on purpose: run the whole remaining clock out
+   over a gap that never resolves, and the worst that happens falling from
+   wherever that leaves it is still exactly the tallest drop a duckling
+   already walks away from, never more. */
 export const BUILD_RISE_HEIGHT = FALL_SAFE;
 
 /* How many columns a Digger will cut before giving up — a safety cap, not a
@@ -140,26 +148,24 @@ export const POOF_TICKS = 8;
  * a tunnel, a bridge, a wall — and only ever have to work once. Climber and
  * Flyer do not: they ride on the one duckling that holds them and have to be
  * given out again to the next one. But when a skill actually takes hold is
- * its own, separate axis, and the three sharing skills split right down the
- * middle of it:
+ * its own, separate axis:
  *
- *   Digger            deferred — waits, held, for the next wall it meets
- *   Builder            instant — starts climbing the moment it is given,
- *                      wherever that duckling is already standing, gap or
- *                      no gap, for BUILD_SECONDS (content.js) and not a
- *                      tick longer
- *   Blocker            instant — plants that duckling for good, right there,
- *                      a wall nothing gets past — another duckling or the
- *                      goose alike, see sim.js's stepWalking and stepGoose
- *   Climber, Flyer      deferred, and never shared — each carries one
- *                      duckling past one obstacle, once, then is spent
+ *   Digger, Climber,    deferred — given anywhere, held, and only actually
+ *   Builder, Flyer      answer the hazard each one is for the moment the
+ *                       duckling meets it, not before
+ *   Blocker             instant — plants that duckling for good, right
+ *                       there, a wall nothing gets past — another duckling
+ *                       or the goose alike, see sim.js's stepWalking and
+ *                       stepGoose
  *
- * That means Builder is the one skill in a genuinely different spot on both
- * axes than everything around it: shared like a Digger's tunnel, but timed
- * like a Blocker's plant rather than waiting for a hazard to ask for it. See
- * sim.js's assignSkill for what that means in practice — a Builder never
- * needs the click lined up with anything; it works from wherever it is
- * clicked, no aiming required.
+ * Blocker is the one skill on this whole page that is not also a click
+ * you can get away with timing badly: every other one can be given the
+ * moment a duckling hatches and still do its job however far off the
+ * hazard is, because none of them act until they actually meet it. Builder
+ * is no exception — see sim.js's assignSkill and stepWalking — a click
+ * never has to be lined up with a gap, only given before the duckling
+ * reaches one, with BUILD_SECONDS (content.js) still on its own clock when
+ * it does.
  */
 export const SKILLS = ['digger', 'builder', 'blocker', 'climber', 'flyer'];
 
@@ -167,7 +173,7 @@ export const SKILL_INFO = {
   digger: { name: 'Digger', verb: 'Dig',
     blurb: 'Tunnels straight through the next wall, leaving a way through for the rest.' },
   builder: { name: 'Builder', verb: 'Build',
-    blurb: `Starts climbing right where it stands, gap or no gap, for ${BUILD_SECONDS} seconds, then stops for good and walks on from wherever that leaves it.` },
+    blurb: `Bridges the next drop it meets, within ${BUILD_SECONDS} seconds of being given — one drop only, then it's spent.` },
   blocker: { name: 'Blocker', verb: 'Block',
     blurb: 'Plants itself for good, turning back anything that meets it — another duckling, or the goose.' },
   climber: { name: 'Climber', verb: 'Climb',

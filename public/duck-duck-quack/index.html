@@ -100,6 +100,7 @@
   }
   .back{ color: var(--muted); font-size: .8rem; text-decoration: none; }
   .back:hover, .back:focus-visible{ color: var(--gv-text); }
+  .version{ color: var(--muted); font-size: .8rem; opacity: .7; }
 
   .sound{
     display: block; margin: 1.1rem auto 0;
@@ -152,6 +153,7 @@
   <div class="foot-links">
     <a class="back" href="/">&larr; all Good Vibe Games</a>
     <a class="back" href="./builder.html">Level builder (dev tool)</a>
+    <span class="version" id="game-version"></span>
   </div>
 </main>
 
@@ -159,10 +161,12 @@
   /* The plate is the park itself, running, with a slow bot playing it over
      and over — the same rule every title screen on this site follows: this is
      not a picture of the game, it is the game, and it cannot go stale. */
-  import { LEVEL_1 } from './content.js';
+  import { LEVEL_1, GAME_VERSION } from './content.js';
   import { newGame, tick, assignSkill, hasTrait } from './sim.js';
   import { paintScene } from './art.js';
   import { createAudio } from './audio.js';
+
+  document.getElementById('game-version').textContent = `v${GAME_VERSION}`;
 
   /* Autoplay policy decides when sound can start, not us: the context cannot
      exist until a gesture, so the button reflects intent and the first click

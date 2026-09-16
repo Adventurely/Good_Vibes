@@ -341,7 +341,7 @@ test('a flyer over a gap still drifts past the bottom of the world — there is 
 
 /* -------------------------------------------------------------- building */
 
-test('a builder given right at a gap climbs straight across it and lands the moment ordinary ground is back underneath', () => {
+test('a builder given long before the gap is still held, and bridges it when the duckling actually gets there', () => {
   const level = miniLevel({
     segments: [
       { from: 0, to: 10, y: 50 },
@@ -352,9 +352,15 @@ test('a builder given right at a gap climbs straight across it and lands the mom
   });
   const state = run(newGame(level), 1);
   const duck = state.ducks[0];
-  tickUntilAt(state, duck, 9); // the pit's edge
+  // Given at the nest — the very first tick, nowhere near the gap.
   assert.equal(assignSkill(state, duck.id, 'builder'), duck);
-  assert.equal(duck.state, 'building'); // instant, not deferred — see the blocker test
+  assert.equal(duck.state, 'walking', 'held, not acted on — see stepWalking');
+  assert.ok(hasTrait(duck, 'builder'));
+  tickUntilAt(state, duck, 9); // the pit's edge, still just walking
+  assert.equal(duck.state, 'walking');
+  assert.ok(hasTrait(duck, 'builder'), 'still held this whole time');
+  tick(state);
+  assert.equal(duck.state, 'building', 'meeting the actual gap is what starts it, not the click');
   // The pit itself is untouched — see content.js's header note — it is
   // `bridgeY` that carries the deck, so the gap is still open beneath it.
   let ticks = 0;
@@ -362,46 +368,66 @@ test('a builder given right at a gap climbs straight across it and lands the mom
   for(let x = 10; x < 20; x++) assert.equal(state.terrain[x], 500, `column ${x}'s terrain should still be open pit`);
   assert.equal(state.bridgeY[10], 50, 'the deck starts level with the bank it left from');
   assert.ok(state.bridgeY[19] < 50, 'and is already climbing by the time it reaches the far side');
-  // Real ground within WALK_STEP of where the climb started ends it — see
-  // stepBuilding's own note on why that is checked against the terrain
-  // rather than the deck's own height — so this lands right back on the far
-  // bank rather than running the full BUILD_SECONDS over solid ground it no
-  // longer needed to cross.
   assert.equal(duck.state, 'walking');
   assert.equal(duck.x, 20);
   assert.equal(duck.y, 50, 'landed right back at the far bank\'s own height');
-  assert.ok(ticks < BUILD_MAX_STEPS, 'stopped well short of the full clock once the gap was behind it');
+  assert.ok(!hasTrait(duck, 'builder'), 'spent — one gap only');
   run(state, 10);
   assert.equal(duck.state, 'saved');
 });
 
-test('a builder given on ordinary ground with nothing to answer lands on its very first step and is simply spent', () => {
-  // The opposite of every other skill's "handed out at the nest, still
-  // works later" test, on purpose — see content.js's SKILL_INFO on why
-  // Builder alone does not wait. Solid ground is already at the height a
-  // fresh climb starts from, so the very first tick's rise already clears
-  // it and this lands at once — and by then there is nothing left to give
-  // the real gap up ahead, because the trait was never held, only spent.
+test('a second builder is refused while one is still held, but a fresh one can be given once it is spent', () => {
+  const level = miniLevel({ supply: { digger: 0, builder: 2, blocker: 0, climber: 0 } });
+  const state = run(newGame(level), 1);
+  const duck = state.ducks[0];
+  assignSkill(state, duck.id, 'builder');
+  assert.match(assignRefusal(state, duck.id, 'builder'), /already has it/i);
+});
+
+test('a builder given on ordinary ground shows immediately, but does nothing until a real hazard actually asks for it', () => {
+  const level = miniLevel({ supply: { digger: 0, builder: 1, blocker: 0, climber: 0 } });
+  const state = run(newGame(level), 1);
+  const duck = state.ducks[0];
+  assignSkill(state, duck.id, 'builder');
+  run(state, 5);
+  assert.equal(duck.state, 'walking', 'flat ground with nothing to build stays plain walking');
+  assert.ok(hasTrait(duck, 'builder'), 'still held — arming it never needed a hazard nearby');
+});
+
+test('a builder\'s own clock runs out before it ever finds a hazard, and the assignment is simply wasted', () => {
+  const level = miniLevel({
+    segments: [{ from: 0, to: 200, y: 50 }, { from: 200, to: 220, y: 500 }, { from: 220, to: SCENE_W, y: 50 }],
+    goalX: SCENE_W - 2, supply: { digger: 0, builder: 1, blocker: 0, climber: 0 },
+  });
+  const state = run(newGame(level), 1);
+  const duck = state.ducks[0];
+  assignSkill(state, duck.id, 'builder');
+  run(state, BUILD_MAX_STEPS);
+  assert.ok(!hasTrait(duck, 'builder'), 'clock ran out before ever reaching the real gap');
+  assert.equal(duck.state, 'walking');
+  run(state, 150);
+  assert.equal(duck.state, 'lost');
+  assert.equal(duck.cause, 'fell', 'nothing was left to bridge the real gap when it got there');
+});
+
+test('a builder given right at a hazard starts climbing the very next step, same as always', () => {
   const level = miniLevel({
     segments: [
       { from: 0, to: 10, y: 50 },
-      { from: 10, to: 20, y: 500 },  // a pit no fall survives
+      { from: 10, to: 20, y: 500 },
       { from: 20, to: SCENE_W, y: 50 },
     ],
     goalX: 25, supply: { digger: 0, builder: 1, blocker: 0, climber: 0 },
   });
   const state = run(newGame(level), 1);
   const duck = state.ducks[0];
-  assert.equal(assignSkill(state, duck.id, 'builder'), duck);
+  tickUntilAt(state, duck, 9);
+  assignSkill(state, duck.id, 'builder');
   tick(state);
-  assert.equal(duck.state, 'walking', 'nothing to build on flat ground — it lands at once');
-  assert.match(assignRefusal(state, duck.id, 'builder'), /out of/i, 'the one Builder in supply is already spent');
-  run(state, 80);
-  assert.equal(duck.state, 'lost');
-  assert.equal(duck.cause, 'fell', 'nothing was left to bridge the real gap when it got there');
+  assert.equal(duck.state, 'building');
 });
 
-test('a builder stops on its own after BUILD_SECONDS, even over a gap with no far bank to land on', () => {
+test('a builder given right at a gap with no far bank to land on stops once its own clock runs out', () => {
   const level = miniLevel({
     segments: [{ from: 0, to: 10, y: 50 }, { from: 10, to: SCENE_W, y: 500 }],  // never resolves
     supply: { digger: 0, builder: 1, blocker: 0, climber: 0 },
@@ -409,37 +435,43 @@ test('a builder stops on its own after BUILD_SECONDS, even over a gap with no fa
   const state = run(newGame(level), 1);
   const duck = state.ducks[0];
   tickUntilAt(state, duck, 9);
-  assert.equal(assignSkill(state, duck.id, 'builder'), duck);
+  assignSkill(state, duck.id, 'builder');
   // Exactly BUILD_SECONDS worth of ticks: one column laid a tick, so this
   // lands right on the moment the budget runs out and not a tick later,
   // where it would already have moved on to falling into the gap it never
   // finished crossing.
   run(state, BUILD_SECONDS * TICK_RATE);
   assert.equal(duck.state, 'walking', 'it gives up on its own rather than building forever');
-  assert.equal(duck.buildStep, BUILD_MAX_STEPS);
+  assert.ok(!hasTrait(duck, 'builder'));
   // Having run the whole clock with nothing ever to land on, it is now
   // BUILD_RISE_HEIGHT above where it started — still hanging over the same
   // gap, so the very next tick drops it, and BUILD_RISE_HEIGHT was chosen to
-  // be exactly FALL_SAFE, so that drop alone is never what kills it.
+  // be exactly FALL_SAFE, so that drop alone is never what kills it — the
+  // gap itself, falling straight back into it, still is.
   assert.equal(duck.y, 50 - BUILD_RISE_HEIGHT);
 });
 
-test('a builder given to a duckling that meets a real drop first just falls, rather than building over it', () => {
+test('a builder also bridges an ordinary lethal drop, not just a bottomless pit', () => {
+  // Same shape as the "given right at a gap" test above, except the low
+  // stretch between the two banks has a real floor — well short of
+  // PIT_Y — rather than being open air no fall survives. stepWalking's own
+  // trigger (delta > FALL_SAFE) does not care which; either one is a drop
+  // nothing but a Flyer or a Builder answers.
   const drop = 50 + FALL_SAFE + 20;
   const level = miniLevel({
-    segments: [{ from: 0, to: 10, y: 50 }, { from: 10, to: SCENE_W, y: drop }],
-    goalX: 40, supply: { digger: 0, builder: 1, blocker: 0, climber: 0 },
+    segments: [
+      { from: 0, to: 10, y: 50 },
+      { from: 10, to: 20, y: drop },
+      { from: 20, to: SCENE_W, y: 50 },
+    ],
+    goalX: 25, supply: { digger: 0, builder: 1, blocker: 0, climber: 0 },
   });
   const state = run(newGame(level), 1);
   const duck = state.ducks[0];
-  assert.equal(assignSkill(state, duck.id, 'builder'), duck);
+  tickUntilAt(state, duck, 9);
+  assignSkill(state, duck.id, 'builder');
   run(state, 60);
-  assert.equal(duck.state, 'lost');
-  assert.equal(duck.cause, 'fell');
-  // No floating bridge left hanging over ground that was already walkable —
-  // the climb landed on it at once, same as the ordinary-ground test above,
-  // long before the duckling itself ever reached the real drop on foot.
-  assert.equal(state.bridgeY[10], null);
+  assert.equal(duck.state, 'saved');
 });
 
 test('BUILD_RISE_HEIGHT never climbs a duckling higher than FALL_SAFE lets it fall back from', () => {
