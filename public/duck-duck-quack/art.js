@@ -62,8 +62,9 @@ export const GOOSE_ART = [
  * Each sits on a plate of ink, because the badge has to read against sky,
  * grass, dirt and water alike rather than against whichever one it was
  * designed over. Blocker is in here for the legend on the page only — it
- * is never a held trait (see sim.js's assignSkill), so it never gets drawn
- * over a duckling's head; a planted one wears its own red bar instead.
+ * is never drawn over a duckling's head at all (see sim.js's assignSkill);
+ * a planted one wears its own red bar instead. Builder is drawn, but not
+ * from a held trait the way the rest of BADGE_ORDER is — see drawDuck.
  */
 const SKILL_BADGE = {
   digger:  ['...', '..N', 'NNN', '..N'],   // straight ahead — tunnels through
@@ -75,8 +76,8 @@ const SKILL_BADGE = {
 
 /* Drawn in this order wherever more than one is held, so the same pair
    always reads the same way round rather than in whatever order they were
-   handed out in. */
-const BADGE_ORDER = ['digger', 'builder', 'climber', 'flyer'];
+   handed out in. Builder is not here — see drawDuck. */
+const BADGE_ORDER = ['digger', 'climber', 'flyer'];
 
 const BADGE_W = 3, BADGE_H = 4, BADGE_PAD = 1, BADGE_GAP = 1;
 export const BADGE_PLATE_W = BADGE_W + BADGE_PAD * 2;
@@ -257,25 +258,99 @@ const GRASS_DEPTH = 11;
    fixed depth would swallow the whole dirt band. */
 const SOIL_SHARE = 0.55;
 
-/* The terrain height array, filled column by column from its surface to the
- * bottom of the scene. A gap's columns sit far below SCENE_H (see content.js's
- * PIT_Y), so they simply paint nothing at all — an open chasm is the absence
- * of ground, not a colour of its own.
- *
- * Every column short of a pit gets the same cross-section: a shallow cap of
- * grass, a seam, then dirt the rest of the way down. That is what turns the
- * wall — one column with fifty pixels of fill instead of thirty — into
- * something that reads as a cliff with exposed dirt on its face, rather
- * than a taller rectangle of the same flat green.
+/* A column of actual rock (content.js's segment `hard`) reads nothing like a
+ * column of dirt — no grass cap, no seam, nothing grown on it — flat slate
+ * the whole way down but for a paler top edge catching the light, plainer
+ * than the strata a dirt wall's face gets because there is only the one
+ * material here to show. */
+function drawStoneColumn(ctx, x, y, fillH){
+  ctx.fillStyle = hex('s');
+  ctx.fillRect(x, y, 1, fillH);
+  ctx.fillStyle = hex('v');
+  ctx.fillRect(x, y, 1, Math.min(2, fillH));
+}
+
+/* How many columns one visible "flight" of the zigzag spans before it
+   reverses — small enough that a run the width of The Spire's rock face
+   reads as several switchbacks, not one long diagonal. */
+const STAIR_FLIGHT = 14;
+
+/* A rock column textured with a switchback ribbon (content.js's segment
+ * `stairs`) rather than left the flat slab drawStoneColumn draws on its
+ * own — a tread mark whose height climbs steadily across one flight's
+ * columns, then reverses for the next, the same triangle wave repeated
+ * for as many flights as the segment is wide. This is texture only: a
+ * duckling still climbs the wall straight up (see sim.js's stepClimbing),
+ * the same as it would a plain rock face — see content.js's header note on
+ * why the "back and forth" here is what is drawn, not what is crossed.
  */
-export function drawGround(ctx, terrain, level){
+function drawStairTreads(ctx, x, segStart, y, fillH){
+  const period = STAIR_FLIGHT * 2;
+  const local = (x - segStart) % period;
+  const phase = local < STAIR_FLIGHT ? local : period - local;
+  const t = phase / STAIR_FLIGHT;
+  const band = Math.max(0, fillH - 4);
+  const treadY = y + 2 + Math.round(t * band);
+  ctx.fillStyle = hex('k');
+  ctx.fillRect(x, treadY, 1, 2);
+  ctx.fillStyle = hex('N');
+  ctx.fillRect(x, treadY - 1, 1, 1);
+}
+
+/* The cut edge under a floating segment (content.js's `floor`) — a slab
+ * with open air under it, not a plateau standing on more ground the way
+ * every other rise in this game is. A flat line of ink would read as the
+ * bottom just being clipped off-screen; a root hanging past it here and
+ * there, sparse the same way the tufts and flowers are scattered, is what
+ * says "this is where the island actually ends" instead of "the drawing
+ * ran out". */
+function drawFloatingEdge(ctx, x, bottom){
+  ctx.fillStyle = hex('k');
+  ctx.fillRect(x, bottom - 1, 1, 1);
+  const h = Math.imul(x + 2917, 2246822519) >>> 0;
+  if(h % 5 !== 0) return;
+  ctx.fillStyle = hex('N');
+  ctx.fillRect(x, bottom, 1, 1 + (h >>> 29));
+}
+
+/* The terrain height array, filled column by column from its surface down to
+ * either the bottom of the scene or, for a floating segment, no further than
+ * its own `floor` (see content.js's header note) — open air below that is
+ * the absence of ground, exactly the way a gap's columns already are. A
+ * gap's columns sit far below SCENE_H (see content.js's PIT_Y), so they
+ * simply paint nothing at all either way.
+ *
+ * Every ordinary column gets the same cross-section: a shallow cap of grass,
+ * a seam, then dirt the rest of the way down. That is what turns the wall —
+ * one column with fifty pixels of fill instead of thirty — into something
+ * that reads as a cliff with exposed dirt on its face, rather than a taller
+ * rectangle of the same flat green. A rock column (`hard`) skips all of that
+ * for drawStoneColumn instead — see it for why.
+ */
+export function drawGround(ctx, terrain, level, rock, floors, stairs){
+  let stairStart = null;
   for(let x = 0; x < terrain.length; x++){
     const y = terrain[x];
     if(y >= SCENE_H) continue;
-    const fillH = SCENE_H - y;
+    const bottom = Math.min(floors ? floors[x] : SCENE_H, SCENE_H);
+    const fillH = bottom - y;
+    if(fillH <= 0) continue;
 
     if(x >= level.goalX){
       drawWaterColumn(ctx, x, y, fillH);
+      if(bottom < SCENE_H) drawFloatingEdge(ctx, x, bottom);
+      continue;
+    }
+
+    if(rock && rock[x]){
+      drawStoneColumn(ctx, x, y, fillH);
+      if(stairs && stairs[x]){
+        if(stairStart == null) stairStart = x;
+        drawStairTreads(ctx, x, stairStart, y, fillH);
+      } else {
+        stairStart = null;
+      }
+      if(bottom < SCENE_H) drawFloatingEdge(ctx, x, bottom);
       continue;
     }
 
@@ -297,10 +372,11 @@ export function drawGround(ctx, terrain, level){
       ctx.fillStyle = hex('k');
       ctx.fillRect(x, y + grassH, 1, 1);
     }
+    if(bottom < SCENE_H) drawFloatingEdge(ctx, x, bottom);
   }
-  drawTufts(ctx, terrain, level);
-  drawFlowers(ctx, terrain, level);
-  drawRockSpeckle(ctx, terrain, level);
+  drawTufts(ctx, terrain, level, rock);
+  drawFlowers(ctx, terrain, level, rock);
+  drawRockSpeckle(ctx, terrain, level, rock, floors);
   drawNest(ctx, level, terrain);
   drawCattails(ctx, level, terrain);
   drawLilyPads(ctx, terrain, level);
@@ -397,12 +473,12 @@ function drawWaterColumn(ctx, x, y, fillH){
    lawn instead. */
 const TUFT_COUNT = 90;
 
-function drawTufts(ctx, terrain, level){
+function drawTufts(ctx, terrain, level, rock){
   for(let i = 0; i < TUFT_COUNT; i++){
     const h = Math.imul(i + 7, 2246822519) >>> 0;
     const x = h % terrain.length;
     const y = terrain[x];
-    if(y >= SCENE_H || x >= level.goalX) continue;
+    if(y >= SCENE_H || x >= level.goalX || (rock && rock[x])) continue;
     ctx.fillStyle = hex((h >>> 17) & 1 ? 't' : 'g');
     ctx.fillRect(x, y - 1, 1, 1);
   }
@@ -416,32 +492,36 @@ function drawTufts(ctx, terrain, level){
 const FLOWER_COUNT = 22;
 const FLOWER_COLOURS = ['r', 'p', 'y'];
 
-function drawFlowers(ctx, terrain, level){
+function drawFlowers(ctx, terrain, level, rock){
   for(let i = 0; i < FLOWER_COUNT; i++){
     const h = Math.imul(i + 401, 2654435761) >>> 0;
     const x = h % terrain.length;
     const y = terrain[x];
-    if(y >= SCENE_H || x >= level.goalX) continue;
+    if(y >= SCENE_H || x >= level.goalX || (rock && rock[x])) continue;
     ctx.fillStyle = hex(FLOWER_COLOURS[(h >>> 13) % FLOWER_COLOURS.length]);
     ctx.fillRect(x, y - 1, 1, 1);
   }
 }
 
-/* A scatter of dark flecks in the rock band — the same fixed-count hash
-   technique as the tufts and flowers, seeded a third way, so the slate
-   below the soil reads as stone grain rather than a second flat fill. Only
-   ever a few dozen pixels regardless of how much rock is on screen, same as
-   every other scatter here. */
+/* A scatter of dark flecks in the rock band under ordinary dirt — the same
+   fixed-count hash technique as the tufts and flowers, seeded a third way,
+   so the slate below the soil reads as stone grain rather than a second
+   flat fill. Only ever a few dozen pixels regardless of how much rock is on
+   screen, same as every other scatter here. Skipped on an actual rock
+   column (`hard`) — drawStoneColumn already has its own top edge and does
+   not have the grass-then-soil-then-rock band this is speckling. */
 const SPECKLE_COUNT = 40;
 
-function drawRockSpeckle(ctx, terrain, level){
+function drawRockSpeckle(ctx, terrain, level, rock, floors){
   ctx.fillStyle = hex('k');
   for(let i = 0; i < SPECKLE_COUNT; i++){
     const h = Math.imul(i + 1109, 2246822519) >>> 0;
     const x = h % terrain.length;
     const y = terrain[x];
-    if(y >= SCENE_H || x >= level.goalX) continue;
-    const fillH = SCENE_H - y;
+    if(y >= SCENE_H || x >= level.goalX || (rock && rock[x])) continue;
+    const bottom = Math.min(floors ? floors[x] : SCENE_H, SCENE_H);
+    const fillH = bottom - y;
+    if(fillH <= 0) continue;
     const grassH = Math.min(GRASS_DEPTH, fillH);
     const dirtH = fillH - grassH;
     if(dirtH <= 0) continue;
@@ -558,8 +638,13 @@ export function drawDuck(ctx, d, ticks = 0){
   /* Every state a duckling can be carrying something in, not just walking:
      the one currently climbing the wall or laying a bridge is exactly the
      one you most want to be able to pick out of the flock, and it was the
-     one showing nothing at all. */
+     one showing nothing at all. Builder is never in `d.traits` (see
+     sim.js's assignSkill) — it is drawn straight from the state itself,
+     for exactly as long as that duckling is actively building and not a
+     tick longer, which is the one badge here that is not saying "this is
+     held" but "this is happening right now". */
   const held = BADGE_ORDER.filter(skill => d.traits.has(skill));
+  if(d.state === 'building') held.unshift('builder');
   if(!held.length) return;
 
   const total = held.length * BADGE_PLATE_W + (held.length - 1) * BADGE_GAP;
@@ -600,7 +685,7 @@ function drawPoof(ctx, p){
    nothing here mutates it. */
 export function paintScene(ctx, state){
   drawSky(ctx, state.ticks);
-  drawGround(ctx, state.terrain, state.level);
+  drawGround(ctx, state.terrain, state.level, state.rock, state.floors, state.stairs);
   drawTunnels(ctx, state);
   drawBridges(ctx, state);
   drawGoose(ctx, state);
