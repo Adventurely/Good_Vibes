@@ -16,11 +16,12 @@
  * riff transposed to whichever root is under it rather than four different
  * melodies — which is exactly the trick a two-channel tracker used to make
  * eight bars feel like one idea instead of four. WARREN_SONG, ORCHARD_SONG,
- * GROVE_SONG and AERIE_SONG below follow the same eight-bar, call-and-response
- * shape, but differ in tempo, swing, register and waveform on purpose: a
- * tunnel is not a park, an orchard is not either of them, a level with a
- * goose that does not give up is not any of the three, and a floating
- * island is not on the ground at all.
+ * GROVE_SONG, AERIE_SONG and SPIRE_SONG below follow the same eight-bar,
+ * call-and-response shape, but differ in tempo, swing, register and
+ * waveform on purpose: a tunnel is not a park, an orchard is not either of
+ * them, a level with a goose that does not give up is not any of the
+ * three, a floating island is not on the ground at all, and a hundred and
+ * twenty pixels of rock is not a climb any of the other five ever ask for.
  *
  * Nothing plays until a user gesture, because autoplay policy decides that,
  * not us. The mute choice persists per browser, under its own key so it
@@ -311,8 +312,69 @@ export const AERIE_SONG = {
   openHatAt: [6, 14],
 };
 
+/* The Spire: the one level tall and mean enough to earn a genuinely
+ * sinister track. Where the other five stay diatonic — a walk-down, a
+ * chug, a bright progression, a chase, an open drift — this one crawls
+ * down by the half step, min7 to dom7 to min7 to dom7, each chord a
+ * semitone under the last rather than a real cadence: four bars that never
+ * resolve, only fall further, and the second pass falls the exact same
+ * way again instead of climbing back to answer it. The lead sits a
+ * dissonant minor second above its own chord as often as a chord tone,
+ * which is the one interval the other five songs never reach for — an
+ * uneasy clash by design, not a wrong note. Slower than every song but
+ * The Aerie's, with almost no swing at all: not funky, not driving, just
+ * heavy, the bass hooded under a low-pass cut darker than any other
+ * track's. Sparse kick, an off-kilter snare that never lands where Park's
+ * or Grove's does, and a hi-hat ticking like a clock rather than keeping
+ * a groove — dread with a pulse, not a beat to nod along to.
+ */
+export const SPIRE_SONG = {
+  bpm: 84,
+  swing: 0.02,
+  bars: [
+    { chord: [45, 'min7'] }, { chord: [44, 'dom7'] },
+    { chord: [43, 'min7'] }, { chord: [42, 'dom7'] },
+    { chord: [45, 'min7'], lead: 'response' }, { chord: [44, 'dom7'], lead: 'response' },
+    { chord: [43, 'min7'], lead: 'response' }, { chord: [42, 'dom7'], lead: 'response', fill: true },
+  ],
+
+  // Root only, twice a bar, nothing else moving under it — a thud rather
+  // than a line, which is what keeps this from ever reading as a walk.
+  bass: [
+    [0, 0, 3], [3, 0, 1], [8, 0, 3], [11, 0, 1],
+  ],
+  bassType: 'square',
+  bassCut: 380,
+  bassLevel: 0.16,
+
+  // A creeping half-step crawl above the chord — semis 12 and 13 sit a
+  // minor second apart, the clash the rest of this file never writes.
+  lead: [
+    [0, 12, 2], [2, 13, 1], [4, 12, 2], [9, 15, 2], [13, 12, 3],
+  ],
+  leadResponse: [
+    [1, 15, 1], [5, 13, 1], [6, 12, 2], [10, 18, 1], [12, 15, 2], [14, 12, 2],
+  ],
+  leadType: 'sawtooth',
+  leadCut: 1500,
+  leadLevel: 0.065,
+
+  stabAt: [7, 15],
+  stabType: 'square',
+  stabCut: 700,
+  stabLevel: 0.04,
+
+  // Sparse and off-kilter on purpose — a snare that never lands with the
+  // kick reads as uneasy in a way a steady backbeat cannot.
+  kickAt: [0, 8],
+  snareAt: [6, 14],
+  hatAt: [2, 4, 10, 12],
+  openHatAt: [15],
+};
+
 export const SONGS = {
   park: PARK_SONG, warren: WARREN_SONG, orchard: ORCHARD_SONG, grove: GROVE_SONG, aerie: AERIE_SONG,
+  spire: SPIRE_SONG,
 };
 
 /* ------------------------------------------------------------------ engine --- */
