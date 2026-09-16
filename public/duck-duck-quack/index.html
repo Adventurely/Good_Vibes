@@ -94,7 +94,11 @@
   }
   .facts li.sun{ color: var(--sun); }
 
-  .back{ grid-row: 3; align-self: end; color: var(--muted); font-size: .8rem; text-decoration: none; }
+  .foot-links{
+    grid-row: 3; align-self: end;
+    display: flex; gap: .9rem; flex-wrap: wrap; justify-content: center;
+  }
+  .back{ color: var(--muted); font-size: .8rem; text-decoration: none; }
   .back:hover, .back:focus-visible{ color: var(--gv-text); }
 
   .sound{
@@ -142,7 +146,10 @@
     <button type="button" id="sound" class="sound" aria-pressed="false">Music off</button>
   </div>
 
-  <a class="back" href="/">&larr; all Good Vibe Games</a>
+  <div class="foot-links">
+    <a class="back" href="/">&larr; all Good Vibe Games</a>
+    <a class="back" href="./builder.html">Level builder (dev tool)</a>
+  </div>
 </main>
 
 <script type="module">
