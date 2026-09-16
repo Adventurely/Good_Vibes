@@ -47,7 +47,7 @@
    straight off the page whether they have the latest build, rather than
    having to guess from behavior alone. Bump it on every change that ships,
    however small. */
-export const GAME_VERSION = '1.0';
+export const GAME_VERSION = '1.1';
 
 export const SCENE_W = 320;
 export const SCENE_H = 180;
@@ -97,26 +97,24 @@ export const WALK_STEP = 4;
    Builder's own ramp is allowed to climb; see BUILD_RISE_HEIGHT below. */
 export const FALL_SAFE = 24;
 
-/* How long a held Builder's own clock runs before it gives up unused — see
-   sim.js's stepWalking, which counts this down on every tick from the
-   moment it is given, whether the duckling is still walking toward a
-   hazard or already climbing one. That single clock is what stops a
-   Builder given right at the nest from climbing forever once it finally
-   reaches a gap, and also what can leave a duckling that spent most of it
-   just walking there with too little left to finish a wide one. Stated as
-   seconds, the same way spawnInterval and timeLimit are, and converted
-   once into ticks here rather than a bare number: one tick of climbing is
-   one column, so this number is a column cap too, in effect, without being
-   written as one. */
+/* How long a Builder keeps laying ramp before it stops on its own, having
+   run into nothing — see sim.js's stepBuilding. It starts the instant it is
+   given, so this is the one thing that ever ends a ramp out in open air,
+   and it is also what bounds how far one reaches: one tick of building is
+   one column, so ten seconds is a hundred and ten columns, a third of the
+   scene. Stated as seconds, the same way spawnInterval and timeLimit are,
+   and converted once into ticks here rather than written as a bare count. */
 export const BUILD_SECONDS = 10;
 export const BUILD_MAX_STEPS = TICK_RATE * BUILD_SECONDS;
 
-/* How high a Builder's climb rises over its own d.buildCap ticks, if it
-   never meets ordinary ground to land on first — see sim.js's stepBuilding.
-   Kept at exactly FALL_SAFE on purpose: run the whole remaining clock out
-   over a gap that never resolves, and the worst that happens falling from
-   wherever that leaves it is still exactly the tallest drop a duckling
-   already walks away from, never more. */
+/* How high a Builder's ramp climbs over the full BUILD_MAX_STEPS, if it
+   never runs into ground first — see sim.js's stepBuilding. Kept at exactly
+   FALL_SAFE on purpose, which is what makes the ordinary case safe: a ramp
+   laid along level ground ends this far up, and this far is exactly the
+   tallest drop a duckling walks away from, so stepping off the end of one
+   costs nothing. Ground that has fallen away further under the ramp's far
+   end is the case that is not safe, and deliberately so — see stepBuilding
+   on why a ramp is a real thing left in the world. */
 export const BUILD_RISE_HEIGHT = FALL_SAFE;
 
 /* How many columns a Digger will cut before giving up — a safety cap, not a
@@ -151,21 +149,25 @@ export const POOF_TICKS = 8;
  * its own, separate axis:
  *
  *   Digger, Climber,    deferred — given anywhere, held, and only actually
- *   Builder, Flyer      answer the hazard each one is for the moment the
+ *   Flyer               answer the hazard each one is for the moment the
  *                       duckling meets it, not before
+ *   Builder             instant — starts laying ramp on the very next tick,
+ *                       from wherever that duckling is standing, whether or
+ *                       not there is anything there to answer
  *   Blocker             instant — plants that duckling for good, right
  *                       there, a wall nothing gets past — another duckling
  *                       or the goose alike, see sim.js's stepWalking and
  *                       stepGoose
  *
- * Blocker is the one skill on this whole page that is not also a click
- * you can get away with timing badly: every other one can be given the
- * moment a duckling hatches and still do its job however far off the
- * hazard is, because none of them act until they actually meet it. Builder
- * is no exception — see sim.js's assignSkill and stepWalking — a click
- * never has to be lined up with a gap, only given before the duckling
- * reaches one, with BUILD_SECONDS (content.js) still on its own clock when
- * it does.
+ * The two instant ones are the two you aim rather than merely spend: a
+ * Blocker plants where you click it, and a Builder's ramp starts where you
+ * click it and runs forward from there. The difference is that a Builder
+ * cannot miss — it always builds, gap or no gap — so the question is never
+ * whether the click took, only whether the ramp went anywhere worth going.
+ * A ramp is also the only one of the five that outlives the duckling that
+ * made it in a way the others don't quite: a tunnel is a hole the flock
+ * walks through, but a ramp is ground the flock walks *up*, and it ends
+ * wherever ten seconds left it. See sim.js's stepBuilding.
  */
 export const SKILLS = ['digger', 'builder', 'blocker', 'climber', 'flyer'];
 
@@ -173,7 +175,7 @@ export const SKILL_INFO = {
   digger: { name: 'Digger', verb: 'Dig',
     blurb: 'Tunnels straight through the next wall, leaving a way through for the rest.' },
   builder: { name: 'Builder', verb: 'Build',
-    blurb: `Bridges the next drop it meets, within ${BUILD_SECONDS} seconds of being given — one drop only, then it's spent.` },
+    blurb: `Starts a ramp climbing the way it faces, right where you click it, for ${BUILD_SECONDS} seconds — until it runs into higher ground, whichever comes first.` },
   blocker: { name: 'Blocker', verb: 'Block',
     blurb: 'Plants itself for good, turning back anything that meets it — another duckling, or the goose.' },
   climber: { name: 'Climber', verb: 'Climb',
@@ -741,8 +743,19 @@ export const LEVEL_6 = {
  * run, in an order that never repeats a beat: bridge, drop, wall, drop,
  * step, bridge, drop, pond. Confirmed by actually running it: a bot with
  * Flyer and Climber wins, the same bot with Digger in place of Climber
- * wins too, and pulling any one of Flyer, Builder, or a way past the wall
- * out from under it loses the whole flock.
+ * wins too, and pulling either Flyer or Builder out from under it loses
+ * the whole flock.
+ *
+ * The wall is the one hazard here with a third answer, and it is a quirk
+ * of this level's own shape rather than a rule: because the whole walk
+ * descends, the wall's top (15) sits only five pixels above the nest's own
+ * ground (20), and a Builder's ramp climbs BUILD_RISE_HEIGHT — so a ramp
+ * still running when it arrives is simply taller than the wall and carries
+ * on over it. On every other level the walls stand fifty to a hundred
+ * pixels above wherever a ramp could start, far out of reach. Left as it
+ * is: a player who spends the first gap's Builder and happens to still be
+ * building at the wall has found something real about this particular
+ * hillside, which is a better thing to meet than a rule bent to forbid it.
  */
 export const LEVEL_7 = {
   id: 'falls',
