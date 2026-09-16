@@ -23,7 +23,7 @@ import {
 } from './orbit.js';
 import {
   CONST, BODIES, GOODS, PORTS, UPGRADES, FORMULAS, TEXT, SPECIES,
-  REGION_OF, wantsGood, lovesGood, QUESTS as QUESTBOOK, DIALOG,
+  REGION_OF, wantsGood, lovesGood, QUESTS as QUESTBOOK, RELICS as RELICBOOK, DIALOG,
 } from './content.js';
 
 export const world = makeWorld(BODIES);
@@ -94,6 +94,13 @@ export function newGame(seed = 1){
     marketEpoch: 0,
     lastMarket: null,
     rep: { emberkin: 0, otter: 0, cat: 0, frog: 0 },
+    /* Relics: things you are given or find rather than things you buy and
+       carry. A relic is not cargo — it has no weight, it cannot be sold, a
+       toll cannot take it and a tow cannot lose it — and it is not a ship
+       system either, so it does not live in `keys`. An open bag rather than a
+       fixed one, because what is in it is a fact about the story you have got
+       through rather than about the ship. */
+    relics: {},
     /* Three berths, and nobody in them. The line pays out an Emberkin
        engineer, a cat navigator and a frog appraiser; until there is a board
        to take those jobs from, this is a list of who is missing. */
@@ -194,10 +201,11 @@ export function fmtMoney(m){
  * and the rule stays because a seasonal market is a thing a port may want. */
 export function portOpen(portId, t){
   const p = PORTS[portId];
-  /* A wreck has no entry in the price list at all — no market, no yard, nobody
-     to keep hours — so "open" is only whether the thing is there. Anything
-     else with no entry is not a place you can tie up to. */
-  if(!p) return isWreck(portId);
+  /* A wreck, and the station at the Dancer, have no entry in the price list at
+     all — no market, no yard, nobody to keep hours — so "open" is only whether
+     the thing is there. Anything else with no entry is not somewhere a ship can
+     tie up. */
+  if(!p) return isHulk(portId);
   if(p.openWithin){
     const r = norm(absState(world, portId, t).r);
     return r <= p.openWithin;
@@ -209,11 +217,17 @@ export function portOpen(portId, t){
  * altitude (or co-moving with a zone), frozen while docked. */
 function placeDocked(state, portId){
   const b = world.get(portId);
-  if(b.mu > 0){
+  /* Where a docked ship sits, which is about the harbour rather than the mass.
+     A world you park above puts you in its parking orbit. Anything you come
+     alongside — a wreck, the station at the Dancer, and the Maw, which is a
+     black hole with no ground to park over — puts you beside it in its
+     parent's frame, moving with it. Branching on `mu` here quietly placed a
+     ship at NaN the day the Maw got weight: it has mass and no parking orbit,
+     so `circularState` was handed an undefined altitude. */
+  if(b.mu > 0 && !b.rendezvous){
     const s = circularState(b.mu, b.dockAlt, 0);
     state.ship = { body: portId, r: s.r, v: s.v };
   }else{
-    // A zone: sit at it, in its parent's frame, moving with it.
     const local = railState(b, world.get(b.parent).mu, state.t);
     state.ship = { body: b.parent, r: [...local.r], v: [...local.v] };
   }
@@ -505,23 +519,35 @@ export const isWreck = id => WRECK_IDS.has(id);
  * because the page already has one per frame. */
 export const nameFor = (id, hidden) => hidden?.has(id) ? '???' : portName(id);
 export const WRECKS = [...WRECK_IDS];
+/* Every weightless harbour, which is the wrecks and the station at the Dancer:
+ * the same machinery, and the same absence from the price list. */
+const HULK_IDS = new Set(BODIES.filter(b => b.port && !(b.mu > 0) && b.parent).map(b => b.id));
+export const isHulk = id => HULK_IDS.has(id);
 /* Bodies the chart should not draw for this player. Physics never consults
  * this: a thing nobody has told you about still has hold of you. */
 export function unseen(state){
   const hide = new Set();
   if(!knowsKnot(state)) hide.add('knot');
   if(!knowsMaw(state)) hide.add('maw');
-  /* A wreck is a rumour until somebody hands you the job that names it. Seven
-     unexplained dots on the chart from the first day would be seven questions
+  /* A wreck is a rumour until somebody hands you the job that names it. Eight
+     unexplained dots on the chart from the first day would be eight questions
      with no way to ask them; one that appears when a salvor tells you where to
      look is a lead. Taking the job is what reveals it, and finishing the job
-     does not hide it again — you have been there now. */
+     does not hide it again — you have been there now.
+
+     The station at the Dancer is hidden the same way and for the same reason.
+     It has been going round that star since before anybody was watching, and it
+     is only ever anywhere a ship would have had reason to look once the
+     Builders' own station has given you the bearing. */
   const told = new Set();
   for(const live of state?.quests ?? []){
-    const w = questById(live.id)?.wreck;
-    if(w) told.add(w);
+    const q = questById(live.id);
+    /* What a job points at: the wreck it names, and where it ends when that is
+       one of these rather than a port. The last job in the line has no wreck —
+       its destination *is* the secret — so both count. */
+    for(const id of [q?.wreck, q?.to]) if(id && HULK_IDS.has(id)) told.add(id);
   }
-  for(const id of WRECK_IDS) if(!told.has(id)) hide.add(id);
+  for(const id of HULK_IDS) if(!told.has(id)) hide.add(id);
   return hide;
 }
 /* Seeing past the encounter. The road normally stops one crossing out — see
@@ -903,6 +929,49 @@ function flag(state, name, events){
 
 export const MAX_ACTIVE_QUESTS = 3;
 
+/* ---- relics, and the jobs that are gated on them ----------------------- */
+
+/* The three things the closing line is about. Written beside the quests
+ * because that is the only place they come from: nothing sells one, nothing
+ * makes one, and the only way into the bag is to finish the job that grants
+ * it. */
+export const RELICS = RELICBOOK;
+const relicIndex = new Map(RELICS.map(r => [r.id, r]));
+export const relicById = id => relicIndex.get(id);
+export const heldRelics = state => RELICS.filter(r => state?.relics?.[r.id]);
+export const hasRelic = (state, id) => !!state?.relics?.[id];
+
+/* Jobs finished *and collected* for a people. Counted off the save rather than
+ * kept as a running total: the record of what you have done is already there,
+ * and a second copy of it is a second thing that can be wrong. */
+export function questsDoneFor(state, people){
+  return (state?.quests ?? []).filter(l => l.claimed && questById(l.id)?.rep === people).length;
+}
+
+/* Why a job cannot be taken on yet, or null when it can. The one kind of
+ * prerequisite in the game: the closing line needs three things in the bag and
+ * the frogs do not make a gift of anything until they know you.
+ *
+ * Reported as a sentence rather than as a flag, because a job you cannot take
+ * is only worth putting on a board if it says what it is waiting for. */
+export function requiresUnmet(state, q){
+  const need = q?.requires;
+  if(!need) return null;
+  for(const [people, n] of Object.entries(need.questsFor ?? {})){
+    const done = questsDoneFor(state, people);
+    if(done < n){
+      const who = SPECIES[people]?.plural ?? people;
+      return `${who} do not hand this to a stranger. ${done} of ${n} jobs done for them.`;
+    }
+  }
+  const short = (need.relics ?? []).filter(id => !hasRelic(state, id));
+  if(short.length){
+    const names = short.map(id => relicById(id)?.name ?? id);
+    return `Not without ${names.join(', ')}.`;
+  }
+  return null;
+}
+
 export const QUESTS = QUESTBOOK;
 export const questById = id => QUESTS.find(q => q.id === id);
 /* Where the chart should point when a job is taken: wherever the first step
@@ -1017,11 +1086,19 @@ export function claimQuest(state, id){
     state.crew[q.crew] = { role: q.crew, from: q.id, joinedAt: state.t };
     crew = q.crew;
   }
+  /* And some pay in a thing that is not money and not a person. It goes in the
+     bag and stays there: nothing in the game takes a relic back out. */
+  let relic = null;
+  if(q?.relic && relicById(q.relic) && !hasRelic(state, q.relic)){
+    state.relics ??= {};
+    state.relics[q.relic] = { from: q.id, foundAt: state.t };
+    relic = q.relic;
+  }
   live.claimed = true;
   live.claimedAt = state.t;
   logLine(state, 'questDone', TEXT.logTemplates.questDone ?? 'Finished {title}. Paid {pay}.',
     { title: q?.title ?? id, pay: fmtMoney(paid) });
-  return { ok: true, pay: paid, rep: q?.rep ?? null, crew, quest: q };
+  return { ok: true, pay: paid, rep: q?.rep ?? null, crew, relic, quest: q };
 }
 /* What is on offer at a port: the jobs given out there that you have not
  * taken and have not already done. This is the board — the one thing the
@@ -1029,7 +1106,11 @@ export function claimQuest(state, id){
  * only be reached from a test. */
 export function questsAt(state, portId){
   const held = new Set((state.quests ?? []).map(l => l.id));
-  return QUESTS.filter(q => q.from === portId && !held.has(q.id));
+  /* A gated job is on the board and refused, so it reads as a goal — except
+     where it asks to be hidden, which is how the last one in the line stays a
+     surprise until the three things are in the bag. */
+  return QUESTS.filter(q => q.from === portId && !held.has(q.id)
+    && !(q.requires?.hidden && requiresUnmet(state, q)));
 }
 /* Hold units a job will cost you the moment you accept it. Only a delivery
  * hands you anything; a message weighs nothing, which is the whole joke, and a
@@ -1048,6 +1129,8 @@ export function canAcceptQuest(state, q){
   const live = (state.quests ?? []).find(l => l.id === q.id);
   if(live) return { ok: false, reason: live.done ? 'Already done.' : 'Already taken.' };
   if(activeQuests(state).length >= MAX_ACTIVE_QUESTS) return { ok: false, reason: `Three jobs is all anybody can hold in their head.` };
+  const unmet = requiresUnmet(state, q);
+  if(unmet) return { ok: false, reason: unmet };
   if(questLeavesSystem(q) && !state.keys.astrolabe){
     return { ok: false, reason: 'That one leaves this sky. You would need an Astrolabe.' };
   }
@@ -2599,6 +2682,11 @@ export function sell(state, goodId, qty){
   if(!port) return { ok: false, reason: 'Not docked.' };
   if(!portOpen(port, state.t)) return { ok: false, reason: 'The market is closed.' };
   if(!Number.isInteger(qty) || qty < 1) return { ok: false, reason: 'That is not a number of crates.' };
+  /* What a port wants only ever moved the price: every good in the game sells
+     anywhere. A relic in the making is the exception — there is no stall in the
+     sky that will turn one back into money, which is what stops the thing you
+     were sent to fetch being worth more as a sale than as an ending. */
+  if(goodById(goodId)?.noResale) return { ok: false, reason: 'Nobody will take that off you. Not here, not anywhere.' };
   const stacks = state.cargo.filter(s => s.good === goodId && !isConsigned(s)).sort((a, b) => a.t - b.t);
   const have = stacks.reduce((s, c) => s + c.qty, 0);
   if(have < qty) return { ok: false, reason: have ? 'The rest of those belong to somebody.' : 'Not that many aboard.' };
@@ -3141,14 +3229,20 @@ export function restore(json){
   for(const k of ['t', 'money', 'dv', 'tank']){
     if(!Number.isFinite(s[k])) bad(`${k} is ${s[k]}`);
   }
-  if(s.dockedAt != null && !PORTS[s.dockedAt]) bad(`it is docked at "${s.dockedAt}", which is not a port`);
+  /* Tied up somewhere real. A weightless harbour is not in the price list — a
+     wreck has no stall and neither does the station at the Dancer — so the sky
+     is the authority on those. Without this, a save made alongside a derelict
+     was refused on load: you could tie up to one and never come back to it. */
+  if(s.dockedAt != null && !PORTS[s.dockedAt] && !isHulk(s.dockedAt)){
+    bad(`it is docked at "${s.dockedAt}", which is nowhere a ship can tie up`);
+  }
   if(!Array.isArray(s.nodes) || s.nodes.some(n => !n || !Number.isFinite(n.t)
     || (n.prograde != null && !Number.isFinite(n.prograde))
     || (n.radial != null && !Number.isFinite(n.radial)))) bad('its plan is not a list of marks');
   if(!Array.isArray(s.cargo) || s.cargo.some(c => !c || !goodById(c.good) || !Number.isFinite(c.qty))) bad('its hold holds something unknown');
   if(!s.tiers || ['tank', 'hold'].some(k => !tiers(k)[s.tiers[k]])) bad('it is fitted with something this game does not have');
   // Everything below is either filled in or safely absent.
-  s.keys ??= {}; s.markets ??= {}; s.log ??= [];
+  s.keys ??= {}; s.relics ??= {}; s.markets ??= {}; s.log ??= [];
   s.rep = { emberkin: 0, otter: 0, cat: 0, frog: 0, ...(s.rep ?? {}) };
   s.pending ??= null; s.flags ??= {}; s.stats ??= {}; s.visited ??= [s.dockedAt].filter(Boolean);
   s.toll ??= { lastT: -1e9, inBelt: false };

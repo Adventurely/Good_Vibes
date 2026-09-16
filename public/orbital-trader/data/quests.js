@@ -499,6 +499,127 @@ export const QUESTBOOK = {
    "taken": "Pell writes the yard number on your hand rather than on paper. “If anybody at Whisker asks where you heard it,” she says, “you did not.” Then she adds, in the same flat voice: “And if the glass is warm, come straight back.”",
    "aboard": "The yard number is stamped, not painted. The plate is ordinary. What is not ordinary is the Arc glass stowed in the hold of a ship that has no business having been anywhere near the Arc, packed carefully, by somebody who knew exactly what it was.",
    "done": "Whisker looks at the glass for a long time. Then somebody says the Arc keeps a tail, and that things fall out of it that nobody put in, and that if you are going to keep pulling on this you should go and look behind the Arc rather than at it. Nobody says anything further, and everybody watches you leave."
+  },
+  {
+   "id": "longdark",
+   "title": "Lanterns for the Long Dark",
+   "giver": "The lamplighter at Haven",
+   "type": "delivery",
+   "from": "haven",
+   "to": "glass",
+   "goods": [
+    {
+     "good": "lanterns",
+     "qty": 6
+    }
+   ],
+   "pay": 380,
+   "rep": "frog",
+   "blurb": "Six prayer lanterns for the scholars under the ice, who go three months of every year without seeing the Lamp and who have never once asked for them. Haven sends them anyway, every year, and has done for longer than the current lamplighter has been alive.",
+   "taken": "The lanterns go aboard already lit, which you had not expected and which nobody offers to explain. “They do not go out,” the lamplighter says, in the tone of somebody stating a specification. “Do not try. It is rude and it does not work.”",
+   "done": "The scholars come up through the ice in ones and twos, take a lantern each, and go back down without much said. One of them tells you the lanterns do go out, eventually, after about a year, and that nobody at Haven has ever been told and nobody at Glass is going to be the one to do it."
+  },
+  {
+   "id": "ninthlens",
+   "title": "The Ninth Lens",
+   "giver": "A factor of the Ninth Forge",
+   "type": "retrieval",
+   "from": "veyra",
+   "to": "veyra",
+   "goods": [
+    {
+     "good": "emberglass",
+     "qty": 1
+    }
+   ],
+   "pay": 4000,
+   "rep": "emberkin",
+   "relic": "lens",
+   "blurb": "The Forge has a thing it cannot make and will not say where it got, and it is for sale at Veyra because Veyra is where things are sold. It is a disc of glass the width of a hand with something under the surface that does not move when you move it. The price is a year of good trading and the factor does not haggle.",
+   "taken": "“It is not an instrument,” says the factor, before you have asked. “It is not a lens either, whatever we call it. It was in the foundations when the Ninth Forge was dug, which is nine hundred years of us not knowing what it is.” He wraps it, and then unwraps it, and looks at it again, and wraps it.",
+   "done": "The sale is witnessed and written down, because on Veyra a price nobody saw settles nothing. Held up, the thing under the glass is not under the glass at all — it is a long way further down than the glass is thick. The factor watches you notice, and nods, and says nothing whatever."
+  },
+  {
+   "id": "tailend",
+   "title": "The Tail End",
+   "giver": "Dockmaster Pell",
+   "type": "salvage",
+   "from": "nail",
+   "to": "arc",
+   "wreck": "tailend",
+   "goods": [
+    {
+     "good": "arcshard",
+     "qty": 2
+    }
+   ],
+   "pay": 6800,
+   "rep": "cat",
+   "relic": "shard",
+   "blurb": "Pell has been thinking about Hull 41 since you brought it in, and has been asking, and has stopped asking because of the answers. There is a hull a third of the way down the Arc's tail, in among the debris and not near it. Nothing that fell off the Arc is shaped like that. She would like somebody who is not a cat to go and look.",
+   "taken": "She gives you the bearing and then holds on to your wrist, which a cat does not do. “It keeps the Arc's own pace,” she says. “A third of the way down and it has never once drifted. Things in a tail drift.” Then she lets go and says the Arc will want its fragments back and she wants to hear what else is aboard.",
+   "aboard": "Two fragments of the Arc, which is what a salvor would come for and what the Arc will pay for. And, racked on its own and strapped like something that was being carried rather than something that fell in, a third piece: the same glass, the same weight, and an edge that was cut rather than broken.",
+   "done": "The Arc takes its two fragments back with the exact politeness of a place that has been asked this before. The third one you do not offer and nobody asks about, which is its own kind of answer. Pell's share of the fee arrives at Nail before you do."
+  },
+  {
+   "id": "fifthsong",
+   "title": "The Fifth Song",
+   "giver": "The temple at Croak",
+   "type": "message",
+   "from": "brine",
+   "to": "croak",
+   "goods": [],
+   "pay": 0,
+   "rep": "frog",
+   "relic": "song",
+   "requires": {
+    "questsFor": {
+     "frog": 5
+    }
+   },
+   "blurb": "An invitation, which the frogs do not issue. You have done five things for them now and they have counted, because the frogs count everything. Come to the temple at Croak. Bring nothing. There is no cargo and there is no fee and the apothecary who hands you the invitation seems to think you already understand why.",
+   "taken": "“Not a job,” says the apothecary, when you reach for the manifest out of habit. “There is nothing to carry.” She hums for a while. “They will give you a thing. You will not know what it is. Nobody does. We have had it four hundred years and we sing about it, which is not the same as knowing.”",
+   "done": "The temple sings the fifth song, which takes most of a day and which nobody translates for you. At the end of it an old frog puts something into your hands that is warm and is not alive and has a cut edge, and closes your fingers round it, and hums once, and goes to sit down. It is the same glass. You have seen the cut before."
+  },
+  {
+   "id": "lantern",
+   "title": "The Lantern",
+   "giver": "The Builder station at the Maw",
+   "type": "message",
+   "from": "maw",
+   "to": "lantern",
+   "goods": [],
+   "pay": 0,
+   "rep": "cat",
+   "ends": true,
+   "requires": {
+    "relics": [
+     "lens",
+     "shard",
+     "song"
+    ],
+    "hidden": true
+   },
+   "blurb": "You have come out here with three pieces of the same cut glass in the hold, and this time the Builder station is not silent. It has been aimed inward at a hole in the sky for longer than there have been people, and what it says, once, without ceremony, is a bearing. Not at the Maw. At the star going round it.",
+   "taken": "The bearing is four hundred thousand kilometres off the Dancer and it is not a place anything should be. Tsuki reads it twice and does not say the thing she is thinking. The station goes quiet again the moment the bearing is given, and nothing anybody tries afterwards gets another word out of it.",
+   "done": "There is a station in a close circle round the Dancer, lit, keeping station, and not answering either. It has been there the whole time — behind the star, in front of the star, and never once anywhere a ship without three pieces of glass would have had reason to look. Your lines go across. Something on the other end takes them."
+  }
+ ],
+ "relics": [
+  {
+   "id": "lens",
+   "name": "The Ninth Lens",
+   "blurb": "Emberkin work, and older than the Emberkin. Bought at Veyra for a year of trading."
+  },
+  {
+   "id": "shard",
+   "name": "The Tail Fragment",
+   "blurb": "Taken off a hull in the Arc’s tail. Nothing that fell off the Arc is shaped like this."
+  },
+  {
+   "id": "song",
+   "name": "The Fifth Song",
+   "blurb": "Given by the frogs at Croak, to somebody who had done enough for them to be given things."
   }
  ]
 };

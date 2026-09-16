@@ -1105,7 +1105,7 @@ function renderHud(docking){
      readout should say so rather than give the answer away. */
   const whose = S.nameFor(state.ship.body, S.unseen(state));
   $('h-where').textContent = state.dockedAt
-    ? `${S.isWreck(state.dockedAt) ? 'Alongside' : 'Docked at'} ${S.portName(state.dockedAt)}`
+    ? `${S.isHulk(state.dockedAt) ? 'Alongside' : 'Docked at'} ${S.portName(state.dockedAt)}`
     : Number.isFinite(el.period) ? `In orbit around ${whose}`
     : `Passing through ${whose}'s gravity`;
   const hint = $('dockhint');
@@ -1705,6 +1705,9 @@ const TABS_DOCK = [['shipyard', 'Shipyard'], ['market', 'Trading'], ['requests',
 /* A wreck has no stall, no pump, no board and nobody to talk to, so it gets
    none of those four. What it has is what is aboard it. */
 const TABS_WRECK = [['salvage', 'Salvage']];
+/* And the end of the line gets one of its own. It is not a wreck and there is
+   nothing aboard it to take: what is there is whatever happens next. */
+const TABS_STATION = [['station', 'The Lantern']];
 let panelMenu = 'ship';
 /* Which face was last pressed, where the ship was when it was, and how far
    through that person's lines we have got. Deliberately not in the save: a
@@ -1719,7 +1722,13 @@ let lastTabsKey = null;
    until it is bought, and then it is. Next to Ship, which is where the rest of
    what is fitted to the ship is listed. */
 function tabsFor(){
-  if(panelMenu === 'dock' && state.dockedAt) return S.isWreck(state.dockedAt) ? TABS_WRECK : TABS_DOCK;
+  if(panelMenu === 'dock' && state.dockedAt){
+    if(S.isWreck(state.dockedAt)) return TABS_WRECK;
+    /* Anything else weightless is the station at the Dancer, which has no
+       market, no yard, no board and nobody to talk to either. */
+    if(S.isHulk(state.dockedAt)) return TABS_STATION;
+    return TABS_DOCK;
+  }
   if(!state.keys?.astrolabe) return TABS_SHIP;
   const out = [...TABS_SHIP];
   out.splice(1, 0, ['windows', 'Windows']);
@@ -1798,7 +1807,7 @@ function renderTab(){
      was and put it back. */
   const active = document.activeElement;
   const was = body.contains(active) ? (active.dataset?.act ?? active.id ?? null) : null;
-  const fn = { market, shipyard: shipyardTab, requests: requestsTab, talk, quests: questsTab, crew: crewTab, ship: shipTab, windows: astrolabeTab, salvage: salvageTab }[tab];
+  const fn = { market, shipyard: shipyardTab, requests: requestsTab, talk, quests: questsTab, crew: crewTab, ship: shipTab, windows: astrolabeTab, salvage: salvageTab, station: stationTab }[tab];
   body.innerHTML = fn ? fn() : '';
   wire(body);
   if(was){
@@ -2188,6 +2197,19 @@ function shipTab(){
     out += `<p>${c.qty} × ${esc(g.name)} <span class="lock">from ${esc(S.portName(c.from))} · paid ${S.fmtMoney(c.price)} each</span>${forWhom}</p>`;
   }
 
+  /* Not cargo and not a fitting, so neither list will have them: a relic
+     weighs nothing, cannot be sold, and nothing in the game takes one back.
+     Silent until the first one is in the bag, because a heading that says
+     "none yet" is a spoiler with a shrug on it. */
+  const relics = S.heldRelics(state);
+  if(relics.length){
+    out += `<h3>Carried</h3>`;
+    for(const r of relics){
+      out += `<div class="row"><div class="name"><b>${esc(r.name)}</b><small>${esc(r.blurb ?? '')}</small></div></div>`;
+    }
+    if(relics.length < S.RELICS.length) out += `<p class="lock">${relics.length} of ${S.RELICS.length}.</p>`;
+  }
+
   out += '<h3>Record</h3>';
   out += `<p>${state.stats.docks} docking${state.stats.docks === 1 ? '' : 's'} · ${S.fmtKms(state.stats.dvSpent)} burned in ${state.stats.burns} burn${state.stats.burns === 1 ? '' : 's'} · farthest ${fmtAu(state.stats.farthest)} from the Lamp.</p>`;
   if(state.debt > 0) out += `<p class="down">${S.fmtMoney(state.debt)} owed to the harbour bank.</p>`;
@@ -2291,6 +2313,28 @@ function salvageTab(){
       : short > 0
         ? `<p class="down">No room for it: ${short} unit${short === 1 ? '' : 's'} short. Sell something or put something down, and it comes across — she is not going anywhere.</p>`
         : '<p class="lock">Coming across now.</p>';
+  }
+  return out;
+}
+
+/* Tied up to the thing at the end of the line. Nothing to trade, nothing to
+   salvage and nobody aboard: what is here is what the last job says happens,
+   and the three things it took to be allowed to read it. */
+function stationTab(){
+  const id = state.dockedAt;
+  const b = world.get(id);
+  const q = S.QUESTS.find(x => x.ends && x.to === id);
+  const live = (state.quests ?? []).find(l => l.id === q?.id);
+  let out = `<h2>${esc(b.name)}</h2>`;
+  if(q && live?.step >= S.questSteps(q).length){
+    out += `<p class="say">${esc(q.done)}</p>`;
+  }else{
+    out += '<p class="say">Lit, keeping station, and not answering. Your lines are across and something on the other end has taken them.</p>';
+  }
+  const relics = S.heldRelics(state);
+  if(relics.length){
+    out += '<h3>What you brought</h3>';
+    for(const r of relics) out += `<div class="row"><div class="name"><b>${esc(r.name)}</b><small>${esc(r.blurb ?? '')}</small></div></div>`;
   }
   return out;
 }
@@ -2458,6 +2502,7 @@ const actions = {
     if(r.pay) bits.push(`+${S.fmtMoney(r.pay)}`);
     if(r.rep) bits.push('+ standing');
     if(r.crew) bits.push('+ a berth filled');
+    if(r.relic) bits.push(`+ ${S.relicById(r.relic)?.name ?? 'something'}`);
     if(card){
       card.classList.add('collecting');
       bits.forEach((text, i) => {

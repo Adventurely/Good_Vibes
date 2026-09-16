@@ -117,6 +117,9 @@ test('every body has what the kernel and the chart read', () => {
     assert.match(b.id, /^[a-z][a-z0-9]*$/, `${w}: id`);
     assert.equal(typeof b.name, 'string', `${w}: name`);
     assert.ok(['star', 'planet', 'moon', 'rock', 'station', 'zone', 'hole', 'wreck'].includes(b.kind), `${w}: kind ${b.kind}`);
+    /* Weightless harbours — the wrecks and the station at the Dancer — are the
+       one class with no price list behind them. */
+    const hulk = b.port && !(b.mu > 0) && b.parent;
     if(b.parent == null){ assert.equal(b.kind, 'star'); assert.equal(b.soi, null); continue; }
     assert.ok(ids.has(b.parent), `${w}: parent ${b.parent} exists`);
     for(const k of ['a', 'e', 'omega', 'M0', 'mu', 'radius']) assert.ok(Number.isFinite(b[k]), `${w}: ${k} is a number`);
@@ -177,8 +180,8 @@ test('every body has what the kernel and the chart read', () => {
      salvage job. Counted this way rather than as a magic total, so that adding
      a derelict does not read as a broken sky. */
   const wrecks = BODIES.filter(b => b.kind === 'wreck');
-  assert.equal(BODIES.length - wrecks.length, 18,
-    'the sixteen named bodies, the one that is not, and the Dancer');
+  assert.equal(BODIES.length - wrecks.length, 19,
+    'the sixteen named bodies, the one that is not, the Dancer and the station at it');
   assert.equal(wrecks.length, S.QUESTS.filter(q => q.type === 'salvage').length,
     'every wreck is a job and every salvage job is a wreck');
   assert.ok(world.get('croak').retrograde, 'Croak is retrograde');
@@ -252,7 +255,7 @@ test('every port is a body with a port, and every reference resolves', () => {
      economy entry would be four empty menus pretending otherwise. */
   for(const b of BODIES){
     if(!b.port) continue;
-    if(b.kind === 'wreck') assert.ok(!PORTS[b.id], `${b.id} is a wreck and should have no price list`);
+    if(!(b.mu > 0) && b.parent) assert.ok(!PORTS[b.id], `${b.id} is weightless and should have no price list`);
     else assert.ok(PORTS[b.id], `${b.id} is a port body with no port table`);
   }
   const known = new Set([...Object.keys(PORTS), ...Object.keys(SPECIES), 'everyone']);
@@ -266,8 +269,21 @@ test('every port is a body with a port, and every reference resolves', () => {
     const [lo, hi] = g.stock;
     assert.ok(Number.isInteger(lo) && Number.isInteger(hi) && lo >= 1 && hi >= lo, `${g.id}: stock range ${g.stock}`);
     assert.ok(['light', 'heavy'].includes(g.weight), `${g.id}: weight ${g.weight}`);
-    // Somebody, somewhere, has to want it, or it is a crate that cannot be sold.
-    assert.ok(Object.keys(PORTS).some(id => S.wantsGood(id, g.id)), `${g.id} has no buyer anywhere`);
+    /* Somebody, somewhere, has to want it, or it is a crate that cannot be
+       sold — unless that is the point of it. A `noResale` good is a relic on
+       its way into the bag: no stall in the sky will turn it back into money,
+       which is what stops the thing you were sent for being worth more as a
+       sale than as an ending. */
+    if(g.noResale){
+      assert.ok(!Object.keys(PORTS).some(id => S.wantsGood(id, g.id)), `${g.id} is unsellable and somebody wants it`);
+      const s = S.newGame(1); s.money = 999999; s.dockedAt = g.producedAt[0];
+      assert.ok(S.buy(s, g.id, 1).ok, `${g.id} cannot be bought where it is made`);
+      for(const port of ['veyra', 'cinder', 'tassel', 'nail']){
+        assert.equal(S.sell({ ...s, dockedAt: port }, g.id, 1).ok, false, `${g.id} sold at ${port}`);
+      }
+    }else{
+      assert.ok(Object.keys(PORTS).some(id => S.wantsGood(id, g.id)), `${g.id} has no buyer anywhere`);
+    }
   }
 });
 
@@ -456,7 +472,12 @@ test('the text has every line the game asks for', () => {
     assert.ok(built.length >= 1 && built.every(st => st.id && st.text), `quest ${q.id} builds no steps`);
     assert.ok((q.steps ?? []).length <= built.length, `quest ${q.id} writes more step text than it has steps`);
     for(const st of q.goods ?? []) assert.ok(GOODS.some(g => g.id === st.good), `quest ${q.id} wants unknown ${st.good}`);
-    for(const id of [q.from, q.to, ...(q.stops ?? [])]) if(id) assert.ok(PORTS[id], `quest ${q.id} names unknown port ${id}`);
+    assert.ok(PORTS[q.from], `quest ${q.id} is offered at an unknown port ${q.from}`);
+    for(const id of [q.to, ...(q.stops ?? [])]) if(id){
+      /* A job can end somewhere with no price list: a wreck, or the station at
+         the Dancer. The sky is the authority on those. */
+      assert.ok(PORTS[id] || S.isHulk(id), `quest ${q.id} ends nowhere a ship can tie up: ${id}`);
+    }
   }
   for(const k of ['docked', 'undocked', 'burn', 'soiEnter', 'soiExit', 'sold', 'bought', 'towed', 'tolled', 'refuelled', 'upgraded']){
     assert.match(TEXT.logTemplates[k], /\{\w+\}/, `log template ${k} has a placeholder`);
@@ -733,7 +754,7 @@ test('the quests are one table in one standard shape', () => {
   /* The documented field order, which is also the order they read in: who is
      asking and what kind of job, then the places, then what it is worth, then
      the words. A record that wanders is a record somebody wrote from memory. */
-  const ORDER = ['id', 'title', 'giver', 'type', 'from', 'to', 'stops', 'wreck', 'goods', 'pay', 'rep', 'crew', 'blurb', 'taken', 'aboard', 'steps', 'done'];
+  const ORDER = ['id', 'title', 'giver', 'type', 'from', 'to', 'stops', 'wreck', 'goods', 'pay', 'rep', 'crew', 'relic', 'ends', 'requires', 'blurb', 'taken', 'aboard', 'steps', 'done'];
   for(const q of book.quests){
     const keys = Object.keys(q);
     for(const k of keys) assert.ok(ORDER.includes(k), `quest ${q.id}: ${k} is not a field of the format`);
@@ -2226,7 +2247,17 @@ test('every quest in the catalogue is one a ship can actually finish', () => {
      the cat navigator. Everything else is flyable with empty berths. */
   for(const q of S.QUESTS){
     assert.ok(['retrieval', 'delivery', 'shopping', 'message', 'chain', 'salvage'].includes(q.type), `${q.id}: ${q.type}`);
-    assert.ok(q.requires == null, `${q.id} needs something the game cannot check yet`);
+    /* `requires` was a reserved name with nothing behind it for a long time.
+       It has two forms now and both are checkable, so what this asserts is that
+       a job never asks for something the gate cannot answer. */
+    for(const k of Object.keys(q.requires ?? {})){
+      assert.ok(['questsFor', 'relics', 'hidden'].includes(k), `${q.id} requires ${k}, which nothing reads`);
+    }
+    for(const people of Object.keys(q.requires?.questsFor ?? {})){
+      assert.ok(['emberkin', 'otter', 'cat', 'frog'].includes(people), `${q.id} requires jobs for nobody: ${people}`);
+    }
+    for(const id of q.requires?.relics ?? []) assert.ok(S.relicById(id), `${q.id} requires an unknown relic ${id}`);
+    if(q.relic) assert.ok(S.relicById(q.relic), `${q.id} grants an unknown relic ${q.relic}`);
     // Every job says where it is offered, so a board will know what to put up.
     assert.ok(PORTS[q.from], `${q.id} does not say where it is given out`);
     for(const g of q.goods ?? []){
@@ -2243,8 +2274,21 @@ test('every quest in the catalogue is one a ship can actually finish', () => {
       const market = (q.goods ?? []).reduce((n, g) => n + S.sellPrice(s, q.to, g.good) * g.qty, 0);
       assert.ok(q.pay > market, `${q.id} pays ${q.pay} for a haul worth ${market} at ${q.to}`);
     }
+    /* A job whose reward is a thing rather than a fee is allowed to cost more
+       than it pays: the three at the end of the line are bought, salvaged and
+       given, and the one you buy costs a year of trading on purpose. What it
+       may never be is *sellable* — that would make the ending a commodity. */
+    if(q.relic){
+      /* Precisely: what a relic job sends you to *buy* must not be sellable, or
+         the ending is a commodity you can churn. What it sends you to salvage
+         is the haul and is meant to be sold — that is how a salvor is paid. */
+      for(const st of S.questSteps(q)){
+        if(st.kind !== 'acquire') continue;
+        assert.ok(S.goodById(st.good).noResale, `${q.id}: ${st.good} is bought for a relic and can be sold back`);
+      }
+    }
     // A job has to be worth more than selling what it asks you to fetch.
-    if(q.type === 'retrieval' || q.type === 'shopping'){
+    if(!q.relic && (q.type === 'retrieval' || q.type === 'shopping')){
       const s = S.newGame(5);
       const market = (q.goods ?? []).reduce((n, g) => n + S.sellPrice(s, q.to, g.good) * g.qty, 0);
       assert.ok(q.pay > market, `${q.id} pays ${q.pay} for goods worth ${market} on the open market at ${q.to}`);
@@ -2266,6 +2310,16 @@ test('every quest in the catalogue can be flown from its giver to its end', () =
     // The one berth a job can require: nothing holds a ship beside a wreck.
     if(q.type === 'salvage') s.crew.navigator = { role: 'navigator', from: 'test', joinedAt: 0 };
     s.quests = [];                              // one job at a time, to keep the three free
+    /* And whatever else the job is gated on. The closing line asks for jobs
+       already done for a people, and for relics already in the bag; both are
+       states a player reaches by playing, and this is the shortest way to
+       stand where they would be standing. */
+    for(const [people, n] of Object.entries(q.requires?.questsFor ?? {})){
+      const forThem = S.QUESTS.filter(x => x.rep === people && x.id !== q.id).slice(0, n);
+      assert.equal(forThem.length, n, `${q.id} wants ${n} jobs for the ${people} and there are ${forThem.length}`);
+      for(const x of forThem) s.quests.push({ id: x.id, step: 99, done: true, claimed: true, doneAt: 0, claimedAt: 0 });
+    }
+    for(const id of q.requires?.relics ?? []) s.relics[id] = { from: 'test', foundAt: 0 };
     const got = S.acceptQuest(s, q.id);
     assert.ok(got.ok, `${q.id} could not be taken at ${q.from}: ${got.reason}`);
     const live = s.quests.find(l => l.id === q.id);
@@ -2290,7 +2344,9 @@ test('every quest in the catalogue can be flown from its giver to its end', () =
     /* Finishing hands nothing over; collecting does. Both are checked, because
        a job that cannot be collected is as broken as one that cannot be flown. */
     assert.ok(S.claimQuest(s, q.id).ok, `${q.id} finished and could not be collected`);
-    assert.ok(s.money > purse, `${q.id} cost more to finish than it paid`);
+    /* Money out has to beat money in — except where the job pays in a thing,
+       which is the whole point of the closing line. */
+    if(!q.relic && !q.ends) assert.ok(s.money > purse, `${q.id} cost more to finish than it paid`);
   }
 });
 
@@ -3512,7 +3568,7 @@ test('the Knot is in the sky for everybody and on the chart only for some', () =
   /* The point of it: a horizon small enough that a ship can pass very close
      without meeting anything. Everything else in the sky is at least a
      hundred times wider. */
-  const smallest = Math.min(...BODIES.filter(b => b.id !== 'knot' && b.kind !== 'wreck').map(b => b.radius));
+  const smallest = Math.min(...BODIES.filter(b => b.id !== 'knot' && (b.mu > 0)).map(b => b.radius));
   assert.ok(k.radius * 100 < smallest, `${k.radius} should be far under ${smallest}`);
   /* Wrecks are the exception, and not a real one: a derelict is a ship, and a
      ship is smaller than a kilometre of nothing. */
@@ -3723,6 +3779,191 @@ test('a stock ship can capture at both rocks and get away again', () => {
   }
 });
 
+/* --------------------------------------------------- the end of the line */
+
+/* Three things, got three different ways, and then somewhere to take them.
+   The only new machinery under it is a `requires` gate and a bag that is
+   neither cargo nor a ship system. */
+
+const relicJobs = () => S.QUESTS.filter(q => q.relic);
+
+test('a relic is not cargo, not a fitting, and cannot be turned back into money', () => {
+  assert.equal(S.RELICS.length, 3);
+  for(const r of S.RELICS){
+    assert.ok(r.id && r.name && r.blurb, `relic ${r.id} has no words`);
+    assert.equal(relicJobs().filter(q => q.relic === r.id).length, 1, `${r.id} is granted by no job, or by two`);
+  }
+  const s = S.newGame(4);
+  assert.deepEqual(s.relics, {}, 'a new ship carries none');
+  assert.deepEqual(S.heldRelics(s), []);
+  /* A save from before they existed gets an empty bag rather than an error. */
+  const old = JSON.parse(S.serialize(s));
+  delete old.relics;
+  assert.deepEqual(S.restore(old).relics, {});
+  /* And the one that is bought is the one that could have been sold. It is the
+     only good in the game no stall will take. */
+  const lens = S.goodById('emberglass');
+  assert.equal(lens.noResale, true);
+  assert.equal(GOODS.filter(g => g.noResale).length, 1, 'more than one good is unsellable');
+  const t = S.newGame(4); t.money = 999999; t.dockedAt = 'veyra';
+  assert.ok(S.buy(t, 'emberglass', 1).ok);
+  for(const port of ['veyra', 'cinder', 'nail', 'croak']){
+    const r = S.sell({ ...t, dockedAt: port }, 'emberglass', 1);
+    assert.equal(r.ok, false, `sold at ${port}`);
+    assert.match(r.reason, /Nobody will take that/);
+  }
+});
+
+test('the gate answers in a sentence, and hides only what should be a surprise', () => {
+  const s = S.newGame(4);
+  assert.equal(S.requiresUnmet(s, S.questById('pebble')), null, 'an ungated job is gated');
+
+  /* The frogs count. Their gift is on the board from the start with its reason
+     written on it, because a job you cannot take yet is worth showing when it
+     tells you what it is waiting for. */
+  const gift = S.questById('fifthsong');
+  assert.deepEqual(gift.requires, { questsFor: { frog: 5 } });
+  assert.match(S.requiresUnmet(s, gift), /0 of 5/);
+  s.dockedAt = 'brine'; s.quests = [];
+  assert.ok(S.questsAt(s, 'brine').some(q => q.id === 'fifthsong'), 'the gift is hidden rather than shown as a goal');
+  assert.match(S.canAcceptQuest(s, gift).reason, /5 jobs done/);
+
+  /* Collected, not merely finished: the count is of jobs you went back and were
+     paid for. */
+  const frogJobs = S.QUESTS.filter(q => q.rep === 'frog' && q.id !== 'fifthsong');
+  assert.ok(frogJobs.length >= 5, `only ${frogJobs.length} frog jobs to count`);
+  for(const q of frogJobs.slice(0, 5)) s.quests.push({ id: q.id, step: 99, done: true, claimed: false });
+  assert.equal(S.questsDoneFor(s, 'frog'), 0, 'finished but uncollected jobs were counted');
+  for(const l of s.quests) l.claimed = true;
+  assert.equal(S.questsDoneFor(s, 'frog'), 5);
+  assert.equal(S.requiresUnmet(s, gift), null);
+  assert.ok(S.canAcceptQuest(s, gift).ok);
+
+  /* The last one is the other kind: off the board entirely until the three are
+     in the bag, because it is the surprise rather than the goal. */
+  const end = S.questById('lantern');
+  assert.equal(end.requires.hidden, true);
+  assert.deepEqual(end.requires.relics, ['lens', 'shard', 'song']);
+  const far = S.newGame(4); far.quests = []; far.dockedAt = 'maw';
+  assert.equal(S.questsAt(far, 'maw').length, 0, 'the Maw gives the ending away');
+  for(const id of ['lens', 'shard']) far.relics[id] = { from: 'test', foundAt: 0 };
+  assert.equal(S.questsAt(far, 'maw').length, 0, 'two of three was enough');
+  assert.match(S.requiresUnmet(far, end), /The Fifth Song/);
+  far.relics.song = { from: 'test', foundAt: 0 };
+  assert.deepEqual(S.questsAt(far, 'maw').map(q => q.id), ['lantern'], 'three in the bag and the Maw still says nothing');
+});
+
+test('the whole closing line can be played, in the order it is meant to be', () => {
+  const s = S.newGame(5);
+  s.money = 200000; s.quests = []; s.keys.astrolabe = true; s.keys.gravSensors = true;
+  s.crew.navigator = { role: 'navigator', from: 'test', joinedAt: 0 };
+
+  /* One: bought at Veyra for a year of trading. */
+  const purse = s.money;
+  s.dockedAt = 'veyra';
+  assert.ok(S.acceptQuest(s, 'ninthlens').ok);
+  assert.ok(S.buy(s, 'emberglass', 1).ok);
+  S.questCheck(s, []);
+  assert.equal(S.claimQuest(s, 'ninthlens').relic, 'lens');
+  assert.ok(purse - s.money > 15000, 'the lens was cheap');
+  assert.equal(S.usedUnits(s), 0, 'and it stayed in the hold');
+
+  /* Two: salvaged out of the Arc's tail. */
+  s.dockedAt = 'nail';
+  assert.ok(S.acceptQuest(s, 'tailend').ok);
+  const w = world.get('tailend'), lamp = world.get('lamp');
+  const st = O.railState(w, lamp.mu, s.t);
+  s.dockedAt = null; s.justLeft = null; s.justLeftAt = -1e9;
+  s.ship = { body: 'lamp', r: [st.r[0] + w.zoneRadius * 0.4, st.r[1]], v: [...st.v] };
+  s.nodes = [];
+  assert.ok(S.dock(s).ok, 'could not come alongside the tail wreck');
+  s.dockedAt = 'arc'; S.questCheck(s, []);
+  assert.equal(S.claimQuest(s, 'tailend').relic, 'shard');
+
+  /* Three: given, after five. */
+  for(const q of S.QUESTS.filter(x => x.rep === 'frog' && x.id !== 'fifthsong').slice(0, 5)){
+    s.quests.push({ id: q.id, step: 99, done: true, claimed: true, doneAt: 0, claimedAt: 0 });
+  }
+  s.dockedAt = 'brine';
+  assert.ok(S.acceptQuest(s, 'fifthsong').ok);
+  s.dockedAt = 'croak'; S.questCheck(s, []);
+  assert.equal(S.claimQuest(s, 'fifthsong').relic, 'song');
+  assert.equal(S.heldRelics(s).length, 3);
+
+  /* And the end of it, which is the only thing the Maw has ever had to offer. */
+  s.dockedAt = 'maw';
+  assert.deepEqual(S.questsAt(s, 'maw').map(q => q.id), ['lantern']);
+  assert.ok(S.acceptQuest(s, 'lantern').ok);
+  assert.equal(S.questTarget(S.questById('lantern')), 'lantern', 'the chart does not point at the station');
+  const b = world.get('lantern'), d = world.get('dancer');
+  const ls = O.railState(b, d.mu, s.t);
+  s.dockedAt = null; s.justLeft = null; s.justLeftAt = -1e9;
+  s.ship = { body: 'dancer', r: [ls.r[0] + b.zoneRadius * 0.4, ls.r[1]], v: [...ls.v] };
+  s.nodes = [];
+  const arrived = S.dock(s);
+  assert.ok(arrived.ok && arrived.port === 'lantern', 'the station refused the lines');
+  S.questCheck(s, []);
+  assert.ok(s.quests.find(l => l.id === 'lantern')?.done, 'arriving did not finish it');
+  assert.ok(S.claimQuest(s, 'lantern').ok);
+});
+
+/* Found by flying it rather than by reading it: a save made while tied up to a
+   wreck was refused on load, because `restore` asked the price list whether the
+   place existed and a derelict is deliberately not in it. You could come
+   alongside one and never get back to it. And docking at the Maw put the ship
+   at NaN, because `placeDocked` branched on mass to decide whether there was a
+   parking orbit — which stopped being the right question the day the Maw got
+   weight and kept its come-alongside harbour. */
+test('every harbour a ship can tie up to survives being put down and picked up', () => {
+  const at = (id, parent, reveal) => {
+    const s = S.newGame(5);
+    s.money = 90000; s.quests = []; s.keys.gravSensors = true;
+    s.crew.navigator = { role: 'navigator', from: 'test', joinedAt: 0 };
+    if(reveal) s.quests.push({ id: reveal, step: 0, done: false });
+    if(parent == null){ s.dockedAt = id; return s; }
+    const b = world.get(id), p = world.get(parent);
+    const st = O.railState(b, p.mu, s.t);
+    s.dockedAt = null; s.justLeft = null; s.justLeftAt = -1e9;
+    s.ship = { body: parent, r: [st.r[0] + b.zoneRadius * 0.4, st.r[1]], v: [...st.v] };
+    s.nodes = [];
+    assert.ok(S.dock(s).ok, `could not tie up to ${id}`);
+    return s;
+  };
+  const cases = [
+    ['tassel', null, null],                 // a world you park above
+    ['maw', 'lamp', null],                  // a black hole you come alongside
+    ['cutterjaw', 'slate', 'cutterjaw'],    // a wreck
+    ['lantern', 'dancer', 'lantern'],       // and the end of the line
+  ];
+  for(const [id, parent, reveal] of cases){
+    const s = at(id, parent, reveal);
+    assert.equal(s.dockedAt, id);
+    for(const v of [...s.ship.r, ...s.ship.v]) assert.ok(Number.isFinite(v), `${id}: the ship was put at ${v}`);
+    const back = S.restore(JSON.parse(S.serialize(s)));
+    assert.equal(back.dockedAt, id, `a save made at ${id} would not load`);
+  }
+  // And nowhere at all is still nowhere at all.
+  assert.throws(() => S.restore({ ...JSON.parse(S.serialize(S.newGame(1))), dockedAt: 'nowhere' }), /nowhere a ship can tie up/);
+});
+
+test('the station is off the chart until the Builders give the bearing', () => {
+  const s = S.newGame(4);
+  assert.ok(S.isHulk('lantern') && !S.isWreck('lantern'), 'the station is not a weightless harbour');
+  assert.ok(S.unseen(s).has('lantern'), 'it is on the chart from the first day');
+  s.quests.push({ id: 'lantern', step: 0, done: false });
+  assert.ok(!S.unseen(s).has('lantern'), 'taking the last job did not put it on the chart');
+  /* Every other weightless thing is still hidden: one job reveals one place. */
+  for(const id of S.WRECKS) assert.ok(S.unseen(s).has(id), `${id} came along with it`);
+
+  const b = world.get('lantern'), d = world.get('dancer');
+  assert.equal(b.parent, 'dancer', 'the station is not at the Dancer');
+  assert.equal(b.mu, 0);
+  assert.ok(b.rendezvous, 'it is orbited rather than come alongside');
+  assert.ok(b.a + b.zoneRadius < d.soi * 0.8, 'it hangs off the edge of the star it circles');
+  assert.equal(PORTS[b.id], undefined, 'the station has a price list');
+  assert.equal(S.portOpen('lantern', 0), true);
+});
+
 /* ------------------------------------------------ the three quest scenes */
 
 /* A job is written three times over: the pitch a stranger reads off the board,
@@ -3881,7 +4122,7 @@ function salvor(seed = 3){
 
 test('every wreck is a thing with no weight that a ship can tie up to', () => {
   const wrecks = wrecksOf();
-  assert.equal(wrecks.length, 7, 'seven wrecks, one per salvage job');
+  assert.equal(wrecks.length, 8, 'eight wrecks, one per salvage job');
   for(const w of wrecks){
     assert.equal(w.mu, 0, `${w.id} has weight`);
     assert.equal(w.soi, null, `${w.id} has a gravity well`);
@@ -3914,7 +4155,7 @@ test('every wreck is a thing with no weight that a ship can tie up to', () => {
 
 test('a salvage job names a wreck, and every wreck has a job that names it', () => {
   const jobs = salvageJobs();
-  assert.equal(jobs.length, 7, 'seven salvage jobs');
+  assert.equal(jobs.length, 8, 'eight salvage jobs');
   const named = jobs.map(q => q.wreck).sort();
   assert.deepEqual(named, wrecksOf().map(w => w.id).sort());
   assert.equal(new Set(named).size, named.length, 'two jobs share a wreck');
@@ -3924,9 +4165,12 @@ test('a salvage job names a wreck, and every wreck has a job that names it', () 
     assert.ok(PORTS[q.from] && PORTS[q.to], `${q.id}: from or to is not a port`);
     assert.ok((q.goods ?? []).length, `${q.id}: a salvage with nothing aboard`);
   }
-  /* The one job that is deliberately not here: the Arc leads somewhere the
-     rest of the line has not been written yet. */
-  assert.ok(!jobs.some(q => q.wreck === 'arc' || q.from === 'arc'), 'the Arc job is not built');
+  /* The eighth is the one the rest of the line was pointing at: Hull 41 hands
+     in with somebody saying to look behind the Arc rather than at it, and the
+     wreck in the Arc's tail is where that goes. */
+  const tail = S.questById('tailend');
+  assert.equal(tail.wreck, 'tailend');
+  assert.equal(tail.relic, 'shard', 'the eighth salvage is the one that pays in a relic');
 });
 
 test('a salvage is two steps: what is aboard, and who wants it', () => {
@@ -4070,12 +4314,13 @@ test('every salvage job can be flown, alongside every wreck', () => {
 test('a wreck has no market, no yard and nobody to talk to', () => {
   const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
   assert.match(PLAY, /const TABS_WRECK = \[\['salvage', 'Salvage'\]\];/, 'a wreck gets the four port tabs');
-  assert.match(PLAY, /S\.isWreck\(state\.dockedAt\) \? TABS_WRECK : TABS_DOCK/, 'and nothing switches to them');
+  assert.match(PLAY, /if\(S\.isWreck\(state\.dockedAt\)\) return TABS_WRECK;/, 'and nothing switches to them');
+  assert.match(PLAY, /if\(S\.isHulk\(state\.dockedAt\)\) return TABS_STATION;/, 'the station at the Dancer gets the port menu');
   assert.match(PLAY, /function salvageTab\(\)/, 'there is no salvage tab to switch to');
   assert.match(PLAY, /salvage: salvageTab/, 'and the tab is never rendered');
   /* Alongside, not docked at: there is no harbour here, only a hull and a line
      across to it. */
-  assert.match(PLAY, /isWreck\(state\.dockedAt\) \? 'Alongside' : 'Docked at'/, 'the readout calls it a dock');
+  assert.match(PLAY, /isHulk\(state\.dockedAt\) \? 'Alongside' : 'Docked at'/, 'the readout calls it a dock');
   for(const id of wrecksOf().map(w => w.id)){
     assert.equal(S.portOpen(id, 0), true, `${id} is shut`);
     assert.equal(PORTS[id], undefined, `${id} has a price list`);

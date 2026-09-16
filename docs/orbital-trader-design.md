@@ -741,7 +741,7 @@ frog system — so that every new place arrives with a reason to be there, and
 each of the three crew members is the reward for the stretch that introduces
 their people.
 
-**Twenty-four jobs are built.** They are written out in `quests.json`, they
+**Twenty-nine jobs are built, and the line has an ending.** They are written out in `quests.json`, they
 work, and a player meets them: the Requests tab on the dock menu lists whatever
 jobs the port you are tied up at is offering, and you can hold three at once.
 
@@ -795,9 +795,41 @@ fragment to exist as a thing to *investigate* rather than a good to carry.
 | 19 | Appraisal | Shopping List | Brine: bring an arc shard, storm crystals and reactor coils to be looked at | **Frog Appraiser** |
 | 20 | What Is This Worth? | Appraisal / Retrieval | With the frog appraiser: investigate an Arc fragment | Major lore reveal *(not built)* |
 
+### 5.0.1 The closing line
+
+**Three things, got three different ways, and then somewhere to take them.** It
+is four jobs rather than one, because `questSteps` generates step *kinds* from
+the type — you can author a step's wording but not its kind — so a single record
+spanning a purchase, a salvage, a gift and an arrival would need a type of its
+own. Four records reuse three types that were already built and tested.
+
+| | job | type | how |
+|---|---|---|---|
+| The Ninth Lens | `ninthlens` | retrieval | bought at Veyra for 22,000, which is about a year of trading |
+| The Tail Fragment | `tailend` | salvage | off a hull a third of the way down the Arc's tail |
+| The Fifth Song | `fifthsong` | message | given at the temple on Croak, after five jobs for the frogs |
+| — | `lantern` | message | the Maw's Builder station gives a bearing; the station at the Dancer is at the end of it |
+
+**A relic is neither cargo nor a fitting.** It lives in `state.relics`, weighs
+nothing, cannot be sold, cannot be taken by a toll and is never lost — where
+consigned cargo has the wrong lifetime (abandoning the job destroys it) and the
+wrong cost (a hold unit, forever). Granting one mirrors `crew` exactly: some
+jobs pay in a person, and three pay in a thing.
+
+**`requires` is the only new mechanism**, and the field name had been reserved
+with nothing behind it for a long time. Two forms: `questsFor: { frog: 5 }`
+counts jobs finished *and collected* for a people, off the save rather than out
+of a second running total; `relics: [...]` asks what is in the bag. A gated job
+sits on the board with its reason written on it, so it reads as a goal — unless
+it says `hidden`, which is how the last one stays a surprise until the three
+are in. The frogs' gift is the first kind; the ending is the second.
+
+**The ending is the one job allowed to pay in neither coin nor kind**, which is
+what `ends: true` says. There is exactly one, and the build step checks it.
+
 ### 5.1 The Types
 
-Seven kinds. **Five of them are built**; the two that need new flight are not.
+Seven kinds. **Six are built**; the seventh, Appraisal, is a retrieval in all but name.
 
 A quest is written as data — its type, the ports it names, the goods it wants
 — and the steps are generated from that. Authored wording wins where a quest

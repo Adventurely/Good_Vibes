@@ -2091,8 +2091,34 @@ face, which is one press rather than two modals racing each other. In hand, the
 card carries `taken` rather than `blurb` — you are not being sold it any more.
 No two of the three may be the same text, and the build step checks it.
 
-That is about 3,800 words across twenty-four jobs, which is most of the writing
+That is about 4,700 words across twenty-nine jobs, which is most of the writing
 in the game.
+
+### The closing line
+
+**Three things, got three different ways.** The Ninth Lens is bought at Veyra
+for about a year of trading; the Tail Fragment is salvaged off a hull a third of
+the way down the Arc's tail; the Fifth Song is given at the temple on Croak,
+after five jobs for the frogs. Then the Builder station at the Maw — silent
+since the day it was drawn — gives a bearing, and there is a station in a close
+circle round the Dancer that has been there the whole time.
+
+Four jobs rather than one, because step *kinds* are generated from the quest's
+type: you can author a step's wording but not its kind, so one record spanning a
+purchase, a salvage, a gift and an arrival would need a type of its own.
+
+**A relic is neither cargo nor a fitting.** `state.relics` weighs nothing,
+cannot be sold, cannot be taken by a toll and is never lost. Consigned cargo has
+the wrong lifetime — abandon the job and it is destroyed — and the wrong cost, a
+hold unit forever. The Ninth Lens is the one good in the game marked
+`noResale`, because every other good sells anywhere and what a port *wants* only
+moves the price: without it, the thing you were sent for would be worth more as
+a sale than as an ending.
+
+`requires` gates a job on jobs already done for a people, or on relics already
+in the bag. A gated job sits on the board with its reason on it, so it reads as
+a goal — unless it asks to be hidden, which is how the last one stays a
+surprise.
 
 ### Salvage
 

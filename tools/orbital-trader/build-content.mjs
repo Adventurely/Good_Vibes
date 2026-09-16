@@ -59,6 +59,11 @@ const QUEST_TYPES = new Set(['retrieval', 'delivery', 'shopping', 'chain', 'mess
    list — a derelict has no stall — so a salvage job's `wreck` is checked
    against the sky rather than against the ports. */
 const wreckIds = new Set(tuning.bodies.filter(b => b.kind === 'wreck' && b.port).map(b => b.id));
+/* Somewhere a job can end. Usually a port off the price list; but a weightless
+   harbour has no price list at all — a derelict has no stall, and neither does
+   a Builder station — so the sky is the authority on those. */
+const stopIds = new Set([...portIds, ...tuning.bodies.filter(b => b.port && !b.mu).map(b => b.id)]);
+const relicIds = new Set((questbook.relics ?? []).map(r => r.id));
 
 /* The quest format, as quests.json describes it. Everything here is something
  * that would otherwise fail at the far end of a flight, in a save, or not at
@@ -72,7 +77,8 @@ for(const [i, q] of (questbook.quests ?? []).entries()){
   need(!questIds.has(q?.id), at, 'two quests share an id');
   questIds.add(q?.id);
   need(QUEST_TYPES.has(q?.type), at, `type ${q?.type} is not one of ${[...QUEST_TYPES].join(', ')}`);
-  for(const k of ['from', 'to']) if(q?.[k]) need(portIds.has(q[k]), at, `${k} names no port: ${q[k]}`);
+  need(portIds.has(q?.from), at, `from names no port: ${q?.from}`);
+  need(stopIds.has(q?.to), at, `to names nowhere a ship can tie up: ${q?.to}`);
   for(const id of q?.stops ?? []) need(portIds.has(id), at, `stops names no port: ${id}`);
   need(q?.type === 'chain' || !q?.stops, at, 'stops belongs to a chain');
   if(q?.type === 'salvage'){
@@ -89,7 +95,16 @@ for(const [i, q] of (questbook.quests ?? []).entries()){
     need(Number.isInteger(g?.qty) && g.qty > 0, at, `${g?.good}: qty must be a whole number above zero`);
   }
   need(q?.type !== 'message' || !(q?.goods ?? []).length, at, 'a message carries nothing');
-  need(Number.isInteger(q?.pay) && q.pay > 0, at, 'pay must be a whole number above zero');
+  /* A job usually pays in coin. Two of them pay in the thing itself — a person
+     for a berth, or a relic — and for those the fee is allowed to be nothing,
+     because the point of the trip is what you are handed at the end of it. */
+  const paysInKind = !!q?.crew || !!q?.relic || !!q?.ends;
+  need(Number.isInteger(q?.pay) && (q.pay > 0 || (paysInKind && q.pay === 0)), at,
+    paysInKind ? 'pay must be a whole number, and may be zero when the job pays in kind'
+               : 'pay must be a whole number above zero');
+  if(q?.relic) need(relicIds.has(q.relic), at, `relic names nothing in the relics block: ${q.relic}`);
+  for(const id of q?.requires?.relics ?? []) need(relicIds.has(id), at, `requires a relic that does not exist: ${id}`);
+  for(const people of Object.keys(q?.requires?.questsFor ?? {})) need(peoples.has(people), at, `requires jobs for nobody: ${people}`);
   need(peoples.has(q?.rep), at, `rep names no people: ${q?.rep}`);
   if(q?.crew) need(berths.has(q.crew), at, `crew names no berth: ${q.crew}`);
   for(const st of q?.steps ?? []) need(st?.id && st?.text, at, 'a written step needs an id and text');
@@ -128,6 +143,22 @@ if(problems.length){
 // The simulator's private assumptions are not content.
 delete economy.sim;
 for(const p of Object.values(economy.ports)) delete p.notes;
+/* One ending, and it is the only job allowed to pay in nothing at all. */
+{
+  const ends = (questbook.quests ?? []).filter(q => q.ends);
+  need(ends.length === 1, 'the line', `${ends.length} jobs say they end it`);
+}
+
+/* And the relics themselves. */
+const seenRelics = new Set();
+for(const [i, r] of (questbook.relics ?? []).entries()){
+  const at = `relic ${r?.id ?? `#${i}`}`;
+  for(const k of ['id', 'name', 'blurb']) need(typeof r?.[k] === 'string' && r[k].length > 0, at, `${k} is required`);
+  need(!seenRelics.has(r?.id), at, 'two relics share an id');
+  seenRelics.add(r?.id);
+  need((questbook.quests ?? []).some(q => q.relic === r?.id), at, 'nothing in the line grants it');
+}
+
 // The format is written down for whoever edits the table, not for the game.
 delete questbook.notes;
 delete dialogue.notes;
