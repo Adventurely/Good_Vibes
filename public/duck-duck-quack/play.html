@@ -294,7 +294,7 @@
     ui.sound.textContent = on ? 'Music on' : 'Music off';
     ui.sound.setAttribute('aria-pressed', String(on));
   };
-  audio.play('park');
+  audio.play(LEVEL.id);
   syncSound();
 
   /* iOS Safari's Web Audio autoplay unlock is pickier than the video/audio
