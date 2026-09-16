@@ -33,7 +33,30 @@
     -webkit-font-smoothing: antialiased;
   }
 
-  .wrap{ max-width: 56rem; margin: 0 auto; }
+  /* Wide enough that a desktop or tablet screen can actually grow the play
+     area past a phone-sized canvas — fitCanvas (../good-vibes/pixel.js)
+     only ever scales up to whatever room this gives it, in whole multiples
+     of the scene's own 320x180, so a tighter cap here was the thing
+     quietly capping the game's size on every screen roomy enough to ask
+     for more. `96vw` is the floor under it on anything narrower. */
+  .wrap{ max-width: min(84rem, 96vw); margin: 0 auto; }
+
+  /* A phone held upright: shown only there (see the media query below),
+     hidden everywhere the game already has the room a landscape hold would
+     free up. A CSS-drawn glyph rather than an image — two arcs and an
+     arrowhead read as "rotate" at this size without a font's worth of emoji
+     support riding on it. */
+  .rotate-hint{
+    display: none;
+    align-items: center; gap: 0.5rem;
+    margin: 0 0 0.6rem; padding: 0.5rem 0.7rem;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+    font-size: 0.82rem; color: var(--muted);
+  }
+  .rotate-hint svg{ flex: none; width: 1.3rem; height: 1.3rem; }
+  @media (orientation: portrait) and (max-width: 640px){
+    .rotate-hint{ display: flex; }
+  }
 
   header{ display: flex; align-items: baseline; gap: 0.9rem; flex-wrap: wrap; padding-bottom: 0.5rem; }
   header h1{ margin: 0; font-size: 1.2rem; font-weight: 800; }
@@ -155,6 +178,32 @@
      tie. Placed where the rest of this stylesheet was, right after
      `.layout`, it lost silently to `.skills` and `.screen` further down and
      the sidebar rendered as four illegible columns regardless of viewport. */
+  /* Anywhere with the width to spare — a tablet, a landscape phone, an
+     ordinary desktop window — the screen and a slim sidebar sit side by
+     side instead of stacked, so the play area gets almost the whole width
+     of the page rather than sharing a column with a full-width skill grid
+     underneath it. 640px is comfortably past a portrait phone (see
+     `.rotate-hint` above, gated at the same width) and comfortably short of
+     needing the sidebar's own room measured first. The sidebar itself
+     borrows the short-phone-landscape layout's own compact styling below —
+     one skill per row, no blurb — rather than a second copy of it, since
+     "reduce how much room the sidebar takes" is the same ask at any width. */
+  @media (min-width: 640px){
+    .layout{ grid-template-columns: minmax(0, 1fr) 11rem; gap: 0.6rem; }
+    .sidebar{
+      display: flex; flex-direction: column; gap: 0.5rem;
+    }
+    .skills{ grid-template-columns: 1fr; gap: 0.3rem; margin-top: 0; }
+    .skill{ padding: 0.35rem 0.5rem; }
+    .skill .head{ display: inline-flex; vertical-align: middle; }
+    .skill .name{ display: inline; }
+    .skill .count{ display: inline; margin-left: 0.35rem; }
+    .skill .blurb{ display: none; }
+    .status{ margin-top: 0; font-size: 0.78rem; }
+    .controls{ flex-direction: column; margin-top: 0; }
+    .controls .btn{ width: 100%; }
+  }
+
   @media (orientation: landscape) and (max-height: 560px){
     body{ padding-top: 0.35rem; padding-bottom: 0.5rem; }
     header{ padding-bottom: 0.3rem; }
@@ -209,6 +258,15 @@
     <h1>Duck Duck Quack <span class="level-name" id="level-name"></span></h1>
     <a class="crumb" href="/duck-duck-quack/">&larr; levels</a>
   </header>
+
+  <p class="rotate-hint" role="note">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+      <rect x="7" y="2" width="10" height="16" rx="1.5"></rect>
+      <path d="M20 8a8 8 0 0 1-11 7.6"></path>
+      <path d="M20 8l-3-1 1-3"></path>
+    </svg>
+    Turn your phone sideways — landscape gives the flock a lot more room.
+  </p>
 
   <div class="layout">
     <div class="screen-col">

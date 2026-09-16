@@ -352,38 +352,50 @@ export const LEVEL_2 = {
   goose: { x0: 260, x1: 299, y: 150, speed: 1.5, catchRadius: 1.5 },
 };
 
-/* "The Orchard": a gap, a wall, then a drop that has nothing to do with the
- * wall at all — the first level where a wall genuinely can be answered
- * either way, Climber or Digger, and the first fact worth knowing about
- * that choice is that they are not equivalent afterward.
+/* "The Orchard": nest and pond swapped ends — the first level run the other
+ * way round (content.js's goalHeading is -1 here; see sim.js's hatchling
+ * and stepWalking for what that changes about how a duckling starts and
+ * finishes). The gap, the wall and the drop are the same three obstacles
+ * this level has always had, in the same order relative to the walk, just
+ * met heading left instead of right, and the nest sits well short of the
+ * right edge rather than hard against it (see below) — 300 to 320 for the
+ * water at 6 to 320 for solid ground was one thing; a duckling stepping off
+ * the level the moment it opened its eyes would be another.
+ *
+ * The one thing that actually changed on purpose, not just moved: the
+ * goose. It used to patrol the last stretch before the pond, a hazard with
+ * nothing much before it to be careful about. Here it patrols the first
+ * stretch out of the nest instead, close enough that the very first
+ * hatchling can meet it before a player has done anything at all. Blocker
+ * is the tool this is built to put in a player's hand early — plant one
+ * near the nest and the goose turns back for good the moment it meets it,
+ * the same way it would anywhere else in this game (see sim.js's stepGoose
+ * and stepWalking). But a planted Blocker is a wall nothing gets past,
+ * ducklings included, so one planted on the only road out of the nest
+ * strands every hatchling still behind it — the same trade a Blocker always
+ * offers, not a special case for this level. Without one, the goose still
+ * only ever gets its first duckling (see sim.js's goosedAt) — the same cost
+ * every other level with a goose already absorbs into its own quota.
  *
  * A wall's "far side" is really two different things depending on how it
  * was crossed. Dig it, and the tunnel holds the digging duckling's own
- * height the whole way through — cut down to nest level, there is no climb
- * and so nothing to come back down from either, and every duckling behind
- * it just walks through flat ground that used to be a wall. Climb it, and
- * the duckling is still standing at the wall's own elevation when the
- * plateau runs out, which is its own small drop back down — survivable
- * here (see the segments below), but real, and Digger quietly skips it.
+ * height the whole way through — no climb, and so nothing to come back down
+ * from either, and every duckling behind it just walks through flat ground
+ * that used to be a wall. Climb it, and the duckling is still standing at
+ * the wall's own elevation when the plateau runs out, which is its own real
+ * drop back down that only Flyer answers, and Digger quietly skips it.
  *
- * That asymmetry does not extend to the second hazard, on purpose: the
- * drop past the buffer at column 165 sits far enough past the wall — more
- * than DIG_MAX_STEPS beyond where the wall's own tunnel could reach, even
- * cut at full length — that no dig started at the wall can run into it.
- * Whichever way the wall was crossed, every duckling reaches that drop on
- * its own two feet, at a height only Flyer answers. Confirmed by actually
- * running it four ways: digger-and-flyer, climber-and-flyer, no-builder,
- * and no-flyer-at-all all come out exactly as their names say they should.
+ * That asymmetry does not extend to the second hazard: the mandatory drop
+ * into the low plain sits far enough past the wall that no dig started at
+ * the wall can run into it, so every duckling reaches it on its own two
+ * feet whichever way the wall was crossed. Confirmed by actually running it
+ * five ways: climb-and-flyer, dig-and-flyer, no-builder, no-flyer-at-all,
+ * and an early Blocker all come out exactly as their names say they should.
  *
- * And the pond itself sits apart from everything before it — a second gap,
- * right at the end, with the pond on the far side of it rather than just
- * more of the same ground. Bridged the same way the first one is, with the
- * same Builder, so the level's one new idea is not a new skill, just the
- * same one asked for twice: the last thing standing between a duckling and
- * the water is not the goose, it is one more span of open air. The goose's
- * beat ends right at that gap's edge rather than reaching over it — a
- * hazard that guarded a rock its patrol could not stand on would be
- * guarding something it can never actually threaten.
+ * And the pond sits apart from everything else — a second gap, right at
+ * the end, bridged the same way the first one is, with the same Builder:
+ * the last thing standing between a duckling and the water is one more
+ * span of open air, not a new skill.
  */
 export const LEVEL_3 = {
   id: 'orchard',
@@ -391,52 +403,57 @@ export const LEVEL_3 = {
   width: SCENE_W,
   height: SCENE_H,
 
-  /* [0, 35)    flat ground out of the nest
-     [35, 55)   the gap — 20 columns of pit, wants a Builder
-     [55, 85)   flat ground up to the wall
-     [85, 130)  the wall — 45 columns, short enough to dig in one go with
+  /* [0, 20)    the pond
+     [20, 35)   the second gap — 15 columns of pit, wants a Builder
+     [35, 130)  the low plain the mandatory drop lands on, the goose's old
+                beat before the reversal, now just open ground
+     [130, 160) flat ground the wall's far side drops onto — the buffer
+                past where any wall-tunnel could possibly still be cutting
+     [160, 205) the wall — 45 columns, short enough to dig in one go with
                 room to spare, but Climber answers it just as well
-     [130, 165) flat ground the far side of the wall — long enough that a
-                dig started at column 85 always runs out inside it
-     [165, 290) a real drop, 25 columns past where any wall-tunnel could
-                possibly still be cutting, and the goose's beat after it
-     [290, 300) the second gap — 10 columns of open air with nothing below,
-                same as the first, wants a second Builder
-     [300, 320) the floating rock the pond sits on, its own island the far
-                side of that gap */
+     [205, 230) flat ground up to the wall
+     [230, 250) the first gap — 20 columns of pit, wants a Builder
+     [250, 320) flat ground out of the nest, with the goose patrolling right
+                through it */
   segments: [
-    { from: 0, to: 35, y: 150 },
-    { from: 35, to: 55, y: PIT_Y },
-    { from: 55, to: 85, y: 150 },
-    { from: 85, to: 130, y: 100 },
-    { from: 130, to: 165, y: 150 },
-    { from: 165, to: 290, y: 175 },
-    { from: 290, to: 300, y: PIT_Y },
-    { from: 300, to: 320, y: 175 },
+    { from: 0, to: 20, y: 175 },
+    { from: 20, to: 35, y: PIT_Y },
+    { from: 35, to: 130, y: 175 },
+    { from: 130, to: 160, y: 150 },
+    { from: 160, to: 205, y: 100 },
+    { from: 205, to: 230, y: 150 },
+    { from: 230, to: 250, y: PIT_Y },
+    { from: 250, to: 320, y: 150 },
   ],
 
-  nestX: 6,
-  goalX: 300,
+  // 24 short of the far edge rather than 6, the way the old nest sat short
+  // of the left one — see the note above on why that margin matters more
+  // on this side.
+  nestX: 296,
+  goalX: 20,
 
-  /* Twelve hatch, nine needed — the same margin The Orchard's neighbours
-     carry, not a tighter one; the escalation here is in what a run asks of
-     a player, not in how little room it leaves for one. */
-  duckCount: 12,
+  /* Twenty-five hatch, nineteen needed — the same three-quarter margin
+     The Orchard has always carried, just against a bigger hatch. */
+  duckCount: 25,
   spawnInterval: TICK_RATE * 2,
-  timeLimit: TICK_RATE * 240,       // four minutes
+  timeLimit: TICK_RATE * 300,       // five minutes — more ducklings, more time
 
   winRatio: 0.75,
 
   /* Climber and Digger both fully supplied — a real choice for the wall,
      not a rationed one. Flyer generous too: it is needed regardless of
      that choice (see the note above), so there is no reason to make it
-     scarce on top of being mandatory. Builder: two required bridges now,
-     not one, so the spare moves with it — one over two, same margin as
-     everywhere else, not the same raw number. Blocker: present, same as
-     everywhere else, with nothing on this level that calls for it. */
-  supply: { digger: 3, builder: 3, blocker: 2, climber: 11, flyer: 11 },
+     scarce on top of being mandatory. Builder: two required bridges, one
+     spare over both, same margin as everywhere else. Blocker: five rather
+     than the usual two — the featured tool for the goose at the nest, worth
+     having enough of to actually try, not just one to prove it exists. */
+  supply: { digger: 3, builder: 3, blocker: 5, climber: 24, flyer: 24 },
 
-  goose: { x0: 250, x1: 289, y: 175, speed: 1.5, catchRadius: 1.5 },
+  // Patrols right past the nest rather than the far end of the walk — see
+  // the note above on why that moved. Starts at x0 and heads toward x1
+  // first (sim.js's newGame), so the very first hatchling gets a few
+  // seconds' grace before the goose actually swings back through the nest.
+  goose: { x0: 260, x1: 318, y: 150, speed: 1.5, catchRadius: 1.5 },
 };
 
 /* "The Grove": nest and pond both sit somewhere new — the first level not
@@ -665,6 +682,17 @@ export const LEVEL_6 = {
 export const LEVELS = [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5, LEVEL_6];
 
 export const winCount = level => Math.ceil(level.duckCount * level.winRatio);
+
+/* Which way a level is actually walked: +1 for a nest to the left of the
+   pond, the way every level before The Orchard's reversal reads, -1 for one
+   built the other way round. Nothing about a duckling's own rules cares
+   which — sim.js's hatchling and stepWalking read this once to know which
+   direction counts as "toward the pond", and pitSpanAt reads a duckling's
+   own `dir` instead, already set from this. art.js reads it too, to know
+   which side of `goalX` the water actually sits on (see drawGround). The
+   `|| 1` only ever matters for a degenerate level where nestX and goalX are
+   the same column, which no real level does. */
+export const goalHeading = level => Math.sign(level.goalX - level.nestX) || 1;
 
 /* ------------------------------------------------------------------ format */
 

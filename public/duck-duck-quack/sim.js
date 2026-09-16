@@ -10,7 +10,7 @@
 
 import { SCENE_H, FALL_SAFE, WALK_STEP, FALL_SPEED, FLY_SPEED, CLIMB_SPEED,
   BUILD_MAX_STEPS, BRIDGE_ARCH_HEIGHT, DIG_MAX_STEPS, SKILLS, GOOSE_FLEE_SPEED,
-  GOOSE_FLEE_LIFT, POOF_TICKS, buildTerrain, buildLayer, winCount } from './content.js';
+  GOOSE_FLEE_LIFT, POOF_TICKS, buildTerrain, buildLayer, winCount, goalHeading } from './content.js';
 
 /* ----------------------------------------------------------------- a duck */
 
@@ -21,7 +21,11 @@ function hatchling(level, groundY){
     id: nextId++,
     x: level.nestX,
     y: groundY,
-    dir: 1,
+    // Toward the pond, whichever side of the nest that is — see content.js's
+    // goalHeading. Every level before The Orchard's reversal has a pond to
+    // the right of its nest, where this is just 1; it is what makes a level
+    // built the other way round walk correctly from the moment it hatches.
+    dir: goalHeading(level),
     state: 'walking',   // walking | falling | digging | building | climbing | blocking | saved | lost
     // Digger and Climber are traits, and a duckling can hold both at once —
     // see assignSkill for why. Builder and Blocker are not in here at all:
@@ -114,13 +118,18 @@ const setBridgeAt = (state, x, y) => { state.bridgeY[columnAt(state, x)] = y; };
    run into it, not just start against it — this is what lets it. */
 const rockAt = (state, x) => state.rock[columnAt(state, x)];
 
-/* How many columns of open pit start at `x` — read once, the moment a
-   Builder starts, so its bridge can be given a shape (see stepBuilding)
-   that is guaranteed to land back at the far bank rather than guessed a
-   column at a time. Capped at BUILD_MAX_STEPS same as the build itself. */
-const pitSpanAt = (state, x, cap) => {
+/* How many columns of open pit start at `x`, scanning the same direction the
+   builder is actually walking — read once, the moment a Builder starts, so
+   its bridge can be given a shape (see stepBuilding) that is guaranteed to
+   land back at the far bank rather than guessed a column at a time. Capped
+   at BUILD_MAX_STEPS same as the build itself. `dir` is the duckling's own
+   `d.dir`, not the level's heading — a builder always walks toward the
+   pond, but on a reversed level (content.js's goalHeading) that is -1, and
+   scanning the wrong way here would count solid ground behind the gap
+   instead of the gap itself. */
+const pitSpanAt = (state, x, cap, dir) => {
   let span = 0;
-  while(span < cap && groundAt(state, x + span) >= SCENE_H) span++;
+  while(span < cap && groundAt(state, x + span * dir) >= SCENE_H) span++;
   return Math.max(1, span);
 };
 
@@ -249,7 +258,11 @@ function goosedAt(state, x){
 function stepWalking(state, d){
   const level = state.level;
 
-  if(d.x >= level.goalX){ d.state = 'saved'; return; }
+  // Reached or past the pond, in whichever direction it actually lies —
+  // see content.js's goalHeading. `d.x >= level.goalX` on its own is only
+  // ever right for a level whose pond is to the right of its nest; a
+  // reversed level needs the mirror image of it instead.
+  if((d.x - level.goalX) * goalHeading(level) >= 0){ d.state = 'saved'; return; }
   if(goosedAt(state, d.x)){
     loseDuckling(state, d, 'goosed');
     // Ordinarily one catch is the whole hunt — see goosedAt above. A
@@ -475,7 +488,7 @@ export function assignSkill(state, duckId, skill){
     const nextX = d.x + d.dir;
     d.state = 'building';
     d.buildLeft = BUILD_MAX_STEPS;
-    d.buildSpan = pitSpanAt(state, nextX, BUILD_MAX_STEPS);
+    d.buildSpan = pitSpanAt(state, nextX, BUILD_MAX_STEPS, d.dir);
     d.buildBaseY = d.y;
     d.buildStep = 0;
     return d;
