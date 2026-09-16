@@ -21,7 +21,7 @@
  */
 
 import { PALETTE, hex, drawSprite, drawTextOutlined } from '../good-vibes/pixel.js';
-import { SCENE_W, SCENE_H, POOF_TICKS } from './content.js';
+import { SCENE_W, SCENE_H, POOF_TICKS, goalHeading } from './content.js';
 
 export { PALETTE, hex };
 
@@ -63,8 +63,7 @@ export const GOOSE_ART = [
  * grass, dirt and water alike rather than against whichever one it was
  * designed over. Blocker is in here for the legend on the page only — it
  * is never drawn over a duckling's head at all (see sim.js's assignSkill);
- * a planted one wears its own red bar instead. Builder is drawn, but not
- * from a held trait the way the rest of BADGE_ORDER is — see drawDuck.
+ * a planted one wears its own red bar instead.
  */
 const SKILL_BADGE = {
   digger:  ['...', '..N', 'NNN', '..N'],   // straight ahead — tunnels through
@@ -76,8 +75,12 @@ const SKILL_BADGE = {
 
 /* Drawn in this order wherever more than one is held, so the same pair
    always reads the same way round rather than in whatever order they were
-   handed out in. Builder is not here — see drawDuck. */
-const BADGE_ORDER = ['digger', 'climber', 'flyer'];
+   handed out in. Builder shows through this list while it is still armed
+   and waiting for a gap (sim.js's stepWalking) same as any other trait; see
+   drawDuck for the moment it stops being one — a held Builder still needs
+   its badge even once it has been spent starting the very bridge it is
+   drawn over. */
+const BADGE_ORDER = ['digger', 'builder', 'climber', 'flyer'];
 
 const BADGE_W = 3, BADGE_H = 4, BADGE_PAD = 1, BADGE_GAP = 1;
 export const BADGE_PLATE_W = BADGE_W + BADGE_PAD * 2;
@@ -156,31 +159,48 @@ const SKY_SEAM_Y = 92;
 const SKY_SEAM_H = 4;
 
 /* Three overlapping domes rather than one ridge line — a single hill silhouette
-   reads as a speed bump; three at different widths and heights read as a range.
-   Each is drawn one row at a time, narrowing toward the top, the same technique
-   Sunward's clouds use for the same reason: a shape built from a few dozen
-   short horizontal runs costs nothing next to filling it pixel by pixel.
-   Static rather than parallaxed — the flock never gets far enough from the
-   camera for a fixed background to give the game away. */
+ * reads as a speed bump; three at different widths and heights read as a range.
+ * Each is drawn one row at a time, narrowing toward the top, the same technique
+ * Sunward's clouds use for the same reason: a shape built from a few dozen
+ * short horizontal runs costs nothing next to filling it pixel by pixel.
+ * Static rather than parallaxed — the flock never gets far enough from the
+ * camera for a fixed background to give the game away.
+ *
+ * Green, not the slate/violet this used to be — a purple dome against a blue
+ * sky reads as a second, unrelated shape floating in the air, not as a hill,
+ * since nothing else in the scene is that colour to anchor it. Pine (`G`) is
+ * already what a tree-covered ridge looks like everywhere else this palette
+ * is used. `haze` is how far each one blends toward the sky's own cyan —
+ * `0` for the nearest hill, closer to `1` for the furthest — the ordinary
+ * trick of aerial perspective: what is far away is paler and cooler, which is
+ * what actually tells three overlapping domes apart as near, middle and far
+ * rather than as one flat frieze.
+ */
 const HILLS = [
-  { cx: 44, w: 100, h: 15, key: 's' },
-  { cx: 168, w: 130, h: 22, key: 'v' },
-  { cx: 274, w: 110, h: 17, key: 's' },
+  { cx: 44, w: 100, h: 15, key: 'G', haze: 0.12 },
+  { cx: 168, w: 130, h: 22, key: 'G', haze: 0.5 },
+  { cx: 274, w: 110, h: 17, key: 'G', haze: 0.28 },
 ];
 
 function drawHills(ctx){
   for(const hill of HILLS){
-    ctx.fillStyle = hex(hill.key);
     for(let row = 0; row < hill.h; row++){
       const y = SKY_SEAM_Y + SKY_SEAM_H + hill.h - row;
       if(y >= SCENE_H) continue;
-      // A dome: wide at the base, narrowing to nothing at the crown, along
-      // a quarter-circle rather than a triangle so the skyline curves.
+      // A dome: wide at the base (row 0, down at the seam), narrowing to
+      // nothing at the crown (the highest row), along a quarter-circle
+      // rather than a triangle so the skyline curves.
       const t = row / hill.h;
-      const width = Math.round(hill.w * Math.sqrt(Math.max(0, 1 - (1 - t) * (1 - t))));
+      const width = Math.round(hill.w * Math.sqrt(Math.max(0, 1 - t * t)));
       if(width <= 0) continue;
-      ctx.fillRect(Math.round(hill.cx - width / 2), y, width, 1);
+      const left = Math.round(hill.cx - width / 2);
+      ditherSeam(ctx, left, y, width, 1, hill.key, 'c', hill.haze);
     }
+    // A single brighter row along the crown — sunlight catching the ridge
+    // line, the same reasoning drawStoneColumn's paler top edge uses.
+    const crownY = SKY_SEAM_Y + SKY_SEAM_H + 1;
+    ctx.fillStyle = hex('t');
+    ctx.fillRect(Math.round(hill.cx - 1), crownY, 2, 1);
   }
 }
 
@@ -313,6 +333,15 @@ function drawFloatingEdge(ctx, x, bottom){
   ctx.fillRect(x, bottom, 1, 1 + (h >>> 29));
 }
 
+/* Whether `x` is on the pond's side of `goalX` — see content.js's
+   goalHeading. Shared by drawGround and the three scatters below it (tufts,
+   flowers, rock speckle), all of which need to stop decorating the lawn
+   once it turns into water, whichever side of `goalX` that water is on. */
+const isPondAt = (level, x) => {
+  const heading = goalHeading(level);
+  return heading === 1 ? x >= level.goalX : x <= level.goalX;
+};
+
 /* The terrain height array, filled column by column from its surface down to
  * either the bottom of the scene or, for a floating segment, no further than
  * its own `floor` (see content.js's header note) — open air below that is
@@ -328,6 +357,7 @@ function drawFloatingEdge(ctx, x, bottom){
  * for drawStoneColumn instead — see it for why.
  */
 export function drawGround(ctx, terrain, level, rock, floors, stairs){
+  const heading = goalHeading(level);
   let stairStart = null;
   for(let x = 0; x < terrain.length; x++){
     const y = terrain[x];
@@ -336,8 +366,12 @@ export function drawGround(ctx, terrain, level, rock, floors, stairs){
     const fillH = bottom - y;
     if(fillH <= 0) continue;
 
-    if(x >= level.goalX){
-      drawWaterColumn(ctx, x, y, fillH);
+    if(isPondAt(level, x)){
+      // The two columns nearest the shore get a wet-sand lip instead of
+      // water reaching all the way to the surface — a hard cut from grass
+      // straight to open water reads as a tile boundary, not a bank.
+      const distFromShore = heading === 1 ? x - level.goalX : level.goalX - x;
+      drawWaterColumn(ctx, x, y, fillH, distFromShore < 2);
       if(bottom < SCENE_H) drawFloatingEdge(ctx, x, bottom);
       continue;
     }
@@ -450,19 +484,61 @@ function drawBridges(ctx, state){
   }
 }
 
-/* The pond: two bands of blue with a dithered seam, the same trick the sky
-   uses, so the water reads as lit from above rather than as a flat tile. */
-function drawWaterColumn(ctx, x, y, fillH){
-  const shallow = Math.min(3, fillH);
+/* The pond: three bands rather than a flat rectangle of blue — a wet-sand
+ * lip where the shore actually meets the water, then shallow cyan lit from
+ * above, then a dithered seam down into the same deep blue the sky's own
+ * horizon uses, so a pond reads as a body of water with a bed sloping away
+ * from its edge rather than a tinted floor tile. `bank` is only true for the
+ * column or two right at the shoreline (see drawGround) — everywhere else
+ * the shallow band starts right at the surface, same as before.
+ */
+function drawWaterColumn(ctx, x, y, fillH, bank){
+  let top = y, remaining = fillH;
+  if(bank && remaining > 1){
+    ctx.fillStyle = hex('N');
+    ctx.fillRect(x, top, 1, 1);
+    top += 1;
+    remaining -= 1;
+  }
+  const shallow = Math.min(3, remaining);
   ctx.fillStyle = hex('c');
-  ctx.fillRect(x, y, 1, shallow);
-  if(fillH > shallow){
-    ditherSeam(ctx, x, y + shallow, 1, Math.min(2, fillH - shallow), 'c', 'b', 0.5);
-    const deepY = y + shallow + Math.min(2, fillH - shallow);
-    if(deepY < y + fillH){
+  ctx.fillRect(x, top, 1, shallow);
+  if(remaining > shallow){
+    ditherSeam(ctx, x, top + shallow, 1, Math.min(2, remaining - shallow), 'c', 'b', 0.5);
+    const deepY = top + shallow + Math.min(2, remaining - shallow);
+    if(deepY < top + remaining){
       ctx.fillStyle = hex('b');
-      ctx.fillRect(x, deepY, 1, y + fillH - deepY);
+      ctx.fillRect(x, deepY, 1, top + remaining - deepY);
     }
+  }
+}
+
+/* A handful of short glints drifting across the surface, the same
+ * `ticks`-driven technique the sky's clouds use — a pond that never moves is
+ * the thing that reads as "a rectangle of blue", not the colour of it. Each
+ * one is a single lit pixel a row or two below the surface rather than a
+ * whole reflected sky, cheap enough to run alongside four other scenes a
+ * frame the same way the clouds already do.
+ */
+const RIPPLE_COUNT = 5;
+
+function drawRipples(ctx, terrain, level, ticks){
+  const heading = goalHeading(level);
+  const span = heading === 1 ? terrain.length - level.goalX : level.goalX;
+  if(span <= 1) return;
+  ctx.fillStyle = hex('t');
+  for(let i = 0; i < RIPPLE_COUNT; i++){
+    const speed = 0.18 + (i % 3) * 0.05;
+    // Drifts the same direction as the goose's own patrol reads on this
+    // level — away from the shore and back — wrapping across the pond's
+    // own width rather than the whole scene's.
+    const along = Math.round((ticks * speed + i * 67) % span);
+    const x = heading === 1 ? level.goalX + along : level.goalX - along;
+    if(x < 0 || x >= terrain.length) continue;
+    const y = terrain[x];
+    if(y >= SCENE_H) continue;
+    const ry = y + 2 + (i % 2);
+    ctx.fillRect(x, ry, 1, 1);
   }
 }
 
@@ -478,7 +554,7 @@ function drawTufts(ctx, terrain, level, rock){
     const h = Math.imul(i + 7, 2246822519) >>> 0;
     const x = h % terrain.length;
     const y = terrain[x];
-    if(y >= SCENE_H || x >= level.goalX || (rock && rock[x])) continue;
+    if(y >= SCENE_H || isPondAt(level, x) || (rock && rock[x])) continue;
     ctx.fillStyle = hex((h >>> 17) & 1 ? 't' : 'g');
     ctx.fillRect(x, y - 1, 1, 1);
   }
@@ -497,7 +573,7 @@ function drawFlowers(ctx, terrain, level, rock){
     const h = Math.imul(i + 401, 2654435761) >>> 0;
     const x = h % terrain.length;
     const y = terrain[x];
-    if(y >= SCENE_H || x >= level.goalX || (rock && rock[x])) continue;
+    if(y >= SCENE_H || isPondAt(level, x) || (rock && rock[x])) continue;
     ctx.fillStyle = hex(FLOWER_COLOURS[(h >>> 13) % FLOWER_COLOURS.length]);
     ctx.fillRect(x, y - 1, 1, 1);
   }
@@ -518,7 +594,7 @@ function drawRockSpeckle(ctx, terrain, level, rock, floors){
     const h = Math.imul(i + 1109, 2246822519) >>> 0;
     const x = h % terrain.length;
     const y = terrain[x];
-    if(y >= SCENE_H || x >= level.goalX || (rock && rock[x])) continue;
+    if(y >= SCENE_H || isPondAt(level, x) || (rock && rock[x])) continue;
     const bottom = Math.min(floors ? floors[x] : SCENE_H, SCENE_H);
     const fillH = bottom - y;
     if(fillH <= 0) continue;
@@ -553,14 +629,20 @@ function drawNest(ctx, level, terrain){
    pine stems with an oak head, tall enough to break the line where lawn
    meets water the way real reeds do. A handful of fixed positions, not a
    scatter: unlike the tufts these need to actually stand at the edge, not
-   anywhere on the lawn. */
+   anywhere on the lawn. Two of the four offsets sit on the grass side, two
+   on the water side (see drawGround/isPondAt) — `heading` (content.js's
+   goalHeading) is what keeps that split correct whichever side of `goalX`
+   the water actually falls on, by flipping the sign of every offset the
+   same way the shore itself flips. */
 const CATTAIL_DX = [-4, -1, 3, 7];
 
 function drawCattails(ctx, level, terrain){
-  const bankY = terrain[Math.max(0, level.goalX - 1)];
+  const heading = goalHeading(level);
+  const landX = Math.max(0, Math.min(terrain.length - 1, level.goalX - heading));
+  const bankY = terrain[landX];
   if(bankY >= SCENE_H) return;
   for(const dx of CATTAIL_DX){
-    const x = level.goalX + dx;
+    const x = level.goalX + dx * heading;
     if(x < 0 || x >= terrain.length) continue;
     ctx.fillStyle = hex('G');
     ctx.fillRect(x, bankY - 7, 1, 7);
@@ -569,22 +651,40 @@ function drawCattails(ctx, level, terrain){
   }
 }
 
-/* Lily pads scattered across the pond, the tufts' hash-scatter trick
-   seeded a fourth way and aimed at the water columns instead of the lawn —
-   flat two-pixel ovals sitting right on the water line so the pond reads
-   as a place with life in it, not just a rectangle of blue. */
-const LILY_COUNT = 6;
+/* Lily pads scattered across the pond, the tufts' hash-scatter trick seeded
+ * a fourth way and aimed at the water columns instead of the lawn. Each pad
+ * is a small round leaf with a dark notch cut into it — the slit every real
+ * lily pad has, and the one detail that keeps it from reading as a plain
+ * green dash — and roughly a third of them carry a tiny bloom just above,
+ * a single bright petal-coloured pixel, so the pond reads as a place with
+ * flowers in it, not just leaves. `heading` (content.js's goalHeading)
+ * picks which side of `goalX` the water actually spans, same as the water
+ * fill itself (see isPondAt).
+ */
+const LILY_COUNT = 7;
+const LILY_COLOURS = ['w', 'p', 'y'];
 
 function drawLilyPads(ctx, terrain, level){
-  const span = terrain.length - level.goalX;
-  if(span <= 0) return;
-  ctx.fillStyle = hex('G');
+  const heading = goalHeading(level);
+  const span = heading === 1 ? terrain.length - level.goalX : level.goalX + 1;
+  if(span <= 1) return;
   for(let i = 0; i < LILY_COUNT; i++){
     const h = Math.imul(i + 5303, 2246822519) >>> 0;
-    const x = level.goalX + (h % span);
+    const along = h % span;
+    const x = heading === 1 ? level.goalX + along : level.goalX - along;
+    if(x < 0 || x >= terrain.length) continue;
     const y = terrain[x];
     if(y >= SCENE_H) continue;
-    ctx.fillRect(x, y, Math.min(2, terrain.length - x), 1);
+    const w = Math.min(3, heading === 1 ? terrain.length - x : x + 1);
+    const left = heading === 1 ? x : x - w + 1;
+    ctx.fillStyle = hex('G');
+    ctx.fillRect(left, y, w, 1);
+    ctx.fillStyle = hex('k');
+    ctx.fillRect(heading === 1 ? left : left + w - 1, y, 1, 1);
+    if((h >>> 9) % 3 === 0){
+      ctx.fillStyle = hex(LILY_COLOURS[(h >>> 5) % LILY_COLOURS.length]);
+      ctx.fillRect(left + (w >> 1), y - 1, 1, 1);
+    }
   }
 }
 
@@ -638,13 +738,14 @@ export function drawDuck(ctx, d, ticks = 0){
   /* Every state a duckling can be carrying something in, not just walking:
      the one currently climbing the wall or laying a bridge is exactly the
      one you most want to be able to pick out of the flock, and it was the
-     one showing nothing at all. Builder is never in `d.traits` (see
-     sim.js's assignSkill) — it is drawn straight from the state itself,
-     for exactly as long as that duckling is actively building and not a
-     tick longer, which is the one badge here that is not saying "this is
-     held" but "this is happening right now". */
+     one showing nothing at all. A held Builder shows through the ordinary
+     `d.traits` filter below like Digger or Climber do, right up until the
+     moment it is actually spent starting a bridge (sim.js's stepWalking
+     removes it from `traits` that same tick) — the explicit check here is
+     what keeps its badge showing for the rest of the build too, once it is
+     no longer a held trait but an active state instead. */
   const held = BADGE_ORDER.filter(skill => d.traits.has(skill));
-  if(d.state === 'building') held.unshift('builder');
+  if(d.state === 'building' && !held.includes('builder')) held.unshift('builder');
   if(!held.length) return;
 
   const total = held.length * BADGE_PLATE_W + (held.length - 1) * BADGE_GAP;
@@ -686,6 +787,7 @@ function drawPoof(ctx, p){
 export function paintScene(ctx, state){
   drawSky(ctx, state.ticks);
   drawGround(ctx, state.terrain, state.level, state.rock, state.floors, state.stairs);
+  drawRipples(ctx, state.terrain, state.level, state.ticks);
   drawTunnels(ctx, state);
   drawBridges(ctx, state);
   drawGoose(ctx, state);

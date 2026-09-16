@@ -647,7 +647,7 @@
 
   function enterPlaytest(){
     const level = buildLevel();
-    if(level.nestX >= level.goalX){ say('Nest has to be before the pond.', true); return; }
+    if(level.nestX === level.goalX){ say('Nest and pond cannot be the same column.', true); return; }
     playState = newGame(level);
     armed = null;
     playAcc = 0; playLast = null;
