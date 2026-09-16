@@ -311,6 +311,170 @@ export const QUESTBOOK = {
    "crew": "appraiser",
    "blurb": "Wicket would like to look at three things at once: a piece of the Arc off Nail, a storm crystal fished out of Grumm's cloud tops, and one of Cinder's reactor coils. He is not buying them. He wants them on the same table under the same lamp, and he has wanted that for some while.",
    "done": "He puts the Arc fragment, the storm crystal and the reactor coil under the one lamp and turns everything else off. Then he taps each of them in turn. The coil was wound by hand on Cinder nine days ago; the crystal came out of Grumm's weather last month; the fragment is older than anybody has a number for. All three ring at the same note. \"There,\" says Wicket. \"That is what I wanted to know.\" Then he asks where you are going next, and starts packing."
+  },
+  {
+   "id": "cutterjaw",
+   "title": "The Cutter's Jaw",
+   "giver": "Harbourmaster Wren",
+   "type": "salvage",
+   "from": "slate",
+   "to": "tassel",
+   "wreck": "cutterjaw",
+   "goods": [
+    {
+     "good": "ironore",
+     "qty": 3
+    },
+    {
+     "good": "hullplate",
+     "qty": 1
+    }
+   ],
+   "pay": 900,
+   "rep": "otter",
+   "blurb": "A mining tender has been parked over the Slate yards for two years with nobody aboard and a full hold, and the yards have finally stopped pretending it might come back. Wren wants the ore and the plate off it before somebody less careful has a go. She is very clear that this is the easy one.",
+   "aboard": "Three crates of ore still strapped where the cutter left them, and a sheet of hull plate somebody had started patching. The tools are put away. Whatever happened, it did not happen in a hurry.",
+   "done": "Wren counts it off the sling, marks the tender as cleared, and writes your name in the column where the finder goes. She says the next one will not be parked this close to home."
+  },
+  {
+   "id": "ashfall",
+   "title": "The Ashfall",
+   "giver": "A yard foreman on Veyra",
+   "type": "salvage",
+   "from": "veyra",
+   "to": "cinder",
+   "wreck": "ashfall",
+   "goods": [
+    {
+     "good": "plating",
+     "qty": 4
+    },
+    {
+     "good": "steel",
+     "qty": 2
+    }
+   ],
+   "pay": 2400,
+   "rep": "emberkin",
+   "blurb": "An ore hauler lost its tank on the Veyra run and has been falling between the two worlds ever since — out to Cinder, back in to Veyra, and round again, for longer than anybody has bothered to count. The plate in it is Cinder work and Cinder wants it back. Catching it is the job.",
+   "aboard": "Four sheets of heat plate and two of finished steel, all of it Cinder-stamped and none of it touched. The tank is a hole you could put a boat through. Nobody was aboard when it went, which is the only good news in the whole story.",
+   "done": "The Ninth Forge takes the plate back, weighs it, and pays as though it had never left. Somebody asks whether the hauler is still out there. You say it is. They seem to find that reassuring rather than otherwise."
+  },
+  {
+   "id": "tinwhistle",
+   "title": "The Tin Whistle",
+   "giver": "Dockmaster Pell",
+   "type": "salvage",
+   "from": "nail",
+   "to": "nail",
+   "wreck": "tinwhistle",
+   "goods": [
+    {
+     "good": "sensorsalvage",
+     "qty": 2
+    },
+    {
+     "good": "thrusters",
+     "qty": 1
+    }
+   ],
+   "pay": 1800,
+   "rep": "cat",
+   "blurb": "A prospector at the inner edge of the Belt that went quiet in the middle of a sentence. The cats have left it alone since, which Pell says is respect and also superstition, and she would rather a stranger went and looked. Bring the instruments back and she will not ask what else you saw.",
+   "aboard": "The instruments are intact and the thruster has been rebuilt twice. The log ends on a half-word. There is nothing wrong with the ship that anybody can point at, and that is what the cats have been declining to talk about.",
+   "done": "Pell takes the sensors, turns one over twice, and puts it down without looking at it again. “Good,” she says. “That is that one done.” She pays in full and does not ask the question you were braced for."
+  },
+  {
+   "id": "patience",
+   "title": "Grandmother's Patience",
+   "giver": "A letter forwarded from Tassel",
+   "type": "salvage",
+   "from": "whisker",
+   "to": "tassel",
+   "wreck": "patience",
+   "goods": [
+    {
+     "good": "pearls",
+     "qty": 2
+    },
+    {
+     "good": "coral",
+     "qty": 2
+    }
+   ],
+   "pay": 2100,
+   "rep": "otter",
+   "blurb": "An otter long-hauler a very long way from any water, named for somebody who is still alive and still asking after her. The letter is from the grandmother. It does not ask for the cargo back. It asks whether the name is still legible on the bow, and if the answer is yes, would you bring home what she was carrying.",
+   "aboard": "The name is still legible. She was carrying pearls and coral out to the Belt, which is a strange thing to carry that far and exactly the sort of thing an otter would try once. Everything is where it was stowed.",
+   "done": "The grandmother opens the crate on the step, the way Tassel opens everything, and hands a pearl to each of the four people who came out to watch. She keeps the coral. She asks you to say the name out loud, and then thanks you as though you had done something much larger."
+  },
+  {
+   "id": "sixthforge",
+   "title": "The Sixth Forge",
+   "giver": "A factor at Whisker",
+   "type": "salvage",
+   "from": "whisker",
+   "to": "veyra",
+   "wreck": "sixthforge",
+   "goods": [
+    {
+     "good": "coils",
+     "qty": 3
+    },
+    {
+     "good": "embersilk",
+     "qty": 2
+    }
+   ],
+   "pay": 3200,
+   "rep": "emberkin",
+   "blurb": "An Emberkin freighter stopped between the two havens with everything aboard still crated and labelled. The factor has the manifest and no ship; you have a ship and no manifest. He proposes the obvious arrangement and is unusually honest about what the coils are worth on Veyra.",
+   "aboard": "Crates, labels, and a manifest that matches them exactly, which on this side of the Belt is startling. Reactor coils and ember silk, all of it bound for Veyra when it stopped. It has been stopped a long time.",
+   "done": "Veyra takes delivery at auction, in public, because a price nobody witnessed settles nothing. The factor's cut goes back across the Belt by some route he declines to describe, and yours is counted into your hand in front of everybody."
+  },
+  {
+   "id": "longsweet",
+   "title": "The Long Sweet",
+   "giver": "The harbour at Haven",
+   "type": "salvage",
+   "from": "haven",
+   "to": "croak",
+   "wreck": "longsweet",
+   "goods": [
+    {
+     "good": "cider",
+     "qty": 3
+    }
+   ],
+   "pay": 4200,
+   "rep": "frog",
+   "blurb": "A cider transport circling wide above Haven, high and slow and perfectly intact. Nobody has been able to say what happened to the crew and the frogs have stopped asking. What they have not stopped doing is wanting the cider, which is older now than it was, and which Croak will pay for in a way Croak does not usually pay for anything.",
+   "aboard": "Three casks, upright, cold, and entirely undisturbed. The galley is laid for a meal that was never eaten. The frogs who told you about this ship told you about the cider and not about the galley, and now you understand why.",
+   "done": "Croak receives it the way Croak receives everything, which is slowly and with a great deal of humming. The cider is poured for the temple first and sold afterwards. Somebody asks you to describe the galley. You do. They nod as though it confirms something, and do not explain what."
+  },
+  {
+   "id": "hull41",
+   "title": "Hull 41",
+   "giver": "Dockmaster Pell",
+   "type": "salvage",
+   "from": "nail",
+   "to": "whisker",
+   "wreck": "hull41",
+   "goods": [
+    {
+     "good": "arcshard",
+     "qty": 2
+    },
+    {
+     "good": "hullplate",
+     "qty": 2
+    }
+   ],
+   "pay": 5400,
+   "rep": "cat",
+   "blurb": "A hull at the outer edge of the Belt with a yard number on it and no name. Nobody built it and nobody lost it, which Pell says are two different problems and she would like an answer to at least one of them. There is Arc glass in it, which there should not be, and that is a thing Whisker will want to see.",
+   "aboard": "The yard number is stamped, not painted. The plate is ordinary. What is not ordinary is the Arc glass stowed in the hold of a ship that has no business having been anywhere near the Arc, packed carefully, by somebody who knew exactly what it was.",
+   "done": "Whisker looks at the glass for a long time. Then somebody says the Arc keeps a tail, and that things fall out of it that nobody put in, and that if you are going to keep pulling on this you should go and look behind the Arc rather than at it. Nobody says anything further, and everybody watches you leave."
   }
  ]
 };

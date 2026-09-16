@@ -194,7 +194,10 @@ export function fmtMoney(m){
  * and the rule stays because a seasonal market is a thing a port may want. */
 export function portOpen(portId, t){
   const p = PORTS[portId];
-  if(!p) return false;
+  /* A wreck has no entry in the price list at all — no market, no yard, nobody
+     to keep hours — so "open" is only whether the thing is there. Anything
+     else with no entry is not a place you can tie up to. */
+  if(!p) return isWreck(portId);
   if(p.openWithin){
     const r = norm(absState(world, portId, t).r);
     return r <= p.openWithin;
@@ -262,6 +265,12 @@ export function dockingStatus(state){
   const here = world.get(state.ship.body);
   let best = null;
   const take = st => { if(!best || st.score < best.score) best = st; };
+  /* A wreck nobody has mentioned is not a harbour. Physics still has hold of a
+     ship near one — the rails do not care what you have been told — but a
+     harbour is a place somebody told you about, and offering the refusal of an
+     unheard-of derelict in place of the world you are plainly trying to orbit
+     is the HUD answering a question nobody asked. */
+  const hidden = unseen(state);
 
   /* The rock we are inside the reach of, when that rock is one you come
      alongside. Ship coordinates are already in its frame, so the two numbers
@@ -291,7 +300,7 @@ export function dockingStatus(state){
   }
   // Rendezvous ports in this frame: near enough, slow enough.
   for(const c of world.children(here.id)){
-    if(!c.port || !c.rendezvous || state.justLeft === c.id) continue;
+    if(!c.port || !c.rendezvous || state.justLeft === c.id || hidden.has(c.id)) continue;
     const st = railState(c, here.mu, state.t);
     take(rendezvousStatus(state, c, sub(state.ship.r, st.r), sub(state.ship.v, st.v)));
   }
@@ -474,11 +483,31 @@ export const skimsAir = state => !!state?.keys?.heatShield;
  * other way, by looking, which is the phenomenon that key was always sold to
  * see. Either one puts it on the chart; neither changes the sky. */
 export const knowsKnot = state => !!(state?.crew?.navigator || state?.keys?.gravSensors);
+
+/* Wrecks: things with no weight, on rails, that you can tie up to and that
+ * nobody lives on. They are bodies in the sky like anywhere else, but they are
+ * deliberately not in the price list — a derelict has no stall, no pump, no
+ * board and nobody to talk to, and giving one an empty market would be four
+ * empty menus pretending otherwise. */
+const WRECK_IDS = new Set(BODIES.filter(b => b.kind === 'wreck').map(b => b.id));
+export const isWreck = id => WRECK_IDS.has(id);
+export const WRECKS = [...WRECK_IDS];
 /* Bodies the chart should not draw for this player. Physics never consults
  * this: a thing nobody has told you about still has hold of you. */
 export function unseen(state){
   const hide = new Set();
   if(!knowsKnot(state)) hide.add('knot');
+  /* A wreck is a rumour until somebody hands you the job that names it. Seven
+     unexplained dots on the chart from the first day would be seven questions
+     with no way to ask them; one that appears when a salvor tells you where to
+     look is a lead. Taking the job is what reveals it, and finishing the job
+     does not hide it again — you have been there now. */
+  const told = new Set();
+  for(const live of state?.quests ?? []){
+    const w = questById(live.id)?.wreck;
+    if(w) told.add(w);
+  }
+  for(const id of WRECK_IDS) if(!told.has(id)) hide.add(id);
   return hide;
 }
 /* Seeing past the encounter. The road normally stops one crossing out — see
@@ -835,6 +864,10 @@ function flag(state, name, events){
  *              together at the end
  *   chain      call at each of `stops` in order, then report back
  *   message    a sealed nothing: no goods, no weight, just be there
+ *   salvage    come alongside the wreck it names, take what is aboard, and
+ *              carry it to `to`. The only type whose first step is a place
+ *              nobody lives, and the only one that puts goods *into* the hold
+ *              rather than taking them out or handing them to you at the dock.
  *
  * Retrieval and shopping run on the same machinery — the difference is one
  * good from a named place against a list from anywhere, which is a difference
@@ -861,6 +894,8 @@ const someOf = st => `${st.qty > 1 ? `${st.qty} × ` : ''}${goodName(st.good)}`;
 const stepText = {
   acquire: st => st.port ? `Buy ${someOf(st)} at ${portName(st.port)}` : `Get ${someOf(st)}`,
   visit: st => `Call at ${portName(st.port)}`,
+  recover: st => `Come alongside ${portName(st.port)} and take ${
+    st.goods.length > 1 ? 'what is aboard' : someOf(st.goods[0])}`,
   handover: st => !st.goods.length ? `Report to ${portName(st.port)}`
     : `Take ${st.goods.length > 1 || st.goods[0].qty > 1 ? 'them' : 'it'} to ${portName(st.port)}`,
 };
@@ -876,6 +911,10 @@ export function questSteps(q){
     for(const g of goods) out.push({ kind: 'acquire', good: g.good, qty: g.qty, port: q.type === 'retrieval' ? (q.from ?? null) : null });
   }
   if(q.type === 'chain') for(const port of q.stops ?? []) out.push({ kind: 'visit', port });
+  /* Salvage: the wreck first, the buyer after. What comes off it is one step,
+     however many crates it is — you are not picking a derelict over item by
+     item, you are emptying it. */
+  if(q.type === 'salvage' && q.wreck) out.push({ kind: 'recover', port: q.wreck, goods });
   if(q.to) out.push({ kind: 'handover', port: q.to, goods });
   return out.map((st, i) => ({
     ...st,
@@ -884,9 +923,16 @@ export function questSteps(q){
   }));
 }
 
+/* Hold units a pile of crates takes up. */
+const unitsOf = goods => goods.reduce((n, g) => n + (g.qty ?? 1) * (goodById(g.good)?.units ?? 1), 0);
+
 const stepDone = {
   acquire: (state, st) => carrying(state, st.good) >= st.qty,
   visit: (state, st) => state.dockedAt === st.port,
+  /* Tied up to it, with somewhere to put what is in it. A full hold does not
+     fail the job — it simply does not finish this step, so a pilot can go and
+     make room and come back. The wreck is not going anywhere. */
+  recover: (state, st) => state.dockedAt === st.port && freeUnits(state) >= unitsOf(st.goods),
   handover: (state, st) => state.dockedAt === st.port && st.goods.every(g => carrying(state, g.good) >= g.qty),
 };
 
@@ -963,11 +1009,17 @@ export function questsAt(state, portId){
   return QUESTS.filter(q => q.from === portId && !held.has(q.id));
 }
 /* Hold units a job will cost you the moment you accept it. Only a delivery
- * hands you anything; a message weighs nothing, which is the whole joke. */
+ * hands you anything; a message weighs nothing, which is the whole joke, and a
+ * salvage costs nothing until you are alongside the thing. */
 export function questLoad(q){
   if(q?.type !== 'delivery') return 0;
-  return (q.goods ?? []).reduce((n, g) => n + (g.qty ?? 1) * (goodById(g.good)?.units ?? 1), 0);
+  return unitsOf(q.goods ?? []);
 }
+/* What a salvage will eventually want room for. Not charged at the dock — it
+ * goes aboard out there — but a ship whose whole hold is smaller than the haul
+ * can never finish the job, and finding that out at the wreck is a wasted
+ * crossing. */
+export const salvageLoad = q => q?.type === 'salvage' ? unitsOf(q.goods ?? []) : 0;
 export function canAcceptQuest(state, q){
   if(!q) return { ok: false, reason: 'No such job.' };
   const live = (state.quests ?? []).find(l => l.id === q.id);
@@ -975,6 +1027,15 @@ export function canAcceptQuest(state, q){
   if(activeQuests(state).length >= MAX_ACTIVE_QUESTS) return { ok: false, reason: `Three jobs is all anybody can hold in their head.` };
   if(questLeavesSystem(q) && !state.keys.astrolabe){
     return { ok: false, reason: 'That one leaves this sky. You would need an Astrolabe.' };
+  }
+  /* Nothing is holding you beside a wreck and nothing will catch you if you are
+     wrong. Holding a ship still against it is the cat's trick a navigator's
+     berth buys, and it is the same rule the harbour itself applies — refused
+     here rather than at the far end, because finding out there is a crossing
+     thrown away. */
+  if(q.type === 'salvage'){
+    if(!canDockDrifting(state)) return { ok: false, reason: 'Coming alongside a wreck takes a navigator. You have not got one.' };
+    if(salvageLoad(q) > holdUnits(state)) return { ok: false, reason: 'Your whole hold is smaller than what is out there.' };
   }
   const load = questLoad(q);
   if(load > freeUnits(state)) return { ok: false, reason: 'No room in the hold for it.' };
@@ -1026,8 +1087,20 @@ export function questCheck(state, events = []){
     while(live.step < steps.length){
       const step = steps[live.step];
       if(!stepDone[step.kind]?.(state, step)) break;
-      // Handing a thing over is the one step that takes something with it.
+      // Handing a thing over is the one step that takes something out of the hold.
       if(step.kind === 'handover') for(const g of step.goods) handOver(state, g.good, g.qty, q.id);
+      /* And recovering is the one that puts something in. It goes aboard as a
+         consignment, like a delivery: it is somebody else's until it is handed
+         over, so it cannot be sold and the cats do not count it for a toll. */
+      if(step.kind === 'recover'){
+        for(const g of step.goods){
+          state.cargo.push({ good: g.good, qty: g.qty, t: state.t, price: 0, from: step.port, questId: q.id });
+        }
+        events.push({ kind: 'salvaged', quest: q, wreck: step.port, goods: step.goods });
+        flag(state, 'firstSalvage', events);
+        logLine(state, 'salvaged', TEXT.logTemplates.salvaged ?? 'Salvaged from {wreck}: {what}.',
+          { wreck: portName(step.port), what: step.goods.map(g => `${g.qty} × ${goodName(g.good)}`).join(', ') });
+      }
       live.step++;
       moved = true;
     }
@@ -2245,6 +2318,10 @@ export function transferWindows(state){
   const rows = [];
   for(const b of world.bodies){
     if(b.parent !== 'lamp' || b.id === from.body?.id) continue;
+    /* Worlds, not wrecks. A window is the cheap day to cross between two
+       circles; a derelict on a long ellipse has no such day, and the
+       instrument would be offering a number that means nothing. */
+    if(b.kind === 'wreck') continue;
     const now = crossingNow(state, b.id, undefined, from);
     const best = crossingBest(state, b.id, from);
     const w = nextWindow(state, b.id);

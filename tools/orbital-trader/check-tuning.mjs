@@ -144,6 +144,40 @@ for(const b of T.bodies){
   }
 }
 
+/* --- wrecks: things with no weight, on rails, that a ship can tie up to.
+   Nothing holds a ship beside one, so the geometry has to be right rather than
+   forgiving. Three rules, and they are all about not standing on somebody
+   else's toes. */
+for(const b of T.bodies){
+  if(b.kind !== 'wreck') continue;
+  const p = by[b.parent];
+  check(`C13 ${b.id} has no weight`, b.mu === 0 && b.port === true, `mu ${b.mu}`);
+  check(`C13 ${b.id} mouth < drift reach`, b.zoneRadius > 0 && b.driftReach > b.zoneRadius,
+    `mouth ${kmOf(b.zoneRadius)} km, reach ${kmOf(b.driftReach)} km`);
+  if(p.soi){
+    /* Inside the parent's reach with room to spare, the same margin a moon
+       gets: a harbour you can only reach by hanging off the edge of a sphere
+       of influence is one arrival in three that goes wrong. */
+    check(`C13 ${b.id} stays inside ${p.id}`, b.a * (1 + b.e) + b.zoneRadius <= 0.8 * p.soi,
+      `${kmOf(b.a * (1 + b.e) + b.zoneRadius)} km <= ${kmOf(0.8 * p.soi)} km`);
+    /* And clear of the harbour it is parked over, by more than the reach that
+       bends the burn axes — or a pilot tying up at the world would find
+       forward and back suddenly measured against a derelict. */
+    check(`C13 ${b.id} keeps out of ${p.id}'s harbour`, b.a * (1 - b.e) - b.driftReach > p.zoneRadius,
+      `${kmOf(b.a * (1 - b.e) - b.driftReach)} km clear of a ${kmOf(p.zoneRadius)} km mouth`);
+  }
+  /* A wreck in the Belt is in the Belt: the whole orbit, not the average of it. */
+  if(b.parent === 'lamp' && b.a > T.belt.inner && b.a < T.belt.outer){
+    check(`C13 ${b.id} keeps to the Belt`, b.a * (1 - b.e) >= T.belt.inner && b.a * (1 + b.e) <= T.belt.outer,
+      `${(b.a * (1 - b.e)).toFixed(4)}-${(b.a * (1 + b.e)).toFixed(4)} in ${T.belt.inner}-${T.belt.outer}`);
+    /* And out of the way of the two rocks people actually live on. */
+    for(const c of [by.nail, by.whisker]){
+      const gap = Math.abs(b.a - c.a) - (b.a * b.e + c.a * c.e);
+      check(`C13 ${b.id} clear of ${c.id}`, gap >= 2 * c.soi, `${gap.toFixed(4)} >= ${(2 * c.soi).toFixed(4)}`);
+    }
+  }
+}
+
 /* --- the orbit a new game opens in, and the clock that is tuned to it.
    Low means what a pilot means by it: the high point of the orbit sits less
    than one planet-diameter above the ground. The clock then has one job — a

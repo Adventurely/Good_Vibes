@@ -993,6 +993,9 @@ function handleEvents(events){
        purse, and both of those are on the panel. Without this the Ship card
        went on listing Nellie's pebble after Nellie had it — the HUD said the
        hold was empty and the panel underneath disagreed, in the same frame. */
+    if(e.kind === 'salvaged'){
+      toast(`Off ${S.portName(e.wreck)}: ${e.goods.map(g => `${g.qty} × ${S.goodById(g.good)?.name ?? g.good}`).join(', ')}.`, 'story', 7000);
+    }
     if(e.kind === 'questStep' || e.kind === 'questDone'){ renderTab(); save(); }
   }
 }
@@ -1077,7 +1080,8 @@ function renderHud(docking){
      ship in a neat circle and of one falling past at four km/s, and those are
      not the same news. A closed path is one with a period. */
   const el = state.dockedAt ? null : elementsFromState(b.mu, state.ship.r, state.ship.v);
-  $('h-where').textContent = state.dockedAt ? `Docked at ${S.portName(state.dockedAt)}`
+  $('h-where').textContent = state.dockedAt
+    ? `${S.isWreck(state.dockedAt) ? 'Alongside' : 'Docked at'} ${S.portName(state.dockedAt)}`
     : Number.isFinite(el.period) ? `In orbit around ${b.name}`
     : `Passing through ${b.name}'s gravity`;
   const hint = $('dockhint');
@@ -1674,6 +1678,9 @@ function lookAt(id){
    and those are here, on the tab that is always open. */
 const TABS_SHIP = [['ship', 'Ship'], ['quests', 'Quests'], ['crew', 'Crew']];
 const TABS_DOCK = [['shipyard', 'Shipyard'], ['market', 'Trading'], ['requests', 'Requests'], ['talk', 'Talk']];
+/* A wreck has no stall, no pump, no board and nobody to talk to, so it gets
+   none of those four. What it has is what is aboard it. */
+const TABS_WRECK = [['salvage', 'Salvage']];
 let panelMenu = 'ship';
 /* Which face was last pressed, where the ship was when it was, and how far
    through that person's lines we have got. Deliberately not in the save: a
@@ -1688,7 +1695,7 @@ let lastTabsKey = null;
    until it is bought, and then it is. Next to Ship, which is where the rest of
    what is fitted to the ship is listed. */
 function tabsFor(){
-  if(panelMenu === 'dock' && state.dockedAt) return TABS_DOCK;
+  if(panelMenu === 'dock' && state.dockedAt) return S.isWreck(state.dockedAt) ? TABS_WRECK : TABS_DOCK;
   if(!state.keys?.astrolabe) return TABS_SHIP;
   const out = [...TABS_SHIP];
   out.splice(1, 0, ['windows', 'Windows']);
@@ -1767,7 +1774,7 @@ function renderTab(){
      was and put it back. */
   const active = document.activeElement;
   const was = body.contains(active) ? (active.dataset?.act ?? active.id ?? null) : null;
-  const fn = { market, shipyard: shipyardTab, requests: requestsTab, talk, quests: questsTab, crew: crewTab, ship: shipTab, windows: astrolabeTab }[tab];
+  const fn = { market, shipyard: shipyardTab, requests: requestsTab, talk, quests: questsTab, crew: crewTab, ship: shipTab, windows: astrolabeTab, salvage: salvageTab }[tab];
   body.innerHTML = fn ? fn() : '';
   wire(body);
   if(was){
@@ -2217,6 +2224,48 @@ function crewTab(){
   return out;
 }
 
+/* Tied up to a wreck. The one stop in the game with nobody in it, so the menu
+   is not four empty rooms pretending otherwise: it is what is aboard, whose job
+   it is, and whether it has come across yet.
+
+   A wreck with no job attached is a thing you found by flying into it, which is
+   allowed and says so. */
+function salvageTab(){
+  const id = state.dockedAt;
+  const b = world.get(id);
+  let out = `<h2>${esc(b.name)}</h2>`;
+  const mine = (state.quests ?? [])
+    .map(l => ({ live: l, q: S.questById(l.id) }))
+    .filter(x => x.q?.wreck === id);
+
+  if(!mine.length){
+    return out + '<p class="say">Nothing aboard is yours, and nobody asked you to come. '
+      + 'You are tied to a hull that has been going round this path a long time, and it will go on going round it.</p>'
+      + '<p class="lock">A salvor somewhere is holding the paperwork for this one.</p>';
+  }
+
+  for(const { live, q } of mine){
+    const steps = S.questSteps(q);
+    const recovered = live.step > 0;
+    const load = S.salvageLoad(q);
+    const short = load - S.freeUnits(state);
+    out += `<p class="say">${esc(q.aboard ?? '')}</p>`;
+    out += '<h3>The haul</h3>';
+    for(const g of q.goods ?? []){
+      const good = S.goodById(g.good);
+      out += `<div class="row"><div class="name"><b>${g.qty} × ${esc(good?.name ?? g.good)}</b>`
+        + `<small>${esc(good?.blurb ?? good?.category ?? '')}</small></div>`
+        + `<div class="price">${recovered ? '<span class="up">aboard</span>' : `${(good?.units ?? 1) * g.qty} unit${(good?.units ?? 1) * g.qty === 1 ? '' : 's'}`}</div></div>`;
+    }
+    out += recovered
+      ? `<p class="lock">Off her and into your hold. ${esc(steps[steps.length - 1]?.text ?? '')}.</p>`
+      : short > 0
+        ? `<p class="down">No room for it: ${short} unit${short === 1 ? '' : 's'} short. Sell something or put something down, and it comes across — she is not going anywhere.</p>`
+        : '<p class="lock">Coming across now.</p>';
+  }
+  return out;
+}
+
 /* The board. Fourteen quests have been written and flyable for a while with
    nowhere to press; this is the somewhere. A job says who is asking, what it
    is, and what it pays, and the Take button carries the rules: three at once,
@@ -2231,9 +2280,15 @@ function requestsTab(){
   for(const q of open){
     const can = S.canAcceptQuest(state, q);
     const load = S.questLoad(q);
+    /* A delivery takes the hold here and now; a salvage takes it at the far
+       end, which is still a number somebody deciding needs in front of them. */
+    const later = S.salvageLoad(q);
+    const room = load ? `${load} unit${load === 1 ? '' : 's'} of hold`
+      : later ? `${later} unit${later === 1 ? '' : 's'} of hold, out there`
+      : '';
     out += `<div class="quest">`;
     out += `<h3>${esc(q.title)}</h3>`;
-    out += `<p class="lock">${esc(q.giver)}${load ? ` · ${load} unit${load === 1 ? '' : 's'} of hold` : ''}</p>`;
+    out += `<p class="lock">${esc(q.giver)}${room ? ` · ${room}` : ''}</p>`;
     out += `<p class="say">${esc(q.blurb)}</p>`;
     out += '<ol class="steps">' + S.questSteps(q).map(st => `<li>${esc(st.text)}</li>`).join('') + '</ol>';
     out += `<div class="row"><div class="name"><small>${q.pay ? `Pays ${S.fmtMoney(q.pay)}` : ''}</small></div>

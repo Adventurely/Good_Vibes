@@ -739,23 +739,36 @@ frog system — so that every new place arrives with a reason to be there, and
 each of the three crew members is the reward for the stretch that introduces
 their people.
 
-**Seventeen of the twenty are built** — every one that is not salvage. They
-are written out in `quests.json`, they work, and a player meets them: the
-Requests tab on the dock menu lists whatever jobs the port you are tied up at
-is offering, and you can hold three at once.
+**Twenty-four jobs are built.** They are written out in `quests.json`, they
+work, and a player meets them: the Requests tab on the dock menu lists whatever
+jobs the port you are tied up at is offering, and you can hold three at once.
 
-The three that are not built, and why:
+**Salvage is built**, and it turned out to need no new flight at all. The
+manoeuvre it wanted — come alongside a thing with no gravity and hold there —
+is the Maw's rendezvous, which was finished for the Maw and works anywhere.
+A wreck is a body in `tuning.json` with no mass, a mouth, a closing speed and
+a drift reach, deliberately *not* in the price list: a derelict has no stall,
+no pump, no board and nobody to talk to, so it has one menu rather than four
+empty ones. Seven of them are in the sky:
 
-| # | Quest | Why not |
+| Wreck | Where | The job |
 |---|---|---|
-| 14 | First Salvage | salvage, which is flight the game does not have |
-| 15 | Lost Cargo | salvage |
-| 20 | What Is This Worth? | needs a thing to find, not a person — the appraiser exists now |
+| The Cutter's Jaw | round Slate | an otter mining tender over the yards it worked |
+| The Ashfall | an ellipse between Veyra and Cinder | an Emberkin ore hauler that lost its tank |
+| The Tin Whistle | the inner Belt | a cat prospector that went quiet mid-sentence |
+| Grandmother's Patience | the Belt | an otter long-hauler a long way from water |
+| The Sixth Forge | the Belt, between the havens | an Emberkin freighter, still crated |
+| Hull 41 | the outer Belt | a hull with a yard number and no name |
+| The Long Sweet | a wide circle above Haven | a frog cider transport, perfectly intact |
 
-Both quest chains run. Crew is settled far enough to pay out (§7.2): three of
-the seventeen hand over a person, and finishing one fills that berth. Salvage
-flight is what is left, and #20 needs an Arc fragment to exist as a good
-before it can be asked for.
+An eighth is designed and not written: it is taken at the Arc and leads into
+the debris trailing behind it, where the key item for the closing line is. Hull
+41 is the thread that points at it — Arc glass in a ship that was never near
+the Arc — and it says so in as many words when you hand it in.
+
+Both quest chains run. Crew is settled far enough to pay out (§7.2): three jobs
+hand over a person, and finishing one fills that berth. #20 still needs an Arc
+fragment to exist as a thing to *investigate* rather than a good to carry.
 
 | # | Quest | Type | Route / Goal | Reward |
 |---|---|---|---|---|
@@ -772,8 +785,8 @@ before it can be asked for.
 | 11 | Into the Belt | Delivery | Cinder → Nail: deliver reactor coils | Credits |
 | 12 | Something Shiny | Retrieval | Nail: retrieve salvaged sensors → Veyra | Credits |
 | 13 | A Cat's Request | Message | Nail → Whisker, the rock next door | **Cat Navigator** |
-| 14 | First Salvage | Salvage | With the cat navigator: recover a drifting wreck | Salvage + credits *(not built)* |
-| 15 | Lost Cargo | Salvage | Belt: intercept a derelict cargo ship | Salvage *(not built)* |
+| 14 | First Salvage | Salvage | With the cat navigator: recover a drifting wreck | Credits — seven of these are built |
+| 15 | Lost Cargo | Salvage | Belt: intercept a derelict cargo ship | Credits — four of the seven are in the Belt |
 | 16 | Medicine Run | Delivery | Nail → Brine: deliver medicinal supplies | Credits |
 | 17 | The Amber Collector | Retrieval | Brine: retrieve brine amber → Veyra | Credits |
 | 18 | A Frog's Question | Message | Brine → Glass: deliver a message | Credits / frog reputation |
@@ -798,7 +811,7 @@ build step refuses a record that does not keep to it.
 | Shopping List | one *acquire* per line on the list, then *handover* | yes |
 | Quest Chain | one *visit* per stop, in order, then *handover* | yes |
 | Message | *handover* with nothing in it: be there, that is all | yes |
-| Salvage | — | no |
+| Salvage | *recover* at the wreck, then *handover* at the destination | yes |
 | Appraisal | mechanically a retrieval | via retrieval |
 
 Three step primitives do all of it. **acquire** is satisfied by having the
@@ -810,10 +823,21 @@ Retrieval and shopping run on the same machinery. The difference — one good
 from a named place against a list from anywhere — is in the telling, not the
 rules, and saying so is cheaper than inventing a mechanical distinction.
 
-**Salvage** is still the outlier: intercept something that is not a port, a
-drifting wreck on its own rail, matched like a harbour with no harbour in it.
-It needs new *flight*, not just new bookkeeping, and it is the first real use
-of the Belt for something other than passing through.
+**Salvage** added the one step that runs the other way. *acquire*, *visit* and
+*handover* all read the hold or the dock; **recover** is the only step that
+puts something *into* the hold, and it is the mirror of handover in every
+respect — the haul rides as a consignment, so it cannot be sold and the cats do
+not count it for a toll.
+
+Two rules keep it honest. Coming alongside takes the cat navigator, which is
+the harbour's own rule applied a crossing earlier: a salvage job is refused at
+the board rather than at the far end, because a crossing spent to be told no is
+a crossing thrown away. And arriving with a full hold does not fail the job —
+the step simply does not tick, so a pilot can make room and come back. The
+wreck is not going anywhere.
+
+It is also the first real use of the Belt for something other than passing
+through: four of the seven are out there.
 
 ### 5.1.1 Taking a Job On
 
@@ -887,7 +911,8 @@ teaches at Slate, asked for again somewhere it matters.
 4. ~~A set-counting quest step, for #9 and #19.~~ Done: a shopping list earns
    one step per line and closes when they are all aboard at the destination.
 5. **Things in space that are not ports**, for #14 and #15. Still open, and
-   still the only part of the line that needs new flight.
+   built now, and it needed no new flight: the rendezvous written for the Maw
+   works at any weightless thing on a rail.
 6. ~~A quest board.~~ Done: the dock menu's Requests tab lists the jobs the
    port you are tied up at is offering, and a ship can hold three at once.
    The randomly generated contract board that used to sit behind a Passengers

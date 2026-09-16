@@ -116,7 +116,7 @@ test('every body has what the kernel and the chart read', () => {
     const w = `body "${b.id}"`;
     assert.match(b.id, /^[a-z][a-z0-9]*$/, `${w}: id`);
     assert.equal(typeof b.name, 'string', `${w}: name`);
-    assert.ok(['star', 'planet', 'moon', 'rock', 'station', 'zone', 'hole'].includes(b.kind), `${w}: kind ${b.kind}`);
+    assert.ok(['star', 'planet', 'moon', 'rock', 'station', 'zone', 'hole', 'wreck'].includes(b.kind), `${w}: kind ${b.kind}`);
     if(b.parent == null){ assert.equal(b.kind, 'star'); assert.equal(b.soi, null); continue; }
     assert.ok(ids.has(b.parent), `${w}: parent ${b.parent} exists`);
     for(const k of ['a', 'e', 'omega', 'M0', 'mu', 'radius']) assert.ok(Number.isFinite(b[k]), `${w}: ${k} is a number`);
@@ -160,7 +160,13 @@ test('every body has what the kernel and the chart read', () => {
   /* Seventeen: the sixteen the setting names, and the Knot, which it does
      not — a micro black hole the cats have never mentioned. It is in the sky
      for everybody; it is only on the chart for a ship that knows. */
-  assert.equal(BODIES.length, 17, 'the sixteen named bodies, and the one that is not');
+  /* The sixteen named bodies, the one that is not, and a wreck for every
+     salvage job. Counted this way rather than as a magic total, so that adding
+     a derelict does not read as a broken sky. */
+  const wrecks = BODIES.filter(b => b.kind === 'wreck');
+  assert.equal(BODIES.length - wrecks.length, 17, 'the sixteen named bodies, and the one that is not');
+  assert.equal(wrecks.length, S.QUESTS.filter(q => q.type === 'salvage').length,
+    'every wreck is a job and every salvage job is a wreck');
   assert.ok(world.get('croak').retrograde, 'Croak is retrograde');
 });
 
@@ -227,7 +233,14 @@ test('every port is a body with a port, and every reference resolves', () => {
     const both = p.sells.filter(s => p.buys.some(b => b.good === s.good));
     assert.equal(both.length, 0, `${id} both buys and sells ${both.map(s => s.good)}`);
   }
-  for(const b of BODIES) if(b.port) assert.ok(PORTS[b.id], `${b.id} is a port body with no port table`);
+  /* Every harbour has a price list behind it — except a wreck, which has no
+     stall, no pump, no board and nobody to talk to. Giving one an empty
+     economy entry would be four empty menus pretending otherwise. */
+  for(const b of BODIES){
+    if(!b.port) continue;
+    if(b.kind === 'wreck') assert.ok(!PORTS[b.id], `${b.id} is a wreck and should have no price list`);
+    else assert.ok(PORTS[b.id], `${b.id} is a port body with no port table`);
+  }
   const known = new Set([...Object.keys(PORTS), ...Object.keys(SPECIES), 'everyone']);
   for(const g of GOODS){
     assert.ok(g.basePrice > 0 && g.units > 0, `${g.id}: price and size`);
@@ -413,7 +426,7 @@ test('the text has every line the game asks for', () => {
   assert.ok(QUESTS.length >= 1, 'there is an opening quest');
   for(const q of QUESTS){
     assert.ok(q.id && q.title && q.giver && q.blurb && q.done, `quest ${q.id} has its words`);
-    assert.ok(['retrieval', 'delivery', 'shopping', 'chain', 'message'].includes(q.type), `quest ${q.id}: type ${q.type}`);
+    assert.ok(['retrieval', 'delivery', 'shopping', 'chain', 'message', 'salvage'].includes(q.type), `quest ${q.id}: type ${q.type}`);
     /* Steps are built from the type, not written out — so what the words have
        to supply is only the wording a generator would do worse, and it has to
        line up with the steps the type actually earns. */
@@ -698,7 +711,7 @@ test('the quests are one table in one standard shape', () => {
   /* The documented field order, which is also the order they read in: who is
      asking and what kind of job, then the places, then what it is worth, then
      the words. A record that wanders is a record somebody wrote from memory. */
-  const ORDER = ['id', 'title', 'giver', 'type', 'from', 'to', 'stops', 'goods', 'pay', 'rep', 'crew', 'blurb', 'steps', 'done'];
+  const ORDER = ['id', 'title', 'giver', 'type', 'from', 'to', 'stops', 'wreck', 'goods', 'pay', 'rep', 'crew', 'blurb', 'aboard', 'steps', 'done'];
   for(const q of book.quests){
     const keys = Object.keys(q);
     for(const k of keys) assert.ok(ORDER.includes(k), `quest ${q.id}: ${k} is not a field of the format`);
@@ -1195,8 +1208,9 @@ test('the Astrolabe reads every world that goes round the Lamp, and no moon', ()
   const named = rows.map(r => r.id).sort();
   /* Everything on a heliocentric rail except the world you are reading from.
      A moon is reached from the world it belongs to, which is a manoeuvre and
-     not a window, so none of them is on the instrument. */
-  const want = world.bodies.filter(b => b.parent === 'lamp' && b.id !== 'tassel').map(b => b.id).sort();
+     not a window, so none of them is on the instrument — and neither is a
+     wreck, which has no cheap day to cross to because it is not on a circle. */
+  const want = world.bodies.filter(b => b.parent === 'lamp' && b.kind !== 'wreck' && b.id !== 'tassel').map(b => b.id).sort();
   assert.deepEqual(named, want);
   for(const id of ['slate', 'moss', 'scorch', 'brine', 'glass', 'croak', 'haven']){
     assert.ok(!named.includes(id), `${id} is a moon and should not be a window`);
@@ -1286,7 +1300,7 @@ test('the Astrolabe reads while coasting, which is when it is wanted', () => {
 
   assert.equal(S.departureName(g), null, 'coasting, there is no world to read from');
   const rows = S.transferWindows(g);
-  assert.equal(rows.length, world.bodies.filter(b => b.parent === 'lamp').length,
+  assert.equal(rows.length, world.bodies.filter(b => b.parent === 'lamp' && b.kind !== 'wreck').length,
     'every world is reachable from open space, Tassel included');
   assert.ok(rows.some(r => r.id === 'tassel'), 'the way home is a window too');
   for(const r of rows){
@@ -2183,12 +2197,11 @@ test('a job of each kind builds the steps its kind earns', () => {
 });
 
 test('every quest in the catalogue is one a ship can actually finish', () => {
-  /* Salvage needs flight the game does not have, so it is not here. Crew is
-     no longer a reason to leave a quest out — three of them pay in a person —
-     but nothing yet *requires* one, so every quest in the list is flyable by
-     a ship with empty berths. */
+  /* Salvage is here now, and it is the one kind that *requires* a berth
+     filled: nothing holds a ship beside a wreck, so coming alongside one takes
+     the cat navigator. Everything else is flyable with empty berths. */
   for(const q of S.QUESTS){
-    assert.ok(['retrieval', 'delivery', 'shopping', 'message', 'chain'].includes(q.type), `${q.id}: ${q.type}`);
+    assert.ok(['retrieval', 'delivery', 'shopping', 'message', 'chain', 'salvage'].includes(q.type), `${q.id}: ${q.type}`);
     assert.ok(q.requires == null, `${q.id} needs something the game cannot check yet`);
     // Every job says where it is offered, so a board will know what to put up.
     assert.ok(PORTS[q.from], `${q.id} does not say where it is given out`);
@@ -2197,6 +2210,14 @@ test('every quest in the catalogue is one a ship can actually finish', () => {
       // A retrieval you cannot buy anywhere is a quest nobody can finish.
       if(q.type !== 'delivery') assert.ok(good.producedAt.length, `${q.id}: nobody makes ${g.good}`);
       if(q.type === 'retrieval') assert.ok(good.producedAt.includes(q.from), `${q.id}: ${q.from} does not sell ${g.good}`);
+    }
+    /* A salvage pays for the whole trip, because the haul is somebody else's:
+       it rides as a consignment and cannot be sold, so the fee is the reward
+       and it had better beat what the crates would have fetched. */
+    if(q.type === 'salvage'){
+      const s = S.newGame(5);
+      const market = (q.goods ?? []).reduce((n, g) => n + S.sellPrice(s, q.to, g.good) * g.qty, 0);
+      assert.ok(q.pay > market, `${q.id} pays ${q.pay} for a haul worth ${market} at ${q.to}`);
     }
     // A job has to be worth more than selling what it asks you to fetch.
     if(q.type === 'retrieval' || q.type === 'shopping'){
@@ -2218,6 +2239,8 @@ test('every quest in the catalogue can be flown from its giver to its end', () =
     s.money = 200000;
     s.keys.tempControl = true;
     s.keys.astrolabe = true;          // the harbourmaster's rule, not the flying
+    // The one berth a job can require: nothing holds a ship beside a wreck.
+    if(q.type === 'salvage') s.crew.navigator = { role: 'navigator', from: 'test', joinedAt: 0 };
     s.quests = [];                              // one job at a time, to keep the three free
     const got = S.acceptQuest(s, q.id);
     assert.ok(got.ok, `${q.id} could not be taken at ${q.from}: ${got.reason}`);
@@ -3445,8 +3468,11 @@ test('the Knot is in the sky for everybody and on the chart only for some', () =
   /* The point of it: a horizon small enough that a ship can pass very close
      without meeting anything. Everything else in the sky is at least a
      hundred times wider. */
-  const smallest = Math.min(...BODIES.filter(b => b.id !== 'knot').map(b => b.radius));
+  const smallest = Math.min(...BODIES.filter(b => b.id !== 'knot' && b.kind !== 'wreck').map(b => b.radius));
   assert.ok(k.radius * 100 < smallest, `${k.radius} should be far under ${smallest}`);
+  /* Wrecks are the exception, and not a real one: a derelict is a ship, and a
+     ship is smaller than a kilometre of nothing. */
+  for(const w of BODIES.filter(b => b.kind === 'wreck')) assert.ok(w.radius < k.radius, `${w.id} is wider than the Knot`);
 
   const green = S.newGame(1);
   assert.equal(S.knowsKnot(green), false);
@@ -3650,6 +3676,237 @@ test('a stock ship can capture at both rocks and get away again', () => {
     assert.ok(S.kms(vc) < 1.0, `${id}: a parked orbit runs at ${S.kms(vc).toFixed(3)} km/s`);
     /* And the mouth is wide enough to aim at: several times the ground. */
     assert.ok(b.zoneRadius / b.radius >= 5, `${id}: mouth is ${(b.zoneRadius / b.radius).toFixed(1)} radii`);
+  }
+});
+
+/* ----------------------------------------------------------- salvage */
+
+/* Come alongside the wreck, take what is aboard, carry it to the buyer. The
+   flight was already built — it is the Maw's rendezvous — so what is new is a
+   sixth quest type and a step that puts goods *into* the hold, which no other
+   step does. */
+
+const wrecksOf = () => BODIES.filter(b => b.kind === 'wreck');
+const salvageJobs = () => S.QUESTS.filter(q => q.type === 'salvage');
+
+/* Park the ship alongside a wreck, in its parent's frame, moving with it. */
+function comeAlongside(s, id){
+  const w = S.world.get(id), p = S.world.get(w.parent);
+  const st = O.railState(w, p.mu, s.t);
+  s.dockedAt = null; s.justLeft = null; s.justLeftAt = -1e9;
+  s.ship = { body: w.parent, r: [st.r[0] + w.zoneRadius * 0.4, st.r[1]], v: [...st.v] };
+  s.nodes = [];
+  return s;
+}
+/* A ship that can take salvage on: a navigator in the berth and money enough
+   not to be the thing under test. */
+function salvor(seed = 3){
+  const s = S.newGame(seed);
+  s.money = 200000; s.quests = []; s.keys.astrolabe = true;
+  s.crew.navigator = { role: 'navigator', from: 'test', joinedAt: 0 };
+  return s;
+}
+
+test('every wreck is a thing with no weight that a ship can tie up to', () => {
+  const wrecks = wrecksOf();
+  assert.equal(wrecks.length, 7, 'seven wrecks, one per salvage job');
+  for(const w of wrecks){
+    assert.equal(w.mu, 0, `${w.id} has weight`);
+    assert.equal(w.soi, null, `${w.id} has a gravity well`);
+    assert.ok(w.port && w.rendezvous, `${w.id} is not a harbour you come alongside`);
+    assert.ok(w.zoneRadius > 0 && w.dockSpeed > 0, `${w.id}: no mouth or no closing speed`);
+    assert.ok(w.driftReach > w.zoneRadius, `${w.id}: the axes bend inside the mouth or not at all`);
+    assert.ok(S.isWreck(w.id), `${w.id} is not known as a wreck`);
+    /* Its own parent has to be somewhere, and it has to be somewhere sane in
+       it: a wreck hanging off the edge of a sphere of influence is an arrival
+       that goes wrong. */
+    const p = S.world.get(w.parent);
+    if(p.soi) assert.ok(w.a * (1 + w.e) + w.zoneRadius <= 0.8 * p.soi, `${w.id} hangs off the edge of ${p.id}`);
+  }
+  /* And the places the design asked for, in the sky where it asked for them. */
+  const by = Object.fromEntries(wrecks.map(w => [w.id, w]));
+  assert.equal(by.cutterjaw.parent, 'slate', 'the mining tender is round Slate');
+  assert.equal(by.longsweet.parent, 'grumm', 'the cider transport is round Grumm');
+  assert.ok(by.longsweet.e === 0 && by.longsweet.a > S.world.get('haven').a,
+    'and it is a wide circle above Haven');
+  assert.equal(by.ashfall.parent, 'lamp');
+  assert.ok(by.ashfall.a * (1 - by.ashfall.e) > S.world.get('veyra').a
+    && by.ashfall.a * (1 + by.ashfall.e) < S.world.get('cinder').a,
+    'the hauler falls between Veyra and Cinder and crosses neither');
+  const belt = wrecks.filter(w => w.parent === 'lamp' && w.a > CONST.BELT.inner && w.a < CONST.BELT.outer);
+  assert.equal(belt.length, 4, 'four in the Belt');
+  for(const w of belt){
+    assert.ok(w.a * (1 - w.e) >= CONST.BELT.inner && w.a * (1 + w.e) <= CONST.BELT.outer, `${w.id} leaves the Belt`);
+  }
+});
+
+test('a salvage job names a wreck, and every wreck has a job that names it', () => {
+  const jobs = salvageJobs();
+  assert.equal(jobs.length, 7, 'seven salvage jobs');
+  const named = jobs.map(q => q.wreck).sort();
+  assert.deepEqual(named, wrecksOf().map(w => w.id).sort());
+  assert.equal(new Set(named).size, named.length, 'two jobs share a wreck');
+  for(const q of jobs){
+    assert.ok(S.isWreck(q.wreck), `${q.id}: ${q.wreck} is not a wreck`);
+    assert.ok(q.aboard, `${q.id}: nothing written for what is aboard`);
+    assert.ok(PORTS[q.from] && PORTS[q.to], `${q.id}: from or to is not a port`);
+    assert.ok((q.goods ?? []).length, `${q.id}: a salvage with nothing aboard`);
+  }
+  /* The one job that is deliberately not here: the Arc leads somewhere the
+     rest of the line has not been written yet. */
+  assert.ok(!jobs.some(q => q.wreck === 'arc' || q.from === 'arc'), 'the Arc job is not built');
+});
+
+test('a salvage is two steps: what is aboard, and who wants it', () => {
+  const q = S.questById('cutterjaw');
+  const steps = S.questSteps(q);
+  assert.equal(steps.length, 2);
+  assert.equal(steps[0].kind, 'recover');
+  assert.equal(steps[0].port, 'cutterjaw', 'the first stop is the wreck');
+  assert.equal(steps[1].kind, 'handover');
+  assert.equal(steps[1].port, q.to);
+  assert.equal(S.questTarget(q), 'cutterjaw', 'and the chart points at the wreck');
+  /* Nothing comes aboard at the dock, so a salvage costs no hold to accept —
+     but it will want the room eventually, and that is a number worth saying. */
+  assert.equal(S.questLoad(q), 0);
+  assert.ok(S.salvageLoad(q) > 0);
+});
+
+test('coming alongside a wreck takes a navigator, and the board says so', () => {
+  const bare = S.newGame(3);
+  bare.money = 200000; bare.quests = []; bare.keys.astrolabe = true;
+  bare.dockedAt = 'slate';
+  const can = S.canAcceptQuest(bare, S.questById('cutterjaw'));
+  assert.equal(can.ok, false);
+  assert.match(can.reason, /navigator/i, 'and it says which piece is missing');
+
+  const crewed = salvor();
+  crewed.dockedAt = 'slate';
+  assert.ok(S.canAcceptQuest(crewed, S.questById('cutterjaw')).ok);
+
+  /* Refused at the board rather than at the far end, because a crossing spent
+     to be told no is a crossing thrown away. It is the same rule the harbour
+     itself applies. */
+  assert.equal(S.canDockDrifting(bare), false);
+  assert.equal(S.canDockDrifting(crewed), true);
+});
+
+test('a hold that could never take the haul is refused at the board', () => {
+  const s = salvor();
+  s.dockedAt = 'nail';
+  const q = S.questById('hull41');
+  assert.ok(S.canAcceptQuest(s, q).ok, 'the starter hold takes it');
+  s.tiers = { ...s.tiers, hold: 0 };
+  const tiny = { ...s, tiers: s.tiers };
+  // Shrink the hold below the haul and the job stops being takeable.
+  const load = S.salvageLoad(q);
+  assert.ok(load > 0);
+  assert.ok(S.holdUnits(tiny) >= load, 'the smallest hold in the game still takes the biggest haul');
+});
+
+test('a wreck is a rumour until somebody hands you the job', () => {
+  const s = salvor();
+  const hidden = S.unseen(s);
+  for(const w of wrecksOf()) assert.ok(hidden.has(w.id), `${w.id} is on the chart before anybody mentioned it`);
+
+  s.dockedAt = 'slate';
+  assert.ok(S.acceptQuest(s, 'cutterjaw').ok);
+  const after = S.unseen(s);
+  assert.ok(!after.has('cutterjaw'), 'taking the job does not put the wreck on the chart');
+  for(const w of wrecksOf()) if(w.id !== 'cutterjaw') assert.ok(after.has(w.id), `${w.id} came along for the ride`);
+
+  /* Physics never reads this — the rails do not care what you have been told —
+     but a harbour is a place somebody told you about, so an unheard-of
+     derelict is not offered as one. */
+  const stranger = salvor();
+  comeAlongside(stranger, 'cutterjaw');
+  assert.equal(S.dockingStatus(stranger)?.port, 'slate', 'an unmentioned wreck is offered as a harbour');
+  const told = salvor();
+  told.dockedAt = 'slate'; S.acceptQuest(told, 'cutterjaw');
+  comeAlongside(told, 'cutterjaw');
+  assert.equal(S.dockingStatus(told)?.port, 'cutterjaw', 'and a mentioned one is not');
+});
+
+test('the haul comes aboard at the wreck and cannot be sold on the way home', () => {
+  const s = salvor();
+  s.dockedAt = 'slate';
+  S.acceptQuest(s, 'cutterjaw');
+  const q = S.questById('cutterjaw');
+  comeAlongside(s, 'cutterjaw');
+
+  const st = S.dockingStatus(s);
+  assert.equal(st.kind, 'zone', 'a wreck is come alongside, not orbited');
+  assert.ok(st.ok, 'and the approach is good');
+  const r = S.dock(s);
+  assert.ok(r.ok && r.port === 'cutterjaw');
+  assert.ok(r.events.some(e => e.kind === 'salvaged'), 'nothing came off it');
+
+  for(const g of q.goods){
+    assert.equal(S.carrying(s, g.good), g.qty, `${g.good} did not come aboard`);
+    assert.equal(S.sellable(s, g.good), 0, `${g.good} can be sold, and it is not yours`);
+  }
+  assert.ok(s.cargo.every(c => c.questId === q.id), 'the haul rides as a consignment');
+  assert.equal(s.quests[0].step, 1, 'and the step ticked over');
+
+  // Home, and paid.
+  s.dockedAt = q.to;
+  S.questCheck(s, []);
+  assert.ok(s.quests[0].done, 'handing it over does not finish the job');
+  assert.equal(S.usedUnits(s), 0, 'and it leaves nothing in the hold');
+  const claim = S.claimQuest(s, q.id);
+  assert.ok(claim.ok && claim.pay === q.pay);
+});
+
+test('a full hold waits at the wreck rather than failing the job', () => {
+  const s = salvor();
+  s.dockedAt = 'slate';
+  S.acceptQuest(s, 'cutterjaw');
+  // Fill the hold to the brim with something of your own.
+  const filler = S.goodById('ironore');
+  s.cargo = [{ good: 'ironore', qty: S.holdUnits(s) / filler.units, t: 0, price: 1, from: 'slate' }];
+  assert.equal(S.freeUnits(s), 0);
+  comeAlongside(s, 'cutterjaw');
+  assert.ok(S.dock(s).ok, 'you can still tie up to it');
+  assert.equal(s.quests[0].step, 0, 'but nothing comes across');
+  assert.equal(s.cargo.length, 1, 'and nothing is quietly dropped');
+  /* The wreck is not going anywhere: make room without leaving and it comes
+     across. A job that could be failed by arriving full would be a job nobody
+     would risk taking. */
+  s.cargo = [];
+  S.questCheck(s, []);
+  assert.equal(s.quests[0].step, 1);
+});
+
+test('every salvage job can be flown, alongside every wreck', () => {
+  for(const q of salvageJobs()){
+    const s = salvor(7);
+    s.dockedAt = q.from;
+    assert.ok(S.acceptQuest(s, q.id).ok, `${q.id} could not be taken at ${q.from}`);
+    comeAlongside(s, q.wreck);
+    const st = S.dockingStatus(s);
+    assert.ok(st?.ok, `${q.id}: could not come alongside ${q.wreck} — ${S.dockRefusal(st)}`);
+    assert.ok(S.dock(s).ok, `${q.id}: the wreck refused the lines`);
+    assert.equal(s.dockedAt, q.wreck);
+    for(const g of q.goods) assert.equal(S.carrying(s, g.good), g.qty, `${q.id}: ${g.good} did not come aboard`);
+    s.dockedAt = q.to;
+    S.questCheck(s, []);
+    assert.ok(s.quests.find(l => l.id === q.id)?.done, `${q.id} did not finish at ${q.to}`);
+    assert.ok(S.claimQuest(s, q.id).ok, `${q.id} could not be collected`);
+  }
+});
+
+test('a wreck has no market, no yard and nobody to talk to', () => {
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.match(PLAY, /const TABS_WRECK = \[\['salvage', 'Salvage'\]\];/, 'a wreck gets the four port tabs');
+  assert.match(PLAY, /S\.isWreck\(state\.dockedAt\) \? TABS_WRECK : TABS_DOCK/, 'and nothing switches to them');
+  assert.match(PLAY, /function salvageTab\(\)/, 'there is no salvage tab to switch to');
+  assert.match(PLAY, /salvage: salvageTab/, 'and the tab is never rendered');
+  /* Alongside, not docked at: there is no harbour here, only a hull and a line
+     across to it. */
+  assert.match(PLAY, /isWreck\(state\.dockedAt\) \? 'Alongside' : 'Docked at'/, 'the readout calls it a dock');
+  for(const id of wrecksOf().map(w => w.id)){
+    assert.equal(S.portOpen(id, 0), true, `${id} is shut`);
+    assert.equal(PORTS[id], undefined, `${id} has a price list`);
   }
 });
 

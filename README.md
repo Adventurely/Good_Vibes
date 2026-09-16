@@ -1972,7 +1972,34 @@ two numbers that were not the manoeuvre, and which let a ship on a wild
 ellipse tie up because it happened to be slow at the top of it.
 
 The Maw has no gravity at all, so there is no orbit to be in, and it keeps the
-near-enough-and-slow-enough rule that everywhere used to have.
+near-enough-and-slow-enough rule that everywhere used to have. So do the seven
+wrecks, which is the whole of what salvage needed.
+
+### Salvage
+
+**Seven derelicts drift on their own rails**, and tying up to one is the Maw's
+rendezvous at a smaller scale: come inside a 295 km mouth at under half a km/s
+and hold there. Nothing catches you if you are wrong, which is why it takes the
+cat navigator — and a salvage job is refused at the board rather than at the
+far end, because a crossing spent to be told no is a crossing thrown away.
+
+A wreck is a body in `tuning.json` with no mass and deliberately **no entry in
+the price list**. A derelict has no stall, no pump, no board and nobody to talk
+to; giving one an empty economy record would be four empty menus pretending
+otherwise, so a wreck has one menu instead — what is aboard, and whether it has
+come across yet.
+
+Salvage added the only step that runs the other way. *acquire*, *visit* and
+*handover* all read the hold or the dock; **recover** is the one step that puts
+something *into* it. The haul rides as a consignment, so it cannot be sold and
+the cats do not count it for a toll, and arriving with a full hold does not
+fail the job — the step simply does not tick until there is room. The wreck is
+not going anywhere.
+
+They are hidden until somebody hands you the job that names one. Physics never
+reads that — the rails do not care what you have been told — but a harbour is a
+place somebody told you about, so an unheard-of derelict is not offered as one,
+and the HUD goes on answering the question you were actually asking.
 
 ### Flying it
 

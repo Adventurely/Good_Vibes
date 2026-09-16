@@ -54,7 +54,11 @@ const goodIds = new Set(economy.goods.map(g => g.id));
 const berths = new Set((narrative.crew?.roles ?? []).map(r => r.id));
 const speakers = new Set(['captain', ...berths]);
 const peoples = new Set(['emberkin', 'otter', 'cat', 'frog']);
-const QUEST_TYPES = new Set(['retrieval', 'delivery', 'shopping', 'chain', 'message']);
+const QUEST_TYPES = new Set(['retrieval', 'delivery', 'shopping', 'chain', 'message', 'salvage']);
+/* Bodies with no mass that a ship can tie up to. They are not in the price
+   list — a derelict has no stall — so a salvage job's `wreck` is checked
+   against the sky rather than against the ports. */
+const wreckIds = new Set(tuning.bodies.filter(b => b.kind === 'wreck' && b.port).map(b => b.id));
 
 /* The quest format, as quests.json describes it. Everything here is something
  * that would otherwise fail at the far end of a flight, in a save, or not at
@@ -71,6 +75,14 @@ for(const [i, q] of (questbook.quests ?? []).entries()){
   for(const k of ['from', 'to']) if(q?.[k]) need(portIds.has(q[k]), at, `${k} names no port: ${q[k]}`);
   for(const id of q?.stops ?? []) need(portIds.has(id), at, `stops names no port: ${id}`);
   need(q?.type === 'chain' || !q?.stops, at, 'stops belongs to a chain');
+  if(q?.type === 'salvage'){
+    need(wreckIds.has(q?.wreck), at, `wreck names no derelict in the sky: ${q?.wreck}`);
+    need((q?.goods ?? []).length > 0, at, 'a salvage with nothing aboard is a trip for nothing');
+    need(typeof q?.aboard === 'string' && q.aboard.length > 0, at, 'aboard is required: it is all there is to read at a wreck');
+  }else{
+    need(!q?.wreck, at, 'only a salvage names a wreck');
+    need(!q?.aboard, at, 'only a salvage has an aboard');
+  }
   need(Array.isArray(q?.goods), at, 'goods is required, empty if there are none');
   for(const g of q?.goods ?? []){
     need(goodIds.has(g?.good), at, `wants a good that does not exist: ${g?.good}`);
