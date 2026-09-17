@@ -72,6 +72,8 @@
   .stat small{ font-size:.66rem; letter-spacing:.12em; text-transform:uppercase; color:var(--faint); }
   .stat b{ font-weight:600; font-size:.92rem; white-space:nowrap; }
   .stat.warn b{ color:var(--rose); }
+  /* A mode that is on, with nobody aboard to put numbers on it. */
+  .stat.dim b{ color:var(--faint); font-weight:400; font-style:italic; }
   #dvbar{ position:relative; width:120px; height:5px; background:var(--gv-sunk); border-radius:3px; overflow:hidden; margin-top:3px; }
   #dvbar i{ display:block; height:100%; background:linear-gradient(90deg, var(--gold-2), var(--gold)); width:100%; transition:width .2s; }
   #dvbar i.low{ background:var(--rose); }
@@ -677,8 +679,15 @@
   <div class="stat" id="clock-stat" hidden><small>Clock</small><b id="h-warp">—</b></div>
   <!-- What a cat navigator is for: not the range now, which says nothing about
        whether you arrive, but how close the path actually comes and how fast
-       you are closing. Only drawn with her aboard and only near a drift. -->
-  <div class="stat" id="rv-stat" hidden><small>Rendezvous</small><b id="h-rv">—</b></div>
+       you are closing.
+
+       The *mode* is announced whenever the ship is in a drifting thing's
+       reach, with her aboard or without: crossing that line really does change
+       what the two buttons on a mark do, and a control scheme that changes
+       without saying so is a control scheme nobody trusts. The two numbers
+       are hers — she is the instruments, not the physics — so without her it
+       says the mode and admits it is being flown by eye. -->
+  <div class="stat" id="rv-stat" hidden><small>Zero-g docking</small><b id="h-rv">—</b></div>
   <div class="stat" id="where"><small>Where</small><b id="h-where">—</b><span id="dockhint"></span></div>
   <!-- A cog: one ring, one hub, eight teeth on the spokes of a compass. Drawn
        from the middle out so it is symmetric by construction — the hand-written
@@ -989,6 +998,8 @@ function frame(now){
     shipLocalV: state.dockedAt ? null : state.ship.v,
     nodeLabel, interceptLabel, insetLabel,
     belt, nearPort: docking?.port ?? null, docking,
+    // The drifting thing the ship is alongside, if any — see drawDriftReaches.
+    rendezvous: S.rendezvous(state)?.target ?? null,
     hidden: S.unseen(state),
   });
   if(dt > 0 && panelOpen && tab === 'windows'
@@ -1100,12 +1111,27 @@ function handleEvents(events){
 function showRendezvous(){
   const box = $('rv-stat');
   const rv = S.rendezvous(state);
-  if(!rv || !rv.instruments){ box.hidden = true; return; }
+  if(!rv){ box.hidden = true; return; }
   box.hidden = false;
-  const miss = rv.closing ? fmtAu(rv.atIntercept) : fmtAu(rv.range) + ' (opening)';
-  $('h-rv').textContent = `${miss} · ${S.fmtKms(rv.speed)}`;
-  box.title = `Closest the path comes to ${S.portName(rv.target)}, and how fast you are closing.`
-    + (rv.timeToIntercept != null ? ` Nearest in ${S.fmtDays(rv.timeToIntercept)}.` : '');
+  const name = S.portName(rv.target);
+  if(rv.instruments){
+    const miss = rv.closing ? fmtAu(rv.atIntercept) : fmtAu(rv.range) + ' (opening)';
+    $('h-rv').textContent = `${miss} · ${S.fmtKms(rv.speed)}`;
+    box.title = `Alongside ${name}: forward and back are along your speed relative to it, `
+      + `and out and in are away from it and toward it. `
+      + `Closest the path comes, and how fast you are closing.`
+      + (rv.timeToIntercept != null ? ` Nearest in ${S.fmtDays(rv.timeToIntercept)}.` : '');
+  }else{
+    /* No navigator: the axes have still turned — that is the sky, not the
+       crew — but nobody aboard can read the range off, and nobody can hold the
+       ship still against a thing with no gravity, so it cannot be tied up to
+       either. Say the first part plainly rather than showing nothing. */
+    $('h-rv').textContent = 'by eye';
+    box.title = `Alongside ${name}: forward and back are along your speed relative to it, `
+      + `and out and in are away from it and toward it. `
+      + `A navigator would read you the range and the closing speed, and could hold the ship still enough to tie up.`;
+  }
+  box.classList.toggle('dim', !rv.instruments);
 }
 
 function showHazard(){

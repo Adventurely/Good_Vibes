@@ -62,6 +62,9 @@ export const PALETTE = {
      was was to be inside it and notice the words had changed. */
   drift:      'rgba(90,166,232,0.06)',
   driftEdge:  'rgba(90,166,232,0.42)',
+  // The same space, once the ship is in it.
+  driftIn:    'rgba(90,166,232,0.13)',
+  driftEdgeIn:'rgba(90,166,232,0.85)',
   /* The harbour mouth. It was dim enough to lose against a bright road drawn
      across it, which is the one moment it matters — so it is the strongest
      green on the chart, and the ring you cannot yet tie up inside is a clear
@@ -395,7 +398,7 @@ function draw(chart, view){
   drawBelt(chart, view, pos);
   drawOrbits(chart, pos, t);
   drawSoiRings(chart, pos);
-  drawDriftReaches(chart, pos);
+  drawDriftReaches(chart, pos, view);
   drawBodies(chart, view, pos, t);
   /* Where each leg of the road is pinned on the screen, worked out once and
      handed to everything that puts a mark on the road. It used to be worked
@@ -578,7 +581,7 @@ export function railLead(chart, el, centre, mu, t){
  * mouth's own ring rather than replacing it: they are two different questions
  * — "are the axes about this thing" and "may I tie up" — and the answer to the
  * first is yes a good while before the answer to the second. */
-function drawDriftReaches(chart, pos){
+function drawDriftReaches(chart, pos, view){
   const { ctx, world, camera } = chart;
   for(const b of world.bodies){
     if(!(b.driftReach > 0)) continue;
@@ -590,9 +593,18 @@ function drawDriftReaches(chart, pos){
     if(px < 10 || px > 6000) continue;
     const p = chart.toScreen(at.r);
     if(p[0] < -px - 40 || p[1] < -px - 40 || p[0] > chart.width + px + 40 || p[1] > chart.height + px + 40) continue;
+    /* The one the ship is actually in reads differently from one it is merely
+       near. Being inside it is a mode — the two buttons on a mark have changed
+       what they do — and a line you have crossed should not look like a line
+       you are approaching. */
+    const inside = view?.rendezvous === b.id;
     ctx.beginPath(); ctx.arc(p[0], p[1], px, 0, Math.PI * 2);
-    if(px < Math.min(chart.width, chart.height) * 0.45){ ctx.fillStyle = PALETTE.drift; ctx.fill(); }
-    ctx.strokeStyle = PALETTE.driftEdge; ctx.lineWidth = 1; ctx.setLineDash([4, 5]); ctx.stroke();
+    if(px < Math.min(chart.width, chart.height) * 0.45){
+      ctx.fillStyle = inside ? PALETTE.driftIn : PALETTE.drift; ctx.fill();
+    }
+    ctx.strokeStyle = inside ? PALETTE.driftEdgeIn : PALETTE.driftEdge;
+    ctx.lineWidth = inside ? 1.5 : 1;
+    ctx.setLineDash(inside ? [6, 4] : [4, 5]); ctx.stroke();
     ctx.setLineDash([]);
   }
 }

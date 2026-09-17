@@ -1810,6 +1810,55 @@ test('a world wears a lead on its rail that points the way it is going', () => {
   } finally { chart.restore(); }
 });
 
+test('the space near a wreck says whether you are in it', () => {
+  /* Crossing that line changes what the two buttons on a mark do, so it is a
+     mode, and a control scheme that changes without saying so is one nobody
+     trusts. The HUD names it; the chart draws the one you are actually inside
+     differently from one you are merely near. */
+  const ops = [];
+  const chart = stubChart(800, 600, ops);
+  try{
+    const g = S.newGame(5);
+    const pred = S.planImmediate(g);
+    chart.camera.follow = 'cutterjaw';
+    chart.camera.anchor = [...O.absState(world, 'cutterjaw', 0).r];
+    chart.camera.zoom = 5e7;                     // the reach about 200 px across
+    chart.settle();
+    const view = { t: g.t, now: 0, shipAbs: { r: S.shipAbsPos(g), v: S.shipAbsVel(g) }, shipBody: 'tassel',
+      prediction: pred, nodes: [], nodePositions: [], apses: [], railCrossings: [], hidden: new Set() };
+    const strokes = () => ops.filter(o => o[0] === 'strokeStyle').map(o => o[1]);
+
+    chart.draw(view);
+    assert.ok(strokes().includes(PALETTE.driftEdge), 'the reach is not drawn at all');
+    assert.ok(!strokes().includes(PALETTE.driftEdgeIn), 'a reach nobody is in reads as one they are');
+
+    ops.length = 0;
+    chart.draw({ ...view, rendezvous: 'cutterjaw' });
+    assert.ok(strokes().includes(PALETTE.driftEdgeIn), 'the reach the ship is in looks the same as one it is not');
+
+    /* And an unfound wreck draws neither, whichever the ship is in. */
+    ops.length = 0;
+    chart.draw({ ...view, rendezvous: 'cutterjaw', hidden: new Set(['cutterjaw']) });
+    assert.ok(!strokes().includes(PALETTE.driftEdge) && !strokes().includes(PALETTE.driftEdgeIn),
+      'a wreck nobody has heard of drew its reach');
+  } finally { chart.restore(); }
+});
+
+test('the mode is announced with or without a navigator, and the numbers are hers', () => {
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.match(PLAY, /<small>Zero-g docking<\/small>/, 'the mode is not named anywhere');
+  /* It used to hide the whole readout without her. The axes turn either way —
+     that is the sky, not the crew — so the mode shows and the numbers do not. */
+  assert.match(PLAY, /if\(!rv\)\{ box\.hidden = true; return; \}/,
+    'the mode is hidden again when nobody can read the numbers');
+  assert.match(PLAY, /'by eye'/, 'there is nothing to say when she is not aboard');
+  assert.doesNotMatch(PLAY, /if\(!rv \|\| !rv\.instruments\)\{ box\.hidden = true/,
+    'the old rule is back');
+  // And the chart is told which one the ship is in.
+  assert.match(PLAY, /rendezvous: S\.rendezvous\(state\)\?\.target \?\? null/,
+    'the chart is not told which reach the ship is in');
+});
+
 test('the point that was tapped stays on the chart while the card is open', () => {
   /* Two roads can lie a few pixels apart, and the card that opens names a
      time rather than a place. Both testers wanted to see which line they had
@@ -1958,7 +2007,7 @@ test('the space near a drifting thing is a place you can see', () => {
   const src = readFileSync(new URL('../public/orbital-trader/render.js', import.meta.url), 'utf8');
   const fn = src.slice(src.indexOf('function drawDriftReaches'), src.indexOf('function drawSoiRings'));
   assert.ok(fn.length > 200, 'found the drawing pass');
-  assert.match(src, /drawDriftReaches\(chart, pos\);/, 'nothing calls it');
+  assert.match(src, /drawDriftReaches\(chart, pos/, 'nothing calls it');
   assert.match(fn, /b\.driftReach > 0/, 'it is not keyed on the reach');
   assert.match(fn, /chart\.hidden\.has\(b\.id\)/, 'an unfound wreck puts its reach on the chart');
   assert.match(fn, /setLineDash/, 'a reach is dashed, like every other reach on this chart');

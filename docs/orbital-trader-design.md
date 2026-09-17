@@ -821,6 +821,16 @@ pixel at that zoom is a ten-millionth of the precision a position is carried
 to. `fmtAu` grew metres to go with it, having rounded everything under a
 kilometre to "0 km".
 
+**And it says so in words.** The corner of the HUD reads **ZERO-G DOCKING**
+whenever the ship is in a drifting thing's reach. Crossing that line really
+does change what the two buttons on a mark do, and a control scheme that
+changes without announcing itself is one nobody trusts — the wording on the
+mark had been saying it since the beginning, which is not the same as saying
+it. The badge shows with the navigator aboard or without, because the axes
+turn either way: that is the sky, not the crew. The two numbers beside it are
+hers, and without her it says `by eye` instead. The chart draws the reach the
+ship is *in* brighter than one it is merely near, for the same reason.
+
 **The reach is a place you can see.** A wreck's `driftReach` is a real
 boundary — cross it and the two buttons on a mark stop meaning forward-and-out
 about the world and start meaning forward-and-away about the thing you are
