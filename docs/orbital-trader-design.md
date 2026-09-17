@@ -821,6 +821,26 @@ pixel at that zoom is a ten-millionth of the precision a position is carried
 to. `fmtAu` grew metres to go with it, having rounded everything under a
 kilometre to "0 km".
 
+**And it is flown by hand.** Everywhere else in this game a burn is a mark on
+the road: you put it where you want it, push it about with the clock stopped,
+and the tick fires it when it gets there. That is the right shape for a
+transfer, where the thing being decided is *when*, months out. It is the wrong
+shape entirely for the last two kilometres, where the thing being decided is
+"a bit less now", over and over, watching the range come down.
+
+So inside a reach the engine answers directly. Four buttons in a cross —
+forward and back along your speed relative to the thing, toward and away across
+it — and a press is an impulse, right now. **The clock does not stop for it**,
+which is the whole point: the range is coming down while you decide. The arrow
+keys are the same four while a reach is up and no mark is open, which is the
+one place on this chart where an arrow does something that happens immediately.
+
+Nothing about the flight model changes. `thrust` takes the same axes from
+`frameAt` that a written mark takes, the same step from `burnStep`, and the
+same charge against the tank and the record. What changes is who is flying it.
+A press is a tenth of the closing speed, so it shrinks as you slow: coming in
+at 400 m/s or at 40, the whole approach is about a dozen presses.
+
 **And it says so in words.** The corner of the HUD reads **ZERO-G DOCKING**
 whenever the ship is in a drifting thing's reach. Crossing that line really
 does change what the two buttons on a mark do, and a control scheme that

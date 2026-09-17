@@ -1339,6 +1339,56 @@ export function burnScaleAt(state, where, t){
  * last few metres a second cost no more presses than the first few hundred. */
 export const BURN_STEP = 0.005, BURN_STEP_REL = 0.1;
 
+/* What one press is worth, in metres a second: that fraction of the speed the
+ * burn is measured against, rounded to a number a person would say out loud.
+ * The chart's arrows and the zero-g thrusters both ask here, so a press is the
+ * same size whichever way it is made. */
+export function burnStep(speed, relative){
+  const ms = kms(speed) * 1000 * (relative ? BURN_STEP_REL : BURN_STEP);
+  const pow = Math.pow(10, Math.floor(Math.log10(Math.max(1, ms))));
+  const nice = [1, 2, 5, 10].map(m => m * pow).find(x => x >= ms) ?? 10 * pow;
+  return Math.max(1, Math.min(500, nice));
+}
+
+/* ------------------------------------------------------------ zero-g thrust
+
+ * Coming alongside is the one manoeuvre in this game flown by hand rather than
+ * written down. Everywhere else a burn is a mark on the road: you put it where
+ * you want it, push it about with the clock stopped, and the tick fires it when
+ * it gets there. That is the right shape for a transfer, where the thing you
+ * are deciding is *when*, months out, and it is the wrong shape entirely for
+ * the last two kilometres — where what you are deciding is "a bit less now",
+ * over and over, watching the range come down.
+ *
+ * So inside a drifting thing's reach the engine answers directly. A press is an
+ * impulse, in the frame the reach put you in: forward and back along your speed
+ * relative to it, away and toward across that. The clock does not stop for it.
+ *
+ * It is the same arithmetic a written mark gets — the same axes from `frameAt`,
+ * the same step from `burnStep`, the same charge against the tank — so nothing
+ * about the flight model changes. What changes is that you are flying it. */
+const THRUST_AXES = { pro: 1, retro: -1, out: 1, in: -1 };
+export const isThrustAxis = which => Object.hasOwn(THRUST_AXES, which);
+
+export function thrust(state, which, fine = 1){
+  if(!state || state.dockedAt) return { ok: false, reason: 'Tied up.' };
+  if(!isThrustAxis(which)) return { ok: false, reason: 'No such thruster.' };
+  const rv = rendezvous(state);
+  if(!rv) return { ok: false, reason: 'Nothing alongside to fly against.' };
+  if(!(state.dv > 0)) return { ok: false, reason: 'The tank is dry.' };
+  const f = burnFrameAt(world, state.ship.body, state.ship.r, state.ship.v, state.t, unseen(state));
+  const along = which === 'out' || which === 'in' ? f.out : f.pro;
+  /* Never more than is in the tank: a press at the end of a long trip is
+     whatever is left of one, not a refusal. */
+  const want = Math.min(state.dv, auDay(burnStep(rv.speed, true) / 1000) * fine);
+  if(!(want > 0)) return { ok: false, reason: 'The tank is dry.' };
+  state.ship.v = add(state.ship.v, scale(along, THRUST_AXES[which] * want));
+  state.dv = Math.max(0, state.dv - want);
+  state.stats.burns++;
+  state.stats.dvSpent += want;
+  return { ok: true, dv: want, target: rv.target };
+}
+
 /* How long a line takes to read, which is how long the next one waits.
  *
  * Counted in characters rather than words because the unit that matters is how
