@@ -1736,6 +1736,11 @@ export function fromSave(raw){
   }
   for(const scope of ['run', 'life']){
     for(const key of STAT_KEYS) state[scope][key] = Math.max(0, num(raw[scope]?.[key]));
+    /* Every save written before there was a "most held" has a zero in it, and
+       a zero is a figure the board leaves off. What is in hand right now is
+       the one thing the file proves about the pile — it was at least this big
+       at least once — so the mark starts there rather than at nothing. */
+    state[scope].peakHeld = Math.max(state[scope].peakHeld, state.light);
   }
   if(Array.isArray(raw.log)){
     state.log = raw.log
