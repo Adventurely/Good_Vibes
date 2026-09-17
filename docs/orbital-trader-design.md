@@ -792,6 +792,24 @@ approach is actually flown in, and the question "am I near this" is asked of
 each harbour rather than of the winner, so a ship outside a wreck's reach is
 still plainly at the moon they are both going round.
 
+**The road beside the ship is out of bounds by the screen, not by the clock.**
+A tap on the road within `MIN_LEAD` of now does nothing — a minute of real time
+at x1, which is right as a rule about the clock, since a burn wants enough
+notice to be caught and pushed before it fires. But the thing a finger aims at
+is a distance on the screen, and a minute is exactly what that is not: beside a
+wreck the ship covers forty-eight kilometres in one, and the chart zoomed in far
+enough to fly that rendezvous is fifty-four kilometres across. The whole visible
+road was untappable at the one zoom where it mattered — invisible until the
+ceiling came up, because at the old one the same minute was seven pixels.
+
+`leadForTap` takes whichever is shorter: the minute, or the time it takes to
+cross a thumb's width of screen. Zoomed out the minute always wins and nothing
+about planning has changed; zoomed in it shrinks to a ring of pixels round the
+ship, which is what the protection was for. `addNode` takes that lead as an
+argument so the card writes the mark on the same terms the tap was judged by —
+it may only ever ask for *less* than the minute, and never less than a floor of
+a couple of real seconds, so a mark can never be written on top of now.
+
 **And the chart goes in a hundred times further.** The ceiling was two hundred
 million pixels to the au, set when the closest thing anybody flew to was a
 harbour mouth thousands of kilometres across; against a ten-kilometre mouth it

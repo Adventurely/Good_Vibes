@@ -1094,6 +1094,57 @@ test('the opening film plays for a new ship and gets out of the way of every oth
   assert.doesNotMatch(html, /^requestAnimationFrame\(frame\);$/m, 'the loop is started behind the film as well');
 });
 
+test('the road beside the ship is out of bounds by the screen, not by the clock', () => {
+  /* MIN_LEAD is a minute of real time at x1, and as a rule about the clock it
+     is right. As the thing a finger may not land on it is a screen distance,
+     and a minute is what that is not: beside a wreck the ship covers 48 km in
+     one, and the chart zoomed in far enough to fly that rendezvous is 54 km
+     across — the whole visible road, out of bounds at the one zoom it mattered.
+     It only showed once the chart was allowed in far enough to see a
+     ten-kilometre mouth; at the old ceiling the same minute was seven pixels. */
+  const pxPerDay = (kms, zoom) => S.auDay(kms) * zoom;
+
+  // Zoomed out, the minute always wins and nothing about planning has changed.
+  assert.equal(S.leadForTap(pxPerDay(7.6, 2e5)), S.MIN_LEAD, 'a wide chart lost the minute');
+  assert.equal(S.leadForTap(pxPerDay(0.25, 2e7)), S.MIN_LEAD, 'the old ceiling was never the problem');
+  assert.equal(S.leadForTap(0), S.MIN_LEAD, 'a ship going nowhere lost the minute');
+
+  // Zoomed in, it is a thumb's width of screen.
+  const deep = pxPerDay(0.25, 2e9);
+  const lead = S.leadForTap(deep);
+  assert.ok(lead < S.MIN_LEAD, 'the minute is still the whole visible road at full zoom');
+  assert.ok(Math.abs(lead * deep - S.TAP_CLEAR_PX) < 1e-6, `${lead * deep} px of road is protected`);
+
+  // And never less than the floor, however far in the chart goes.
+  assert.equal(S.leadForTap(1e12), S.LEAD_FLOOR, 'a mark could be written on top of now');
+  assert.ok(S.LEAD_FLOOR > 0 && S.LEAD_FLOOR < S.MIN_LEAD);
+});
+
+test('a mark may be written closer when the chart is close, and never on top of now', () => {
+  const g = transferShip();
+  const near = g.t + S.LEAD_FLOOR * 1.5;
+  assert.equal(S.addNode(g, near), -1, 'the standard lead let a mark in under the minute');
+  assert.ok(S.addNode(g, near, S.LEAD_FLOOR) >= 0, 'a close-in tap could not write its own mark');
+
+  /* A caller may ask for less than the minute, never more — and never less
+     than the floor, whatever it passes. */
+  const h = transferShip();
+  assert.equal(S.addNode(h, h.t + S.MIN_LEAD * 1.5, S.MIN_LEAD * 10), 0,
+    'a caller talked the lead up past the minute');
+  const i = transferShip();
+  assert.equal(S.addNode(i, i.t + S.LEAD_FLOOR * 0.5, 0), -1, 'a caller talked the lead under the floor');
+  assert.equal(S.addNode(i, i.t - 1, -99), -1, 'a mark was written into the past');
+});
+
+test('the tap on the road asks the screen, and the card writes on the same terms', () => {
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.match(PLAY, /S\.leadForTap\(S\.norm\(state\.ship\.v\) \* chart\.camera\.zoom\)/,
+    'the tap is judged by the clock again');
+  assert.match(PLAY, /askAtPath\(p\.t, lead\)/, 'the card is not told what the tap was allowed under');
+  assert.match(PLAY, /S\.addNode\(state, t, lead\)/,
+    'the card opens on a tap it will then refuse to write');
+});
+
 /* ------------------------------------------------------------- chart */
 
 test('the chart goes in far enough to fly the last ten kilometres', () => {

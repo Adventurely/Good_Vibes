@@ -1302,7 +1302,10 @@ function askSkip(t, what){
 /* Tapping the road is how both of the things you can do to it start: write a
    burn down at that moment, or skip the clock to it. One gesture, two big
    buttons, and the time to that point on the card either way. */
-function askAtPath(t){
+/* `lead` is the one this tap was allowed under — the card has to write the
+   mark on the same terms the tap was judged by, or the button opens and then
+   refuses. */
+function askAtPath(t, lead = S.MIN_LEAD){
   tapMark = t;
   /* One mark at a time while the lesson is running. The button is simply not
      available — no toast, no explanation: a beginner who has not been told
@@ -1320,7 +1323,7 @@ function askAtPath(t){
     m.querySelector('#m-close').addEventListener('click', closeModal);
     m.querySelector('#m-burn').addEventListener('click', () => {
       closeModal();
-      const ix = S.addNode(state, t);
+      const ix = S.addNode(state, t, lead);
       if(ix < 0) return;   // the button is already disabled when there is no room
       /* The chart is the editor, so writing a burn down leaves the panel
          exactly as it was: shoving the side menu open over the sky is the
@@ -1570,7 +1573,10 @@ function endPointer(e){
     const p = prediction && !state.dockedAt ? chart.nearestPathPoint(e.clientX, e.clientY, prediction, state.t) : null;
     const onBody = d.hit?.kind === 'body';
     const insideDrawn = onBody && d.hit.d <= (d.hit.drawn ?? 0) + 2;
-    if(p && !insideDrawn && p.t > state.t + S.MIN_LEAD){ askAtPath(p.t); return; }
+    /* How much road beside the ship is out of bounds. A thumb's width of it,
+       or a minute, whichever comes first — see `leadForTap`. */
+    const lead = S.leadForTap(S.norm(state.ship.v) * chart.camera.zoom);
+    if(p && !insideDrawn && p.t > state.t + lead){ askAtPath(p.t, lead); return; }
     if(onBody){ lookAt(d.hit.id); return; }
     /* Last, after the road and after the worlds: a tap on the ring a world
        travels on asks the clock to wait until that world gets there. It is

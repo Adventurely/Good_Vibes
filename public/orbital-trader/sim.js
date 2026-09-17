@@ -1392,8 +1392,37 @@ export const tutorialRunning = state => !(state.flags?.tutorialDone || state.fla
 export const maxNodes = state => (tutorialRunning(state) ? 1 : MAX_NODES);
 
 export const MIN_LEAD = CONST.BASE_RATE_DAYS_PER_SEC * 60;
-export function addNode(state, t){
-  if(state.dockedAt || t < state.t + MIN_LEAD || state.nodes.length >= maxNodes(state)) return -1;
+
+/* The hard floor under any lead: a couple of real seconds at x1. A mark is a
+ * thing you push around, and one written on top of now fires before it can be
+ * touched. */
+export const LEAD_FLOOR = CONST.BASE_RATE_DAYS_PER_SEC * 2;
+
+/* How much road beside the ship a finger may not land on, as a time.
+ *
+ * MIN_LEAD is a minute of real time at x1, and as a rule about the clock that
+ * is right: a burn wants enough notice to be caught and pushed before it
+ * fires. But the thing a finger aims at is a *distance on the screen*, and a
+ * minute is exactly what that is not. Beside a wreck the ship covers
+ * forty-eight kilometres in one, and the chart zoomed in far enough to fly
+ * that rendezvous is fifty-four kilometres across — so the whole of the
+ * visible road was out of bounds at precisely the zoom where it mattered.
+ *
+ * So the lead is whichever is shorter: the minute, or the time it takes to
+ * travel a thumb's width of screen. Zoomed out the minute always wins and
+ * nothing has changed; zoomed in it shrinks to a ring of pixels round the
+ * ship, which is what the protection was for in the first place. */
+export const TAP_CLEAR_PX = 28;
+export const leadForTap = pxPerDay =>
+  Math.max(LEAD_FLOOR, Math.min(MIN_LEAD, pxPerDay > 0 ? TAP_CLEAR_PX / pxPerDay : MIN_LEAD));
+
+/* `lead` is how far ahead this particular way of writing a mark insists on.
+ * It may only ever ask for *less* than the standard minute, never more, and
+ * never less than the floor: a caller may say "the player is looking at this
+ * closely and means it", not "let them write a mark into the past". */
+export function addNode(state, t, lead = MIN_LEAD){
+  const floor = Math.max(LEAD_FLOOR, Math.min(lead, MIN_LEAD));
+  if(state.dockedAt || t < state.t + floor || state.nodes.length >= maxNodes(state)) return -1;
   state.nodes.push({ t, prograde: 0, radial: 0 });
   state.nodes.sort((a, b) => a.t - b.t);
   return state.nodes.findIndex(n => n.t === t);
