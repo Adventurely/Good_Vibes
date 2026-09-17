@@ -417,32 +417,33 @@ const BRIDGE_DECK_H = 2;
 const BRIDGE_POST_GAP = 8;
 const BRIDGE_POST_H = 5;
 
-/* A deck laid over open air, drawn one column at a time rather than one flat
- * run — see sim.js's stepBuilding, which angles the deck up toward a crest
- * over the middle of the gap and back down to meet the far bank, so each
- * column's own height is its own point on that arch rather than a shared
- * flat plank. `terrain` under a bridged column is still PIT_Y (see
- * buildTerrain), so drawGround has already painted nothing at all there;
- * this is what turns that absence into a crossing instead of leaving it
- * looking like an unfinished level.
+/* Ramp decks, drawn a column at a time rather than as flat runs — see
+ * sim.js's stepBuilding, which climbs a fraction of a pixel a column, so
+ * each column's own height is its own point on the slope. A column can carry
+ * more than one: ramps cross, and both are still standing and both still
+ * walkable (see sim.js's `decks` and surfacesAt), so both are drawn.
+ * `terrain` under a deck is untouched — still open pit where the ramp
+ * crosses a gap (see buildTerrain) — which is what makes a ramp read as a
+ * thing standing over the scene rather than the ground quietly changing
+ * shape.
  */
 function drawBridges(ctx, state){
-  const { bridgeY } = state;
-  for(let x = 0; x < bridgeY.length; x++){
-    const y = bridgeY[x];
-    if(y == null) continue;
-    ctx.fillStyle = hex('N');
-    ctx.fillRect(x, y, 1, BRIDGE_DECK_H);
-    ctx.fillStyle = hex('k');
-    ctx.fillRect(x, y, 1, 1);
-    // A post every few columns rather than one per column — the same
-    // "suggest it, do not render every plank" economy the grass tufts and
-    // rock speckle use elsewhere in this file — hung from this column's own
-    // height, which is what keeps the posts themselves tracing the arch
-    // rather than fanning out from underneath a flat deck.
-    if(x % BRIDGE_POST_GAP === 0){
-      ctx.fillStyle = hex('n');
-      ctx.fillRect(x, y + BRIDGE_DECK_H, 1, BRIDGE_POST_H);
+  const { decks } = state;
+  for(let x = 0; x < decks.length; x++){
+    for(const y of decks[x]){
+      ctx.fillStyle = hex('N');
+      ctx.fillRect(x, y, 1, BRIDGE_DECK_H);
+      ctx.fillStyle = hex('k');
+      ctx.fillRect(x, y, 1, 1);
+      // A post every few columns rather than one per column — the same
+      // "suggest it, do not render every plank" economy the grass tufts and
+      // rock speckle use elsewhere in this file — hung from this column's
+      // own height, which is what keeps the posts tracing the slope rather
+      // than fanning out from underneath a flat deck.
+      if(x % BRIDGE_POST_GAP === 0){
+        ctx.fillStyle = hex('n');
+        ctx.fillRect(x, y + BRIDGE_DECK_H, 1, BRIDGE_POST_H);
+      }
     }
   }
 }

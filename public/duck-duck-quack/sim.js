@@ -54,11 +54,16 @@ export function newGame(level){
   return {
     level,
     terrain: buildTerrain(level.segments, level.width),
-    // Where a Digger or a Builder has actually changed the way through — see
-    // groundAt below for why these live apart from `terrain` rather than
-    // overwriting it. null everywhere nothing has been dug or bridged yet.
+    // Where a Digger has cut through — one height per column, or null where
+    // nothing has been dug. See groundAt below for why this lives apart from
+    // `terrain` rather than overwriting it.
     tunnelY: new Array(level.width).fill(null),
-    bridgeY: new Array(level.width).fill(null),
+    // Every ramp deck standing at each column, as a list rather than one
+    // height: ramps cross. Build one over another heading the other way and
+    // both are still there, one above the other, each its own thing to walk
+    // on — see surfacesAt below, and addDeckAt, which never replaces a deck
+    // already standing at a column, only adds to it.
+    decks: Array.from({ length: level.width }, () => []),
     // Where a wall is rock rather than dirt — see rockAt below and
     // content.js's header note on segments' `hard` field. `floors` (art.js's
     // drawGround) is not read anywhere in this file at all — nothing below a
@@ -90,20 +95,58 @@ function loseDuckling(state, d, cause){
 
 const columnAt = (state, x) => Math.max(0, Math.min(state.level.width - 1, Math.round(x)));
 
-/* The ground a walking duckling actually stands on: whichever a Digger or a
-   Builder has left at this column, or the level's own terrain if neither
-   ever touched it. `terrain` itself never changes after newGame — see
-   setTunnelAt/setBridgeAt, and content.js's header note on why the two are
-   kept apart rather than one overwriting the other. */
+/* The level's own ground at a column, with a Digger's tunnel counted where
+   there is one and ramps ignored entirely. `terrain` itself never changes
+   after newGame — see setTunnelAt, and content.js's header note on why a
+   tunnel is kept apart rather than overwriting the wall it runs through. */
 const groundAt = (state, x) => {
   const col = columnAt(state, x);
   if(state.tunnelY[col] != null) return state.tunnelY[col];
-  if(state.bridgeY[col] != null) return state.bridgeY[col];
   return state.terrain[col];
 };
 
+/* Everything at this column a duckling could be standing on: the ground
+   itself, plus every ramp deck crossing it. Order is not meaningful — the
+   callers below all pick out the one surface they want by height, because
+   which surface is the right one depends entirely on where the duckling
+   already is. A deck overhead is not ground to a duckling walking under it;
+   the same deck is the only ground there is to the duckling walking along
+   it. That is the whole reason this is a list. */
+const surfacesAt = (state, x) => [groundAt(state, x), ...state.decks[columnAt(state, x)]];
+
 const setTunnelAt = (state, x, y) => { state.tunnelY[columnAt(state, x)] = y; };
-const setBridgeAt = (state, x, y) => { state.bridgeY[columnAt(state, x)] = y; };
+
+/* Adds a deck without disturbing any already standing at that column — see
+   `decks` in newGame. A ramp laid across an older one leaves both. */
+const addDeckAt = (state, x, y) => {
+  const at = state.decks[columnAt(state, x)];
+  if(!at.includes(y)) at.push(y);
+};
+
+/* Which of a column's surfaces a duckling at `fromY` would actually step
+ * onto, or null if none of them is anything but a wall to it.
+ *
+ * Within WALK_STEP either way is ordinary ground to step along, and the
+ * nearest such surface wins — that is what keeps a duckling on the ramp it
+ * is already walking, up or down, rather than dropping off it onto whatever
+ * happens to lie below. Failing that, the highest surface still beneath it
+ * is where it is headed, which is what lets a duckling walk clean under a
+ * ramp overhead instead of being lifted onto it, and what makes the ground
+ * under a ramp still count as ground. Only when every surface here stands
+ * more than a step above is there nothing to step onto at all — a wall.
+ */
+const stepTargetAt = (state, x, fromY) => {
+  const surfaces = surfacesAt(state, x);
+  let onLevel = null, below = null;
+  for(const s of surfaces){
+    if(Math.abs(s - fromY) <= WALK_STEP){
+      if(onLevel === null || Math.abs(s - fromY) < Math.abs(onLevel - fromY)) onLevel = s;
+    } else if(s > fromY){
+      if(below === null || s < below) below = s;
+    }
+  }
+  return onLevel !== null ? onLevel : below;
+};
 
 /* Whether the wall at this column is rock rather than dirt — see
    content.js's header note on segments' `hard` field. A Digger already
@@ -259,8 +302,14 @@ function stepWalking(state, d){
   // around exactly the way it would at a wall it cannot climb.
   if(blockerAt(state, nextX)){ d.dir = -d.dir; return; }
 
-  const nextY = groundAt(state, nextX);
-  const delta = nextY - d.y;   // positive: ground drops away; negative: ground rises
+  /* Which surface at the next column this duckling is actually headed for —
+     the ground, or one of the ramp decks crossing it, whichever it could
+     step onto from where it stands. See stepTargetAt: this is what carries a
+     duckling along the ramp it is already on, in whichever direction it is
+     walking, and what lets one walk under a ramp it is not on. A null means
+     every surface there stands too high to step onto, which is a wall. */
+  const nextY = stepTargetAt(state, nextX, d.y);
+  const delta = nextY === null ? -Infinity : nextY - d.y;   // positive: ground drops away; negative: ground rises
 
   /* A wall: ground that rises faster than a duckling can step up. Two skills
    * answer it, and a duckling holding both digs, because tunnelling leaves a
@@ -307,13 +356,20 @@ function stepWalking(state, d){
 /* A Flyer flaps down slowly and walks away from whatever it lands on. It
  * still needs something to land on, though — over a gap it flaps gently
  * past the bottom of the world and is lost all the same, which is the line
- * between "survives the drop" and "crosses the gap". */
+ * between "survives the drop" and "crosses the gap".
+ *
+ * What it lands on is the first thing it reaches going down, which over a
+ * column a ramp crosses is that ramp, not the ground far below it: falling
+ * onto a deck is caught by the deck. Walking into the underside of one is
+ * the case that passes through (see stepTargetAt) — coming down on top of
+ * it is not. */
 function stepFalling(state, d){
   const flying = hasTrait(d, 'flyer');
   d.y += flying ? FLY_SPEED : FALL_SPEED;
   if(d.y > SCENE_H){ loseDuckling(state, d, 'fell'); return; }
-  const ground = groundAt(state, d.x);
-  if(d.y >= ground){
+  const reached = surfacesAt(state, d.x).filter(s => d.y >= s);
+  if(reached.length){
+    const ground = Math.min(...reached);
     const dropped = ground - d.fallFrom;
     d.y = ground;
     if(!flying && dropped > FALL_SAFE) loseDuckling(state, d, 'fell');
@@ -367,32 +423,37 @@ function stepDigging(state, d){
  * was over it, not because the ramp went looking for it. Two things stop it,
  * and only two — running into ground, and running out of clock.
  *
- * Running into ground: real ground ahead standing higher than the ramp's own
- * deck. A wall, a rock face, the side of a hill, or a staircase climbing
- * faster than the ramp is — all the same thing from here, and all of them
- * end the climb. Because the test is "has the ground caught up to the deck
- * yet", it fires exactly where the two meet, which is what makes the ramp
- * always join whatever stopped it within a pixel or so rather than leaving a
- * step. That matters more than it sounds: `bridgeY` is shared, permanent
- * ground (see groundAt above), so every duckling behind this one walks up
- * this ramp too, and a ramp that ended a foot above the hillside would
- * strand all of them.
+ * Running into ground: the ground itself standing higher than the ramp's own
+ * deck — see groundAt above, which is the level's terrain and a Digger's
+ * tunnels and nothing else. A wall, a rock face, the side of a hill, or a
+ * staircase climbing faster than the ramp is: all the same thing from here,
+ * and all of them end the climb. Other ramps are deliberately not in that
+ * test. A ramp crossing one already standing passes over or under it and
+ * both are left whole (see addDeckAt), which is the only way building a
+ * second ramp back the other way over a first can work at all.
  *
- * Running out of clock: BUILD_MAX_STEPS ticks, ten seconds (content.js), at
- * which point the ramp simply ends wherever it is — in mid-air if that is
- * where ten seconds left it, since it never comes back down on its own. It
- * will be at most BUILD_RISE_HEIGHT above the height it started from, and
- * that is kept equal to FALL_SAFE on purpose: over ground no lower than
- * where the ramp began, stepping off the end is exactly the tallest drop a
- * duckling walks away from unhurt. Over ground that has fallen away further
- * since — a level that descends, like The Falls — it is further than that,
- * and walking off the end is fatal for this duckling and for every one
- * following it up. A ramp is a real thing left in the world, and putting one
- * somewhere careless is a real mistake.
+ * Because the test is "has the ground caught up to the deck yet", it fires
+ * exactly where the two meet, which is what makes the ramp always join
+ * whatever stopped it within a pixel or so rather than leaving a step. That
+ * matters more than it sounds: a deck is shared, permanent ground (see
+ * surfacesAt above), so every duckling behind this one walks up this ramp
+ * too, and a ramp that ended a foot above the hillside would strand them.
  *
- * `bridgeY` is its own layer over the same column `tunnelY` uses for a dig
- * — see groundAt above — so a bridged gap still shows as open air below the
- * deck in art.js rather than the gap itself quietly filling in with dirt.
+ * Running out of clock: BUILD_MAX_STEPS ticks (content.js), at which point
+ * the ramp simply ends wherever it is — in mid-air if that is where the
+ * clock left it, since it never comes back down on its own. It will be at
+ * most BUILD_RISE_HEIGHT above the height it started from, and that is kept
+ * equal to FALL_SAFE on purpose: over ground no lower than where the ramp
+ * began, stepping off the end is exactly the tallest drop a duckling walks
+ * away from unhurt. Over ground that has fallen away further since — a level
+ * that descends, like The Falls — it is further than that, and walking off
+ * the end is fatal for this duckling and for every one following it up. A
+ * ramp is a real thing left in the world, and putting one somewhere careless
+ * is a real mistake.
+ *
+ * A deck is its own thing standing over the column rather than a change to
+ * it — see `decks` in newGame — so a gap a ramp crosses still shows as open
+ * air below the deck in art.js rather than quietly filling in with dirt.
  */
 function stepBuilding(state, d){
   const level = state.level;
@@ -421,18 +482,21 @@ function stepBuilding(state, d){
     return;
   }
 
-  setBridgeAt(state, nextX, y);
+  addDeckAt(state, nextX, y);
   d.x = nextX;
   d.y = y;
   d.buildStep = step;
   if(d.buildStep >= BUILD_MAX_STEPS) d.state = 'walking';
 }
 
+/* Climbs until it reaches something to stand on — the first surface it comes
+   up under, which over a column some ramp crosses is that ramp's deck rather
+   than the wall top far above it. */
 function stepClimbing(state, d){
   d.y -= CLIMB_SPEED;
-  const top = groundAt(state, d.x);
-  if(d.y <= top){
-    d.y = top;
+  const reached = surfacesAt(state, d.x).filter(s => d.y <= s);
+  if(reached.length){
+    d.y = Math.max(...reached);
     d.state = 'walking';
   }
 }

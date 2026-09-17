@@ -14,15 +14,20 @@
  * One number per column: how far down the ground is. A "wall" is a big jump
  * between two neighbouring columns, a "gap" is a run of columns set far below
  * the screen (so far that the fall is always lethal). `terrain` itself is
- * never touched once a level starts — a Digger and a Builder each write into
- * their own second layer instead (`tunnelY`, `bridgeY` in sim.js's game
- * state), one number per column same as `terrain`, consulted first wherever
- * it is not null. That is what lets a dig leave the wall standing — a bored
- * hole through it, the wall still overhead — instead of quietly bulldozing
- * the whole column down to head height, and what lets a bridge leave the gap
- * still open underneath the deck instead of the pit just filling in with
- * dirt. See sim.js's groundAt for the one place all three ever get read
- * together.
+ * never touched once a level starts — a Digger and a Builder each leave their
+ * mark somewhere else instead (`tunnelY` and `decks` in sim.js's game state).
+ * A tunnel is one height per column, consulted in the terrain's place wherever
+ * it is not null, which is what lets a dig leave the wall standing — a bored
+ * hole through it, the wall still overhead — rather than quietly bulldozing
+ * the whole column down to head height.
+ *
+ * A ramp is not a height for the column at all, it is a deck standing over
+ * it, and a column can carry several: ramps cross, and crossing leaves both
+ * whole. So the gap stays open underneath a ramp instead of filling in with
+ * dirt, the ground under one is still ground to walk along, and which of a
+ * column's surfaces a duckling is on depends on where that duckling already
+ * was. See sim.js's surfacesAt and stepTargetAt, which is where all of that
+ * is actually decided.
  *
  * A segment can carry two more things besides its height, both optional and
  * both expanded the same way `y` is (see buildLayer):
@@ -47,7 +52,7 @@
    straight off the page whether they have the latest build, rather than
    having to guess from behavior alone. Bump it on every change that ships,
    however small. */
-export const GAME_VERSION = '1.1';
+export const GAME_VERSION = '1.2';
 
 export const SCENE_W = 320;
 export const SCENE_H = 180;
@@ -101,10 +106,14 @@ export const FALL_SAFE = 24;
    run into nothing — see sim.js's stepBuilding. It starts the instant it is
    given, so this is the one thing that ever ends a ramp out in open air,
    and it is also what bounds how far one reaches: one tick of building is
-   one column, so ten seconds is a hundred and ten columns, a third of the
-   scene. Stated as seconds, the same way spawnInterval and timeLimit are,
-   and converted once into ticks here rather than written as a bare count. */
-export const BUILD_SECONDS = 10;
+   one column, so four seconds is forty-four columns, about an eighth of the
+   scene. Was ten, which reached a third of the way across a level off a
+   single click and left very little a player could get wrong; four is short
+   enough that where the ramp starts is a real decision, and still comfortably
+   longer than the widest gap in the game (The Park's, at thirty-five).
+   Stated as seconds, the same way spawnInterval and timeLimit are, and
+   converted once into ticks here rather than written as a bare count. */
+export const BUILD_SECONDS = 4;
 export const BUILD_MAX_STEPS = TICK_RATE * BUILD_SECONDS;
 
 /* How high a Builder's ramp climbs over the full BUILD_MAX_STEPS, if it
@@ -743,19 +752,18 @@ export const LEVEL_6 = {
  * run, in an order that never repeats a beat: bridge, drop, wall, drop,
  * step, bridge, drop, pond. Confirmed by actually running it: a bot with
  * Flyer and Climber wins, the same bot with Digger in place of Climber
- * wins too, and pulling either Flyer or Builder out from under it loses
- * the whole flock.
+ * wins too, and pulling any one of Flyer, Builder, or a way past the wall
+ * out from under it loses the whole flock.
  *
- * The wall is the one hazard here with a third answer, and it is a quirk
- * of this level's own shape rather than a rule: because the whole walk
- * descends, the wall's top (15) sits only five pixels above the nest's own
- * ground (20), and a Builder's ramp climbs BUILD_RISE_HEIGHT — so a ramp
- * still running when it arrives is simply taller than the wall and carries
- * on over it. On every other level the walls stand fifty to a hundred
- * pixels above wherever a ramp could start, far out of reach. Left as it
- * is: a player who spends the first gap's Builder and happens to still be
- * building at the wall has found something real about this particular
- * hillside, which is a better thing to meet than a rule bent to forbid it.
+ * The wall is worth one note, because it is the only wall in the game a
+ * ramp could ever reach the top of. This level descends, so the wall's top
+ * (15) sits a mere five pixels above the nest's own ground (20) — well
+ * inside a ramp's BUILD_RISE_HEIGHT — where every other level's walls stand
+ * fifty to a hundred pixels above anywhere a ramp could start. What keeps
+ * it a wall is reach, not height: at BUILD_SECONDS a ramp is forty-four
+ * columns, and the wall is seventy past the first gap, so a Builder spent
+ * there has long since stopped by the time a duckling arrives. Lengthen
+ * BUILD_SECONDS much and this is the level that notices first.
  */
 export const LEVEL_7 = {
   id: 'falls',

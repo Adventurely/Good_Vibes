@@ -341,7 +341,13 @@ test('a flyer over a gap still drifts past the bottom of the world — there is 
 
 /* -------------------------------------------------------------- building */
 
-test('a builder starts on the click and builds the whole ten seconds on flat ground, with nothing there to answer', () => {
+/* How many columns carry a deck, and how many decks are standing in all —
+   the two are the same number until ramps start crossing each other, which
+   is the whole point of the pair. See sim.js's `decks`. */
+const deckColumns = state => state.decks.filter(at => at.length > 0).length;
+const deckCount = state => state.decks.reduce((n, at) => n + at.length, 0);
+
+test('a builder starts on the click and builds the whole BUILD_SECONDS on flat ground, with nothing there to answer', () => {
   // The heart of it: no gap, no wall, nothing — and it still builds. The
   // click is never the thing that has to be aimed, and a duckling given one
   // always, visibly, starts climbing on the very next tick.
@@ -352,12 +358,10 @@ test('a builder starts on the click and builds the whole ten seconds on flat gro
   assert.equal(duck.state, 'building', 'instant — see assignSkill');
 
   run(state, BUILD_MAX_STEPS);
-  assert.equal(duck.buildStep, BUILD_MAX_STEPS, 'the full ten seconds, none of it skipped');
+  assert.equal(duck.buildStep, BUILD_MAX_STEPS, 'the whole clock, none of it skipped');
   assert.equal(duck.y, 50 - BUILD_RISE_HEIGHT, 'and the full climb with it');
   assert.equal(duck.state, 'walking', 'then it stops and walks on');
-
-  const laid = state.bridgeY.filter(y => y != null).length;
-  assert.equal(laid, BUILD_MAX_STEPS, 'a column of ramp laid every tick of it');
+  assert.equal(deckCount(state), BUILD_MAX_STEPS, 'a column of ramp laid every tick of it');
 
   // Stepping off the far end of a ramp laid over level ground is exactly
   // FALL_SAFE, never more — see content.js's BUILD_RISE_HEIGHT.
@@ -380,11 +384,11 @@ test('a builder crosses a gap it happens to be aimed over, without ever being to
   // Given at the nest, seven columns short of the pit — no aiming at all.
   assignSkill(state, duck.id, 'builder');
   run(state, BUILD_MAX_STEPS);
-  // The pit itself is untouched — see content.js's header note — it is
-  // `bridgeY` that carries the ramp, so the gap is still open beneath it.
+  // The pit itself is untouched — see content.js's header note — the deck is
+  // its own thing standing over the column, so the gap is still open below.
   for(let x = 10; x < 20; x++){
     assert.equal(state.terrain[x], 500, `column ${x}'s terrain should still be open pit`);
-    assert.ok(state.bridgeY[x] != null, `column ${x} should be carrying ramp`);
+    assert.equal(state.decks[x].length, 1, `column ${x} should be carrying ramp`);
   }
   run(state, 200);
   assert.equal(duck.state, 'saved', 'it walked over its own ramp and on to the pond');
@@ -392,7 +396,7 @@ test('a builder crosses a gap it happens to be aimed over, without ever being to
 
 test('a builder stops dead at a wall rather than climbing it, and turns back like anything else would', () => {
   const level = miniLevel({
-    segments: [{ from: 0, to: 40, y: 50 }, { from: 40, to: SCENE_W, y: 10 }],  // a 40px wall
+    segments: [{ from: 0, to: 30, y: 50 }, { from: 30, to: SCENE_W, y: 10 }],  // a 40px wall
     supply: { digger: 0, builder: 1, blocker: 0, climber: 0 },
   });
   const state = run(newGame(level), 1);
@@ -400,9 +404,9 @@ test('a builder stops dead at a wall rather than climbing it, and turns back lik
   assignSkill(state, duck.id, 'builder');
   let ticks = 0;
   while(duck.state === 'building' && ticks < 300){ tick(state); ticks++; }
-  assert.ok(ticks < BUILD_MAX_STEPS, 'the wall ended it well short of the ten seconds');
-  assert.equal(duck.x, 39, 'left standing on the last column of its own ramp');
-  for(let x = 40; x < 45; x++) assert.equal(state.bridgeY[x], null, 'and nothing laid into the wall itself');
+  assert.ok(ticks < BUILD_MAX_STEPS, 'the wall ended it short of the clock');
+  assert.equal(duck.x, 29, 'left standing on the last column of its own ramp');
+  for(let x = 30; x < 35; x++) assert.equal(state.decks[x].length, 0, 'and nothing laid into the wall itself');
   // Getting up a wall is a Climber's job and a Digger's. A Builder holding
   // neither turns back from one exactly as it would without the ramp.
   run(state, 3);
@@ -412,24 +416,96 @@ test('a builder stops dead at a wall rather than climbing it, and turns back lik
 test('a builder\'s ramp joins a staircase rather than cutting across it, so the flock behind can still walk up', () => {
   /* The Spire in miniature — treads that climb faster than the ramp does.
    * Because the ramp stops where the ground catches up to it, the two meet
-   * within a step of each other, and `bridgeY` being shared ground (see
-   * sim.js's groundAt) the rest of the flock walks the ramp up onto the
+   * within a step of each other, and a deck being shared ground (see
+   * sim.js's surfacesAt) the rest of the flock walks the ramp up onto the
    * stairs and carries on. A ramp that ran on at its own angle instead
    * would leave every duckling behind it stranded.
    */
-  const segments = [{ from: 0, to: 40, y: 50 }];
-  for(let i = 0; i < 30; i++) segments.push({ from: 40 + i * 2, to: 42 + i * 2, y: 50 - 4 * (i + 1) });
-  segments.push({ from: 100, to: SCENE_W, y: -70 });
+  const segments = [{ from: 0, to: 30, y: 50 }];
+  for(let i = 0; i < 30; i++) segments.push({ from: 30 + i * 2, to: 32 + i * 2, y: 50 - 4 * (i + 1) });
+  segments.push({ from: 90, to: SCENE_W, y: -70 });
   const level = miniLevel({ segments, supply: { digger: 0, builder: 1, blocker: 0, climber: 0 } });
   const state = run(newGame(level), 1);
   const duck = state.ducks[0];
   assignSkill(state, duck.id, 'builder');
   while(duck.state === 'building') tick(state);
 
-  const last = state.bridgeY.findLastIndex(y => y != null);
-  const step = state.bridgeY[last] - state.terrain[last + 1];
+  const last = state.decks.findLastIndex(at => at.length > 0);
+  const step = state.decks[last][0] - state.terrain[last + 1];
   assert.ok(step >= 0 && step <= WALK_STEP,
     `the ramp should meet the stairs within one step, not ${step}px above them`);
+});
+
+test('a ramp laid across one already standing leaves both — neither clears the other away', () => {
+  // The two are their own decks at every column they share, and a duckling
+  // walks whichever one it is actually on; see sim.js's addDeckAt and
+  // stepTargetAt.
+  const level = miniLevel({
+    duckCount: 2, spawnInterval: 1,
+    supply: { digger: 0, builder: 2, blocker: 0, climber: 0 },
+  });
+  const state = run(newGame(level), 2);
+  const [first, second] = state.ducks;
+
+  assignSkill(state, first.id, 'builder');
+  run(state, BUILD_MAX_STEPS + 2);
+  const before = state.decks.map(at => [...at]);
+  assert.equal(deckCount(state), BUILD_MAX_STEPS);
+
+  // The second one, turned around, builds back across the first.
+  second.x = 40; second.y = 50; second.dir = -1;
+  assignSkill(state, second.id, 'builder');
+  run(state, BUILD_MAX_STEPS + 2);
+
+  for(let x = 0; x < SCENE_W; x++){
+    for(const y of before[x]){
+      assert.ok(state.decks[x].includes(y), `the first ramp's deck at ${x} should still be standing`);
+    }
+  }
+  assert.ok(deckCount(state) > deckColumns(state), 'and some columns should be carrying both');
+});
+
+test('a duckling walks under a ramp overhead rather than being lifted onto it', () => {
+  const level = miniLevel({
+    duckCount: 2, spawnInterval: 1,
+    supply: { digger: 0, builder: 1, blocker: 0, climber: 0 },
+  });
+  const state = run(newGame(level), 2);
+  const [builder, walker] = state.ducks;
+  assignSkill(state, builder.id, 'builder');
+  run(state, BUILD_MAX_STEPS + 2);
+
+  // Stand the other one on the ground under the high end of that ramp.
+  const under = state.decks.findLastIndex(at => at.length > 0) - 1;
+  assert.ok(state.decks[under][0] < 50 - WALK_STEP, 'the deck there should be well overhead');
+  walker.x = under - 1; walker.y = 50; walker.dir = 1; walker.state = 'walking';
+  tick(state);
+  assert.equal(walker.x, under, 'it kept walking');
+  assert.equal(walker.y, 50, 'along the ground, under the ramp, not up onto it');
+});
+
+test('a duckling on a ramp follows it whichever way it is walking — up one way, down the other', () => {
+  const level = miniLevel({
+    duckCount: 2, spawnInterval: 1,
+    supply: { digger: 0, builder: 1, blocker: 0, climber: 0 },
+  });
+  const state = run(newGame(level), 2);
+  const [builder, walker] = state.ducks;
+  assignSkill(state, builder.id, 'builder');
+  run(state, BUILD_MAX_STEPS + 2);
+
+  // Put the other one up on the high end of the ramp, facing back down it.
+  const top = state.decks.findLastIndex(at => at.length > 0);
+  walker.x = top; walker.y = state.decks[top][0]; walker.dir = -1; walker.state = 'walking';
+  const startY = walker.y;
+  run(state, 8);
+  assert.ok(walker.y > startY, 'walking back the way the ramp came should take it down the ramp');
+  assert.ok(walker.y < 50, 'and it should still be on the ramp, not dropped off it');
+  // Turn it round and it climbs the same ramp again.
+  walker.dir = 1;
+  const turnedAt = walker.y;
+  run(state, 8);
+  assert.ok(walker.y < turnedAt, 'and turning round takes it back up');
 });
 
 test('a builder is never held, so a duckling that has finished one ramp can be given another', () => {
@@ -488,7 +564,7 @@ test('a builder ramps over an ordinary lethal drop the same as over a bottomless
   // still building long after the far bank is behind it.
   run(state, BUILD_MAX_STEPS + 4);
   assert.equal(duck.state, 'saved');
-  for(let x = 10; x < 20; x++) assert.ok(state.bridgeY[x] != null, `column ${x} should be carrying ramp`);
+  for(let x = 10; x < 20; x++) assert.equal(state.decks[x].length, 1, `column ${x} should be carrying ramp`);
 });
 
 test('BUILD_RISE_HEIGHT never climbs a duckling higher than FALL_SAFE lets it fall back from', () => {
@@ -1045,18 +1121,15 @@ test('The Falls cannot be won without a Flyer — two of its three drops are rea
   assert.equal(state.saved, 0, 'nothing should survive the real drops without a Flyer');
 });
 
-test('The Falls\' wall can also be answered by a ramp that reaches it, not only by a Digger or a Climber', () => {
-  /* The one level where that is true, and worth pinning down rather than
-   * leaving as a surprise. This level descends: its wall's top sits at 15,
-   * only five pixels above the nest's own 20 (see LEVEL_7's segments), and a
-   * Builder's ramp climbs BUILD_RISE_HEIGHT — twenty-four — so a ramp still
-   * running when it arrives is simply higher than the wall is, and carries
-   * on over the top of it. Everywhere else the walls stand fifty to a
-   * hundred pixels above the ground a ramp would start from, well out of
-   * reach, which is why this is the only level it happens on.
-   *
-   * So the same bot that used to prove the wall needed a Digger or a Climber
-   * now clears the level without either, off the first gap's Builder alone.
+test('The Falls cannot be won without a way past the one wall', () => {
+  /* This level descends, so its wall's top (15) sits only five pixels above
+   * the nest's own ground (20) — within a ramp's BUILD_RISE_HEIGHT, and for
+   * as long as BUILD_SECONDS was ten a Builder given at the first gap was
+   * still climbing seventy columns later when it reached the wall, and went
+   * straight over it. At four seconds a ramp is forty-four columns and runs
+   * out well short, so the wall is a wall again and this holds the way it
+   * always did. Worth keeping the reason written down: the margin here is
+   * BUILD_SECONDS, not anything about the wall.
    */
   const state = newGame(LEVEL_7);
   let builder1Used = false, builder2Used = false;
@@ -1069,9 +1142,7 @@ test('The Falls\' wall can also be answered by a ramp that reaches it, not only 
     }
     tick(state);
   }
-  assert.equal(state.ended, 'won');
-  assert.ok(state.bridgeY.some((y, x) => y != null && x >= 210 && x < 230),
-    'the ramp should be lying over the wall\'s own plateau — that is what got them past it');
+  assert.equal(state.saved, 0, 'nothing should get past the wall without a Digger or a Climber');
 });
 
 test('The Falls cannot be won without a Builder — neither gap has any other answer', () => {
