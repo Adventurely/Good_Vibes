@@ -88,7 +88,7 @@
    straight off the page whether they have the latest build, rather than
    having to guess from behavior alone. Bump it on every change that ships,
    however small. */
-export const GAME_VERSION = '1.8';
+export const GAME_VERSION = '1.9';
 
 export const SCENE_W = 320;
 export const SCENE_H = 180;
@@ -167,12 +167,18 @@ export const BUILD_MAX_STEPS = TICK_RATE * BUILD_SECONDS;
 
 /* How high a Builder's ramp climbs over the full BUILD_MAX_STEPS, if it
    never runs into ground first — see sim.js's stepBuilding. Kept at exactly
-   FALL_SAFE on purpose, which is what makes the ordinary case safe: a ramp
-   laid along level ground ends this far up, and this far is exactly the
-   tallest drop a duckling walks away from, so stepping off the end of one
-   costs nothing. Ground that has fallen away further under the ramp's far
-   end is the case that is not safe, and deliberately so — see stepBuilding
-   on why a ramp is a real thing left in the world. */
+   FALL_SAFE on purpose, which is what makes the ordinary case safe: one
+   ramp laid along level ground ends this far up, and this far is exactly
+   the tallest drop a duckling walks away from, so stepping off the end of
+   one costs nothing. Ground that has fallen away further under the ramp's
+   far end is the case that is not safe, and deliberately so — see
+   stepBuilding on why a ramp is a real thing left in the world.
+
+   A staircase of them is not bounded by this at all. Builders alternate
+   climbing and level runs (see sim.js's assignSkill), so the third one is
+   twice this height above the ground and the fifth is three times, and the
+   end of any of those is a ledge that kills. That is the whole risk of The
+   Stepping Stones, and the reason it hands out Blockers by the handful. */
 export const BUILD_RISE_HEIGHT = FALL_SAFE;
 
 /* How long a Digger keeps cutting, and so how far one tunnel reaches: one
@@ -272,7 +278,7 @@ export const SKILL_INFO = {
   digger: { name: 'Digger', verb: 'Dig',
     blurb: `Tunnels straight through the next wall for ${DIG_SECONDS} seconds, leaving a way through for the rest. Then the knack is spent.` },
   builder: { name: 'Builder', verb: 'Build',
-    blurb: `Starts a ramp climbing the way it faces, right where you click it, for ${BUILD_SECONDS} seconds — until it runs into higher ground, whichever comes first.` },
+    blurb: `Starts a ramp the way it faces, right where you click it, for ${BUILD_SECONDS} seconds. From the ground it climbs; from a climbing ramp it carries on level; from a level one it climbs again — so a chain of them is a staircase.` },
   blocker: { name: 'Blocker', verb: 'Block',
     blurb: 'Plants itself, turning back anything that meets it — another duckling, or the goose. Click it again to stand it down and send it on its way.' },
   climber: { name: 'Climber', verb: 'Climb',
@@ -1154,7 +1160,116 @@ export const LEVEL_9 = {
   goose: { x0: 270, x1: 299, y: 150, speed: 1.5, catchRadius: 1.5 },
 };
 
-export const LEVELS = [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5, LEVEL_6, LEVEL_7, LEVEL_8, LEVEL_9];
+/* "The Stepping Stones": four islands in the sky, a pond on the last of
+ * them, and no way up to any of it but ramps.
+ *
+ * The flock hatches on a strip of ground with a rock wall at each end — a
+ * pen, deliberately, and the only ground in this game where doing nothing
+ * costs nothing. Everything above it is the opposite. The first island is
+ * one ramp's climb over the grass, so falling off it is exactly FALL_SAFE
+ * and a duckling that gets it wrong just lands back in the pen and walks
+ * round again. Every island after that is higher, and falling off one is
+ * the end of that duckling.
+ *
+ * The islands zigzag, and that is the level. Island A is away to the right,
+ * B is back over to the left and above it, C is right again, D is right
+ * again and higher still. A duckling walks one way until something turns it
+ * round, and the only thing in this game that turns one around in mid-air
+ * is a Blocker — so two of them are not a safety net here, they are the
+ * route. One near island A's right-hand end sends the flock back left to
+ * the ramp up to B; one near island B's left-hand end sends it back right
+ * to the ramp up to C. Both stay planted: stand either one down while
+ * ducklings are still coming and the flock simply walks the wrong way again
+ * and off the far end. The two ducklings holding them are the price of the
+ * level, and the last thing a player does, once the quota is safe, is click
+ * them both and let them walk up after everyone else (see sim.js's
+ * releaseBlocker).
+ *
+ * The other four Blockers are the safety net: the end of a half-built ramp
+ * is a ledge, and everything above island A is high enough that walking off
+ * one is fatal. Planting one at the working end while the next ramp goes in
+ * costs nothing and saves whatever would have walked off it.
+ *
+ * The climbing is the other half. A Builder handed to a duckling on the
+ * ground or on an island climbs BUILD_RISE_HEIGHT; one handed to a duckling
+ * already on a climbing ramp runs level; and one handed to a duckling on
+ * *that* runs up again (see sim.js's assignSkill). So a chain of Builders
+ * is a staircase, and the last hop — C to D, forty-eight pixels — is built
+ * to need the whole of it: climb, level, climb, three Builders and
+ * ninety-nine columns of it. The first three hops are one ramp each,
+ * because an island is ground: a ramp off one starts a fresh staircase
+ * rather than carrying on from whatever got the flock up there. That is
+ * what the islands are for. Ramps alone gain twenty-four pixels every
+ * sixty-six columns, which does not reach the top of this level inside the
+ * width of the scene; ramps off islands gain it every thirty-three.
+ *
+ * The pond is the right-hand end of the top island, a hundred and twenty
+ * pixels above the grass, and the first water in this game that is not on
+ * the ground. There is nothing else up there and nothing to do once a
+ * duckling arrives. The whole of the level is the getting there.
+ */
+export const LEVEL_10 = {
+  id: 'stones',
+  name: 'The Stepping Stones',
+  width: SCENE_W,
+  height: SCENE_H,
+
+  /* [0, 12)    the left rock wall — `hard`, and there to turn a duckling
+                back rather than let it walk off the edge of the level
+     [12, 200)  the pen floor, with the nest at one end and the goose
+                patrolling the middle
+     [200, 212) the right rock wall, the same thing at the other end. Forty
+                pixels, taller than any one ramp climbs, so nothing ever
+                gets on top of it and off into the void beyond
+     [212, 320) the void under the upper islands */
+  segments: [
+    { from: 0, to: 12, y: 110, hard: true },
+    { from: 12, to: 200, y: 150 },
+    { from: 200, to: 212, y: 110, hard: true },
+    { from: 212, to: 320, y: PIT_Y },
+  ],
+
+  /* Right, then back left, then right, then right and up again — and each
+     one higher than the last. Ten pixels thick rather than the fourteen The
+     Overlook's shelf gets: three of these stack within fifty pixels of each
+     other over the middle of the level, and a duckling walking the lower
+     one wants air over its head. */
+  islands: [
+    { from: 110, to: 190, y: 126, floor: 136 },   // A: one ramp up from the pen
+    { from: 30, to: 100, y: 102, floor: 112 },    // B: back to the left
+    { from: 60, to: 150, y: 78, floor: 88 },      // C: right again
+    { from: 165, to: 320, y: 30, floor: 40 },     // D: the top, with the pond on it
+  ],
+
+  nestX: 18,
+  /* Inside the top island, so its right-hand end is open water — art.js
+     decides that off goalX alone (see isPondAt), and draws the pond on
+     whatever surface happens to be carrying it. */
+  goalX: 290,
+
+  duckCount: 24,
+  spawnInterval: TICK_RATE * 3,
+  timeLimit: TICK_RATE * 420,       // seven minutes: six ramps and a lot of walking
+  winRatio: 0.5,
+
+  /* Builder: ten, for the six the climb needs. Four spare is more margin
+     than any other level gives its mandatory skill, and this is the level
+     that wants it — every ramp is a placement decision, a ramp in the wrong
+     place cannot be taken back, and the last thing this level should be is
+     one where the sixth mistake ends a run that was going fine. Blocker:
+     six, for the two turns the route cannot be walked without and four for
+     the ledges. Digger: zero — both walls are rock and there is nothing
+     else here to tunnel. Climber: zero; the walls are the only things to
+     climb and the top of either one is the void. Flyer: two, which save a
+     duckling that has already walked off something rather than opening any
+     route of their own. Jumper: zero, nothing here is hop-sized. */
+  supply: { digger: 0, builder: 10, blocker: 6, climber: 0, flyer: 2, jumper: 0 },
+
+  goose: { x0: 90, x1: 150, y: 150, speed: 1.5, catchRadius: 1.5 },
+};
+
+export const LEVELS = [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5, LEVEL_6, LEVEL_7, LEVEL_8,
+  LEVEL_9, LEVEL_10];
 
 export const winCount = level => Math.ceil(level.duckCount * level.winRatio);
 

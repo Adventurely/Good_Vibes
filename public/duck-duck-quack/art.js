@@ -400,8 +400,11 @@ export function drawGround(ctx, terrain, level, rock, floors, rockBelow){
   drawRockSpeckle(ctx, terrain, level, rock, floors);
   drawIslands(ctx, level);
   drawNest(ctx, level, terrain);
-  drawCattails(ctx, level, terrain);
-  drawLilyPads(ctx, terrain, level);
+  // The pond's own decoration follows the pond, which is not always the
+  // ground: The Stepping Stones' sits on the top island. See pondRow.
+  const water = pondRow(level, terrain);
+  drawCattails(ctx, level, water);
+  drawLilyPads(ctx, water, level);
 }
 
 /* An island's slab is a stretch of ordinary ground that happens to be up in
@@ -427,6 +430,23 @@ export function drawIslands(ctx, level){
     }
     drawTufts(ctx, tuftRow(level, isle), level, null);
   }
+}
+
+/* The surface the water actually sits on at each column: the terrain,
+   except where an island stands over it, in which case the island's own
+   top. Every pond in this game but one is on the ground and this hands back
+   `terrain` unchanged for them; the one that is not is The Stepping Stones'
+   (see content.js), and its ripples, lily pads and cattails would otherwise
+   be drawn a hundred and twenty pixels below the water. */
+function pondRow(level, terrain){
+  if(!level.islands?.length) return terrain;
+  const row = terrain.slice();
+  for(const isle of level.islands){
+    for(let x = Math.max(0, isle.from); x < Math.min(row.length, isle.to); x++){
+      if(isle.y < row[x]) row[x] = isle.y;
+    }
+  }
+  return row;
 }
 
 /* A height array shaped like `terrain` but empty everywhere except this one
@@ -871,7 +891,7 @@ function drawZap(ctx, z){
 export function paintScene(ctx, state){
   drawSky(ctx, state.ticks);
   drawGround(ctx, state.terrain, state.level, state.rock, state.floors, state.rockBelow);
-  drawRipples(ctx, state.terrain, state.level, state.ticks);
+  drawRipples(ctx, pondRow(state.level, state.terrain), state.level, state.ticks);
   drawTunnels(ctx, state);
   drawBridges(ctx, state);
   for(const pad of state.pads) drawPad(ctx, pad, state.ticks);
