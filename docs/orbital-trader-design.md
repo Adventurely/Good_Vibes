@@ -867,6 +867,18 @@ it is why the clock had to keep running for it.
 Nothing about the flight model changes. `thrust` charges the tank and writes
 the record exactly as a fired mark does.
 
+**And a written mark is an orbit again, everywhere.** It used to bend to the
+drifting thing's frame inside a reach — forward became "along your speed
+relative to it", out became "away from it" — so that the same four buttons
+could fly both jobs. Two live thrusters do the rendezvous now, and they take
+their directions from the pair rather than from any frame, so the mark has no
+second meaning left to carry. `frameAt` is gone with it, and so is the set of
+hidden bodies the kernel was being handed to keep an unfound wreck from
+bending one: nothing bends any more, which covers that case and every other.
+`driftTargetAt` stays, because *what the ship is alongside* is still the
+question the readout, the harbour and the thrusters all ask — it simply no
+longer has anything to say about how a burn is written.
+
 **And it says so in words.** The corner of the HUD reads **ZERO-G DOCKING**
 whenever the ship is in a drifting thing's reach. Crossing that line really
 does change what the two buttons on a mark do, and a control scheme that

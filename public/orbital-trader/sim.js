@@ -19,7 +19,7 @@ import {
   closestApproach, nodeMagnitude, nodeCost, nodeFromVector, cross, dot, localState, TAU,
   /* aliased: seedFromLambert has a local `frameAt` of its own, and two things
      of that name one function apart is a trap waiting for the next edit. */
-  frameAt as burnFrameAt, driftTargetAt,
+  burnFrame, driftTargetAt,
 } from './orbit.js';
 import {
   CONST, BODIES, GOODS, PORTS, UPGRADES, FORMULAS, TEXT, SPECIES,
@@ -735,17 +735,14 @@ function skimShed(b, el, at){
  * to a ship without a shield and a brake to one with. */
 function legOpts(state, extra = {}){
   const skim = skimsAir(state);
-  /* What the ship has not been told about cannot bend its burns: the same set
-     the chart refuses to draw is handed to the flying, so an unfound wreck is
-     absent rather than merely invisible. */
-  return { atmosphere: !skim, dvAvailable: state.dv, skimAt: skim ? skimShed : null, hidden: unseen(state), ...extra };
+  return { atmosphere: !skim, dvAvailable: state.dv, skimAt: skim ? skimShed : null, ...extra };
 }
 const sortedNodes = state => state.nodes.map(n => ({ ...n })).sort((a, b) => a.t - b.t);
 
 export function effectiveNodes(state, horizon, { skim = skimsAir(state) } = {}){
   const nodes = sortedNodes(state);
   if(!skim) return nodes;
-  const pred = predictLegs(world, state.ship, state.t, nodes, { atmosphere: false, dvAvailable: state.dv, skimAt: skimShed, hidden: unseen(state), maxTime: horizon, noSamples: true });
+  const pred = predictLegs(world, state.ship, state.t, nodes, { atmosphere: false, dvAvailable: state.dv, skimAt: skimShed, maxTime: horizon, noSamples: true });
   const aero = pred.events.filter(e => e.kind === 'burn' && e.node.aero).map(e => e.node);
   return [...nodes, ...aero].sort((a, b) => a.t - b.t);
 }
@@ -1321,34 +1318,15 @@ export function exchangeFor(state, who, nth = 0){
   return list[((nth % list.length) + list.length) % list.length];
 }
 
-/* The speed a burn written here is actually measured against, and whether that
- * is a relative one.
+/* What one press is worth, as a fraction of the speed it is measured against.
  *
- * A press on one of the four buttons is a fraction of "how fast you are
- * going", and the frame decides which speed that is. Beside a wreck out at the
- * Lamp the ship is doing thirty-six kilometres a second round the Lamp and a
- * few dozen metres a second relative to the hulk it is trying to touch — and
- * the press was being sized off the first of those, so one tap was two hundred
- * metres a second and the whole approach could only be flown by overshooting.
- * The burn itself has always been written in the drifting thing's frame; this
- * is the button catching up with it. */
-export function burnScaleAt(state, where, t){
-  if(!where) return { speed: norm(state?.ship?.v ?? [0, 0]), relative: false };
-  const tgt = driftTargetAt(world, where.body, where.r, t, unseen(state));
-  return tgt
-    ? { speed: norm(sub(where.v, tgt.v)), relative: true, target: tgt.id }
-    : { speed: norm(where.v), relative: false };
-}
-
-/* What one press is worth, as a fraction of that speed.
- *
- * Flying an orbit you are nudging something enormous and a half-percent step
- * is a nudge. Coming alongside you are killing nearly all of what you have, and
- * a half-percent of two hundred metres a second is two hundred presses — so a
- * rendezvous gets a tenth of the relative speed instead. It shrinks as you
- * slow, which is the whole trick: the same button is ten metres a second when
- * you are closing fast and a tenth of one when you are nearly stopped, so the
- * last few metres a second cost no more presses than the first few hundred. */
+ * Pushing an orbit about you are nudging something enormous, and a half-percent
+ * step is a nudge. Killing a drift you are trying to lose nearly all of what
+ * you have, and a half-percent of two hundred metres a second is two hundred
+ * presses — so Match takes a tenth instead. It shrinks as it works, which is
+ * the whole trick: the same button is twenty metres a second when you are
+ * closing fast and a fifth of one when you are nearly stopped, so the last few
+ * metres a second cost no more presses than the first few hundred. */
 export const BURN_STEP = 0.005, BURN_STEP_REL = 0.1;
 
 /* What one press is worth, in metres a second: that fraction of the speed the
@@ -1572,19 +1550,17 @@ export function addNodeAhead(state){
  * that are already written on the buttons, and the fuel it costs is shown
  * against the fuel gauge where the word "fuel" is. Nothing about a burn that
  * slows you down now goes up. */
-export function burnWords(node, relTo){
+/* A mark says the same four words wherever it is written. It used to have a
+ * second sentence for a mark inside a drifting thing's reach, where the axes
+ * bent and "out" became "away from it" — the thrusters do that job now, so a
+ * mark is an orbit again everywhere, and only ever means the one thing. */
+export function burnWords(node){
   if(!node) return 'nothing yet';
   const parts = [];
   const pro = node.prograde ?? 0, rad = node.radial ?? 0;
-  /* Near something drifting, the same two numbers mean something else: forward
-     is along your speed relative to it, and the second axis points at it
-     rather than out of an orbit. Same axes, different sentence. */
   if(Math.abs(pro) > 1e-15) parts.push(`${pro > 0 ? 'forward' : 'back'} ${fmtKms(pro)}`);
-  if(Math.abs(rad) > 1e-15){
-    parts.push(relTo ? `${rad > 0 ? 'away' : 'toward'} ${fmtKms(rad)}` : `${rad > 0 ? 'out' : 'in'} ${fmtKms(rad)}`);
-  }
-  if(!parts.length) return 'nothing yet';
-  return parts.join(' · ') + (relTo ? ` · on ${relTo}` : '');
+  if(Math.abs(rad) > 1e-15) parts.push(`${rad > 0 ? 'out' : 'in'} ${fmtKms(rad)}`);
+  return parts.length ? parts.join(' · ') : 'nothing yet';
 }
 
 export function planCost(state, horizon){
@@ -2105,9 +2081,8 @@ function pickSeed(state, node, candidates, scoreFn, reference){
   const byTime = [...candidates].sort((a, b) => (a.arrives ?? 0) - (b.arrives ?? 0));
   const shortlist = [...new Set([...candidates.slice(0, 6), ...byTime.slice(0, 4)])];
   const scored = [];
-  const hidden = unseen(state);
   for(const c of shortlist){
-    const parts = nodeFromVector(c.r, c.v, c.dv, burnFrameAt(world, c.body ?? state.ship.body, c.r, c.v, state.t + c.dep, hidden));
+    const parts = nodeFromVector(c.r, c.v, c.dv, burnFrame(c.r, c.v));
     if(!parts) continue;
     node.t = state.t + c.dep;
     node.prograde = parts.prograde;

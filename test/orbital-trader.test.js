@@ -1707,7 +1707,10 @@ test('the cost of a burn is shown against the fuel, not against the burn', () =>
   /* The label is words, not a bare length of engine. It takes a second
      argument now — the drifting thing the axes are measured against, when
      there is one — so the guard checks the call rather than its arity. */
-  assert.match(PLAY, /nodeLabel = n \? `\$\{S\.burnWords\(n[,)]/, 'the mark is labelled with a length of engine again');
+  assert.match(PLAY, /nodeLabel = n \? `\$\{S\.burnWords\(n\)/, 'the mark is labelled with a length of engine again');
+  /* And with one thing only: a mark is an orbit everywhere now, so nothing
+     hands it a drifting thing to be measured against. */
+  assert.doesNotMatch(PLAY, /burnWords\(n,/, 'a mark is being labelled against a rendezvous again');
   assert.doesNotMatch(PLAY, /nodeLabel = `\$\{S\.fmtKms/, 'the old bare-magnitude label is back');
   assert.match(PLAY, /planned`/, 'the gauge does not say what the plan will spend');
   assert.match(PLAY, /id="h-dvplan"/, 'the gauge has no planned-spend segment');
@@ -4666,28 +4669,24 @@ test('the whole approach belongs to the wreck, not the moon behind it', () => {
   assert.equal(outside?.port, 'slate', 'no harbour at all outside the reach');
 });
 
-test('a press is worth something on a rendezvous, not two hundred metres a second', () => {
-  /* The buttons size themselves off "how fast you are going", and the frame
-     decides which speed that is. Beside a wreck out at the Lamp the ship does
-     thirty-six kilometres a second round the Lamp and metres a second relative
-     to the hulk — and the press was sized off the first, so one tap was two
-     hundred metres a second and a ten-metre gate could not be reached at all. */
-  const s = alongsideAt(salvor(), 'tinwhistle', 200, 200);
-  const rel = S.burnScaleAt(s, { body: s.ship.body, r: s.ship.r, v: s.ship.v }, s.t);
-  assert.equal(rel.relative, true, 'the burn beside a wreck is not written against it');
-  assert.ok(Math.abs(S.kms(rel.speed) * 1000 - 200) < 1, `closing at ${S.kms(rel.speed) * 1000} m/s`);
-
-  /* Far from anything drifting it is the orbit again, and the old number. */
+test('a mark is an orbit everywhere, beside a wreck as anywhere else', () => {
+  /* A written mark used to bend to the drifting thing's frame inside a reach so
+     the same four buttons could fly a rendezvous. The two thrusters do that
+     now, in real time and off the pair rather than off any frame — so a mark is
+     back to meaning one thing wherever it is written, which is the only thing
+     it was ever good at. */
+  const near = alongsideAt(salvor(), 'tinwhistle', 200, 200);
   const far = alongsideAt(salvor(), 'tinwhistle', 5000, 200);
-  const abs = S.burnScaleAt(far, { body: far.ship.body, r: far.ship.r, v: far.ship.v }, far.t);
-  assert.equal(abs.relative, false, 'a burn out in the open is written against a drifting thing');
-  assert.ok(S.kms(abs.speed) > 10, `${S.kms(abs.speed)} km/s round the Lamp`);
-
-  /* The step is a tenth of the closing speed, so it shrinks as you slow and the
-     last few metres a second cost no more presses than the first few hundred. */
-  assert.ok(S.BURN_STEP_REL > S.BURN_STEP, 'a rendezvous nudges as gently as an orbit');
-  const press = v => S.kms(v) * 1000 * S.BURN_STEP_REL;
-  assert.ok(press(rel.speed) <= 21 && press(rel.speed) >= 5, `${press(rel.speed)} m/s a press at 200`);
+  for(const [label, s] of [['beside a wreck', near], ['out in the open', far]]){
+    const f = O.burnFrame(s.ship.r, s.ship.v);
+    assert.ok(Math.abs(O.dot(f.pro, O.unit(s.ship.v)) - 1) < 1e-9, `${label}: forward is not along the orbit`);
+    assert.ok(Math.abs(O.dot(f.pro, f.out)) < 1e-12, `${label}: the axes lean`);
+  }
+  /* And the press is the orbital one — a half-percent of how fast the ship is
+     actually going round the Lamp, not of anything relative. */
+  const orbital = S.burnStep(O.norm(near.ship.v), false);
+  assert.equal(orbital, S.burnStep(O.norm(far.ship.v), false), 'the step changes beside a wreck');
+  assert.ok(orbital >= 100, `${orbital} m/s is not an orbital press round the Lamp`);
 });
 
 test('a wreck is a rumour until somebody hands you the job', () => {
@@ -4738,27 +4737,22 @@ test('a line is on screen for as long as it takes to read, and never less or muc
   }
 });
 
-test('an unfound wreck bends nothing: no readout, and forward is still forward', () => {
-  /* Hiding a thing on the chart is a lie the player can feel if the flying
-     still leans on it: coming near a blank patch of sky would swing forward
-     and out round to face something that is not drawn, and the numbers on a
-     mark would stop meaning what the road shows. So the same set the chart
-     refuses to draw is handed to the burn frame. */
+test('an unfound wreck is no harbour and no readout', () => {
+  /* Hiding a thing on the chart is a lie the player can feel if anything the
+     ship does still leans on it. Nothing bends a burn any more — a mark is an
+     orbit everywhere — but the readout, the harbour and the thrusters all ask
+     what the ship is alongside, and none of them may answer with a wreck
+     nobody has been told about. */
   const stranger = comeAlongside(salvor(), 'cutterjaw');
   const told = comeAlongside((() => { const s = salvor(); s.dockedAt = 'slate'; S.acceptQuest(s, 'cutterjaw'); return s; })(), 'cutterjaw');
 
+  assert.equal(S.alongside(stranger), null, 'a wreck nobody mentioned is something to fly against');
+  assert.equal(S.alongside(told)?.id, 'cutterjaw', 'and a mentioned one is not');
   assert.equal(S.rendezvous(stranger), null, 'a wreck nobody mentioned got a rendezvous readout');
-  assert.equal(S.rendezvous(told)?.target, 'cutterjaw', 'and a mentioned one did not');
-
-  /* Alongside but still closing: matched speeds have no relative forward to
-     measure from, and the frame falls back to the orbital one on its own. */
-  for(const s of [stranger, told]) s.ship.v = [s.ship.v[0] + 1e-4, s.ship.v[1] - 1e-4];
-  const frame = s => O.frameAt(S.world, s.ship.body, s.ship.r, s.ship.v, s.t, S.unseen(s));
-  const bare = O.frameAt(S.world, stranger.ship.body, stranger.ship.r, stranger.ship.v, stranger.t);
-  const orbital = O.burnFrame(stranger.ship.r, stranger.ship.v);
-  assert.ok(Math.abs(O.norm(O.sub(bare.pro, orbital.pro))) > 1e-6, 'the wreck is close enough to bend a burn at all');
-  assert.ok(O.norm(O.sub(frame(stranger).pro, orbital.pro)) < 1e-12, 'an unfound wreck still bent the burn axes');
-  assert.ok(O.norm(O.sub(frame(told).pro, bare.pro)) < 1e-12, 'a found one stopped bending them');
+  assert.equal(S.rendezvous(told)?.target, 'cutterjaw');
+  assert.equal(S.thrust(stranger, 'toward').ok, false, 'the thrusters fly against an unheard-of wreck');
+  assert.ok(S.thrust(told, 'toward').ok, 'and will not fly against a known one');
+  assert.equal(S.dockingStatus(stranger)?.port, 'slate', 'an unmentioned wreck is offered as a harbour');
 });
 
 test('the haul comes aboard at the wreck and cannot be sold on the way home', () => {
@@ -4879,31 +4873,26 @@ test('a drifting thing has a reach that bends thrust and nothing else', () => {
   assert.equal(s.ship.body, 'lamp', 'and never captured it');
 });
 
-test('inside the reach, the axes are measured against the target', () => {
+test('inside the reach a mark is still an orbit, and the thrusters are the relative pair', () => {
   const lamp = world.get('lamp'), t = 2000;
-  /* A wreck, since the Maw has a well of its own now and does this the ordinary
-     way. Offsets are taken off the thing's own reach rather than written as au,
-     so the test says what it means at any scale. */
-  const maw = BODIES.find(b => b.kind === 'wreck' && b.parent === 'lamp');
-  const m = O.railState(maw, lamp.mu, t);
-  const r = [m.r[0] + maw.driftReach * 0.4, m.r[1] + maw.driftReach * 0.2];
+  const wreck = BODIES.find(b => b.kind === 'wreck' && b.parent === 'lamp');
+  const m = O.railState(wreck, lamp.mu, t);
+  const r = [m.r[0] + wreck.driftReach * 0.4, m.r[1] + wreck.driftReach * 0.2];
   const v = [m.v[0] - 0.0005, m.v[1] + 0.0003];
 
-  const f = O.frameAt(world, 'lamp', r, v, t);
-  const vRel = O.sub(v, m.v), away = O.sub(r, m.r);
-  /* Forward is along the speed relative to it, not along the orbit. */
-  assert.ok(Math.abs(O.dot(f.pro, O.unit(vRel)) - 1) < 1e-9, 'forward is relative prograde');
-  /* The second axis points at it — out is away, in is toward. */
-  assert.ok(O.dot(f.out, away) > 0, 'out is away from the target');
-  /* And they are still at right angles, which is what makes a mark cost the
-     hypotenuse of its own two numbers. */
+  /* Well inside the reach, and the mark's axes are the world's all the same. */
+  const f = O.burnFrame(r, v);
+  assert.ok(Math.abs(O.dot(f.pro, O.unit(v)) - 1) < 1e-9, 'forward is not along the orbit');
   assert.ok(Math.abs(O.dot(f.pro, f.out)) < 1e-12, 'the axes lean');
+  /* Nothing in the kernel knows about the drifting thing when it writes a
+     burn: `frameAt` is gone, and with it the only path that bent one. */
+  assert.equal(typeof O.frameAt, 'undefined', 'the bending frame is back');
+  const src = readFileSync(new URL('../public/orbital-trader/orbit.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /burnVector\([^)]*frameAt/, 'a burn is being written in a bent frame again');
 
-  /* Well outside, it is the ordinary frame again. */
-  const farR = [m.r[0] + maw.driftReach * 3, m.r[1]];
-  const plain = O.frameAt(world, 'lamp', farR, v, t);
-  const ordinary = O.burnFrame(farR, v);
-  assert.ok(Math.abs(O.dot(plain.pro, ordinary.pro) - 1) < 1e-12, 'outside the reach nothing changed');
+  /* What *is* relative is the pair of thrusters, and they take their directions
+     from the thing itself rather than from any frame. */
+  assert.deepEqual(S.THRUSTERS, ['toward', 'match']);
 });
 
 test('the two marks do the two jobs a rendezvous needs', () => {
@@ -4945,10 +4934,11 @@ test('the navigator is the instruments, not the physics', () => {
     return s;
   };
   const green = at(false), crewed = at(true);
-  /* The axes are the same for everybody: she does not change how a ship flies. */
-  const f1 = O.frameAt(world, 'maw', green.ship.r, green.ship.v, t);
-  const f2 = O.frameAt(world, 'maw', crewed.ship.r, crewed.ship.v, t);
-  assert.deepEqual(f1, f2, 'the frame is the same with or without her');
+  /* The flying is the same for everybody: she does not change how a ship moves,
+     what it is alongside, or which way a thruster points. */
+  assert.deepEqual(O.burnFrame(green.ship.r, green.ship.v), O.burnFrame(crewed.ship.r, crewed.ship.v),
+    'the frame is the same with or without her');
+  assert.equal(S.alongside(green)?.id, S.alongside(crewed)?.id, 'she decides what the ship is beside');
   /* What she brings is the two numbers, and the docking they make possible. */
   assert.equal(S.rendezvous(green).instruments, false);
   assert.equal(S.rendezvous(crewed).instruments, true);
