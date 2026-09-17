@@ -682,6 +682,35 @@ function drawBodies(chart, view, pos, t){
       ctx.beginPath(); ctx.arc(p[0], p[1], b.atmo * zoom, 0, Math.PI * 2);
       ctx.fillStyle = haze(bodyColour(b)); ctx.fill();
     }
+    /* A thing you come alongside, marked in orange for as long as you are
+       still flying at it.
+
+       The orange pair that says where the road cuts a rail and where the world
+       will be when it does is the mark a salvage run is aimed by, and it goes
+       out halfway through the run: a crossing is only drawn on a rail that is
+       on the screen, and a wreck's rail is a quarter of an astronomical unit
+       across, so it is culled as a line running off both edges long before the
+       approach begins. A world in that position hands over to its sphere of
+       influence and an encounter mark. A wreck weighs nothing and has neither,
+       so what was left was a grey dot two and a half pixels wide, and nothing
+       orange again until the mouth ring lit three thousand kilometres out.
+
+       So the mark follows the wreck in. It is the same diamond and the same
+       orange, which is the honest continuation of the pair: the second of
+       those two is where the thing will be when you get there, and from close
+       enough in, where it will be is where it is. Drawn in pixels, so it is
+       the same size to find at any zoom, and only for a wreck somebody has
+       told you about — an unheard-of derelict is not on this chart at all.
+
+       It stops when you are in the mouth, where aiming stops: the ring is
+       already round you by then, and the corner has turned into range and
+       closing speed. */
+    const arrived = view.dockedAt === b.id || (view.docking?.port === b.id && view.docking.inZone);
+    if(b.driftReach > 0 && !arrived){
+      ctx.strokeStyle = PALETTE.railCross; ctx.lineWidth = 1.5;
+      diamond(ctx, p, rpx + 5); ctx.stroke();
+    }
+
     // Docking zone, when near enough to be about to use it.
     if(b.port && b.zoneRadius && view.nearPort === b.id){
       /* The mouth: the circle your orbit has to fit inside to tie up. A ring,
