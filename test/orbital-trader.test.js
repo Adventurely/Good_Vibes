@@ -1894,25 +1894,44 @@ test('the page keeps the playtest fixes wired', () => {
   assert.match(PLAY, /const aimed = \([^\n]*\) && !hits;/, 'the aiming card passes a path into the ground');
 });
 
-test('only the first crossing is marked, however many the road makes', () => {
-  /* The same refusal the road itself makes. A long ellipse cuts five rails
-     going out and the same five coming back, and ten honest pairs of orange
-     diamonds is a chart nobody can read. */
+test('every world the road reaches is marked, and each of them once', () => {
+  /* It used to be one mark for the whole road, on the reasoning that a long
+     ellipse cuts five rails going out and the same five coming back and ten
+     pairs of diamonds is unreadable. The reasoning was about the doubles and
+     the answer punished the wrong thing: flying Tassel to Grumm, the single
+     mark you got was where you cut the rail of Slate — a moon of the world you
+     had just left, six days into a seventy-day trip — and every other world the
+     road met, including all four moons of the one you were going to, went
+     unmarked. Worse, that one mark sits on a rail that is rarely on screen, so
+     the honest answer to "what did a player actually see" was nothing at all. */
   const g = transferShip();
   const pred = S.planImmediate(g);
-  const all = railCrossings(world, pred, g.t, { minLead: S.MIN_LEAD, limit: 8 });
-  assert.ok(all.length > 1, 'this road makes more than one, so there is something to refuse');
   const shown = railCrossings(world, pred, g.t, { minLead: S.MIN_LEAD });
-  assert.equal(shown.length, 1, 'and only one is drawn');
-  assert.deepEqual(shown[0], all[0], 'the soonest one');
+  assert.ok(shown.length > 1, 'still only marking one of them');
+  assert.deepEqual(shown, [...shown].sort((a, b) => a.t - b.t), 'not in the order they happen');
 
-  /* A long ellipse right out past the Belt, which is the case that made this
-     necessary: five rails, twice each. */
+  /* One per world: the doubles are what the cap is for now. */
+  const bodies = shown.map(c => c.body);
+  assert.equal(new Set(bodies).size, bodies.length, `a world is marked twice: ${bodies.join(', ')}`);
+
+  /* A long ellipse right out past the Belt — the busy case, where the same
+     rails are cut twice each and one mark apiece is the whole point. */
   const wide = transferShip('tassel', world.get('grumm').a * 0.68);
   wide.ship.v = O.scale(O.unit(wide.ship.v), O.norm(wide.ship.v) * 1.28);
-  const far = railCrossings(world, S.planImmediate(wide), wide.t, { minLead: S.MIN_LEAD, limit: 64 });
-  assert.ok(far.length >= 4, `the busy case needs to be busy; found ${far.length}`);
-  assert.equal(railCrossings(world, S.planImmediate(wide), wide.t, { minLead: S.MIN_LEAD }).length, 1);
+  const wpred = S.planImmediate(wide);
+  const raw = railCrossings(world, wpred, wide.t, { minLead: S.MIN_LEAD, limit: 64 });
+  const once = railCrossings(world, wpred, wide.t, { minLead: S.MIN_LEAD });
+  assert.ok(raw.length >= 4, `the busy case needs to be busy; found ${raw.length}`);
+  assert.equal(new Set(once.map(c => c.body)).size, once.length, 'the busy case marks a world twice');
+  assert.ok(once.length <= raw.length, 'one per world should never be more than the lot');
+  // Each kept one is the soonest of its world's.
+  for(const c of once){
+    const soonest = Math.min(...raw.filter(o => o.body === c.body).map(o => o.t));
+    assert.ok(Math.abs(c.t - soonest) < 1e-9, `${c.body}: kept a later crossing than its first`);
+  }
+
+  /* A caller may still ask for fewer, which is what the encounter list does. */
+  assert.equal(railCrossings(world, pred, g.t, { minLead: S.MIN_LEAD, limit: 1 }).length, 1);
 });
 
 test('a road past a dozen worlds wears one crosshair at most, and only for an arrival', () => {
@@ -2042,6 +2061,40 @@ test('nothing is drawn joining the pair', () => {
      something else being drawn — which is the thing that was removed. */
   assert.doesNotMatch(fn, /setLineDash|lineTo/, 'something is drawing a line between the diamonds again');
   assert.doesNotMatch(src, /railTie/, 'the tie colour is still in the palette');
+});
+
+test('the world you are aiming at is marked the moment your road reaches its orbit', () => {
+  /* This is what the pair of diamonds is *for*: where the road cuts a world's
+     rail, and where that world will be when it does. Pushing a burn out of
+     Tassel towards Grumm, the mark has to appear as soon as the road reaches
+     Grumm's orbit — not at the last second, and not only once the intercept is
+     already solved.
+
+     Note what happens *after* it is solved: a road that actually hits Grumm
+     ends inside its reach, a tenth of an au short of its rail, so there is no
+     crossing left to mark and the encounter marks and the arrival take over.
+     The diamonds are the aiming tool, and they are there for the aiming. */
+  const grumm = world.get('grumm');
+  const reach = kick => {
+    const s = S.newGame(7);
+    s.dockedAt = 'tassel'; S.undock(s); s.dv = s.tank = S.auDay(400);
+    const ix = S.addNode(s, s.t + 0.02);
+    s.nodes[ix].prograde = S.auDay(kick);
+    const pred = S.planImmediate(s, true, { farSight: false });
+    const far = Math.max(0, ...pred.segments
+      .filter(sg => sg.body === 'lamp' && sg.points).flatMap(sg => sg.points.map(O.norm)));
+    const marks = railCrossings(world, pred, s.t, { minLead: S.MIN_LEAD });
+    return { far, grumm: marks.some(c => c.body === 'grumm') };
+  };
+  const short = reach(8), over = reach(9);
+  assert.ok(short.far < grumm.a, `an 8 km/s burn should fall short; reached ${short.far.toFixed(3)} au`);
+  assert.ok(over.far > grumm.a, `a 9 km/s burn should reach past; reached ${over.far.toFixed(3)} au`);
+  assert.equal(short.grumm, false, 'a road that never reaches Grumm marked its rail anyway');
+  assert.ok(over.grumm, 'a road out past Grumm did not mark where it cuts its orbit');
+
+  /* And with nobody special aboard: seeing where a world will be is the
+     chart's arithmetic, not a thing a crew member unlocks. */
+  assert.ok(reach(11).grumm, 'the mark needs a navigator');
 });
 
 test('the rail a ship is standing on is not a crossing', () => {

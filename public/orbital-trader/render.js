@@ -1682,11 +1682,24 @@ export function railCrossings(world, prediction, tNow, opts = {}){
      that has just left Tassel is sitting exactly on Tassel's rail, so the
      first sample is a crossing at t = now — true, useless, and drawn right
      on top of the ship. */
-  /* One, unless a caller asks for more. A road that cuts five rails twice
-     over earns ten honest pairs of diamonds and becomes unreadable; the rest
-     of this chart already refuses to draw past the first thing that happens,
-     and this is the same refusal. */
-  const { limit = 1, minLead = 0 } = opts;
+  /* Every world the road cuts the rail of, and once each.
+ 
+     It used to be one mark for the whole road — the first thing that happens —
+     on the reasoning that a road cutting five rails twice over earns ten pairs
+     of diamonds and becomes unreadable. The reasoning was about the doubles and
+     the answer punished the wrong thing: flying Tassel to Grumm, the one mark
+     you got was where you cut the rail of Slate, a moon of the world you had
+     just left, six days into a seventy-day trip — and the twenty others,
+     including every moon of the world you were actually going to, were not
+     drawn at all. A mark per world says what the road meets; a single mark says
+     what it meets first, which is rarely the question.
+
+     So the cap is on the doubles instead: soonest per world, so a road that
+     cuts the same rail going out and coming back earns one pair and not two.
+     What keeps the chart readable is the rail being on screen — a diamond sits
+     on a rail, and `drawRailCrossings` draws none for a rail it did not draw,
+     which is already how the zoom decides how much of this a player sees. */
+  const { limit = Infinity, minLead = 0 } = opts;
   const out = [];
   if(!prediction?.segments) return out;
   for(let si = 0; si < prediction.segments.length; si++){
@@ -1749,9 +1762,14 @@ export function railCrossings(world, prediction, tNow, opts = {}){
       }
     }
   }
-  /* Soonest first, so the one that survives the cap is the one you are about
-     to fly. */
-  return out.sort((a, b) => a.t - b.t).slice(0, limit);
+  /* Soonest first, and then one per world. */
+  const seen = new Set(), first = [];
+  for(const c of out.sort((a, b) => a.t - b.t)){
+    if(seen.has(c.body)) continue;
+    seen.add(c.body);
+    first.push(c);
+  }
+  return first.slice(0, limit);
 }
 
 /* Where a node sits on the plan: the ship's state at the node's time in the

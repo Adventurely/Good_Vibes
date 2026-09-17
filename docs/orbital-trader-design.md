@@ -889,6 +889,33 @@ turn either way: that is the sky, not the crew. The two numbers beside it are
 hers, and without her it says `by eye` instead. The chart draws the reach the
 ship is *in* brighter than one it is merely near, for the same reason.
 
+**Every world the road reaches gets its pair of orange diamonds**, and each of
+them once. The pair is the aiming tool — where the road cuts a world's rail, and
+where that world will be when it does, the gap between them being the answer to
+"will it be there when I am".
+
+It used to draw one mark for the whole road, on the reasoning that a long
+ellipse cuts five rails going out and the same five coming back and ten pairs is
+unreadable. The reasoning was about the doubles and the cap punished the wrong
+thing. Flying Tassel to Grumm, the one mark you got was where you cut the rail
+of *Slate* — a moon of the world you had just left, six days into a seventy-day
+trip — and everything else the road met, Grumm included, went unmarked. Worse,
+that one mark sits on a rail rarely on screen, so what a player actually saw on
+that trip was nothing at all. Measured across seven zoom levels: nought marks
+drawn, at every one of them.
+
+So the cap is on the doubles instead — soonest per world — and the clutter is
+left to the zoom, which was already doing the work: a diamond is only drawn for
+a rail that is itself drawn. The same road now draws four marks at the zooms
+where it is legible, and none at the ones where no relevant rail is on screen.
+
+One consequence worth knowing. A road that *actually hits* Grumm ends inside its
+reach, a fortieth of an au short of its rail, so there is no crossing left to
+mark — you arrive rather than cross. The diamonds appear the moment your road
+reaches Grumm's orbit and stay while you are aiming, which is when the question
+is live; once the intercept is solved the encounter marks, the inset window and
+the arrival line take over. Aiming is what they are for.
+
 **The reach is a place you can see.** A wreck's `driftReach` is a real
 boundary — cross it and the two buttons on a mark stop meaning forward-and-out
 about the world and start meaning forward-and-away about the thing you are
