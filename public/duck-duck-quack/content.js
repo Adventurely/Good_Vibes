@@ -14,15 +14,20 @@
  * One number per column: how far down the ground is. A "wall" is a big jump
  * between two neighbouring columns, a "gap" is a run of columns set far below
  * the screen (so far that the fall is always lethal). `terrain` itself is
- * never touched once a level starts — a Digger and a Builder each write into
- * their own second layer instead (`tunnelY`, `bridgeY` in sim.js's game
- * state), one number per column same as `terrain`, consulted first wherever
- * it is not null. That is what lets a dig leave the wall standing — a bored
- * hole through it, the wall still overhead — instead of quietly bulldozing
- * the whole column down to head height, and what lets a bridge leave the gap
- * still open underneath the deck instead of the pit just filling in with
- * dirt. See sim.js's groundAt for the one place all three ever get read
- * together.
+ * never touched once a level starts — a Digger and a Builder each leave their
+ * mark somewhere else instead (`tunnelY` and `decks` in sim.js's game state).
+ * A tunnel is one height per column, consulted in the terrain's place wherever
+ * it is not null, which is what lets a dig leave the wall standing — a bored
+ * hole through it, the wall still overhead — rather than quietly bulldozing
+ * the whole column down to head height.
+ *
+ * A ramp is not a height for the column at all, it is a deck standing over
+ * it, and a column can carry several: ramps cross, and crossing leaves both
+ * whole. So the gap stays open underneath a ramp instead of filling in with
+ * dirt, the ground under one is still ground to walk along, and which of a
+ * column's surfaces a duckling is on depends on where that duckling already
+ * was. See sim.js's surfacesAt and stepTargetAt, which is where all of that
+ * is actually decided.
  *
  * A segment can carry two more things besides its height, both optional and
  * both expanded the same way `y` is (see buildLayer):
@@ -41,6 +46,13 @@
  *           column's surface height is ever solid to begin with (see
  *           groundAt again), so leaving it off changes no duckling's path.
  */
+
+/* Shown on the page itself (play.html's header, index.html's footer) so a
+   player — or anyone checking that a change actually shipped — can read
+   straight off the page whether they have the latest build, rather than
+   having to guess from behavior alone. Bump it on every change that ships,
+   however small. */
+export const GAME_VERSION = '1.2';
 
 export const SCENE_W = 320;
 export const SCENE_H = 180;
@@ -84,33 +96,41 @@ export const WALK_STEP = 4;
 /* The longest drop a duckling walks away from. Past this and a fall the level
    otherwise leaves alone is a duckling lost, so a platform's far edge always
    has to be either shorter than this or handled some other way (a dig, a
-   bridge, a gentle staircase). */
+   bridge, a gentle staircase). Also, not by coincidence, about four times a
+   duckling's own height — art.js's DUCK_ART is six rows drawn four pixels
+   apart — which is what makes it the right number to also cap how high a
+   Builder's own ramp is allowed to climb; see BUILD_RISE_HEIGHT below. */
 export const FALL_SAFE = 24;
 
-/* How long a Builder keeps laying deck before stopping on its own, whether
-   or not it has reached anywhere worth landing — see sim.js's assignSkill
-   and stepBuilding. A Builder starts the moment it is given, wherever that
-   duckling happens to be standing, so this is what stops one handed out on
-   ordinary ground, or over a gap wider than a duckling can usefully cross,
-   from just running to the edge of the level. Stated as seconds, the same
-   way spawnInterval and timeLimit are, and converted once into ticks here
-   rather than a bare number: one tick of building is one column, so this
-   number is a column cap too, in effect, without being written as one. */
-export const BUILD_SECONDS = 10;
+/* How long a Builder keeps laying ramp before it stops on its own, having
+   run into nothing — see sim.js's stepBuilding. It starts the instant it is
+   given, so this is the one thing that ever ends a ramp out in open air,
+   and it is also what bounds how far one reaches: one tick of building is
+   one column, so four seconds is forty-four columns, about an eighth of the
+   scene. Was ten, which reached a third of the way across a level off a
+   single click and left very little a player could get wrong; four is short
+   enough that where the ramp starts is a real decision, and still comfortably
+   longer than the widest gap in the game (The Park's, at thirty-five).
+   Stated as seconds, the same way spawnInterval and timeLimit are, and
+   converted once into ticks here rather than written as a bare count. */
+export const BUILD_SECONDS = 4;
 export const BUILD_MAX_STEPS = TICK_RATE * BUILD_SECONDS;
+
+/* How high a Builder's ramp climbs over the full BUILD_MAX_STEPS, if it
+   never runs into ground first — see sim.js's stepBuilding. Kept at exactly
+   FALL_SAFE on purpose, which is what makes the ordinary case safe: a ramp
+   laid along level ground ends this far up, and this far is exactly the
+   tallest drop a duckling walks away from, so stepping off the end of one
+   costs nothing. Ground that has fallen away further under the ramp's far
+   end is the case that is not safe, and deliberately so — see stepBuilding
+   on why a ramp is a real thing left in the world. */
+export const BUILD_RISE_HEIGHT = FALL_SAFE;
 
 /* How many columns a Digger will cut before giving up — a safety cap, not a
    number any level here is tuned to reach. It stops the moment the ground
    ahead makes it unnecessary, so one assigned right at the wall's edge stops
    well short of this. */
 export const DIG_MAX_STEPS = 60;
-
-/* How far a Builder's deck rises at the crest of its arch — see sim.js's
-   stepBuilding. Well under WALK_STEP even spread over a short gap, so the
-   climb to the crest is never itself a "wall" a walking duckling without
-   the trait would refuse: the whole point is a bridge everyone can just
-   walk across once it's there. */
-export const BRIDGE_ARCH_HEIGHT = 10;
 
 /* Once the goose has caught its one duckling (see sim.js's `goose.fed`) it
    has nothing left to threaten, so rather than leave it patrolling the same
@@ -135,24 +155,28 @@ export const POOF_TICKS = 8;
  * a tunnel, a bridge, a wall — and only ever have to work once. Climber and
  * Flyer do not: they ride on the one duckling that holds them and have to be
  * given out again to the next one. But when a skill actually takes hold is
- * its own, separate axis, and the three sharing skills split right down the
- * middle of it:
+ * its own, separate axis:
  *
- *   Digger            deferred — waits, held, for the next wall it meets
- *   Builder            instant — starts laying ground the moment it is
- *                      given, wherever that duckling is already standing,
- *                      for BUILD_SECONDS (content.js) and not a tick longer
- *   Blocker            instant — plants that duckling for good, right there,
- *                      a wall nothing gets past — another duckling or the
- *                      goose alike, see sim.js's stepWalking and stepGoose
- *   Climber, Flyer      deferred, and never shared — each carries one
- *                      duckling past one obstacle, once, then is spent
+ *   Digger, Climber,    deferred — given anywhere, held, and only actually
+ *   Flyer               answer the hazard each one is for the moment the
+ *                       duckling meets it, not before
+ *   Builder             instant — starts laying ramp on the very next tick,
+ *                       from wherever that duckling is standing, whether or
+ *                       not there is anything there to answer
+ *   Blocker             instant — plants that duckling for good, right
+ *                       there, a wall nothing gets past — another duckling
+ *                       or the goose alike, see sim.js's stepWalking and
+ *                       stepGoose
  *
- * That means Builder is the one skill in a genuinely different spot on both
- * axes than everything around it: shared like a Digger's tunnel, but timed
- * like a Blocker's plant rather than waiting for a hazard to ask for it. See
- * sim.js's assignSkill for what that means in practice — it is the one skill
- * where *when* you click matters as much as *who*.
+ * The two instant ones are the two you aim rather than merely spend: a
+ * Blocker plants where you click it, and a Builder's ramp starts where you
+ * click it and runs forward from there. The difference is that a Builder
+ * cannot miss — it always builds, gap or no gap — so the question is never
+ * whether the click took, only whether the ramp went anywhere worth going.
+ * A ramp is also the only one of the five that outlives the duckling that
+ * made it in a way the others don't quite: a tunnel is a hole the flock
+ * walks through, but a ramp is ground the flock walks *up*, and it ends
+ * wherever ten seconds left it. See sim.js's stepBuilding.
  */
 export const SKILLS = ['digger', 'builder', 'blocker', 'climber', 'flyer'];
 
@@ -160,7 +184,7 @@ export const SKILL_INFO = {
   digger: { name: 'Digger', verb: 'Dig',
     blurb: 'Tunnels straight through the next wall, leaving a way through for the rest.' },
   builder: { name: 'Builder', verb: 'Build',
-    blurb: `Starts building right where it stands, for ${BUILD_SECONDS} seconds, then stops for good — aim before you click.` },
+    blurb: `Starts a ramp climbing the way it faces, right where you click it, for ${BUILD_SECONDS} seconds — until it runs into higher ground, whichever comes first.` },
   blocker: { name: 'Blocker', verb: 'Block',
     blurb: 'Plants itself for good, turning back anything that meets it — another duckling, or the goose.' },
   climber: { name: 'Climber', verb: 'Climb',
@@ -730,6 +754,16 @@ export const LEVEL_6 = {
  * Flyer and Climber wins, the same bot with Digger in place of Climber
  * wins too, and pulling any one of Flyer, Builder, or a way past the wall
  * out from under it loses the whole flock.
+ *
+ * The wall is worth one note, because it is the only wall in the game a
+ * ramp could ever reach the top of. This level descends, so the wall's top
+ * (15) sits a mere five pixels above the nest's own ground (20) — well
+ * inside a ramp's BUILD_RISE_HEIGHT — where every other level's walls stand
+ * fifty to a hundred pixels above anywhere a ramp could start. What keeps
+ * it a wall is reach, not height: at BUILD_SECONDS a ramp is forty-four
+ * columns, and the wall is seventy past the first gap, so a Builder spent
+ * there has long since stopped by the time a duckling arrives. Lengthen
+ * BUILD_SECONDS much and this is the level that notices first.
  */
 export const LEVEL_7 = {
   id: 'falls',
@@ -793,9 +827,10 @@ export const winCount = level => Math.ceil(level.duckCount * level.winRatio);
    pond, the way every level before The Orchard's reversal reads, -1 for one
    built the other way round. Nothing about a duckling's own rules cares
    which — sim.js's hatchling and stepWalking read this once to know which
-   direction counts as "toward the pond", and pitSpanAt reads a duckling's
-   own `dir` instead, already set from this. art.js reads it too, to know
-   which side of `goalX` the water actually sits on (see drawGround). The
+   direction counts as "toward the pond", and every duckling's own `dir` is
+   set from it at the moment it hatches, including which way a Builder's
+   ramp climbs. art.js reads it too, to know which side of `goalX` the water
+   actually sits on (see drawGround). The
    `|| 1` only ever matters for a degenerate level where nestX and goalX are
    the same column, which no real level does. */
 export const goalHeading = level => Math.sign(level.goalX - level.nestX) || 1;

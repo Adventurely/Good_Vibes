@@ -61,6 +61,7 @@
   header{ display: flex; align-items: baseline; gap: 0.9rem; flex-wrap: wrap; padding-bottom: 0.5rem; }
   header h1{ margin: 0; font-size: 1.2rem; font-weight: 800; }
   header .level-name{ color: var(--muted); font-weight: 600; }
+  header .version{ color: var(--muted); font-size: 0.72rem; }
   header .crumb{ color: var(--muted); font-size: 0.82rem; text-decoration: none; margin-left: auto; }
   header .crumb:hover{ color: var(--text); }
 
@@ -256,6 +257,7 @@
 <div class="wrap">
   <header>
     <h1>Duck Duck Quack <span class="level-name" id="level-name"></span></h1>
+    <span class="version" id="game-version"></span>
     <a class="crumb" href="/duck-duck-quack/">&larr; levels</a>
   </header>
 
@@ -314,7 +316,7 @@
 </div>
 
 <script type="module">
-  import { LEVELS, SKILLS, SKILL_INFO, TICK_RATE, winCount, formatTime } from './content.js';
+  import { LEVELS, SKILLS, SKILL_INFO, TICK_RATE, GAME_VERSION, winCount, formatTime } from './content.js';
   import { newGame, tick, assignSkill, assignRefusal, duckNear } from './sim.js';
   import { paintScene, drawSkillBadge, BADGE_PLATE_W, BADGE_PLATE_H } from './art.js';
   import { createAudio } from './audio.js';
@@ -332,6 +334,7 @@
   const nextLevel = LEVELS[LEVELS.indexOf(LEVEL) + 1] || null;
   document.getElementById('level-name').textContent = `— ${LEVEL.name}`;
   document.title = `Duck Duck Quack — ${LEVEL.name}`;
+  document.getElementById('game-version').textContent = `v${GAME_VERSION}`;
 
   const els = id => document.getElementById(id);
   const ui = {
