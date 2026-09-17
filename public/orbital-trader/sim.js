@@ -596,24 +596,36 @@ export const canDockDrifting = state => !!state?.crew?.navigator;
  * that matter, or null. Distance at intercept is the closest the *current*
  * path comes, which is the number you fly a rendezvous on — the range right
  * now says nothing about whether you are going to arrive. */
-export function rendezvous(state){
+/* The thing the ship is currently alongside, in the ship's own frame, or null.
+ *
+ * Two ways to be near one. A wreck drifts in somebody else's frame, and a reach
+ * round it is what says you are close enough to be flying the rendezvous rather
+ * than the orbit. The Maw has weight, so its own reach does that job and the
+ * ship is simply *in* its frame — where the two numbers are where you are and
+ * how fast, with nothing to subtract. Without this, giving the Maw a well
+ * silently took its readout away: the drift reach sits inside the sphere of
+ * influence and can never fire again.
+ *
+ * The hidden set gates the *drifting* things and only those. A wreck nobody has
+ * heard of gives no readout at all, because the ship has no idea it is there;
+ * the Maw keeps its numbers and loses its name — the road still runs into it,
+ * and how close and how fast are still true, which is exactly what `nameFor`
+ * draws as ??? until the sensors are aboard.
+ *
+ * The readout and the thrusters both come through here, so what the corner says
+ * and what the engine does can never be about different things. */
+export function alongside(state){
   if(!state || state.dockedAt) return null;
   const here = world.get(state.ship.body);
-  /* Two ways to be near one of these. A wreck drifts in somebody else's frame,
-     and a reach round it is what says you are close enough to be flying the
-     rendezvous rather than the orbit. The Maw has weight, so its own reach does
-     that job and the ship is simply *in* its frame — where the two numbers are
-     where you are and how fast, with nothing to subtract. Without this, giving
-     the Maw a well silently took its readout away: the drift reach sits inside
-     the sphere of influence and can never fire again. */
-  /* The hidden set gates the *drifting* things and only those. A wreck nobody
-     has heard of gives no readout at all, because the ship has no idea it is
-     there; the Maw keeps its numbers and loses its name — the road still runs
-     into it, and how close and how fast are still true, which is exactly what
-     `nameFor` draws as ??? until the sensors are aboard. */
-  const tgt = here.port && here.rendezvous && here.mu > 0
+  if(!here) return null;
+  return here.port && here.rendezvous && here.mu > 0
     ? { id: here.id, r: [0, 0], v: [0, 0], reach: here.soi }
     : driftTargetAt(world, here.id, state.ship.r, state.t, unseen(state));
+}
+
+export function rendezvous(state){
+  if(!state || state.dockedAt) return null;
+  const tgt = alongside(state);
   if(!tgt) return null;
   const rel = sub(state.ship.r, tgt.r);
   const vRel = sub(state.ship.v, tgt.v);
@@ -1360,33 +1372,65 @@ export function burnStep(speed, relative){
  * the last two kilometres — where what you are deciding is "a bit less now",
  * over and over, watching the range come down.
  *
- * So inside a drifting thing's reach the engine answers directly. A press is an
- * impulse, in the frame the reach put you in: forward and back along your speed
- * relative to it, away and toward across that. The clock does not stop for it.
+ * There are two controls, and between them they are the whole manoeuvre:
  *
- * It is the same arithmetic a written mark gets — the same axes from `frameAt`,
- * the same step from `burnStep`, the same charge against the tank — so nothing
+ *   MATCH    kill your speed relative to the thing. Straight down the relative
+ *            velocity vector, whichever way that happens to point. This is the
+ *            one that ends the approach, because tying up asks for slow.
+ *   TOWARD   push straight along the line of sight to it. This is the one that
+ *            starts the approach, and the only one that shortens the range.
+ *
+ * It used to be four — the orbital axes, forward/back and out/in, in the
+ * relative frame. That was a worse scheme than it looked, because `out` is at
+ * right angles to your *relative velocity* rather than along the line to the
+ * thing, so the button labelled "toward" pointed at the wreck only in the one
+ * case where those coincide. Two buttons that mean what they say beat four
+ * that are exactly right and unreadable.
+ *
+ * The charge, the tank and the record are a written mark's own, so nothing
  * about the flight model changes. What changes is that you are flying it. */
-const THRUST_AXES = { pro: 1, retro: -1, out: 1, in: -1 };
-export const isThrustAxis = which => Object.hasOwn(THRUST_AXES, which);
+
+/* A press of TOWARD, which has nothing to be a fraction of: the range is not a
+ * speed and the relative velocity may be nothing at all. Five metres a second
+ * is a nudge at every scale this is flown at — a few taps to get moving across
+ * a five-hundred-kilometre reach, and small enough not to overshoot a mouth ten
+ * across. */
+export const THRUST_NUDGE = 0.005;               // km/s
+
+/* What one press of each is worth, in metres a second, for the labels and for
+ * the engine — asked once so the button and the burn can never disagree.
+ * MATCH is a tenth of what there is to kill, and never more than all of it:
+ * held down it brings the ship to rest rather than bouncing it off nothing. */
+export function thrustStep(which, relSpeed){
+  if(which === 'toward') return kms(auDay(THRUST_NUDGE)) * 1000;
+  return Math.min(burnStep(relSpeed, true), kms(relSpeed) * 1000);
+}
+
+export const THRUSTERS = ['toward', 'match'];
+export const isThrustAxis = which => THRUSTERS.includes(which);
 
 export function thrust(state, which, fine = 1){
   if(!state || state.dockedAt) return { ok: false, reason: 'Tied up.' };
   if(!isThrustAxis(which)) return { ok: false, reason: 'No such thruster.' };
-  const rv = rendezvous(state);
-  if(!rv) return { ok: false, reason: 'Nothing alongside to fly against.' };
+  const tgt = alongside(state);
+  if(!tgt) return { ok: false, reason: 'Nothing alongside to fly against.' };
   if(!(state.dv > 0)) return { ok: false, reason: 'The tank is dry.' };
-  const f = burnFrameAt(world, state.ship.body, state.ship.r, state.ship.v, state.t, unseen(state));
-  const along = which === 'out' || which === 'in' ? f.out : f.pro;
-  /* Never more than is in the tank: a press at the end of a long trip is
-     whatever is left of one, not a refusal. */
-  const want = Math.min(state.dv, auDay(burnStep(rv.speed, true) / 1000) * fine);
-  if(!(want > 0)) return { ok: false, reason: 'The tank is dry.' };
-  state.ship.v = add(state.ship.v, scale(along, THRUST_AXES[which] * want));
+
+  const rel = sub(state.ship.r, tgt.r);          // ship, as seen from the thing
+  const vRel = sub(state.ship.v, tgt.v);
+  const range = norm(rel), relSpeed = norm(vRel);
+  const along = which === 'toward'
+    ? (range > 0 ? scale(rel, -1 / range) : null)          // down the line of sight
+    : (relSpeed > 0 ? scale(vRel, -1 / relSpeed) : null);  // against the drift
+  if(!along) return { ok: false, reason: which === 'toward' ? 'You are on top of it.' : 'Already matched.' };
+
+  const want = Math.min(state.dv, auDay(thrustStep(which, relSpeed) / 1000) * fine);
+  if(!(want > 0)) return { ok: false, reason: 'Already matched.' };
+  state.ship.v = add(state.ship.v, scale(along, want));
   state.dv = Math.max(0, state.dv - want);
   state.stats.burns++;
   state.stats.dvSpent += want;
-  return { ok: true, dv: want, target: rv.target };
+  return { ok: true, dv: want, target: tgt.id };
 }
 
 /* How long a line takes to read, which is how long the next one waits.

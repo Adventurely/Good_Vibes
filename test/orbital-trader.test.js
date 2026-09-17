@@ -4480,69 +4480,145 @@ function alongsideAt(s, id, km, ms){
   return s;
 }
 
-test('the thrusters fly the rendezvous by hand, and the clock keeps running', () => {
-  /* Everywhere else a burn is a mark on the road: put it where you want it,
-     push it about with the clock stopped, and the tick fires it when it gets
-     there. That is right for a transfer, where what you are deciding is *when*,
-     months out. It is wrong for the last two kilometres, where what you are
-     deciding is "a bit less now", over and over, watching the range come down. */
-  const s = alongsideAt(salvor(), 'cutterjaw', 120, 40);
+test('toward really points at it, and match really stops the drift', () => {
+  /* The two controls, and between them the whole manoeuvre. It was four — the
+     orbital axes in the relative frame — and the trouble with those was not
+     only that four is a lot: `out` is at right angles to your relative
+     velocity rather than along the line to the thing, so the button labelled
+     "toward" pointed at the wreck in the one case where those coincide and
+     somewhere else the rest of the time. */
+  const s = alongsideAt(salvor(), 'cutterjaw', 300, 40);
+  s.ship.v = [s.ship.v[0] + S.auDay(0.02), s.ship.v[1]];   // well off the line of sight
   s.dv = s.tank;
-  const before = S.rendezvous(s);
-  assert.ok(Math.abs(S.kms(before.speed) * 1000 - 40) < 0.5, 'the test ship is not closing at 40 m/s');
+  const tgt = S.alongside(s);
+  assert.equal(tgt.id, 'cutterjaw');
 
-  const r = S.thrust(s, 'retro');
-  assert.ok(r.ok, r.reason);
-  assert.equal(r.target, 'cutterjaw', 'the burn was not written against the wreck');
-  const after = S.rendezvous(s);
-  assert.ok(after.speed < before.speed, 'pressing back did not kill any closing speed');
-  /* The same charge a written mark gets: out of the tank, and on the record. */
-  assert.ok(Math.abs((s.tank - s.dv) - r.dv) < 1e-12, 'the tank was not charged for it');
-  assert.equal(s.stats.burns, 1);
-  assert.ok(Math.abs(s.stats.dvSpent - r.dv) < 1e-12);
+  const v0 = [...s.ship.v];
+  assert.ok(S.thrust(s, 'toward').ok);
+  const push = O.sub(s.ship.v, v0);
+  const sight = O.unit(O.sub(tgt.r, [s.ship.r[0], s.ship.r[1]]));
+  /* Straight down the line of sight: the two unit vectors are the same one. */
+  assert.ok(O.norm(O.sub(O.unit(push), sight)) < 1e-9,
+    'toward did not push along the line to the thing');
 
-  /* And it is flyable: a press is a tenth of what is left, so the whole
-     approach is a couple of dozen presses however fast you came in. */
-  let presses = 1;
-  while(S.kms(S.rendezvous(s).speed) * 1000 > 10 && presses < 100){ S.thrust(s, 'retro'); presses++; }
-  assert.ok(presses <= 25, `${presses} presses to come to rest is not a manoeuvre, it is a chore`);
-  assert.ok(S.dockingStatus(s)?.slow, 'still too fast to tie up after all that');
+  /* And match is straight against the drift, whichever way it points. */
+  const before = S.rendezvous(s).speed;
+  const v1 = [...s.ship.v];
+  assert.ok(S.thrust(s, 'match').ok);
+  const brake = O.sub(s.ship.v, v1);
+  const drift = O.unit(O.sub(v1, tgt.v));
+  assert.ok(O.norm(O.sub(O.unit(brake), O.scale(drift, -1))) < 1e-9,
+    'match did not push against the relative velocity');
+  assert.ok(S.rendezvous(s).speed < before, 'match did not slow the drift');
+});
+
+test('match brings the ship to rest and never past it', () => {
+  /* Held down, it should stop — not bounce the ship off nothing and send it
+     back the other way. A press is a tenth of what is left, and never more
+     than all of what is left. */
+  const s = alongsideAt(salvor(), 'cutterjaw', 60, 40);
+  s.dv = s.tank;
+  let last = Infinity, presses = 0;
+  while(presses < 300){
+    const speed = S.rendezvous(s).speed;
+    assert.ok(speed <= last + 1e-15, 'the relative speed went back up');
+    last = speed;
+    if(S.kms(speed) * 1000 < 0.05) break;
+    assert.ok(S.thrust(s, 'match').ok);
+    presses++;
+  }
+  assert.ok(S.kms(S.rendezvous(s).speed) * 1000 < 0.05, `still drifting after ${presses} presses`);
+
+  /* The charge is a written mark's own: out of the tank, and on the record. */
+  assert.ok(s.tank - s.dv > 0);
+  assert.equal(s.stats.burns, presses);
+  assert.ok(Math.abs(s.stats.dvSpent - (s.tank - s.dv)) < 1e-12);
+});
+
+test('two controls are enough to fly the whole approach', () => {
+  /* The test that says the simplification is not a loss. A pilot who can only
+     point at it and stop drifting has to be able to get from the edge of the
+     reach to the mouth, from any of the ways an approach can start. */
+  const flyIn = (km, off, vx, vy) => {
+    const s = alongsideAt(salvor(), 'cutterjaw', km, 0);
+    const t = S.alongside(s);
+    s.ship.r = [t.r[0] + km / KM_PER_AU, t.r[1] + off / KM_PER_AU];
+    s.ship.v = [t.v[0] + S.auDay(vx / 1000), t.v[1] + S.auDay(vy / 1000)];
+    s.dv = s.tank;
+    let presses = 0;
+    for(let i = 0; i < 4000; i++){
+      const rv = S.rendezvous(s);
+      if(!rv) return { left: true };
+      const range = rv.range * KM_PER_AU, ms = S.kms(rv.speed) * 1000;
+      if(range <= 9 && ms <= 9) break;
+      /* Cross what is left in about five minutes: a slow approach is one that
+         differential gravity has time to bend, the pair being in orbit. */
+      const want = Math.max(4, Math.min(150, range * 1000 / 300));
+      const closing = rv.closing ? ms : -ms;
+      if(closing > want * 1.3 || range <= 9 || closing < 0) S.thrust(s, 'match');
+      else if(closing < want * 0.7) S.thrust(s, 'toward');
+      else { S.tick(s, 0.0002); continue; }
+      presses++;
+    }
+    return { presses, ok: S.dockingStatus(s)?.ok === true, spent: S.kms(s.tank - s.dv) * 1000 };
+  };
+  for(const [label, ...args] of [
+    ['off-axis', 300, 120, -30, 26],
+    ['head-on', 500, 0, -40, 0],
+    ['drifting away', 120, 60, 10, 10],
+    ['at rest', 40, 10, 0, 0],
+  ]){
+    const r = flyIn(...args);
+    assert.ok(!r.left, `${label}: flew out of the reach`);
+    assert.ok(r.ok, `${label}: never got alongside`);
+    assert.ok(r.presses < 200, `${label}: ${r.presses} presses is a chore, not a manoeuvre`);
+    assert.ok(r.spent < 2000, `${label}: ${r.spent.toFixed(0)} m/s is too dear an approach`);
+  }
 });
 
 test('a thruster refuses where there is nothing to fly against', () => {
   const docked = alongsideAt(salvor(), 'cutterjaw', 5, 5); docked.dockedAt = 'slate';
-  assert.equal(S.thrust(docked, 'pro').ok, false, 'thrusting while tied up');
+  assert.equal(S.thrust(docked, 'toward').ok, false, 'thrusting while tied up');
   const far = alongsideAt(salvor(), 'cutterjaw', 5000, 40);
-  assert.equal(S.thrust(far, 'pro').ok, false, 'thrusting with nothing alongside');
+  assert.equal(S.thrust(far, 'toward').ok, false, 'thrusting with nothing alongside');
   const dry = alongsideAt(salvor(), 'cutterjaw', 50, 40); dry.dv = 0;
-  assert.equal(S.thrust(dry, 'pro').ok, false, 'thrusting on an empty tank');
+  assert.equal(S.thrust(dry, 'toward').ok, false, 'thrusting on an empty tank');
   assert.equal(S.thrust(alongsideAt(salvor(), 'cutterjaw', 50, 40), 'sideways').ok, false, 'a thruster that is not there');
 
-  /* A press at the very end of a trip is whatever is left of one, never a
-     refusal — the same rule a written mark gets when the tank runs short. */
+  // Matched already: nothing to kill, and it says so rather than doing nothing.
+  const still = alongsideAt(salvor(), 'cutterjaw', 20, 0);
+  assert.equal(S.thrustStep('match', S.rendezvous(still).speed), 0, 'a step to kill nothing');
+  assert.equal(S.thrust(still, 'match').ok, false, 'matched a ship that was already matched');
+  assert.ok(S.thrust(still, 'toward').ok, 'but it can still be pushed at the thing');
+
+  /* A press at the end of a long trip is whatever is left of one, never a
+     refusal — the same rule a written mark gets on a short tank. */
   const low = alongsideAt(salvor(), 'cutterjaw', 50, 400);
-  low.dv = S.auDay(0.002);                       // 2 m/s left, a press wants 40
-  const r = S.thrust(low, 'retro');
+  low.dv = S.auDay(0.002);
+  const r = S.thrust(low, 'match');
   assert.ok(r.ok && Math.abs(r.dv - S.auDay(0.002)) < 1e-15, 'a short tank refused instead of giving what it had');
   assert.equal(low.dv, 0);
 });
 
-test('one press is the same size however it is made', () => {
-  /* The chart's arrows and the thrusters both ask `burnStep`, so a mark and a
-     thruster never disagree about what a press is worth. */
-  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
-  assert.match(PLAY, /return S\.burnStep\(f\.speed, f\.relative\);/, 'the arrows round it themselves again');
-  assert.match(PLAY, /S\.burnStep\(rv\.speed, true\)/, 'the thrusters round it themselves');
-  assert.equal(S.burnStep(S.auDay(0.2), true), 20, '200 m/s relative should step 20');
-  assert.equal(S.burnStep(S.auDay(7.6), false), 50, 'a low orbit should step 50');
+test('each thruster says what one press of it is worth', () => {
+  /* Toward is the same nudge at every range — there is nothing for it to be a
+     fraction of — and match is a tenth of what there is to kill, so it shrinks
+     as it works and the last metres a second cost no more than the first. */
+  assert.equal(S.thrustStep('toward', S.auDay(0.4)), 5);
+  assert.equal(S.thrustStep('toward', 0), 5);
+  assert.equal(S.thrustStep('match', S.auDay(0.2)), 20);
+  assert.equal(S.thrustStep('match', S.auDay(0.04)), 5);
+  assert.equal(S.thrustStep('match', 0), 0);
+  // Never more than there is: a press cannot send the ship back the other way.
+  assert.ok(S.thrustStep('match', S.auDay(0.0004)) <= 0.4 + 1e-9);
 });
 
 test('the thrusters are on screen in a reach, and never stop the clock', () => {
   const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
   assert.match(PLAY, /id="thrust"/, 'there is no thruster pad');
-  for(const which of ['pro', 'retro', 'out', 'in'])
-    assert.match(PLAY, new RegExp(`data-th="${which}"`), `no ${which} thruster`);
-  // Shown exactly when the ship is alongside something, and gone when tied up.
+  assert.match(PLAY, /data-th="toward"/, 'no toward thruster');
+  assert.match(PLAY, /data-th="match"/, 'no match thruster');
+  assert.doesNotMatch(PLAY, /data-th="(pro|retro|out|in)"/, 'the four orbital axes are back on the pad');
   assert.match(PLAY, /const rv = state\.dockedAt \? null : S\.rendezvous\(state\);/,
     'the pad does not ask whether the ship is alongside anything');
   assert.match(PLAY, /refreshThrusters\(\);/, 'nothing keeps the pad up to date');
@@ -4553,9 +4629,9 @@ test('the thrusters are on screen in a reach, and never stop the clock', () => {
   assert.doesNotMatch(fn, /setPaused|holdForPlanning/, 'firing a thruster stops the clock');
   assert.match(fn, /S\.thrust\(state, which, fine\)/, 'the pad does not fire the engine');
   assert.match(fn, /replan\(true\)/, 'the road is not redrawn as the ship is flown');
-  // And the arrow keys drive it, which is the one place on this chart they do something now.
-  assert.match(PLAY, /else if\(!\$\('thrust'\)\.hidden\) fireThruster\('retro', fine\)/,
-    'the arrows do not fly the ship');
+  // Up and down fly it; left and right still pan, there being no third thruster.
+  assert.match(PLAY, /fireThruster\('toward', fine\)/, 'up does not push at it');
+  assert.match(PLAY, /fireThruster\('match', fine\)/, 'down does not stop the drift');
 });
 
 test('coming alongside is ten kilometres and ten metres a second', () => {

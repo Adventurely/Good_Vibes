@@ -119,43 +119,47 @@
     position:fixed; left:.8rem; top:calc(70px + env(safe-area-inset-top)); z-index:7;
     display:flex; flex-direction:column; gap:.35rem;
   }
-  /* The thrusters: a cross, because the two axes are at right angles and a row
-     of four buttons says nothing about which is which. Bottom right, inboard of
-     the view column, where a thumb already is — and clear of the tutorial card
-     in the middle and the conversation down the left. */
+  /* The thrusters. Two, because two is the manoeuvre: point at it, and stop
+     drifting. It was the four orbital axes in the relative frame, which is
+     exactly right and unreadable — and worse, `out` is at right angles to your
+     relative velocity rather than along the line to the thing, so the button
+     labelled "toward" pointed at the wreck only when those happened to
+     coincide. Bottom right, inboard of the view column where a thumb already
+     is, and clear of the tutorial card in the middle and the conversation down
+     the left. */
   #thrust{
     position:fixed; right:calc(.8rem + 40px + .5rem); z-index:7;
     /* Clear of the tutorial card as well, which is bottom-centre and, with the
        panel open, centred on the chart rather than the window — so it reaches
        across to here. Same measurement the conversation uses. */
     bottom:max(.8rem, env(safe-area-inset-bottom), var(--tut-lift, 0px));
-    display:grid; grid-template-columns:repeat(3, 52px); grid-template-rows:repeat(3, 34px);
-    gap:.25rem; place-items:stretch;
+    display:flex; gap:.4rem;
   }
   #thrust[hidden]{ display:none; }
   #thrust button{
-    border-radius:9px; border:1px solid var(--line-2); background:var(--glass);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.1rem;
+    width:86px; height:52px;
+    border-radius:11px; border:1px solid var(--line-2); background:var(--glass);
     color:var(--ink); cursor:pointer; backdrop-filter:blur(8px);
-    font-size:.72rem; letter-spacing:.04em; padding:0; line-height:1;
-    touch-action:none; -webkit-tap-highlight-color:transparent;
+    padding:0; line-height:1; touch-action:none; -webkit-tap-highlight-color:transparent;
   }
+  #thrust button b{ font-size:.82rem; font-weight:600; letter-spacing:.02em; }
+  /* What this press is worth. Its own number on each, because the two are not
+     the same size: Match is a tenth of what there is to kill and shrinks as it
+     works, and Toward is the same nudge at every range. */
+  #thrust button small{ font-size:.62rem; color:var(--faint); white-space:nowrap; }
   #thrust button:hover{ border-color:var(--gold-2); }
   #thrust button:active{ background:var(--gold-2); color:var(--gv-paper); }
+  #thrust button:active small{ color:var(--gv-paper); }
   #thrust button:disabled{ opacity:.35; cursor:default; }
-  .th-in{ grid-area:1 / 2; } .th-retro{ grid-area:2 / 1; }
-  .th-pro{ grid-area:2 / 3; } .th-out{ grid-area:3 / 2; }
-  /* What one press is worth, in the hole in the middle of the cross. */
-  #th-step{
-    grid-area:2 / 2; display:flex; align-items:center; justify-content:center;
-    font-size:.64rem; font-weight:600; color:var(--faint); white-space:nowrap;
-  }
   @media (max-width: 760px){
     #thrust{
-      right:.5rem; grid-template-columns:repeat(3, 58px); grid-template-rows:repeat(3, 38px);
+      right:.5rem;
       /* Still above the tutorial card, which on a phone is nearly the width of
          the screen — the override must carry the lift or it loses it. */
       bottom:max(calc(.6rem + env(safe-area-inset-bottom)), var(--tut-lift, 0px));
     }
+    #thrust button{ width:92px; height:56px; }
     body.sheet #thrust{ bottom:calc(var(--sheet-h) + .5rem); }
   }
 
@@ -757,11 +761,10 @@
      a burn is flown by hand instead of written down — see `thrust` in sim.js.
      Pressing one fires the engine now; the clock keeps running. -->
 <div id="thrust" hidden role="group" aria-label="Zero-g thrusters">
-  <button data-th="in" class="th-in" title="Toward it (Up)" aria-label="Thrust toward it">Toward</button>
-  <button data-th="retro" class="th-retro" title="Kill your closing speed (Left)" aria-label="Thrust back">Back</button>
-  <b id="th-step">—</b>
-  <button data-th="pro" class="th-pro" title="Close on it faster (Right)" aria-label="Thrust forward">Fwd</button>
-  <button data-th="out" class="th-out" title="Away from it (Down)" aria-label="Thrust away">Away</button>
+  <button data-th="toward" title="Push straight at it (Up)" aria-label="Thrust toward it">
+    <b>Toward</b><small id="th-toward">—</small></button>
+  <button data-th="match" title="Kill your speed relative to it (Down)" aria-label="Match its speed">
+    <b>Match</b><small id="th-match">—</small></button>
 </div>
 
 <div id="view">
@@ -1727,16 +1730,14 @@ addEventListener('keydown', e => {
     /* The arrows push the selected burn; with nothing selected they are the
        keyboard's pan, so the chart can be walked around without a pointer.
        Shift makes both of them fine. */
-    /* With a mark open the arrows push it; in a reach with no mark open they
-       are the thrusters, which is the one place on this chart where the
-       arrows do something that happens *now*. Panning is still a drag away,
-       and outside a reach they pan as they always did. Up and down are
-       toward and away, to match the cross on screen: on a mark the same two
-       keys are out and in, which is the same axis under another name. */
-    case 'ArrowRight': e.preventDefault(); if(state.nodes[selectedNode]) pushAxis(selectedNode, 'pro', fine); else if(!$('thrust').hidden) fireThruster('pro', fine); else keyPan(-panStep(e), 0); break;
-    case 'ArrowLeft': e.preventDefault(); if(state.nodes[selectedNode]) pushAxis(selectedNode, 'retro', fine); else if(!$('thrust').hidden) fireThruster('retro', fine); else keyPan(panStep(e), 0); break;
-    case 'ArrowUp': e.preventDefault(); if(state.nodes[selectedNode]) pushAxis(selectedNode, 'out', fine); else if(!$('thrust').hidden) fireThruster('in', fine); else keyPan(0, panStep(e)); break;
-    case 'ArrowDown': e.preventDefault(); if(state.nodes[selectedNode]) pushAxis(selectedNode, 'in', fine); else if(!$('thrust').hidden) fireThruster('out', fine); else keyPan(0, -panStep(e)); break;
+    /* With a mark open the arrows push it. In a reach with no mark open, up and
+       down are the two thrusters — the one place on this chart where an arrow
+       does something that happens *now*. Left and right still pan there, since
+       there is no third thruster for them to be. */
+    case 'ArrowRight': e.preventDefault(); if(state.nodes[selectedNode]) pushAxis(selectedNode, 'pro', fine); else keyPan(-panStep(e), 0); break;
+    case 'ArrowLeft': e.preventDefault(); if(state.nodes[selectedNode]) pushAxis(selectedNode, 'retro', fine); else keyPan(panStep(e), 0); break;
+    case 'ArrowUp': e.preventDefault(); if(state.nodes[selectedNode]) pushAxis(selectedNode, 'out', fine); else if(!$('thrust').hidden) fireThruster('toward', fine); else keyPan(0, panStep(e)); break;
+    case 'ArrowDown': e.preventDefault(); if(state.nodes[selectedNode]) pushAxis(selectedNode, 'in', fine); else if(!$('thrust').hidden) fireThruster('match', fine); else keyPan(0, -panStep(e)); break;
   }
 });
 
@@ -2269,10 +2270,15 @@ function refreshThrusters(){
   if(!rv){ if(!box.hidden){ box.hidden = true; stopThrust(); } return; }
   box.hidden = false;
   liftOverTut();
-  const step = S.burnStep(rv.speed, true);
-  $('th-step').textContent = `${step} m/s`;
   const dry = !(state.dv > 0);
-  for(const b of box.querySelectorAll('button')) b.disabled = dry;
+  for(const which of S.THRUSTERS){
+    const step = S.thrustStep(which, rv.speed);
+    $(`th-${which}`).textContent = `${step < 1 ? step.toFixed(1) : Math.round(step)} m/s`;
+    /* Match goes dim when there is nothing left to kill: at rest beside it the
+       button has no work, and saying so is better than a press that does
+       nothing. */
+    box.querySelector(`[data-th="${which}"]`).disabled = dry || !(step > 0);
+  }
 }
 $('thrust').addEventListener('pointerdown', e => {
   const b = e.target.closest('button[data-th]');
