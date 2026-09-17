@@ -900,6 +900,23 @@ ring and anchor: two different questions, two different marks. "Are the axes
 about this thing" is answered a good way out from "may I tie up" — the checker
 holds the mouth inside the reach (C13), so the space is always entered first.
 
+**A wreck exists for exactly as long as there is a reason to fly to it**, and
+that is a window with two ends. It is not there until a salvor names it — see
+below — and it is gone the moment its hold is empty. A picked-over hulk left on
+the chart is a harbour that offers nothing: a dot you keep flying back to in
+order to find out it is the one you already did. Stripped, it stops being drawn,
+stops being offered as a harbour, stops giving a readout, and stops being
+something the thrusters will fly against — all of which fall out of the one set
+`unseen` builds. The exception is while you are tied up to it, since a harbour
+you are sitting in belongs on the chart under you.
+
+The one thing that keeps a wreck on the chart after you have been there is a
+hold that could not take the haul. It goes aboard whole or not at all, so a ship
+arriving full takes none of it: the job does not fail, the step simply does not
+finish, and the wreck stays where it was. The dock menu says how many units
+short you are and that she is not going anywhere. Coming back is the cost of
+arriving full.
+
 **A wreck does not exist until somebody names it.** Eight unexplained dots on
 the chart from the first day would be eight questions with no way to ask them;
 one that appears when a salvor tells you where to look is a lead. Taking the

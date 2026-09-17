@@ -557,11 +557,18 @@ export function unseen(state){
   const hide = new Set();
   if(!knowsKnot(state)) hide.add('knot');
   if(!knowsMaw(state)) hide.add('maw');
-  /* A wreck is a rumour until somebody hands you the job that names it. Eight
-     unexplained dots on the chart from the first day would be eight questions
-     with no way to ask them; one that appears when a salvor tells you where to
-     look is a lead. Taking the job is what reveals it, and finishing the job
-     does not hide it again — you have been there now.
+  /* A wreck is on the chart for exactly as long as there is a reason to fly to
+     it: from the moment a salvor names it to the moment its hold is empty.
+     Eight unexplained dots from the first day would be eight questions with no
+     way to ask them, and a picked-over hulk left on the chart afterwards is a
+     harbour that offers nothing — a dot you keep flying back to to find out it
+     is the one you already did.
+
+     A full hold is the one thing that keeps a stripped wreck on the chart, and
+     that is deliberate. The haul goes aboard whole or not at all, so a ship
+     that cannot fit it takes none of it: the job does not fail, the step simply
+     does not finish, and the wreck stays exactly where it was until you have
+     been and made room. Coming back is the cost of arriving full.
 
      The station at the Dancer is hidden the same way and for the same reason.
      It has been going round that star since before anybody was watching, and it
@@ -570,13 +577,23 @@ export function unseen(state){
   const told = new Set();
   for(const live of state?.quests ?? []){
     const q = questById(live.id);
-    /* What a job points at: the wreck it names, and where it ends when that is
-       one of these rather than a port. The last job in the line has no wreck —
-       its destination *is* the secret — so both count. */
-    for(const id of [q?.wreck, q?.to]) if(id && HULK_IDS.has(id)) told.add(id);
+    /* The wreck it names, while there is still something in it, and where it
+       ends when that is one of these rather than a port. The last job in the
+       line has no wreck — its destination *is* the secret — so both count. */
+    if(q?.wreck && HULK_IDS.has(q.wreck) && !stripped(live, q)) told.add(q.wreck);
+    if(q?.to && HULK_IDS.has(q.to)) told.add(q.to);
   }
+  /* And whatever the ship is tied up to, empty or not: a harbour you are
+     sitting in belongs on the chart under you until you cast off from it. */
+  if(state?.dockedAt && HULK_IDS.has(state.dockedAt)) told.add(state.dockedAt);
   for(const id of HULK_IDS) if(!told.has(id)) hide.add(id);
   return hide;
+}
+
+/* Whether this job's haul is already aboard — the recover step is behind us. */
+function stripped(live, q){
+  const i = questSteps(q).findIndex(st => st.kind === 'recover');
+  return i >= 0 && (live?.step ?? 0) > i;
 }
 /* Seeing past the encounter. The road normally stops one crossing out — see
  * the note on fullLap — because a road that chases every encounter it can find

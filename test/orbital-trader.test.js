@@ -4755,6 +4755,72 @@ test('an unfound wreck is no harbour and no readout', () => {
   assert.equal(S.dockingStatus(stranger)?.port, 'slate', 'an unmentioned wreck is offered as a harbour');
 });
 
+test('a stripped wreck comes off the chart', () => {
+  /* A picked-over hulk left on the chart is a harbour that offers nothing — a
+     dot you keep flying back to in order to find out it is the one you already
+     did. It is there from the moment a salvor names it to the moment its hold
+     is empty, and no longer. */
+  const s = salvor();
+  s.quests = []; s.dockedAt = 'slate';
+  assert.ok(S.acceptQuest(s, 'cutterjaw').ok);
+  assert.ok(!S.unseen(s).has('cutterjaw'), 'the job named it and it is not on the chart');
+
+  comeAlongside(s, 'cutterjaw');
+  assert.equal(S.dockingStatus(s)?.port, 'cutterjaw');
+  const r = S.dock(s);
+  assert.ok(r.ok, S.dockRefusal(S.dockingStatus(s)));
+  assert.ok(r.events.some(e => e.kind === 'salvaged'), 'nothing came aboard');
+
+  /* Still there while the ship is tied up to it: a harbour you are sitting in
+     belongs on the chart under you, empty or not. */
+  assert.ok(!S.unseen(s).has('cutterjaw'), 'the wreck vanished from under the ship');
+
+  S.undock(s);
+  assert.ok(S.unseen(s).has('cutterjaw'), 'the emptied wreck is still on the chart');
+  /* And it is nothing the ship can do anything with any more: no harbour, no
+     readout, nothing for the thrusters to fly against. */
+  comeAlongside(s, 'cutterjaw');
+  assert.notEqual(S.dockingStatus(s)?.port, 'cutterjaw', 'an emptied wreck is still offered as a harbour');
+  assert.equal(S.alongside(s), null, 'an emptied wreck is still something to fly against');
+
+  // The job itself carries on: the haul is aboard and still has to be delivered.
+  const live = s.quests.find(q => q.id === 'cutterjaw');
+  assert.ok(live && !live.done, 'the job finished at the wreck');
+  assert.ok(S.carrying(s, S.questById('cutterjaw').goods[0].good) > 0, 'the haul is not in the hold');
+});
+
+test('arriving with a full hold leaves the wreck where it is', () => {
+  /* The haul goes aboard whole or not at all, so a ship that cannot fit it
+     takes none of it. The job does not fail — the step simply does not finish,
+     and the wreck stays exactly where it was until you have been and made
+     room. Coming back is the cost of arriving full. */
+  const q = S.questById('cutterjaw');
+  const load = S.salvageLoad(q);
+  const s = salvor();
+  s.quests = []; s.dockedAt = 'slate';
+  assert.ok(S.acceptQuest(s, 'cutterjaw').ok);
+
+  // Room for all but one unit of it.
+  const per = S.goodById(q.goods[0].good)?.units ?? 1;
+  s.cargo = [{ good: q.goods[0].good, qty: Math.floor((S.holdUnits(s) - (load - per)) / per), t: 0, price: 1 }];
+  assert.ok(S.freeUnits(s) < load && S.freeUnits(s) > 0, `${S.freeUnits(s)} free of a ${load} unit haul`);
+
+  comeAlongside(s, 'cutterjaw');
+  const r = S.dock(s);
+  assert.ok(r.ok, 'could not even tie up');
+  assert.ok(!r.events.some(e => e.kind === 'salvaged'), 'a hold that cannot fit the haul took some of it');
+  S.undock(s);
+  assert.ok(!S.unseen(s).has('cutterjaw'), 'the wreck went off the chart with its hold still full');
+
+  // Make room, come back, and now it goes aboard and the site is done with.
+  s.cargo = [];
+  comeAlongside(s, 'cutterjaw');
+  const again = S.dock(s);
+  assert.ok(again.events.some(e => e.kind === 'salvaged'), 'coming back empty did not finish the job');
+  S.undock(s);
+  assert.ok(S.unseen(s).has('cutterjaw'), 'the wreck is still on the chart after being stripped');
+});
+
 test('the haul comes aboard at the wreck and cannot be sold on the way home', () => {
   const s = salvor();
   s.dockedAt = 'slate';
