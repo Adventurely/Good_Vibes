@@ -2463,6 +2463,83 @@ test('the game opens in a low orbit, clear of the air, and a lap of it is about 
   assert.ok(O.dist(s.ship.r, r0) < el.ra * 1e-6, 'one lap of ×1 is back where it started');
 });
 
+test('a skip ends the same distance from the thing it was sent to, whatever the trip', () => {
+  /* The run-in is flown at ×1, so the only honest unit for it is real seconds
+     of watching. It used to be two per cent of the trip capped at a fiftieth of
+     a day, which is neither: a fiftieth of a day is nine real minutes of ×1, so
+     a one-day skip handed back nine minutes of staring at nothing. And past
+     about ten days the margin stopped meaning anything, because a frame of a
+     skip is a six-hundredth of the trip and by then one frame was longer than
+     the whole margin — measured, a twenty-day skip and a three-hundred-day skip
+     both landed *past* the moment they were sent to. */
+  const B = CONST.BASE_RATE_DAYS_PER_SEC;
+  const coaster = () => {
+    const g = S.newGame(5);
+    g.dockedAt = null; g.justLeft = null; g.justLeftAt = -1e9; g.t = 0; g.nodes = [];
+    const start = O.absState(world, 'tassel', 0);
+    const mu = world.get('lamp').mu;
+    g.ship = { body: 'lamp', r: [...start.r],
+      v: O.scale(O.unit(start.v), Math.sqrt(mu / O.norm(start.r)) * 1.02) };
+    return g;
+  };
+  for(const days of [0.05, 0.2, 1, 5, 20, 70, 300]){
+    const g = coaster();
+    const target = g.t + days;
+    const plan = S.skipPlan(g, target);
+    g.warp = plan.rate;
+    /* The loop the browser runs, at sixty frames a second. */
+    let frames = 0;
+    while(g.t < plan.stopAt && frames++ < 2e5){
+      const dt = S.dtForFrame(g, 1 / 60, plan.stopAt);
+      if(dt <= 0) break;
+      S.tick(g, dt);
+    }
+    const short = target - g.t;
+    assert.ok(short > 0, `a ${days}-day skip landed past the moment it was sent to`);
+    assert.ok(Math.abs(short - S.MIN_LEAD) < 1e-9,
+      `a ${days}-day skip left ${(short / B).toFixed(0)} real seconds of ×1, not the ${(S.MIN_LEAD / B).toFixed(0)} every other one leaves`);
+  }
+
+  /* Except a skip too short to spare it, which still has to go somewhere. */
+  const tiny = coaster();
+  const plan = S.skipPlan(tiny, tiny.t + S.MIN_LEAD * 2);
+  assert.ok(plan.stopAt > tiny.t, 'a very short skip has nowhere to go');
+  assert.ok(plan.stopAt < tiny.t + S.MIN_LEAD * 2, 'and it does not land on top of the thing');
+});
+
+test('skipping to a burn lands a lead short of the burn, not half an hour short', () => {
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  /* It used to ask to be sent to a twentieth of a day before the burn, on top
+     of the margin the skip already leaves. A twentieth of a day is twenty-two
+     real minutes of ×1, so pressing "Skip to it" on a burn gave back half an
+     hour of staring — and the card, which reads the plan, understated the wait
+     by all of it. */
+  assert.match(PLAY, /warpnode\(i\)\{ const n = state\.nodes\[Number\(i\)\]; if\(n\) askSkip\(n\.t,/,
+    'the burn skip still cuts its own lead');
+  assert.doesNotMatch(PLAY, /askSkip\(n\.t - 0\.05/, 'the old hand-cut lead is back');
+});
+
+test('a frame of a skip never steps past the end of it', () => {
+  /* The guarantee the above rests on. A frame of a long skip is hours of game
+     time; the step is cut to what is left. */
+  const g = S.newGame(5); S.undock(g); g.warp = 5e4;
+  const until = g.t + 0.01;
+  const full = S.dtForFrame(g, 1 / 60);
+  assert.ok(full > 0.01, 'this frame is too small for the test to mean anything');
+  assert.equal(S.dtForFrame(g, 1 / 60, until), until - g.t, 'the last step was not cut to fit');
+  g.t = until;
+  assert.equal(S.dtForFrame(g, 1 / 60, until), 0, 'a step was offered past the end');
+  assert.equal(S.dtForFrame(g, 1 / 60, null), full, 'a frame with no end to reach was cut anyway');
+});
+
+test('the loop hands the skip\'s end to the clock, and skips to where the plan says', () => {
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.match(PLAY, /S\.dtForFrame\(state, real, warpTarget\)/,
+    'the frame steps without knowing where the skip ends');
+  assert.match(PLAY, /warpTarget = plan\.stopAt;/,
+    'the stopping point is worked out somewhere other than the plan');
+});
+
 test('undocking puts the ship in a prograde parking orbit at the docking altitude', () => {
   /* Casting off is not the same frame as a new game: the opening orbit is low
      and the harbour's is not, so this ties up first and then lets go. */

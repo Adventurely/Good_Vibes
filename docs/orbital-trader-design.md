@@ -158,6 +158,12 @@ Anything worth being awake for cancels the skip and drops the clock back to ×1:
 
 A cap on the rate means the longest hauls take proportionally more than ten seconds; the confirmation says so rather than promising ten.
 
+**A skip stops a minute of ×1 short of what it was sent to, and that is one number for every skip.** The run-in is flown at ×1, so the only honest unit for it is real seconds of watching — and it used to be two per cent of the trip capped at a fiftieth of a day, which is neither. A fiftieth of a day is nine real minutes of ×1: skip one day ahead and the game handed back nine minutes of staring before anything happened. Past about ten days the margin stopped meaning anything at all, because a frame of a skip is a six-hundredth of the trip and by then one frame was longer than the whole margin — measured, a twenty-day skip and a three-hundred-day skip both landed *past* the moment they were sent to. Two faults with one shape: a margin in game time cannot describe a wait in real seconds.
+
+So the margin is `MIN_LEAD`, the number the rest of the game already uses for "enough notice" — what a burn wants to be caught and pushed before it fires, and the reason a mark cannot be written inside it. Landing exactly there is the shortest run-in that leaves the thing you skipped to still yours to change. A quarter of the trip is the floor under a very short skip, which should not be a skip that goes nowhere. And the last frame of a skip is cut to the distance left, so a skip ends where it said it would rather than a frame's worth either side of it: measured in the browser, a one-day skip, a twenty-day skip and a three-hundred-day skip now all stop sixty real seconds of ×1 short, each in the ten seconds it promised.
+
+**Skip to it** on a burn used to ask to be sent to a twentieth of a day *before* the burn, on top of all that — a hand-cut lead doing the margin's job twenty-two times over, since a twentieth of a day is twenty-two real minutes of ×1. It sent you to the burn's own moment now, and the margin does the rest.
+
 ### 2.6.1 The Chart
 
 Two rules keep the chart readable, and both of them are about refusing to show things.
