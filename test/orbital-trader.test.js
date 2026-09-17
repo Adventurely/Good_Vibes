@@ -1847,68 +1847,73 @@ test('the space near a wreck says whether you are in it', () => {
   } finally { chart.restore(); }
 });
 
-test('a wreck you have been told about is marked in orange the whole way in', () => {
-  /* The orange pair that says where the road cuts a rail and where the world
-     will be when it does is what a salvage run is aimed by, and it cannot
-     carry the last stretch: a crossing is drawn only on a rail that is on the
-     screen, and a wreck's rail is a quarter of an astronomical unit across, so
-     it is culled long before the approach starts. A world hands over to its
-     sphere of influence; a wreck weighs nothing and has none. So the diamond
-     follows the wreck itself in, and stops at the mouth. */
+test('zooming in does not take the orange pair away with the rail', () => {
+  /* `drawOrbits` culls a rail at both ends, and a crossing used to be drawn
+     only on a rail that survived. Under six pixels across that is right — a
+     pair of diamonds on a dot says nothing. Over six screen diagonals it is
+     not a rail nobody can see, it is the rail you are standing on, and it is
+     culled at exactly the zoom the run to it is flown at. */
   const ops = [];
   const chart = stubChart(800, 600, ops);
   try{
-    const w = world.get('tinwhistle'), p = world.get(w.parent);
-    const strokes = () => ops.filter(o => o[0] === 'strokeStyle').map(o => o[1]);
-    /* Closing straight in on it, from a range where the rail is long gone. */
-    const at = km => {
-      const s = salvor();
-      s.quests = [{ id: S.QUESTS.find(q => q.wreck === 'tinwhistle').id, step: 0, done: false, takenAt: 0 }];
-      s.dockedAt = null; s.justLeft = null; s.justLeftAt = -1e9; s.t = 0;
-      const st = O.railState(w, p.mu, 0), out = O.unit(st.r);
-      s.ship = { body: w.parent, r: O.add(st.r, O.scale(out, km / KM_PER_AU)), v: O.sub(st.v, O.scale(out, S.auDay(0.05))) };
-      const docking = S.dockingStatus(s);
-      chart.camera.anchor = [...O.absState(world, 'tinwhistle', 0).r];
-      chart.camera.zoom = 150 / (km / KM_PER_AU);   // the range a quarter of the screen
+    const g = salvor();
+    g.quests = [{ id: S.QUESTS.find(q => q.wreck === 'tinwhistle').id, step: 0, done: false, takenAt: 0 }];
+    g.dockedAt = null; g.justLeft = null; g.t = 0;
+    const start = O.absState(world, 'tassel', 0);
+    const mu = world.get('lamp').mu, r1 = O.norm(start.r), r2 = world.get('tinwhistle').a;
+    const vc = Math.sqrt(mu / r1);
+    g.ship = { body: 'lamp', r: [...start.r],
+      v: O.scale(O.unit(start.v), vc * Math.sqrt(2 * r2 / (r1 + r2))) };
+    const pred = S.planImmediate(g);
+    const crossings = railCrossings(world, pred, 0, { minLead: S.MIN_LEAD });
+    assert.ok(crossings.some(c => c.body === 'tinwhistle'), 'the road does not reach the wreck\'s rail at all');
+    const view = { t: 0, now: 0, shipAbs: { r: S.shipAbsPos(g), v: S.shipAbsVel(g) }, shipBody: 'lamp',
+      prediction: pred, nodes: [], nodePositions: [], apses: [], railCrossings: crossings,
+      hidden: S.unseen(g) };
+    const at = zoom => {
+      chart.camera.zoom = zoom;
+      chart.camera.anchor = [...S.shipAbsPos(g)];
       chart.settle();
       ops.length = 0;
-      return { s, view: {
-        t: 0, now: 0, shipAbs: { r: S.shipAbsPos(s), v: S.shipAbsVel(s) }, shipBody: s.ship.body,
-        prediction: S.planImmediate(s), nodes: [], nodePositions: [], apses: [],
-        railCrossings: [], hidden: S.unseen(s), docking, nearPort: docking?.port ?? null, dockedAt: null,
-      } };
+      chart.draw(view);
+      return {
+        rail: chart.hits.rails.some(r => r.id === 'tinwhistle'),
+        orange: ops.some(o => o[0] === 'strokeStyle' && o[1] === PALETTE.railCross),
+      };
     };
 
-    for(const km of [1e5, 2e4, 5e3, 1000, 200, 20]){
-      const { view } = at(km);
-      chart.draw(view);
-      assert.ok(!chart.hits.rails.some(r => r.id === 'tinwhistle'),
-        `at ${km} km the wreck's rail is on the screen after all — the crossing pair could have carried this`);
-      assert.ok(strokes().includes(PALETTE.railCross), `no orange mark on the wreck at ${km} km`);
-    }
+    const wide = at(8e3);
+    assert.ok(wide.rail && wide.orange, 'the pair is not drawn even with the rail on the screen');
 
-    // In the mouth: the ring is round you and the aiming is over.
-    const close = at(5);
-    assert.equal(close.view.docking?.inZone, true, 'five kilometres out is not in the mouth');
-    chart.draw(close.view);
-    assert.ok(!strokes().includes(PALETTE.railCross), 'still being aimed at from inside the mouth');
-
-    // Tied up to it, the same.
-    const held = at(200);
-    chart.draw({ ...held.view, dockedAt: 'tinwhistle' });
-    assert.ok(!strokes().includes(PALETTE.railCross), 'marked as somewhere to fly to while tied up to it');
-
-    // And a derelict nobody has mentioned is not on the chart at all.
-    const unheard = at(200);
-    chart.draw({ ...unheard.view, hidden: new Set(['tinwhistle']) });
-    assert.ok(!strokes().includes(PALETTE.railCross), 'an unheard-of wreck was marked');
+    /* And in, past the zoom that culls the rail for running off both edges.
+       The marks are still on the screen; it was only the rail that left. */
+    const close = at(3e4);
+    assert.ok(!close.rail, 'the rail is still drawn at this zoom — the test has stopped testing anything');
+    assert.ok(close.orange, 'zooming in took the orange pair away with the rail');
   } finally { chart.restore(); }
 });
 
-test('the chart is told what the ship is tied up to', () => {
-  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
-  assert.match(PLAY, /dockedAt: state\.dockedAt \?\? null/,
-    'without it the wreck under the ship is still marked as somewhere to fly to');
+test('zooming out past a rail still takes its crossing with it', () => {
+  /* The other end of the same cull, which was doing its job: a whole orbit
+     three pixels across is a dot, and a pair of diamonds on a dot is two marks
+     with nothing to be against. */
+  const ops = [];
+  const chart = stubChart(800, 600, ops);
+  try{
+    const g = transferShip();
+    const pred = S.planImmediate(g);
+    const crossings = railCrossings(world, pred, 0, { minLead: S.MIN_LEAD });
+    assert.ok(crossings.some(c => c.body === 'tassel'), 'nothing crosses the rail it left from');
+    chart.camera.zoom = 10;              // Tassel's whole orbit about three pixels across
+    chart.camera.anchor = [0, 0];
+    chart.settle();
+    assert.ok(world.get('tassel').a * chart.camera.zoom < 6, 'the rail is big enough to draw after all');
+    chart.draw({ t: 0, now: 0, shipAbs: { r: S.shipAbsPos(g), v: S.shipAbsVel(g) }, shipBody: 'lamp',
+      prediction: pred, nodes: [], nodePositions: [], apses: [], railCrossings: crossings,
+      hidden: new Set() });
+    assert.ok(!ops.some(o => o[0] === 'strokeStyle' && o[1] === PALETTE.railCross),
+      'a crossing was drawn on a rail too small to be a shape');
+  } finally { chart.restore(); }
 });
 
 test('the mode is announced with or without a navigator, and the numbers are hers', () => {

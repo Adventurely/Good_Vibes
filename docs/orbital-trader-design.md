@@ -941,26 +941,25 @@ ring and anchor: two different questions, two different marks. "Are the axes
 about this thing" is answered a good way out from "may I tie up" — the checker
 holds the mouth inside the reach (C13), so the space is always entered first.
 
-**And it is marked in orange until you are in the mouth.** The reach ring is
-only three thousand kilometres wide; everything before that a salvage run is
-aimed by the orange pair that says where the road cuts a rail and where the
-world will be when it does — and that pair cannot carry the run. A crossing is
-drawn only on a rail that is on the screen, and a wreck's rail is a good part of
-an astronomical unit across, so it is culled as a line running off both edges
-long before the approach begins. A world in that position hands over to its
-sphere of influence and an encounter mark; a wreck weighs nothing and has
-neither. What was left in between was a grey dot two and a half pixels wide, and
-nothing orange again until the mouth ring lit.
+**Zooming out past a rail hides its crossing; zooming in does not.** The orange
+pair — where the road cuts a rail, and where that world will be when it does —
+was drawn only on a rail the frame had drawn, and `drawOrbits` culls a rail at
+both ends: under six pixels across, and over six screen diagonals. That was one
+rule doing two jobs and only one of them was wanted. A rail three pixels across
+is a dot, and a pair of diamonds on a dot is two marks with nothing to be
+against. A rail running off both edges is not a rail nobody can see — it is the
+rail you are standing on, and it is culled at exactly the zoom the run to it is
+flown at. A wreck's is a good part of an astronomical unit across, so the marks
+a salvage run is aimed by went out halfway through the run, and a planet at that
+zoom at least has its sphere of influence and an encounter mark to hand over to.
 
-So the mark follows the wreck in. The same diamond and the same orange, drawn
-on the wreck itself, in pixels so it is the same size to find at any zoom — the
-honest continuation of the pair, because the second of those two is where the
-thing will be when you get there, and from close enough in, where it will be is
-where it is. Only for a wreck somebody has told you about, which `unseen`
-already decides, so it is one diamond for the job in hand and not eight. It
-stops at the mouth, and while you are tied up: that is where aiming ends, the
-ring is already round you, and the corner has turned into range and closing
-speed.
+So a crossing now outlives its rail upward and not downward. Whether the pair is
+worth any ink was already settled separately, by whether either mark is on the
+screen at all — and that is also the limit of what this can do. The pair marks a
+place *ahead in time*: zoom in far enough that the screen spans less than the
+ship will travel before the crossing and both diamonds are genuinely off it,
+with nothing honest left to draw. What the rule change buys is every zoom in
+between, which is where the aiming happens.
 
 **A wreck exists for exactly as long as there is a reason to fly to it**, and
 that is a window with two ends. It is not there until a salvor names it — see

@@ -1046,7 +1046,7 @@ function frame(now){
   if(warpTarget != null && state.t >= warpTarget) stopSkip();
   const shipAbs = state.dockedAt ? { r: absState(world, state.dockedAt, state.t).r, v: absState(world, state.dockedAt, state.t).v } : { r: S.shipAbsPos(state), v: S.shipAbsVel(state) };
   chart.draw({
-    t: state.t, now, shipAbs, shipBody: state.ship.body, docked: !!state.dockedAt, dockedAt: state.dockedAt ?? null,
+    t: state.t, now, shipAbs, shipBody: state.ship.body, docked: !!state.dockedAt,
     prediction, nodes: state.nodes, nodePositions, selectedNode, apses, railCrossings: crossedRails,
     tapMark: tapMark != null && prediction && !state.dockedAt ? locateOnPrediction(world, prediction, tapMark) : null,
     editing: selectedNode >= 0 && !!state.nodes[selectedNode],
