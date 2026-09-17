@@ -503,8 +503,9 @@
         <section class="sheet" id="sheet-board" role="tabpanel" aria-labelledby="tab-board" hidden>
           <div class="boardbox">
             <p class="board-what"><b>The board.</b> Who has tapped the most, earned the most seeds,
-               made the most energy and gone fastest. Joining sends the name you type and those four
-               numbers. The lot itself, and everything else on the record, stays on this device.</p>
+               made the most energy, sat on the biggest pile of it and gone fastest. Joining sends the
+               name you type and those five numbers, and a name nobody else has taken. The lot itself,
+               and everything else on the record, stays on this device.</p>
             <form class="board-join" id="board-join">
               <label for="board-name">Your name on the board</label>
               <input id="board-name" maxlength="16" autocomplete="nickname" spellcheck="false"
@@ -1454,8 +1455,15 @@
       const BOARD_URL = '/api/sunward/board';
       const BOARD_REFRESH = 60 * 1000;          // while the tab is open
       const BOARD_SEND_EVERY = 5 * 60 * 1000;   // while joined and playing
+      /* Five lists, and the two energy ones are the pair that have to be told
+         apart on sight: "all told" read as a maximum to the one person who
+         asked, and the number underneath it had never been one. */
       const BOARD_LABELS = {
-        taps: 'Most taps', seeds: 'Most seeds', earned: 'Most energy, all told', peakTaps: 'Fastest hands',
+        taps: 'Most taps',
+        seeds: 'Most seeds',
+        earned: 'Most energy ever earned',
+        peakHeld: 'Most energy held at once',
+        peakTaps: 'Fastest hands',
       };
       /* "Third seed" reads; "3rd seed" reads like a spreadsheet. Words as far
          as the medals name them, and the digits after that. */
@@ -1516,7 +1524,8 @@
       }
       const boardStats = () => ({
         taps: Math.floor(state.life.taps), seeds: seedsEarned(state),
-        earned: state.life.earned, peakTaps: state.life.peakTaps,
+        earned: state.life.earned, peakHeld: state.life.peakHeld,
+        peakTaps: state.life.peakTaps,
       });
       /* The board takes any figure a browser can hold, so the row has to be able
          to draw one. A count in full stops being readable long before it stops
@@ -1631,6 +1640,16 @@
             const wait = Math.max(0, Math.min(60000, Number(data?.retryIn) || 0));
             board.sentAt = performance.now() - BOARD_SEND_EVERY + wait + 250;
             if(joining) ui.boardLine.textContent = `Just a moment — your score goes up in ${Math.ceil(wait / 1000)} seconds.`;
+          } else if(res.status === 409){
+            /* Somebody has that name. Hand back whatever they were called
+               before — their own name if they were already on the board,
+               nothing if they were joining — so the next timer tick does not
+               post a name that will be refused again. */
+            board.name = board.wasNamed || '';
+            board.joined = board.joined && Boolean(board.name);
+            writeBoard();
+            ui.boardName.value = board.name;
+            ui.boardLine.textContent = data?.error || 'That name is already taken.';
           } else {
             ui.boardLine.textContent = data?.error
               || 'Something went wrong putting you on the board. Try again in a moment.';
@@ -1659,6 +1678,11 @@
           ui.boardLine.textContent = 'This browser will not make an id, so it cannot hold a place on the board.';
           return;
         }
+        /* Kept, so a refusal can put it back. A name is one player's now, and
+           a player already on the board who tries to rename onto somebody
+           else's would otherwise be left holding a name the board never
+           accepted — posting it every minute for ever and being told no. */
+        board.wasNamed = board.name;
         board.name = name;
         // Not joined until the board says so: the name is checked there, and a
         // row the server refused must not come back tomorrow as one it took.

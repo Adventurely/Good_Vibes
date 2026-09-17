@@ -605,6 +605,12 @@ export const STAT_LABELS = {
   studied: 'Upgrades bought',
   peakRate: 'Best energy per second',
   peakTaps: 'Best taps per second',
+  /* The most that has ever been in hand at one moment, which is a different
+     question from how much has ever been earned: earned only ever climbs, and
+     held falls every time the shelf is visited. A player who has made a
+     trillion and spent it on growers has a held figure of whatever the biggest
+     pile was before they broke into it. */
+  peakHeld: 'Most energy held at once',
   seconds: 'Time',
 };
 
@@ -620,6 +626,7 @@ export const STAT_SHORT = {
   studied: 'Upgrades',
   peakRate: 'Best e/s',
   peakTaps: 'Best t/s',
+  peakHeld: 'Most held',
   seconds: 'Time',
 };
 
@@ -627,11 +634,11 @@ export const STAT_KEYS = Object.keys(STAT_LABELS);
 
 /* Which of them are a high-water mark rather than a running total. The adder
    and the save loader both read this, so there is one answer. */
-export const PEAK_KEYS = ['peakRate', 'peakTaps'];
+export const PEAK_KEYS = ['peakRate', 'peakTaps', 'peakHeld'];
 
 /* Which want a clock rendering rather than a number, and which are light. */
 export const TIME_KEYS = ['seconds'];
-export const ENERGY_KEYS = ['tapped', 'grown', 'earned', 'spent', 'peakRate'];
+export const ENERGY_KEYS = ['tapped', 'grown', 'earned', 'spent', 'peakRate', 'peakHeld'];
 // The name it had when the resource was called light. Kept, so nothing that
 // imported it stops resolving; the export list is a contract.
 export const LIGHT_KEYS = ENERGY_KEYS;
@@ -1289,6 +1296,7 @@ export function tick(state, dt){
 
   state.light += gained;
   state.elapsed += step;
+  score(state, 'peakHeld', state.light);
   score(state, 'seconds', step);
   score(state, 'grown', gained);
   score(state, 'earned', gained);
@@ -1311,6 +1319,7 @@ export function tap(state, rate = 0){
   const bonus = bonuses(state);
   const value = tapPays(state, rate, bonus);
   state.light += value;
+  score(state, 'peakHeld', state.light);
   score(state, 'taps', 1);
   score(state, 'tapped', value);
   score(state, 'earned', value);
@@ -1613,6 +1622,7 @@ export function catchUp(state, seconds){
       }
     }
     state.light += gain.light;
+    score(state, 'peakHeld', state.light);
     score(state, 'grown', gain.light);
     score(state, 'earned', gain.light);
   }
