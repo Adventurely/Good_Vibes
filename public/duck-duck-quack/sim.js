@@ -126,21 +126,27 @@ const addDeckAt = (state, x, y) => {
 /* Which of a column's surfaces a duckling at `fromY` would actually step
  * onto, or null if none of them is anything but a wall to it.
  *
- * Within WALK_STEP either way is ordinary ground to step along, and the
- * nearest such surface wins — that is what keeps a duckling on the ramp it
- * is already walking, up or down, rather than dropping off it onto whatever
- * happens to lie below. Failing that, the highest surface still beneath it
- * is where it is headed, which is what lets a duckling walk clean under a
- * ramp overhead instead of being lifted onto it, and what makes the ground
- * under a ramp still count as ground. Only when every surface here stands
- * more than a step above is there nothing to step onto at all — a wall.
+ * Anything within WALK_STEP either way is ordinary ground to step along, and
+ * of those the *highest* wins — a duckling always takes the step up if there
+ * is one to take. That is what puts a duckling walking the ground onto the
+ * foot of a ramp rather than under it, and what makes one coming down a ramp
+ * change onto another crossing it the other way and carry on up: at the
+ * crossing both decks are a step away, and up beats down. Preferring the
+ * nearest instead kept it on the ramp it was already descending, which is
+ * the one thing a duckling standing at the foot of an upward ramp plainly
+ * should not do.
+ *
+ * Failing that, the highest surface still beneath it is where it is headed,
+ * which is what lets a duckling walk clean under a ramp overhead instead of
+ * being lifted onto it, and what makes the ground under a ramp still count
+ * as ground. Only when every surface here stands more than a step above is
+ * there nothing to step onto at all — a wall.
  */
 const stepTargetAt = (state, x, fromY) => {
-  const surfaces = surfacesAt(state, x);
   let onLevel = null, below = null;
-  for(const s of surfaces){
+  for(const s of surfacesAt(state, x)){
     if(Math.abs(s - fromY) <= WALK_STEP){
-      if(onLevel === null || Math.abs(s - fromY) < Math.abs(onLevel - fromY)) onLevel = s;
+      if(onLevel === null || s < onLevel) onLevel = s;
     } else if(s > fromY){
       if(below === null || s < below) below = s;
     }

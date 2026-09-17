@@ -508,6 +508,43 @@ test('a duckling on a ramp follows it whichever way it is walking — up one way
   assert.ok(walker.y < turnedAt, 'and turning round takes it back up');
 });
 
+test('a duckling coming down one ramp changes onto another crossing it the other way, and goes up', () => {
+  /* Two ramps meeting head on. Walking into the crossing the duckling is
+   * descending the one it is on and the other one climbs the way it is
+   * going; both decks are a step away, so which it takes is decided by
+   * stepTargetAt preferring the higher — up over down. */
+  const level = miniLevel({
+    duckCount: 3, spawnInterval: 1,
+    supply: { digger: 0, builder: 2, blocker: 0, climber: 0 },
+  });
+  const state = run(newGame(level), 3);
+  const [up, down, walker] = state.ducks;
+
+  up.x = 20; up.y = 50; up.dir = 1; up.state = 'walking';       // climbs rightward
+  assignSkill(state, up.id, 'builder');
+  run(state, BUILD_MAX_STEPS + 2);
+  let top = { x: -1, y: Infinity };
+  state.decks.forEach((at, x) => at.forEach(y => { if(y < top.y) top = { x, y }; }));
+
+  down.x = 100; down.y = 50; down.dir = -1; down.state = 'walking';  // climbs leftward
+  assignSkill(state, down.id, 'builder');
+  run(state, BUILD_MAX_STEPS + 2);
+  assert.ok(state.decks.some(at => at.length > 1), 'the two should be crossing somewhere');
+
+  // Off the first ramp's high end, heading back down it — into the crossing.
+  walker.x = top.x; walker.y = top.y; walker.dir = -1; walker.state = 'walking';
+  const ys = [walker.y];
+  for(let i = 0; i < 12; i++){ tick(state); ys.push(walker.y); }
+
+  // Bigger y is further down. It should drop away from where it started,
+  // then climb back to at least that height again on the other ramp.
+  const wentDown = ys.findIndex(y => y > ys[0] + 1);
+  assert.ok(wentDown > 0, `it should walk down the first ramp first, got ${ys}`);
+  const cameBackUp = ys.findIndex((y, i) => i > wentDown && y <= ys[0]);
+  assert.ok(cameBackUp > wentDown,
+    `and then climb the ramp going the other way back up, got ${ys}`);
+});
+
 test('a builder is never held, so a duckling that has finished one ramp can be given another', () => {
   const level = miniLevel({ supply: { digger: 0, builder: 2, blocker: 0, climber: 0 } });
   const state = run(newGame(level), 1);

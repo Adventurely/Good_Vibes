@@ -52,7 +52,7 @@
    straight off the page whether they have the latest build, rather than
    having to guess from behavior alone. Bump it on every change that ships,
    however small. */
-export const GAME_VERSION = '1.2';
+export const GAME_VERSION = '1.3';
 
 export const SCENE_W = 320;
 export const SCENE_H = 180;
