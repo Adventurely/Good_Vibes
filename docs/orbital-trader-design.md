@@ -86,6 +86,8 @@ On the chart the mouth is a dashed ring with **a small anchor hung at the top of
 
 **It is also invisible.** Nothing on the chart until a ship carries gravitational sensors — no dot, no rail, no reach, no name. What a player sees instead is **the Dancer**: a small blue star of Grumm's size that laps the Maw every 234 days and appears, for as long as anybody has looked, to be going round nothing. That is the whole advertisement for the instrument. Where a road runs into the Maw the chart still marks the crossing and the pass, with the real distance and the real closing speed, and calls it **???**.
 
+Because the Dancer is carrying that whole hint on its own, it is drawn as a landmark rather than as a body its real size: a floor that still reads at the widest zoom the chart allows, a corona half again as wide as the Lamp's, a rim so it is a star and not a smudge, and its name at full strength. The Maw, once the sensors find it, is the opposite — never at full strength even when its ring is lit, because the reading is that something is *there*, not that something is bright, and the star beside it is what the eye should find first.
+
 This is a scope decision as much as a fictional one. Landing would need a second control scheme, a second set of physics, and a second art problem, and it would buy nothing the orbital game does not already have. The fiction absorbs it easily: Tassel is an ocean of floating harbour cities that meet ships in orbit, the cats cannot survive a heavy world at all, and the frogs' balloon villages have no ground under them either.
 
 The player therefore **starts in orbit**, not moored. A new game opens with the ship already going round Tassel — *low* round it, high point under one planet-diameter of altitude, so the ocean fills the chart and visibly turns underneath — with a road drawn ahead of it and a crate in the hold. There is nothing to cast off from and nothing to press before the chart means something. The harbour itself is higher up, at the docking altitude every other orbit in the game is measured from; tying up and casting off again is what puts a ship there.
@@ -741,7 +743,7 @@ frog system — so that every new place arrives with a reason to be there, and
 each of the three crew members is the reward for the stretch that introduces
 their people.
 
-**Twenty-four jobs are built.** They are written out in `quests.json`, they
+**Twenty-nine jobs are built, and the line has an ending.** They are written out in `quests.json`, they
 work, and a player meets them: the Requests tab on the dock menu lists whatever
 jobs the port you are tied up at is offering, and you can hold three at once.
 
@@ -762,6 +764,56 @@ empty ones. Seven of them are in the sky:
 | The Sixth Forge | the Belt, between the havens | an Emberkin freighter, still crated |
 | Hull 41 | the outer Belt | a hull with a yard number and no name |
 | The Long Sweet | a wide circle above Haven | a frog cider transport, perfectly intact |
+
+**Coming alongside is ten kilometres and ten metres a second.** It was two
+hundred and ninety-five kilometres at five hundred, which is not coming
+alongside a derelict so much as passing one, and made tying up feel like
+something that happened rather than something flown. The reach stays at five
+hundred and ninety, so the approach is a real piece of flying: cross the space,
+kill the closing speed, and touch.
+
+That number could not simply be written down, because a press of a burn button
+is a fraction of "how fast you are going" and the frame decides which speed
+that is. Beside a wreck out at the Lamp the ship is doing thirty-six kilometres
+a second round the Lamp and metres a second relative to the hulk, and the press
+was sized off the first of those — two hundred metres a second a tap, which no
+ten-metre gate survives. A burn written in a drifting thing's frame now sizes
+itself off the closing speed, and takes a tenth of it rather than a
+two-hundredth: about ten presses to halve what you have at any scale, shrinking
+as you slow, so the last few metres a second cost no more than the first few
+hundred.
+
+Shrinking the mouth also broke who owns the approach. A rendezvous was scored
+against its own mouth and an orbit against its own, so a thirty-fold smaller
+mouth made every wreck lose to the moon it orbits from forty kilometres out —
+the axes turned to the wreck, the corner counting it down, and the card saying
+Slate. A rendezvous is scored against its *reach* now, which is the space the
+approach is actually flown in, and the question "am I near this" is asked of
+each harbour rather than of the winner, so a ship outside a wreck's reach is
+still plainly at the moon they are both going round.
+
+**The reach is a place you can see.** A wreck's `driftReach` is a real
+boundary — cross it and the two buttons on a mark stop meaning forward-and-out
+about the world and start meaning forward-and-away about the thing you are
+coming alongside, and the corner of the HUD turns into range and closing speed
+— and for a while it drew nothing at all. A pilot could only find out where it
+was by being inside it and noticing the words had changed. It is now a dashed
+blue ring with a faint wash, inside which the harbour mouth keeps its own amber
+ring and anchor: two different questions, two different marks. "Are the axes
+about this thing" is answered a good way out from "may I tie up" — the checker
+holds the mouth inside the reach (C13), so the space is always entered first.
+
+**A wreck does not exist until somebody names it.** Eight unexplained dots on
+the chart from the first day would be eight questions with no way to ask them;
+one that appears when a salvor tells you where to look is a lead. Taking the
+job is what reveals it, and handing it in does not hide it again — you have
+been there now. Absent means absent rather than merely undrawn: an unfound
+derelict is not offered as a harbour, gives no rendezvous readout, and does not
+bend the burn axes when a ship passes through the reach it would have had. The
+rails are the one thing that does not care — it goes round its world whether or
+not anybody has heard of it, which is why it is *there* to be found. (The Maw
+is the other way about, and deliberately: it keeps its numbers and loses its
+name. See §2.3.)
 
 An eighth is designed and not written: it is taken at the Arc and leads into
 the debris trailing behind it, where the key item for the closing line is. Hull
@@ -795,9 +847,41 @@ fragment to exist as a thing to *investigate* rather than a good to carry.
 | 19 | Appraisal | Shopping List | Brine: bring an arc shard, storm crystals and reactor coils to be looked at | **Frog Appraiser** |
 | 20 | What Is This Worth? | Appraisal / Retrieval | With the frog appraiser: investigate an Arc fragment | Major lore reveal *(not built)* |
 
+### 5.0.1 The closing line
+
+**Three things, got three different ways, and then somewhere to take them.** It
+is four jobs rather than one, because `questSteps` generates step *kinds* from
+the type — you can author a step's wording but not its kind — so a single record
+spanning a purchase, a salvage, a gift and an arrival would need a type of its
+own. Four records reuse three types that were already built and tested.
+
+| | job | type | how |
+|---|---|---|---|
+| The Ninth Lens | `ninthlens` | retrieval | bought at Veyra for 22,000, which is about a year of trading |
+| The Tail Fragment | `tailend` | salvage | off a hull a third of the way down the Arc's tail |
+| The Fifth Song | `fifthsong` | message | given at the temple on Croak, after five jobs for the frogs |
+| — | `lantern` | message | the Maw's Builder station gives a bearing; the station at the Dancer is at the end of it |
+
+**A relic is neither cargo nor a fitting.** It lives in `state.relics`, weighs
+nothing, cannot be sold, cannot be taken by a toll and is never lost — where
+consigned cargo has the wrong lifetime (abandoning the job destroys it) and the
+wrong cost (a hold unit, forever). Granting one mirrors `crew` exactly: some
+jobs pay in a person, and three pay in a thing.
+
+**`requires` is the only new mechanism**, and the field name had been reserved
+with nothing behind it for a long time. Two forms: `questsFor: { frog: 5 }`
+counts jobs finished *and collected* for a people, off the save rather than out
+of a second running total; `relics: [...]` asks what is in the bag. A gated job
+sits on the board with its reason written on it, so it reads as a goal — unless
+it says `hidden`, which is how the last one stays a surprise until the three
+are in. The frogs' gift is the first kind; the ending is the second.
+
+**The ending is the one job allowed to pay in neither coin nor kind**, which is
+what `ends: true` says. There is exactly one, and the build step checks it.
+
 ### 5.1 The Types
 
-Seven kinds. **Five of them are built**; the two that need new flight are not.
+Seven kinds. **Six are built**; the seventh, Appraisal, is a retrieval in all but name.
 
 A quest is written as data — its type, the ports it names, the goods it wants
 — and the steps are generated from that. Authored wording wins where a quest
@@ -805,6 +889,23 @@ supplies it, so the opening errand still says "Bring it home to Tassel" rather
 than anything a generator would produce. Adding a quest is a few lines in
 `quests.json` and no code — the file opens with the record format, and the
 build step refuses a record that does not keep to it.
+
+**Every job is written three times**, because a job has three moments and only
+one of them is a card in a list:
+
+| | | |
+|---|---|---|
+| `blurb` | on the board, before you take it | the pitch, to a stranger |
+| `taken` | a scene, the moment you agree | the handshake, and the thing they only mention now |
+| `done` | a scene, the moment you are paid | what happened when you handed it over |
+
+The two scenes are modals rather than lines in the corner: one is an answer to
+a button that was just pressed, and the other is the point of the whole trip. A
+job that pays in a person goes on from its payoff to their face, which is one
+press rather than two modals racing. In hand, the card carries `taken` rather
+than `blurb` — you are not being sold it any more. Salvage adds a fourth,
+`aboard`, for the one stop in the game with nobody in it to say anything. None
+of the three may repeat another, and the build step checks that too.
 
 | Type | Steps it earns | Built |
 |---|---|---|
@@ -1009,6 +1110,35 @@ and is written to be the one sprite in the game that is easy to replace. All
 five portraits — captain, the three crew, and the empty chair — are 24×24
 character grids in `sprites.js` sharing one ink legend, drawn to a cached data
 URL by `portraitURL(id)`.
+
+**Every face aboard can be pressed, and answers.** `dialog.json` holds
+exchanges keyed to a port — `at: "cinder"`, or `"*"` for anywhere — and to the
+person whose picture starts them; a line written for the port you are tied up
+at beats a line written for anywhere, and an exchange that puts words in the
+mouth of somebody not aboard is not offered at all. Nothing about a
+conversation is saved. Talking is free, it changes nothing, and the only thing
+a game remembers about one is that it happened — and it does not remember that
+either.
+
+What comes back is a popup over the sky rather than a block in the menu,
+because a line somebody says is an event and an event belongs where the player
+is looking. One bubble per line, each wearing the face of whoever is speaking,
+stacking up rather than replacing each other so a slow reader still has the
+first line when the third arrives. They arrive one at a time, and the gap
+before the next is how long the one on screen takes to read: `sayMs`, forty
+milliseconds a character over a beat of half a second — a shade under 250
+words a minute. Characters rather than words, because the unit that matters is
+how far the eye has to travel and "Aye" and "Nevertheless" are not the same
+amount of reading however you count words. Floored at 0.9 s so a two-word
+answer still lands as its own beat, and capped at 6.5 s so one long speech
+cannot hold the rest of the conversation.
+
+A drip you cannot outrun is a drip you sit through, so pressing the face again
+— or the bubbles — brings the rest up at once; pressing a finished one gets
+the next thing they have to say about this place, and once they are out the
+popup goes away rather than looping. Under reduced motion the whole exchange
+goes up on the first press, a timed reveal being both motion and the one kind
+a player cannot simply wait out.
 
 What is still open is most of what the berths are for: whether the other two
 get effects of their own, whether anybody can be recruited outside the quest

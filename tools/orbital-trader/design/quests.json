@@ -31,13 +31,37 @@
   "  rep     required. Which people's standing it moves: emberkin, otter, cat, frog.",
   "  crew    optional. A berth this job fills: engineer, navigator, appraiser.",
   "          A job that pays in a person is the only way a berth is filled.",
+  "  relic   optional. A relic this job puts in the bag when it is collected, by",
+  "          id against the `relics` block below. Like `crew`, the real reward is",
+  "          the thing and not the money. A relic has no weight, cannot be sold,",
+  "          cannot be taken by a toll and is never lost.",
+  "  ends    optional. True on the one job that is the end of the line. It is the",
+  "          only job allowed to pay in neither coin nor kind: what it pays in is",
+  "          arriving. There is exactly one.",
+  "  requires optional. What has to be true before the job can be taken on:",
+  "            questsFor  { people: n } — jobs finished *and collected* for them",
+  "            relics     [ id, ... ]   — relics already in the bag",
+  "            hidden     true          — keep it off the board until the rest is",
+  "                                       met, instead of showing it refused. Use",
+  "                                       it for a surprise; leave it off and the",
+  "                                       card reads as a goal with its reason on.",
   "  blurb   required. What the giver says when offering it.",
+  "  taken   required. What the giver says once you have agreed — the handshake, and",
+  "          the thing they only mention now. Shown when the job is taken on, and",
+  "          on the card while it is in hand. Not the blurb again: the blurb sells",
+  "          it to a stranger, this is said to somebody who has already said yes.",
   "  steps   optional. Authored wording for the steps, index-aligned to the steps",
   "          the type earns. Anything not written here is generated, so supply a",
   "          step only where a generator would do worse.",
   "  aboard  salvage only. What you find when you tie up to it. Shown at the wreck,",
   "          which is the one stop in the game with nobody in it to say anything.",
-  "  done    required. What happens when you hand it over."
+  "  done    required. What happens when you hand it over.",
+  "",
+  "The `relics` block is the three things the closing line is about. Nothing sells",
+  "one and nothing makes one: the only way into the bag is the job that grants it.",
+  "  id      required. What a quest's `relic` names.",
+  "  name    required. What the Ship tab calls it.",
+  "  blurb   required. One line, under the name."
  ],
  "quests": [
   {
@@ -56,6 +80,7 @@
    "pay": 630,
    "rep": "otter",
    "blurb": "Nellie's birthday is coming and Theo has left it late, as Theo does. The Slate yards tumble their offcuts smooth and sell them in jars by the gate, and no otter alive can walk past them. He has put what he has in your purse. It is enough for one.",
+   "taken": "Theo counts the coins into your hand twice, which is how he counts, and tells you the jar by the gate is the one with the chipped lid. Then he says not to tell Nellie he left it late. Then he says she will know anyway.",
    "steps": [
     {
      "id": "buy",
@@ -84,6 +109,7 @@
    "pay": 270,
    "rep": "otter",
    "blurb": "Four jars of moonfish oil for a farm on Moss that has not smelled the sea in two generations. Wren has already had them carried aboard; she says they will not ask what it cost and you are not to tell them.",
+   "taken": "Wren does not shake on it. She points at the sling already swaying over your hatch, says “mind the third jar, the lid is proud,” and is halfway down the pier before you have said yes out loud.",
    "done": "They open a jar on the step. The old man says nothing for a moment, then tells his granddaughter the name of the boat his mother crewed out of Tassel. It is how she learns her family used to fish, and that he has been keeping the name for her."
   },
   {
@@ -102,6 +128,7 @@
    "pay": 510,
    "rep": "otter",
    "blurb": "The Tassel rafts are short of cut herbs and the physician is short of patience. Moss has them by the bundle. Buy six and get them back before they are hay.",
+   "taken": "“Cut this morning,” says the physician, “not cut last week and kept damp.” She holds up a thumbnail and does something to it you do not quite catch. “They squeak. If it does not squeak, it is hay, and I will not pay for hay.”",
    "done": "She smells one bundle, pulls three stems out of it and drops them in the stove. \"Cut wet,\" she says, and shows you the trick with a thumbnail: the good ones squeak. The rest goes to the dispensary, and you can price a bundle yourself now."
   },
   {
@@ -115,6 +142,7 @@
    "pay": 230,
    "rep": "otter",
    "blurb": "A sealed note for the yard foreman on Slate. Theo will not say what is in it and has gone slightly pink about the ears. It weighs nothing and it is not to be opened.",
+   "taken": "Theo hands it over face down and holds on to it a moment longer than he means to. “Foreman Bel,” he says. “Bel. Not the yard office.” The ears are pinker than they were. He wishes you a safe flight and goes inside.",
    "done": "The foreman reads it, goes very still, and reads it again. Then she writes four words on the back and folds it into your hand to carry home. It says: Yes. Bring the boat."
   },
   {
@@ -133,6 +161,7 @@
    "pay": 900,
    "rep": "emberkin",
    "blurb": "Four crates of ore for the engine smiths, loaded before you agreed to it. It is heavy and it is dull and the Emberkin are waiting on it, which is the whole job.",
+   "taken": "The foreman has been watching the loading rather than the conversation. “Four,” he says, when the last one is down. “They will count. They always count.” He knocks the crate twice with his knuckle and walks off to the next ship.",
    "done": "A smith signs for it without looking up, then looks up, then asks where you learned an approach like that. When you say nowhere, she walks you in to see the forge — lit by her great-grandmother, banked every night since, and not once in four generations allowed to go out."
   },
   {
@@ -152,6 +181,7 @@
    "rep": "emberkin",
    "crew": "engineer",
    "blurb": "Two crates of spares for the pit crews on Scorch, and Kiran is coming with them. He has been at the Ninth Forge eleven years, has run out of things there he has not already taken apart, and has heard the hoists on Scorch are held together with wire and opinion.",
+   "taken": "Kiran brings one bag and a roll of tools longer than the bag. He stows the tools first. Then he stands in the middle of your engine room for a while without touching anything, and says, “Right,” in the voice of somebody who has already found three things.",
    "done": "The big hoist has been running on a worn bearing for two seasons and every shift knew. Kiran has it apart in eleven minutes, says one sentence nobody enjoys, and puts it back together better than it left Cinder. Then he asks what your tank is rated at, hears the answer, and looks at you the way people look at a room they are thinking of taking. He does not get off the ship."
   },
   {
@@ -165,6 +195,7 @@
    "pay": 300,
    "rep": "emberkin",
    "blurb": "A sealed note for somebody on Scorch, from a smith who will not say who they are to her. She has written the name in a hand that took a long time. It weighs nothing, and she would like it to go quickly.",
+   "taken": "Devika gives you the note and then does not let go of it, and then does. “If they are not there,” she says, “bring it back. Do not leave it with anybody.” She stays on the apron until your lines are off, which nobody does.",
    "done": "The woman on the dock reads it standing up, puts it inside her coat, and asks you to say that she is well. She is not well, and you both know you will say it anyway."
   },
   {
@@ -183,6 +214,7 @@
    "pay": 2250,
    "rep": "emberkin",
    "blurb": "Three fire crystals, cut cold on Scorch, wanted on Veyra before the month turns. The agent does not say which house wants them and looks faintly pained when you ask.",
+   "taken": "The agent gives you a cloth-lined case with three hollows in it and tells you the cold matters more than the speed. Then, at the hatch, without turning round: “If one comes out cloudy, that is the cutting, not the carrying. Bring it anyway.”",
    "done": "The agent holds all three under a lamp for a count of ten, then carries them into a windowless room and shuts the door. The strip of floor you can see underneath it is lit like evening, and stays lit. She pays without haggling, which on Veyra is as near a compliment as money gets."
   },
   {
@@ -209,6 +241,7 @@
    "pay": 3600,
    "rep": "emberkin",
    "blurb": "A list, not a cargo: one string of Tassel pearls, one coral carving, one precision clock. House Rathore wants all three on the table at once and does not care where you get them. The clock is made on Veyra, which they appear to find funny.",
+   "taken": "The steward writes the three lines on a card and hands it over as though it were a wine list. “All three at once,” he says. “One at a time is a delivery. Three at once is a collection.” He does not explain the difference and clearly enjoys not explaining it.",
    "done": "The three go on a velvet board in that order. House Rathore's heir, who is eleven, is brought in and asked which one came furthest. She picks the clock, because it is the finest thing she has ever been allowed near. It was made four streets away. The room is delighted with her, nobody corrects her, and a steward writes the sum out longhand."
   },
   {
@@ -222,6 +255,7 @@
    "pay": 600,
    "rep": "emberkin",
    "blurb": "Confidential, the steward says, twice. It goes to a name on Cinder and into that person's hand and nobody else's. You are being paid for the part where you do not ask.",
+   "taken": "“Into the hand,” the steward says, for the third time. “The hand.” The note goes into a flat case and the case is sealed in front of you. “You will be told where. Not by me, and not here.”",
    "done": "The name belongs to a woman minding a furnace on the third terrace. She reads it once, puts it in the fire, and watches until it is gone. Then she has you wait while she takes a ring off her hand and files the crest flat, and sends that back instead. The steward on Veyra takes it without looking at it and pays you twice what was agreed."
   },
   {
@@ -240,6 +274,7 @@
    "pay": 3400,
    "rep": "cat",
    "blurb": "Two reactor coils for the cats at Nail, crated and aboard before the paperwork was finished. The Forge would like it known that these are a favour and not a precedent.",
+   "taken": "The Forge's clerk stamps the manifest, looks at the two coils sitting in your hold in their own cradles, and says: “These do not like being dropped and they do not like being warm. You have managed neither yet. Keep it up.”",
    "done": "Half the rock comes out to watch the crates open, and somebody says a word that the whole bar says back. Kaede translates it: roughly, the thing that was owed. Nail has been running a reactor short for two years and told nobody on Cinder, because saying it out loud would have made it a debt instead of a favour. You are bought drinks until counting stops being possible."
   },
   {
@@ -258,6 +293,7 @@
    "pay": 1050,
    "rep": "cat",
    "blurb": "Two sets of salvaged sensors off Nail, for a client on Veyra who wants to see further than they are supposed to. Buy them honestly. The agent is very keen that you buy them honestly.",
+   "taken": "“Honestly,” the agent says again, and writes a figure on a slip that is comfortably above what anybody at Nail will ask for. “The difference is yours. I would simply like to be able to say, if asked, that they were bought.”",
    "done": "They are unpacked, powered up, and pointed — not at a rival's shipping lane, which is what you had assumed — straight up out of the plane of the system, at nothing, eighteen au out. The client watches for six hours. When they pay you they ask, very carefully, whether you have ever been that far."
   },
   {
@@ -272,6 +308,7 @@
    "rep": "cat",
    "crew": "navigator",
    "blurb": "Kaede wants a word carried to Whisker by hand, by somebody who is not a cat. It weighs nothing and it is not to be opened. She will not say what is in it, and it is rude to ask a cat twice.",
+   "taken": "Kaede does not hand it to you so much as put it down where you can reach it. “Whisker,” she says. “The one with the grey ear. She will know what it is.” She watches you stow it, and then she keeps watching you, which is how a cat says thank you.",
    "done": "The cat who takes it reads it twice and then, to your surprise, tells you what it says. The rocks are open, and Kaede has put her name to that. The proof is a ship from outside the Belt getting into a clean orbit round both of them inside one run, which is the thing you have just spent a week doing. Then Tsuki comes down off the cradle where she has been sitting the whole time, and it turns out she already knows what your ship is called."
   },
   {
@@ -290,6 +327,7 @@
    "pay": 2100,
    "rep": "frog",
    "blurb": "Four cases of medicine that came through Whisker and did not come with paperwork. Kaede wants them on Brine, cold, and soon. The apothecaries there will know exactly what they are and will not say so.",
+   "taken": "The cases go aboard in their own cold box, packed by somebody who has done it a great many times. Kaede tells you the temperature and then tells you it again. “Brine,” she says. “Not Glass, not Croak. Brine. They are expecting you and they will not say so.”",
    "done": "A frog with very old hands opens each case, names the raft that brewed it, and does not ask how it came to you. It goes to the ward at the end of the walkway, where eleven people have been waiting on it since the last shipment was priced out of reach. He gives you a jar for the road: sleep, he says, for when you cannot."
   },
   {
@@ -308,6 +346,7 @@
    "pay": 1350,
    "rep": "emberkin",
    "blurb": "Two pieces of brine amber, the kind with something inside that is not quite a leaf. Veyra has a collector and the collector has an opinion about which two.",
+   "taken": "The collector's list is two sketches, quite good ones, of two pieces of amber with two particular somethings inside them. “Not similar,” says the agent. “These. She has been looking for eleven years and she will know.”",
    "done": "The collector turns each piece for a long time, then tilts the second one into the lamp and lets you see. It is not a leaf. Six arms, folded, with a seam down the middle that has been open and shut. \"Ammonia sea,\" they say. \"Nothing in it has bones.\" They pay precisely, and thank you twice."
   },
   {
@@ -321,6 +360,7 @@
    "pay": 530,
    "rep": "frog",
    "blurb": "A question for the scholars under the ice on Glass. It is one sentence long and the apothecary has been working on it for eleven years. She would like an answer, eventually, and is in no hurry.",
+   "taken": "The apothecary gives you a single folded sheet and then sits with you a while longer, humming, in no hurry at all. “There is no answer to bring back,” she says eventually. “Not this year. Just put it in front of them. That is the whole errand.”",
    "done": "A scholar reads it, sits down, and reads it again. Eleven words, she says, and about forty years. She writes the date on the wall beside eleven other dates in eleven other hands, and points at the top one, which was set down before this station had a roof and was answered last spring."
   },
   {
@@ -348,6 +388,7 @@
    "rep": "frog",
    "crew": "appraiser",
    "blurb": "Wicket would like to look at three things at once: a piece of the Arc off Nail, a storm crystal fished out of Grumm's cloud tops, and one of Cinder's reactor coils. He is not buying them. He wants them on the same table under the same lamp, and he has wanted that for some while.",
+   "taken": "Wicket does not get up. He clears one end of the shelf, sets out a lamp, and turns it so the light falls where he wants it. Then he says: “I will wait here,” which from a frog on a raft is not a joke and not a figure of speech.",
    "done": "He puts the Arc fragment, the storm crystal and the reactor coil under the one lamp and turns everything else off. Then he taps each of them in turn. The coil was wound by hand on Cinder nine days ago; the crystal came out of Grumm's weather last month; the fragment is older than anybody has a number for. All three ring at the same note. \"There,\" says Wicket. \"That is what I wanted to know.\" Then he asks where you are going next, and starts packing."
   },
   {
@@ -371,6 +412,7 @@
    "pay": 900,
    "rep": "otter",
    "blurb": "A mining tender has been parked over the Slate yards for two years with nobody aboard and a full hold, and the yards have finally stopped pretending it might come back. Wren wants the ore and the plate off it before somebody less careful has a go. She is very clear that this is the easy one.",
+   "taken": "Wren gives you the tender's berth number and the last name on its crew list, and asks you to bring that back too if it is still painted anywhere. “The easy one,” she says again. “They are not all going to be parked over the yards.”",
    "aboard": "Three crates of ore still strapped where the cutter left them, and a sheet of hull plate somebody had started patching. The tools are put away. Whatever happened, it did not happen in a hurry.",
    "done": "Wren counts it off the sling, marks the tender as cleared, and writes your name in the column where the finder goes. She says the next one will not be parked this close to home."
   },
@@ -395,6 +437,7 @@
    "pay": 2400,
    "rep": "emberkin",
    "blurb": "An ore hauler lost its tank on the Veyra run and has been falling between the two worlds ever since — out to Cinder, back in to Veyra, and round again, for longer than anybody has bothered to count. The plate in it is Cinder work and Cinder wants it back. Catching it is the job.",
+   "taken": "The foreman writes the hauler's lap down for you — out, back, and how long — and underlines the number twice. “It is not hiding,” he says. “It has never once been hiding. It is simply always somewhere else by the time anybody gets there.”",
    "aboard": "Four sheets of heat plate and two of finished steel, all of it Cinder-stamped and none of it touched. The tank is a hole you could put a boat through. Nobody was aboard when it went, which is the only good news in the whole story.",
    "done": "The Ninth Forge takes the plate back, weighs it, and pays as though it had never left. Somebody asks whether the hauler is still out there. You say it is. They seem to find that reassuring rather than otherwise."
   },
@@ -419,6 +462,7 @@
    "pay": 1800,
    "rep": "cat",
    "blurb": "A prospector at the inner edge of the Belt that went quiet in the middle of a sentence. The cats have left it alone since, which Pell says is respect and also superstition, and she would rather a stranger went and looked. Bring the instruments back and she will not ask what else you saw.",
+   "taken": "Pell gives you the prospector's last heading and nothing else. When you ask what the half-word was, she says the cats have a rule about repeating it, and that the rule is older than the reason for it. “Bring the instruments,” she says. “Tell me the rest or do not.”",
    "aboard": "The instruments are intact and the thruster has been rebuilt twice. The log ends on a half-word. There is nothing wrong with the ship that anybody can point at, and that is what the cats have been declining to talk about.",
    "done": "Pell takes the sensors, turns one over twice, and puts it down without looking at it again. “Good,” she says. “That is that one done.” She pays in full and does not ask the question you were braced for."
   },
@@ -443,6 +487,7 @@
    "pay": 2100,
    "rep": "otter",
    "blurb": "An otter long-hauler a very long way from any water, named for somebody who is still alive and still asking after her. The letter is from the grandmother. It does not ask for the cargo back. It asks whether the name is still legible on the bow, and if the answer is yes, would you bring home what she was carrying.",
+   "taken": "The letter comes with a second, shorter one that you are asked not to read and to leave aboard her. It is in the same hand, much older, and it is already sealed. “If the name is gone,” the first letter says, “bring this back unopened and say nothing.”",
    "aboard": "The name is still legible. She was carrying pearls and coral out to the Belt, which is a strange thing to carry that far and exactly the sort of thing an otter would try once. Everything is where it was stowed.",
    "done": "The grandmother opens the crate on the step, the way Tassel opens everything, and hands a pearl to each of the four people who came out to watch. She keeps the coral. She asks you to say the name out loud, and then thanks you as though you had done something much larger."
   },
@@ -467,6 +512,7 @@
    "pay": 3200,
    "rep": "emberkin",
    "blurb": "An Emberkin freighter stopped between the two havens with everything aboard still crated and labelled. The factor has the manifest and no ship; you have a ship and no manifest. He proposes the obvious arrangement and is unusually honest about what the coils are worth on Veyra.",
+   "taken": "The factor copies out the manifest for you by hand, which takes a while and which he does not hurry. At the bottom he adds a line that is not on his copy: a crate that is aboard and is not listed. “That one,” he says, “is not mine and not yours. Leave it.”",
    "aboard": "Crates, labels, and a manifest that matches them exactly, which on this side of the Belt is startling. Reactor coils and ember silk, all of it bound for Veyra when it stopped. It has been stopped a long time.",
    "done": "Veyra takes delivery at auction, in public, because a price nobody witnessed settles nothing. The factor's cut goes back across the Belt by some route he declines to describe, and yours is counted into your hand in front of everybody."
   },
@@ -487,6 +533,7 @@
    "pay": 4200,
    "rep": "frog",
    "blurb": "A cider transport circling wide above Haven, high and slow and perfectly intact. Nobody has been able to say what happened to the crew and the frogs have stopped asking. What they have not stopped doing is wanting the cider, which is older now than it was, and which Croak will pay for in a way Croak does not usually pay for anything.",
+   "taken": "The harbour gives you the transport's orbit and a blessing, in that order and with equal seriousness. Nobody mentions the crew. When you ask, an old frog says they have been asking for sixty years and have got good at the asking and no good at all at the answer.",
    "aboard": "Three casks, upright, cold, and entirely undisturbed. The galley is laid for a meal that was never eaten. The frogs who told you about this ship told you about the cider and not about the galley, and now you understand why.",
    "done": "Croak receives it the way Croak receives everything, which is slowly and with a great deal of humming. The cider is poured for the temple first and sold afterwards. Somebody asks you to describe the galley. You do. They nod as though it confirms something, and do not explain what."
   },
@@ -511,8 +558,130 @@
    "pay": 5400,
    "rep": "cat",
    "blurb": "A hull at the outer edge of the Belt with a yard number on it and no name. Nobody built it and nobody lost it, which Pell says are two different problems and she would like an answer to at least one of them. There is Arc glass in it, which there should not be, and that is a thing Whisker will want to see.",
+   "taken": "Pell writes the yard number on your hand rather than on paper. “If anybody at Whisker asks where you heard it,” she says, “you did not.” Then she adds, in the same flat voice: “And if the glass is warm, come straight back.”",
    "aboard": "The yard number is stamped, not painted. The plate is ordinary. What is not ordinary is the Arc glass stowed in the hold of a ship that has no business having been anywhere near the Arc, packed carefully, by somebody who knew exactly what it was.",
    "done": "Whisker looks at the glass for a long time. Then somebody says the Arc keeps a tail, and that things fall out of it that nobody put in, and that if you are going to keep pulling on this you should go and look behind the Arc rather than at it. Nobody says anything further, and everybody watches you leave."
+  },
+  {
+   "id": "longdark",
+   "title": "Lanterns for the Long Dark",
+   "giver": "The lamplighter at Haven",
+   "type": "delivery",
+   "from": "haven",
+   "to": "glass",
+   "goods": [
+    {
+     "good": "lanterns",
+     "qty": 6
+    }
+   ],
+   "pay": 380,
+   "rep": "frog",
+   "blurb": "Six prayer lanterns for the scholars under the ice, who go three months of every year without seeing the Lamp and who have never once asked for them. Haven sends them anyway, every year, and has done for longer than the current lamplighter has been alive.",
+   "taken": "The lanterns go aboard already lit, which you had not expected and which nobody offers to explain. “They do not go out,” the lamplighter says, in the tone of somebody stating a specification. “Do not try. It is rude and it does not work.”",
+   "done": "The scholars come up through the ice in ones and twos, take a lantern each, and go back down without much said. One of them tells you the lanterns do go out, eventually, after about a year, and that nobody at Haven has ever been told and nobody at Glass is going to be the one to do it."
+  },
+  {
+   "id": "ninthlens",
+   "title": "The Ninth Lens",
+   "giver": "A factor of the Ninth Forge",
+   "type": "retrieval",
+   "from": "veyra",
+   "to": "veyra",
+   "goods": [
+    {
+     "good": "emberglass",
+     "qty": 1
+    }
+   ],
+   "pay": 4000,
+   "rep": "emberkin",
+   "relic": "lens",
+   "blurb": "The Forge has a thing it cannot make and will not say where it got, and it is for sale at Veyra because Veyra is where things are sold. It is a disc of glass the width of a hand with something under the surface that does not move when you move it. The price is a year of good trading and the factor does not haggle.",
+   "taken": "“It is not an instrument,” says the factor, before you have asked. “It is not a lens either, whatever we call it. It was in the foundations when the Ninth Forge was dug, which is nine hundred years of us not knowing what it is.” He wraps it, and then unwraps it, and looks at it again, and wraps it.",
+   "done": "The sale is witnessed and written down, because on Veyra a price nobody saw settles nothing. Held up, the thing under the glass is not under the glass at all — it is a long way further down than the glass is thick. The factor watches you notice, and nods, and says nothing whatever."
+  },
+  {
+   "id": "tailend",
+   "title": "The Tail End",
+   "giver": "Dockmaster Pell",
+   "type": "salvage",
+   "from": "nail",
+   "to": "arc",
+   "wreck": "tailend",
+   "goods": [
+    {
+     "good": "arcshard",
+     "qty": 2
+    }
+   ],
+   "pay": 6800,
+   "rep": "cat",
+   "relic": "shard",
+   "blurb": "Pell has been thinking about Hull 41 since you brought it in, and has been asking, and has stopped asking because of the answers. There is a hull a third of the way down the Arc's tail, in among the debris and not near it. Nothing that fell off the Arc is shaped like that. She would like somebody who is not a cat to go and look.",
+   "taken": "She gives you the bearing and then holds on to your wrist, which a cat does not do. “It keeps the Arc's own pace,” she says. “A third of the way down and it has never once drifted. Things in a tail drift.” Then she lets go and says the Arc will want its fragments back and she wants to hear what else is aboard.",
+   "aboard": "Two fragments of the Arc, which is what a salvor would come for and what the Arc will pay for. And, racked on its own and strapped like something that was being carried rather than something that fell in, a third piece: the same glass, the same weight, and an edge that was cut rather than broken.",
+   "done": "The Arc takes its two fragments back with the exact politeness of a place that has been asked this before. The third one you do not offer and nobody asks about, which is its own kind of answer. Pell's share of the fee arrives at Nail before you do."
+  },
+  {
+   "id": "fifthsong",
+   "title": "The Fifth Song",
+   "giver": "The temple at Croak",
+   "type": "message",
+   "from": "brine",
+   "to": "croak",
+   "goods": [],
+   "pay": 0,
+   "rep": "frog",
+   "relic": "song",
+   "requires": {
+    "questsFor": {
+     "frog": 5
+    }
+   },
+   "blurb": "An invitation, which the frogs do not issue. You have done five things for them now and they have counted, because the frogs count everything. Come to the temple at Croak. Bring nothing. There is no cargo and there is no fee and the apothecary who hands you the invitation seems to think you already understand why.",
+   "taken": "“Not a job,” says the apothecary, when you reach for the manifest out of habit. “There is nothing to carry.” She hums for a while. “They will give you a thing. You will not know what it is. Nobody does. We have had it four hundred years and we sing about it, which is not the same as knowing.”",
+   "done": "The temple sings the fifth song, which takes most of a day and which nobody translates for you. At the end of it an old frog puts something into your hands that is warm and is not alive and has a cut edge, and closes your fingers round it, and hums once, and goes to sit down. It is the same glass. You have seen the cut before."
+  },
+  {
+   "id": "lantern",
+   "title": "The Lantern",
+   "giver": "The Builder station at the Maw",
+   "type": "message",
+   "from": "maw",
+   "to": "lantern",
+   "goods": [],
+   "pay": 0,
+   "rep": "cat",
+   "ends": true,
+   "requires": {
+    "relics": [
+     "lens",
+     "shard",
+     "song"
+    ],
+    "hidden": true
+   },
+   "blurb": "You have come out here with three pieces of the same cut glass in the hold, and this time the Builder station is not silent. It has been aimed inward at a hole in the sky for longer than there have been people, and what it says, once, without ceremony, is a bearing. Not at the Maw. At the star going round it.",
+   "taken": "The bearing is four hundred thousand kilometres off the Dancer and it is not a place anything should be. Tsuki reads it twice and does not say the thing she is thinking. The station goes quiet again the moment the bearing is given, and nothing anybody tries afterwards gets another word out of it.",
+   "done": "There is a station in a close circle round the Dancer, lit, keeping station, and not answering either. It has been there the whole time — behind the star, in front of the star, and never once anywhere a ship without three pieces of glass would have had reason to look. Your lines go across. Something on the other end takes them."
+  }
+ ],
+ "relics": [
+  {
+   "id": "lens",
+   "name": "The Ninth Lens",
+   "blurb": "Emberkin work, and older than the Emberkin. Bought at Veyra for a year of trading."
+  },
+  {
+   "id": "shard",
+   "name": "The Tail Fragment",
+   "blurb": "Taken off a hull in the Arc’s tail. Nothing that fell off the Arc is shaped like this."
+  },
+  {
+   "id": "song",
+   "name": "The Fifth Song",
+   "blurb": "Given by the frogs at Croak, to somebody who had done enough for them to be given things."
   }
  ]
 }

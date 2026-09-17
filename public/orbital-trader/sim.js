@@ -23,7 +23,7 @@ import {
 } from './orbit.js';
 import {
   CONST, BODIES, GOODS, PORTS, UPGRADES, FORMULAS, TEXT, SPECIES,
-  REGION_OF, wantsGood, lovesGood, QUESTS as QUESTBOOK, DIALOG,
+  REGION_OF, wantsGood, lovesGood, QUESTS as QUESTBOOK, RELICS as RELICBOOK, DIALOG,
 } from './content.js';
 
 export const world = makeWorld(BODIES);
@@ -94,6 +94,13 @@ export function newGame(seed = 1){
     marketEpoch: 0,
     lastMarket: null,
     rep: { emberkin: 0, otter: 0, cat: 0, frog: 0 },
+    /* Relics: things you are given or find rather than things you buy and
+       carry. A relic is not cargo — it has no weight, it cannot be sold, a
+       toll cannot take it and a tow cannot lose it — and it is not a ship
+       system either, so it does not live in `keys`. An open bag rather than a
+       fixed one, because what is in it is a fact about the story you have got
+       through rather than about the ship. */
+    relics: {},
     /* Three berths, and nobody in them. The line pays out an Emberkin
        engineer, a cat navigator and a frog appraiser; until there is a board
        to take those jobs from, this is a list of who is missing. */
@@ -194,10 +201,11 @@ export function fmtMoney(m){
  * and the rule stays because a seasonal market is a thing a port may want. */
 export function portOpen(portId, t){
   const p = PORTS[portId];
-  /* A wreck has no entry in the price list at all — no market, no yard, nobody
-     to keep hours — so "open" is only whether the thing is there. Anything
-     else with no entry is not a place you can tie up to. */
-  if(!p) return isWreck(portId);
+  /* A wreck, and the station at the Dancer, have no entry in the price list at
+     all — no market, no yard, nobody to keep hours — so "open" is only whether
+     the thing is there. Anything else with no entry is not somewhere a ship can
+     tie up. */
+  if(!p) return isHulk(portId);
   if(p.openWithin){
     const r = norm(absState(world, portId, t).r);
     return r <= p.openWithin;
@@ -209,11 +217,17 @@ export function portOpen(portId, t){
  * altitude (or co-moving with a zone), frozen while docked. */
 function placeDocked(state, portId){
   const b = world.get(portId);
-  if(b.mu > 0){
+  /* Where a docked ship sits, which is about the harbour rather than the mass.
+     A world you park above puts you in its parking orbit. Anything you come
+     alongside — a wreck, the station at the Dancer, and the Maw, which is a
+     black hole with no ground to park over — puts you beside it in its
+     parent's frame, moving with it. Branching on `mu` here quietly placed a
+     ship at NaN the day the Maw got weight: it has mass and no parking orbit,
+     so `circularState` was handed an undefined altitude. */
+  if(b.mu > 0 && !b.rendezvous){
     const s = circularState(b.mu, b.dockAlt, 0);
     state.ship = { body: portId, r: s.r, v: s.v };
   }else{
-    // A zone: sit at it, in its parent's frame, moving with it.
     const local = railState(b, world.get(b.parent).mu, state.t);
     state.ship = { body: b.parent, r: [...local.r], v: [...local.v] };
   }
@@ -256,15 +270,24 @@ function rendezvousStatus(state, c, r, v){
     mouth: c.zoneRadius, dockSpeed: c.dockSpeed,
     inZone, slow, needsNavigator: !held, ok: inZone && slow && held,
     over: Math.max(0, relSpeed - c.dockSpeed),
-    score: distance / c.zoneRadius,
+    /* How near, as a fraction of the space this harbour is approached in: its
+       reach where it has one, and its mouth where it has not — Nail, Whisker
+       and the Maw are come alongside but have gravity instead of a reach.
+       Against the `ra / mouth` an orbit scores, that puts "inside the space,
+       flying the rendezvous" under one and "not there yet" over it, which is
+       the comparison this number exists to make. Scored on the mouth alone a
+       ten-kilometre mouth made every wreck lose to the moon it orbits from
+       forty kilometres out — with the burn axes already turned to the wreck
+       and the readout already counting it down. */
+    score: distance / (c.driftReach > 0 ? c.driftReach : c.zoneRadius),
     open: portOpen(c.id, state.t),
   };
 }
 export function dockingStatus(state){
   if(state.dockedAt) return null;
   const here = world.get(state.ship.body);
-  let best = null;
-  const take = st => { if(!best || st.score < best.score) best = st; };
+  const found = [];
+  const take = st => { if(st) found.push(st); };
   /* A wreck nobody has mentioned is not a harbour. Physics still has hold of a
      ship near one — the rails do not care what you have been told — but a
      harbour is a place somebody told you about, and offering the refusal of an
@@ -304,11 +327,23 @@ export function dockingStatus(state){
     const st = railState(c, here.mu, state.t);
     take(rendezvousStatus(state, c, sub(state.ship.r, st.r), sub(state.ship.v, st.v)));
   }
-  if(!best) return null;
-  // Nowhere near: do not clutter the HUD with a port you are nothing like at.
-  if(best.kind === 'zone' && best.distance > best.mouth * 8) return null;
-  if(best.kind === 'orbit' && !best.ok && best.distance > best.mouth * 8) return null;
-  return best;
+  /* Nowhere near: do not clutter the HUD with a port you are nothing like at.
+     For a thing you come alongside, "near" is its reach — that is the space the
+     approach is actually flown in, and with a mouth ten kilometres across eight
+     of them is eighty, so the card would appear only in the last sixth of a
+     five-hundred-kilometre approach and the mouth would not be drawn until
+     then either.
+
+     Asked of each one rather than of the winner, so a port that is nothing
+     like near hands the question down instead of answering "nowhere" for
+     everybody: a ship a long way outside a wreck's reach is still plainly at
+     the moon they are both going round. */
+  const nearEnough = st => st.kind === 'zone'
+    ? st.distance <= Math.max(st.mouth * 8, world.get(st.port)?.driftReach ?? 0)
+    : st.ok || st.distance <= st.mouth * 8;
+  const live = found.filter(nearEnough);
+  if(!live.length) return null;
+  return live.reduce((a, b) => (b.score < a.score ? b : a));
 }
 
 /* Why not, in the words a pilot would use. */
@@ -505,23 +540,42 @@ export const isWreck = id => WRECK_IDS.has(id);
  * because the page already has one per frame. */
 export const nameFor = (id, hidden) => hidden?.has(id) ? '???' : portName(id);
 export const WRECKS = [...WRECK_IDS];
-/* Bodies the chart should not draw for this player. Physics never consults
- * this: a thing nobody has told you about still has hold of you. */
+/* Every weightless harbour, which is the wrecks and the station at the Dancer:
+ * the same machinery, and the same absence from the price list. */
+const HULK_IDS = new Set(BODIES.filter(b => b.port && !(b.mu > 0) && b.parent).map(b => b.id));
+export const isHulk = id => HULK_IDS.has(id);
+/* Bodies the chart should not draw for this player.
+ *
+ * Gravity never consults this — a world nobody has told you about still has
+ * hold of you, and the Knot will still whip a ship round whether or not the
+ * cat aboard has mentioned it. But everything the *ship* does with a body
+ * does: it is offered as a harbour, it bends the burn axes when you come
+ * alongside it, it gets a readout. All of that is knowing where something
+ * is, and it is all gated here, so an unfound thing is absent rather than
+ * merely undrawn. Passed to `legOpts`, `rendezvous` and `dockingStatus`. */
 export function unseen(state){
   const hide = new Set();
   if(!knowsKnot(state)) hide.add('knot');
   if(!knowsMaw(state)) hide.add('maw');
-  /* A wreck is a rumour until somebody hands you the job that names it. Seven
-     unexplained dots on the chart from the first day would be seven questions
+  /* A wreck is a rumour until somebody hands you the job that names it. Eight
+     unexplained dots on the chart from the first day would be eight questions
      with no way to ask them; one that appears when a salvor tells you where to
      look is a lead. Taking the job is what reveals it, and finishing the job
-     does not hide it again — you have been there now. */
+     does not hide it again — you have been there now.
+
+     The station at the Dancer is hidden the same way and for the same reason.
+     It has been going round that star since before anybody was watching, and it
+     is only ever anywhere a ship would have had reason to look once the
+     Builders' own station has given you the bearing. */
   const told = new Set();
   for(const live of state?.quests ?? []){
-    const w = questById(live.id)?.wreck;
-    if(w) told.add(w);
+    const q = questById(live.id);
+    /* What a job points at: the wreck it names, and where it ends when that is
+       one of these rather than a port. The last job in the line has no wreck —
+       its destination *is* the secret — so both count. */
+    for(const id of [q?.wreck, q?.to]) if(id && HULK_IDS.has(id)) told.add(id);
   }
-  for(const id of WRECK_IDS) if(!told.has(id)) hide.add(id);
+  for(const id of HULK_IDS) if(!told.has(id)) hide.add(id);
   return hide;
 }
 /* Seeing past the encounter. The road normally stops one crossing out — see
@@ -552,9 +606,14 @@ export function rendezvous(state){
      where you are and how fast, with nothing to subtract. Without this, giving
      the Maw a well silently took its readout away: the drift reach sits inside
      the sphere of influence and can never fire again. */
+  /* The hidden set gates the *drifting* things and only those. A wreck nobody
+     has heard of gives no readout at all, because the ship has no idea it is
+     there; the Maw keeps its numbers and loses its name — the road still runs
+     into it, and how close and how fast are still true, which is exactly what
+     `nameFor` draws as ??? until the sensors are aboard. */
   const tgt = here.port && here.rendezvous && here.mu > 0
     ? { id: here.id, r: [0, 0], v: [0, 0], reach: here.soi }
-    : driftTargetAt(world, here.id, state.ship.r, state.t);
+    : driftTargetAt(world, here.id, state.ship.r, state.t, unseen(state));
   if(!tgt) return null;
   const rel = sub(state.ship.r, tgt.r);
   const vRel = sub(state.ship.v, tgt.v);
@@ -664,14 +723,17 @@ function skimShed(b, el, at){
  * to a ship without a shield and a brake to one with. */
 function legOpts(state, extra = {}){
   const skim = skimsAir(state);
-  return { atmosphere: !skim, dvAvailable: state.dv, skimAt: skim ? skimShed : null, ...extra };
+  /* What the ship has not been told about cannot bend its burns: the same set
+     the chart refuses to draw is handed to the flying, so an unfound wreck is
+     absent rather than merely invisible. */
+  return { atmosphere: !skim, dvAvailable: state.dv, skimAt: skim ? skimShed : null, hidden: unseen(state), ...extra };
 }
 const sortedNodes = state => state.nodes.map(n => ({ ...n })).sort((a, b) => a.t - b.t);
 
 export function effectiveNodes(state, horizon, { skim = skimsAir(state) } = {}){
   const nodes = sortedNodes(state);
   if(!skim) return nodes;
-  const pred = predictLegs(world, state.ship, state.t, nodes, { atmosphere: false, dvAvailable: state.dv, skimAt: skimShed, maxTime: horizon, noSamples: true });
+  const pred = predictLegs(world, state.ship, state.t, nodes, { atmosphere: false, dvAvailable: state.dv, skimAt: skimShed, hidden: unseen(state), maxTime: horizon, noSamples: true });
   const aero = pred.events.filter(e => e.kind === 'burn' && e.node.aero).map(e => e.node);
   return [...nodes, ...aero].sort((a, b) => a.t - b.t);
 }
@@ -903,6 +965,49 @@ function flag(state, name, events){
 
 export const MAX_ACTIVE_QUESTS = 3;
 
+/* ---- relics, and the jobs that are gated on them ----------------------- */
+
+/* The three things the closing line is about. Written beside the quests
+ * because that is the only place they come from: nothing sells one, nothing
+ * makes one, and the only way into the bag is to finish the job that grants
+ * it. */
+export const RELICS = RELICBOOK;
+const relicIndex = new Map(RELICS.map(r => [r.id, r]));
+export const relicById = id => relicIndex.get(id);
+export const heldRelics = state => RELICS.filter(r => state?.relics?.[r.id]);
+export const hasRelic = (state, id) => !!state?.relics?.[id];
+
+/* Jobs finished *and collected* for a people. Counted off the save rather than
+ * kept as a running total: the record of what you have done is already there,
+ * and a second copy of it is a second thing that can be wrong. */
+export function questsDoneFor(state, people){
+  return (state?.quests ?? []).filter(l => l.claimed && questById(l.id)?.rep === people).length;
+}
+
+/* Why a job cannot be taken on yet, or null when it can. The one kind of
+ * prerequisite in the game: the closing line needs three things in the bag and
+ * the frogs do not make a gift of anything until they know you.
+ *
+ * Reported as a sentence rather than as a flag, because a job you cannot take
+ * is only worth putting on a board if it says what it is waiting for. */
+export function requiresUnmet(state, q){
+  const need = q?.requires;
+  if(!need) return null;
+  for(const [people, n] of Object.entries(need.questsFor ?? {})){
+    const done = questsDoneFor(state, people);
+    if(done < n){
+      const who = SPECIES[people]?.plural ?? people;
+      return `${who} do not hand this to a stranger. ${done} of ${n} jobs done for them.`;
+    }
+  }
+  const short = (need.relics ?? []).filter(id => !hasRelic(state, id));
+  if(short.length){
+    const names = short.map(id => relicById(id)?.name ?? id);
+    return `Not without ${names.join(', ')}.`;
+  }
+  return null;
+}
+
 export const QUESTS = QUESTBOOK;
 export const questById = id => QUESTS.find(q => q.id === id);
 /* Where the chart should point when a job is taken: wherever the first step
@@ -1017,11 +1122,19 @@ export function claimQuest(state, id){
     state.crew[q.crew] = { role: q.crew, from: q.id, joinedAt: state.t };
     crew = q.crew;
   }
+  /* And some pay in a thing that is not money and not a person. It goes in the
+     bag and stays there: nothing in the game takes a relic back out. */
+  let relic = null;
+  if(q?.relic && relicById(q.relic) && !hasRelic(state, q.relic)){
+    state.relics ??= {};
+    state.relics[q.relic] = { from: q.id, foundAt: state.t };
+    relic = q.relic;
+  }
   live.claimed = true;
   live.claimedAt = state.t;
   logLine(state, 'questDone', TEXT.logTemplates.questDone ?? 'Finished {title}. Paid {pay}.',
     { title: q?.title ?? id, pay: fmtMoney(paid) });
-  return { ok: true, pay: paid, rep: q?.rep ?? null, crew, quest: q };
+  return { ok: true, pay: paid, rep: q?.rep ?? null, crew, relic, quest: q };
 }
 /* What is on offer at a port: the jobs given out there that you have not
  * taken and have not already done. This is the board — the one thing the
@@ -1029,7 +1142,11 @@ export function claimQuest(state, id){
  * only be reached from a test. */
 export function questsAt(state, portId){
   const held = new Set((state.quests ?? []).map(l => l.id));
-  return QUESTS.filter(q => q.from === portId && !held.has(q.id));
+  /* A gated job is on the board and refused, so it reads as a goal — except
+     where it asks to be hidden, which is how the last one in the line stays a
+     surprise until the three things are in the bag. */
+  return QUESTS.filter(q => q.from === portId && !held.has(q.id)
+    && !(q.requires?.hidden && requiresUnmet(state, q)));
 }
 /* Hold units a job will cost you the moment you accept it. Only a delivery
  * hands you anything; a message weighs nothing, which is the whole joke, and a
@@ -1048,6 +1165,8 @@ export function canAcceptQuest(state, q){
   const live = (state.quests ?? []).find(l => l.id === q.id);
   if(live) return { ok: false, reason: live.done ? 'Already done.' : 'Already taken.' };
   if(activeQuests(state).length >= MAX_ACTIVE_QUESTS) return { ok: false, reason: `Three jobs is all anybody can hold in their head.` };
+  const unmet = requiresUnmet(state, q);
+  if(unmet) return { ok: false, reason: unmet };
   if(questLeavesSystem(q) && !state.keys.astrolabe){
     return { ok: false, reason: 'That one leaves this sky. You would need an Astrolabe.' };
   }
@@ -1189,6 +1308,52 @@ export function exchangeFor(state, who, nth = 0){
   if(!list.length) return null;
   return list[((nth % list.length) + list.length) % list.length];
 }
+
+/* The speed a burn written here is actually measured against, and whether that
+ * is a relative one.
+ *
+ * A press on one of the four buttons is a fraction of "how fast you are
+ * going", and the frame decides which speed that is. Beside a wreck out at the
+ * Lamp the ship is doing thirty-six kilometres a second round the Lamp and a
+ * few dozen metres a second relative to the hulk it is trying to touch — and
+ * the press was being sized off the first of those, so one tap was two hundred
+ * metres a second and the whole approach could only be flown by overshooting.
+ * The burn itself has always been written in the drifting thing's frame; this
+ * is the button catching up with it. */
+export function burnScaleAt(state, where, t){
+  if(!where) return { speed: norm(state?.ship?.v ?? [0, 0]), relative: false };
+  const tgt = driftTargetAt(world, where.body, where.r, t, unseen(state));
+  return tgt
+    ? { speed: norm(sub(where.v, tgt.v)), relative: true, target: tgt.id }
+    : { speed: norm(where.v), relative: false };
+}
+
+/* What one press is worth, as a fraction of that speed.
+ *
+ * Flying an orbit you are nudging something enormous and a half-percent step
+ * is a nudge. Coming alongside you are killing nearly all of what you have, and
+ * a half-percent of two hundred metres a second is two hundred presses — so a
+ * rendezvous gets a tenth of the relative speed instead. It shrinks as you
+ * slow, which is the whole trick: the same button is ten metres a second when
+ * you are closing fast and a tenth of one when you are nearly stopped, so the
+ * last few metres a second cost no more presses than the first few hundred. */
+export const BURN_STEP = 0.005, BURN_STEP_REL = 0.1;
+
+/* How long a line takes to read, which is how long the next one waits.
+ *
+ * Counted in characters rather than words because the unit that matters is how
+ * far the eye has to travel, and "Aye" and "Nevertheless" are not the same
+ * amount of reading however you count words. Forty milliseconds a character
+ * over a beat of half a second is a shade under two hundred and fifty words a
+ * minute — near enough the pace of somebody reading a caption rather than a
+ * book.
+ *
+ * Floored, so a two-word answer still lands as its own beat instead of
+ * flashing past, and capped, so one long speech cannot hold the rest of the
+ * conversation for half a minute. Here rather than in the page because it is a
+ * rule about the writing, and because a rule in a page is a rule with no
+ * test. */
+export const sayMs = text => Math.max(900, Math.min(6500, 520 + (text?.length ?? 0) * 40));
 
 /* Who a line belongs to, as a name and a berth, so the page can label it
  * without knowing how the crew table is laid out. */
@@ -1442,33 +1607,59 @@ function fullLap(seg, mu){
  * the nearest point is simply that leg's periapsis — no search, no sampling,
  * exact. It is the number a pilot is actually asking for while they push a
  * burn around: not "does this reach Slate" but "how close, and how fast". */
-function interceptOf(segments, crossed){
-  let from;
-  if(crossed >= 0 && segments[crossed].reason === 'enter'){
-    /* A door the road goes in through: the encounter is inside the new reach.
-       An *exit* is not one. Climbing out of a world's reach leaves you on an
-       orbit round its parent, and the low point of that orbit is not an
-       encounter with anything — reporting it as one put "the Lamp, eighty
-       million kilometres" on the chart as though it were a near miss. */
-    from = crossed + 1;
-  }else{
-    /* No door the road goes *in* through, but the ship may already be through
-       one. A ship that has just fallen into a world's reach is going round it
-       in the arithmetic and nowhere near it yet: the low point ahead is the
-       encounter, and the one place a rendezvous can be made. A skip ends at
-       every change of reach, so this is exactly where a pilot gets put down,
-       and without this the panel offers them nothing but the way out the far
-       side.
+/* Every reach the drawn road passes through, earliest first.
+ *
+ * It used to derive exactly one, from the index of the door the road was
+ * trimmed at, and that was wrong in both directions. The road can hold two
+ * reaches — falling into Grumm and going on to one of its moons is the
+ * ordinary way to arrive anywhere in that system — and only one of them was
+ * ever marked. Worse, which one depended on the *last* door rather than the
+ * doors in between: a road from Tassel to Slate is `enter` then `exit`, so
+ * with a navigator aboard (who is the reason the road is drawn as far as the
+ * second door at all) the trim landed on the exit, the exit is not an
+ * encounter, and the crosshair on the opening quest of the game disappeared
+ * for having a better crew.
+ *
+ * So it walks the legs instead of indexing into them. Every run of legs about
+ * the same world is one pass through one reach, and the rules for whether a
+ * pass is an encounter are the two that were already here. */
+function interceptsOf(segments){
+  const out = [];
+  for(let i = 0; i < segments.length; i++){
+    const prev = i > 0 ? segments[i - 1] : null;
+    if(prev && segments[i].body === prev.body) continue;      // still the same pass
+    if(prev){
+      /* A door the road goes in through: the encounter is inside the new
+         reach. An *exit* is not one. Climbing out of a world's reach leaves
+         you on an orbit round its parent, and the low point of that orbit is
+         not an encounter with anything — reporting it as one put "the Lamp,
+         eighty million kilometres" on the chart as though it were a near
+         miss. */
+      if(prev.reason !== 'enter') continue;
+    }else{
+      /* The first run is the reach the ship is already in. A ship that has
+         just fallen into one is going round it in the arithmetic and nowhere
+         near it yet: the low point ahead is the encounter, and the one place a
+         rendezvous can be made. A skip ends at every change of reach, so this
+         is exactly where a pilot gets put down, and without this the panel
+         offers them nothing but the way out the far side.
 
-       Two things this must not call an encounter. A parking orbit reaches its
-       low point once a lap as well, and that is where you already are, not
-       somewhere you are going. And a ship on its way *out* of a reach has its
-       low point behind it — so it has to be falling, not climbing. */
-    const first = segments[0];
-    if(!first || Number.isFinite(first.elements?.period)) return null;
-    if(!(dot(first.r0, first.v0) < 0)) return null;
-    from = 0;
+         Two things this must not call an encounter. A parking orbit reaches
+         its low point once a lap as well, and that is where you already are,
+         not somewhere you are going. And a ship on its way *out* of a reach
+         has its low point behind it — so it has to be falling, not climbing. */
+      const first = segments[0];
+      if(!first || Number.isFinite(first.elements?.period)) continue;
+      if(!(dot(first.r0, first.v0) < 0)) continue;
+    }
+    const ic = encounterIn(segments, i);
+    if(ic) out.push(ic);
   }
+  return out;
+}
+
+/* The nearest the road comes to one world, over the run of legs about it. */
+function encounterIn(segments, from){
   const first = segments[from];
   if(!first) return null;
   const b = world.get(first.body);
@@ -1582,14 +1773,14 @@ export function planImmediate(state, flown = true, opts = {}){
      pilot steers by is where a world will be when the road cuts its rail,
      which the chart already draws, and what the road does once it arrives,
      which is this. */
-  const exact = interceptOf(segments, crossed);
-  const intercepts = exact ? [exact] : [];
+  const intercepts = interceptsOf(segments);
   return {
     ...pred, segments, events, end: endT, horizon,
     crossings,
     crossing: crossings[0] ?? null,
-    /* One per world, earliest first. `intercept` is the next one, which is
-       what the readouts and the encounter window have always wanted. */
+    /* One per reach the road passes through, earliest first. `intercept` is
+       the next one, which is what the readouts and the encounter window have
+       always wanted. */
     intercepts,
     intercept: intercepts[0] ?? null,
     /* From here on the road is drawn in the second colour: it is a different
@@ -1791,8 +1982,9 @@ function pickSeed(state, node, candidates, scoreFn, reference){
   const byTime = [...candidates].sort((a, b) => (a.arrives ?? 0) - (b.arrives ?? 0));
   const shortlist = [...new Set([...candidates.slice(0, 6), ...byTime.slice(0, 4)])];
   const scored = [];
+  const hidden = unseen(state);
   for(const c of shortlist){
-    const parts = nodeFromVector(c.r, c.v, c.dv, burnFrameAt(world, c.body ?? state.ship.body, c.r, c.v, state.t + c.dep));
+    const parts = nodeFromVector(c.r, c.v, c.dv, burnFrameAt(world, c.body ?? state.ship.body, c.r, c.v, state.t + c.dep, hidden));
     if(!parts) continue;
     node.t = state.t + c.dep;
     node.prograde = parts.prograde;
@@ -2599,6 +2791,11 @@ export function sell(state, goodId, qty){
   if(!port) return { ok: false, reason: 'Not docked.' };
   if(!portOpen(port, state.t)) return { ok: false, reason: 'The market is closed.' };
   if(!Number.isInteger(qty) || qty < 1) return { ok: false, reason: 'That is not a number of crates.' };
+  /* What a port wants only ever moved the price: every good in the game sells
+     anywhere. A relic in the making is the exception — there is no stall in the
+     sky that will turn one back into money, which is what stops the thing you
+     were sent to fetch being worth more as a sale than as an ending. */
+  if(goodById(goodId)?.noResale) return { ok: false, reason: 'Nobody will take that off you. Not here, not anywhere.' };
   const stacks = state.cargo.filter(s => s.good === goodId && !isConsigned(s)).sort((a, b) => a.t - b.t);
   const have = stacks.reduce((s, c) => s + c.qty, 0);
   if(have < qty) return { ok: false, reason: have ? 'The rest of those belong to somebody.' : 'Not that many aboard.' };
@@ -3141,14 +3338,20 @@ export function restore(json){
   for(const k of ['t', 'money', 'dv', 'tank']){
     if(!Number.isFinite(s[k])) bad(`${k} is ${s[k]}`);
   }
-  if(s.dockedAt != null && !PORTS[s.dockedAt]) bad(`it is docked at "${s.dockedAt}", which is not a port`);
+  /* Tied up somewhere real. A weightless harbour is not in the price list — a
+     wreck has no stall and neither does the station at the Dancer — so the sky
+     is the authority on those. Without this, a save made alongside a derelict
+     was refused on load: you could tie up to one and never come back to it. */
+  if(s.dockedAt != null && !PORTS[s.dockedAt] && !isHulk(s.dockedAt)){
+    bad(`it is docked at "${s.dockedAt}", which is nowhere a ship can tie up`);
+  }
   if(!Array.isArray(s.nodes) || s.nodes.some(n => !n || !Number.isFinite(n.t)
     || (n.prograde != null && !Number.isFinite(n.prograde))
     || (n.radial != null && !Number.isFinite(n.radial)))) bad('its plan is not a list of marks');
   if(!Array.isArray(s.cargo) || s.cargo.some(c => !c || !goodById(c.good) || !Number.isFinite(c.qty))) bad('its hold holds something unknown');
   if(!s.tiers || ['tank', 'hold'].some(k => !tiers(k)[s.tiers[k]])) bad('it is fitted with something this game does not have');
   // Everything below is either filled in or safely absent.
-  s.keys ??= {}; s.markets ??= {}; s.log ??= [];
+  s.keys ??= {}; s.relics ??= {}; s.markets ??= {}; s.log ??= [];
   s.rep = { emberkin: 0, otter: 0, cat: 0, frog: 0, ...(s.rep ?? {}) };
   s.pending ??= null; s.flags ??= {}; s.stats ??= {}; s.visited ??= [s.dockedAt].filter(Boolean);
   s.toll ??= { lastT: -1e9, inBelt: false };

@@ -876,7 +876,7 @@ export function advance(world, ship, t, dt, nodes = [], opts = {}){
       r = s.r; v = s.v; now += span;
     }
     if(nodeNext && Math.abs(now - nodeNext.t) <= T_TOL + 1e-12){
-      const burn = burnVector(r, v, nodeNext, opts.dvAvailable, frameAt(world, body.id, r, v, now));
+      const burn = burnVector(r, v, nodeNext, opts.dvAvailable, frameAt(world, body.id, r, v, now, opts.hidden));
       v = add(v, burn.dv);
       events.push({ kind: 'burn', t: now, node: nodeNext, dv: burn.dv, magnitude: burn.magnitude, short: burn.short, body: body.id });
       if(opts.dvAvailable != null) opts.dvAvailable = Math.max(0, opts.dvAvailable - burn.magnitude);
@@ -924,7 +924,7 @@ export function burnFrame(r, v){
  * "toward the target" axis keeps the two axes at right angles, which is what
  * makes a mark cost the hypotenuse of its own two numbers — see the note above
  * burnFrame for the three bugs that invariant was bought with. */
-export function driftTargetAt(world, bodyId, r, t){
+export function driftTargetAt(world, bodyId, r, t, hidden = null){
   const parent = world.get(bodyId);
   if(!parent) return null;
   let best = null;
@@ -933,6 +933,11 @@ export function driftTargetAt(world, bodyId, r, t){
        to have a reach and still be a thing you come alongside, and that one
        should fly relative too. */
     if(!c.rendezvous || !(c.driftReach > 0)) continue;
+    /* A thing the ship has never been told about does not bend its burns. The
+       chart hides an unfound wreck, and if the flying still leaned on it the
+       hiding would be a lie the player could feel: forward and out would swing
+       round on approach to a blank patch of sky. Hidden here means absent. */
+    if(hidden && hidden.has(c.id)) continue;
     const st = railState(c, parent.mu, t);
     const d = norm(sub(r, st.r));
     if(d > c.driftReach) continue;
@@ -944,8 +949,8 @@ export function driftTargetAt(world, bodyId, r, t){
 /* The frame a burn at (r, v) is actually written in: relative to a drifting
  * thing when the ship is inside one's reach, and to the world it is going
  * round otherwise. */
-export function frameAt(world, bodyId, r, v, t){
-  const tgt = world && bodyId ? driftTargetAt(world, bodyId, r, t) : null;
+export function frameAt(world, bodyId, r, v, t, hidden = null){
+  const tgt = world && bodyId ? driftTargetAt(world, bodyId, r, t, hidden) : null;
   if(!tgt) return burnFrame(r, v);
   const vRel = sub(v, tgt.v);
   /* Speeds already matched: there is no relative forward to measure from, so
@@ -1020,7 +1025,7 @@ export function predict(world, ship, t0, nodes = [], horizon = 720, opts = {}){
   let t = t0;
   const end = t0 + horizon;
   const dvBudget = opts.dvAvailable;
-  const o = { atmosphere: opts.atmosphere, dvAvailable: dvBudget };
+  const o = { atmosphere: opts.atmosphere, dvAvailable: dvBudget, hidden: opts.hidden };
   let segStart = { body: body.id, t, r, v };
   let ni = 0;
   while(ni < nodes.length && nodes[ni].t < t - T_TOL) ni++;
@@ -1047,7 +1052,7 @@ export function predict(world, ship, t0, nodes = [], horizon = 720, opts = {}){
     }
     if(step.reason === 'burn'){
       const node = nodes[ni];
-      const burn = burnVector(step.r, step.v, node, o.dvAvailable, frameAt(world, body.id, step.r, step.v, step.t));
+      const burn = burnVector(step.r, step.v, node, o.dvAvailable, frameAt(world, body.id, step.r, step.v, step.t, o.hidden));
       const vNew = add(step.v, burn.dv);
       if(o.dvAvailable != null) o.dvAvailable = Math.max(0, o.dvAvailable - burn.magnitude);
       dvTotal += burn.magnitude;
@@ -1099,7 +1104,7 @@ export function predictLegs(world, ship, t0, nodes = [], opts = {}){
   let body = world.get(ship.body);
   let r = ship.r, v = ship.v;
   let t = t0;
-  const o = { atmosphere: opts.atmosphere, dvAvailable: opts.dvAvailable };
+  const o = { atmosphere: opts.atmosphere, dvAvailable: opts.dvAvailable, hidden: opts.hidden };
   let ni = 0;
   while(ni < nodes.length && nodes[ni].t < t - T_TOL) ni++;
   let crashed = false;
@@ -1186,7 +1191,7 @@ export function predictLegs(world, ship, t0, nodes = [], opts = {}){
     }
     if(ending === 'burn'){
       segments.push(finishSegment(world, start, body, t1, s.r, s.v, 'burn', opts));
-      const burn = burnVector(s.r, s.v, node, o.dvAvailable, frameAt(world, body.id, s.r, s.v, t1));
+      const burn = burnVector(s.r, s.v, node, o.dvAvailable, frameAt(world, body.id, s.r, s.v, t1, o.hidden));
       const vNew = add(s.v, burn.dv);
       if(o.dvAvailable != null) o.dvAvailable = Math.max(0, o.dvAvailable - burn.magnitude);
       dvTotal += burn.magnitude;

@@ -9,7 +9,8 @@
  */
 
 import { SCENE_H, FALL_SAFE, WALK_STEP, FALL_SPEED, FLY_SPEED, CLIMB_SPEED,
-  BUILD_MAX_STEPS, BRIDGE_ARCH_HEIGHT, DIG_MAX_STEPS, SKILLS, GOOSE_FLEE_SPEED,
+  BUILD_MAX_STEPS, BUILD_RISE_HEIGHT, DIG_MAX_STEPS, JUMP_SPAN, JUMP_RISE,
+  SKILLS, GOOSE_FLEE_SPEED,
   GOOSE_FLEE_LIFT, POOF_TICKS, buildTerrain, buildLayer, winCount, goalHeading } from './content.js';
 
 /* ----------------------------------------------------------------- a duck */
@@ -26,22 +27,18 @@ function hatchling(level, groundY){
     // the right of its nest, where this is just 1; it is what makes a level
     // built the other way round walk correctly from the moment it hatches.
     dir: goalHeading(level),
-    state: 'walking',   // walking | falling | digging | building | climbing | blocking | saved | lost
-    // Digger, Climber and Builder are all traits, held until the hazard
-    // each answers actually turns up — see assignSkill and stepWalking.
-    // Blocker alone is not in here at all: it is instant, planting that
-    // duckling the moment it is given rather than waiting to be checked
+    state: 'walking',   // walking | falling | digging | building | climbing | jumping | blocking | saved | lost
+    // Digger and Climber are traits, and a duckling can hold both at once —
+    // see assignSkill for why. Builder and Blocker are not in here at all:
+    // both act the instant they are given rather than waiting to be checked
     // for later — see assignSkill again.
     traits: new Set(),
     fallFrom: 0,
-    // A Builder's own clock, counting down from BUILD_SECONDS' worth of
-    // ticks the moment it is given, whether or not a gap has turned up yet
-    // — see content.js's BUILD_SECONDS and stepWalking. Unused by every
-    // other trait.
-    buildLeft: 0,
-    buildSpan: 0,       // set when building actually starts — see stepWalking, stepBuilding
-    buildBaseY: 0,
-    buildStep: 0,
+    buildBaseY: 0,      // the height the ramp started from — see stepBuilding
+    buildStep: 0,       // ticks spent building so far, up to BUILD_MAX_STEPS
+    buildLevel: false,  // true when this one is extending a ramp rather than starting one
+    // Where a hop took off from and where it is coming down — see startJump.
+    jumpFromX: 0, jumpFromY: 0, jumpToX: 0, jumpToY: 0, jumpSpan: 0, jumpStep: 0,
     digLeft: 0,
     cause: null,        // set when lost: 'fell' | 'edge' | 'goosed'
   };
@@ -61,22 +58,27 @@ export function newGame(level){
   return {
     level,
     terrain: buildTerrain(level.segments, level.width),
-    // Where a Digger or a Builder has actually changed the way through — see
-    // groundAt below for why these live apart from `terrain` rather than
-    // overwriting it. null everywhere nothing has been dug or bridged yet.
+    // Where a Digger has cut through — one height per column, or null where
+    // nothing has been dug. See groundAt below for why this lives apart from
+    // `terrain` rather than overwriting it.
     tunnelY: new Array(level.width).fill(null),
-    bridgeY: new Array(level.width).fill(null),
+    // Every ramp deck standing at each column, as a list rather than one
+    // height: ramps cross. Build one over another heading the other way and
+    // both are still there, one above the other, each its own thing to walk
+    // on — see surfacesAt below, and addDeckAt, which never replaces a deck
+    // already standing at a column, only adds to it.
+    decks: Array.from({ length: level.width }, () => []),
     // Where a wall is rock rather than dirt — see rockAt below and
     // content.js's header note on segments' `hard` field. `floors` (art.js's
     // drawGround) is not read anywhere in this file at all — nothing below a
     // column's surface is ever solid to begin with — but it is built here
     // rather than recomputed every frame, the same reasoning `terrain` is.
     rock: buildLayer(level.segments, 'hard', false, level.width),
+    // The height rock starts at in a column that is only rock lower down —
+    // see rockAt, and content.js's header note on `hardBelow`. null wherever
+    // a column is all one thing.
+    rockBelow: buildLayer(level.segments, 'hardBelow', null, level.width),
     floors: buildLayer(level.segments, 'floor', SCENE_H, level.width),
-    // Purely a rendering flag, same footing as `floors` — see content.js's
-    // header note on segments' `stairs` field and art.js's drawStairTreads.
-    // Nothing in this file ever reads it.
-    stairs: buildLayer(level.segments, 'stairs', false, level.width),
     ticks: 0,
     hatched: 0,
     nextHatch: 0,
@@ -101,44 +103,83 @@ function loseDuckling(state, d, cause){
 
 const columnAt = (state, x) => Math.max(0, Math.min(state.level.width - 1, Math.round(x)));
 
-/* The ground a walking duckling actually stands on: whichever a Digger or a
-   Builder has left at this column, or the level's own terrain if neither
-   ever touched it. `terrain` itself never changes after newGame — see
-   setTunnelAt/setBridgeAt, and content.js's header note on why the two are
-   kept apart rather than one overwriting the other. */
+/* The level's own ground at a column, with a Digger's tunnel counted where
+   there is one and ramps ignored entirely. `terrain` itself never changes
+   after newGame — see setTunnelAt, and content.js's header note on why a
+   tunnel is kept apart rather than overwriting the wall it runs through. */
 const groundAt = (state, x) => {
   const col = columnAt(state, x);
   if(state.tunnelY[col] != null) return state.tunnelY[col];
-  if(state.bridgeY[col] != null) return state.bridgeY[col];
   return state.terrain[col];
 };
 
+/* Everything at this column a duckling could be standing on: the ground
+   itself, plus every ramp deck crossing it. Order is not meaningful — the
+   callers below all pick out the one surface they want by height, because
+   which surface is the right one depends entirely on where the duckling
+   already is. A deck overhead is not ground to a duckling walking under it;
+   the same deck is the only ground there is to the duckling walking along
+   it. That is the whole reason this is a list. */
+const surfacesAt = (state, x) => [groundAt(state, x), ...state.decks[columnAt(state, x)]];
+
 const setTunnelAt = (state, x, y) => { state.tunnelY[columnAt(state, x)] = y; };
-const setBridgeAt = (state, x, y) => { state.bridgeY[columnAt(state, x)] = y; };
 
-/* Whether the wall at this column is rock rather than dirt — see
-   content.js's header note on segments' `hard` field. A Digger already
-   tunnelling never re-checks this on its own (see stepDigging), so a level
-   that ever put rock right behind a diggable wall would need the tunnel to
-   run into it, not just start against it — this is what lets it. */
-const rockAt = (state, x) => state.rock[columnAt(state, x)];
+/* Adds a deck without disturbing any already standing at that column — see
+   `decks` in newGame. A ramp laid across an older one leaves both. */
+const addDeckAt = (state, x, y) => {
+  const at = state.decks[columnAt(state, x)];
+  if(!at.includes(y)) at.push(y);
+};
 
-/* How many columns of open pit start at `x`, scanning the same direction the
-   builder is actually walking — read once, the moment a gap actually
-   appears (see stepWalking), so its bridge can be given a shape (see
-   stepBuilding) that is guaranteed to land back at the far bank rather than
-   guessed a column at a time. `cap` is whatever is left of the duckling's
-   own BUILD_SECONDS budget at that moment (see stepWalking again), not
-   always the full thing — a Builder given well before the gap has already
-   spent some of it just walking there. `dir` is the duckling's own `d.dir`,
-   not the level's heading — a builder always walks toward the pond, but on
-   a reversed level (content.js's goalHeading) that is -1, and scanning the
-   wrong way here would count solid ground behind the gap instead of the
-   gap itself. */
-const pitSpanAt = (state, x, cap, dir) => {
-  let span = 0;
-  while(span < cap && groundAt(state, x + span * dir) >= SCENE_H) span++;
-  return Math.max(1, span);
+/* Which of a column's surfaces a duckling at `fromY` would actually step
+ * onto, or null if none of them is anything but a wall to it.
+ *
+ * Anything within WALK_STEP either way is ordinary ground to step along, and
+ * of those the highest wins: a duckling takes the step up when there is one.
+ * That is what puts one walking the ground onto the foot of a ramp, and what
+ * carries one coming down a ramp onto another crossing it the other way.
+ *
+ * Note what this does *not* do. A duckling is never lifted onto a deck more
+ * than a step above it — a ramp overhead is not a candidate at all, and it
+ * walks underneath. Getting onto a ramp always means walking up from the
+ * foot, where the deck and the ground are within a step of each other, which
+ * is also the only way a flock can follow one: nothing can see far enough
+ * ahead to know it is going to need the ramp thirty columns later, so
+ * boarding has to happen where the two meet or not at all. See The Grove,
+ * which is built on exactly that.
+ *
+ * Failing that, the highest surface still beneath it is where it is headed,
+ * which is what makes the ground under a ramp still count as ground. Only
+ * when every surface here stands more than a step above is there nothing to
+ * step onto at all — a wall.
+ */
+const stepTargetAt = (state, x, fromY) => {
+  let onLevel = null, below = null;
+  for(const s of surfacesAt(state, x)){
+    if(Math.abs(s - fromY) <= WALK_STEP){
+      if(onLevel === null || s < onLevel) onLevel = s;
+    } else if(s > fromY){
+      if(below === null || s < below) below = s;
+    }
+  }
+  return onLevel !== null ? onLevel : below;
+};
+
+/* Whether a tunnel cut through this column at height `y` would be cutting
+   rock rather than dirt — see content.js's header note on segments' `hard`
+   and `hardBelow` fields. `hard` is the whole column, top to bottom, the way
+   The Aerie's rock face is. `hardBelow` is a height: rock from there down,
+   dirt above it, which is a wall a Digger cannot get through at the level it
+   is standing on but can at a level a ramp lifts it to. A column with
+   neither is dirt all the way and diggable anywhere.
+
+   A Digger already tunnelling re-checks this every column (see stepDigging),
+   so a tunnel started in dirt runs into rock behind it and stops there. */
+const rockAt = (state, x, y) => {
+  const col = columnAt(state, x);
+  if(state.rock[col]) return true;
+  const floor = state.rockBelow[col];
+  return floor != null && y > floor;
 };
 
 const blockerAt = (state, x) =>
@@ -241,6 +282,7 @@ function stepDuck(state, d){
     case 'digging': return stepDigging(state, d);
     case 'building': return stepBuilding(state, d);
     case 'climbing': return stepClimbing(state, d);
+    case 'jumping': return stepJumping(state, d);
     default: return; // blocking, saved, lost: nothing left to do
   }
 }
@@ -266,24 +308,20 @@ function goosedAt(state, x){
 function stepWalking(state, d){
   const level = state.level;
 
-  // A Builder's clock runs the whole time it is held, not only once it
-  // starts building (see content.js's BUILD_SECONDS) — held too long
-  // without meeting a gap and it simply expires, same as any other
-  // assignment that never found what it was for. Checked every tick a
-  // walking duckling holds it, which is the only state it ever ticks down
-  // in — see stepBuilding for the state it moves into once a gap actually
-  // asks for it.
-  if(hasTrait(d, 'builder')){
-    d.buildLeft -= 1;
-    if(d.buildLeft <= 0) d.traits.delete('builder');
-  }
-
   // Reached or past the pond, in whichever direction it actually lies —
   // see content.js's goalHeading. `d.x >= level.goalX` on its own is only
   // ever right for a level whose pond is to the right of its nest; a
   // reversed level needs the mirror image of it instead.
   if((d.x - level.goalX) * goalHeading(level) >= 0){ d.state = 'saved'; return; }
   if(goosedAt(state, d.x)){
+    /* A Jumper goes over the top of it. The goose is a thing in the way of
+       about the size of everything else a Jumper hops, and a duckling that
+       can clear a ditch can clear a goose — it is the one hazard here that
+       is answered by not being where it is for a moment. The hunt is not
+       called off by a jump: nothing was caught, so the goose is still
+       hunting whoever comes next, which is what makes a Jumper a thing you
+       spend per duckling rather than once. */
+    if(hasTrait(d, 'jumper') && startJump(state, d, true)) return;
     loseDuckling(state, d, 'goosed');
     // Ordinarily one catch is the whole hunt — see goosedAt above. A
     // relentless goose (content.js's goose.relentless) keeps hunting after
@@ -300,8 +338,14 @@ function stepWalking(state, d){
   // around exactly the way it would at a wall it cannot climb.
   if(blockerAt(state, nextX)){ d.dir = -d.dir; return; }
 
-  const nextY = groundAt(state, nextX);
-  const delta = nextY - d.y;   // positive: ground drops away; negative: ground rises
+  /* Which surface at the next column this duckling is actually headed for —
+     the ground, or one of the ramp decks crossing it, whichever it could
+     step onto from where it stands. See stepTargetAt: this is what carries a
+     duckling along the ramp it is already on, in whichever direction it is
+     walking, and what lets one walk under a ramp it is not on. A null means
+     every surface there stands too high to step onto, which is a wall. */
+  const nextY = stepTargetAt(state, nextX, d.y);
+  const delta = nextY === null ? -Infinity : nextY - d.y;   // positive: ground drops away; negative: ground rises
 
   /* A wall: ground that rises faster than a duckling can step up. Two skills
    * answer it, and a duckling holding both digs, because tunnelling leaves a
@@ -315,7 +359,12 @@ function stepWalking(state, d){
    * scales it exactly the way it would anything else.
    */
   if(delta < -WALK_STEP){
-    if(!rockAt(state, nextX) && hasTrait(d, 'digger')){ d.state = 'digging'; d.digLeft = DIG_MAX_STEPS; return; }
+    // A Jumper first, and only for a step low enough to hop onto — see
+    // startJump. It is tried ahead of the other two because it costs the
+    // flock nothing: a hop leaves the wall exactly as it was, so a duckling
+    // that can hop a low step should, rather than spend a tunnel on it.
+    if(hasTrait(d, 'jumper') && startJump(state, d)) return;
+    if(!rockAt(state, nextX, d.y) && hasTrait(d, 'digger')){ d.state = 'digging'; d.digLeft = DIG_MAX_STEPS; return; }
     if(hasTrait(d, 'climber')){ d.state = 'climbing'; d.x = nextX; return; }
     d.dir = -d.dir;
     return;
@@ -323,33 +372,23 @@ function stepWalking(state, d){
 
   if(delta > FALL_SAFE){
     /* A gap has no floor anywhere in the visible scene (see content.js's
-     * PIT_Y); a plain drop still has one, just further down. Builder only
-     * ever answers the first kind — a plain drop is still just a drop, the
-     * same as it would be without the skill at all, which is what a
-     * Builder given right at a drop like that finds out (see
-     * test/duck-duck-quack.test.js).
-     *
-     * A gap it does answer, provided the clock above has not already run
-     * out — one-shot, so it comes straight out of `traits` the moment it
-     * is spent here, the same tick the bridge itself is shaped (see
-     * pitSpanAt and stepBuilding). Whatever is left of `buildLeft` is the
-     * cap that shape is read against, not the full BUILD_SECONDS again —
-     * a Builder given early has already spent some of its own clock just
-     * walking here.
+     * PIT_Y); a plain drop still has one, just further down. Builder is not
+     * checked for here at all — it does not wait to be asked, it starts the
+     * moment it is given (see assignSkill), so by the time a duckling meets
+     * a drop still walking, it either has a ramp already under it or never
+     * had a Builder to begin with. Either way this is just a fall.
      *
      * A Flyer needs no branch of its own. It does not avoid the fall, it
      * survives it — see stepFalling, which is also why it is no use at all
      * over a gap, where there is nothing to land on however gently you
-     * arrive.
+     * arrive. Nothing here waits for a particular column, which is what
+     * makes it safe to hand a skill out long before the obstacle it is for.
+     *
+     * A Jumper does get a branch, for a ditch narrow enough to hop — see
+     * startJump, which is where "narrow enough" is decided and which says no
+     * to anything a Builder is actually for.
      */
-    if(nextY >= SCENE_H && hasTrait(d, 'builder') && d.buildLeft > 0){
-      d.traits.delete('builder');
-      d.state = 'building';
-      d.buildBaseY = d.y;
-      d.buildSpan = pitSpanAt(state, nextX, d.buildLeft, d.dir);
-      d.buildStep = 0;
-      return;
-    }
+    if(hasTrait(d, 'jumper') && startJump(state, d)) return;
     d.x = nextX;
     d.state = 'falling';
     d.fallFrom = d.y;
@@ -363,13 +402,20 @@ function stepWalking(state, d){
 /* A Flyer flaps down slowly and walks away from whatever it lands on. It
  * still needs something to land on, though — over a gap it flaps gently
  * past the bottom of the world and is lost all the same, which is the line
- * between "survives the drop" and "crosses the gap". */
+ * between "survives the drop" and "crosses the gap".
+ *
+ * What it lands on is the first thing it reaches going down, which over a
+ * column a ramp crosses is that ramp, not the ground far below it: falling
+ * onto a deck is caught by the deck. Walking into the underside of one is
+ * the case that passes through (see stepTargetAt) — coming down on top of
+ * it is not. */
 function stepFalling(state, d){
   const flying = hasTrait(d, 'flyer');
   d.y += flying ? FLY_SPEED : FALL_SPEED;
   if(d.y > SCENE_H){ loseDuckling(state, d, 'fell'); return; }
-  const ground = groundAt(state, d.x);
-  if(d.y >= ground){
+  const reached = surfacesAt(state, d.x).filter(s => d.y >= s);
+  if(reached.length){
+    const ground = Math.min(...reached);
     const dropped = ground - d.fallFrom;
     d.y = ground;
     if(!flying && dropped > FALL_SAFE) loseDuckling(state, d, 'fell');
@@ -405,7 +451,7 @@ function stepDigging(state, d){
   const level = state.level;
   const nextX = d.x + d.dir;
   if(nextX < 0 || nextX >= level.width){ d.state = 'walking'; return; }
-  if(rockAt(state, nextX)){ d.state = 'walking'; return; }
+  if(rockAt(state, nextX, d.y)){ d.state = 'walking'; return; }
 
   if(groundAt(state, nextX) >= d.y){ d.state = 'walking'; return; }
 
@@ -415,55 +461,155 @@ function stepDigging(state, d){
   if(d.digLeft <= 0) d.state = 'walking';
 }
 
-/* A builder doesn't lay a flat plank — it angles the deck up, cresting over
- * the middle of the gap and back down to meet the far bank, the shape an
- * actual bridge takes rather than a raft towed across at one fixed height.
- * `d.buildSpan` (set the moment the gap is actually reached — see
- * stepWalking) is how many columns of open pit there are to cross, read as
- * building starts so the rise can be shaped to come back down to
- * `d.buildBaseY` exactly at the far edge, landing correctly however wide
- * the gap turns out to be, rather than guessed a column at a time and left
- * to hang short or fly past the bank.
+/* A builder starts the moment it is given (see assignSkill) and climbs from
+ * right where that duckling was standing, in whichever direction it was
+ * already walking. Nothing about a gap starts it and nothing about a gap is
+ * required for it to work: it lays a ramp forward and upward, a column a
+ * tick, and a gap it happens to cross on the way is crossed because the ramp
+ * was over it, not because the ramp went looking for it. Two things stop it,
+ * and only two — running into ground, and running out of clock.
  *
- * `bridgeY` is its own layer over the same column `tunnelY` uses for a dig
- * — see groundAt above — so a bridged gap still shows as open air below the
- * deck in art.js rather than the gap itself quietly filling in with dirt.
- * `d.buildLeft` (whatever was left of BUILD_MAX_STEPS by the time the gap
- * was reached — see stepWalking) caps how long this can keep running even
- * over a gap wider than there is clock left to cross, the one place that
- * budget is actually spent, one tick at a time.
+ * Running into ground: the ground itself standing higher than the ramp's own
+ * deck — see groundAt above, which is the level's terrain and a Digger's
+ * tunnels and nothing else. A wall, a rock face, the side of a hill, or a
+ * staircase climbing faster than the ramp is: all the same thing from here,
+ * and all of them end the climb. Other ramps are deliberately not in that
+ * test. A ramp crossing one already standing passes over or under it and
+ * both are left whole (see addDeckAt), which is the only way building a
+ * second ramp back the other way over a first can work at all.
+ *
+ * Because the test is "has the ground caught up to the deck yet", it fires
+ * exactly where the two meet, which is what makes the ramp always join
+ * whatever stopped it within a pixel or so rather than leaving a step. That
+ * matters more than it sounds: a deck is shared, permanent ground (see
+ * surfacesAt above), so every duckling behind this one walks up this ramp
+ * too, and a ramp that ended a foot above the hillside would strand them.
+ *
+ * Running out of clock: BUILD_MAX_STEPS ticks (content.js), at which point
+ * the ramp simply ends wherever it is — in mid-air if that is where the
+ * clock left it, since it never comes back down on its own. It will be at
+ * most BUILD_RISE_HEIGHT above the height it started from, and that is kept
+ * equal to FALL_SAFE on purpose: over ground no lower than where the ramp
+ * began, stepping off the end is exactly the tallest drop a duckling walks
+ * away from unhurt. Over ground that has fallen away further since — a level
+ * that descends, like The Falls — it is further than that, and walking off
+ * the end is fatal for this duckling and for every one following it up. A
+ * ramp is a real thing left in the world, and putting one somewhere careless
+ * is a real mistake.
+ *
+ * A deck is its own thing standing over the column rather than a change to
+ * it — see `decks` in newGame — so a gap a ramp crosses still shows as open
+ * air below the deck in art.js rather than quietly filling in with dirt.
  */
 function stepBuilding(state, d){
   const level = state.level;
   const nextX = d.x + d.dir;
   if(nextX < 0 || nextX >= level.width){ d.state = 'walking'; return; }
 
-  const progress = Math.min(1, (d.buildStep + 1) / d.buildSpan);
-  const rise = Math.round(Math.sin(progress * Math.PI) * BRIDGE_ARCH_HEIGHT);
-  const y = d.buildBaseY - rise;
+  const step = d.buildStep + 1;
+  const y = d.buildLevel
+    ? d.buildBaseY
+    : d.buildBaseY - Math.round(step * BUILD_RISE_HEIGHT / BUILD_MAX_STEPS);
 
+  /* Strictly higher, not "at or above": the first few ticks of a ramp round
+     to no rise at all (BUILD_RISE_HEIGHT spread over BUILD_MAX_STEPS is well
+     under a pixel a tick), so ground exactly level with the deck is still
+     ground the ramp is climbing away from, not ground it has run into. Told
+     to stop at level ground, a ramp given on the flat would stop on its very
+     first tick, every time, and look like the click did nothing at all. */
   const ahead = groundAt(state, nextX);
-  if(ahead <= y){
-    // Solid ground already at or above the deck: step onto it and stop.
-    d.x = nextX;
-    d.y = ahead;
+  if(ahead < y){
+    /* Stop, without stepping onto it. Stepping on would hand a Builder a
+       free way up any wall it happened to end at, which is a Climber's job
+       and a Digger's; leaving the duckling standing on the last column of
+       its own ramp means the ordinary walking rules get to decide what that
+       ground is, exactly as if it had walked there — a gentle rise it steps
+       up (which is how a ramp joins a hillside or a staircase without a
+       seam), or a wall it turns back from. */
     d.state = 'walking';
     return;
   }
 
-  setBridgeAt(state, nextX, y);
+  addDeckAt(state, nextX, y);
   d.x = nextX;
   d.y = y;
-  d.buildStep += 1;
-  d.buildLeft -= 1;
-  if(d.buildLeft <= 0) d.state = 'walking';
+  d.buildStep = step;
+  if(d.buildStep >= BUILD_MAX_STEPS) d.state = 'walking';
+}
+
+/* Climbs until it reaches something to stand on — the first surface it comes
+   up under, which over a column some ramp crosses is that ramp's deck rather
+   than the wall top far above it. */
+/* Can this duckling hop whatever is in front of it, and if so, set it going.
+ * Returns whether it did, so the caller can fall through to everything else
+ * when the answer is no.
+ *
+ * It looks for somewhere to land, one column at a time out to JUMP_SPAN, and
+ * takes the first landing it finds: ground no more than JUMP_RISE above
+ * where it stands, and no more than FALL_SAFE below — a hop is not a way to
+ * survive a fall, which is a Flyer's job. Nothing within that reach means no
+ * jump, and a ditch too wide or a wall too tall is left to whatever else the
+ * duckling is carrying. That is what keeps this from quietly becoming a
+ * cheaper Builder or a cheaper Climber: every real gap and every real wall in
+ * the game is well outside it (see content.js's JUMP_SPAN and JUMP_RISE).
+ *
+ * Landing is checked against the same surfaces walking uses, so a Jumper can
+ * land on a ramp deck as readily as on the ground.
+ *
+ * `preferFar` takes the longest landing rather than the nearest, which is
+ * what the goose gets: over open ground the nearest landing is the very next
+ * column, and hopping one column on the spot is not what clearing a goose
+ * looks like. Terrain asks for the nearest instead — a low step should be a
+ * short hop onto it, not a leap over it.
+ */
+function startJump(state, d, preferFar = false){
+  const level = state.level;
+  const spans = preferFar
+    ? Array.from({ length: JUMP_SPAN }, (_, i) => JUMP_SPAN - i)
+    : Array.from({ length: JUMP_SPAN }, (_, i) => i + 1);
+  for(const span of spans){
+    const x = d.x + d.dir * span;
+    if(x < 0 || x >= level.width) continue;
+    if(blockerAt(state, x)) continue;       // a planted Blocker stops a Jumper too
+    for(const s of surfacesAt(state, x)){
+      const rise = d.y - s;                 // positive: the landing is higher
+      if(rise <= JUMP_RISE && rise >= -FALL_SAFE){
+        d.state = 'jumping';
+        d.jumpFromX = d.x; d.jumpFromY = d.y;
+        d.jumpToX = x; d.jumpToY = s;
+        d.jumpSpan = span;
+        d.jumpStep = 0;
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/* The hop itself: a column a tick along a shallow arch from where it took off
+ * to where it lands, cresting a little above the higher of the two ends so it
+ * reads as clearing the thing rather than sliding over it. Nothing underneath
+ * is consulted on the way — it is in the air, which is the whole point, and
+ * `startJump` already picked somewhere real to come down. */
+function stepJumping(state, d){
+  d.jumpStep += 1;
+  const t = d.jumpStep / d.jumpSpan;
+  d.x = d.jumpFromX + d.dir * d.jumpStep;
+  if(d.jumpStep >= d.jumpSpan){
+    d.x = d.jumpToX;
+    d.y = d.jumpToY;
+    d.state = 'walking';
+    return;
+  }
+  const line = d.jumpFromY + (d.jumpToY - d.jumpFromY) * t;
+  d.y = Math.round(line - Math.sin(t * Math.PI) * (JUMP_RISE / 2));
 }
 
 function stepClimbing(state, d){
   d.y -= CLIMB_SPEED;
-  const top = groundAt(state, d.x);
-  if(d.y <= top){
-    d.y = top;
+  const reached = surfacesAt(state, d.x).filter(s => d.y <= s);
+  if(reached.length){
+    d.y = Math.max(...reached);
     d.state = 'walking';
   }
 }
@@ -471,23 +617,21 @@ function stepClimbing(state, d){
 /* ---------------------------------------------------------------- assigning */
 
 /* Why a skill cannot be given right now, or null. A duckling can only take a
-   new job while it is plainly walking — mid-fall, mid-dig, already planted as
-   a blocker, already saved or already lost are all "no", and each says why
-   rather than the click just doing nothing. Already holding the trait being
-   offered is also a "no" — nothing would change, and there is no reason to
-   spend a second one finding that out, Builder included: a duckling still
-   armed with one is not free to be handed a second until the first is
-   actually spent (see stepWalking) or expires on its own. A duckling that
-   has already finished a build, or whose Builder ran out before it ever
-   met a gap, holds none of it anymore and is equally free to be given a
-   fresh one either way. */
+   new job while it is plainly walking — mid-fall, mid-dig, mid-ramp, already
+   planted as a blocker, already saved or already lost are all "no", and each
+   says why rather than the click just doing nothing. Already holding the
+   trait being offered is also a "no" for Digger or Climber: nothing would
+   change, and there is no reason to spend a second one finding that out.
+   Builder is not checked against this at all — it is never held, only spent
+   — so a duckling that already built one ramp and walked on is equally free
+   to be given a second, somewhere else. */
 export function assignRefusal(state, duckId, skill){
   if(state.ended) return 'The level is over.';
   if(!SKILLS.includes(skill)) return 'There is no such skill.';
   const d = state.ducks.find(duck => duck.id === duckId);
   if(!d) return 'There is no such duckling.';
   if(d.state !== 'walking') return 'That one is busy.';
-  if(skill !== 'blocker' && hasTrait(d, skill)) return 'That one already has it.';
+  if(skill !== 'blocker' && skill !== 'builder' && hasTrait(d, skill)) return 'That one already has it.';
   if(!(state.supply[skill] > 0)) return `Out of ${skill}s.`;
   return null;
 }
@@ -495,23 +639,23 @@ export function assignRefusal(state, duckId, skill){
 /* Give a duckling a skill. Returns the duckling, or null if it was refused
  * and nothing changed.
  *
- * Blocker acts at once, right where the duckling already is, rather than
- * waiting for a particular spot — planting itself is not something it
- * defers. It is not a trait either: `d.traits` never gains a 'blocker',
- * which is what makes a duckling already planted a dead end (see
- * assignRefusal's `d.state !== 'walking'` check) rather than something
- * that could ever be handed a second one.
+ * Blocker and Builder both act at once, right where the duckling already is,
+ * rather than waiting for a particular spot: planting itself is not
+ * something a Blocker defers, and a Builder starts its ramp on the very next
+ * tick, whatever is or isn't in front of it (see stepBuilding). Neither is a
+ * trait either — `d.traits` never gains a 'blocker' or a 'builder' — which
+ * is what makes a duckling that has already finished one ramp free to be
+ * handed a second, later, somewhere else; see assignRefusal.
  *
- * Digger, Climber and Builder are all traits, deferred until the duckling
- * actually meets the thing each answers, which is what stepWalking checks
- * for on every step. A duckling can hold more than one at once, and that
+ * Digger, Climber, Flyer and Jumper are the deferred ones, held until the
+ * duckling actually meets the thing each answers, which is what stepWalking
+ * checks for on every step. A duckling can hold several at once, and that
  * stacking is not a nicety — a duckling that dug through one wall still
- * turns back at a second one without a fresh Digger, and Climber is the
- * only thing that would get it there instead. Handed out one at a time as
- * each wall is reached, that is automatic; handed out both at the nest, it
- * only works at all because holding one never stops it from also holding
- * the other. Builder rides along the same way, just spent rather than kept
- * the moment a gap actually calls for it — see stepWalking again.
+ * turns back at a second one without a fresh Digger, and Climber is the only
+ * thing that would get it there instead. Where more than one could answer
+ * the same obstacle, stepWalking's order decides: a Jumper hops a low step
+ * before a Digger would tunnel it, because a hop costs the flock nothing and
+ * a tunnel is spent.
  */
 export function assignSkill(state, duckId, skill){
   if(assignRefusal(state, duckId, skill)) return null;
@@ -519,7 +663,23 @@ export function assignSkill(state, duckId, skill){
   state.supply[skill] -= 1;
 
   if(skill === 'blocker'){ d.state = 'blocking'; return d; }
-  if(skill === 'builder') d.buildLeft = BUILD_MAX_STEPS;
+  if(skill === 'builder'){
+    d.state = 'building';
+    d.buildBaseY = d.y;
+    d.buildStep = 0;
+    /* Given to a duckling already standing on a ramp, this one extends it
+       rather than starting a fresh one: it carries on at the height it is
+       already at instead of climbing another BUILD_RISE_HEIGHT on top. Two
+       Builders chained the other way would end up twice as high, and the far
+       end of a ramp is a ledge everything behind it has to step off — one
+       climb's worth is FALL_SAFE, which is survivable, and two is not. So
+       the first Builder decides how high the ramp goes and every one after
+       it decides how far. */
+    d.buildLevel = state.decks[columnAt(state, d.x)].includes(d.y);
+    return d;
+  }
+  // digger, climber, flyer, jumper: stay 'walking' until the right hazard
+  // asks for them.
   d.traits.add(skill);
   return d;
 }

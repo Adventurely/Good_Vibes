@@ -1048,6 +1048,25 @@ export const ECONOMY = {
    ],
    "blurb": "Replacement hands, eyes and spines. Cats pay most.",
    "nature": "Made to order and sold through Whisker, because the inner worlds have strong opinions about who should be allowed to sell them. A cat who has lost something to vacuum would rather not discuss it with a licensing board. They cost a fortune, and nobody who needs one haggles."
+  },
+  {
+   "id": "emberglass",
+   "name": "The Ninth Lens",
+   "category": "curio",
+   "weight": "light",
+   "basePrice": 26000,
+   "stock": [
+    1,
+    1
+   ],
+   "noResale": true,
+   "producedAt": [
+    "veyra"
+   ],
+   "buyers": [],
+   "lovedBy": [],
+   "blurb": "A hand-width disc of something the Ninth Forge cannot make any more and will not say where it got.",
+   "nature": "Emberkin work, and older than the Emberkin. Nobody buys these back."
   }
  ],
  "ports": {

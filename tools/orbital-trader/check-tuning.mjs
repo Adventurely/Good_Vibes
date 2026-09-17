@@ -184,9 +184,27 @@ for(const b of T.bodies){
    forgiving. Three rules, and they are all about not standing on somebody
    else's toes. */
 for(const b of T.bodies){
-  if(b.kind !== 'wreck') continue;
+  /* Anything weightless you can tie up to: the wrecks and the station at the
+     Dancer, which is the same shape with a wider mouth. */
+  if(b.mu !== 0 || !b.port || b.parent == null) continue;
   const p = by[b.parent];
   check(`C13 ${b.id} has no weight`, b.mu === 0 && b.port === true, `mu ${b.mu}`);
+  /* A weightless harbour must never pass through a sibling's reach. Inside one
+     it is a child of the wrong frame, and the harbour search — which only looks
+     at children of the frame the ship is in — stops being able to find it.
+     Orbits that never overlap are free; orbits that do have to keep station
+     exactly: same a, same period, a fixed angle apart, which is how the Arc's
+     drawn tail works and so how a wreck in that tail has to work. */
+  for(const c of T.bodies){
+    if(c.id === b.id || c.parent !== b.parent || !(c.soi > 0)) continue;
+    const overlaps = b.a * (1 - b.e) <= c.a * (1 + c.e) + c.soi
+                  && b.a * (1 + b.e) >= c.a * (1 - c.e) - c.soi;
+    if(!overlaps) continue;
+    check(`C13 ${b.id} keeps station with ${c.id}`, b.a === c.a && b.e === 0 && c.e === 0,
+      `a ${b.a} vs ${c.a}, e ${b.e} vs ${c.e}`);
+    const apart = 2 * b.a * Math.abs(Math.sin(((b.M0 + b.omega) - (c.M0 + c.omega)) / 2));
+    check(`C13 ${b.id} stays clear of ${c.id}`, apart > 10 * c.soi, `${apart.toFixed(4)} au apart, reach ${c.soi.toFixed(5)}`);
+  }
   check(`C13 ${b.id} mouth < drift reach`, b.zoneRadius > 0 && b.driftReach > b.zoneRadius,
     `mouth ${kmOf(b.zoneRadius)} km, reach ${kmOf(b.driftReach)} km`);
   if(p.soi){

@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="../theme.css">
 <title>Duck Duck Quack</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%234fc4d3'/%3E%3Ccircle cx='9' cy='7' r='4' fill='%23ffd34e'/%3E%3Cpath d='M12 7h2l-1 1z' fill='%23f08c33'/%3E%3C/svg%3E">
-<meta name="description" content="A duckling hatches and walks on its own. Give it a skill before it wanders into something — a gap, a wall, a drop, or the goose — and get enough of the hatch to the pond.">
+<meta name="description" content="A duckling hatches and walks on its own. Give it a skill before it wanders into something — a gap, a ditch, a wall, a drop, or the goose — and get enough of the hatch to the pond.">
 <style>
   :root{
     --type: var(--gv-type);
@@ -61,6 +61,7 @@
   header{ display: flex; align-items: baseline; gap: 0.9rem; flex-wrap: wrap; padding-bottom: 0.5rem; }
   header h1{ margin: 0; font-size: 1.2rem; font-weight: 800; }
   header .level-name{ color: var(--muted); font-weight: 600; }
+  header .version{ color: var(--muted); font-size: 0.72rem; }
   header .crumb{ color: var(--muted); font-size: 0.82rem; text-decoration: none; margin-left: auto; }
   header .crumb:hover{ color: var(--text); }
 
@@ -256,6 +257,7 @@
 <div class="wrap">
   <header>
     <h1>Duck Duck Quack <span class="level-name" id="level-name"></span></h1>
+    <span class="version" id="game-version"></span>
     <a class="crumb" href="/duck-duck-quack/">&larr; levels</a>
   </header>
 
@@ -314,7 +316,7 @@
 </div>
 
 <script type="module">
-  import { LEVELS, SKILLS, SKILL_INFO, TICK_RATE, winCount, formatTime } from './content.js';
+  import { LEVELS, SKILLS, SKILL_INFO, TICK_RATE, GAME_VERSION, winCount, formatTime } from './content.js';
   import { newGame, tick, assignSkill, assignRefusal, duckNear } from './sim.js';
   import { paintScene, drawSkillBadge, BADGE_PLATE_W, BADGE_PLATE_H } from './art.js';
   import { createAudio } from './audio.js';
@@ -330,8 +332,15 @@
   const requestedId = new URLSearchParams(location.search).get('level');
   const LEVEL = LEVELS.find(l => l.id === requestedId) || LEVELS[0];
   const nextLevel = LEVELS[LEVELS.indexOf(LEVEL) + 1] || null;
-  document.getElementById('level-name').textContent = `— ${LEVEL.name}`;
-  document.title = `Duck Duck Quack — ${LEVEL.name}`;
+  /* Which of the seven this is, counted from one. Worth saying out loud on
+     the page: a level has always had a name here but never a place in the
+     order, so "The Aerie" told you nothing about how far in you were, or
+     which one to go back to. */
+  const levelNumber = LEVELS.indexOf(LEVEL) + 1;
+  document.getElementById('level-name').textContent =
+    `— Level ${levelNumber} of ${LEVELS.length}: ${LEVEL.name}`;
+  document.title = `Duck Duck Quack — Level ${levelNumber}: ${LEVEL.name}`;
+  document.getElementById('game-version').textContent = `v${GAME_VERSION}`;
 
   const els = id => document.getElementById(id);
   const ui = {
@@ -481,11 +490,24 @@
   const STEP = 1 / TICK_RATE;
   let acc = 0, last = null;
 
-  // Ids already credited with a quack or a loss, so a duckling sitting
-  // saved in the pond — or one already gone — does not retrigger its sound
-  // on every subsequent frame, only the tick it actually happened on.
+  // Ids already credited with a hatch, a quack or a loss, so a duckling
+  // sitting saved in the pond — or one already gone — does not retrigger
+  // its sound on every subsequent frame, only the tick it actually
+  // happened on.
+  let hatchedSfxed = new Set();
   let quacked = new Set();
   let mourned = new Set();
+
+  // Every duckling gets exactly one of these, the tick it first appears in
+  // `state.ducks` — see sim.js's hatch, which is the only place one is
+  // ever added to that array.
+  function sfxNewHatchlings(){
+    for(const d of state.ducks){
+      if(hatchedSfxed.has(d.id)) continue;
+      hatchedSfxed.add(d.id);
+      audio.sfx('hatch');
+    }
+  }
 
   function quackNewArrivals(){
     for(const d of state.ducks){
@@ -497,11 +519,13 @@
 
   // Plays alongside the poof (see art.js/sim.js), on the same tick a
   // duckling actually goes down rather than on every frame it stays lost.
+  // A goose's catch gets its own sound (see audio.js's SFX.goosed) rather
+  // than the generic one every other cause of loss shares.
   function sfxNewLosses(){
     for(const d of state.ducks){
       if(d.state !== 'lost' || mourned.has(d.id)) continue;
       mourned.add(d.id);
-      audio.sfx('lost');
+      audio.sfx(d.cause === 'goosed' ? 'goosed' : 'lost');
     }
   }
 
@@ -529,7 +553,7 @@
       ui.nextLevel.hidden = false;
       let secondsLeft = 4;
       const countdown = () => {
-        ui.nextLevel.textContent = `Next: ${nextLevel.name} (${secondsLeft})`;
+        ui.nextLevel.textContent = `Next: Level ${levelNumber + 1}, ${nextLevel.name} (${secondsLeft})`;
         if(secondsLeft <= 0){ cancelAutoAdvance(); location.href = href; return; }
         secondsLeft -= 1;
       };
@@ -595,6 +619,7 @@
     } else if(!paused && !state.ended){
       acc += dt;
       while(acc >= STEP){ tick(state); acc -= STEP; }
+      sfxNewHatchlings();
       quackNewArrivals();
       sfxNewLosses();
       if(state.ended){ refreshSkills(); endMessage(); }
@@ -614,6 +639,7 @@
     state = newGame(LEVEL);
     armed = null;
     paused = false;
+    hatchedSfxed = new Set();
     quacked = new Set();
     mourned = new Set();
     ui.pause.textContent = 'Pause';

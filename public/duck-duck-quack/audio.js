@@ -16,12 +16,14 @@
  * riff transposed to whichever root is under it rather than four different
  * melodies — which is exactly the trick a two-channel tracker used to make
  * eight bars feel like one idea instead of four. WARREN_SONG, ORCHARD_SONG,
- * GROVE_SONG, AERIE_SONG and SPIRE_SONG below follow the same eight-bar,
- * call-and-response shape, but differ in tempo, swing, register and
- * waveform on purpose: a tunnel is not a park, an orchard is not either of
- * them, a level with a goose that does not give up is not any of the
- * three, a floating island is not on the ground at all, and a hundred and
- * twenty pixels of rock is not a climb any of the other five ever ask for.
+ * GROVE_SONG, AERIE_SONG, SPIRE_SONG and FALLS_SONG below follow the same
+ * eight-bar, call-and-response shape, but differ in tempo, swing, register
+ * and waveform on purpose: a tunnel is not a park, an orchard is not either
+ * of them, a level with a goose that does not give up is not any of the
+ * three, a floating island is not on the ground at all, a hundred and
+ * twenty pixels of rock is not a climb any of the other five ever ask for,
+ * and a level that spends its whole length going downhill does not sound
+ * like one that mostly doesn't.
  *
  * Nothing plays until a user gesture, because autoplay policy decides that,
  * not us. The mute choice persists per browser, under its own key so it
@@ -372,9 +374,66 @@ export const SPIRE_SONG = {
   openHatAt: [15],
 };
 
+/* The Falls: the one level that is a descent from end to end, so the lead
+ * is built to actually fall — a run of four or five notes tumbling down in
+ * pitch within a single bar, rather than the held or rising phrases every
+ * other song here uses. Where Park's own walk-down moves the chord under a
+ * held lead, this moves the lead itself, bar after bar, the same cascade
+ * repeating at a new height each time the chord changes under it — water
+ * over three separate drops, not one. The bass answers in kind, a short
+ * three-note run down by whole steps rather than a held root, so nothing
+ * in the arrangement just sits still. Brighter and quicker than The
+ * Spire's dread on purpose — a fall is not a threat lying in wait, it is
+ * motion — with hi-hats open more often than closed, the closest this
+ * palette gets to the sound of water actually landing.
+ */
+export const FALLS_SONG = {
+  bpm: 118,
+  swing: 0.08,
+  bars: [
+    { chord: [62, 'dom7'] }, { chord: [60, 'maj'] },
+    { chord: [58, 'maj'] },  { chord: [57, 'dom7'] },
+    { chord: [62, 'dom7'], lead: 'response' }, { chord: [60, 'maj'], lead: 'response' },
+    { chord: [58, 'maj'],  lead: 'response' }, { chord: [57, 'dom7'], lead: 'response', fill: true },
+  ],
+
+  // A short run down by whole steps, twice a bar — the bass itself
+  // cascading rather than holding a root under the lead's own fall.
+  bass: [
+    [0, 0, 1], [1, -2, 1], [2, -4, 2], [8, 0, 1], [9, -2, 1], [10, -4, 2],
+  ],
+  bassType: 'triangle',
+  bassCut: 1200,
+  bassLevel: 0.15,
+
+  // The cascade itself: four notes tumbling down from a high start, twice
+  // a bar, each run beginning a little differently than the last so it
+  // reads as falling water rather than a repeated riff.
+  lead: [
+    [0, 24, 1], [1, 21, 1], [2, 19, 1], [3, 17, 2], [8, 26, 1], [9, 22, 1], [10, 19, 1], [11, 17, 2],
+  ],
+  leadResponse: [
+    [0, 27, 1], [1, 24, 1], [2, 20, 1], [3, 17, 1], [4, 15, 2],
+    [9, 24, 1], [10, 20, 1], [11, 17, 1], [12, 15, 2],
+  ],
+  leadType: 'triangle',
+  leadCut: 4200,
+  leadLevel: 0.08,
+
+  stabAt: [6, 14],
+  stabType: 'triangle',
+  stabCut: 1800,
+  stabLevel: 0.04,
+
+  kickAt: [0, 8],
+  snareAt: [4, 12],
+  hatAt: [2, 6, 10],
+  openHatAt: [3, 7, 11, 15],
+};
+
 export const SONGS = {
   park: PARK_SONG, warren: WARREN_SONG, orchard: ORCHARD_SONG, grove: GROVE_SONG, aerie: AERIE_SONG,
-  spire: SPIRE_SONG,
+  spire: SPIRE_SONG, falls: FALLS_SONG,
 };
 
 /* ------------------------------------------------------------------ engine --- */
@@ -626,6 +685,50 @@ export function createAudio(){
       // The thump: a low sine falling under the puff, for the landing
       // rather than for the feathers.
       voice(150, t, 0.12, 'sine', 0.14, 62, 300);
+    },
+
+    /* The goose actually catching one — its own sound, not the generic
+     * `lost` above, because losing one to a wall or a gap is a mistake and
+     * this is a hunt landing. A honk first, harsher and lower than
+     * anything `quackSyllable` makes (a plain sawtooth through one narrow
+     * band, none of the quack's three-formant throat), then the caught
+     * duckling's own startled cry close behind it rather than under it —
+     * two distinct voices, the same reason the hunt and the catch are two
+     * different things in sim.js. At most once a run (see sim.js's
+     * `goose.fed`), so this can afford to be the loudest thing here.
+     */
+    goosed(t){
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(220, t);
+      o.frequency.exponentialRampToValueAtTime(130, t + 0.17);
+      const band = ctx.createBiquadFilter();
+      band.type = 'bandpass';
+      band.frequency.setValueAtTime(480, t);
+      band.frequency.exponentialRampToValueAtTime(300, t + 0.17);
+      band.Q.value = 2.4;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.24, t + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.19);
+      o.connect(band).connect(g).connect(bus);
+      o.start(t); o.stop(t + 0.2);
+
+      // The catch, hard on the honk's heel — short and sharp rather than
+      // the two full, rounded syllables a safe arrival gets.
+      quackSyllable(t + 0.1, 0.09, 0.55);
+    },
+
+    /* A new duckling, right as it steps out of the nest — quick and light,
+     * because this is the one sound here that can fire thirty times in a
+     * single run (see content.js's duckCount) and still has to sit under
+     * everything else, not on top of it. A crack for the shell first, then
+     * one short peep gliding up rather than down — an entrance, the
+     * opposite shape from `lost`'s falling puff.
+     */
+    hatch(t){
+      hit(t, 0.02, 0.05, 3200, 'bandpass');
+      voice(950, t + 0.008, 0.08, 'triangle', 0.045, 1500, 5000);
     },
   };
 

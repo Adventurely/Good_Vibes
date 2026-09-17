@@ -53,6 +53,15 @@ export const PALETTE = {
   orbitLead:  'rgba(245,234,214,0.80)',
   soi:        'rgba(245,154,46,0.05)',
   soiEdge:    'rgba(245,154,46,0.30)',
+  /* The space near a drifting thing. Not gravity and not a harbour, so neither
+     the amber of a reach nor the green of a mouth: inside it the two buttons on
+     a mark stop being about an orbit and start being about the thing you are
+     coming alongside, and the readout in the corner turns into range and
+     closing speed. That is a place, and a place a pilot has to aim at — it was
+     doing all of this and drawing nothing, so the only way to learn where it
+     was was to be inside it and notice the words had changed. */
+  drift:      'rgba(90,166,232,0.06)',
+  driftEdge:  'rgba(90,166,232,0.42)',
   /* The harbour mouth. It was dim enough to lose against a bright road drawn
      across it, which is the one moment it matters — so it is the strongest
      green on the chart, and the ring you cannot yet tie up inside is a clear
@@ -376,6 +385,7 @@ function draw(chart, view){
   drawBelt(chart, view, pos);
   drawOrbits(chart, pos, t);
   drawSoiRings(chart, pos);
+  drawDriftReaches(chart, pos);
   drawBodies(chart, view, pos, t);
   /* Where each leg of the road is pinned on the screen, worked out once and
      handed to everything that puts a mark on the road. It used to be worked
@@ -549,6 +559,34 @@ export function railLead(chart, el, centre, mu, t){
   return { arc, head: arc[N], angle };
 }
 
+/* The reach round a weightless thing: the wrecks, and the Builder station at
+ * the Dancer. A sphere of influence is drawn for everything with weight, and
+ * this is the same promise for the things with none — cross it and the flying
+ * changes, so it is drawn whether or not you are inside it yet.
+ *
+ * Dashed like a reach rather than solid like a mouth, and inside the harbour
+ * mouth's own ring rather than replacing it: they are two different questions
+ * — "are the axes about this thing" and "may I tie up" — and the answer to the
+ * first is yes a good while before the answer to the second. */
+function drawDriftReaches(chart, pos){
+  const { ctx, world, camera } = chart;
+  for(const b of world.bodies){
+    if(!(b.driftReach > 0)) continue;
+    if(chart.hidden.has(b.id)) continue;
+    const at = pos.get(b.id);
+    if(!at) continue;
+    const px = b.driftReach * camera.zoom;
+    // Smaller than the dot it is round, or bigger than the sky: no use either way.
+    if(px < 10 || px > 6000) continue;
+    const p = chart.toScreen(at.r);
+    if(p[0] < -px - 40 || p[1] < -px - 40 || p[0] > chart.width + px + 40 || p[1] > chart.height + px + 40) continue;
+    ctx.beginPath(); ctx.arc(p[0], p[1], px, 0, Math.PI * 2);
+    if(px < Math.min(chart.width, chart.height) * 0.45){ ctx.fillStyle = PALETTE.drift; ctx.fill(); }
+    ctx.strokeStyle = PALETTE.driftEdge; ctx.lineWidth = 1; ctx.setLineDash([4, 5]); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
 function drawSoiRings(chart, pos){
   const { ctx, world, camera } = chart;
   for(const b of world.bodies){
@@ -581,7 +619,15 @@ function drawBodies(chart, view, pos, t){
     const p = chart.toScreen(pos.get(b.id).r);
     if(p[0] < -60 || p[1] < -60 || p[0] > chart.width + 60 || p[1] > chart.height + 60) continue;
     const real = (b.radius ?? 0) * zoom;
-    const minPx = b.kind === 'star' ? 9 : b.kind === 'planet' ? 4.5 : b.kind === 'moon' ? 3 : 2.5;
+    /* A star that goes round something else is the Dancer, and the Dancer is a
+       signpost as much as a body. For most of a game it is the only thing
+       marking where the Maw is — the Maw itself does not draw until the
+       gravitational sensors are aboard — and where the Maw is is where the
+       story ends. So it is drawn as a landmark rather than as a dot its own
+       size: a floor that still reads at the widest zoom the chart allows, a
+       wider corona, and a rim so it is a star rather than a smudge. */
+    const beacon = b.kind === 'star' && b.parent != null;
+    const minPx = beacon ? 11 : b.kind === 'star' ? 9 : b.kind === 'planet' ? 4.5 : b.kind === 'moon' ? 3 : 2.5;
     const rpx = Math.max(minPx, real);
     const colour = bodyColour(b);
 
@@ -600,9 +646,10 @@ function drawBodies(chart, view, pos, t){
        one is blue, so a gradient hard-coded to the Lamp's orange would have put
        a sunset round it. */
     if(b.kind === 'star'){
-      const glow = ctx.createRadialGradient(p[0], p[1], rpx, p[0], p[1], rpx * 5);
-      glow.addColorStop(0, rgba(colour, 0.22)); glow.addColorStop(1, rgba(colour, 0));
-      ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(p[0], p[1], rpx * 5, 0, Math.PI * 2); ctx.fill();
+      const far = rpx * (beacon ? 7 : 5);
+      const glow = ctx.createRadialGradient(p[0], p[1], rpx, p[0], p[1], far);
+      glow.addColorStop(0, rgba(colour, beacon ? 0.34 : 0.22)); glow.addColorStop(1, rgba(colour, 0));
+      ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(p[0], p[1], far, 0, Math.PI * 2); ctx.fill();
     }
     /* The band of air, when it is big enough to mean something. In the world's
        own colour: four worlds have weather now and a violet haze round all of
@@ -639,7 +686,10 @@ function drawBodies(chart, view, pos, t){
     if(b.id === 'maw'){
       // The ring flickers at gaps nobody has explained. Under reduced motion it rests, lit.
       const lit = chart.reducedMotion || mawLit(view.now ?? 0);
-      alpha = lit ? 1 : 0.35;
+      /* Never at full strength. It is a hole: the reading is that something is
+         there, not that something is bright, and the Dancer next to it is the
+         thing the eye is meant to find first. */
+      alpha = lit ? 0.72 : 0.24;
     }
     /* The picture is the planet, so it is drawn at the planet's real size and
        clipped to it. It used to be painted at 1.2 times the radius with
@@ -684,8 +734,20 @@ function drawBodies(chart, view, pos, t){
     }
     if((b.kind === 'zone' || b.mu === 0) && !drew && b.kind !== 'hole'){
       // Gravity-less things are hollow: the belt havens and the Maw.
+      /* Under the body's own alpha, which for everything but the Maw is one.
+         The Maw's flicker used to be applied to the dot and not to the ring,
+         so the one mark it actually draws never dimmed at all and a thing
+         that is meant to be barely there out-shouted the star beside it. */
+      ctx.globalAlpha = alpha;
       ctx.strokeStyle = colour; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(p[0], p[1], rpx + 3, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    /* The beacon's rim: the corona alone is fog, and fog at the widest zoom is
+       what a player scrolls past. */
+    if(beacon){
+      ctx.strokeStyle = rgba(lighten(colour, 0.5), 0.9); ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(p[0], p[1], rpx + 3.5, 0, Math.PI * 2); ctx.stroke();
     }
     // The body the chart is centred on wears a ring, so "what am I looking
     // at" is answered by the picture rather than by a panel.
@@ -714,7 +776,10 @@ function drawBodies(chart, view, pos, t){
       if(!placed.some(o => o.x < box.x + box.w && o.x + o.w > box.x && o.y < box.y + box.h && o.y + o.h > box.y)){ spot = c; placed.push(box); break; }
     }
     if(!spot) continue;
-    ctx.fillStyle = camera.follow === b.id ? PALETTE.text : PALETTE.textDim;
+    /* A star's name in full strength. There are two, they are the only things
+       out here that give off light, and both are places the chart is read from
+       rather than dots among dots. */
+    ctx.fillStyle = camera.follow === b.id || b.kind === 'star' ? PALETTE.text : PALETTE.textDim;
     ctx.fillText(text, spot[0], spot[1]);
   }
   void t;
@@ -1012,15 +1077,18 @@ function drawRailCrossings(chart, view, anchors){
   }
 }
 
-/* The intercepts: the nearest the road comes to each world it passes, once
- * per world and at the first pass. This is the question a pilot is actually
- * asking while they push a burn around — not "does this reach Slate" but "how
- * close, and how fast" — so they are marked wherever the chart is zoomed, even
- * when the whole encounter is a few pixels wide.
+/* The intercepts: the nearest the road comes to each reach it passes through.
+ * This is the question a pilot is actually asking while they push a burn
+ * around — not "does this reach Slate" but "how close, and how fast" — so they
+ * are marked wherever the chart is zoomed, even when the whole encounter is a
+ * few pixels wide.
  *
- * It used to draw exactly one, for the world whose reach the road crossed
- * into. A road out of Tassel to the Belt goes past both of Tassel's moons and
- * then meets a haven that has no reach at all, and none of that was marked. */
+ * There is more than one whenever the road goes through more than one reach,
+ * which is how you arrive anywhere in the Grumm system: fall into Grumm, go on
+ * to the moon. Both passes are real and both are drawn. What is *not* here,
+ * deliberately, is a world the road merely goes near without entering its
+ * reach — see the note by `interceptsOf` for the sweep that used to do that
+ * and what it cost. */
 function drawIntercepts(chart, view, anchors, afterBurnAt, taken){
   for(const ic of view.prediction?.intercepts ?? []) drawIntercept(chart, view, anchors, afterBurnAt, ic, taken);
 }

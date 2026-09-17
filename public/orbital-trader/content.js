@@ -184,6 +184,10 @@ export const GOODS = ECONOMY.goods.map(g => ({
   ...g,
   units: UNITS[g.weight] ?? 1,
   needsTempControl: !!g.needsTempControl,
+  /* A thing no stall will take off you at any price. Every other good in the
+     game sells anywhere — what a port wants only moves the price — so this is
+     the one way to make something a trader cannot turn back into money. */
+  noResale: !!g.noResale,
   producedAt: g.producedAt ?? [],
   stock: g.stock ?? [1, 1],
   buyers: g.buyers ?? [],
@@ -306,6 +310,10 @@ export const TEXT = NARRATIVE;
  * the rest of the game keeps asking content.js for content and never has to
  * know how many files it came out of. */
 export const QUESTS = QUESTBOOK.quests ?? [];
+/* The three things the closing line is about. They sit beside the quests
+ * because that is the only place they come from: nothing sells one and nothing
+ * makes one, and the only way to hold one is to finish the job that grants it. */
+export const RELICS = QUESTBOOK.relics ?? [];
 export const DIALOG = DIALOGUE.exchanges ?? [];
 TEXT.logTemplates ??= {};
 TEXT.logTemplates.aerobrake ??= 'Air braked at {body}: {dv} shed to the clouds.';
