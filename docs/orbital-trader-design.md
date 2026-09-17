@@ -1,6 +1,6 @@
 # Orbital Trader (Working Title): Design Document
 
-**Status:** Early draft, revised. Sections 2.2, 2.3, 2.6 and 2.6.1 record decisions made after the first playable build. Sections marked **TBD** are intentionally undecided and collect open questions rather than decisions.
+**Status:** Revised against the shipped build. The closing line is built (§5.0.1) — three relics, three different ways of getting them, and a station at the end — which was the last system the whole design was waiting on. Sections 2.2, 2.3, 2.6 and 2.6.1 record decisions made after the first playable build. Section 7 now collects what is genuinely undecided, which after the closing line is a much shorter list than it was: one wanted system (events, §7.3), one ruled out (§7.4), and tuning.
 
 ---
 
@@ -340,12 +340,26 @@ and no good will tell you which of a people's moons is the one that loves it.
 A captain closes that gap by carrying some and finding out. Wicket closes it by
 looking: prices appear on the lists, and every good's "i" gains *loved by* and
 *wanted by* in the same words the table uses — sometimes a port, sometimes a
-whole people. She is a shortcut through reasoning that was always possible,
+whole people. He is a shortcut through reasoning that was always possible,
 which is the only kind of knowledge worth selling a journey for.
 
 **Jobs are priced against this table**, not against a number somebody liked:
 fetching work pays more than selling the same goods on the open market at the
 same destination would, and a test holds that line as prices move (§5.1.1).
+
+**Profit per game-day is the wrong number to tune against.** Time is skipped by
+pointing at a place (§2.6), and a skip costs about ten real seconds whether it
+covers one day or forty-five. So a one-day hop between Cinder and Scorch and a
+forty-five-day crossing from Moss to Cinder cost a player roughly *the same
+amount of the only currency they actually spend*, which is their own attention.
+The number that matters is **profit per trip**, and per trip the spread between
+the best loops in the shipped economy is about 1.2× rather than the 25× that
+`test/orbital-balance.mjs` appears to report in its per-day column. Read that
+column as a measure of *impatience* — how long a player waits between payouts —
+and not as a measure of what a route is worth. The harness plays a pure market
+bot with no jobs and no curiosity, so its route choice is a floor on the
+economy, not a prediction of play: a player following the line (§5) is sent
+outward by the jobs long before the market would send them.
 
 Money is treated as a **key** (to upgrades, access, and relationships) rather than a scoreboard.
 
@@ -753,7 +767,7 @@ is the Maw's rendezvous, which was finished for the Maw and works anywhere.
 A wreck is a body in `tuning.json` with no mass, a mouth, a closing speed and
 a drift reach, deliberately *not* in the price list: a derelict has no stall,
 no pump, no board and nobody to talk to, so it has one menu rather than four
-empty ones. Seven of them are in the sky:
+empty ones. Eight of them are in the sky:
 
 | Wreck | Where | The job |
 |---|---|---|
@@ -764,6 +778,7 @@ empty ones. Seven of them are in the sky:
 | The Sixth Forge | the Belt, between the havens | an Emberkin freighter, still crated |
 | Hull 41 | the outer Belt | a hull with a yard number and no name |
 | The Long Sweet | a wide circle above Haven | a frog cider transport, perfectly intact |
+| The Tail End | a third of the way down the Arc's tail | a hull that is not shaped like anything that fell off the Arc |
 
 **Coming alongside is ten kilometres and ten metres a second.** It was two
 hundred and ninety-five kilometres at five hundred, which is not coming
@@ -990,14 +1005,19 @@ not anybody has heard of it, which is why it is *there* to be found. (The Maw
 is the other way about, and deliberately: it keeps its numbers and loses its
 name. See §2.3.)
 
-An eighth is designed and not written: it is taken at the Arc and leads into
-the debris trailing behind it, where the key item for the closing line is. Hull
-41 is the thread that points at it — Arc glass in a ship that was never near
-the Arc — and it says so in as many words when you hand it in.
+**The eighth is written**, and it is the one that turns the salvage chain into
+the closing line. *The Tail End* is taken at Nail from Dockmaster Pell and
+flown to the Arc's tail: two fragments go back to the Arc, which is what a
+salvor would come for, and a third piece — racked on its own, strapped like
+something that was being carried rather than something that fell in, with an
+edge that was cut rather than broken — does not get offered to anybody. Hull 41
+is the thread that points at it (Arc glass in a ship that was never near the
+Arc) and says so in as many words when you hand it in.
 
-Both quest chains run. Crew is settled far enough to pay out (§7.2): three jobs
-hand over a person, and finishing one fills that berth. #20 still needs an Arc
-fragment to exist as a thing to *investigate* rather than a good to carry.
+Both quest chains run, and both now finish. Crew pays out (§7.2): three jobs
+hand over a person, and finishing one fills that berth. The Arc fragment that
+#20 was waiting on exists, and #20 itself has been replaced by the four-job
+closing line at §5.0.1.
 
 | # | Quest | Type | Route / Goal | Reward |
 |---|---|---|---|---|
@@ -1020,7 +1040,7 @@ fragment to exist as a thing to *investigate* rather than a good to carry.
 | 17 | The Amber Collector | Retrieval | Brine: retrieve brine amber → Veyra | Credits |
 | 18 | A Frog's Question | Message | Brine → Glass: deliver a message | Credits / frog reputation |
 | 19 | Appraisal | Shopping List | Brine: bring an arc shard, storm crystals and reactor coils to be looked at | **Frog Appraiser** |
-| 20 | What Is This Worth? | Appraisal / Retrieval | With the frog appraiser: investigate an Arc fragment | Major lore reveal *(not built)* |
+| 20 | *superseded* | — | The lore reveal this slot held is now the four-job closing line: The Ninth Lens, The Tail End, The Fifth Song, and The Lantern | See §5.0.1 |
 
 ### 5.0.1 The closing line
 
@@ -1149,9 +1169,12 @@ prices move.
 
 Every quest names the port it is offered at, so a board has something to read.
 
-**There is still no board.** Fourteen quests are written, tested and flyable,
-and the opening errand is the only one a player can take, because there is
-nowhere to press. That is the last piece.
+**The board is built**, and this paragraph used to say it was the last piece
+missing. It is the dock menu's **Requests** tab: the jobs the port you are tied
+up at is offering, with who is asking, what it is and what it pays, and a Take
+button that carries the three-at-once rule and refuses a delivery there is no
+hold room (or no cold hold) for. Twenty-nine jobs are written, tested and
+flyable, and a player meets them by tying up somewhere and reading.
 
 ### 5.1.2 The two early berths
 
@@ -1174,23 +1197,31 @@ teaches at Slate, asked for again somewhere it matters.
 
 ### 5.2 What the Line Needs That the Game Does Not Have
 
+**All six are now done.** The list is kept as a record of what the line was
+waiting on and what each wait was settled as.
+
 1. ~~**Crew as a reward.**~~ Done, as far as the line needs. Three of the
    twenty hand over a person — Kiran the Emberkin engineer at #6, Tsuki the cat
    navigator at #13, Wicket the frog appraiser at #19 — one each from the three
    peoples whose region the player has just finished crossing. Finishing one
    of those quests fills that berth and the Crew menu shows who is in it. What
-   a crew member *does* is still open (§7.2); the quests no longer wait on it.
-2. **Faction reputation.** #7 and #10 pay in it. The game keeps reputation per
-   *people*, not per house, and the Emberkin are explicitly factional — so
-   either the Emberkin score splits into houses, or "faction reputation" means
-   the Emberkin score and the houses stay fiction.
+   a crew member *does* is settled too: all three berths gate something
+   (§7.2).
+2. ~~**Faction reputation.**~~ Done, and settled the second way: standing is
+   kept per *people* in `state.rep`, the Emberkin houses stay fiction, and #7
+   and #10 pay into the Emberkin score. It is a real currency rather than a
+   label — it discounts what a port charges (`repDiscount`), gates upgrades
+   that carry a `minRep`, buys the cats off a toll, and at five jobs for the
+   frogs it opens the temple at Croak (§7.5). Splitting the Emberkin score
+   into houses remains possible and nothing now waits on it.
 3. ~~A weightless parcel, for the four message quests.~~ Done: a message
    carries no goods, so it costs no hold room.
 4. ~~A set-counting quest step, for #9 and #19.~~ Done: a shopping list earns
    one step per line and closes when they are all aboard at the destination.
-5. **Things in space that are not ports**, for #14 and #15. Still open, and
-   built now, and it needed no new flight: the rendezvous written for the Maw
-   works at any weightless thing on a rail.
+5. ~~**Things in space that are not ports**, for #14 and #15.~~ Done, and it
+   needed no new flight: the rendezvous written for the Maw works at any
+   weightless thing on a rail. Eight wrecks are in the sky, and the eighth —
+   The Tail End, down the Arc's tail — carries the first of the three relics.
 6. ~~A quest board.~~ Done: the dock menu's Requests tab lists the jobs the
    port you are tied up at is offering, and a ship can hold three at once.
    The randomly generated contract board that used to sit behind a Passengers
@@ -1231,6 +1262,13 @@ parts to Slate, fire crystals to Veyra (who love them), reactor coils to Nail
 
 ## 7. Undecided Systems (TBD)
 
+**Most of this section is now decided.** The player character (7.1) and art
+direction (7.6) were settled in practice by what shipped; crew (7.2) has all
+three berths doing work; the ending (7.5) is built; rivalry (7.4) is ruled out.
+What is actually left is **events** (7.3), which nothing depends on, and
+**tuning** (7.7). Sections are kept rather than deleted so that a question that
+was closed does not get reopened without someone reading why it closed.
+
 ### 7.1 Player Character — TBD
 
 The shipped Crew menu names the captain **Finn**, an otter who left their raft. That explains flying solo, makes the player a slight outsider in their own culture, and gives each crew member the role of a surrogate raft. Leaving the species open or customizable is still the alternative, and the card is one line of `narrative.json` if it changes; the captain's own blurb is written without a pronoun so a change of species costs nothing.
@@ -1255,12 +1293,12 @@ berth fills with a name, a species, a portrait and a line:
 `state.crew` carries a slot per berth, null until earned and then `{ role,
 from, joinedAt }` — who they are, which job brought them, and when.
 
-**Two of the three berths now do something**, and both do it the same way: a
+**All three berths do something**, and all three do it the same way: a
 thing the world already contains is refused to a ship with nobody aboard who
 can reach it. No bonuses, no discounts, no numbers folded quietly into a burn.
 
 **The Engineer** gates the rack. The second and third size of tank and hold,
-and every gate key but the cat sensors, are refused while her berth is empty
+and every gate key but the cat sensors, are refused while his berth is empty
 (§2.8).
 
 **The Appraiser** gates *knowing what a thing is worth*, which is a different
@@ -1270,13 +1308,22 @@ by anybody, on hover or behind the "i" beside its name. That much is written on
 the crate. What no captain can see until Wicket is aboard is which of a
 people's four moons is the one that *loves* a thing rather than merely taking
 it, and what any of them would pay: a stall's wants are a list of names until
-she is there to put numbers on them. The reasoning is the game in the gap —
+he is there to put numbers on them. The reasoning is the game in the gap —
 glass that will not crack under pressure, and a world at the bottom of an
-ocean — and she is the shortcut, bought with a journey.
+ocean — and he is the shortcut, bought with a journey.
 
-The Navigator still does nothing. Two effects in, the pattern is clear enough
-to say what hers should be: something the sky already knows and a ship cannot
-read without her.
+**The Navigator** gates *reading the sky*, and it came out as three things
+rather than one. Tsuki puts the **Knot** on the chart — the cats have known
+where it is for nine generations, and `knowsKnot` is her berth or the
+gravitational sensors, whichever a ship got first. She puts the **second
+crossing** on the road, so a route can be read a world further ahead than a
+captain flying alone can see (`canSeePast`). And she is what lets a ship
+**come alongside a thing with no gravity**: every wreck in the game, and the
+rendezvous at the Maw, are refused without her (`canDockDrifting`), which is
+why a salvage job is turned down at the board rather than at the far end
+(§5.1). All three keep the rule the other two berths keep — something the
+world already contains, refused to a ship with nobody aboard who can reach it,
+and never a number folded quietly into a burn.
 
 The captain is drawn as an otter. §7.1 still has that down as a proposal, but
 the shipped fiction already leans that way — the game opens among otters, and
@@ -1315,9 +1362,9 @@ popup goes away rather than looping. Under reduced motion the whole exchange
 goes up on the first press, a timed reveal being both motion and the one kind
 a player cannot simply wait out.
 
-What is still open is most of what the berths are for: whether the other two
-get effects of their own, whether anybody can be recruited outside the quest
-line, and whether three is the number. Note what the Engineer's gate does to
+**All three berths now do something**, so what a crew member is *for* is no
+longer the open question it was. What is still open is whether anybody can be
+recruited outside the quest line, and whether three is the number. Note what the Engineer's gate does to
 the line's ordering — quest #6 now sits in front of the whole upper rack, and
 in front of fire crystals at #8, so the errand that was a story beat is load
 bearing.
@@ -1326,7 +1373,13 @@ Crew reacting to the player's burns is a desired feature, working as characteriz
 
 How crew relate to the player's standing with each species is also unsettled: each of the three comes from the people whose region their quest crosses, so reputation and crew already move together in the fiction without being wired together in the code.
 
-### 7.3 Events — TBD
+### 7.3 Events — TBD, and now the only wanted system still outstanding
+
+**Still on the agenda, as an addition rather than a gap.** With the closing line
+built (§7.5) and rivalry ruled out (§7.4), events are the one system the design
+still wants and does not have. Nothing else depends on them, which is why they
+keep getting deferred and why they are safe to defer again: the game is
+finishable without them.
 
 Coasting stretches are natural pacing gaps and the likely home for events. The guiding principle is that events should ask for **orbital decisions** where possible, not just text choices.
 
@@ -1334,13 +1387,56 @@ Candidates from brainstorming include distress beacons (requiring a rendezvous),
 
 Open questions include event frequency, trigger conditions (location, cargo, reputation, time), and how events tie into species relationships.
 
-### 7.4 Competition and Rivalry — TBD
+### 7.4 Competition and Rivalry — ruled out
 
-Options for channeling competitive drives without combat include a named rival trader who taunts the player over the radio and races them to markets, economic plays like cornering a market before a festival, and asynchronous route leaderboards or ghost trajectories. None are committed.
+**Not a planned feature.** A named rival racing the player to markets, cornering
+a market before a festival, route leaderboards and ghost trajectories were all
+considered and are not being built. They are recorded here so the idea is not
+raised a third time.
 
-### 7.5 Ending and Long-Term Goal — TBD
+The reason is the first pillar. A rival who beats you to a market is pressure
+that arrives on a *clock* rather than on an *orbit* — it would be felt as a
+number going the wrong way while the player is ten real seconds into a skip
+they cannot shorten, and the only counterplay the flight model offers is a
+burn they were already going to make. It would also cut across the tone
+(§4.1): this is a game about people being pleased to see you. Whatever
+competitive pull the game needs, it gets from the market itself and from the
+Δv a good route saves.
 
-The Builders and the Maw are the long-term hook, with breadcrumbs at the Arc, on Whisker, and in the research station under the ice on Glass. Undecided: what the Builder station at the Maw is for, what the Builders were and why they vanished, whether reaching the Maw ends the game or opens a post-game, and how the frogs' songs pay off.
+### 7.5 Ending and Long-Term Goal — built
+
+**The closing line is in the game.** It is written up in full at §5.0.1; this
+section records what the old open questions were settled *as*.
+
+*What the Builder station at the Maw is for.* It is a thing that has been
+aimed at a hole in the sky since before there were people to notice, and what
+it does — once, without ceremony, and only to a ship carrying all three pieces
+of cut glass — is give a bearing. Not at the Maw: at the star going round it.
+
+*How the frogs' songs pay off.* The Fifth Song is one of the three relics. Five
+jobs finished for the frogs buys an invitation the frogs do not issue, and the
+temple at Croak sings for most of a day and puts the third piece of glass into
+the captain's hands without translating any of it. `requires: { questsFor: {
+frog: 5 } }` is the only place in the game where standing with a people opens
+a door rather than moving a price.
+
+*Whether reaching the Maw ends the game.* Reaching the Maw does not. The Maw is
+where the bearing is given; **The Lantern** — a Builder station in a close
+circle round the Dancer, hidden from the chart until the bearing names it — is
+where the line ends. `ends: true` marks it, there is exactly one, and the build
+step checks that. It is also the only job in the game allowed to pay in neither
+coin nor kind: what it pays in is arriving.
+
+*What the Builders were and why they vanished.* Still not answered, and
+deliberately: the last thing the player gets is that something on the other end
+takes their lines. The breadcrumbs at the Arc, on Whisker and under the ice on
+Glass all still point inward at a question the game declines to close.
+
+**What is genuinely left here** is what happens *after*. There is no post-game,
+no reason to keep flying once the lines are across, and no acknowledgement
+anywhere else in the game that a captain has been out there. Whether the ending
+should hand back a changed sky, a title, or simply stop is the one part of this
+section still open.
 
 ### 7.6 Art Direction — TBD
 
