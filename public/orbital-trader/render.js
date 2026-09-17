@@ -62,6 +62,9 @@ export const PALETTE = {
      was was to be inside it and notice the words had changed. */
   drift:      'rgba(90,166,232,0.06)',
   driftEdge:  'rgba(90,166,232,0.42)',
+  // The same space, once the ship is in it.
+  driftIn:    'rgba(90,166,232,0.13)',
+  driftEdgeIn:'rgba(90,166,232,0.85)',
   /* The harbour mouth. It was dim enough to lose against a bright road drawn
      across it, which is the one moment it matters — so it is the strongest
      green on the chart, and the ring you cannot yet tie up inside is a clear
@@ -159,7 +162,17 @@ export function bodyColour(body){
 /* A lap of Tassel is 0.0007 au across and a lap of Slate is 0.00003; the chart
    has to frame both, so the ceiling is set by the smallest moon rather than
    by the biggest orbit. */
-const MIN_ZOOM = 8, MAX_ZOOM = 2e7;
+/* How far in the chart goes. Two hundred million was set when the closest
+ * thing anybody flew to was a harbour mouth thousands of kilometres across;
+ * coming alongside is ten kilometres now, which at that ceiling was a circle
+ * three pixels wide — the last and most delicate piece of flying in the game,
+ * done blind. At two thousand million the chart spans about fifty kilometres,
+ * so the mouth is a third of it and a kilometre is fourteen pixels.
+ *
+ * Nothing here minds the extra depth: positions are au in float64, and even
+ * at the far edge of the Belt a pixel at this zoom is a ten-millionth of the
+ * precision a position is carried to. */
+const MIN_ZOOM = 8, MAX_ZOOM = 2e9;
 
 /* One clock for the whole file, and one that does not throw where there is no
    window: the chart is also drawn on the title screen and in tests. */
@@ -385,7 +398,7 @@ function draw(chart, view){
   drawBelt(chart, view, pos);
   drawOrbits(chart, pos, t);
   drawSoiRings(chart, pos);
-  drawDriftReaches(chart, pos);
+  drawDriftReaches(chart, pos, view);
   drawBodies(chart, view, pos, t);
   /* Where each leg of the road is pinned on the screen, worked out once and
      handed to everything that puts a mark on the road. It used to be worked
@@ -568,7 +581,7 @@ export function railLead(chart, el, centre, mu, t){
  * mouth's own ring rather than replacing it: they are two different questions
  * — "are the axes about this thing" and "may I tie up" — and the answer to the
  * first is yes a good while before the answer to the second. */
-function drawDriftReaches(chart, pos){
+function drawDriftReaches(chart, pos, view){
   const { ctx, world, camera } = chart;
   for(const b of world.bodies){
     if(!(b.driftReach > 0)) continue;
@@ -580,9 +593,18 @@ function drawDriftReaches(chart, pos){
     if(px < 10 || px > 6000) continue;
     const p = chart.toScreen(at.r);
     if(p[0] < -px - 40 || p[1] < -px - 40 || p[0] > chart.width + px + 40 || p[1] > chart.height + px + 40) continue;
+    /* The one the ship is actually in reads differently from one it is merely
+       near. Being inside it is a mode — the two buttons on a mark have changed
+       what they do — and a line you have crossed should not look like a line
+       you are approaching. */
+    const inside = view?.rendezvous === b.id;
     ctx.beginPath(); ctx.arc(p[0], p[1], px, 0, Math.PI * 2);
-    if(px < Math.min(chart.width, chart.height) * 0.45){ ctx.fillStyle = PALETTE.drift; ctx.fill(); }
-    ctx.strokeStyle = PALETTE.driftEdge; ctx.lineWidth = 1; ctx.setLineDash([4, 5]); ctx.stroke();
+    if(px < Math.min(chart.width, chart.height) * 0.45){
+      ctx.fillStyle = inside ? PALETTE.driftIn : PALETTE.drift; ctx.fill();
+    }
+    ctx.strokeStyle = inside ? PALETTE.driftEdgeIn : PALETTE.driftEdge;
+    ctx.lineWidth = inside ? 1.5 : 1;
+    ctx.setLineDash(inside ? [6, 4] : [4, 5]); ctx.stroke();
     ctx.setLineDash([]);
   }
 }
@@ -1476,6 +1498,12 @@ export const KM_PER_AU = 147400000;
 export function fmtAu(au){
   if(au >= 0.05) return `${au.toFixed(2)} au`;
   const km = au * KM_PER_AU;
+  /* Below a kilometre, metres. Whole kilometres were fine when nothing was
+     measured closer than a harbour mouth; a ten-kilometre mouth is flown from
+     the inside, and "0 km" is what the scale bar and every readout said for
+     the whole of the last kilometre of it. */
+  if(km < 1) return `${Math.round(km * 1000).toLocaleString('en-GB')} m`;
+  if(km < 10) return `${+km.toFixed(1)} km`;
   const sig = km >= 100 ? Number(km.toPrecision(3)) : Math.round(km);
   return `${sig.toLocaleString('en-GB')} km`;
 }

@@ -72,6 +72,8 @@
   .stat small{ font-size:.66rem; letter-spacing:.12em; text-transform:uppercase; color:var(--faint); }
   .stat b{ font-weight:600; font-size:.92rem; white-space:nowrap; }
   .stat.warn b{ color:var(--rose); }
+  /* A mode that is on, with nobody aboard to put numbers on it. */
+  .stat.dim b{ color:var(--faint); font-weight:400; font-style:italic; }
   #dvbar{ position:relative; width:120px; height:5px; background:var(--gv-sunk); border-radius:3px; overflow:hidden; margin-top:3px; }
   #dvbar i{ display:block; height:100%; background:linear-gradient(90deg, var(--gold-2), var(--gold)); width:100%; transition:width .2s; }
   #dvbar i.low{ background:var(--rose); }
@@ -108,6 +110,8 @@
      out of it: they used to sit underneath it, where a press meant to zoom in
      landed on whatever the market had in that spot. */
   body.panel-open #view{ right: calc(.8rem + var(--panel-w) + .8rem); }
+  /* Inboard of the view column, wherever that column has got to. */
+  body.panel-open #thrust{ right: calc(.8rem + var(--panel-w) + .8rem + 40px + .5rem); }
   /* The one button that does something to the ship rather than to the view,
      so it lives on its own away from the two that open menus: top left, under
      the fuel gauge and the way back to the title. */
@@ -115,6 +119,50 @@
     position:fixed; left:.8rem; top:calc(70px + env(safe-area-inset-top)); z-index:7;
     display:flex; flex-direction:column; gap:.35rem;
   }
+  /* The thrusters. Two, because two is the manoeuvre: point at it, and stop
+     drifting. It was the four orbital axes in the relative frame, which is
+     exactly right and unreadable — and worse, `out` is at right angles to your
+     relative velocity rather than along the line to the thing, so the button
+     labelled "toward" pointed at the wreck only when those happened to
+     coincide. Bottom right, inboard of the view column where a thumb already
+     is, and clear of the tutorial card in the middle and the conversation down
+     the left. */
+  #thrust{
+    position:fixed; right:calc(.8rem + 40px + .5rem); z-index:7;
+    /* Clear of the tutorial card as well, which is bottom-centre and, with the
+       panel open, centred on the chart rather than the window — so it reaches
+       across to here. Same measurement the conversation uses. */
+    bottom:max(.8rem, env(safe-area-inset-bottom), var(--tut-lift, 0px));
+    display:flex; gap:.4rem;
+  }
+  #thrust[hidden]{ display:none; }
+  #thrust button{
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.1rem;
+    width:86px; height:52px;
+    border-radius:11px; border:1px solid var(--line-2); background:var(--glass);
+    color:var(--ink); cursor:pointer; backdrop-filter:blur(8px);
+    padding:0; line-height:1; touch-action:none; -webkit-tap-highlight-color:transparent;
+  }
+  #thrust button b{ font-size:.82rem; font-weight:600; letter-spacing:.02em; }
+  /* What this press is worth. Its own number on each, because the two are not
+     the same size: Match is a tenth of what there is to kill and shrinks as it
+     works, and Toward is the same nudge at every range. */
+  #thrust button small{ font-size:.62rem; color:var(--faint); white-space:nowrap; }
+  #thrust button:hover{ border-color:var(--gold-2); }
+  #thrust button:active{ background:var(--gold-2); color:var(--gv-paper); }
+  #thrust button:active small{ color:var(--gv-paper); }
+  #thrust button:disabled{ opacity:.35; cursor:default; }
+  @media (max-width: 760px){
+    #thrust{
+      right:.5rem;
+      /* Still above the tutorial card, which on a phone is nearly the width of
+         the screen — the override must carry the lift or it loses it. */
+      bottom:max(calc(.6rem + env(safe-area-inset-bottom)), var(--tut-lift, 0px));
+    }
+    #thrust button{ width:92px; height:56px; }
+    body.sheet #thrust{ bottom:calc(var(--sheet-h) + .5rem); }
+  }
+
   #view button, #act button{
     width:40px; height:40px; border-radius:10px; border:1px solid var(--line);
     background:var(--glass); color:var(--dim); cursor:pointer; backdrop-filter:blur(8px); font-size:1.05rem;
@@ -328,10 +376,10 @@
   #chatter{
     position:fixed; left:1rem; z-index:8;
     /* Clear of the row of buttons along the bottom, and of the tutorial card
-       when there is one — `liftChatter` measures that card rather than
+       when there is one — `liftOverTut` measures that card rather than
        guessing at it, because its height is a different number on every one of
        the fourteen and different again folded. */
-    bottom:calc(64px + var(--chatter-lift, 0px) + env(safe-area-inset-bottom));
+    bottom:max(calc(64px + env(safe-area-inset-bottom)), var(--tut-lift, 0px));
     width:min(42vw, 340px); display:flex; flex-direction:column; gap:.4rem;
     align-items:flex-start; cursor:pointer;
   }
@@ -677,8 +725,15 @@
   <div class="stat" id="clock-stat" hidden><small>Clock</small><b id="h-warp">—</b></div>
   <!-- What a cat navigator is for: not the range now, which says nothing about
        whether you arrive, but how close the path actually comes and how fast
-       you are closing. Only drawn with her aboard and only near a drift. -->
-  <div class="stat" id="rv-stat" hidden><small>Rendezvous</small><b id="h-rv">—</b></div>
+       you are closing.
+
+       The *mode* is announced whenever the ship is in a drifting thing's
+       reach, with her aboard or without: crossing that line really does change
+       what the two buttons on a mark do, and a control scheme that changes
+       without saying so is a control scheme nobody trusts. The two numbers
+       are hers — she is the instruments, not the physics — so without her it
+       says the mode and admits it is being flown by eye. -->
+  <div class="stat" id="rv-stat" hidden><small>Zero-g docking</small><b id="h-rv">—</b></div>
   <div class="stat" id="where"><small>Where</small><b id="h-where">—</b><span id="dockhint"></span></div>
   <!-- A cog: one ring, one hub, eight teeth on the spokes of a compass. Drawn
        from the middle out so it is symmetric by construction — the hand-written
@@ -700,6 +755,16 @@
     <svg class="i-dock" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="3.4"/><path d="M12 10.4 V20"/><path d="M8 13.5 H16"/><path d="M5 15.5 a7 7 0 0 0 14 0"/></svg>
     <svg class="i-lift" viewBox="0 0 24 24" aria-hidden="true" hidden><path d="M12 4 V16"/><path d="M8 8 L12 4 L16 8"/><path d="M6 20 H18"/></svg>
   </button>
+</div>
+
+<!-- The thrusters. Only ever on screen inside a drifting thing's reach, where
+     a burn is flown by hand instead of written down — see `thrust` in sim.js.
+     Pressing one fires the engine now; the clock keeps running. -->
+<div id="thrust" hidden role="group" aria-label="Zero-g thrusters">
+  <button data-th="toward" title="Push straight at it (Up)" aria-label="Thrust toward it">
+    <b>Toward</b><small id="th-toward">—</small></button>
+  <button data-th="match" title="Kill your speed relative to it (Down)" aria-label="Match its speed">
+    <b>Match</b><small id="th-match">—</small></button>
 </div>
 
 <div id="view">
@@ -989,6 +1054,8 @@ function frame(now){
     shipLocalV: state.dockedAt ? null : state.ship.v,
     nodeLabel, interceptLabel, insetLabel,
     belt, nearPort: docking?.port ?? null, docking,
+    // The drifting thing the ship is alongside, if any — see drawDriftReaches.
+    rendezvous: S.rendezvous(state)?.target ?? null,
     hidden: S.unseen(state),
   });
   if(dt > 0 && panelOpen && tab === 'windows'
@@ -1100,12 +1167,27 @@ function handleEvents(events){
 function showRendezvous(){
   const box = $('rv-stat');
   const rv = S.rendezvous(state);
-  if(!rv || !rv.instruments){ box.hidden = true; return; }
+  if(!rv){ box.hidden = true; return; }
   box.hidden = false;
-  const miss = rv.closing ? fmtAu(rv.atIntercept) : fmtAu(rv.range) + ' (opening)';
-  $('h-rv').textContent = `${miss} · ${S.fmtKms(rv.speed)}`;
-  box.title = `Closest the path comes to ${S.portName(rv.target)}, and how fast you are closing.`
-    + (rv.timeToIntercept != null ? ` Nearest in ${S.fmtDays(rv.timeToIntercept)}.` : '');
+  const name = S.portName(rv.target);
+  if(rv.instruments){
+    const miss = rv.closing ? fmtAu(rv.atIntercept) : fmtAu(rv.range) + ' (opening)';
+    $('h-rv').textContent = `${miss} · ${S.fmtKms(rv.speed)}`;
+    box.title = `Alongside ${name}: forward and back are along your speed relative to it, `
+      + `and out and in are away from it and toward it. `
+      + `Closest the path comes, and how fast you are closing.`
+      + (rv.timeToIntercept != null ? ` Nearest in ${S.fmtDays(rv.timeToIntercept)}.` : '');
+  }else{
+    /* No navigator: the axes have still turned — that is the sky, not the
+       crew — but nobody aboard can read the range off, and nobody can hold the
+       ship still against a thing with no gravity, so it cannot be tied up to
+       either. Say the first part plainly rather than showing nothing. */
+    $('h-rv').textContent = 'by eye';
+    box.title = `Alongside ${name}: forward and back are along your speed relative to it, `
+      + `and out and in are away from it and toward it. `
+      + `A navigator would read you the range and the closing speed, and could hold the ship still enough to tie up.`;
+  }
+  box.classList.toggle('dim', !rv.instruments);
 }
 
 function showHazard(){
@@ -1134,6 +1216,7 @@ function renderHud(docking){
   showHazard();
   refreshFarButton();
   showRendezvous();
+  refreshThrusters();
   refreshOwedFlash();
   /* The tank, and what the plan will take out of it. The cost of a burn is
      shown here and nowhere near the burn itself: it is a length of fuel, and
@@ -1302,7 +1385,10 @@ function askSkip(t, what){
 /* Tapping the road is how both of the things you can do to it start: write a
    burn down at that moment, or skip the clock to it. One gesture, two big
    buttons, and the time to that point on the card either way. */
-function askAtPath(t){
+/* `lead` is the one this tap was allowed under — the card has to write the
+   mark on the same terms the tap was judged by, or the button opens and then
+   refuses. */
+function askAtPath(t, lead = S.MIN_LEAD){
   tapMark = t;
   /* One mark at a time while the lesson is running. The button is simply not
      available — no toast, no explanation: a beginner who has not been told
@@ -1320,7 +1406,7 @@ function askAtPath(t){
     m.querySelector('#m-close').addEventListener('click', closeModal);
     m.querySelector('#m-burn').addEventListener('click', () => {
       closeModal();
-      const ix = S.addNode(state, t);
+      const ix = S.addNode(state, t, lead);
       if(ix < 0) return;   // the button is already disabled when there is no room
       /* The chart is the editor, so writing a burn down leaves the panel
          exactly as it was: shoving the side menu open over the sky is the
@@ -1570,7 +1656,10 @@ function endPointer(e){
     const p = prediction && !state.dockedAt ? chart.nearestPathPoint(e.clientX, e.clientY, prediction, state.t) : null;
     const onBody = d.hit?.kind === 'body';
     const insideDrawn = onBody && d.hit.d <= (d.hit.drawn ?? 0) + 2;
-    if(p && !insideDrawn && p.t > state.t + S.MIN_LEAD){ askAtPath(p.t); return; }
+    /* How much road beside the ship is out of bounds. A thumb's width of it,
+       or a minute, whichever comes first — see `leadForTap`. */
+    const lead = S.leadForTap(S.norm(state.ship.v) * chart.camera.zoom);
+    if(p && !insideDrawn && p.t > state.t + lead){ askAtPath(p.t, lead); return; }
     if(onBody){ lookAt(d.hit.id); return; }
     /* Last, after the road and after the worlds: a tap on the ring a world
        travels on asks the clock to wait until that world gets there. It is
@@ -1641,10 +1730,14 @@ addEventListener('keydown', e => {
     /* The arrows push the selected burn; with nothing selected they are the
        keyboard's pan, so the chart can be walked around without a pointer.
        Shift makes both of them fine. */
+    /* With a mark open the arrows push it. In a reach with no mark open, up and
+       down are the two thrusters — the one place on this chart where an arrow
+       does something that happens *now*. Left and right still pan there, since
+       there is no third thruster for them to be. */
     case 'ArrowRight': e.preventDefault(); if(state.nodes[selectedNode]) pushAxis(selectedNode, 'pro', fine); else keyPan(-panStep(e), 0); break;
     case 'ArrowLeft': e.preventDefault(); if(state.nodes[selectedNode]) pushAxis(selectedNode, 'retro', fine); else keyPan(panStep(e), 0); break;
-    case 'ArrowUp': e.preventDefault(); if(state.nodes[selectedNode]) pushAxis(selectedNode, 'out', fine); else keyPan(0, panStep(e)); break;
-    case 'ArrowDown': e.preventDefault(); if(state.nodes[selectedNode]) pushAxis(selectedNode, 'in', fine); else keyPan(0, -panStep(e)); break;
+    case 'ArrowUp': e.preventDefault(); if(state.nodes[selectedNode]) pushAxis(selectedNode, 'out', fine); else if(!$('thrust').hidden) fireThruster('toward', fine); else keyPan(0, panStep(e)); break;
+    case 'ArrowDown': e.preventDefault(); if(state.nodes[selectedNode]) pushAxis(selectedNode, 'in', fine); else if(!$('thrust').hidden) fireThruster('match', fine); else keyPan(0, -panStep(e)); break;
   }
 });
 
@@ -2134,6 +2227,66 @@ function startRepeat(i, axis){
 }
 for(const ev of ['pointerup', 'pointercancel', 'blur']) document.addEventListener(ev, stopRepeat, true);
 
+/* ------------------------------------------------------- zero-g thrusters */
+
+/* The last two kilometres are flown rather than written down. Inside a
+   drifting thing's reach the four buttons fire the engine where they stand,
+   and — this is the point of them — the clock keeps running while they do. A
+   mark is the right shape for deciding *when*, months out; it is the wrong
+   shape entirely for "a bit less now", over and over, watching the range come
+   down. See `thrust` in sim.js for the arithmetic, which is a written mark's
+   own, so nothing about the flight model changes. */
+let thrusting = null;
+function fireThruster(which, fine = 1){
+  const r = S.thrust(state, which, fine);
+  if(!r.ok){ if(r.reason !== 'Nothing alongside to fly against.') toast(r.reason, 'bad', 2200); return false; }
+  /* The road has changed under the ship, so it is redrawn at once rather than
+     on the next budget tick — the whole feel of this is the path swinging
+     while you hold the button. The save is the ordinary autosave: writing
+     localStorage ten times a second would be the one expensive thing here. */
+  replan(true);
+  refreshThrusters();
+  if(tab === 'ship') renderTab();
+  return true;
+}
+function stopThrust(){ if(thrusting){ clearTimeout(thrusting.timer); thrusting = null; } }
+function startThrust(which){
+  stopThrust();
+  if(!fireThruster(which)) return;
+  let n = 0;
+  const tick = () => {
+    n++;
+    if(!fireThruster(which)) return stopThrust();
+    thrusting.timer = setTimeout(tick, n < 3 ? 220 : 90);
+  };
+  thrusting = { timer: setTimeout(tick, 300) };
+}
+for(const ev of ['pointerup', 'pointercancel', 'blur']) document.addEventListener(ev, stopThrust, true);
+
+/* On screen exactly when the ship is in a reach, and never while tied up. */
+function refreshThrusters(){
+  const box = $('thrust');
+  const rv = state.dockedAt ? null : S.rendezvous(state);
+  if(!rv){ if(!box.hidden){ box.hidden = true; stopThrust(); } return; }
+  box.hidden = false;
+  liftOverTut();
+  const dry = !(state.dv > 0);
+  for(const which of S.THRUSTERS){
+    const step = S.thrustStep(which, rv.speed);
+    $(`th-${which}`).textContent = `${step < 1 ? step.toFixed(1) : Math.round(step)} m/s`;
+    /* Match goes dim when there is nothing left to kill: at rest beside it the
+       button has no work, and saying so is better than a press that does
+       nothing. */
+    box.querySelector(`[data-th="${which}"]`).disabled = dry || !(step > 0);
+  }
+}
+$('thrust').addEventListener('pointerdown', e => {
+  const b = e.target.closest('button[data-th]');
+  if(!b || b.disabled) return;
+  e.preventDefault();
+  startThrust(b.dataset.th);
+});
+
 
 /* Four buttons and two axes, and that is the whole of flying this ship.
  *
@@ -2160,12 +2313,9 @@ const AXES = {
    mark, rounded to a number a person would say out loud. */
 function stepFor(i){
   const where = nodePositions[i];
-  // Which speed, and so which fraction of it — see `burnScaleAt`.
+  // Which speed, and so which fraction of it — see `burnScaleAt` and `burnStep`.
   const f = S.burnScaleAt(state, where, state.nodes[i]?.t ?? state.t);
-  const ms = S.kms(f.speed) * 1000 * (f.relative ? S.BURN_STEP_REL : S.BURN_STEP);
-  const pow = Math.pow(10, Math.floor(Math.log10(Math.max(1, ms))));
-  const nice = [1, 2, 5, 10].map(m => m * pow).find(x => x >= ms) ?? 10 * pow;
-  return Math.max(1, Math.min(500, nice));
+  return S.burnStep(f.speed, f.relative);
 }
 
 /* The last resort, which has to live somewhere a stranded pilot can find it:
@@ -2880,14 +3030,24 @@ function confirmNew(){
    the timer that will put up the next line. Never saved — see `talking`. */
 let chatter = null;
 
-/* The tutorial card is bottom-centre and this is bottom-left, which on a narrow
-   screen is the same place. While a card is up the conversation sits above it
-   rather than under it: the card is the more important of the two, and it is
-   the one that must not be covered. */
-function liftChatter(){
+/* The tutorial card is bottom-centre, and two things live along the bottom that
+   would otherwise sit under it: the conversation down the left and the
+   thrusters over on the right — which, with the panel open, the card reaches
+   across to, since it centres on the chart rather than the window. Both sit
+   above it instead. The card is the more important of them and is the one that
+   must not be covered. Measured rather than guessed at: its height is a
+   different number on every one of the fourteen, and different again folded. */
+function liftOverTut(){
   const t = $('tut');
-  const h = t && !t.hidden ? t.getBoundingClientRect().height + 12 : 0;
-  document.documentElement.style.setProperty('--chatter-lift', `${Math.round(h)}px`);
+  const r = t && !t.hidden ? t.getBoundingClientRect() : null;
+  /* How far off the bottom of the window the card's top edge is, not how tall
+     the card is. A height only clears the card for something sitting on the
+     same baseline the card does, and these two do not: the conversation rides
+     64px up and the thrusters sit almost on the floor, so the same number left
+     one of them clear and the other still under it. A distance from the bottom
+     is the same distance for everybody. */
+  const lift = r ? Math.max(0, innerHeight - r.top + 10) : 0;
+  document.documentElement.style.setProperty('--tut-lift', `${Math.round(lift)}px`);
 }
 
 /* Take the bubbles down. This leaves `talking` alone, because the next thing
@@ -2925,7 +3085,7 @@ function restOfChatter(){
 function sayLine(){
   const l = chatter.lines[chatter.i++];
   if(!l) return;
-  liftChatter();
+  liftOverTut();
   const box = $('chatter');
   for(const b of box.children) b.classList.add('said');
   const who = S.speaker(l.who);
@@ -3138,7 +3298,7 @@ function tutorialCheck(){
   $('tut').classList.toggle('min', !!state.flags.tutorialFolded);
   // A different card is a different height, and a conversation may be sitting
   // on top of the old one.
-  liftChatter();
+  liftOverTut();
 }
 $('tut-skip').addEventListener('click', () => { state.flags.tutorialSkipped = true; $('tut').hidden = true; save(); });
 

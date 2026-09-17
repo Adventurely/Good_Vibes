@@ -792,6 +792,91 @@ approach is actually flown in, and the question "am I near this" is asked of
 each harbour rather than of the winner, so a ship outside a wreck's reach is
 still plainly at the moon they are both going round.
 
+**The road beside the ship is out of bounds by the screen, not by the clock.**
+A tap on the road within `MIN_LEAD` of now does nothing — a minute of real time
+at x1, which is right as a rule about the clock, since a burn wants enough
+notice to be caught and pushed before it fires. But the thing a finger aims at
+is a distance on the screen, and a minute is exactly what that is not: beside a
+wreck the ship covers forty-eight kilometres in one, and the chart zoomed in far
+enough to fly that rendezvous is fifty-four kilometres across. The whole visible
+road was untappable at the one zoom where it mattered — invisible until the
+ceiling came up, because at the old one the same minute was seven pixels.
+
+`leadForTap` takes whichever is shorter: the minute, or the time it takes to
+cross a thumb's width of screen. Zoomed out the minute always wins and nothing
+about planning has changed; zoomed in it shrinks to a ring of pixels round the
+ship, which is what the protection was for. `addNode` takes that lead as an
+argument so the card writes the mark on the same terms the tap was judged by —
+it may only ever ask for *less* than the minute, and never less than a floor of
+a couple of real seconds, so a mark can never be written on top of now.
+
+**And the chart goes in a hundred times further.** The ceiling was two hundred
+million pixels to the au, set when the closest thing anybody flew to was a
+harbour mouth thousands of kilometres across; against a ten-kilometre mouth it
+drew a circle three pixels wide, so the last and most delicate flying in the
+game was done blind. It is two thousand million now: the chart spans about
+fifty kilometres at full zoom, the mouth is a third of it, and a kilometre is
+fourteen pixels. Nothing minds the depth — positions are au in float64, and a
+pixel at that zoom is a ten-millionth of the precision a position is carried
+to. `fmtAu` grew metres to go with it, having rounded everything under a
+kilometre to "0 km".
+
+**And it is flown by hand.** Everywhere else in this game a burn is a mark on
+the road: you put it where you want it, push it about with the clock stopped,
+and the tick fires it when it gets there. That is the right shape for a
+transfer, where the thing being decided is *when*, months out. It is the wrong
+shape entirely for the last two kilometres, where the thing being decided is
+"a bit less now", over and over, watching the range come down.
+
+So inside a reach the engine answers directly, and it answers to **two**
+buttons, which between them are the whole manoeuvre:
+
+| | what it does | one press |
+|---|---|---|
+| **Toward** | straight down the line of sight to the thing | 5 m/s, at any range |
+| **Match** | straight against the drift, killing relative speed | a tenth of what is left |
+
+A press is an impulse, right now. **The clock does not stop for it**, which is
+the point: the range is coming down while you decide. Up and down on the
+keyboard are the same two while a reach is up and no mark is open — the one
+place on this chart where an arrow does something immediate.
+
+It was four at first: the orbital axes, forward/back and out/in, in the
+relative frame. That was a worse scheme than it looked. Four live controls is
+already a lot to read in the one situation with a clock running against you —
+but the real trouble is that `out` is at right angles to your *relative
+velocity* rather than along the line to the thing, so the button labelled
+"toward" pointed at the wreck only in the one case where those coincide, and
+somewhere else the rest of the time. Two buttons that mean what they say beat
+four that are exactly right and unreadable.
+
+Match is a tenth of what there is to kill and never more than all of it, so it
+shrinks as it works — held down it brings the ship to rest rather than bouncing
+it back the other way, and the last metres a second cost no more presses than
+the first hundred. Toward has nothing to be a fraction of (a range is not a
+speed) so it is the same nudge everywhere. Flown from four different starts —
+off-axis, head-on, drifting away, and at rest — the approach takes between
+thirty and eighty presses and two or three percent of a full tank.
+
+One thing the pair teaches by being insufficient in the obvious way: pushing
+straight at a thing you are in orbit beside does not simply take you to it. An
+approach slow enough to matter is an approach differential gravity has time to
+bend, so the loop is push, watch, match, push again. That is the manoeuvre, and
+it is why the clock had to keep running for it.
+
+Nothing about the flight model changes. `thrust` charges the tank and writes
+the record exactly as a fired mark does.
+
+**And it says so in words.** The corner of the HUD reads **ZERO-G DOCKING**
+whenever the ship is in a drifting thing's reach. Crossing that line really
+does change what the two buttons on a mark do, and a control scheme that
+changes without announcing itself is one nobody trusts — the wording on the
+mark had been saying it since the beginning, which is not the same as saying
+it. The badge shows with the navigator aboard or without, because the axes
+turn either way: that is the sky, not the crew. The two numbers beside it are
+hers, and without her it says `by eye` instead. The chart draws the reach the
+ship is *in* brighter than one it is merely near, for the same reason.
+
 **The reach is a place you can see.** A wreck's `driftReach` is a real
 boundary — cross it and the two buttons on a mark stop meaning forward-and-out
 about the world and start meaning forward-and-away about the thing you are
