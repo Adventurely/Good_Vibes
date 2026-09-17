@@ -446,19 +446,35 @@ function stepFalling(state, d){
  * tunnel already under way does not re-check that on its own, so this is
  * what stops one that started in ordinary wall from running straight
  * through rock behind it.
+ *
+ * However it ends, the trait ends with it: a Digger is spent on the one
+ * tunnel it cuts, whether that tunnel broke through, ran into rock or
+ * simply ran out of the DIG_SECONDS clock (content.js) partway. So a wall
+ * thicker than a tunnel is long does not fall to one Digger: the first
+ * duckling stops inside the hill and walks back out of its own hole, and
+ * going further means a second Digger given to a second duckling once that
+ * one has walked in to where the cutting stopped — a relay, the same way
+ * two Builders extend one ramp. It is also what makes "one duckling, one
+ * wall" true rather than nearly true; a duckling that tunnelled here still
+ * turns back at the next wall along.
  */
+function endDig(d){
+  d.state = 'walking';
+  d.traits.delete('digger');
+}
+
 function stepDigging(state, d){
   const level = state.level;
   const nextX = d.x + d.dir;
-  if(nextX < 0 || nextX >= level.width){ d.state = 'walking'; return; }
-  if(rockAt(state, nextX, d.y)){ d.state = 'walking'; return; }
+  if(nextX < 0 || nextX >= level.width){ endDig(d); return; }
+  if(rockAt(state, nextX, d.y)){ endDig(d); return; }
 
-  if(groundAt(state, nextX) >= d.y){ d.state = 'walking'; return; }
+  if(groundAt(state, nextX) >= d.y){ endDig(d); return; }
 
   setTunnelAt(state, nextX, d.y);
   d.x = nextX;
   d.digLeft -= 1;
-  if(d.digLeft <= 0) d.state = 'walking';
+  if(d.digLeft <= 0) endDig(d);
 }
 
 /* A builder starts the moment it is given (see assignSkill) and climbs from
@@ -684,10 +700,31 @@ export function assignSkill(state, duckId, skill){
   return d;
 }
 
+/* Send a planted Blocker on its way again: it stops blocking and carries on
+ * walking, in the direction it was facing when it was planted. Returns the
+ * duckling, or null if that one was not a Blocker to begin with.
+ *
+ * Nothing is refunded. The Blocker is still spent — this is a Blocker
+ * finishing its job rather than a Blocker being taken back — so a flock held
+ * at a ledge while the bridge goes in can be let go the moment it is safe,
+ * and that costs the same one Blocker it always did. Which matters because
+ * the alternative was that it cost a duckling too: before this, planting one
+ * meant that duckling stood there for the rest of the level and never
+ * reached the pond. Now it can be part of the quota it was holding back.
+ */
+export function releaseBlocker(state, duckId){
+  if(state.ended) return null;
+  const d = state.ducks.find(duck => duck.id === duckId);
+  if(!d || d.state !== 'blocking') return null;
+  d.state = 'walking';
+  return d;
+}
+
 /* Duckling at a point on screen, nearest first, or null. What a click on the
-   scene resolves to — only ducklings still open to a new job are candidates,
-   so a click near a blocker or a duckling already saved picks the one next to
-   it instead of doing nothing. */
+   scene resolves to — ducklings already saved or already lost are not
+   candidates, so a click near one of those picks the one next to it instead
+   of doing nothing. A planted Blocker very much is a candidate: clicking one
+   is how it gets released (see releaseBlocker). */
 export function duckNear(state, x, y, radius = 10){
   let best = null, bestDist = Infinity;
   for(const d of state.ducks){

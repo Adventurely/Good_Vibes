@@ -274,7 +274,7 @@
     <div class="screen-col">
       <div class="screen">
         <canvas id="scene" width="320" height="180" tabindex="0" role="application"
-                aria-label="Arm a skill below, then click a walking duckling to give it that skill."></canvas>
+                aria-label="Arm a skill below, then click a walking duckling to give it that skill. Click a planted blocker to stand it down."></canvas>
         <div class="hud" aria-hidden="true">
           <div>
             Saved <b id="hud-saved">0 / 0</b> <span class="hint" id="hud-hint">needed</span><br>
@@ -317,7 +317,7 @@
 
 <script type="module">
   import { LEVELS, SKILLS, SKILL_INFO, TICK_RATE, GAME_VERSION, winCount, formatTime } from './content.js';
-  import { newGame, tick, assignSkill, assignRefusal, duckNear } from './sim.js';
+  import { newGame, tick, assignSkill, assignRefusal, duckNear, releaseBlocker } from './sim.js';
   import { paintScene, drawSkillBadge, BADGE_PLATE_W, BADGE_PLATE_H } from './art.js';
   import { createAudio } from './audio.js';
   import { fitCanvas, context2d } from '../good-vibes/pixel.js';
@@ -461,7 +461,6 @@
      it answers what that one is already carrying. The badges over its head
      say the same thing at a glance; this is the version you can read. */
   function describeDuck(d){
-    if(d.state === 'blocking') return 'That one is planted as a Blocker.';
     const held = SKILLS.filter(s => s !== 'blocker' && d.traits.has(s));
     if(!held.length) return 'That one is carrying nothing yet.';
     return `That one has: ${held.map(s => SKILL_INFO[s].name).join(', ')}.`;
@@ -471,16 +470,25 @@
     event.preventDefault();
     ui.scene.focus({ preventScroll: true });
     const at = sceneXY(event);
-    if(!armed){
-      const asked = duckNear(state, at.x, at.y, 12);
-      return say(asked ? describeDuck(asked) : 'Arm a skill first, then click a duckling.');
+    const near = duckNear(state, at.x, at.y, 12);
+
+    /* A click that lands on a planted Blocker means that one, whatever is
+       armed: it is the only thing you can say to a Blocker, since it is
+       already busy for every other purpose (see assignRefusal), and a
+       Blocker standing in the way of the click is the thing you meant to
+       hit rather than the walker behind it. */
+    if(near && near.state === 'blocking'){
+      releaseBlocker(state, near.id);
+      return say('Blocker stood down — off it goes.');
     }
-    const { x, y } = at;
-    const duck = duckNear(state, x, y, 12);
-    if(!duck) return say('No duckling there.');
-    const refusal = assignRefusal(state, duck.id, armed);
+
+    if(!armed){
+      return say(near ? describeDuck(near) : 'Arm a skill first, then click a duckling.');
+    }
+    if(!near) return say('No duckling there.');
+    const refusal = assignRefusal(state, near.id, armed);
     if(refusal) return say(refusal, true);
-    assignSkill(state, duck.id, armed);
+    assignSkill(state, near.id, armed);
     say(`${SKILL_INFO[armed].name} given.`);
     refreshSkills();
   });
