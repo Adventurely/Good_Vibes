@@ -192,8 +192,11 @@
     display:flex; flex-direction:column;
     background:var(--glass-2); border:1px solid var(--line); border-radius:var(--radius);
     backdrop-filter:blur(10px); overflow:hidden;
-    transition:transform .2s ease, opacity .2s ease;
+    transition:transform .2s ease, opacity .2s ease, height .18s ease;
   }
+  /* Under a finger the sheet follows the finger. Snapping is the only part
+     that should be animated. */
+  #panel.dragging{ transition:none; }
   #panel.closed{ transform:translateX(calc(100% + 1rem)); opacity:0; pointer-events:none; }
   #tabs{ display:flex; gap:2px; padding:.4rem .4rem 0; border-bottom:1px solid var(--line); overflow-x:auto; scrollbar-width:none; }
   .tab{
@@ -445,7 +448,7 @@
      under them, the panel is a sheet that starts closed, and the cards that
      matter sit along the bottom where a thumb is. */
   @media (max-width: 760px){
-    :root{ --panel-w:100%; }
+    :root{ --panel-w:100%; --sheet-h:min(64vh, 560px); }
     #hud{ gap:.15rem .6rem; padding:.3rem .6rem; padding-top:max(.3rem, env(safe-area-inset-top)); }
     .stat small{ font-size:.6rem; letter-spacing:.08em; }
     .stat b{ font-size:.82rem; }
@@ -481,18 +484,46 @@
     #view button:not(#m-ship):not(#m-dock){ opacity:.85; }
 
     #panel{
-      top:auto; left:0; right:0; bottom:0; width:100%; height:min(64vh, 560px);
+      top:auto; left:0; right:0; bottom:0; width:100%; height:var(--sheet-h);
       border-radius:16px 16px 0 0; border-bottom:0;
       padding-bottom:env(safe-area-inset-bottom);
     }
     #panel.closed{ transform:translateY(100%); opacity:1; pointer-events:none; }
-    #grab{ display:block; width:44px; height:5px; border-radius:3px; background:var(--line-2); margin:.45rem auto 0; }
+    /* The grabber. It was a five-pixel pill sitting on nothing: it looked like
+       the handle every phone sheet has, and was neither draggable nor — at five
+       pixels tall — reliably hittable. The pill is still five pixels because
+       that is what the shape is; what you are actually pressing is the strip it
+       sits in, which is a thumb high.
+
+       `touch-action:none` so the drag is ours: without it the browser claims a
+       vertical swipe for scrolling or for pull-to-refresh, and the sheet either
+       does not move or the whole page bounces. */
+    #grab{
+      display:flex; align-items:center; justify-content:center;
+      height:26px; margin:0; cursor:grab; touch-action:none;
+      -webkit-tap-highlight-color:transparent;
+    }
+    #grab::before{
+      content:''; width:44px; height:5px; border-radius:3px;
+      background:var(--line-2); transition:background .15s ease, width .15s ease;
+    }
+    #grab:hover::before, #grab:focus-visible::before{ background:var(--gold-2); width:52px; }
+    #grab:focus-visible{ outline:2px solid var(--gold-2); outline-offset:-2px; border-radius:8px; }
+    #panel.dragging #grab{ cursor:grabbing; }
+    #panel.dragging #grab::before{ background:var(--gold-2); width:52px; }
+
+    /* The sheet owns the bottom of the screen, so a conversation sits above it
+       rather than behind it — which is where the bubbles were, on the one
+       screen where the face you press to start one is inside the sheet. */
+    body.sheet #chatter{ bottom:calc(var(--sheet-h) + .5rem); }
 
     /* Bottom cards, stacked: the docking card closest to the thumb. */
     #tut{ left:.5rem; right:.5rem; transform:none; width:auto; bottom:calc(.6rem + env(safe-area-inset-bottom)); }
     #tut p{ font-size:.84rem; }
     #toasts{ top:calc(112px + env(safe-area-inset-top)); width:calc(100vw - 1rem); }
-    #chatter{ left:.5rem; width:calc(100vw - 1rem); }
+    /* Narrower than the screen: the view buttons are a column down the right on
+       a phone, and a bubble the full width of the chart sits on top of them. */
+    #chatter{ left:.5rem; width:calc(100vw - 3.6rem); }
 
     /* When the sheet is up it owns the bottom of the screen. */
     body.sheet #tut{ display:none; }
@@ -1413,7 +1444,11 @@ function applyOffset(){
 }
 // A window that changes width changes which layout it is in, so the classes
 // that depend on the width have to be worked out again.
-addEventListener('resize', () => togglePanel(panelOpen, true));
+addEventListener('resize', () => {
+  /* A turn to landscape can leave a sheet taller than the screen it is on. */
+  if(sheetH != null) setSheetHeight(nearestStop(sheetHeight()));
+  togglePanel(panelOpen, true);
+});
 
 /* ------------------------------------------------------------- input */
 
@@ -3172,11 +3207,86 @@ $('intro-skip').addEventListener('click', e => { e.stopPropagation(); film?.skip
 
 /* ------------------------------------------------------------- boot */
 
-$('grab').addEventListener('click', () => togglePanel(false));
+/* The sheet's handle. Three heights and a way between them.
+ *
+ * A phone sheet that is always the same size is a phone sheet that is always
+ * the wrong size: reading the market wants the whole screen, and watching a
+ * burn come up wants the chart. The three stops are a peek, the height it has
+ * always opened at, and nearly the whole screen — and the middle one is
+ * exactly what it was, so nothing about opening the panel has changed.
+ *
+ * Not saved. A sheet height is a thing you set for the next minute, not a
+ * setting, and putting it in the save would mean a version bump for it. */
+/* The height we have settled on, or null while it is still whatever the
+   stylesheet says. Kept here rather than read back off the element, because
+   the element spends a fifth of a second animating to each new height and
+   everything downstream — which stop are we on, which is the next one up —
+   would be working from a number that is still moving. */
+let sheetH = null;
+const defaultSheet = () => Math.round(Math.min(innerHeight * 0.64, 560));
+const sheetStops = () => [Math.round(innerHeight * 0.34), defaultSheet(), Math.round(innerHeight * 0.9)];
+const sheetHeight = () => sheetH ?? defaultSheet();
+const setSheetHeight = px => {
+  sheetH = Math.round(px);
+  document.documentElement.style.setProperty('--sheet-h', `${sheetH}px`);
+};
+const nearestStop = h => sheetStops().reduce((a, b) => Math.abs(b - h) < Math.abs(a - h) ? b : a);
+
+/* Step to the next stop up or down, for a keyboard and for the two ends of a
+   drag that went past them. */
+function stepSheet(dir){
+  const stops = sheetStops();
+  const i = stops.indexOf(nearestStop(sheetHeight()));
+  const next = stops[Math.max(0, Math.min(stops.length - 1, i + dir))];
+  setSheetHeight(next);
+  applyOffset();
+}
+
+let sheetDrag = null;
+$('grab').addEventListener('pointerdown', e => {
+  if(innerWidth > 760 || !panelOpen) return;
+  sheetDrag = { id: e.pointerId, y: e.clientY, h0: sheetHeight(), moved: false };
+  $('grab').setPointerCapture(e.pointerId);
+  $('panel').classList.add('dragging');
+  e.preventDefault();
+});
+$('grab').addEventListener('pointermove', e => {
+  if(!sheetDrag || e.pointerId !== sheetDrag.id) return;
+  const dy = sheetDrag.y - e.clientY;                      // up is taller
+  if(Math.abs(dy) > TAP_SLOP) sheetDrag.moved = true;
+  const stops = sheetStops();
+  /* A little give at each end, so the sheet feels like a sheet rather than a
+     wall — and so there is somewhere below the smallest stop to let go and
+     have it mean "away with it". */
+  setSheetHeight(Math.max(stops[0] * 0.5, Math.min(stops.at(-1) + 28, sheetDrag.h0 + dy)));
+});
+function endSheetDrag(e){
+  if(!sheetDrag || (e && e.pointerId !== sheetDrag.id)) return;
+  const h = sheetHeight(), stops = sheetStops(), moved = sheetDrag.moved;
+  sheetDrag = null;
+  $('panel').classList.remove('dragging');
+  /* A press that never moved is the press it always was: the sheet goes away.
+     This is why there is no click handler here — after a drag the browser
+     fires one anyway, and the panel would shut every time it was resized. */
+  if(!moved) return togglePanel(false);
+  /* Pulled down below the smallest stop and let go: away with it. The height
+     goes back to the middle one, so opening it again is not a sliver. */
+  if(h < stops[0] * 0.8){ setSheetHeight(stops[1]); return togglePanel(false); }
+  setSheetHeight(nearestStop(h));
+  applyOffset();
+}
+$('grab').addEventListener('pointerup', endSheetDrag);
+$('grab').addEventListener('pointercancel', endSheetDrag);
+
 $('grab').setAttribute('role', 'button');
 $('grab').setAttribute('tabindex', '0');
-$('grab').setAttribute('aria-label', 'Close the panel');
-$('grab').addEventListener('keydown', e => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); togglePanel(false); } });
+$('grab').setAttribute('aria-label', 'Panel height: drag to resize, or press to close');
+$('grab').addEventListener('keydown', e => {
+  if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); togglePanel(false); }
+  // The drag is a drag; the arrows are how it is reachable without one.
+  else if(e.key === 'ArrowUp'){ e.preventDefault(); stepSheet(1); }
+  else if(e.key === 'ArrowDown'){ e.preventDefault(); stepSheet(-1); }
+});
 
 renderTabs();
 togglePanel(panelOpen, true);

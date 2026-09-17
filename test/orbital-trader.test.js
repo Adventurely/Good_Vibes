@@ -828,6 +828,35 @@ test('pressing the same face again gets the next thing, and then comes round', (
   assert.equal(S.speaker('navigator').name, 'Tsuki');
 });
 
+test('the sheet handle is a handle: hittable, draggable, and it resizes', () => {
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  /* It was a 44x5 pill with nothing behind it — the shape every phone sheet
+     wears to say "drag me", wired to nothing but close, and five pixels tall.
+     The pill is now drawn on a strip that is a thumb high, and the strip is
+     what you press. */
+  assert.match(PLAY, /#grab\{[^}]*height:26px/s, 'the handle is back to being a sliver');
+  assert.match(PLAY, /#grab::before\{/, 'the pill is gone');
+  assert.match(PLAY, /#grab\{[^}]*touch-action:none/s,
+    'without this the browser takes the swipe for scrolling or pull-to-refresh');
+
+  /* The drag is pointer events, and there must be no click handler beside it:
+     a click fires after a drag too, and the panel would shut every time it was
+     resized. A press that never moved is what closes it. */
+  assert.match(PLAY, /\$\('grab'\)\.addEventListener\('pointerdown'/, 'the handle does not drag');
+  assert.doesNotMatch(PLAY, /\$\('grab'\)\.addEventListener\('click'/,
+    'a click handler will shut the panel at the end of every resize');
+
+  /* Three stops, and the middle one is exactly the height the sheet has always
+     opened at, so nothing about opening the panel has changed. */
+  assert.match(PLAY, /--sheet-h:min\(64vh, 560px\)/, 'the sheet no longer opens where it used to');
+  assert.match(PLAY, /Math\.min\(innerHeight \* 0\.64, 560\)/, 'the middle stop is not the old height');
+  assert.match(PLAY, /height:var\(--sheet-h\)/, 'the sheet height is not something JS can move');
+
+  /* And the sheet owns the bottom of the screen, so the one popup that lives
+     there gets out of its way rather than playing behind it. */
+  assert.match(PLAY, /body\.sheet #chatter\{/, 'a conversation plays behind the sheet on a phone');
+});
+
 test('the crew menu turns a portrait into a question', () => {
   const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
   assert.match(PLAY, /class="face" data-act="say\|\$\{who\}"/, 'the portraits are not buttons');
