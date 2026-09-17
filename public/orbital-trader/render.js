@@ -62,6 +62,9 @@ export const PALETTE = {
      was was to be inside it and notice the words had changed. */
   drift:      'rgba(90,166,232,0.06)',
   driftEdge:  'rgba(90,166,232,0.42)',
+  // The same space, once the ship is in it.
+  driftIn:    'rgba(90,166,232,0.13)',
+  driftEdgeIn:'rgba(90,166,232,0.85)',
   /* The harbour mouth. It was dim enough to lose against a bright road drawn
      across it, which is the one moment it matters — so it is the strongest
      green on the chart, and the ring you cannot yet tie up inside is a clear
@@ -395,7 +398,7 @@ function draw(chart, view){
   drawBelt(chart, view, pos);
   drawOrbits(chart, pos, t);
   drawSoiRings(chart, pos);
-  drawDriftReaches(chart, pos);
+  drawDriftReaches(chart, pos, view);
   drawBodies(chart, view, pos, t);
   /* Where each leg of the road is pinned on the screen, worked out once and
      handed to everything that puts a mark on the road. It used to be worked
@@ -578,7 +581,7 @@ export function railLead(chart, el, centre, mu, t){
  * mouth's own ring rather than replacing it: they are two different questions
  * — "are the axes about this thing" and "may I tie up" — and the answer to the
  * first is yes a good while before the answer to the second. */
-function drawDriftReaches(chart, pos){
+function drawDriftReaches(chart, pos, view){
   const { ctx, world, camera } = chart;
   for(const b of world.bodies){
     if(!(b.driftReach > 0)) continue;
@@ -590,9 +593,18 @@ function drawDriftReaches(chart, pos){
     if(px < 10 || px > 6000) continue;
     const p = chart.toScreen(at.r);
     if(p[0] < -px - 40 || p[1] < -px - 40 || p[0] > chart.width + px + 40 || p[1] > chart.height + px + 40) continue;
+    /* The one the ship is actually in reads differently from one it is merely
+       near. Being inside it is a mode — the two buttons on a mark have changed
+       what they do — and a line you have crossed should not look like a line
+       you are approaching. */
+    const inside = view?.rendezvous === b.id;
     ctx.beginPath(); ctx.arc(p[0], p[1], px, 0, Math.PI * 2);
-    if(px < Math.min(chart.width, chart.height) * 0.45){ ctx.fillStyle = PALETTE.drift; ctx.fill(); }
-    ctx.strokeStyle = PALETTE.driftEdge; ctx.lineWidth = 1; ctx.setLineDash([4, 5]); ctx.stroke();
+    if(px < Math.min(chart.width, chart.height) * 0.45){
+      ctx.fillStyle = inside ? PALETTE.driftIn : PALETTE.drift; ctx.fill();
+    }
+    ctx.strokeStyle = inside ? PALETTE.driftEdgeIn : PALETTE.driftEdge;
+    ctx.lineWidth = inside ? 1.5 : 1;
+    ctx.setLineDash(inside ? [6, 4] : [4, 5]); ctx.stroke();
     ctx.setLineDash([]);
   }
 }
@@ -1670,11 +1682,24 @@ export function railCrossings(world, prediction, tNow, opts = {}){
      that has just left Tassel is sitting exactly on Tassel's rail, so the
      first sample is a crossing at t = now — true, useless, and drawn right
      on top of the ship. */
-  /* One, unless a caller asks for more. A road that cuts five rails twice
-     over earns ten honest pairs of diamonds and becomes unreadable; the rest
-     of this chart already refuses to draw past the first thing that happens,
-     and this is the same refusal. */
-  const { limit = 1, minLead = 0 } = opts;
+  /* Every world the road cuts the rail of, and once each.
+ 
+     It used to be one mark for the whole road — the first thing that happens —
+     on the reasoning that a road cutting five rails twice over earns ten pairs
+     of diamonds and becomes unreadable. The reasoning was about the doubles and
+     the answer punished the wrong thing: flying Tassel to Grumm, the one mark
+     you got was where you cut the rail of Slate, a moon of the world you had
+     just left, six days into a seventy-day trip — and the twenty others,
+     including every moon of the world you were actually going to, were not
+     drawn at all. A mark per world says what the road meets; a single mark says
+     what it meets first, which is rarely the question.
+
+     So the cap is on the doubles instead: soonest per world, so a road that
+     cuts the same rail going out and coming back earns one pair and not two.
+     What keeps the chart readable is the rail being on screen — a diamond sits
+     on a rail, and `drawRailCrossings` draws none for a rail it did not draw,
+     which is already how the zoom decides how much of this a player sees. */
+  const { limit = Infinity, minLead = 0 } = opts;
   const out = [];
   if(!prediction?.segments) return out;
   for(let si = 0; si < prediction.segments.length; si++){
@@ -1737,9 +1762,14 @@ export function railCrossings(world, prediction, tNow, opts = {}){
       }
     }
   }
-  /* Soonest first, so the one that survives the cap is the one you are about
-     to fly. */
-  return out.sort((a, b) => a.t - b.t).slice(0, limit);
+  /* Soonest first, and then one per world. */
+  const seen = new Set(), first = [];
+  for(const c of out.sort((a, b) => a.t - b.t)){
+    if(seen.has(c.body)) continue;
+    seen.add(c.body);
+    first.push(c);
+  }
+  return first.slice(0, limit);
 }
 
 /* Where a node sits on the plan: the ship's state at the node's time in the

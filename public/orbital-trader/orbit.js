@@ -876,7 +876,7 @@ export function advance(world, ship, t, dt, nodes = [], opts = {}){
       r = s.r; v = s.v; now += span;
     }
     if(nodeNext && Math.abs(now - nodeNext.t) <= T_TOL + 1e-12){
-      const burn = burnVector(r, v, nodeNext, opts.dvAvailable, frameAt(world, body.id, r, v, now, opts.hidden));
+      const burn = burnVector(r, v, nodeNext, opts.dvAvailable, burnFrame(r, v));
       v = add(v, burn.dv);
       events.push({ kind: 'burn', t: now, node: nodeNext, dv: burn.dv, magnitude: burn.magnitude, short: burn.short, body: body.id });
       if(opts.dvAvailable != null) opts.dvAvailable = Math.max(0, opts.dvAvailable - burn.magnitude);
@@ -946,19 +946,18 @@ export function driftTargetAt(world, bodyId, r, t, hidden = null){
   return best;
 }
 
-/* The frame a burn at (r, v) is actually written in: relative to a drifting
- * thing when the ship is inside one's reach, and to the world it is going
- * round otherwise. */
-export function frameAt(world, bodyId, r, v, t, hidden = null){
-  const tgt = world && bodyId ? driftTargetAt(world, bodyId, r, t, hidden) : null;
-  if(!tgt) return burnFrame(r, v);
-  const vRel = sub(v, tgt.v);
-  /* Speeds already matched: there is no relative forward to measure from, so
-     fall back rather than hand back a basis made of NaN. A ship this still is
-     one that should be tying up, not burning. */
-  if(!(norm(vRel) > 1e-12)) return burnFrame(r, v);
-  return burnFrame(sub(r, tgt.r), vRel);
-}
+/* A written mark is always in the world's frame — forward and back along the
+ * way you are going round it, out and in across that — wherever the ship is.
+ *
+ * It used to bend to a drifting thing's frame inside one's reach, so that the
+ * same four buttons could fly a rendezvous. That is what the two thrusters do
+ * now, directly and in real time, and they take their directions from the pair
+ * rather than from any frame: so the mark can go back to meaning one thing
+ * everywhere, which is the only thing it was ever good at. `driftTargetAt`
+ * stays, because finding what the ship is alongside is still the question the
+ * readout, the harbour and the thrusters all ask.
+ *
+ */
 
 /* A node's burn as a vector in the current frame. If the tank cannot cover it,
  * the burn is scaled down to what there is and flagged: the design says a
@@ -1025,7 +1024,7 @@ export function predict(world, ship, t0, nodes = [], horizon = 720, opts = {}){
   let t = t0;
   const end = t0 + horizon;
   const dvBudget = opts.dvAvailable;
-  const o = { atmosphere: opts.atmosphere, dvAvailable: dvBudget, hidden: opts.hidden };
+  const o = { atmosphere: opts.atmosphere, dvAvailable: dvBudget };
   let segStart = { body: body.id, t, r, v };
   let ni = 0;
   while(ni < nodes.length && nodes[ni].t < t - T_TOL) ni++;
@@ -1052,7 +1051,7 @@ export function predict(world, ship, t0, nodes = [], horizon = 720, opts = {}){
     }
     if(step.reason === 'burn'){
       const node = nodes[ni];
-      const burn = burnVector(step.r, step.v, node, o.dvAvailable, frameAt(world, body.id, step.r, step.v, step.t, o.hidden));
+      const burn = burnVector(step.r, step.v, node, o.dvAvailable, burnFrame(step.r, step.v));
       const vNew = add(step.v, burn.dv);
       if(o.dvAvailable != null) o.dvAvailable = Math.max(0, o.dvAvailable - burn.magnitude);
       dvTotal += burn.magnitude;
@@ -1104,7 +1103,7 @@ export function predictLegs(world, ship, t0, nodes = [], opts = {}){
   let body = world.get(ship.body);
   let r = ship.r, v = ship.v;
   let t = t0;
-  const o = { atmosphere: opts.atmosphere, dvAvailable: opts.dvAvailable, hidden: opts.hidden };
+  const o = { atmosphere: opts.atmosphere, dvAvailable: opts.dvAvailable };
   let ni = 0;
   while(ni < nodes.length && nodes[ni].t < t - T_TOL) ni++;
   let crashed = false;
@@ -1191,7 +1190,7 @@ export function predictLegs(world, ship, t0, nodes = [], opts = {}){
     }
     if(ending === 'burn'){
       segments.push(finishSegment(world, start, body, t1, s.r, s.v, 'burn', opts));
-      const burn = burnVector(s.r, s.v, node, o.dvAvailable, frameAt(world, body.id, s.r, s.v, t1, o.hidden));
+      const burn = burnVector(s.r, s.v, node, o.dvAvailable, burnFrame(s.r, s.v));
       const vNew = add(s.v, burn.dv);
       if(o.dvAvailable != null) o.dvAvailable = Math.max(0, o.dvAvailable - burn.magnitude);
       dvTotal += burn.magnitude;

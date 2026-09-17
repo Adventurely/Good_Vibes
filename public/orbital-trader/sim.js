@@ -19,7 +19,7 @@ import {
   closestApproach, nodeMagnitude, nodeCost, nodeFromVector, cross, dot, localState, TAU,
   /* aliased: seedFromLambert has a local `frameAt` of its own, and two things
      of that name one function apart is a trap waiting for the next edit. */
-  frameAt as burnFrameAt, driftTargetAt,
+  burnFrame, driftTargetAt,
 } from './orbit.js';
 import {
   CONST, BODIES, GOODS, PORTS, UPGRADES, FORMULAS, TEXT, SPECIES,
@@ -557,11 +557,18 @@ export function unseen(state){
   const hide = new Set();
   if(!knowsKnot(state)) hide.add('knot');
   if(!knowsMaw(state)) hide.add('maw');
-  /* A wreck is a rumour until somebody hands you the job that names it. Eight
-     unexplained dots on the chart from the first day would be eight questions
-     with no way to ask them; one that appears when a salvor tells you where to
-     look is a lead. Taking the job is what reveals it, and finishing the job
-     does not hide it again — you have been there now.
+  /* A wreck is on the chart for exactly as long as there is a reason to fly to
+     it: from the moment a salvor names it to the moment its hold is empty.
+     Eight unexplained dots from the first day would be eight questions with no
+     way to ask them, and a picked-over hulk left on the chart afterwards is a
+     harbour that offers nothing — a dot you keep flying back to to find out it
+     is the one you already did.
+
+     A full hold is the one thing that keeps a stripped wreck on the chart, and
+     that is deliberate. The haul goes aboard whole or not at all, so a ship
+     that cannot fit it takes none of it: the job does not fail, the step simply
+     does not finish, and the wreck stays exactly where it was until you have
+     been and made room. Coming back is the cost of arriving full.
 
      The station at the Dancer is hidden the same way and for the same reason.
      It has been going round that star since before anybody was watching, and it
@@ -570,13 +577,23 @@ export function unseen(state){
   const told = new Set();
   for(const live of state?.quests ?? []){
     const q = questById(live.id);
-    /* What a job points at: the wreck it names, and where it ends when that is
-       one of these rather than a port. The last job in the line has no wreck —
-       its destination *is* the secret — so both count. */
-    for(const id of [q?.wreck, q?.to]) if(id && HULK_IDS.has(id)) told.add(id);
+    /* The wreck it names, while there is still something in it, and where it
+       ends when that is one of these rather than a port. The last job in the
+       line has no wreck — its destination *is* the secret — so both count. */
+    if(q?.wreck && HULK_IDS.has(q.wreck) && !stripped(live, q)) told.add(q.wreck);
+    if(q?.to && HULK_IDS.has(q.to)) told.add(q.to);
   }
+  /* And whatever the ship is tied up to, empty or not: a harbour you are
+     sitting in belongs on the chart under you until you cast off from it. */
+  if(state?.dockedAt && HULK_IDS.has(state.dockedAt)) told.add(state.dockedAt);
   for(const id of HULK_IDS) if(!told.has(id)) hide.add(id);
   return hide;
+}
+
+/* Whether this job's haul is already aboard — the recover step is behind us. */
+function stripped(live, q){
+  const i = questSteps(q).findIndex(st => st.kind === 'recover');
+  return i >= 0 && (live?.step ?? 0) > i;
 }
 /* Seeing past the encounter. The road normally stops one crossing out — see
  * the note on fullLap — because a road that chases every encounter it can find
@@ -596,24 +613,36 @@ export const canDockDrifting = state => !!state?.crew?.navigator;
  * that matter, or null. Distance at intercept is the closest the *current*
  * path comes, which is the number you fly a rendezvous on — the range right
  * now says nothing about whether you are going to arrive. */
-export function rendezvous(state){
+/* The thing the ship is currently alongside, in the ship's own frame, or null.
+ *
+ * Two ways to be near one. A wreck drifts in somebody else's frame, and a reach
+ * round it is what says you are close enough to be flying the rendezvous rather
+ * than the orbit. The Maw has weight, so its own reach does that job and the
+ * ship is simply *in* its frame — where the two numbers are where you are and
+ * how fast, with nothing to subtract. Without this, giving the Maw a well
+ * silently took its readout away: the drift reach sits inside the sphere of
+ * influence and can never fire again.
+ *
+ * The hidden set gates the *drifting* things and only those. A wreck nobody has
+ * heard of gives no readout at all, because the ship has no idea it is there;
+ * the Maw keeps its numbers and loses its name — the road still runs into it,
+ * and how close and how fast are still true, which is exactly what `nameFor`
+ * draws as ??? until the sensors are aboard.
+ *
+ * The readout and the thrusters both come through here, so what the corner says
+ * and what the engine does can never be about different things. */
+export function alongside(state){
   if(!state || state.dockedAt) return null;
   const here = world.get(state.ship.body);
-  /* Two ways to be near one of these. A wreck drifts in somebody else's frame,
-     and a reach round it is what says you are close enough to be flying the
-     rendezvous rather than the orbit. The Maw has weight, so its own reach does
-     that job and the ship is simply *in* its frame — where the two numbers are
-     where you are and how fast, with nothing to subtract. Without this, giving
-     the Maw a well silently took its readout away: the drift reach sits inside
-     the sphere of influence and can never fire again. */
-  /* The hidden set gates the *drifting* things and only those. A wreck nobody
-     has heard of gives no readout at all, because the ship has no idea it is
-     there; the Maw keeps its numbers and loses its name — the road still runs
-     into it, and how close and how fast are still true, which is exactly what
-     `nameFor` draws as ??? until the sensors are aboard. */
-  const tgt = here.port && here.rendezvous && here.mu > 0
+  if(!here) return null;
+  return here.port && here.rendezvous && here.mu > 0
     ? { id: here.id, r: [0, 0], v: [0, 0], reach: here.soi }
     : driftTargetAt(world, here.id, state.ship.r, state.t, unseen(state));
+}
+
+export function rendezvous(state){
+  if(!state || state.dockedAt) return null;
+  const tgt = alongside(state);
   if(!tgt) return null;
   const rel = sub(state.ship.r, tgt.r);
   const vRel = sub(state.ship.v, tgt.v);
@@ -723,17 +752,14 @@ function skimShed(b, el, at){
  * to a ship without a shield and a brake to one with. */
 function legOpts(state, extra = {}){
   const skim = skimsAir(state);
-  /* What the ship has not been told about cannot bend its burns: the same set
-     the chart refuses to draw is handed to the flying, so an unfound wreck is
-     absent rather than merely invisible. */
-  return { atmosphere: !skim, dvAvailable: state.dv, skimAt: skim ? skimShed : null, hidden: unseen(state), ...extra };
+  return { atmosphere: !skim, dvAvailable: state.dv, skimAt: skim ? skimShed : null, ...extra };
 }
 const sortedNodes = state => state.nodes.map(n => ({ ...n })).sort((a, b) => a.t - b.t);
 
 export function effectiveNodes(state, horizon, { skim = skimsAir(state) } = {}){
   const nodes = sortedNodes(state);
   if(!skim) return nodes;
-  const pred = predictLegs(world, state.ship, state.t, nodes, { atmosphere: false, dvAvailable: state.dv, skimAt: skimShed, hidden: unseen(state), maxTime: horizon, noSamples: true });
+  const pred = predictLegs(world, state.ship, state.t, nodes, { atmosphere: false, dvAvailable: state.dv, skimAt: skimShed, maxTime: horizon, noSamples: true });
   const aero = pred.events.filter(e => e.kind === 'burn' && e.node.aero).map(e => e.node);
   return [...nodes, ...aero].sort((a, b) => a.t - b.t);
 }
@@ -1309,35 +1335,98 @@ export function exchangeFor(state, who, nth = 0){
   return list[((nth % list.length) + list.length) % list.length];
 }
 
-/* The speed a burn written here is actually measured against, and whether that
- * is a relative one.
+/* What one press is worth, as a fraction of the speed it is measured against.
  *
- * A press on one of the four buttons is a fraction of "how fast you are
- * going", and the frame decides which speed that is. Beside a wreck out at the
- * Lamp the ship is doing thirty-six kilometres a second round the Lamp and a
- * few dozen metres a second relative to the hulk it is trying to touch — and
- * the press was being sized off the first of those, so one tap was two hundred
- * metres a second and the whole approach could only be flown by overshooting.
- * The burn itself has always been written in the drifting thing's frame; this
- * is the button catching up with it. */
-export function burnScaleAt(state, where, t){
-  if(!where) return { speed: norm(state?.ship?.v ?? [0, 0]), relative: false };
-  const tgt = driftTargetAt(world, where.body, where.r, t, unseen(state));
-  return tgt
-    ? { speed: norm(sub(where.v, tgt.v)), relative: true, target: tgt.id }
-    : { speed: norm(where.v), relative: false };
+ * Pushing an orbit about you are nudging something enormous, and a half-percent
+ * step is a nudge. Killing a drift you are trying to lose nearly all of what
+ * you have, and a half-percent of two hundred metres a second is two hundred
+ * presses — so Match takes a tenth instead. It shrinks as it works, which is
+ * the whole trick: the same button is twenty metres a second when you are
+ * closing fast and a fifth of one when you are nearly stopped, so the last few
+ * metres a second cost no more presses than the first few hundred. */
+export const BURN_STEP = 0.005, BURN_STEP_REL = 0.1;
+
+/* What one press is worth, in metres a second: that fraction of the speed the
+ * burn is measured against, rounded to a number a person would say out loud.
+ * The chart's arrows and the zero-g thrusters both ask here, so a press is the
+ * same size whichever way it is made. */
+export function burnStep(speed, relative){
+  const ms = kms(speed) * 1000 * (relative ? BURN_STEP_REL : BURN_STEP);
+  const pow = Math.pow(10, Math.floor(Math.log10(Math.max(1, ms))));
+  const nice = [1, 2, 5, 10].map(m => m * pow).find(x => x >= ms) ?? 10 * pow;
+  return Math.max(1, Math.min(500, nice));
 }
 
-/* What one press is worth, as a fraction of that speed.
+/* ------------------------------------------------------------ zero-g thrust
+
+ * Coming alongside is the one manoeuvre in this game flown by hand rather than
+ * written down. Everywhere else a burn is a mark on the road: you put it where
+ * you want it, push it about with the clock stopped, and the tick fires it when
+ * it gets there. That is the right shape for a transfer, where the thing you
+ * are deciding is *when*, months out, and it is the wrong shape entirely for
+ * the last two kilometres — where what you are deciding is "a bit less now",
+ * over and over, watching the range come down.
  *
- * Flying an orbit you are nudging something enormous and a half-percent step
- * is a nudge. Coming alongside you are killing nearly all of what you have, and
- * a half-percent of two hundred metres a second is two hundred presses — so a
- * rendezvous gets a tenth of the relative speed instead. It shrinks as you
- * slow, which is the whole trick: the same button is ten metres a second when
- * you are closing fast and a tenth of one when you are nearly stopped, so the
- * last few metres a second cost no more presses than the first few hundred. */
-export const BURN_STEP = 0.005, BURN_STEP_REL = 0.1;
+ * There are two controls, and between them they are the whole manoeuvre:
+ *
+ *   MATCH    kill your speed relative to the thing. Straight down the relative
+ *            velocity vector, whichever way that happens to point. This is the
+ *            one that ends the approach, because tying up asks for slow.
+ *   TOWARD   push straight along the line of sight to it. This is the one that
+ *            starts the approach, and the only one that shortens the range.
+ *
+ * It used to be four — the orbital axes, forward/back and out/in, in the
+ * relative frame. That was a worse scheme than it looked, because `out` is at
+ * right angles to your *relative velocity* rather than along the line to the
+ * thing, so the button labelled "toward" pointed at the wreck only in the one
+ * case where those coincide. Two buttons that mean what they say beat four
+ * that are exactly right and unreadable.
+ *
+ * The charge, the tank and the record are a written mark's own, so nothing
+ * about the flight model changes. What changes is that you are flying it. */
+
+/* A press of TOWARD, which has nothing to be a fraction of: the range is not a
+ * speed and the relative velocity may be nothing at all. Five metres a second
+ * is a nudge at every scale this is flown at — a few taps to get moving across
+ * a five-hundred-kilometre reach, and small enough not to overshoot a mouth ten
+ * across. */
+export const THRUST_NUDGE = 0.005;               // km/s
+
+/* What one press of each is worth, in metres a second, for the labels and for
+ * the engine — asked once so the button and the burn can never disagree.
+ * MATCH is a tenth of what there is to kill, and never more than all of it:
+ * held down it brings the ship to rest rather than bouncing it off nothing. */
+export function thrustStep(which, relSpeed){
+  if(which === 'toward') return kms(auDay(THRUST_NUDGE)) * 1000;
+  return Math.min(burnStep(relSpeed, true), kms(relSpeed) * 1000);
+}
+
+export const THRUSTERS = ['toward', 'match'];
+export const isThrustAxis = which => THRUSTERS.includes(which);
+
+export function thrust(state, which, fine = 1){
+  if(!state || state.dockedAt) return { ok: false, reason: 'Tied up.' };
+  if(!isThrustAxis(which)) return { ok: false, reason: 'No such thruster.' };
+  const tgt = alongside(state);
+  if(!tgt) return { ok: false, reason: 'Nothing alongside to fly against.' };
+  if(!(state.dv > 0)) return { ok: false, reason: 'The tank is dry.' };
+
+  const rel = sub(state.ship.r, tgt.r);          // ship, as seen from the thing
+  const vRel = sub(state.ship.v, tgt.v);
+  const range = norm(rel), relSpeed = norm(vRel);
+  const along = which === 'toward'
+    ? (range > 0 ? scale(rel, -1 / range) : null)          // down the line of sight
+    : (relSpeed > 0 ? scale(vRel, -1 / relSpeed) : null);  // against the drift
+  if(!along) return { ok: false, reason: which === 'toward' ? 'You are on top of it.' : 'Already matched.' };
+
+  const want = Math.min(state.dv, auDay(thrustStep(which, relSpeed) / 1000) * fine);
+  if(!(want > 0)) return { ok: false, reason: 'Already matched.' };
+  state.ship.v = add(state.ship.v, scale(along, want));
+  state.dv = Math.max(0, state.dv - want);
+  state.stats.burns++;
+  state.stats.dvSpent += want;
+  return { ok: true, dv: want, target: tgt.id };
+}
 
 /* How long a line takes to read, which is how long the next one waits.
  *
@@ -1392,8 +1481,37 @@ export const tutorialRunning = state => !(state.flags?.tutorialDone || state.fla
 export const maxNodes = state => (tutorialRunning(state) ? 1 : MAX_NODES);
 
 export const MIN_LEAD = CONST.BASE_RATE_DAYS_PER_SEC * 60;
-export function addNode(state, t){
-  if(state.dockedAt || t < state.t + MIN_LEAD || state.nodes.length >= maxNodes(state)) return -1;
+
+/* The hard floor under any lead: a couple of real seconds at x1. A mark is a
+ * thing you push around, and one written on top of now fires before it can be
+ * touched. */
+export const LEAD_FLOOR = CONST.BASE_RATE_DAYS_PER_SEC * 2;
+
+/* How much road beside the ship a finger may not land on, as a time.
+ *
+ * MIN_LEAD is a minute of real time at x1, and as a rule about the clock that
+ * is right: a burn wants enough notice to be caught and pushed before it
+ * fires. But the thing a finger aims at is a *distance on the screen*, and a
+ * minute is exactly what that is not. Beside a wreck the ship covers
+ * forty-eight kilometres in one, and the chart zoomed in far enough to fly
+ * that rendezvous is fifty-four kilometres across — so the whole of the
+ * visible road was out of bounds at precisely the zoom where it mattered.
+ *
+ * So the lead is whichever is shorter: the minute, or the time it takes to
+ * travel a thumb's width of screen. Zoomed out the minute always wins and
+ * nothing has changed; zoomed in it shrinks to a ring of pixels round the
+ * ship, which is what the protection was for in the first place. */
+export const TAP_CLEAR_PX = 28;
+export const leadForTap = pxPerDay =>
+  Math.max(LEAD_FLOOR, Math.min(MIN_LEAD, pxPerDay > 0 ? TAP_CLEAR_PX / pxPerDay : MIN_LEAD));
+
+/* `lead` is how far ahead this particular way of writing a mark insists on.
+ * It may only ever ask for *less* than the standard minute, never more, and
+ * never less than the floor: a caller may say "the player is looking at this
+ * closely and means it", not "let them write a mark into the past". */
+export function addNode(state, t, lead = MIN_LEAD){
+  const floor = Math.max(LEAD_FLOOR, Math.min(lead, MIN_LEAD));
+  if(state.dockedAt || t < state.t + floor || state.nodes.length >= maxNodes(state)) return -1;
   state.nodes.push({ t, prograde: 0, radial: 0 });
   state.nodes.sort((a, b) => a.t - b.t);
   return state.nodes.findIndex(n => n.t === t);
@@ -1449,19 +1567,17 @@ export function addNodeAhead(state){
  * that are already written on the buttons, and the fuel it costs is shown
  * against the fuel gauge where the word "fuel" is. Nothing about a burn that
  * slows you down now goes up. */
-export function burnWords(node, relTo){
+/* A mark says the same four words wherever it is written. It used to have a
+ * second sentence for a mark inside a drifting thing's reach, where the axes
+ * bent and "out" became "away from it" — the thrusters do that job now, so a
+ * mark is an orbit again everywhere, and only ever means the one thing. */
+export function burnWords(node){
   if(!node) return 'nothing yet';
   const parts = [];
   const pro = node.prograde ?? 0, rad = node.radial ?? 0;
-  /* Near something drifting, the same two numbers mean something else: forward
-     is along your speed relative to it, and the second axis points at it
-     rather than out of an orbit. Same axes, different sentence. */
   if(Math.abs(pro) > 1e-15) parts.push(`${pro > 0 ? 'forward' : 'back'} ${fmtKms(pro)}`);
-  if(Math.abs(rad) > 1e-15){
-    parts.push(relTo ? `${rad > 0 ? 'away' : 'toward'} ${fmtKms(rad)}` : `${rad > 0 ? 'out' : 'in'} ${fmtKms(rad)}`);
-  }
-  if(!parts.length) return 'nothing yet';
-  return parts.join(' · ') + (relTo ? ` · on ${relTo}` : '');
+  if(Math.abs(rad) > 1e-15) parts.push(`${rad > 0 ? 'out' : 'in'} ${fmtKms(rad)}`);
+  return parts.length ? parts.join(' · ') : 'nothing yet';
 }
 
 export function planCost(state, horizon){
@@ -1982,9 +2098,8 @@ function pickSeed(state, node, candidates, scoreFn, reference){
   const byTime = [...candidates].sort((a, b) => (a.arrives ?? 0) - (b.arrives ?? 0));
   const shortlist = [...new Set([...candidates.slice(0, 6), ...byTime.slice(0, 4)])];
   const scored = [];
-  const hidden = unseen(state);
   for(const c of shortlist){
-    const parts = nodeFromVector(c.r, c.v, c.dv, burnFrameAt(world, c.body ?? state.ship.body, c.r, c.v, state.t + c.dep, hidden));
+    const parts = nodeFromVector(c.r, c.v, c.dv, burnFrame(c.r, c.v));
     if(!parts) continue;
     node.t = state.t + c.dep;
     node.prograde = parts.prograde;
