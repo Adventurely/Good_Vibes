@@ -191,9 +191,15 @@
       <div class="toolbar" id="edit-toolbar">
         <button class="btn" id="tool-terrain" type="button" aria-pressed="true">Terrain</button>
         <button class="btn" id="tool-gap" type="button" aria-pressed="false">Gap</button>
+        <button class="btn" id="tool-rock" type="button" aria-pressed="false">Rock</button>
+        <button class="btn" id="tool-seam" type="button" aria-pressed="false">Rock seam</button>
+        <button class="btn" id="tool-island" type="button" aria-pressed="false">Island</button>
+        <button class="btn" id="tool-teleport" type="button" aria-pressed="false">Teleport</button>
+        <button class="btn" id="tool-erase" type="button" aria-pressed="false">Erase</button>
         <button class="btn" id="undo" type="button">Undo stroke</button>
         <button class="btn" id="flatten" type="button">Reset to flat</button>
       </div>
+      <p class="status" id="tool-help"></p>
       <div class="toolbar" id="play-toolbar" hidden>
         <div class="skills" id="skills" role="group" aria-label="Skills to arm"></div>
       </div>
@@ -224,6 +230,13 @@
         <div class="row"><label for="f-id">Id</label><input type="text" id="f-id" value="custom"></div>
         <div class="row"><label for="f-nestX">Nest x</label><input type="number" id="f-nestX" min="0" max="319" value="20"></div>
         <div class="row"><label for="f-goalX">Pond starts at</label><input type="number" id="f-goalX" min="1" max="319" value="300"></div>
+        <div class="row"><label for="f-hatchDir">Hatchlings face</label>
+          <select id="f-hatchDir">
+            <option value="">Towards the pond</option>
+            <option value="-1">Left</option>
+            <option value="1">Right</option>
+          </select>
+        </div>
         <div class="row"><label for="f-duckCount">Duck count</label><input type="number" id="f-duckCount" min="1" max="60" value="10"></div>
         <div class="row"><label for="f-spawn">Spawn every (s)</label><input type="number" id="f-spawn" min="0.5" max="10" step="0.5" value="2"></div>
         <div class="row"><label for="f-time">Time limit (s)</label><input type="number" id="f-time" min="10" max="600" value="180"></div>
@@ -238,6 +251,7 @@
           <div><label for="s-blocker">Blocker</label><input type="number" id="s-blocker" min="0" max="60" value="2"></div>
           <div><label for="s-climber">Climber</label><input type="number" id="s-climber" min="0" max="60" value="2"></div>
           <div><label for="s-flyer">Flyer</label><input type="number" id="s-flyer" min="0" max="60" value="2"></div>
+          <div><label for="s-jumper">Jumper</label><input type="number" id="s-jumper" min="0" max="60" value="0"></div>
         </div>
       </div>
 
@@ -268,7 +282,7 @@
 
 <script type="module">
   import { SCENE_W, SCENE_H, PIT_Y, TICK_RATE, SKILLS, SKILL_INFO, LEVELS,
-    buildTerrain, winCount, formatTime } from './content.js';
+    buildTerrain, buildLayer, winCount, formatTime } from './content.js';
   import { newGame, tick, assignSkill, assignRefusal, duckNear } from './sim.js';
   import { paintScene, drawSkillBadge, BADGE_PLATE_W, BADGE_PLATE_H } from './art.js';
   import { fitCanvas, context2d } from '../good-vibes/pixel.js';
@@ -281,6 +295,7 @@
     playtestRestart: els('playtest-restart'),
     editToolbar: els('edit-toolbar'), playToolbar: els('play-toolbar'),
     toolTerrain: els('tool-terrain'), toolGap: els('tool-gap'), undo: els('undo'), flatten: els('flatten'),
+    toolHelp: els('tool-help'),
     status: els('status'), skills: els('skills'),
     playtestBtn: els('playtest-btn'), stopPlaytest: els('stop-playtest'),
     startFrom: els('start-from'), loadStartFrom: els('load-start-from'), newLevel: els('new-level'),
@@ -302,26 +317,48 @@
 
   /* ------------------------------------------------------------ the model */
 
-  // One height per column — the same shape sim.js's terrain is built into
-  // (see content.js's buildTerrain), just edited directly instead of typed
-  // out as segments. PIT_Y marks a column as open pit, same convention as
-  // everywhere else in this game.
+  /* The level being edited, in the flattest shape that can hold one.
+   *
+   * `heights` is one number per column — the same shape sim.js's terrain is
+   * built into (see content.js's buildTerrain), just edited directly instead
+   * of typed out as segments. PIT_Y marks a column as open pit, same
+   * convention as everywhere else in this game. `rock` and `seam` ride
+   * alongside it, one entry per column, because that is what a brush paints:
+   * they are turned back into segment fields on the way out (see
+   * heightsToSegments).
+   *
+   * `islands` and `teleports` are not per-column at all and are kept exactly
+   * as the level will carry them — an island is a span with a height and a
+   * teleporter is a pair of points, and neither is anything a column-shaped
+   * array could hold.
+   */
   let heights = new Array(SCENE_W).fill(150);
+  let rock = new Array(SCENE_W).fill(false);      // `hard`: a column of stone
+  let seam = new Array(SCENE_W).fill(null);       // `hardBelow`: stone under a height
+  let islands = [];                               // { from, to, y, floor }
+  let teleports = [];                             // { ax, ay, bx, by }
 
   const meta = {
     id: 'custom', name: 'Custom Level',
-    nestX: 20, goalX: 300,
+    nestX: 20, goalX: 300, hatchDir: '',
     duckCount: 10, spawnSeconds: 2, timeSeconds: 180, winRatio: 0.75,
-    supply: { digger: 2, builder: 2, blocker: 2, climber: 2, flyer: 2 },
+    supply: { digger: 2, builder: 2, blocker: 2, climber: 2, flyer: 2, jumper: 0 },
     goose: { x0: 250, x1: 299, y: 150, speed: 1.5, catchRadius: 1.5, relentless: false },
   };
 
+  // A run of columns becomes one segment only while every one of its three
+  // painted layers agrees — a stretch of wall half of which is stone is two
+  // segments, not one with a note attached.
   function heightsToSegments(hs){
+    const same = (a, b) => hs[a] === hs[b] && rock[a] === rock[b] && seam[a] === seam[b];
     const segments = [];
     let start = 0;
     for(let x = 1; x <= hs.length; x++){
-      if(x === hs.length || hs[x] !== hs[start]){
-        segments.push({ from: start, to: x, y: hs[start] });
+      if(x === hs.length || !same(x, start)){
+        const seg = { from: start, to: x, y: hs[start] };
+        if(rock[start]) seg.hard = true;
+        if(seam[start] != null) seg.hardBelow = seam[start];
+        segments.push(seg);
         start = x;
       }
     }
@@ -333,7 +370,10 @@
       id: meta.id || 'custom', name: meta.name || 'Custom Level',
       width: SCENE_W, height: SCENE_H,
       segments: heightsToSegments(heights),
+      islands: islands.map(i => ({ ...i })),
+      teleports: teleports.map(t => ({ ...t })),
       nestX: meta.nestX, goalX: meta.goalX,
+      ...(meta.hatchDir ? { hatchDir: Number(meta.hatchDir) } : {}),
       duckCount: meta.duckCount,
       spawnInterval: Math.round(TICK_RATE * meta.spawnSeconds),
       timeLimit: Math.round(TICK_RATE * meta.timeSeconds),
@@ -341,6 +381,26 @@
       supply: { ...meta.supply },
       goose: { ...meta.goose },
     };
+  }
+
+  /* Everything a stroke could change, kept together so one undo puts all of
+     it back — painting rock and dropping an island are the same kind of edit
+     from here, and an undo that only remembered the heights would quietly
+     lose the rest. */
+  function snapshot(){
+    return {
+      heights: heights.slice(), rock: rock.slice(), seam: seam.slice(),
+      islands: islands.map(i => ({ ...i })),
+      teleports: teleports.map(t => ({ ...t })),
+    };
+  }
+
+  function restore(snap){
+    heights = snap.heights.slice();
+    rock = snap.rock.slice();
+    seam = snap.seam.slice();
+    islands = snap.islands.map(i => ({ ...i }));
+    teleports = snap.teleports.map(t => ({ ...t }));
   }
 
   /* ------------------------------------------------------------- the form */
@@ -359,6 +419,7 @@
     's-blocker': ['num', v => meta.supply.blocker = v, () => meta.supply.blocker],
     's-climber': ['num', v => meta.supply.climber = v, () => meta.supply.climber],
     's-flyer': ['num', v => meta.supply.flyer = v, () => meta.supply.flyer],
+    's-jumper': ['num', v => meta.supply.jumper = v, () => meta.supply.jumper],
     'g-x0': ['num', v => meta.goose.x0 = v, () => meta.goose.x0],
     'g-x1': ['num', v => meta.goose.x1 = v, () => meta.goose.x1],
     'g-y': ['num', v => meta.goose.y = v, () => meta.goose.y],
@@ -367,6 +428,7 @@
   };
 
   function readFieldsIntoMeta(){
+    meta.hatchDir = els('f-hatchDir').value;
     for(const [id, [kind, setter]] of Object.entries(fields)){
       const el = els(id);
       const raw = el.value;
@@ -382,25 +444,33 @@
 
   function writeMetaIntoFields(){
     for(const [id, [, , getter]] of Object.entries(fields)) els(id).value = getter();
+    els('f-hatchDir').value = meta.hatchDir ?? '';
     els('g-relentless').checked = Boolean(meta.goose.relentless);
   }
 
   for(const id of Object.keys(fields)){
     els(id).addEventListener('input', () => { readFieldsIntoMeta(); refreshExport(); saveToStorage(); });
   }
-  els('g-relentless').addEventListener('change', () => { readFieldsIntoMeta(); refreshExport(); saveToStorage(); });
+  for(const id of ['g-relentless', 'f-hatchDir']){
+    els(id).addEventListener('change', () => { readFieldsIntoMeta(); refreshExport(); saveToStorage(); });
+  }
 
   /* --------------------------------------------------------- load a level */
 
   function loadLevel(level){
     heights = buildTerrain(level.segments, level.width).map(y => y ?? SCENE_H + 200);
+    rock = buildLayer(level.segments, 'hard', false, level.width).map(Boolean);
+    seam = buildLayer(level.segments, 'hardBelow', null, level.width);
+    islands = (level.islands ?? []).map(i => ({ ...i }));
+    teleports = (level.teleports ?? []).map(t => ({ ...t }));
     meta.id = level.id; meta.name = level.name;
     meta.nestX = level.nestX; meta.goalX = level.goalX;
+    meta.hatchDir = level.hatchDir == null ? '' : String(level.hatchDir);
     meta.duckCount = level.duckCount;
     meta.spawnSeconds = level.spawnInterval / TICK_RATE;
     meta.timeSeconds = level.timeLimit / TICK_RATE;
     meta.winRatio = level.winRatio;
-    meta.supply = { ...level.supply };
+    meta.supply = { jumper: 0, ...level.supply };
     meta.goose = { ...level.goose };
     writeMetaIntoFields();
     refreshExport();
@@ -410,7 +480,7 @@
   ui.loadStartFrom.addEventListener('click', () => {
     const id = ui.startFrom.value;
     if(!id){
-      heights = new Array(SCENE_W).fill(150);
+      clearAll();
       say('Starting from a blank, flat canvas.');
     } else {
       const level = LEVELS.find(l => l.id === id);
@@ -419,13 +489,22 @@
     }
   });
 
+  function clearAll(){
+    heights = new Array(SCENE_W).fill(150);
+    rock = new Array(SCENE_W).fill(false);
+    seam = new Array(SCENE_W).fill(null);
+    islands = [];
+    teleports = [];
+    pendingPad = null;
+  }
+
   ui.newLevel.addEventListener('click', () => {
     if(!confirm('Clear the current level and start over?')) return;
-    heights = new Array(SCENE_W).fill(150);
+    clearAll();
     meta.id = 'custom'; meta.name = 'Custom Level';
-    meta.nestX = 20; meta.goalX = 300;
+    meta.nestX = 20; meta.goalX = 300; meta.hatchDir = '';
     meta.duckCount = 10; meta.spawnSeconds = 2; meta.timeSeconds = 180; meta.winRatio = 0.75;
-    meta.supply = { digger: 2, builder: 2, blocker: 2, climber: 2, flyer: 2 };
+    meta.supply = { digger: 2, builder: 2, blocker: 2, climber: 2, flyer: 2, jumper: 0 };
     meta.goose = { x0: 250, x1: 299, y: 150, speed: 1.5, catchRadius: 1.5, relentless: false };
     writeMetaIntoFields();
     refreshExport();
@@ -439,13 +518,37 @@
 
   function refreshExport(){
     const level = buildLevel();
-    const segLines = level.segments.map(s =>
-      `    { from: ${s.from}, to: ${s.to}, y: ${formatY(s.y)} },`).join('\n');
+    const segLines = level.segments.map(seg => {
+      const parts = [`from: ${seg.from}`, `to: ${seg.to}`, `y: ${formatY(seg.y)}`];
+      if(seg.hard) parts.push('hard: true');
+      if(seg.hardBelow != null) parts.push(`hardBelow: ${Math.round(seg.hardBelow)}`);
+      return `    { ${parts.join(', ')} },`;
+    }).join('\n');
     const gooseParts = [
       `x0: ${level.goose.x0}`, `x1: ${level.goose.x1}`, `y: ${level.goose.y}`,
       `speed: ${level.goose.speed}`, `catchRadius: ${level.goose.catchRadius}`,
     ];
     if(level.goose.relentless) gooseParts.push('relentless: true');
+
+    // Both of these are left out entirely when the level has none, rather
+    // than written as an empty array — every level in content.js that has no
+    // island and no teleporter says nothing at all about either, and an
+    // export that pasted `islands: []` into one would read as a decision.
+    const isleLines = level.islands.length ? [
+      `  islands: [`,
+      ...level.islands.map(i =>
+        `    { from: ${i.from}, to: ${i.to}, y: ${Math.round(i.y)}, floor: ${Math.round(i.floor)} },`),
+      `  ],`,
+      ``,
+    ] : [];
+    const padLines = level.teleports.length ? [
+      `  teleports: [`,
+      ...level.teleports.map(t =>
+        `    { ax: ${t.ax}, ay: ${Math.round(t.ay)}, bx: ${t.bx}, by: ${Math.round(t.by)} },`),
+      `  ],`,
+      ``,
+    ] : [];
+
     const code = [
       `export const LEVEL_${(level.id || 'custom').toUpperCase().replace(/[^A-Z0-9]+/g, '_')} = {`,
       `  id: '${level.id}',`,
@@ -457,7 +560,10 @@
       segLines,
       `  ],`,
       ``,
+      ...isleLines,
+      ...padLines,
       `  nestX: ${level.nestX},`,
+      ...(level.hatchDir ? [`  hatchDir: ${level.hatchDir},`] : []),
       `  goalX: ${level.goalX},`,
       ``,
       `  duckCount: ${level.duckCount},`,
@@ -465,7 +571,7 @@
       `  timeLimit: TICK_RATE * ${meta.timeSeconds},`,
       `  winRatio: ${level.winRatio},`,
       ``,
-      `  supply: { digger: ${level.supply.digger}, builder: ${level.supply.builder}, blocker: ${level.supply.blocker}, climber: ${level.supply.climber}, flyer: ${level.supply.flyer} },`,
+      `  supply: { digger: ${level.supply.digger}, builder: ${level.supply.builder}, blocker: ${level.supply.blocker}, climber: ${level.supply.climber}, flyer: ${level.supply.flyer}, jumper: ${level.supply.jumper ?? 0} },`,
       ``,
       `  goose: { ${gooseParts.join(', ')} },`,
       `};`,
@@ -485,13 +591,16 @@
 
   /* --------------------------------------------------------------- saving */
 
-  const STORAGE_KEY = 'ddq-builder-v1';
+  // v2: the saved shape gained rock, seams, islands and teleporters, so a
+  // v1 draft would come back missing half of what the editor now reads. A
+  // new key drops those on the floor rather than half-loading one.
+  const STORAGE_KEY = 'ddq-builder-v2';
   let saveTimer = null;
   function saveToStorage(){
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       try{
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ heights, meta }));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...snapshot(), meta }));
       }catch{ /* private mode, or full — fine, this is a convenience only */ }
     }, 300);
   }
@@ -500,9 +609,15 @@
     let saved = null;
     try{ saved = JSON.parse(localStorage.getItem(STORAGE_KEY)); }catch{ /* ignore */ }
     if(!saved || !Array.isArray(saved.heights) || saved.heights.length !== SCENE_W) return false;
-    heights = saved.heights;
+    restore({
+      heights: saved.heights,
+      rock: saved.rock ?? new Array(SCENE_W).fill(false),
+      seam: saved.seam ?? new Array(SCENE_W).fill(null),
+      islands: saved.islands ?? [],
+      teleports: saved.teleports ?? [],
+    });
     Object.assign(meta, saved.meta);
-    meta.supply = { ...meta.supply };
+    meta.supply = { jumper: 0, ...meta.supply };
     meta.goose = { ...meta.goose };
     writeMetaIntoFields();
     return true;
@@ -511,30 +626,49 @@
   /* ------------------------------------------------------------- terrain */
 
   let mode = 'edit';    // 'edit' | 'play'
-  let tool = 'terrain'; // 'terrain' | 'gap'
+  let tool = 'terrain';
   let strokeUndo = null;
   let painting = false;
   let lastCol = null, lastRow = null;
+  let dragFrom = null;     // island tool: where the drag started
+  let pendingPad = null;   // teleport tool: the first pad of a pair
+
+  /* Every tool, with the one line of help each one needs. Kept as data so
+     the buttons, the pressed states and the help line all come from the same
+     place rather than three lists that have to be remembered together. */
+  const TOOLS = {
+    terrain: ['tool-terrain', 'Drag to raise or lower the ground.'],
+    gap: ['tool-gap', 'Drag to open a bottomless gap — nothing survives one.'],
+    rock: ['tool-rock', 'Drag to turn ground to stone. A Digger cannot start a tunnel into it (content.js\'s `hard`).'],
+    seam: ['tool-seam', 'Drag to put a rock seam at this height: dirt above it, stone below (`hardBelow`). A tunnel only gets through over the top.'],
+    island: ['tool-island', 'Drag across to drop a platform in the sky at that height. The ground underneath stays walkable.'],
+    teleport: ['tool-teleport', 'Click once for each end of a pair. A duckling walking onto either pad comes out of the other.'],
+    erase: ['tool-erase', 'Click an island or a pad to remove it; drag over ground to clear rock and seams.'],
+  };
 
   function setTool(next){
     tool = next;
-    ui.toolTerrain.setAttribute('aria-pressed', String(tool === 'terrain'));
-    ui.toolGap.setAttribute('aria-pressed', String(tool === 'gap'));
+    pendingPad = null;
+    for(const [name, [id, help]] of Object.entries(TOOLS)){
+      els(id).setAttribute('aria-pressed', String(tool === name));
+      if(tool === name) ui.toolHelp.textContent = help;
+    }
   }
-  ui.toolTerrain.addEventListener('click', () => setTool('terrain'));
-  ui.toolGap.addEventListener('click', () => setTool('gap'));
+  for(const [name, [id]] of Object.entries(TOOLS)){
+    els(id).addEventListener('click', () => setTool(name));
+  }
 
   ui.flatten.addEventListener('click', () => {
-    strokeUndo = heights.slice();
-    heights = new Array(SCENE_W).fill(150);
+    strokeUndo = snapshot();
+    clearAll();
     refreshExport();
     saveToStorage();
-    say('Terrain reset to flat ground.');
+    say('Terrain reset to flat ground, and everything on it cleared.');
   });
 
   ui.undo.addEventListener('click', () => {
     if(!strokeUndo){ say('Nothing to undo.'); return; }
-    heights = strokeUndo;
+    restore(strokeUndo);
     strokeUndo = null;
     refreshExport();
     saveToStorage();
@@ -549,8 +683,40 @@
     };
   }
 
+  /* Which island a point is inside, or null — the hit test the erase tool
+     and the teleport tool both need, since a pad dropped on an island has to
+     know it is standing on one. */
+  function islandAt(col, row){
+    for(let i = islands.length - 1; i >= 0; i--){
+      const isle = islands[i];
+      if(col >= isle.from && col < isle.to && row >= isle.y - 6 && row <= isle.floor + 2) return i;
+    }
+    return null;
+  }
+
+  /* The surface a pad dropped here should sit on: the island top if the
+     click is anywhere near one, the ground otherwise. A pad floating in
+     mid-air is never what anyone meant, and sim.js would never fire it —
+     padUnder wants a duckling standing at the pad's own height. */
+  function surfaceFor(col, row){
+    let best = heights[col];
+    for(const isle of islands){
+      if(col < isle.from || col >= isle.to) continue;
+      if(Math.abs(row - isle.y) < Math.abs(row - best)) best = isle.y;
+    }
+    return best;
+  }
+
   function paintAt(col, row){
-    heights[col] = tool === 'gap' ? PIT_Y : row;
+    if(tool === 'gap'){ heights[col] = PIT_Y; return; }
+    if(tool === 'terrain'){ heights[col] = row; return; }
+    // Stone in a column that has no ground in it is a note nobody reads:
+    // a gap is open air all the way down, and `hard` on one would export a
+    // flag that changes nothing. Both brushes skip them rather than writing
+    // it.
+    if(tool === 'rock'){ if(heights[col] < SCENE_H) rock[col] = true; return; }
+    if(tool === 'seam'){ if(heights[col] < SCENE_H) seam[col] = row; return; }
+    if(tool === 'erase'){ rock[col] = false; seam[col] = null; return; }
   }
 
   // A straight line between the last painted column and this one, so a fast
@@ -566,13 +732,54 @@
     }
   }
 
+  const ISLAND_THICKNESS = 16;
+
   ui.scene.addEventListener('pointerdown', event => {
     if(mode !== 'edit') return;
     event.preventDefault();
     ui.scene.focus({ preventScroll: true });
     ui.scene.setPointerCapture(event.pointerId);
     const { col, row } = sceneCoords(event);
-    strokeUndo = heights.slice();
+    strokeUndo = snapshot();
+
+    if(tool === 'island'){ dragFrom = { col, row }; return; }
+
+    if(tool === 'teleport'){
+      const y = surfaceFor(col, row);
+      if(!pendingPad){
+        pendingPad = { x: col, y };
+        say(`First pad at column ${col}. Click where its other end goes.`);
+      } else {
+        teleports.push({ ax: pendingPad.x, ay: pendingPad.y, bx: col, by: y });
+        say(`Teleporter laid: ${pendingPad.x} to ${col}.`);
+        pendingPad = null;
+        refreshExport();
+        saveToStorage();
+      }
+      return;
+    }
+
+    if(tool === 'erase'){
+      const padIdx = teleports.findIndex(t =>
+        (Math.abs(t.ax - col) <= 3 && Math.abs(t.ay - row) <= 6) ||
+        (Math.abs(t.bx - col) <= 3 && Math.abs(t.by - row) <= 6));
+      if(padIdx >= 0){
+        teleports.splice(padIdx, 1);
+        say('Teleporter removed — both ends, since a pad on its own goes nowhere.');
+        refreshExport();
+        saveToStorage();
+        return;
+      }
+      const isleIdx = islandAt(col, row);
+      if(isleIdx != null){
+        islands.splice(isleIdx, 1);
+        say('Island removed.');
+        refreshExport();
+        saveToStorage();
+        return;
+      }
+    }
+
     painting = true;
     lastCol = col; lastRow = row;
     paintAt(col, row);
@@ -589,9 +796,27 @@
     }
   });
 
-  addEventListener('pointerup', () => {
+  addEventListener('pointerup', event => {
+    if(dragFrom){
+      const { col } = sceneCoords(event);
+      const from = Math.min(dragFrom.col, col), to = Math.max(dragFrom.col, col) + 1;
+      // A one-column island is almost certainly a mis-click rather than a
+      // platform, so the smallest one that can be drawn is a few columns.
+      if(to - from >= 4){
+        islands.push({ from, to, y: dragFrom.row, floor: Math.min(dragFrom.row + ISLAND_THICKNESS, SCENE_H) });
+        say(`Island laid from ${from} to ${to} at height ${dragFrom.row}.`);
+      } else {
+        say('Too narrow to be an island — drag across at least four columns.', true);
+      }
+      dragFrom = null;
+      refreshExport();
+      saveToStorage();
+      return;
+    }
     if(painting){ painting = false; refreshExport(); saveToStorage(); }
   });
+
+  setTool('terrain');
 
   /* ------------------------------------------------------------ rendering */
 

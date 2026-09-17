@@ -14,8 +14,10 @@ import { test } from 'node:test';
 import {
   SCENE_W, SCENE_H, WALK_STEP, FALL_SAFE, FALL_SPEED, FLY_SPEED, TICK_RATE, BUILD_SECONDS,
   BUILD_MAX_STEPS, BUILD_RISE_HEIGHT, DIG_SECONDS, DIG_MAX_STEPS, JUMP_SPAN, JUMP_RISE, PIT_Y,
-  SKILLS, SKILL_INFO, LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5, LEVEL_6, LEVEL_7, LEVEL_8, LEVELS,
-  buildTerrain, buildLayer, stairs, winCount, goalHeading, formatTime,
+  FLY_DRIFT, SKILLS, SKILL_INFO,
+  LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5, LEVEL_6, LEVEL_7, LEVEL_8, LEVEL_9, LEVEL_10,
+  LEVELS,
+  buildTerrain, buildLayer, stairs, winCount, goalHeading, hatchHeading, formatTime,
 } from '../public/duck-duck-quack/content.js';
 
 import {
@@ -739,6 +741,84 @@ test('BUILD_RISE_HEIGHT never climbs a duckling higher than FALL_SAFE lets it fa
   assert.equal(BUILD_RISE_HEIGHT, FALL_SAFE);
 });
 
+/* --------------------------------------------------- the builder staircase */
+
+/* Flat ground and nothing else, so a chain of Builders can be read off
+   plainly: what each one does depends only on what the duckling handing it
+   over is standing on. */
+function stairLevel(builders){
+  return miniLevel({
+    goalX: SCENE_W - 1, timeLimit: 2000,
+    supply: { digger: 0, builder: builders, blocker: 0, climber: 0, flyer: 0 },
+  });
+}
+
+test('builders alternate: ground climbs, a climbing ramp runs level, a level one climbs again', () => {
+  const state = run(newGame(stairLevel(6)), 1);
+  const duck = state.ducks[0];
+  const kinds = [];
+  const heights = [];
+  for(let i = 0; i < 400 && kinds.length < 6; i++){
+    if(duck.state === 'walking'){
+      heights.push(duck.y);
+      assignSkill(state, duck.id, 'builder');
+      kinds.push(duck.buildLevel ? 'level' : 'climb');
+    }
+    tick(state);
+  }
+  assert.deepEqual(kinds, ['climb', 'level', 'climb', 'level', 'climb', 'level']);
+  // And the climbs actually gain height, a ramp's worth at a time.
+  assert.deepEqual(heights, [50, 50 - BUILD_RISE_HEIGHT, 50 - BUILD_RISE_HEIGHT,
+    50 - 2 * BUILD_RISE_HEIGHT, 50 - 2 * BUILD_RISE_HEIGHT, 50 - 3 * BUILD_RISE_HEIGHT]);
+});
+
+test('a ramp off an island climbs — an island is ground, not somebody else\'s staircase', () => {
+  const level = miniLevel({
+    segments: [{ from: 0, to: SCENE_W, y: 150 }],
+    islands: [{ from: 20, to: 120, y: 100, floor: 110 }],
+    teleports: [{ ax: 10, ay: 150, bx: 25, by: 100 }],
+    goalX: SCENE_W - 1, timeLimit: 600,
+    supply: { digger: 0, builder: 1, blocker: 0, climber: 0, flyer: 0 },
+  });
+  const state = run(newGame(level), 1);
+  const duck = state.ducks[0];
+  run(state, 20);
+  assert.equal(duck.y, 100, 'up on the island');
+  assignSkill(state, duck.id, 'builder');
+  assert.equal(duck.buildLevel, false, 'so its ramp climbs');
+  run(state, BUILD_MAX_STEPS);
+  const top = Math.min(...state.decks.flat());
+  assert.equal(top, 100 - BUILD_RISE_HEIGHT, 'a full ramp\'s climb above the island');
+});
+
+test('a blocker only stops what is standing at its own height', () => {
+  // A blocker down on the grass, and an island ninety pixels over its head:
+  // the one has nothing to do with the other.
+  const level = miniLevel({
+    segments: [{ from: 0, to: SCENE_W, y: 150 }],
+    islands: [{ from: 20, to: 200, y: 60, floor: 70 }],
+    duckCount: 2, spawnInterval: 2, timeLimit: 600, goalX: SCENE_W - 1,
+    supply: { digger: 0, builder: 0, blocker: 1, climber: 0, flyer: 0 },
+  });
+  const state = run(newGame(level), 1);
+  const planted = state.ducks[0];
+  run(state, 40);
+  assignSkill(state, planted.id, 'blocker');
+  const at = Math.round(planted.x);
+
+  const high = state.ducks[1];
+  high.y = 60;                 // as a ramp up onto the island would have left it
+  high.x = at - 10;
+  high.dir = 1;
+  run(state, 30);
+  assert.ok(high.x > at + 5, `the one up on the island should be well past ${at}, got ${high.x}`);
+  assert.equal(high.y, 60, 'and still on it');
+
+  // While anything on the grass still turns back at it.
+  const low = state.ducks.find(d => d.state === 'walking' && d.y === 150 && d.id !== planted.id);
+  if(low){ assert.ok(low.x <= at, 'the grass is still blocked'); }
+});
+
 /* --------------------------------------------------------------- blocking */
 
 test('a blocker plants itself for good and turns other ducklings back', () => {
@@ -1295,29 +1375,30 @@ test('The Aerie cannot be won without a Builder — neither gap has any other an
   assert.notEqual(state.ended, 'won');
 });
 
-/* The Spire: one bridge over the gap, then one Digger through the spire's
- * face. `digAt` is where that Digger goes — anywhere on the approach will
- * do, which is the point of a held trait — and `climbAt`, when it is set,
- * sends ducklings over the top instead, a Climber up the face and a Flyer
- * for the drop off the ledge.
+/* The Spire, played from the top down. Every run needs the same three
+ * moves in the same order: wings on the first duckling out of the nest so
+ * something survives the drop off the bottom tread, a ramp laid under that
+ * drop so everyone behind it lands on a deck instead, and a tunnel through
+ * the spire's foot. `rampAt` is where the Builder goes, which is the one
+ * placement decision the level asks for.
  */
-function playLevel6({ digAt = 80, climbAt = null, rampAt = null } = {}){
+function playLevel6({ flyers = 3, rampAt = 62, dig = true } = {}){
   const state = newGame(LEVEL_6);
-  let gapBuilder = false, faceRamp = false, dug = false;
+  let flown = 0, ramped = false, dug = false;
   for(let i = 0; i < LEVEL_6.timeLimit && !state.ended; i++){
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
-      if(!gapBuilder && d.x === 39){ if(assignSkill(state, d.id, 'builder')) gapBuilder = true; continue; }
-      if(rampAt !== null && gapBuilder && !faceRamp && d.x === rampAt){
-        if(assignSkill(state, d.id, 'builder')) faceRamp = true;
+      // Up on the ledge, before it walks off the face.
+      if(flown < flyers && !hasTrait(d, 'flyer') && d.y <= 40){
+        if(assignSkill(state, d.id, 'flyer')) flown++;
         continue;
       }
-      if(digAt !== null && !dug && d.x === digAt && d.dir > 0){
+      if(rampAt !== null && !ramped && d.y >= 150 && d.dir > 0 && d.x === rampAt){
+        if(assignSkill(state, d.id, 'builder')) ramped = true;
+        continue;
+      }
+      if(dig && ramped && !dug && d.dir > 0 && d.x >= 62 && d.x <= 88){
         if(assignSkill(state, d.id, 'digger')) dug = true;
-        continue;
-      }
-      if(climbAt !== null && d.x === climbAt && d.dir > 0){
-        if(assignSkill(state, d.id, 'climber')) assignSkill(state, d.id, 'flyer');
         continue;
       }
     }
@@ -1326,7 +1407,7 @@ function playLevel6({ digAt = 80, climbAt = null, rampAt = null } = {}){
   return state;
 }
 
-test('The Spire can be won by tunnelling its face, with no Climber or Flyer at all', () => {
+test('The Spire can be won with a Flyer, a Builder and a Digger, in that order', () => {
   const state = playLevel6();
   assert.equal(state.ended, 'won');
   assert.ok(state.saved >= winCount(LEVEL_6), `only ${state.saved} saved, needed ${winCount(LEVEL_6)}`);
@@ -1335,81 +1416,275 @@ test('The Spire can be won by tunnelling its face, with no Climber or Flyer at a
   assert.ok(cut <= DIG_MAX_STEPS, 'and inside what one Digger reaches');
 });
 
-test('The Spire\'s Digger can be handed out anywhere on the approach', () => {
-  for(const digAt of [66, 80, 100, 119]){
-    const state = playLevel6({ digAt });
-    assert.equal(state.ended, 'won', `a Digger given at ${digAt} should still win`);
-  }
+test('The Spire hatches its flock on the summit, walking away from the pond', () => {
+  const state = run(newGame(LEVEL_6), 1);
+  const first = state.ducks[0];
+  // One tick in, so it has hatched and taken its first step away from the nest.
+  assert.equal(first.x, LEVEL_6.nestX - 1, 'a step to the left of the nest');
+  assert.equal(first.y, 30, 'the nest sits on the summit ledge');
+  assert.equal(first.dir, -1, 'and its ducklings step out to the left');
+  assert.equal(goalHeading(LEVEL_6), 1, 'while the pond is still away to the right');
 });
 
-test('The Spire cannot be won without a Digger — the face is the only way through', () => {
-  const state = playLevel6({ digAt: null });
-  assert.equal(state.saved, 0, 'nothing gets past the face without a tunnel');
-  assert.notEqual(state.ended, 'won');
-});
-
-test('The Spire cannot be won over the top — three Climbers and three Flyers is a scenic route, not a solution', () => {
-  const state = playLevel6({ digAt: null, climbAt: 100 });
-  assert.ok(state.saved <= 3, `only the three that can climb and fly get over, got ${state.saved}`);
-  assert.ok(state.saved < winCount(LEVEL_6));
-  assert.notEqual(state.ended, 'won');
-});
-
-test('The Spire\'s face stands higher than any ramp can reach, so a stray Builder cannot commit the flock', () => {
+test('The Spire\'s face is walked down and never up', () => {
+  // Every tread is taller than a step and shorter than a killing fall, so
+  // the descent is free and the climb back is impossible. That one fact is
+  // what makes the level a one-way trip.
   const terrain = buildTerrain(LEVEL_6.segments);
-  assert.equal(terrain[119] - terrain[120], 40, 'the face should be forty pixels');
-  assert.ok(terrain[119] - terrain[120] > BUILD_RISE_HEIGHT,
-    'a ramp must not be able to join the top of the face');
-  // And played: a ramp laid at the face costs a Builder and nothing else.
-  const state = playLevel6({ rampAt: 90 });
-  assert.equal(state.ended, 'won', 'the tunnel still carries the level');
+  for(let x = 91; x <= 101; x++){
+    const rise = terrain[x - 1] - terrain[x];
+    if(rise === 0) continue;
+    assert.ok(rise > WALK_STEP, `the tread at ${x} should be too tall to walk up, got ${rise}`);
+    assert.ok(rise <= FALL_SAFE, `and short enough to walk down, got ${rise}`);
+  }
+  // And the last one is not a tread at all: it is a real drop.
+  assert.equal(terrain[89] - terrain[90], 30, 'thirty pixels from the bottom tread down to the ground');
+  assert.ok(terrain[89] - terrain[90] > FALL_SAFE, 'which is past what a duckling survives');
 });
 
-test('The Spire\'s stairs never turn a duckling back — every tread is a step, not a wall', () => {
+test('The Spire cannot be won without a Flyer — nothing else survives the first drop', () => {
+  const state = playLevel6({ flyers: 0 });
+  assert.equal(state.saved, 0);
+  assert.notEqual(state.ended, 'won');
+});
+
+test('The Spire cannot be won without a Builder — the flock lands on the ramp or not at all', () => {
+  const state = playLevel6({ rampAt: null });
+  assert.equal(state.saved, 0);
+  assert.notEqual(state.ended, 'won');
+});
+
+test('The Spire cannot be won without a Digger, and the pen holds the flock safely while it waits', () => {
+  const state = playLevel6({ dig: false });
+  assert.equal(state.saved, 0, 'nothing gets past the spire without a tunnel');
+  assert.notEqual(state.ended, 'won');
+  // The bluff at one end and the spire at the other: ducklings shuttle
+  // between them rather than walking off anything.
+  assert.ok(state.lost <= 1, `the pen should not be killing them, lost ${state.lost}`);
+  const penned = state.ducks.filter(d => d.state === 'walking');
+  assert.ok(penned.length > 10, 'most of the flock should still be alive and waiting');
+  for(const d of penned){
+    assert.ok(d.x >= 59 && d.x <= 120, `a penned duckling at ${d.x} has got out somehow`);
+  }
+});
+
+test('The Spire\'s bluff is rock — a Digger sent at it never starts', () => {
   const state = newGame(LEVEL_6);
-  let gapBuilder = false;
-  const dirAtStairs = new Map();
-  let turnedBack = 0;
+  assert.ok(state.rock[30], 'the bluff should be stone');
+  assert.ok(!state.rock[95], 'and the spire itself should not be');
+  let cutAtBluff = false;
   for(let i = 0; i < LEVEL_6.timeLimit && !state.ended; i++){
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
-      if(!gapBuilder && d.x === 39){ if(assignSkill(state, d.id, 'builder')) gapBuilder = true; continue; }
-      if(d.x === 100 && d.dir > 0){
-        if(assignSkill(state, d.id, 'climber')) assignSkill(state, d.id, 'flyer');
-        continue;
-      }
-      // x=120 is the face itself, which is a wall; the treads start above it.
-      if(d.x > 120 && d.x < 141 && d.y < 110){
-        const prev = dirAtStairs.get(d.id);
-        if(prev !== undefined && prev !== d.dir) turnedBack++;
-        dirAtStairs.set(d.id, d.dir);
-      }
+      if(!hasTrait(d, 'flyer') && d.y <= 40) assignSkill(state, d.id, 'flyer');
+      if(!hasTrait(d, 'digger') && d.y >= 150) assignSkill(state, d.id, 'digger');
     }
     tick(state);
+    if(state.tunnelY.slice(0, 60).some(v => v != null)) cutAtBluff = true;
   }
-  assert.ok(dirAtStairs.size > 0, 'someone should have got onto the stairs at all');
-  assert.equal(turnedBack, 0, 'nothing should ever turn back on the stairs themselves');
+  assert.equal(cutAtBluff, false, 'no tunnel should ever appear in the bluff');
 });
 
-test('a blocker planted on The Spire\'s ledge turns a wingless duckling back rather than saving it', () => {
-  const state = newGame(LEVEL_6);
-  let gapBuilder = false, blockerUsed = false;
-  for(let i = 0; i < LEVEL_6.timeLimit && !state.ended; i++){
-    for(const d of state.ducks){
-      if(d.state !== 'walking') continue;
-      if(!gapBuilder && d.x === 39){ if(assignSkill(state, d.id, 'builder')) gapBuilder = true; continue; }
-      if(d.x === 100 && d.dir > 0){ assignSkill(state, d.id, 'climber'); continue; }
-      // On the ledge itself — the column above the tunnel's far end, not in it.
-      if(!blockerUsed && d.x === 149 && d.y <= 30){
-        if(assignSkill(state, d.id, 'blocker')) blockerUsed = true;
-        continue;
-      }
-    }
-    tick(state);
+test('The Spire takes a ramp anywhere along the pen floor', () => {
+  for(const rampAt of [60, 66, 72, 78]){
+    const state = playLevel6({ rampAt });
+    assert.equal(state.ended, 'won', `a ramp started at ${rampAt} should win`);
   }
-  assert.ok(blockerUsed, 'a climber should have reached the ledge to plant one');
-  assert.equal(state.saved, 0, 'a blocker turns ducklings back, it does not fly them down');
-  assert.ok(state.ducks.some(d => d.state === 'blocking'), 'the blocker itself should still be standing there');
+});
+
+/* --------------------------------------------------------------- islands */
+
+/* Flat ground with a shelf in the sky over the middle of it. The whole
+   point of an island is that both of those are real at once. */
+function islandLevel(overrides = {}){
+  return miniLevel({
+    islands: [{ from: 20, to: 60, y: 20, floor: 34 }],
+    goalX: SCENE_W - 1, timeLimit: 600,
+    ...overrides,
+  });
+}
+
+test('a duckling walks along the ground underneath an island, not into it', () => {
+  const state = run(newGame(islandLevel()), 1);
+  const duck = state.ducks[0];
+  run(state, 60);
+  assert.equal(duck.y, 50, 'still on the ground the whole way');
+  assert.ok(duck.x > 40, 'and out the far side of the island overhead');
+  run(state, 400);
+  assert.equal(duck.state, 'saved');
+});
+
+test('an island is real ground to anything standing on it', () => {
+  // Put a duckling up there the only way a level can — a teleporter — and
+  // it walks the shelf exactly as it would walk the floor.
+  const level = islandLevel({ teleports: [{ ax: 10, ay: 50, bx: 25, by: 20 }] });
+  const state = run(newGame(level), 1);
+  const duck = state.ducks[0];
+  run(state, 20);
+  assert.equal(duck.y, 20, 'up on the island');
+  assert.ok(duck.x > 25, 'and walking along it');
+  // And it walks off the far end, falling to the ground below.
+  run(state, 60);
+  assert.equal(duck.y, 50, 'back on the ground past the island');
+});
+
+test('an island does not fill in the ground under it', () => {
+  const state = newGame(islandLevel());
+  assert.equal(state.terrain[40], 50, 'the ground below is untouched');
+  assert.deepEqual(state.sky[40], [20], 'and the shelf is a surface of its own');
+  assert.deepEqual(state.sky[10], [], 'with nothing anywhere else');
+});
+
+/* ----------------------------------------------------------- teleporters */
+
+function padLevel(overrides = {}){
+  return miniLevel({
+    teleports: [{ ax: 20, ay: 50, bx: 60, by: 50 }],
+    goalX: SCENE_W - 1, timeLimit: 600,
+    ...overrides,
+  });
+}
+
+test('a duckling that walks onto a pad comes out of the other one', () => {
+  const state = run(newGame(padLevel()), 1);
+  const duck = state.ducks[0];
+  tickUntilAt(state, duck, 20);
+  assert.equal(state.warps, 0);
+  tick(state);
+  assert.equal(duck.x, 60, 'out of the far pad');
+  assert.equal(duck.y, 50);
+  assert.equal(duck.dir, 1, 'still going the way it was going');
+  assert.equal(state.warps, 1);
+  assert.equal(state.zaps.length, 2, 'a flash at both ends');
+});
+
+test('arriving on a pad does not send a duckling straight back', () => {
+  const state = run(newGame(padLevel()), 1);
+  const duck = state.ducks[0];
+  run(state, 400);
+  assert.equal(state.warps, 1, 'one trip, not a hundred');
+  assert.equal(duck.state, 'saved');
+});
+
+test('a pair works both ways, once a duckling has walked off the pad', () => {
+  const state = run(newGame(padLevel()), 1);
+  const traveller = state.ducks[0];
+  run(state, 30);
+  assert.equal(state.warps, 1);
+  assert.ok(traveller.x > 60, 'well clear of the pad it arrived on');
+  traveller.dir = -1;                       // as a blocker would have left it
+  run(state, 40);
+  assert.equal(state.warps, 2, 'back through the pair the other way');
+  assert.ok(traveller.x < 60, 'and back at the near end');
+});
+
+test('a pad under an island belongs to whatever is standing on it', () => {
+  // One pad on the ground, one up on the shelf directly above it. A
+  // duckling walking the floor must not be caught by the shelf's pad.
+  const level = miniLevel({
+    islands: [{ from: 20, to: 60, y: 20, floor: 34 }],
+    teleports: [{ ax: 40, ay: 20, bx: 200, by: 50 }],
+    goalX: SCENE_W - 1, timeLimit: 600,
+  });
+  const state = run(newGame(level), 1);
+  const duck = state.ducks[0];
+  run(state, 80);
+  assert.equal(state.warps, 0, 'a pad overhead is not underfoot');
+  assert.ok(duck.x > 60);
+});
+
+test('a falling duckling never lands on something over its head', () => {
+  /* Stepping off a ledge with an island hanging above the column it steps
+     into: the island is not a landing, it is a thing it is falling away
+     from. This was real — the first cut of The Stepping Stones had the
+     flock arriving safely on an island twenty-four pixels above the ramp
+     they walked off. */
+  const level = miniLevel({
+    segments: [{ from: 0, to: 20, y: 60 }, { from: 20, to: SCENE_W, y: 150 }],
+    islands: [{ from: 20, to: 120, y: 36, floor: 46 }],
+    goalX: SCENE_W - 1, timeLimit: 600,
+  });
+  const state = run(newGame(level), 1);
+  const duck = state.ducks[0];
+  run(state, 60);
+  assert.notEqual(duck.y, 36, 'it must not have landed on the island above it');
+  assert.equal(duck.state, 'lost');
+  assert.equal(duck.cause, 'fell');
+});
+
+test('a falling duckling still lands on a ramp deck it falls past', () => {
+  // The other half of the same rule: a deck between where it stepped off
+  // and where it is now is a landing, and catches it.
+  const level = miniLevel({
+    segments: [{ from: 0, to: 20, y: 60 }, { from: 20, to: SCENE_W, y: 150 }],
+    islands: [{ from: 20, to: 120, y: 80, floor: 90 }],
+    goalX: SCENE_W - 1, timeLimit: 600,
+  });
+  const state = run(newGame(level), 1);
+  const duck = state.ducks[0];
+  run(state, 30);
+  assert.equal(duck.y, 80, 'caught by the island below the ledge');
+  assert.equal(duck.state, 'walking');
+});
+
+/* ------------------------------------------------------------- flyer drift */
+
+test('a flyer comes down at a slant, in the direction it was walking', () => {
+  const level = miniLevel({
+    segments: [{ from: 0, to: 20, y: 40 }, { from: 20, to: SCENE_W, y: 150 }],
+    goalX: SCENE_W - 1, timeLimit: 600,
+    supply: { digger: 0, builder: 0, blocker: 0, climber: 0, flyer: 1 },
+  });
+  const state = run(newGame(level), 1);
+  const duck = state.ducks[0];
+  assignSkill(state, duck.id, 'flyer');
+  run(state, 25);
+  assert.equal(duck.state, 'falling');
+  const drifted = duck.x - 20;
+  assert.ok(drifted > 2, `it should have slid forward by now, got ${drifted.toFixed(1)}`);
+  run(state, 200);
+  assert.equal(duck.state, 'walking', 'and landed unhurt');
+  assert.equal(duck.y, 150);
+  // 110 pixels of drop at FLY_SPEED, drifting FLY_DRIFT a tick.
+  assert.ok(duck.x > 20 + 110 * FLY_DRIFT - 4, `landed at ${duck.x}, short of the glide`);
+  assert.equal(duck.x, Math.round(duck.x), 'and back onto a whole column');
+});
+
+test('a plain fall does not drift at all', () => {
+  // Same cliff as the flyer above, and no wings: it goes straight down the
+  // column it stepped off, and dies where it lands.
+  const level = miniLevel({
+    segments: [{ from: 0, to: 20, y: 40 }, { from: 20, to: SCENE_W, y: 150 }],
+    goalX: SCENE_W - 1, timeLimit: 600,
+  });
+  const state = run(newGame(level), 1);
+  const duck = state.ducks[0];
+  run(state, 22);
+  assert.equal(duck.state, 'falling');
+  assert.equal(duck.x, 20, 'not a pixel sideways');
+  run(state, 60);
+  assert.equal(duck.state, 'lost');
+  assert.equal(duck.x, 20);
+});
+
+test('a flyer pinned against a cliff face comes straight down it', () => {
+  // The drop is into a shaft one column wide: drifting into the wall would
+  // land it on top of the thing it just fell off.
+  const level = miniLevel({
+    segments: [
+      { from: 0, to: 20, y: 40 },
+      { from: 20, to: 24, y: 150 },
+      { from: 24, to: SCENE_W, y: 40 },
+    ],
+    goalX: SCENE_W - 1, timeLimit: 600,
+    supply: { digger: 0, builder: 0, blocker: 0, climber: 0, flyer: 1 },
+  });
+  const state = run(newGame(level), 1);
+  const duck = state.ducks[0];
+  assignSkill(state, duck.id, 'flyer');
+  run(state, 200);
+  assert.equal(duck.y, 150, 'it reached the bottom of the shaft');
+  assert.ok(duck.x >= 20 && duck.x < 24, `and landed in it, not on the far lip (${duck.x})`);
 });
 
 /* --------------------------------------------------------------- jumping */
@@ -1626,6 +1901,214 @@ test('The Falls walks nest to pond right to left, from a higher start down to a 
   const nestY = buildTerrain(LEVEL_7.segments, LEVEL_7.width)[LEVEL_7.nestX];
   const goalY = buildTerrain(LEVEL_7.segments, LEVEL_7.width)[LEVEL_7.goalX];
   assert.ok(goalY > nestY, 'the pond should sit lower (larger y) than the nest');
+});
+
+/* ------------------------------------------------- The Overlook, played */
+
+/* The Overlook: one ramp across the gap and a second given to a duckling
+   standing on the end of it, which carries that ramp on level to the
+   bluff's face. Everything past the bluff is the pair of teleporters, and
+   they need nothing from a player at all. */
+function playLevel9({ gapAt = 59, extend = true } = {}){
+  const state = newGame(LEVEL_9);
+  let bridged = false, extended = false;
+  for(let i = 0; i < LEVEL_9.timeLimit && !state.ended; i++){
+    for(const d of state.ducks){
+      if(d.state !== 'walking') continue;
+      if(gapAt !== null && !bridged && d.x === gapAt){
+        if(assignSkill(state, d.id, 'builder')) bridged = true;
+        continue;
+      }
+      if(extend && bridged && !extended){
+        const end = rampEnd(state);
+        if(end > 0 && d.x === end && state.decks[end].includes(d.y)){
+          if(assignSkill(state, d.id, 'builder')) extended = true;
+        }
+      }
+    }
+    tick(state);
+  }
+  return state;
+}
+
+test('The Overlook can be won with two Builders and the teleporters', () => {
+  const state = playLevel9();
+  assert.equal(state.ended, 'won');
+  assert.ok(state.saved >= winCount(LEVEL_9), `only ${state.saved} saved, needed ${winCount(LEVEL_9)}`);
+  assert.ok(state.warps >= state.saved, 'every duckling saved went through both pads');
+});
+
+test('The Overlook cannot be won with one Builder — the bluff is still a wall', () => {
+  const state = playLevel9({ extend: false });
+  assert.equal(state.saved, 0);
+  assert.notEqual(state.ended, 'won');
+});
+
+test('The Overlook cannot be won with none at all', () => {
+  const state = playLevel9({ gapAt: null, extend: false });
+  assert.equal(state.saved, 0);
+  assert.notEqual(state.ended, 'won');
+});
+
+test('The Overlook\'s bluff is rock, and no ramp is taller than it', () => {
+  const state = newGame(LEVEL_9);
+  assert.ok(state.rock[130], 'the bluff is stone');
+  assert.equal(state.terrain[119] - state.terrain[120], 24,
+    'and exactly one ramp high, which is what makes the second Builder the answer');
+  assert.equal(state.terrain[119] - state.terrain[120], BUILD_RISE_HEIGHT);
+});
+
+test('The Overlook opens with a walkway running underneath an island', () => {
+  const state = newGame(LEVEL_9);
+  const isle = LEVEL_9.islands[0];
+  // Ground below, shelf above, right where the flock walks in.
+  for(let x = isle.from; x < 120; x++){
+    assert.equal(state.terrain[x], 150, `the walkway at ${x} should be ordinary ground`);
+    assert.deepEqual(state.sky[x], [isle.y], `with the shelf overhead at ${x}`);
+  }
+  // And nothing walks up into it on its own.
+  let bridged = false;
+  const walk = newGame(LEVEL_9);
+  for(let i = 0; i < 300 && !walk.ended; i++){
+    for(const d of walk.ducks){
+      if(d.state === 'walking' && !bridged && d.x === 59){
+        if(assignSkill(walk, d.id, 'builder')) bridged = true;
+      }
+    }
+    tick(walk);
+    for(const d of walk.ducks){
+      if(d.state === 'walking' && d.x >= isle.from && d.x < 120){
+        assert.notEqual(d.y, isle.y, 'nothing should end up on the shelf by walking');
+      }
+    }
+  }
+});
+
+test('every level supplies a jumper count, and only The Overlook and The Spire carry the new furniture', () => {
+  for(const level of LEVELS){
+    for(const skill of SKILLS){
+      assert.equal(typeof level.supply[skill], 'number', `${level.name} is missing ${skill}`);
+    }
+    for(const isle of level.islands ?? []){
+      assert.ok(isle.to > isle.from, `${level.name} has a backwards island`);
+      assert.ok(isle.floor > isle.y, `${level.name} has an island with no thickness`);
+    }
+    for(const t of level.teleports ?? []){
+      assert.ok(t.ax >= 0 && t.ax < level.width, `${level.name} has a pad off the edge`);
+      assert.ok(t.bx >= 0 && t.bx < level.width, `${level.name} has a pad off the edge`);
+    }
+  }
+});
+
+test('no level puts walkable ground so high that a ramp leaves the picture', () => {
+  // The Falls was exactly this bug: a plateau fifteen pixels from the top of
+  // the scene, and a Builder given anywhere near it drew its ramp off the
+  // picture entirely.
+  for(const level of LEVELS){
+    const terrain = buildTerrain(level.segments, level.width);
+    const tops = terrain.filter(y => y < SCENE_H);
+    const highest = Math.min(...tops);
+    assert.ok(highest - BUILD_RISE_HEIGHT >= 0,
+      `${level.name}'s highest ground is ${highest}, and a ramp from it would reach ${highest - BUILD_RISE_HEIGHT}`);
+    for(const isle of level.islands ?? []){
+      assert.ok(isle.y - BUILD_RISE_HEIGHT >= 0,
+        `${level.name}'s island at ${isle.y} leaves no room for a ramp above it`);
+    }
+  }
+});
+
+/* ------------------------------------------ The Stepping Stones, played */
+
+/* The zigzag, worked the way a player would: a Blocker to turn the flock
+   round on the islands that double back, and six Builders — four single
+   ramps and, for the last hop, the climb-level-climb staircase. The two
+   turning Blockers stay planted; they are the route, not a hold. */
+const STONES_PLAN = [
+  { y: 150, at: 120, dir: 1 },                 // pen -> island A
+  { y: 126, at: 120, dir: -1, turn: 185 },     // A -> B, back to the left
+  { y: 102, at: 60, dir: 1, turn: 35 },        // B -> C, right again
+  { y: 78, at: 100, dir: 1 },                  // C: climb
+  { y: 54, at: 133, dir: 1 },                  //    level
+  { y: 54, at: 166, dir: 1 },                  //    climb, onto D
+];
+
+function playLevel10({ steps = STONES_PLAN.length, turns = true } = {}){
+  const state = newGame(LEVEL_10);
+  let stage = 0, held = null;
+  const kinds = [];
+  for(let i = 0; i < LEVEL_10.timeLimit && !state.ended; i++){
+    const move = stage < steps ? STONES_PLAN[stage] : null;
+    if(move){
+      if(turns && move.turn != null && !held){
+        const d = state.ducks.find(k => k.state === 'walking'
+          && Math.round(k.x) === move.turn && k.y === move.y);
+        if(d && assignSkill(state, d.id, 'blocker')) held = d;
+      }
+      if(!move.turn || !turns || held){
+        const d = state.ducks.find(k => k.state === 'walking'
+          && Math.round(k.x) === move.at && k.y === move.y && k.dir === move.dir);
+        if(d && assignSkill(state, d.id, 'builder')){
+          kinds.push(d.buildLevel ? 'level' : 'climb');
+          stage++;
+          held = null;    // it stays planted: the turn is the route
+        }
+      }
+    }
+    tick(state);
+  }
+  return { state, built: stage, kinds };
+}
+
+test('The Stepping Stones can be won by climbing the zigzag', () => {
+  const { state, built, kinds } = playLevel10();
+  assert.equal(built, 6, 'all six ramps should have gone in');
+  assert.deepEqual(kinds, ['climb', 'climb', 'climb', 'climb', 'level', 'climb'],
+    'four ramps off solid ground, then the climb-level-climb staircase');
+  assert.equal(state.ended, 'won');
+  assert.ok(state.saved >= winCount(LEVEL_10), `only ${state.saved} saved, needed ${winCount(LEVEL_10)}`);
+});
+
+test('The Stepping Stones cannot be climbed without the Blockers that turn the flock', () => {
+  const { state, built } = playLevel10({ turns: false });
+  assert.ok(built <= 1, 'nothing past the first island can even be built');
+  assert.equal(state.saved, 0);
+  assert.notEqual(state.ended, 'won');
+});
+
+test('every one of The Stepping Stones\' six ramps is load-bearing', () => {
+  for(let n = 1; n < STONES_PLAN.length; n++){
+    const { state } = playLevel10({ steps: n });
+    assert.equal(state.saved, 0, `${n} of six ramps should save nobody`);
+    assert.notEqual(state.ended, 'won');
+  }
+});
+
+test('The Stepping Stones leaves the flock safe on the ground and nowhere else', () => {
+  // Doing nothing at all costs at most the one the goose takes: the pen has
+  // a rock wall at each end, so there is no edge to walk off down there.
+  const state = newGame(LEVEL_10);
+  for(let i = 0; i < LEVEL_10.timeLimit && !state.ended; i++) tick(state);
+  assert.ok(state.lost <= 1, `the pen should not be killing anybody, lost ${state.lost}`);
+  assert.ok(state.rock[5] && state.rock[205], 'both walls are rock');
+  // And the first island is a forgiving mistake, the rest are not.
+  const [a, b, c, d] = LEVEL_10.islands;
+  assert.equal(150 - a.y, FALL_SAFE, 'falling off island A lands in the pen unhurt');
+  for(const isle of [b, c, d]){
+    assert.ok(150 - isle.y > FALL_SAFE, `falling off the island at ${isle.y} is fatal`);
+  }
+});
+
+test('The Stepping Stones puts its pond on the top island, past everything else', () => {
+  const [, , , top] = LEVEL_10.islands;
+  assert.ok(LEVEL_10.goalX > top.from && LEVEL_10.goalX < top.to,
+    'the pond is the right-hand end of the top island');
+  const terrain = buildTerrain(LEVEL_10.segments, LEVEL_10.width);
+  assert.ok(terrain[LEVEL_10.goalX] >= SCENE_H,
+    'and there is no ground under it, so the pen cannot simply walk to it');
+  for(const isle of LEVEL_10.islands){
+    if(isle === top) continue;
+    assert.ok(isle.to <= LEVEL_10.goalX, 'and no lower island reaches it either');
+  }
 });
 
 test('formatTime reads as minutes:seconds', () => {

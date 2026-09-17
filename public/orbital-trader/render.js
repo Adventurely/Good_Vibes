@@ -1074,9 +1074,30 @@ function drawRailCrossings(chart, view, anchors){
      see is two orange diamonds floating in the dark with nothing to be
      against. */
   const drawn = new Set(chart.hits.rails.map(r => r.id));
+  /* Zooming *out* past a rail hides its crossing; zooming in does not. The
+     rule above is one rule doing two jobs, and only one of them was wanted.
+     `drawOrbits` drops a rail at both ends — under six pixels across, where it
+     is a dot and a pair of diamonds on it means nothing, and over six screen
+     diagonals, where all you would see of it is a line running off both edges.
+     The second of those is not a rail nobody can see. It is the rail you are
+     standing on, and it gets culled at exactly the zoom the last part of a run
+     to it is flown at: a wreck's is a good part of an astronomical unit across,
+     so the marks a salvage run is aimed by went out halfway through the run.
+     A planet at that zoom has its sphere of influence and an encounter mark to
+     hand over to. A wreck weighs nothing and has neither.
+
+     So a crossing outlives its rail upward. Only upward — hiding it when the
+     whole orbit has shrunk to a dot is the part of the rule that was doing its
+     job. Whether the marks are worth any ink at that point is already settled
+     below by whether either of them is on the screen. */
+  const diag = Math.hypot(chart.width, chart.height);
+  const zoomedPast = c => {
+    const b = world.get(c.body);
+    return b?.a > 0 && !chart.hidden.has(c.body) && b.a * chart.camera.zoom > diag * 6;
+  };
   ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
   for(const c of list){
-    if(!drawn.has(c.body)) continue;
+    if(!drawn.has(c.body) && !zoomedPast(c)) continue;
     const anchor = anchors[c.segIndex];
     if(!anchor) continue;
     const p = chart.toScreen(add(anchor, c.r));
@@ -1682,11 +1703,24 @@ export function railCrossings(world, prediction, tNow, opts = {}){
      that has just left Tassel is sitting exactly on Tassel's rail, so the
      first sample is a crossing at t = now — true, useless, and drawn right
      on top of the ship. */
-  /* One, unless a caller asks for more. A road that cuts five rails twice
-     over earns ten honest pairs of diamonds and becomes unreadable; the rest
-     of this chart already refuses to draw past the first thing that happens,
-     and this is the same refusal. */
-  const { limit = 1, minLead = 0 } = opts;
+  /* Every world the road cuts the rail of, and once each.
+ 
+     It used to be one mark for the whole road — the first thing that happens —
+     on the reasoning that a road cutting five rails twice over earns ten pairs
+     of diamonds and becomes unreadable. The reasoning was about the doubles and
+     the answer punished the wrong thing: flying Tassel to Grumm, the one mark
+     you got was where you cut the rail of Slate, a moon of the world you had
+     just left, six days into a seventy-day trip — and the twenty others,
+     including every moon of the world you were actually going to, were not
+     drawn at all. A mark per world says what the road meets; a single mark says
+     what it meets first, which is rarely the question.
+
+     So the cap is on the doubles instead: soonest per world, so a road that
+     cuts the same rail going out and coming back earns one pair and not two.
+     What keeps the chart readable is the rail being on screen — a diamond sits
+     on a rail, and `drawRailCrossings` draws none for a rail it did not draw,
+     which is already how the zoom decides how much of this a player sees. */
+  const { limit = Infinity, minLead = 0 } = opts;
   const out = [];
   if(!prediction?.segments) return out;
   for(let si = 0; si < prediction.segments.length; si++){
@@ -1749,9 +1783,14 @@ export function railCrossings(world, prediction, tNow, opts = {}){
       }
     }
   }
-  /* Soonest first, so the one that survives the cap is the one you are about
-     to fly. */
-  return out.sort((a, b) => a.t - b.t).slice(0, limit);
+  /* Soonest first, and then one per world. */
+  const seen = new Set(), first = [];
+  for(const c of out.sort((a, b) => a.t - b.t)){
+    if(seen.has(c.body)) continue;
+    seen.add(c.body);
+    first.push(c);
+  }
+  return first.slice(0, limit);
 }
 
 /* Where a node sits on the plan: the ship's state at the node's time in the

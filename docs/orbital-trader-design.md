@@ -1,6 +1,6 @@
 # Orbital Trader (Working Title): Design Document
 
-**Status:** Early draft, revised. Sections 2.2, 2.3, 2.6 and 2.6.1 record decisions made after the first playable build. Sections marked **TBD** are intentionally undecided and collect open questions rather than decisions.
+**Status:** Revised against the shipped build. The closing line is built (§5.0.1) — three relics, three different ways of getting them, and a station at the end — which was the last system the whole design was waiting on. Sections 2.2, 2.3, 2.6 and 2.6.1 record decisions made after the first playable build. Section 7 now collects what is genuinely undecided, which after the closing line is a much shorter list than it was: one wanted system (events, §7.3), one ruled out (§7.4), and tuning.
 
 ---
 
@@ -158,6 +158,12 @@ Anything worth being awake for cancels the skip and drops the clock back to ×1:
 
 A cap on the rate means the longest hauls take proportionally more than ten seconds; the confirmation says so rather than promising ten.
 
+**A skip stops a minute of ×1 short of what it was sent to, and that is one number for every skip.** The run-in is flown at ×1, so the only honest unit for it is real seconds of watching — and it used to be two per cent of the trip capped at a fiftieth of a day, which is neither. A fiftieth of a day is nine real minutes of ×1: skip one day ahead and the game handed back nine minutes of staring before anything happened. Past about ten days the margin stopped meaning anything at all, because a frame of a skip is a six-hundredth of the trip and by then one frame was longer than the whole margin — measured, a twenty-day skip and a three-hundred-day skip both landed *past* the moment they were sent to. Two faults with one shape: a margin in game time cannot describe a wait in real seconds.
+
+So the margin is `MIN_LEAD`, the number the rest of the game already uses for "enough notice" — what a burn wants to be caught and pushed before it fires, and the reason a mark cannot be written inside it. Landing exactly there is the shortest run-in that leaves the thing you skipped to still yours to change. A quarter of the trip is the floor under a very short skip, which should not be a skip that goes nowhere. And the last frame of a skip is cut to the distance left, so a skip ends where it said it would rather than a frame's worth either side of it: measured in the browser, a one-day skip, a twenty-day skip and a three-hundred-day skip now all stop sixty real seconds of ×1 short, each in the ten seconds it promised.
+
+**Skip to it** on a burn used to ask to be sent to a twentieth of a day *before* the burn, on top of all that — a hand-cut lead doing the margin's job twenty-two times over, since a twentieth of a day is twenty-two real minutes of ×1. It sent you to the burn's own moment now, and the margin does the rest.
+
 ### 2.6.1 The Chart
 
 Two rules keep the chart readable, and both of them are about refusing to show things.
@@ -184,6 +190,10 @@ The road has three voices and they always mean the same thing: the orbit you are
 
 A road that predicts nine encounters is a road nobody can read, and every prediction past the first is a guess that a single burn will erase anyway. One crossing at a time is enough.
 
+**And one lap at a time.** A leg is *drawn* as a single lap however long it runs for — fifty turns of the same ellipse laid on top of one another is a scribble, not a road — so anything the road finds on a later lap gets painted onto the lap in front of the pilot, and the picture says "just there" while the clock says four days. So the search that feeds the chart is capped at the lap it draws: the road shows what happens on this lap and then says the honest thing instead, which is that you are going round. What lines up a later meeting is the rail crossings, which are on that same lap.
+
+The cap has to be a cap in *laps* and nothing else. It was two laps with a floor of two days underneath it, left over from the unbounded look — and against a Tassel parking orbit pushed out past Slate, whose period is about a day, two days is between two and four laps, so the floor overrode the cap and the cap never bit. Measured across that family of orbits, twenty-four marks were being drawn between 1.07 and 4.80 laps out. Only the chart is bounded: the flight still looks as far as it must, or a ship would fly into a reach the search had stopped short of, and the aim helper still looks as far as it must, or it could not score a road that arrives.
+
 **Every drawn rail carries a lead: a short bright stretch just ahead of its world, ending in a chevron.** Which way a moon is going is the first thing an aiming card asks a player to know — "thirty degrees ahead of Slate" — and on a faint grey circle two new players could not tell ahead from behind. The lead is sampled from the same function that places the world, so it sits on the rail rather than on a tangent to it, and it is left off rails too small on screen to carry one.
 
 **Where the road first cuts a world's rail, the chart says where that world
@@ -195,14 +205,18 @@ crossing has always been visible — but crossing it with Veyra a quarter of a
 lap away means you left too early, and the gap between the marks is how much
 too early.
 
-The same refusal as the road itself: **one crossing, the soonest, and no
-more.** A long ellipse cuts five rails going out and the same five coming
-back, and ten honest pairs of diamonds is a chart nobody can read. The rail
-also has to be on the screen — a crossing of a ring nobody can see is two
-marks in the dark with nothing to be against. And the pair is left unjoined
-on purpose: a dashed line between them was the obvious thing to draw and the
-wrong one, because a straight line across a chart of curves reads as a path
-you could fly.
+**One pair per world, the soonest.** A long ellipse cuts five rails going out
+and the same five coming back, and ten honest pairs of diamonds is a chart
+nobody can read — but the cap used to be one pair for the whole road, which
+punished the wrong thing: flying Tassel to Grumm, the single mark you got was
+where you cut the rail of a moon of the world you had just left, and Grumm's
+own was not drawn. So the doubles are what the cap is on. The rest is left to
+the zoom: a pair hides when you zoom *out* past its rail, where a whole orbit
+is three pixels and two marks on it have nothing to be against, and not when
+you zoom in, where the rail that leaves the screen is the one you are aiming
+at. And the pair is left unjoined on purpose: a dashed line between them was
+the obvious thing to draw and the wrong one, because a straight line across a
+chart of curves reads as a path you could fly.
 
 **A world you are already going round is not an encounter — unless you have just fallen into it.** A parking orbit reaches its low point once a lap; that is where you already are, and marking it would put a crosshair under the ship in the opening frame of every game. But a skip ends at every change of reach, so the door into a world is exactly where a pilot gets put down, and on the hyperbola they arrived on the low point ahead *is* the encounter — at a rendezvous it is the one moment the ship can be tied up. Suppressing it left the panel offering nothing but the way out the far side, and at ×1 the crossing of Nail's reach is nine real minutes of watching. So the rule is keyed on the orbit being closed, not on it being yours.
 
@@ -340,12 +354,26 @@ and no good will tell you which of a people's moons is the one that loves it.
 A captain closes that gap by carrying some and finding out. Wicket closes it by
 looking: prices appear on the lists, and every good's "i" gains *loved by* and
 *wanted by* in the same words the table uses — sometimes a port, sometimes a
-whole people. She is a shortcut through reasoning that was always possible,
+whole people. He is a shortcut through reasoning that was always possible,
 which is the only kind of knowledge worth selling a journey for.
 
 **Jobs are priced against this table**, not against a number somebody liked:
 fetching work pays more than selling the same goods on the open market at the
 same destination would, and a test holds that line as prices move (§5.1.1).
+
+**Profit per game-day is the wrong number to tune against.** Time is skipped by
+pointing at a place (§2.6), and a skip costs about ten real seconds whether it
+covers one day or forty-five. So a one-day hop between Cinder and Scorch and a
+forty-five-day crossing from Moss to Cinder cost a player roughly *the same
+amount of the only currency they actually spend*, which is their own attention.
+The number that matters is **profit per trip**, and per trip the spread between
+the best loops in the shipped economy is about 1.2× rather than the 25× that
+`test/orbital-balance.mjs` appears to report in its per-day column. Read that
+column as a measure of *impatience* — how long a player waits between payouts —
+and not as a measure of what a route is worth. The harness plays a pure market
+bot with no jobs and no curiosity, so its route choice is a floor on the
+economy, not a prediction of play: a player following the line (§5) is sent
+outward by the jobs long before the market would send them.
 
 Money is treated as a **key** (to upgrades, access, and relationships) rather than a scoreboard.
 
@@ -753,7 +781,7 @@ is the Maw's rendezvous, which was finished for the Maw and works anywhere.
 A wreck is a body in `tuning.json` with no mass, a mouth, a closing speed and
 a drift reach, deliberately *not* in the price list: a derelict has no stall,
 no pump, no board and nobody to talk to, so it has one menu rather than four
-empty ones. Seven of them are in the sky:
+empty ones. Eight of them are in the sky:
 
 | Wreck | Where | The job |
 |---|---|---|
@@ -764,6 +792,7 @@ empty ones. Seven of them are in the sky:
 | The Sixth Forge | the Belt, between the havens | an Emberkin freighter, still crated |
 | Hull 41 | the outer Belt | a hull with a yard number and no name |
 | The Long Sweet | a wide circle above Haven | a frog cider transport, perfectly intact |
+| The Tail End | a third of the way down the Arc's tail | a hull that is not shaped like anything that fell off the Arc |
 
 **Coming alongside is ten kilometres and ten metres a second.** It was two
 hundred and ninety-five kilometres at five hundred, which is not coming
@@ -889,6 +918,47 @@ turn either way: that is the sky, not the crew. The two numbers beside it are
 hers, and without her it says `by eye` instead. The chart draws the reach the
 ship is *in* brighter than one it is merely near, for the same reason.
 
+**Every world the road reaches gets its pair of orange diamonds**, and each of
+them once. The pair is the aiming tool — where the road cuts a world's rail, and
+where that world will be when it does, the gap between them being the answer to
+"will it be there when I am".
+
+It used to draw one mark for the whole road, on the reasoning that a long
+ellipse cuts five rails going out and the same five coming back and ten pairs is
+unreadable. The reasoning was about the doubles and the cap punished the wrong
+thing. Flying Tassel to Grumm, the one mark you got was where you cut the rail
+of *Slate* — a moon of the world you had just left, six days into a seventy-day
+trip — and everything else the road met, Grumm included, went unmarked. Worse,
+that one mark sits on a rail rarely on screen, so what a player actually saw on
+that trip was nothing at all. Measured across seven zoom levels: nought marks
+drawn, at every one of them.
+
+So the cap is on the doubles instead — soonest per world — and the clutter is
+left to the zoom, which was already doing the work: a diamond is only drawn for
+a rail that is itself drawn. The same road now draws four marks at the zooms
+where it is legible, and none at the ones where no relevant rail is on screen.
+
+One consequence worth knowing. A road that *actually hits* Grumm ends inside its
+reach, a fortieth of an au short of its rail, so there is no crossing left to
+mark — you arrive rather than cross. The diamonds appear the moment your road
+reaches Grumm's orbit and stay while you are aiming, which is when the question
+is live; once the intercept is solved the encounter marks, the inset window and
+the arrival line take over. Aiming is what they are for.
+
+**A reach out at the Lamp is five times the size of one round a moon**, and it
+has to be. A reach is a distance, but what it buys a pilot is *time* — the
+minutes between the controls turning relative and the mouth arriving — and the
+same distance buys wildly different amounts of it depending on how fast the
+pair are moving. Round Slate the ship is doing a quarter of a kilometre a
+second and five hundred and ninety kilometres is thirty-nine minutes; round the
+Lamp it is doing twenty to thirty-six, and the same sphere is *twenty seconds*.
+You would cross the whole zero-g regime before noticing it existed.
+
+So the six wrecks on solar orbits carry 2,948 km rather than 590, which is one
+to three minutes apiece. Still the shortest approach in the game — the pair are
+simply going very fast — but a manoeuvre rather than a blink. The two on
+moon orbits keep theirs, since theirs were never the problem.
+
 **The reach is a place you can see.** A wreck's `driftReach` is a real
 boundary — cross it and the two buttons on a mark stop meaning forward-and-out
 about the world and start meaning forward-and-away about the thing you are
@@ -899,6 +969,43 @@ blue ring with a faint wash, inside which the harbour mouth keeps its own amber
 ring and anchor: two different questions, two different marks. "Are the axes
 about this thing" is answered a good way out from "may I tie up" — the checker
 holds the mouth inside the reach (C13), so the space is always entered first.
+
+**Zooming out past a rail hides its crossing; zooming in does not.** The orange
+pair — where the road cuts a rail, and where that world will be when it does —
+was drawn only on a rail the frame had drawn, and `drawOrbits` culls a rail at
+both ends: under six pixels across, and over six screen diagonals. That was one
+rule doing two jobs and only one of them was wanted. A rail three pixels across
+is a dot, and a pair of diamonds on a dot is two marks with nothing to be
+against. A rail running off both edges is not a rail nobody can see — it is the
+rail you are standing on, and it is culled at exactly the zoom the run to it is
+flown at. A wreck's is a good part of an astronomical unit across, so the marks
+a salvage run is aimed by went out halfway through the run, and a planet at that
+zoom at least has its sphere of influence and an encounter mark to hand over to.
+
+So a crossing now outlives its rail upward and not downward. Whether the pair is
+worth any ink was already settled separately, by whether either mark is on the
+screen at all — and that is also the limit of what this can do. The pair marks a
+place *ahead in time*: zoom in far enough that the screen spans less than the
+ship will travel before the crossing and both diamonds are genuinely off it,
+with nothing honest left to draw. What the rule change buys is every zoom in
+between, which is where the aiming happens.
+
+**A wreck exists for exactly as long as there is a reason to fly to it**, and
+that is a window with two ends. It is not there until a salvor names it — see
+below — and it is gone the moment its hold is empty. A picked-over hulk left on
+the chart is a harbour that offers nothing: a dot you keep flying back to in
+order to find out it is the one you already did. Stripped, it stops being drawn,
+stops being offered as a harbour, stops giving a readout, and stops being
+something the thrusters will fly against — all of which fall out of the one set
+`unseen` builds. The exception is while you are tied up to it, since a harbour
+you are sitting in belongs on the chart under you.
+
+The one thing that keeps a wreck on the chart after you have been there is a
+hold that could not take the haul. It goes aboard whole or not at all, so a ship
+arriving full takes none of it: the job does not fail, the step simply does not
+finish, and the wreck stays where it was. The dock menu says how many units
+short you are and that she is not going anywhere. Coming back is the cost of
+arriving full.
 
 **A wreck does not exist until somebody names it.** Eight unexplained dots on
 the chart from the first day would be eight questions with no way to ask them;
@@ -912,14 +1019,19 @@ not anybody has heard of it, which is why it is *there* to be found. (The Maw
 is the other way about, and deliberately: it keeps its numbers and loses its
 name. See §2.3.)
 
-An eighth is designed and not written: it is taken at the Arc and leads into
-the debris trailing behind it, where the key item for the closing line is. Hull
-41 is the thread that points at it — Arc glass in a ship that was never near
-the Arc — and it says so in as many words when you hand it in.
+**The eighth is written**, and it is the one that turns the salvage chain into
+the closing line. *The Tail End* is taken at Nail from Dockmaster Pell and
+flown to the Arc's tail: two fragments go back to the Arc, which is what a
+salvor would come for, and a third piece — racked on its own, strapped like
+something that was being carried rather than something that fell in, with an
+edge that was cut rather than broken — does not get offered to anybody. Hull 41
+is the thread that points at it (Arc glass in a ship that was never near the
+Arc) and says so in as many words when you hand it in.
 
-Both quest chains run. Crew is settled far enough to pay out (§7.2): three jobs
-hand over a person, and finishing one fills that berth. #20 still needs an Arc
-fragment to exist as a thing to *investigate* rather than a good to carry.
+Both quest chains run, and both now finish. Crew pays out (§7.2): three jobs
+hand over a person, and finishing one fills that berth. The Arc fragment that
+#20 was waiting on exists, and #20 itself has been replaced by the four-job
+closing line at §5.0.1.
 
 | # | Quest | Type | Route / Goal | Reward |
 |---|---|---|---|---|
@@ -942,7 +1054,7 @@ fragment to exist as a thing to *investigate* rather than a good to carry.
 | 17 | The Amber Collector | Retrieval | Brine: retrieve brine amber → Veyra | Credits |
 | 18 | A Frog's Question | Message | Brine → Glass: deliver a message | Credits / frog reputation |
 | 19 | Appraisal | Shopping List | Brine: bring an arc shard, storm crystals and reactor coils to be looked at | **Frog Appraiser** |
-| 20 | What Is This Worth? | Appraisal / Retrieval | With the frog appraiser: investigate an Arc fragment | Major lore reveal *(not built)* |
+| 20 | *superseded* | — | The lore reveal this slot held is now the four-job closing line: The Ninth Lens, The Tail End, The Fifth Song, and The Lantern | See §5.0.1 |
 
 ### 5.0.1 The closing line
 
@@ -1071,9 +1183,12 @@ prices move.
 
 Every quest names the port it is offered at, so a board has something to read.
 
-**There is still no board.** Fourteen quests are written, tested and flyable,
-and the opening errand is the only one a player can take, because there is
-nowhere to press. That is the last piece.
+**The board is built**, and this paragraph used to say it was the last piece
+missing. It is the dock menu's **Requests** tab: the jobs the port you are tied
+up at is offering, with who is asking, what it is and what it pays, and a Take
+button that carries the three-at-once rule and refuses a delivery there is no
+hold room (or no cold hold) for. Twenty-nine jobs are written, tested and
+flyable, and a player meets them by tying up somewhere and reading.
 
 ### 5.1.2 The two early berths
 
@@ -1096,23 +1211,31 @@ teaches at Slate, asked for again somewhere it matters.
 
 ### 5.2 What the Line Needs That the Game Does Not Have
 
+**All six are now done.** The list is kept as a record of what the line was
+waiting on and what each wait was settled as.
+
 1. ~~**Crew as a reward.**~~ Done, as far as the line needs. Three of the
    twenty hand over a person — Kiran the Emberkin engineer at #6, Tsuki the cat
    navigator at #13, Wicket the frog appraiser at #19 — one each from the three
    peoples whose region the player has just finished crossing. Finishing one
    of those quests fills that berth and the Crew menu shows who is in it. What
-   a crew member *does* is still open (§7.2); the quests no longer wait on it.
-2. **Faction reputation.** #7 and #10 pay in it. The game keeps reputation per
-   *people*, not per house, and the Emberkin are explicitly factional — so
-   either the Emberkin score splits into houses, or "faction reputation" means
-   the Emberkin score and the houses stay fiction.
+   a crew member *does* is settled too: all three berths gate something
+   (§7.2).
+2. ~~**Faction reputation.**~~ Done, and settled the second way: standing is
+   kept per *people* in `state.rep`, the Emberkin houses stay fiction, and #7
+   and #10 pay into the Emberkin score. It is a real currency rather than a
+   label — it discounts what a port charges (`repDiscount`), gates upgrades
+   that carry a `minRep`, buys the cats off a toll, and at five jobs for the
+   frogs it opens the temple at Croak (§7.5). Splitting the Emberkin score
+   into houses remains possible and nothing now waits on it.
 3. ~~A weightless parcel, for the four message quests.~~ Done: a message
    carries no goods, so it costs no hold room.
 4. ~~A set-counting quest step, for #9 and #19.~~ Done: a shopping list earns
    one step per line and closes when they are all aboard at the destination.
-5. **Things in space that are not ports**, for #14 and #15. Still open, and
-   built now, and it needed no new flight: the rendezvous written for the Maw
-   works at any weightless thing on a rail.
+5. ~~**Things in space that are not ports**, for #14 and #15.~~ Done, and it
+   needed no new flight: the rendezvous written for the Maw works at any
+   weightless thing on a rail. Eight wrecks are in the sky, and the eighth —
+   The Tail End, down the Arc's tail — carries the first of the three relics.
 6. ~~A quest board.~~ Done: the dock menu's Requests tab lists the jobs the
    port you are tied up at is offering, and a ship can hold three at once.
    The randomly generated contract board that used to sit behind a Passengers
@@ -1153,6 +1276,13 @@ parts to Slate, fire crystals to Veyra (who love them), reactor coils to Nail
 
 ## 7. Undecided Systems (TBD)
 
+**Most of this section is now decided.** The player character (7.1) and art
+direction (7.6) were settled in practice by what shipped; crew (7.2) has all
+three berths doing work; the ending (7.5) is built; rivalry (7.4) is ruled out.
+What is actually left is **events** (7.3), which nothing depends on, and
+**tuning** (7.7). Sections are kept rather than deleted so that a question that
+was closed does not get reopened without someone reading why it closed.
+
 ### 7.1 Player Character — TBD
 
 The shipped Crew menu names the captain **Finn**, an otter who left their raft. That explains flying solo, makes the player a slight outsider in their own culture, and gives each crew member the role of a surrogate raft. Leaving the species open or customizable is still the alternative, and the card is one line of `narrative.json` if it changes; the captain's own blurb is written without a pronoun so a change of species costs nothing.
@@ -1177,12 +1307,12 @@ berth fills with a name, a species, a portrait and a line:
 `state.crew` carries a slot per berth, null until earned and then `{ role,
 from, joinedAt }` — who they are, which job brought them, and when.
 
-**Two of the three berths now do something**, and both do it the same way: a
+**All three berths do something**, and all three do it the same way: a
 thing the world already contains is refused to a ship with nobody aboard who
 can reach it. No bonuses, no discounts, no numbers folded quietly into a burn.
 
 **The Engineer** gates the rack. The second and third size of tank and hold,
-and every gate key but the cat sensors, are refused while her berth is empty
+and every gate key but the cat sensors, are refused while his berth is empty
 (§2.8).
 
 **The Appraiser** gates *knowing what a thing is worth*, which is a different
@@ -1192,13 +1322,22 @@ by anybody, on hover or behind the "i" beside its name. That much is written on
 the crate. What no captain can see until Wicket is aboard is which of a
 people's four moons is the one that *loves* a thing rather than merely taking
 it, and what any of them would pay: a stall's wants are a list of names until
-she is there to put numbers on them. The reasoning is the game in the gap —
+he is there to put numbers on them. The reasoning is the game in the gap —
 glass that will not crack under pressure, and a world at the bottom of an
-ocean — and she is the shortcut, bought with a journey.
+ocean — and he is the shortcut, bought with a journey.
 
-The Navigator still does nothing. Two effects in, the pattern is clear enough
-to say what hers should be: something the sky already knows and a ship cannot
-read without her.
+**The Navigator** gates *reading the sky*, and it came out as three things
+rather than one. Tsuki puts the **Knot** on the chart — the cats have known
+where it is for nine generations, and `knowsKnot` is her berth or the
+gravitational sensors, whichever a ship got first. She puts the **second
+crossing** on the road, so a route can be read a world further ahead than a
+captain flying alone can see (`canSeePast`). And she is what lets a ship
+**come alongside a thing with no gravity**: every wreck in the game, and the
+rendezvous at the Maw, are refused without her (`canDockDrifting`), which is
+why a salvage job is turned down at the board rather than at the far end
+(§5.1). All three keep the rule the other two berths keep — something the
+world already contains, refused to a ship with nobody aboard who can reach it,
+and never a number folded quietly into a burn.
 
 The captain is drawn as an otter. §7.1 still has that down as a proposal, but
 the shipped fiction already leans that way — the game opens among otters, and
@@ -1237,9 +1376,9 @@ popup goes away rather than looping. Under reduced motion the whole exchange
 goes up on the first press, a timed reveal being both motion and the one kind
 a player cannot simply wait out.
 
-What is still open is most of what the berths are for: whether the other two
-get effects of their own, whether anybody can be recruited outside the quest
-line, and whether three is the number. Note what the Engineer's gate does to
+**All three berths now do something**, so what a crew member is *for* is no
+longer the open question it was. What is still open is whether anybody can be
+recruited outside the quest line, and whether three is the number. Note what the Engineer's gate does to
 the line's ordering — quest #6 now sits in front of the whole upper rack, and
 in front of fire crystals at #8, so the errand that was a story beat is load
 bearing.
@@ -1248,7 +1387,13 @@ Crew reacting to the player's burns is a desired feature, working as characteriz
 
 How crew relate to the player's standing with each species is also unsettled: each of the three comes from the people whose region their quest crosses, so reputation and crew already move together in the fiction without being wired together in the code.
 
-### 7.3 Events — TBD
+### 7.3 Events — TBD, and now the only wanted system still outstanding
+
+**Still on the agenda, as an addition rather than a gap.** With the closing line
+built (§7.5) and rivalry ruled out (§7.4), events are the one system the design
+still wants and does not have. Nothing else depends on them, which is why they
+keep getting deferred and why they are safe to defer again: the game is
+finishable without them.
 
 Coasting stretches are natural pacing gaps and the likely home for events. The guiding principle is that events should ask for **orbital decisions** where possible, not just text choices.
 
@@ -1256,13 +1401,56 @@ Candidates from brainstorming include distress beacons (requiring a rendezvous),
 
 Open questions include event frequency, trigger conditions (location, cargo, reputation, time), and how events tie into species relationships.
 
-### 7.4 Competition and Rivalry — TBD
+### 7.4 Competition and Rivalry — ruled out
 
-Options for channeling competitive drives without combat include a named rival trader who taunts the player over the radio and races them to markets, economic plays like cornering a market before a festival, and asynchronous route leaderboards or ghost trajectories. None are committed.
+**Not a planned feature.** A named rival racing the player to markets, cornering
+a market before a festival, route leaderboards and ghost trajectories were all
+considered and are not being built. They are recorded here so the idea is not
+raised a third time.
 
-### 7.5 Ending and Long-Term Goal — TBD
+The reason is the first pillar. A rival who beats you to a market is pressure
+that arrives on a *clock* rather than on an *orbit* — it would be felt as a
+number going the wrong way while the player is ten real seconds into a skip
+they cannot shorten, and the only counterplay the flight model offers is a
+burn they were already going to make. It would also cut across the tone
+(§4.1): this is a game about people being pleased to see you. Whatever
+competitive pull the game needs, it gets from the market itself and from the
+Δv a good route saves.
 
-The Builders and the Maw are the long-term hook, with breadcrumbs at the Arc, on Whisker, and in the research station under the ice on Glass. Undecided: what the Builder station at the Maw is for, what the Builders were and why they vanished, whether reaching the Maw ends the game or opens a post-game, and how the frogs' songs pay off.
+### 7.5 Ending and Long-Term Goal — built
+
+**The closing line is in the game.** It is written up in full at §5.0.1; this
+section records what the old open questions were settled *as*.
+
+*What the Builder station at the Maw is for.* It is a thing that has been
+aimed at a hole in the sky since before there were people to notice, and what
+it does — once, without ceremony, and only to a ship carrying all three pieces
+of cut glass — is give a bearing. Not at the Maw: at the star going round it.
+
+*How the frogs' songs pay off.* The Fifth Song is one of the three relics. Five
+jobs finished for the frogs buys an invitation the frogs do not issue, and the
+temple at Croak sings for most of a day and puts the third piece of glass into
+the captain's hands without translating any of it. `requires: { questsFor: {
+frog: 5 } }` is the only place in the game where standing with a people opens
+a door rather than moving a price.
+
+*Whether reaching the Maw ends the game.* Reaching the Maw does not. The Maw is
+where the bearing is given; **The Lantern** — a Builder station in a close
+circle round the Dancer, hidden from the chart until the bearing names it — is
+where the line ends. `ends: true` marks it, there is exactly one, and the build
+step checks that. It is also the only job in the game allowed to pay in neither
+coin nor kind: what it pays in is arriving.
+
+*What the Builders were and why they vanished.* Still not answered, and
+deliberately: the last thing the player gets is that something on the other end
+takes their lines. The breadcrumbs at the Arc, on Whisker and under the ice on
+Glass all still point inward at a question the game declines to close.
+
+**What is genuinely left here** is what happens *after*. There is no post-game,
+no reason to keep flying once the lines are across, and no acknowledgement
+anywhere else in the game that a captain has been out there. Whether the ending
+should hand back a changed sky, a title, or simply stop is the one part of this
+section still open.
 
 ### 7.6 Art Direction — TBD
 

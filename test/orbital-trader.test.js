@@ -1847,6 +1847,78 @@ test('the space near a wreck says whether you are in it', () => {
   } finally { chart.restore(); }
 });
 
+test('zooming in does not take the orange pair away with the rail', () => {
+  /* `drawOrbits` culls a rail at both ends, and a crossing used to be drawn
+     only on a rail that survived. Under six pixels across that is right — a
+     pair of diamonds on a dot says nothing. Over six screen diagonals it is
+     not a rail nobody can see, it is the rail you are standing on, and it is
+     culled at exactly the zoom the run to it is flown at. */
+  const ops = [];
+  const chart = stubChart(800, 600, ops);
+  try{
+    const g = salvor();
+    g.quests = [{ id: S.QUESTS.find(q => q.wreck === 'tinwhistle').id, step: 0, done: false, takenAt: 0 }];
+    g.dockedAt = null; g.justLeft = null; g.t = 0;
+    const start = O.absState(world, 'tassel', 0);
+    const mu = world.get('lamp').mu, r1 = O.norm(start.r), r2 = world.get('tinwhistle').a;
+    const vc = Math.sqrt(mu / r1);
+    g.ship = { body: 'lamp', r: [...start.r],
+      v: O.scale(O.unit(start.v), vc * Math.sqrt(2 * r2 / (r1 + r2))) };
+    const pred = S.planImmediate(g);
+    const crossings = railCrossings(world, pred, 0, { minLead: S.MIN_LEAD });
+    assert.ok(crossings.some(c => c.body === 'tinwhistle'), 'the road does not reach the wreck\'s rail at all');
+    const view = { t: 0, now: 0, shipAbs: { r: S.shipAbsPos(g), v: S.shipAbsVel(g) }, shipBody: 'lamp',
+      prediction: pred, nodes: [], nodePositions: [], apses: [], railCrossings: crossings,
+      hidden: S.unseen(g) };
+    const at = zoom => {
+      chart.camera.zoom = zoom;
+      chart.camera.anchor = [...S.shipAbsPos(g)];
+      chart.settle();
+      ops.length = 0;
+      chart.draw(view);
+      return {
+        rail: chart.hits.rails.some(r => r.id === 'tinwhistle'),
+        orange: ops.some(o => o[0] === 'strokeStyle' && o[1] === PALETTE.railCross),
+      };
+    };
+
+    const wide = at(8e3);
+    assert.ok(wide.rail && wide.orange, 'the pair is not drawn even with the rail on the screen');
+
+    /* And in, past the zoom that culls the rail for running off both edges.
+       The marks are still on the screen; it was only the rail that left. */
+    const close = at(3e4);
+    assert.ok(!close.rail, 'the rail is still drawn at this zoom — the test has stopped testing anything');
+    assert.ok(close.orange, 'zooming in took the orange pair away with the rail');
+  } finally { chart.restore(); }
+});
+
+test('zooming out past a rail still takes its crossing with it', () => {
+  /* The other end of the same cull, which was doing its job: a whole orbit
+     three pixels across is a dot, and a pair of diamonds on a dot is two marks
+     with nothing to be against. */
+  const ops = [];
+  const chart = stubChart(800, 600, ops);
+  try{
+    const g = transferShip();
+    const pred = S.planImmediate(g);
+    const crossings = railCrossings(world, pred, 0, { minLead: S.MIN_LEAD });
+    assert.ok(crossings.some(c => c.body === 'veyra'), 'the fall to Veyra does not cut Veyra\'s rail');
+    chart.camera.zoom = 10;              // Veyra's whole orbit about one pixel across
+    chart.camera.anchor = [0, 0];
+    chart.settle();
+    for(const c of crossings){
+      assert.ok(world.get(c.body).a * chart.camera.zoom < 6,
+        `${c.body}'s rail is big enough to draw after all`);
+    }
+    chart.draw({ t: 0, now: 0, shipAbs: { r: S.shipAbsPos(g), v: S.shipAbsVel(g) }, shipBody: 'lamp',
+      prediction: pred, nodes: [], nodePositions: [], apses: [], railCrossings: crossings,
+      hidden: new Set() });
+    assert.ok(!ops.some(o => o[0] === 'strokeStyle' && o[1] === PALETTE.railCross),
+      'a crossing was drawn on a rail too small to be a shape');
+  } finally { chart.restore(); }
+});
+
 test('the mode is announced with or without a navigator, and the numbers are hers', () => {
   const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
   assert.match(PLAY, /<small>Zero-g docking<\/small>/, 'the mode is not named anywhere');
@@ -1894,25 +1966,44 @@ test('the page keeps the playtest fixes wired', () => {
   assert.match(PLAY, /const aimed = \([^\n]*\) && !hits;/, 'the aiming card passes a path into the ground');
 });
 
-test('only the first crossing is marked, however many the road makes', () => {
-  /* The same refusal the road itself makes. A long ellipse cuts five rails
-     going out and the same five coming back, and ten honest pairs of orange
-     diamonds is a chart nobody can read. */
+test('every world the road reaches is marked, and each of them once', () => {
+  /* It used to be one mark for the whole road, on the reasoning that a long
+     ellipse cuts five rails going out and the same five coming back and ten
+     pairs of diamonds is unreadable. The reasoning was about the doubles and
+     the answer punished the wrong thing: flying Tassel to Grumm, the single
+     mark you got was where you cut the rail of Slate — a moon of the world you
+     had just left, six days into a seventy-day trip — and every other world the
+     road met, including all four moons of the one you were going to, went
+     unmarked. Worse, that one mark sits on a rail that is rarely on screen, so
+     the honest answer to "what did a player actually see" was nothing at all. */
   const g = transferShip();
   const pred = S.planImmediate(g);
-  const all = railCrossings(world, pred, g.t, { minLead: S.MIN_LEAD, limit: 8 });
-  assert.ok(all.length > 1, 'this road makes more than one, so there is something to refuse');
   const shown = railCrossings(world, pred, g.t, { minLead: S.MIN_LEAD });
-  assert.equal(shown.length, 1, 'and only one is drawn');
-  assert.deepEqual(shown[0], all[0], 'the soonest one');
+  assert.ok(shown.length > 1, 'still only marking one of them');
+  assert.deepEqual(shown, [...shown].sort((a, b) => a.t - b.t), 'not in the order they happen');
 
-  /* A long ellipse right out past the Belt, which is the case that made this
-     necessary: five rails, twice each. */
+  /* One per world: the doubles are what the cap is for now. */
+  const bodies = shown.map(c => c.body);
+  assert.equal(new Set(bodies).size, bodies.length, `a world is marked twice: ${bodies.join(', ')}`);
+
+  /* A long ellipse right out past the Belt — the busy case, where the same
+     rails are cut twice each and one mark apiece is the whole point. */
   const wide = transferShip('tassel', world.get('grumm').a * 0.68);
   wide.ship.v = O.scale(O.unit(wide.ship.v), O.norm(wide.ship.v) * 1.28);
-  const far = railCrossings(world, S.planImmediate(wide), wide.t, { minLead: S.MIN_LEAD, limit: 64 });
-  assert.ok(far.length >= 4, `the busy case needs to be busy; found ${far.length}`);
-  assert.equal(railCrossings(world, S.planImmediate(wide), wide.t, { minLead: S.MIN_LEAD }).length, 1);
+  const wpred = S.planImmediate(wide);
+  const raw = railCrossings(world, wpred, wide.t, { minLead: S.MIN_LEAD, limit: 64 });
+  const once = railCrossings(world, wpred, wide.t, { minLead: S.MIN_LEAD });
+  assert.ok(raw.length >= 4, `the busy case needs to be busy; found ${raw.length}`);
+  assert.equal(new Set(once.map(c => c.body)).size, once.length, 'the busy case marks a world twice');
+  assert.ok(once.length <= raw.length, 'one per world should never be more than the lot');
+  // Each kept one is the soonest of its world's.
+  for(const c of once){
+    const soonest = Math.min(...raw.filter(o => o.body === c.body).map(o => o.t));
+    assert.ok(Math.abs(c.t - soonest) < 1e-9, `${c.body}: kept a later crossing than its first`);
+  }
+
+  /* A caller may still ask for fewer, which is what the encounter list does. */
+  assert.equal(railCrossings(world, pred, g.t, { minLead: S.MIN_LEAD, limit: 1 }).length, 1);
 });
 
 test('a road past a dozen worlds wears one crosshair at most, and only for an arrival', () => {
@@ -2042,6 +2133,40 @@ test('nothing is drawn joining the pair', () => {
      something else being drawn — which is the thing that was removed. */
   assert.doesNotMatch(fn, /setLineDash|lineTo/, 'something is drawing a line between the diamonds again');
   assert.doesNotMatch(src, /railTie/, 'the tie colour is still in the palette');
+});
+
+test('the world you are aiming at is marked the moment your road reaches its orbit', () => {
+  /* This is what the pair of diamonds is *for*: where the road cuts a world's
+     rail, and where that world will be when it does. Pushing a burn out of
+     Tassel towards Grumm, the mark has to appear as soon as the road reaches
+     Grumm's orbit — not at the last second, and not only once the intercept is
+     already solved.
+
+     Note what happens *after* it is solved: a road that actually hits Grumm
+     ends inside its reach, a tenth of an au short of its rail, so there is no
+     crossing left to mark and the encounter marks and the arrival take over.
+     The diamonds are the aiming tool, and they are there for the aiming. */
+  const grumm = world.get('grumm');
+  const reach = kick => {
+    const s = S.newGame(7);
+    s.dockedAt = 'tassel'; S.undock(s); s.dv = s.tank = S.auDay(400);
+    const ix = S.addNode(s, s.t + 0.02);
+    s.nodes[ix].prograde = S.auDay(kick);
+    const pred = S.planImmediate(s, true, { farSight: false });
+    const far = Math.max(0, ...pred.segments
+      .filter(sg => sg.body === 'lamp' && sg.points).flatMap(sg => sg.points.map(O.norm)));
+    const marks = railCrossings(world, pred, s.t, { minLead: S.MIN_LEAD });
+    return { far, grumm: marks.some(c => c.body === 'grumm') };
+  };
+  const short = reach(8), over = reach(9);
+  assert.ok(short.far < grumm.a, `an 8 km/s burn should fall short; reached ${short.far.toFixed(3)} au`);
+  assert.ok(over.far > grumm.a, `a 9 km/s burn should reach past; reached ${over.far.toFixed(3)} au`);
+  assert.equal(short.grumm, false, 'a road that never reaches Grumm marked its rail anyway');
+  assert.ok(over.grumm, 'a road out past Grumm did not mark where it cuts its orbit');
+
+  /* And with nobody special aboard: seeing where a world will be is the
+     chart's arithmetic, not a thing a crew member unlocks. */
+  assert.ok(reach(11).grumm, 'the mark needs a navigator');
 });
 
 test('the rail a ship is standing on is not a crossing', () => {
@@ -2336,6 +2461,83 @@ test('the game opens in a low orbit, clear of the air, and a lap of it is about 
   const r0 = [...s.ship.r];
   for(let left = lapSeconds; left > 0; left -= 1) S.tick(s, S.dtForFrame(s, Math.min(1, left)));
   assert.ok(O.dist(s.ship.r, r0) < el.ra * 1e-6, 'one lap of ×1 is back where it started');
+});
+
+test('a skip ends the same distance from the thing it was sent to, whatever the trip', () => {
+  /* The run-in is flown at ×1, so the only honest unit for it is real seconds
+     of watching. It used to be two per cent of the trip capped at a fiftieth of
+     a day, which is neither: a fiftieth of a day is nine real minutes of ×1, so
+     a one-day skip handed back nine minutes of staring at nothing. And past
+     about ten days the margin stopped meaning anything, because a frame of a
+     skip is a six-hundredth of the trip and by then one frame was longer than
+     the whole margin — measured, a twenty-day skip and a three-hundred-day skip
+     both landed *past* the moment they were sent to. */
+  const B = CONST.BASE_RATE_DAYS_PER_SEC;
+  const coaster = () => {
+    const g = S.newGame(5);
+    g.dockedAt = null; g.justLeft = null; g.justLeftAt = -1e9; g.t = 0; g.nodes = [];
+    const start = O.absState(world, 'tassel', 0);
+    const mu = world.get('lamp').mu;
+    g.ship = { body: 'lamp', r: [...start.r],
+      v: O.scale(O.unit(start.v), Math.sqrt(mu / O.norm(start.r)) * 1.02) };
+    return g;
+  };
+  for(const days of [0.05, 0.2, 1, 5, 20, 70, 300]){
+    const g = coaster();
+    const target = g.t + days;
+    const plan = S.skipPlan(g, target);
+    g.warp = plan.rate;
+    /* The loop the browser runs, at sixty frames a second. */
+    let frames = 0;
+    while(g.t < plan.stopAt && frames++ < 2e5){
+      const dt = S.dtForFrame(g, 1 / 60, plan.stopAt);
+      if(dt <= 0) break;
+      S.tick(g, dt);
+    }
+    const short = target - g.t;
+    assert.ok(short > 0, `a ${days}-day skip landed past the moment it was sent to`);
+    assert.ok(Math.abs(short - S.MIN_LEAD) < 1e-9,
+      `a ${days}-day skip left ${(short / B).toFixed(0)} real seconds of ×1, not the ${(S.MIN_LEAD / B).toFixed(0)} every other one leaves`);
+  }
+
+  /* Except a skip too short to spare it, which still has to go somewhere. */
+  const tiny = coaster();
+  const plan = S.skipPlan(tiny, tiny.t + S.MIN_LEAD * 2);
+  assert.ok(plan.stopAt > tiny.t, 'a very short skip has nowhere to go');
+  assert.ok(plan.stopAt < tiny.t + S.MIN_LEAD * 2, 'and it does not land on top of the thing');
+});
+
+test('skipping to a burn lands a lead short of the burn, not half an hour short', () => {
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  /* It used to ask to be sent to a twentieth of a day before the burn, on top
+     of the margin the skip already leaves. A twentieth of a day is twenty-two
+     real minutes of ×1, so pressing "Skip to it" on a burn gave back half an
+     hour of staring — and the card, which reads the plan, understated the wait
+     by all of it. */
+  assert.match(PLAY, /warpnode\(i\)\{ const n = state\.nodes\[Number\(i\)\]; if\(n\) askSkip\(n\.t,/,
+    'the burn skip still cuts its own lead');
+  assert.doesNotMatch(PLAY, /askSkip\(n\.t - 0\.05/, 'the old hand-cut lead is back');
+});
+
+test('a frame of a skip never steps past the end of it', () => {
+  /* The guarantee the above rests on. A frame of a long skip is hours of game
+     time; the step is cut to what is left. */
+  const g = S.newGame(5); S.undock(g); g.warp = 5e4;
+  const until = g.t + 0.01;
+  const full = S.dtForFrame(g, 1 / 60);
+  assert.ok(full > 0.01, 'this frame is too small for the test to mean anything');
+  assert.equal(S.dtForFrame(g, 1 / 60, until), until - g.t, 'the last step was not cut to fit');
+  g.t = until;
+  assert.equal(S.dtForFrame(g, 1 / 60, until), 0, 'a step was offered past the end');
+  assert.equal(S.dtForFrame(g, 1 / 60, null), full, 'a frame with no end to reach was cut anyway');
+});
+
+test('the loop hands the skip\'s end to the clock, and skips to where the plan says', () => {
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.match(PLAY, /S\.dtForFrame\(state, real, warpTarget\)/,
+    'the frame steps without knowing where the skip ends');
+  assert.match(PLAY, /warpTarget = plan\.stopAt;/,
+    'the stopping point is worked out somewhere other than the plan');
 });
 
 test('undocking puts the ship in a prograde parking orbit at the docking altitude', () => {
@@ -4755,6 +4957,72 @@ test('an unfound wreck is no harbour and no readout', () => {
   assert.equal(S.dockingStatus(stranger)?.port, 'slate', 'an unmentioned wreck is offered as a harbour');
 });
 
+test('a stripped wreck comes off the chart', () => {
+  /* A picked-over hulk left on the chart is a harbour that offers nothing — a
+     dot you keep flying back to in order to find out it is the one you already
+     did. It is there from the moment a salvor names it to the moment its hold
+     is empty, and no longer. */
+  const s = salvor();
+  s.quests = []; s.dockedAt = 'slate';
+  assert.ok(S.acceptQuest(s, 'cutterjaw').ok);
+  assert.ok(!S.unseen(s).has('cutterjaw'), 'the job named it and it is not on the chart');
+
+  comeAlongside(s, 'cutterjaw');
+  assert.equal(S.dockingStatus(s)?.port, 'cutterjaw');
+  const r = S.dock(s);
+  assert.ok(r.ok, S.dockRefusal(S.dockingStatus(s)));
+  assert.ok(r.events.some(e => e.kind === 'salvaged'), 'nothing came aboard');
+
+  /* Still there while the ship is tied up to it: a harbour you are sitting in
+     belongs on the chart under you, empty or not. */
+  assert.ok(!S.unseen(s).has('cutterjaw'), 'the wreck vanished from under the ship');
+
+  S.undock(s);
+  assert.ok(S.unseen(s).has('cutterjaw'), 'the emptied wreck is still on the chart');
+  /* And it is nothing the ship can do anything with any more: no harbour, no
+     readout, nothing for the thrusters to fly against. */
+  comeAlongside(s, 'cutterjaw');
+  assert.notEqual(S.dockingStatus(s)?.port, 'cutterjaw', 'an emptied wreck is still offered as a harbour');
+  assert.equal(S.alongside(s), null, 'an emptied wreck is still something to fly against');
+
+  // The job itself carries on: the haul is aboard and still has to be delivered.
+  const live = s.quests.find(q => q.id === 'cutterjaw');
+  assert.ok(live && !live.done, 'the job finished at the wreck');
+  assert.ok(S.carrying(s, S.questById('cutterjaw').goods[0].good) > 0, 'the haul is not in the hold');
+});
+
+test('arriving with a full hold leaves the wreck where it is', () => {
+  /* The haul goes aboard whole or not at all, so a ship that cannot fit it
+     takes none of it. The job does not fail — the step simply does not finish,
+     and the wreck stays exactly where it was until you have been and made
+     room. Coming back is the cost of arriving full. */
+  const q = S.questById('cutterjaw');
+  const load = S.salvageLoad(q);
+  const s = salvor();
+  s.quests = []; s.dockedAt = 'slate';
+  assert.ok(S.acceptQuest(s, 'cutterjaw').ok);
+
+  // Room for all but one unit of it.
+  const per = S.goodById(q.goods[0].good)?.units ?? 1;
+  s.cargo = [{ good: q.goods[0].good, qty: Math.floor((S.holdUnits(s) - (load - per)) / per), t: 0, price: 1 }];
+  assert.ok(S.freeUnits(s) < load && S.freeUnits(s) > 0, `${S.freeUnits(s)} free of a ${load} unit haul`);
+
+  comeAlongside(s, 'cutterjaw');
+  const r = S.dock(s);
+  assert.ok(r.ok, 'could not even tie up');
+  assert.ok(!r.events.some(e => e.kind === 'salvaged'), 'a hold that cannot fit the haul took some of it');
+  S.undock(s);
+  assert.ok(!S.unseen(s).has('cutterjaw'), 'the wreck went off the chart with its hold still full');
+
+  // Make room, come back, and now it goes aboard and the site is done with.
+  s.cargo = [];
+  comeAlongside(s, 'cutterjaw');
+  const again = S.dock(s);
+  assert.ok(again.events.some(e => e.kind === 'salvaged'), 'coming back empty did not finish the job');
+  S.undock(s);
+  assert.ok(S.unseen(s).has('cutterjaw'), 'the wreck is still on the chart after being stripped');
+});
+
 test('the haul comes aboard at the wreck and cannot be sold on the way home', () => {
   const s = salvor();
   s.dockedAt = 'slate';
@@ -5271,7 +5539,7 @@ test('an orbit that overlaps a moon\'s rail is not marked with a meeting laps aw
 
   const pred = S.planImmediate(s, true, {});
   const road = pred.end - s.t;
-  assert.ok(road <= el.period * 2.5, `the drawn road runs ${(road / el.period).toFixed(1)} laps`);
+  assert.ok(road <= el.period * 1.001, `the drawn road runs ${(road / el.period).toFixed(2)} laps`);
   for(const e of pred.events){
     assert.ok(e.t - s.t <= road + 1e-9, `${e.kind} is marked at +${(e.t - s.t).toFixed(1)} d, past the end of the road`);
   }
@@ -5282,6 +5550,45 @@ test('an orbit that overlaps a moon\'s rail is not marked with a meeting laps aw
   const rc = railCrossings(world, pred, s.t, { minLead: S.MIN_LEAD, limit: 8 });
   assert.ok(rc.length > 0, 'and nothing is left to line the meeting up with');
   for(const c of rc) assert.ok(c.t - s.t <= road + 1e-9, 'a rail crossing is off the end of the drawn road');
+});
+
+test('nor with one on the very next lap, which is still not this lap', () => {
+  /* The bound was two laps, on the reasoning that the next lap round is nearly
+     here. It is not: the leg is *drawn* as one lap, so a meeting on the second
+     is painted on the first, and the picture says "just there" while the clock
+     says a lap and a half.
+
+     And under the two laps was a floor of two days, left over from the default
+     look, which in front of a small lap count is not a floor but an override.
+     A Tassel parking orbit pushed out past Slate has a period of about a day,
+     so two days was between two and four laps and the cap never bit at all:
+     measured across this family of orbits, twenty-four marks were being drawn
+     between 1.07 and 4.80 laps out. */
+  const b = world.get('tassel'), slate = world.get('slate');
+  /* Find one whose meeting really is on the second lap, by asking the
+     unbounded search — the one the flight itself flies by — where it is. */
+  let found = null;
+  for(let k = 1.30; k <= 1.42 && !found; k += 0.002){
+    const s = S.newGame(1); S.undock(s); s.nodes = []; s.dv = s.tank = 0.02;
+    const r0 = b.dockAlt;
+    s.ship = { body: 'tassel', r: [r0, 0], v: [0, Math.sqrt(b.mu / r0) * k] };
+    const el = O.elementsFromState(b.mu, s.ship.r, s.ship.v);
+    if(!Number.isFinite(el.period) || !(el.ra > slate.a)) continue;
+    const far = S.plan(s, el.period * 6);
+    const door = far.events.find(e => e.kind === 'soi' && e.to === 'slate');
+    if(!door) continue;
+    const laps = (door.t - s.t) / el.period;
+    if(laps > 1.05 && laps < 2) found = { s, el, laps };
+  }
+  assert.ok(found, 'no orbit in this family meets Slate on its second lap');
+
+  const pred = S.planImmediate(found.s, true, {});
+  assert.equal(pred.intercept, null,
+    `a meeting ${found.laps.toFixed(2)} laps out is marked as though it were this lap`);
+  assert.ok(!pred.events.some(e => e.kind === 'soi'),
+    'and its door is drawn on the lap in front of the pilot');
+  assert.ok(pred.end - found.s.t <= found.el.period * 1.001,
+    'the road ran past the lap it draws');
 });
 
 test('but a moon the road reaches on the lap in front of you still is', () => {
