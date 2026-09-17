@@ -36,8 +36,8 @@
     position: fixed; inset: 0; z-index: 1;
     background:
       radial-gradient(60% 42% at 50% 46%, rgba(244,239,228,.90) 0%, rgba(244,239,228,.60) 60%, rgba(244,239,228,0) 100%),
-      linear-gradient(180deg, rgba(244,239,228,.88) 0%, rgba(244,239,228,.34) 40%,
-                              rgba(244,239,228,.60) 74%, rgba(244,239,228,.95) 100%);
+      linear-gradient(180deg, rgba(244,239,228,.88) 0%, rgba(244,239,228,.58) 40%,
+                              rgba(244,239,228,.74) 74%, rgba(244,239,228,.95) 100%);
   }
 
   main{
@@ -78,10 +78,57 @@
   .enter:focus-visible{ outline: 3px solid var(--gv-leaf); outline-offset: 3px; }
 
   .more-levels{
-    margin: .7rem 0 0; color: var(--muted); font-size: .82rem;
+    margin: 1.3rem 0 .7rem; color: var(--muted); font-size: .82rem;
   }
-  .more-levels a{ color: var(--leaf); text-decoration: none; font-weight: 600; }
-  .more-levels a:hover, .more-levels a:focus-visible{ text-decoration: underline; }
+
+  /* One card per level, each showing the level itself rather than its name:
+     the thumbnail is the real scene, painted by the real renderer straight
+     out of newGame (see the script below), so it cannot drift out of step
+     with what you get when you click it. Auto-fit rather than a fixed count
+     — seven levels wrap to whatever the screen has room for, and an eighth
+     would need nothing here to change. */
+  .levels{
+    list-style: none; margin: 0; padding: 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+    gap: .7rem;
+  }
+  /* Opaque, not the glass the rest of this page uses: these sit over the
+     live demo scene running behind everything (see #plate), and a
+     translucent card lets a duckling wander through the middle of a
+     thumbnail of a different level entirely. */
+  .levels a{
+    display: block; text-decoration: none; color: inherit;
+    border: 1px solid var(--edge); border-radius: 8px; overflow: hidden;
+    background: var(--ink);
+    box-shadow: var(--gv-shadow);
+    transition: transform .12s ease, border-color .12s ease;
+  }
+  .levels a:hover, .levels a:focus-visible{
+    transform: translateY(-2px); border-color: var(--leaf);
+  }
+  .levels a:focus-visible{ outline: 2px solid var(--leaf); outline-offset: 2px; }
+  /* Deliberately *not* `pixelated`: a thumbnail is the 320x180 scene shrunk
+     to whatever width the grid gives it, which is rarely a whole-number
+     divisor, and nearest-neighbour at an awkward ratio drops every other
+     row of a one-pixel-thick bridge deck. Letting the browser resample keeps
+     a duckling and a ramp legible at this size. */
+  .levels canvas{
+    display: block; width: 100%; height: auto;
+    border-bottom: 1px solid var(--edge);
+  }
+  .levels .cap{
+    display: flex; align-items: baseline; gap: .4rem;
+    padding: .35rem .5rem;
+    font-size: .78rem; font-weight: 700; color: var(--gv-text);
+  }
+  .levels .num{
+    color: var(--leaf); font-variant-numeric: tabular-nums;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .levels a{ transition: none; }
+    .levels a:hover, .levels a:focus-visible{ transform: none; }
+  }
 
   .facts{
     margin: 1.6rem auto 0; padding: 0; list-style: none;
@@ -131,15 +178,8 @@
        wall, a drop, or the goose — and get enough of the hatch to the pond.</p>
 
     <a class="enter" href="./play.html?level=park">Hatch the flock</a>
-    <p class="more-levels">
-      or jump to
-      <a href="./play.html?level=warren">The Warren</a>,
-      <a href="./play.html?level=orchard">The Orchard</a>,
-      <a href="./play.html?level=grove">The Grove</a>,
-      <a href="./play.html?level=aerie">The Aerie</a>,
-      <a href="./play.html?level=spire">The Spire</a>,
-      <a href="./play.html?level=falls">The Falls</a>
-    </p>
+    <p class="more-levels" id="levels-label">or start anywhere &mdash; every level, as it actually looks</p>
+    <ul class="levels" id="levels" aria-labelledby="levels-label"></ul>
 
     <ul class="facts">
       <li>Single player</li>
@@ -161,12 +201,47 @@
   /* The plate is the park itself, running, with a slow bot playing it over
      and over — the same rule every title screen on this site follows: this is
      not a picture of the game, it is the game, and it cannot go stale. */
-  import { LEVEL_1, GAME_VERSION } from './content.js';
+  import { LEVEL_1, LEVELS, GAME_VERSION } from './content.js';
   import { newGame, tick, assignSkill, hasTrait } from './sim.js';
   import { paintScene } from './art.js';
   import { createAudio } from './audio.js';
 
   document.getElementById('game-version').textContent = `v${GAME_VERSION}`;
+
+  /* The level picker: one card per level, each showing that level rather
+     than naming it. A fresh `newGame` is the level at tick zero — its
+     terrain, its water, its goose on its mark, nothing hatched yet — and
+     painting it with the game's own `paintScene` is what keeps a thumbnail
+     honest. There is no image to re-export when a level's shape changes;
+     move a gap in content.js and the picture here moves with it. */
+  const levelList = document.getElementById('levels');
+  LEVELS.forEach((level, i) => {
+    const link = document.createElement('a');
+    link.href = `./play.html?level=${level.id}`;
+    link.setAttribute('aria-label', `Level ${i + 1} of ${LEVELS.length}, ${level.name}`);
+
+    const shot = document.createElement('canvas');
+    shot.width = level.width;
+    shot.height = level.height;
+    const shotCtx = shot.getContext('2d', { alpha: false });
+    shotCtx.imageSmoothingEnabled = false;
+    paintScene(shotCtx, newGame(level));
+    shot.setAttribute('aria-hidden', 'true');
+
+    const cap = document.createElement('span');
+    cap.className = 'cap';
+    const num = document.createElement('span');
+    num.className = 'num';
+    num.textContent = String(i + 1);
+    const name = document.createElement('span');
+    name.textContent = level.name;
+    cap.append(num, name);
+
+    link.append(shot, cap);
+    const card = document.createElement('li');
+    card.append(link);
+    levelList.append(card);
+  });
 
   /* Autoplay policy decides when sound can start, not us: the context cannot
      exist until a gesture, so the button reflects intent and the first click
@@ -229,19 +304,28 @@
      own flyer for the drop off the far side of the plateau, since neither
      of those leaves anything behind for the next one. */
   let state = newGame(LEVEL_1);
-  let builderUsed = false;
+  let builderUsed = false, rampExtended = false;
 
   function playStep(){
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
-      if(!builderUsed && d.x === 69 && assignSkill(state, d.id, 'builder')) builderUsed = true;
-      else if(!hasTrait(d, 'climber') && d.x >= 130 && d.x < 150) assignSkill(state, d.id, 'climber');
+      // The Park's gap is wider than one ramp reaches, so this lays one at
+      // the lip and then extends it from its far end — see content.js's
+      // note on LEVEL_1, and BUILD_SECONDS for why it takes two.
+      if(!builderUsed && d.x === 69 && assignSkill(state, d.id, 'builder')){ builderUsed = true; continue; }
+      const end = state.decks.findLastIndex(at => at.length > 0);
+      if(builderUsed && !rampExtended && end > 0 && d.x === end && state.decks[end].includes(d.y)){
+        if(assignSkill(state, d.id, 'builder')) rampExtended = true;
+        continue;
+      }
+      if(!hasTrait(d, 'climber') && d.x >= 136 && d.x < 150) assignSkill(state, d.id, 'climber');
       else if(!hasTrait(d, 'flyer') && d.x >= 160 && d.x < 219) assignSkill(state, d.id, 'flyer');
     }
     tick(state);
     if(state.ended){
       state = newGame(LEVEL_1);
       builderUsed = false;
+      rampExtended = false;
     }
   }
 

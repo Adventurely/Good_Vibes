@@ -332,8 +332,14 @@
   const requestedId = new URLSearchParams(location.search).get('level');
   const LEVEL = LEVELS.find(l => l.id === requestedId) || LEVELS[0];
   const nextLevel = LEVELS[LEVELS.indexOf(LEVEL) + 1] || null;
-  document.getElementById('level-name').textContent = `— ${LEVEL.name}`;
-  document.title = `Duck Duck Quack — ${LEVEL.name}`;
+  /* Which of the seven this is, counted from one. Worth saying out loud on
+     the page: a level has always had a name here but never a place in the
+     order, so "The Aerie" told you nothing about how far in you were, or
+     which one to go back to. */
+  const levelNumber = LEVELS.indexOf(LEVEL) + 1;
+  document.getElementById('level-name').textContent =
+    `— Level ${levelNumber} of ${LEVELS.length}: ${LEVEL.name}`;
+  document.title = `Duck Duck Quack — Level ${levelNumber}: ${LEVEL.name}`;
   document.getElementById('game-version').textContent = `v${GAME_VERSION}`;
 
   const els = id => document.getElementById(id);
@@ -547,7 +553,7 @@
       ui.nextLevel.hidden = false;
       let secondsLeft = 4;
       const countdown = () => {
-        ui.nextLevel.textContent = `Next: ${nextLevel.name} (${secondsLeft})`;
+        ui.nextLevel.textContent = `Next: Level ${levelNumber + 1}, ${nextLevel.name} (${secondsLeft})`;
         if(secondsLeft <= 0){ cancelAutoAdvance(); location.href = href; return; }
         secondsLeft -= 1;
       };

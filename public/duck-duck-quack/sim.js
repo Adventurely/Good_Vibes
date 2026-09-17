@@ -35,6 +35,7 @@ function hatchling(level, groundY){
     fallFrom: 0,
     buildBaseY: 0,      // the height the ramp started from — see stepBuilding
     buildStep: 0,       // ticks spent building so far, up to BUILD_MAX_STEPS
+    buildLevel: false,  // true when this one is extending a ramp rather than starting one
     digLeft: 0,
     cause: null,        // set when lost: 'fell' | 'edge' | 'goosed'
   };
@@ -126,21 +127,27 @@ const addDeckAt = (state, x, y) => {
 /* Which of a column's surfaces a duckling at `fromY` would actually step
  * onto, or null if none of them is anything but a wall to it.
  *
- * Within WALK_STEP either way is ordinary ground to step along, and the
- * nearest such surface wins — that is what keeps a duckling on the ramp it
- * is already walking, up or down, rather than dropping off it onto whatever
- * happens to lie below. Failing that, the highest surface still beneath it
- * is where it is headed, which is what lets a duckling walk clean under a
- * ramp overhead instead of being lifted onto it, and what makes the ground
- * under a ramp still count as ground. Only when every surface here stands
- * more than a step above is there nothing to step onto at all — a wall.
+ * Anything within WALK_STEP either way is ordinary ground to step along, and
+ * of those the *highest* wins — a duckling always takes the step up if there
+ * is one to take. That is what puts a duckling walking the ground onto the
+ * foot of a ramp rather than under it, and what makes one coming down a ramp
+ * change onto another crossing it the other way and carry on up: at the
+ * crossing both decks are a step away, and up beats down. Preferring the
+ * nearest instead kept it on the ramp it was already descending, which is
+ * the one thing a duckling standing at the foot of an upward ramp plainly
+ * should not do.
+ *
+ * Failing that, the highest surface still beneath it is where it is headed,
+ * which is what lets a duckling walk clean under a ramp overhead instead of
+ * being lifted onto it, and what makes the ground under a ramp still count
+ * as ground. Only when every surface here stands more than a step above is
+ * there nothing to step onto at all — a wall.
  */
 const stepTargetAt = (state, x, fromY) => {
-  const surfaces = surfacesAt(state, x);
   let onLevel = null, below = null;
-  for(const s of surfaces){
+  for(const s of surfacesAt(state, x)){
     if(Math.abs(s - fromY) <= WALK_STEP){
-      if(onLevel === null || Math.abs(s - fromY) < Math.abs(onLevel - fromY)) onLevel = s;
+      if(onLevel === null || s < onLevel) onLevel = s;
     } else if(s > fromY){
       if(below === null || s < below) below = s;
     }
@@ -461,7 +468,9 @@ function stepBuilding(state, d){
   if(nextX < 0 || nextX >= level.width){ d.state = 'walking'; return; }
 
   const step = d.buildStep + 1;
-  const y = d.buildBaseY - Math.round(step * BUILD_RISE_HEIGHT / BUILD_MAX_STEPS);
+  const y = d.buildLevel
+    ? d.buildBaseY
+    : d.buildBaseY - Math.round(step * BUILD_RISE_HEIGHT / BUILD_MAX_STEPS);
 
   /* Strictly higher, not "at or above": the first few ticks of a ramp round
      to no rise at all (BUILD_RISE_HEIGHT spread over BUILD_MAX_STEPS is well
@@ -551,6 +560,15 @@ export function assignSkill(state, duckId, skill){
     d.state = 'building';
     d.buildBaseY = d.y;
     d.buildStep = 0;
+    /* Given to a duckling already standing on a ramp, this one extends it
+       rather than starting a fresh one: it carries on at the height it is
+       already at instead of climbing another BUILD_RISE_HEIGHT on top. Two
+       Builders chained the other way would end up twice as high, and the far
+       end of a ramp is a ledge everything behind it has to step off — one
+       climb's worth is FALL_SAFE, which is survivable, and two is not. So
+       the first Builder decides how high the ramp goes and every one after
+       it decides how far. */
+    d.buildLevel = state.decks[columnAt(state, d.x)].includes(d.y);
     return d;
   }
   // digger, climber: stay 'walking' until the right hazard asks for them.

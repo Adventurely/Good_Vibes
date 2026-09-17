@@ -52,7 +52,7 @@
    straight off the page whether they have the latest build, rather than
    having to guess from behavior alone. Bump it on every change that ships,
    however small. */
-export const GAME_VERSION = '1.2';
+export const GAME_VERSION = '1.5';
 
 export const SCENE_W = 320;
 export const SCENE_H = 180;
@@ -106,14 +106,12 @@ export const FALL_SAFE = 24;
    run into nothing — see sim.js's stepBuilding. It starts the instant it is
    given, so this is the one thing that ever ends a ramp out in open air,
    and it is also what bounds how far one reaches: one tick of building is
-   one column, so four seconds is forty-four columns, about an eighth of the
-   scene. Was ten, which reached a third of the way across a level off a
-   single click and left very little a player could get wrong; four is short
-   enough that where the ramp starts is a real decision, and still comfortably
-   longer than the widest gap in the game (The Park's, at thirty-five).
+   one column, so three seconds is thirty-three columns, about a tenth of
+   the scene. Was ten, which reached a third of the way across a level off a
+   single click and left very little a player could get wrong, then four.
    Stated as seconds, the same way spawnInterval and timeLimit are, and
    converted once into ticks here rather than written as a bare count. */
-export const BUILD_SECONDS = 4;
+export const BUILD_SECONDS = 3;
 export const BUILD_MAX_STEPS = TICK_RATE * BUILD_SECONDS;
 
 /* How high a Builder's ramp climbs over the full BUILD_MAX_STEPS, if it
@@ -233,11 +231,20 @@ export function buildLayer(segments, field, fallback, width = SCENE_W){
 /* "The Park": nest, a gap, a wall, a drop, a goose, a pond.
  *
  * Three obstacles, and deliberately one of each kind of answer. The gap is
- * solved once and stays solved — one Builder lays a bridge the whole flock
- * walks over. The wall and the drop are not: a Climber gets one duckling up
- * and a Flyer gets one duckling down, and the next duckling arrives at an
- * obstacle exactly as tall as the first one found it. That is why those two
- * supplies are sized for most of the flock while the builder supply is two.
+ * solved once and stays solved — a ramp the whole flock walks over. The wall
+ * and the drop are not: a Climber gets one duckling up and a Flyer gets one
+ * duckling down, and the next duckling arrives at an obstacle exactly as
+ * tall as the first one found it. That is why those two supplies are sized
+ * for most of the flock while the builder supply is a handful.
+ *
+ * This gap is thirty-five columns and a ramp is thirty-three (see
+ * BUILD_SECONDS), so it is also the one gap in the game that wants two
+ * Builders rather than one: the first laid at the lip carries a duckling
+ * most of the way over, and a second, given to a duckling standing out on
+ * the end of that ramp, extends it the rest of the way. That is deliberate —
+ * it is the level that introduces Builder, and a gap it cannot quite reach
+ * across in one go is what teaches that a ramp can be carried on from where
+ * the last one stopped.
  *
  * No Diggers here at all. A Digger tunnels through a wall, which would make
  * the wall a solved-once obstacle like the gap — worth meeting, but not on
@@ -286,9 +293,10 @@ export const LEVEL_1 = {
      the point of it is to feel the skills work, not to run out of them.
      Climber and Flyer are the two every crossing duckling needs its own
      copy of, so both are sized to the save quota with one to spare. Builder
-     only ever needs to fire once, plus a spare. Digger is zero: see the
-     level's note above. */
-  supply: { digger: 0, builder: 2, blocker: 2, climber: 9, flyer: 9 },
+     is four: two to reach across the gap (see the level's note above) and
+     two more, because getting a ramp wrong on the level that teaches ramps
+     should cost a Builder, not the run. Digger is zero: see the note too. */
+  supply: { digger: 0, builder: 4, blocker: 2, climber: 9, flyer: 9 },
 
   /* Patrols the near half of the pond's approach. `speed` is columns a tick,
      `catchRadius` is how close a duckling has to be to it, in columns, to get
