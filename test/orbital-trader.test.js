@@ -828,6 +828,35 @@ test('pressing the same face again gets the next thing, and then comes round', (
   assert.equal(S.speaker('navigator').name, 'Tsuki');
 });
 
+test('the sheet handle is a handle: hittable, draggable, and it resizes', () => {
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  /* It was a 44x5 pill with nothing behind it — the shape every phone sheet
+     wears to say "drag me", wired to nothing but close, and five pixels tall.
+     The pill is now drawn on a strip that is a thumb high, and the strip is
+     what you press. */
+  assert.match(PLAY, /#grab\{[^}]*height:26px/s, 'the handle is back to being a sliver');
+  assert.match(PLAY, /#grab::before\{/, 'the pill is gone');
+  assert.match(PLAY, /#grab\{[^}]*touch-action:none/s,
+    'without this the browser takes the swipe for scrolling or pull-to-refresh');
+
+  /* The drag is pointer events, and there must be no click handler beside it:
+     a click fires after a drag too, and the panel would shut every time it was
+     resized. A press that never moved is what closes it. */
+  assert.match(PLAY, /\$\('grab'\)\.addEventListener\('pointerdown'/, 'the handle does not drag');
+  assert.doesNotMatch(PLAY, /\$\('grab'\)\.addEventListener\('click'/,
+    'a click handler will shut the panel at the end of every resize');
+
+  /* Three stops, and the middle one is exactly the height the sheet has always
+     opened at, so nothing about opening the panel has changed. */
+  assert.match(PLAY, /--sheet-h:min\(64vh, 560px\)/, 'the sheet no longer opens where it used to');
+  assert.match(PLAY, /Math\.min\(innerHeight \* 0\.64, 560\)/, 'the middle stop is not the old height');
+  assert.match(PLAY, /height:var\(--sheet-h\)/, 'the sheet height is not something JS can move');
+
+  /* And the sheet owns the bottom of the screen, so the one popup that lives
+     there gets out of its way rather than playing behind it. */
+  assert.match(PLAY, /body\.sheet #chatter\{/, 'a conversation plays behind the sheet on a phone');
+});
+
 test('the crew menu turns a portrait into a question', () => {
   const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
   assert.match(PLAY, /class="face" data-act="say\|\$\{who\}"/, 'the portraits are not buttons');
@@ -1773,6 +1802,49 @@ test('a road past a dozen worlds wears one crosshair at most, and only for an ar
   assert.equal(pred.intercept, pred.intercepts[0] ?? null);
 });
 
+test('a road through two reaches is marked at both of them', () => {
+  /* The ordinary way to arrive anywhere in the Grumm system: fall into Grumm,
+     and go on from there to one of its moons. The road holds both passes and
+     both are real — the pass at Grumm is the one being flown right now, and the
+     pass at the moon is the one being aimed at. Only one used to be marked, and
+     which one fell out of an index rather than out of the road: this case
+     marked Grumm and left the moon, the thing the burn was for, with nothing. */
+  const s = S.newGame(7);
+  s.dockedAt = 'tassel'; S.undock(s);
+  s.dv = s.tank = S.auDay(400);
+  assert.ok(S.trimToTarget(s, 'grumm', 20000)?.ok, 'could not plot the road this test is about');
+  let guard = 0;
+  while(s.ship.body !== 'grumm' && guard++ < 4000) S.tick(s, 0.5);
+  assert.equal(s.ship.body, 'grumm', 'never got to Grumm');
+
+  s.nodes = [];
+  assert.ok(S.trimToTarget(s, 'haven', 400)?.ok, 'could not aim at the moon from inside the reach');
+  const pred = S.planImmediate(s, true, { farSight: true });
+  const ids = (pred.intercepts ?? []).map(ic => ic.body);
+  assert.deepEqual(ids, ['grumm', 'haven'], `the road passes through two reaches and marks ${ids.join(', ') || 'none'}`);
+  /* Earliest first, and `intercept` is still the next one. */
+  assert.ok(pred.intercepts[0].t < pred.intercepts[1].t, 'they are not in the order they happen');
+  assert.equal(pred.intercept, pred.intercepts[0]);
+  for(const ic of pred.intercepts) assert.ok(!ic.passing, 'a sampled close pass came back');
+});
+
+test('a navigator does not take the crosshair away', () => {
+  /* She is the reason the road is drawn as far as the second door at all, and
+     that is what broke it: Tassel to Slate is `enter` then `exit`, the trim
+     landed on the exit, an exit is not an encounter — and the mark on the
+     opening quest of the game vanished for having a better crew. Whatever
+     else she changes about the road, the passes along it are the same passes. */
+  const road = far => {
+    const s = S.newGame(7);
+    s.dockedAt = 'tassel'; S.undock(s);
+    s.dv = s.tank = S.auDay(60);
+    assert.ok(S.trimToTarget(s, 'slate', 6000)?.ok);
+    return (S.planImmediate(s, true, { farSight: far }).intercepts ?? []).map(ic => ic.body);
+  };
+  assert.deepEqual(road(false), ['slate'], 'the road to Slate is not marked at Slate');
+  assert.deepEqual(road(true), ['slate'], 'a navigator aboard lost the mark at Slate');
+});
+
 test('the world you are leaving is not an encounter with anything', () => {
   /* A parking orbit reaches its low point once a lap, which is a real local
      minimum and completely uninteresting: it is where you already are. Cast
@@ -1794,6 +1866,33 @@ test('the world you are leaving is not an encounter with anything', () => {
   const veyra = (leaving.intercepts ?? []).find(ic => ic.body === 'veyra');
   assert.ok(veyra, 'the destination is not marked');
   assert.ok(!veyra.passing, 'an encounter inside a reach should carry the solved periapsis, not a sampled pass');
+});
+
+test('the space near a drifting thing is a place you can see', () => {
+  /* A wreck's reach does everything a sphere of influence does to the flying —
+     cross it and the two buttons on a mark stop being about an orbit and start
+     being about the thing you are coming alongside, and the corner of the HUD
+     turns into range and closing speed — and it was drawing nothing at all. The
+     only way to find out where it was was to be inside it and notice the words
+     had changed. */
+  const src = readFileSync(new URL('../public/orbital-trader/render.js', import.meta.url), 'utf8');
+  const fn = src.slice(src.indexOf('function drawDriftReaches'), src.indexOf('function drawSoiRings'));
+  assert.ok(fn.length > 200, 'found the drawing pass');
+  assert.match(src, /drawDriftReaches\(chart, pos\);/, 'nothing calls it');
+  assert.match(fn, /b\.driftReach > 0/, 'it is not keyed on the reach');
+  assert.match(fn, /chart\.hidden\.has\(b\.id\)/, 'an unfound wreck puts its reach on the chart');
+  assert.match(fn, /setLineDash/, 'a reach is dashed, like every other reach on this chart');
+  assert.match(src, /driftEdge/, 'it is drawn in the harbour mouth\'s colours');
+
+  /* And the promise the drawing makes: the mouth is inside the reach at every
+     one of them, so a ship is always in the space — axes turned, numbers up —
+     a good while before it may tie up. `check-tuning` says the same thing to
+     the design table; this says it to the game that ships. */
+  for(const b of BODIES.filter(x => x.port && !(x.mu > 0) && x.parent)){
+    assert.ok(b.driftReach > 0, `${b.id} has no reach to draw`);
+    assert.ok(b.driftReach > b.zoneRadius,
+      `${b.id}: you could tie up at ${b.zoneRadius} without ever entering ${b.driftReach}`);
+  }
 });
 
 test('nothing is drawn joining the pair', () => {

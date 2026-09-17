@@ -1556,33 +1556,59 @@ function fullLap(seg, mu){
  * the nearest point is simply that leg's periapsis — no search, no sampling,
  * exact. It is the number a pilot is actually asking for while they push a
  * burn around: not "does this reach Slate" but "how close, and how fast". */
-function interceptOf(segments, crossed){
-  let from;
-  if(crossed >= 0 && segments[crossed].reason === 'enter'){
-    /* A door the road goes in through: the encounter is inside the new reach.
-       An *exit* is not one. Climbing out of a world's reach leaves you on an
-       orbit round its parent, and the low point of that orbit is not an
-       encounter with anything — reporting it as one put "the Lamp, eighty
-       million kilometres" on the chart as though it were a near miss. */
-    from = crossed + 1;
-  }else{
-    /* No door the road goes *in* through, but the ship may already be through
-       one. A ship that has just fallen into a world's reach is going round it
-       in the arithmetic and nowhere near it yet: the low point ahead is the
-       encounter, and the one place a rendezvous can be made. A skip ends at
-       every change of reach, so this is exactly where a pilot gets put down,
-       and without this the panel offers them nothing but the way out the far
-       side.
+/* Every reach the drawn road passes through, earliest first.
+ *
+ * It used to derive exactly one, from the index of the door the road was
+ * trimmed at, and that was wrong in both directions. The road can hold two
+ * reaches — falling into Grumm and going on to one of its moons is the
+ * ordinary way to arrive anywhere in that system — and only one of them was
+ * ever marked. Worse, which one depended on the *last* door rather than the
+ * doors in between: a road from Tassel to Slate is `enter` then `exit`, so
+ * with a navigator aboard (who is the reason the road is drawn as far as the
+ * second door at all) the trim landed on the exit, the exit is not an
+ * encounter, and the crosshair on the opening quest of the game disappeared
+ * for having a better crew.
+ *
+ * So it walks the legs instead of indexing into them. Every run of legs about
+ * the same world is one pass through one reach, and the rules for whether a
+ * pass is an encounter are the two that were already here. */
+function interceptsOf(segments){
+  const out = [];
+  for(let i = 0; i < segments.length; i++){
+    const prev = i > 0 ? segments[i - 1] : null;
+    if(prev && segments[i].body === prev.body) continue;      // still the same pass
+    if(prev){
+      /* A door the road goes in through: the encounter is inside the new
+         reach. An *exit* is not one. Climbing out of a world's reach leaves
+         you on an orbit round its parent, and the low point of that orbit is
+         not an encounter with anything — reporting it as one put "the Lamp,
+         eighty million kilometres" on the chart as though it were a near
+         miss. */
+      if(prev.reason !== 'enter') continue;
+    }else{
+      /* The first run is the reach the ship is already in. A ship that has
+         just fallen into one is going round it in the arithmetic and nowhere
+         near it yet: the low point ahead is the encounter, and the one place a
+         rendezvous can be made. A skip ends at every change of reach, so this
+         is exactly where a pilot gets put down, and without this the panel
+         offers them nothing but the way out the far side.
 
-       Two things this must not call an encounter. A parking orbit reaches its
-       low point once a lap as well, and that is where you already are, not
-       somewhere you are going. And a ship on its way *out* of a reach has its
-       low point behind it — so it has to be falling, not climbing. */
-    const first = segments[0];
-    if(!first || Number.isFinite(first.elements?.period)) return null;
-    if(!(dot(first.r0, first.v0) < 0)) return null;
-    from = 0;
+         Two things this must not call an encounter. A parking orbit reaches
+         its low point once a lap as well, and that is where you already are,
+         not somewhere you are going. And a ship on its way *out* of a reach
+         has its low point behind it — so it has to be falling, not climbing. */
+      const first = segments[0];
+      if(!first || Number.isFinite(first.elements?.period)) continue;
+      if(!(dot(first.r0, first.v0) < 0)) continue;
+    }
+    const ic = encounterIn(segments, i);
+    if(ic) out.push(ic);
   }
+  return out;
+}
+
+/* The nearest the road comes to one world, over the run of legs about it. */
+function encounterIn(segments, from){
   const first = segments[from];
   if(!first) return null;
   const b = world.get(first.body);
@@ -1696,14 +1722,14 @@ export function planImmediate(state, flown = true, opts = {}){
      pilot steers by is where a world will be when the road cuts its rail,
      which the chart already draws, and what the road does once it arrives,
      which is this. */
-  const exact = interceptOf(segments, crossed);
-  const intercepts = exact ? [exact] : [];
+  const intercepts = interceptsOf(segments);
   return {
     ...pred, segments, events, end: endT, horizon,
     crossings,
     crossing: crossings[0] ?? null,
-    /* One per world, earliest first. `intercept` is the next one, which is
-       what the readouts and the encounter window have always wanted. */
+    /* One per reach the road passes through, earliest first. `intercept` is
+       the next one, which is what the readouts and the encounter window have
+       always wanted. */
     intercepts,
     intercept: intercepts[0] ?? null,
     /* From here on the road is drawn in the second colour: it is a different
