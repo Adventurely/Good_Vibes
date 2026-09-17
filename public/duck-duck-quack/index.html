@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="../theme.css">
 <title>Duck Duck Quack &mdash; guide the hatch home</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%234fc4d3'/%3E%3Ccircle cx='9' cy='7' r='4' fill='%23ffd34e'/%3E%3Cpath d='M12 7h2l-1 1z' fill='%23f08c33'/%3E%3C/svg%3E">
-<meta name="description" content="A duckling hatches and walks on its own, straight into whatever is in front of it. Give it a skill before it does — dig, build, block, climb, fly — and get enough of the hatch to the pond before the goose does, or the clock does.">
+<meta name="description" content="A duckling hatches and walks on its own, straight into whatever is in front of it. Give it a skill before it does — dig, build, block, climb, fly, jump — and get enough of the hatch to the pond before the goose does, or the clock does.">
 <style>
   :root{
     --ink: var(--gv-paper);
@@ -85,8 +85,8 @@
      the thumbnail is the real scene, painted by the real renderer straight
      out of newGame (see the script below), so it cannot drift out of step
      with what you get when you click it. Auto-fit rather than a fixed count
-     — seven levels wrap to whatever the screen has room for, and an eighth
-     would need nothing here to change. */
+     — however many levels there are wrap to whatever the screen has room
+     for, and one more would need nothing here to change. */
   .levels{
     list-style: none; margin: 0; padding: 0;
     display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
@@ -174,8 +174,8 @@
     <p class="eyebrow">Good Vibe Games</p>
     <h1>Duck Duck Quack</h1>
     <p class="tag">A duckling hatches and walks straight into whatever is ahead of it.
-       <b>Dig, build, block, climb or fly</b> — give it a skill before it meets a gap, a
-       wall, a drop, or the goose — and get enough of the hatch to the pond.</p>
+       <b>Dig, build, block, climb, fly or jump</b> — give it a skill before it meets a
+       gap, a wall, a drop, or the goose — and get enough of the hatch to the pond.</p>
 
     <a class="enter" href="./play.html?level=park">Hatch the flock</a>
     <p class="more-levels" id="levels-label">or start anywhere &mdash; every level, as it actually looks</p>
@@ -184,7 +184,7 @@
     <ul class="facts">
       <li>Single player</li>
       <li class="sun">Puzzle</li>
-      <li>Seven levels, five skills</li>
+      <li>Eight levels, six skills</li>
       <li>Nothing saved, nothing sent anywhere</li>
     </ul>
     <button type="button" id="sound" class="sound" aria-pressed="false">Music off</button>

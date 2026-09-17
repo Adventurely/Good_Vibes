@@ -40,10 +40,15 @@
 
 /* ---------------------------------------------------------------- the four */
 
-/* Which counters have a board. Four rather than the record's ten, because the
-   others are either derived from these or are only interesting to the player
-   who made them — nobody wants a leaderboard of energy spent. */
-export const BOARD_KEYS = ['taps', 'seeds', 'earned', 'peakTaps'];
+/* Which counters have a board. Five rather than the record's eleven, because
+   the others are either derived from these or are only interesting to the
+   player who made them — nobody wants a leaderboard of energy spent.
+
+   `earned` and `peakHeld` are the two that read alike and are not: earned is
+   every unit that has ever arrived and never falls, so spending it on growers
+   costs you nothing here; held is the biggest the pile has ever been at one
+   moment, which is a record of restraint as much as of income. */
+export const BOARD_KEYS = ['taps', 'seeds', 'earned', 'peakHeld', 'peakTaps'];
 
 /* What the fourth board was called for the first fortnight, when a replant was
    a winter rather than a seed. Rows written then hold `winters`, and a client
@@ -57,7 +62,8 @@ export const WAS_CALLED = { winters: 'seeds' };
 export const LABELS = {
   taps: 'Taps',
   seeds: 'Seeds earned',
-  earned: 'Energy earned',
+  earned: 'Energy ever earned',
+  peakHeld: 'Most energy held at once',
   peakTaps: 'Best taps per second',
 };
 
@@ -91,6 +97,7 @@ export const LIMITS = {
   taps: Number.MAX_SAFE_INTEGER,
   seeds: Number.MAX_SAFE_INTEGER,
   earned: Number.MAX_VALUE,
+  peakHeld: Number.MAX_VALUE,
   peakTaps: Number.MAX_VALUE,
 };
 
@@ -141,6 +148,28 @@ export function cleanName(raw){
   if(length < NAME_MIN || length > NAME_MAX) return null;
   return name;
 }
+
+/* A name for comparing rather than for showing: case folded, and with the
+   spaces and the punctuation a name is allowed to contain taken out, so that
+   "Quadmonium", "quadmonium" and "Quad Monium" are one name and not three.
+   Two people who both want to be Quadmonium is a board where nobody can tell
+   which row is whose, and the second one to arrive is told so rather than
+   quietly seated next to the first. */
+export const nameKey = name =>
+  String(name).toLowerCase().replace(/[\s\-_.']/g, '');
+
+/* Whose row already holds that name, or null. An id of its own does not count
+   against it: keeping your name is not taking it. */
+export function nameHeldBy(players, name, exceptId = null){
+  const want = nameKey(name);
+  for(const [id, row] of Object.entries(players || {})){
+    if(id === exceptId) continue;
+    if(row && nameKey(row.name) === want) return id;
+  }
+  return null;
+}
+
+export const NAME_TAKEN = 'That name is already taken.';
 
 /* ------------------------------------------------------------------- the id */
 
@@ -260,6 +289,15 @@ export function merge(players, entry, now){
     if(wait > 0 && wait <= MIN_INTERVAL) return { ok: false, error: 'Too soon.', retryIn: wait };
   }
 
+  /* One name, one row. Checked before the rate limit's own answer is written
+     and after it is read, so a player changing to a taken name hears why
+     rather than hearing "too soon" for something that was never going to be
+     accepted. Your own row is not in your way: a player reposting under the
+     name they already have is not taking it from anybody. */
+  if(nameHeldBy(players, entry.name, entry.id)){
+    return { ok: false, error: NAME_TAKEN, taken: true };
+  }
+
   const stats = {};
   for(const key of BOARD_KEYS){
     stats[key] = Math.max(old?.stats?.[key] || 0, entry.stats[key] || 0);
@@ -318,6 +356,35 @@ export function migrateStore(store){
       delete stats[was];
       moved = true;
     }
+  }
+
+  /* The rows that were written before a name meant one row. One player on two
+   * browsers is two ids and two rows under the same name, sitting next to each
+   * other on every board and neither of them wrong.
+   *
+   * They are folded rather than dropped: the surviving row takes the best of
+   * each figure, so nothing anybody actually did is lost to the tidying. The
+   * one kept is the one that has posted most recently, because that is the
+   * browser still in use, and the `since` of the oldest, because that is when
+   * the player really arrived — it is what ties are broken on.
+   */
+  const byName = new Map();
+  for(const [id, row] of Object.entries(players)){
+    if(!row || typeof row !== 'object') continue;
+    const key = nameKey(row.name);
+    const seen = byName.get(key);
+    if(!seen){ byName.set(key, id); continue; }
+
+    const winner = (players[seen].at || 0) >= (row.at || 0) ? seen : id;
+    const loser = winner === seen ? id : seen;
+    const keep = players[winner], gone = players[loser];
+    for(const stat of BOARD_KEYS){
+      keep.stats[stat] = Math.max(keep.stats?.[stat] || 0, gone.stats?.[stat] || 0);
+    }
+    keep.since = Math.min(keep.since ?? keep.at ?? 0, gone.since ?? gone.at ?? 0);
+    delete players[loser];
+    byName.set(key, winner);
+    moved = true;
   }
   return moved;
 }
@@ -381,6 +448,10 @@ export function serve(store, method, body, query = {}, now = 0){
     const checked = validate(body);
     if(!checked.ok) return { status: 400, body: { error: checked.error } };
     const merged = merge(players, checked.entry, now);
+    /* A taken name is a conflict and not a rate limit, and the difference
+       matters to the client: 429 means "the same thing, later" and this is a
+       thing that will never work however long it waits. */
+    if(!merged.ok && merged.taken) return { status: 409, body: { error: merged.error } };
     if(!merged.ok) return { status: 429, body: { error: merged.error, retryIn: merged.retryIn } };
     return { status: 200, body: page(checked.entry.id) };
   }
