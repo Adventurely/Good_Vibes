@@ -278,17 +278,6 @@
   .crew .face img{ display:block; transition:border-color .15s ease; }
   .crew .face:hover img{ border-color:var(--gold-2); }
   .crew .face:focus-visible{ outline:2px solid var(--gold-2); outline-offset:2px; }
-  .talk{ margin:.45rem 0 0; display:flex; flex-direction:column; gap:.35rem; }
-  .talk p{
-    margin:0; font-size:.86rem; font-style:italic; color:var(--ink);
-    border-left:2px solid var(--gold-2); padding-left:.6rem;
-  }
-  /* Who is speaking, above what they said, because an exchange is two or three
-     people and a wall of italics is nobody. */
-  .talk p small{
-    display:block; font-style:normal; color:var(--faint);
-    font-size:.68rem; letter-spacing:.1em; text-transform:uppercase;
-  }
   /* The Astrolabe's rows: a world, what it costs today, and one word for
      whether today is the day. */
   .win{ display:flex; align-items:baseline; gap:.6rem; border-top:1px solid var(--line); padding-top:.4rem; margin-top:.4rem; }
@@ -321,6 +310,55 @@
   .toast.story{ border-color:var(--gold-2); }
   .toast.bad{ border-color:var(--bad); }
   @keyframes toast{ from{ opacity:0; transform:translateY(-6px);} }
+
+  /* A conversation. It is a popup rather than a block in the crew menu because
+     a line somebody says is an event, and an event belongs on the screen the
+     player is looking at — which, on a ship, is the sky. Down the left, clear
+     of the panel on the right and of the toasts overhead, and above the
+     tutorial card in the middle at the bottom.
+
+     One bubble per line, and each bubble wears the face of whoever is
+     speaking: an exchange is usually two people and the portraits are how you
+     tell them apart without reading the names. They stack up as they are said
+     rather than replacing each other, so a slow reader still has the first
+     line when the third arrives. */
+  #chatter{
+    position:fixed; left:1rem; z-index:8;
+    /* Clear of the row of buttons along the bottom, and of the tutorial card
+       when there is one — `liftChatter` measures that card rather than
+       guessing at it, because its height is a different number on every one of
+       the fourteen and different again folded. */
+    bottom:calc(64px + var(--chatter-lift, 0px) + env(safe-area-inset-bottom));
+    width:min(42vw, 340px); display:flex; flex-direction:column; gap:.4rem;
+    align-items:flex-start; cursor:pointer;
+  }
+  #chatter[hidden]{ display:none; }
+  /* The panel's own glass rather than the modals' thinner sort: a bubble sits on
+     the open sky, where a starfield read straight through the words is not a
+     background but noise. Blurred behind it as well, so what little shows
+     through is a wash rather than points of light in the middle of a sentence. */
+  .bubble{
+    display:flex; gap:.55rem; align-items:flex-start; width:100%;
+    background:var(--glass-2); border:1px solid var(--gold-2); border-radius:12px;
+    backdrop-filter:blur(14px) saturate(1.1);
+    padding:.5rem .7rem; box-shadow:var(--gv-shadow);
+    animation:bubble .22s ease;
+  }
+  .bubble img{
+    width:34px; height:34px; flex:0 0 34px; border-radius:8px;
+    image-rendering:pixelated; background:var(--gv-sunk); border:1px solid var(--line-2);
+  }
+  .bubble .who{ min-width:0; }
+  .bubble .who small{
+    display:block; color:var(--faint);
+    font-size:.64rem; letter-spacing:.1em; text-transform:uppercase;
+  }
+  .bubble .who p{ margin:.1rem 0 0; font-size:.84rem; font-style:italic; color:var(--ink); }
+  /* The last thing said is the thing being read; the ones above it are there to
+     be looked back at, and fade so the eye knows which is which. */
+  .bubble.said{ opacity:.68; }
+  @keyframes bubble{ from{ opacity:0; transform:translateY(6px);} }
+  @media (prefers-reduced-motion: reduce){ .bubble{ animation:none; } }
 
   /* A popup over a chart should not put the chart away. These sit on the sky
      at three-quarters opacity with a blur behind them, so the road you tapped
@@ -454,6 +492,7 @@
     #tut{ left:.5rem; right:.5rem; transform:none; width:auto; bottom:calc(.6rem + env(safe-area-inset-bottom)); }
     #tut p{ font-size:.84rem; }
     #toasts{ top:calc(112px + env(safe-area-inset-top)); width:calc(100vw - 1rem); }
+    #chatter{ left:.5rem; width:calc(100vw - 1rem); }
 
     /* When the sheet is up it owns the bottom of the screen. */
     body.sheet #tut{ display:none; }
@@ -647,6 +686,7 @@
 </aside>
 
 <div id="toasts" aria-live="polite" aria-atomic="false"></div>
+<div id="chatter" aria-live="polite" aria-atomic="false" hidden></div>
 
 </div>
 
@@ -1553,8 +1593,12 @@ addEventListener('keydown', e => {
     /* One key for both: it opens the ship, and at a port it steps on to the
        dock and then shuts, which is the whole cycle in one thumb. */
     case 'p': openMenu(state.dockedAt && panelOpen && panelMenu === 'ship' ? 'dock' : 'ship'); break;
+    /* Escape takes down one thing: whatever was put up last. A conversation
+       comes off before the panel it was started from, or pressing a face and
+       changing your mind would shut the crew menu as well. */
     case 'Escape':
       if(gearOpen) openGear(false);
+      else if(chatter){ dismissChatter(); renderTab(); }
       else if(selectedNode >= 0){ selectNode(-1); renderTab(); }
       else togglePanel(false);
       break;
@@ -1713,8 +1757,10 @@ let panelMenu = 'ship';
    through that person's lines we have got. Deliberately not in the save: a
    conversation changes nothing, and a game that remembered them would have to
    version its saves every time somebody wrote another one. Cleared when the
-   menu changes or the ship moves, so a line about Cinder never survives the
-   trip to Moss. */
+   menu changes, and keyed on where the ship is tied up, so a line about Cinder
+   never survives the trip to Moss.
+
+   This is only the counter — what is actually on screen is `chatter`. */
 let talking = null;
 
 let lastTabsKey = null;
@@ -1790,7 +1836,10 @@ function renderTabs(){
   refreshMenuButtons();
 }
 function setTab(id, open = true){
-  // Nobody is mid-sentence across a change of menu.
+  /* A change of menu starts the next conversation from the top. Whatever is
+     already being said carries on: the bubbles are over the sky rather than in
+     the panel, and cutting somebody off because you pressed Ship would be a
+     worse answer than letting them finish. */
   if(id !== tab) talking = null;
   tab = id;
   [...$('tabs').children].forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === id)));
@@ -2233,21 +2282,14 @@ function shipTab(){
    anybody had been anywhere. The mystery is the point.
 
    Everybody who is actually aboard has a face you can press, which is the
-   other half of this menu — see talkBlock and dialog.json. */
-function talkBlock(who){
-  if(talking?.who !== who || talking.at !== (state.dockedAt ?? null)) return '';
-  const x = S.exchangeFor(state, who, talking.nth);
-  if(!x) return '';
-  return '<div class="talk">' + x.lines.map(l =>
-    `<p><small>${esc(S.speaker(l.who).name)}</small>${esc(l.say)}</p>`).join('') + '</div>';
-}
-
+   other half of this menu — see `playChatter` and dialog.json. */
 /* A portrait you can press, for somebody who is actually aboard. An empty
-   berth keeps the plain picture: there is nobody in it to answer. */
+   berth keeps the plain picture: there is nobody in it to answer. What comes
+   back is a popup over the sky rather than a block under the picture — see
+   `#chatter` and `playChatter`. */
 function face(who, name){
   const url = portraitURL(who);
-  const open = talking?.who === who && talkBlock(who) !== '';
-  return `<button class="face" data-act="say|${who}" aria-expanded="${open}"`
+  return `<button class="face" data-act="say|${who}" aria-expanded="${chatter?.who === who}"`
     + ` title="Ask ${esc(name)} what they make of it"`
     + ` aria-label="What does ${esc(name)} have to say?">`
     + `<img src="${url}" alt="" width="24" height="24"></button>`;
@@ -2259,7 +2301,7 @@ function crewTab(){
   out += '<div class="crew">'
     + face('captain', c.captain.name)
     + `<div class="who"><b>${esc(c.captain.name)}</b><small>${esc(c.captain.role)} · ${sp(c.captain.species)}</small>`
-    + `<p class="say">${esc(c.captain.line)}</p>${talkBlock('captain')}</div></div>`;
+    + `<p class="say">${esc(c.captain.line)}</p></div></div>`;
   out += `<p class="lock">${esc(state.shipName)} · ${state.stats.docks} docking${state.stats.docks === 1 ? '' : 's'} · ${S.fmtKms(state.stats.dvSpent)} burned</p>`;
   out += '<h3>Berths</h3>';
   for(const r of c.roles ?? []){
@@ -2268,7 +2310,7 @@ function crewTab(){
     out += aboard
       ? `<div class="crew">${face(r.id, name)}`
         + `<div class="who"><b>${esc(name)}</b><small>${esc(r.name)} · ${sp(r.species)}</small>`
-        + `<p class="say">${esc(r.person?.line ?? r.does)}</p>${talkBlock(r.id)}</div></div>`
+        + `<p class="say">${esc(r.person?.line ?? r.does)}</p></div></div>`
       : `<div class="crew open"><img src="${portraitURL('berth')}" alt="" width="24" height="24">`
         + `<div class="who"><b>Missing ${esc(r.name)}</b></div></div>`;
   }
@@ -2593,15 +2635,22 @@ const actions = {
     });
   },
   look(gid){ showAppraisal(gid); },
-  /* Pressing a face: they say their piece. Pressing it again gets the next
-     thing they have to say about this place, and once they are out of lines the
-     block goes away rather than looping — a portrait that will not stop talking
-     is a portrait you stop pressing. */
+  /* Pressing a face: they say their piece, as a popup over the sky. Pressing it
+     again while they are still speaking is "yes, and?" and brings the rest of
+     it up at once; pressing a finished one gets the next thing they have to say
+     about this place, and once they are out of lines the popup goes away rather
+     than looping — a portrait that will not stop talking is a portrait you stop
+     pressing. */
   say(who){
+    if(chatter?.who === who && chatter.i < chatter.lines.length) return restOfChatter();
     const n = S.exchangesFor(state, who).length;
-    if(!n || (talking?.who === who && talking.at === (state.dockedAt ?? null) && talking.nth >= n - 1)) talking = null;
-    else if(talking?.who === who && talking.at === (state.dockedAt ?? null)) talking = { ...talking, nth: talking.nth + 1 };
-    else talking = { who, nth: 0, at: state.dockedAt ?? null };
+    const sameSpot = talking?.who === who && talking.at === (state.dockedAt ?? null);
+    if(!n || (sameSpot && talking.nth >= n - 1)) dismissChatter();
+    else{
+      talking = sameSpot ? { ...talking, nth: talking.nth + 1 } : { who, nth: 0, at: state.dockedAt ?? null };
+      const x = S.exchangeFor(state, who, talking.nth);
+      if(x) playChatter(who, x); else dismissChatter();
+    }
     renderTab();
   },
   fuel(k){ const r = S.refuel(state, Number(k)); if(!r.ok) toast(r.reason, 'bad'); renderTab(); save(); },
@@ -2783,6 +2832,103 @@ function confirmNew(){
    the caller asked for. Nellie's scene at the end of the lesson is sixty words
    and used to be pulled off the screen in nine seconds, which is halfway
    through it: a story beat somebody only sees once should not be a race. */
+/* ------------------------------------------------------------ conversation */
+
+/* An exchange plays out a line at a time, and the gap before the next line is
+   how long the one on screen takes to read — `S.sayMs`, which is where that
+   rule is written down and tested.
+
+   What is being said right now: the exchange, how much of it is on screen, and
+   the timer that will put up the next line. Never saved — see `talking`. */
+let chatter = null;
+
+/* The tutorial card is bottom-centre and this is bottom-left, which on a narrow
+   screen is the same place. While a card is up the conversation sits above it
+   rather than under it: the card is the more important of the two, and it is
+   the one that must not be covered. */
+function liftChatter(){
+  const t = $('tut');
+  const h = t && !t.hidden ? t.getBoundingClientRect().height + 12 : 0;
+  document.documentElement.style.setProperty('--chatter-lift', `${Math.round(h)}px`);
+}
+
+/* Take the bubbles down. This leaves `talking` alone, because the next thing
+   about to happen may be the next exchange from the same face. */
+function wipeChatter(){
+  if(chatter?.timer) clearTimeout(chatter.timer);
+  chatter = null;
+  const box = $('chatter');
+  box.innerHTML = ''; box.hidden = true;
+  /* A conversation that ends on its own ends without a re-render, so the faces
+     are told here rather than left claiming somebody is still speaking. */
+  for(const b of document.querySelectorAll('.crew .face')) b.setAttribute('aria-expanded', 'false');
+}
+
+/* The conversation is over: bubbles down, and the count of what has been asked
+   forgotten with them.
+
+   Forgetting is the point. Pressing Escape, or walking away and letting the
+   bubbles time out, is ending a conversation rather than getting through one —
+   so the next press starts it again instead of being told they have run out of
+   things to say. Without this, everybody with one exchange to their name
+   answered every *other* press and stood there mute in between. */
+function dismissChatter(){ wipeChatter(); talking = null; }
+
+/* Everything still unsaid, said at once. What a player pressing during a
+   conversation means is "yes, and?", so the answer is the rest of it rather
+   than nothing — a drip you cannot outrun is a drip you sit through. */
+function restOfChatter(){
+  if(!chatter) return;
+  while(chatter.i < chatter.lines.length) sayLine();
+  if(chatter.timer) clearTimeout(chatter.timer);
+  chatter.timer = setTimeout(dismissChatter, S.sayMs(chatter.lines.at(-1)?.say) + 1400);
+}
+
+function sayLine(){
+  const l = chatter.lines[chatter.i++];
+  if(!l) return;
+  liftChatter();
+  const box = $('chatter');
+  for(const b of box.children) b.classList.add('said');
+  const who = S.speaker(l.who);
+  const el = document.createElement('div');
+  el.className = 'bubble';
+  el.innerHTML = `<img src="${portraitURL(l.who)}" alt="" width="34" height="34">`
+    + `<div class="who"><small>${esc(who.name)}</small><p>${esc(l.say)}</p></div>`;
+  box.appendChild(el);
+  box.hidden = false;
+}
+
+function stepChatter(){
+  if(!chatter) return;
+  sayLine();
+  const last = chatter.lines[chatter.i - 1];
+  const wait = S.sayMs(last?.say);
+  /* After the last line the whole thing stays up a moment longer and then goes
+     of its own accord: a conversation nobody dismissed should not still be on
+     the sky when the ship arrives somewhere. */
+  chatter.timer = setTimeout(chatter.i < chatter.lines.length ? stepChatter : dismissChatter,
+    chatter.i < chatter.lines.length ? wait : wait + 1400);
+}
+
+/* Somebody's turn to speak. Under reduced motion the whole exchange goes up at
+   once: a timed reveal is motion, and it is also the one kind of motion a
+   player cannot simply wait out. */
+function playChatter(who, x){
+  wipeChatter();
+  chatter = { who, lines: x.lines ?? [], i: 0, timer: null };
+  if(!chatter.lines.length) return dismissChatter();
+  if(reduced) restOfChatter(); else stepChatter();
+}
+
+/* The stack is one big button: press it and the rest of the exchange arrives,
+   press a finished one and it goes away. */
+$('chatter').addEventListener('click', () => {
+  if(!chatter) return;
+  if(chatter.i < chatter.lines.length) restOfChatter(); else dismissChatter();
+});
+
+
 function toast(text, kind = '', ms = 4200){
   if(!text) return;
   ms = Math.max(ms, 1200 + text.split(/\s+/).length * 280);
@@ -2949,6 +3095,9 @@ function tutorialCheck(){
   $('tut-skip').textContent = last ? 'Thanks, Theo' : 'Stop writing, Theo';
   $('tut').classList.toggle('done', last);
   $('tut').classList.toggle('min', !!state.flags.tutorialFolded);
+  // A different card is a different height, and a conversation may be sitting
+  // on top of the old one.
+  liftChatter();
 }
 $('tut-skip').addEventListener('click', () => { state.flags.tutorialSkipped = true; $('tut').hidden = true; save(); });
 
