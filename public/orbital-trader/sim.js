@@ -270,15 +270,24 @@ function rendezvousStatus(state, c, r, v){
     mouth: c.zoneRadius, dockSpeed: c.dockSpeed,
     inZone, slow, needsNavigator: !held, ok: inZone && slow && held,
     over: Math.max(0, relSpeed - c.dockSpeed),
-    score: distance / c.zoneRadius,
+    /* How near, as a fraction of the space this harbour is approached in: its
+       reach where it has one, and its mouth where it has not — Nail, Whisker
+       and the Maw are come alongside but have gravity instead of a reach.
+       Against the `ra / mouth` an orbit scores, that puts "inside the space,
+       flying the rendezvous" under one and "not there yet" over it, which is
+       the comparison this number exists to make. Scored on the mouth alone a
+       ten-kilometre mouth made every wreck lose to the moon it orbits from
+       forty kilometres out — with the burn axes already turned to the wreck
+       and the readout already counting it down. */
+    score: distance / (c.driftReach > 0 ? c.driftReach : c.zoneRadius),
     open: portOpen(c.id, state.t),
   };
 }
 export function dockingStatus(state){
   if(state.dockedAt) return null;
   const here = world.get(state.ship.body);
-  let best = null;
-  const take = st => { if(!best || st.score < best.score) best = st; };
+  const found = [];
+  const take = st => { if(st) found.push(st); };
   /* A wreck nobody has mentioned is not a harbour. Physics still has hold of a
      ship near one — the rails do not care what you have been told — but a
      harbour is a place somebody told you about, and offering the refusal of an
@@ -318,11 +327,23 @@ export function dockingStatus(state){
     const st = railState(c, here.mu, state.t);
     take(rendezvousStatus(state, c, sub(state.ship.r, st.r), sub(state.ship.v, st.v)));
   }
-  if(!best) return null;
-  // Nowhere near: do not clutter the HUD with a port you are nothing like at.
-  if(best.kind === 'zone' && best.distance > best.mouth * 8) return null;
-  if(best.kind === 'orbit' && !best.ok && best.distance > best.mouth * 8) return null;
-  return best;
+  /* Nowhere near: do not clutter the HUD with a port you are nothing like at.
+     For a thing you come alongside, "near" is its reach — that is the space the
+     approach is actually flown in, and with a mouth ten kilometres across eight
+     of them is eighty, so the card would appear only in the last sixth of a
+     five-hundred-kilometre approach and the mouth would not be drawn until
+     then either.
+
+     Asked of each one rather than of the winner, so a port that is nothing
+     like near hands the question down instead of answering "nowhere" for
+     everybody: a ship a long way outside a wreck's reach is still plainly at
+     the moon they are both going round. */
+  const nearEnough = st => st.kind === 'zone'
+    ? st.distance <= Math.max(st.mouth * 8, world.get(st.port)?.driftReach ?? 0)
+    : st.ok || st.distance <= st.mouth * 8;
+  const live = found.filter(nearEnough);
+  if(!live.length) return null;
+  return live.reduce((a, b) => (b.score < a.score ? b : a));
 }
 
 /* Why not, in the words a pilot would use. */
@@ -1287,6 +1308,36 @@ export function exchangeFor(state, who, nth = 0){
   if(!list.length) return null;
   return list[((nth % list.length) + list.length) % list.length];
 }
+
+/* The speed a burn written here is actually measured against, and whether that
+ * is a relative one.
+ *
+ * A press on one of the four buttons is a fraction of "how fast you are
+ * going", and the frame decides which speed that is. Beside a wreck out at the
+ * Lamp the ship is doing thirty-six kilometres a second round the Lamp and a
+ * few dozen metres a second relative to the hulk it is trying to touch — and
+ * the press was being sized off the first of those, so one tap was two hundred
+ * metres a second and the whole approach could only be flown by overshooting.
+ * The burn itself has always been written in the drifting thing's frame; this
+ * is the button catching up with it. */
+export function burnScaleAt(state, where, t){
+  if(!where) return { speed: norm(state?.ship?.v ?? [0, 0]), relative: false };
+  const tgt = driftTargetAt(world, where.body, where.r, t, unseen(state));
+  return tgt
+    ? { speed: norm(sub(where.v, tgt.v)), relative: true, target: tgt.id }
+    : { speed: norm(where.v), relative: false };
+}
+
+/* What one press is worth, as a fraction of that speed.
+ *
+ * Flying an orbit you are nudging something enormous and a half-percent step
+ * is a nudge. Coming alongside you are killing nearly all of what you have, and
+ * a half-percent of two hundred metres a second is two hundred presses — so a
+ * rendezvous gets a tenth of the relative speed instead. It shrinks as you
+ * slow, which is the whole trick: the same button is ten metres a second when
+ * you are closing fast and a tenth of one when you are nearly stopped, so the
+ * last few metres a second cost no more presses than the first few hundred. */
+export const BURN_STEP = 0.005, BURN_STEP_REL = 0.1;
 
 /* How long a line takes to read, which is how long the next one waits.
  *
