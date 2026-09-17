@@ -229,20 +229,25 @@ test('GET the board when nobody is on it', async () => {
   assert.match(res.headers.get('content-type'), /application\/json/);
   assert.equal(res.headers.get('cache-control'), 'no-store');
   const body = await res.json();
-  assert.deepEqual(body.boards, { taps: [], seeds: [], earned: [], peakTaps: [] });
+  assert.deepEqual(body.boards, { taps: [], seeds: [], earned: [], peakHeld: [], peakTaps: [] });
   assert.equal(body.players, 0);
-  assert.deepEqual(body.you, { taps: null, seeds: null, earned: null, peakTaps: null });
+  assert.deepEqual(body.you, { taps: null, seeds: null, earned: null, peakHeld: null, peakTaps: null });
   assert.equal(typeof body.updated, 'number');
 });
 
 test('POST a score and it is on the board', async () => {
-  const res = await post({ id: PLAYER, name: '  Finn  ', stats: { taps: 120, seeds: 1, earned: 2.5e6, peakTaps: 7.5 } });
+  const res = await post({ id: PLAYER, name: '  Finn  ',
+    stats: { taps: 120, seeds: 1, earned: 2.5e6, peakHeld: 9e5, peakTaps: 7.5 } });
   assert.equal(res.status, 200);
   assert.match(res.headers.get('content-type'), /application\/json/);
   const body = await res.json();
   assert.deepEqual(body.boards.taps, [{ name: 'Finn', value: 120 }]);
   assert.deepEqual(body.boards.seeds, [{ name: 'Finn', value: 1 }]);
-  assert.deepEqual(body.you, { taps: 1, seeds: 1, earned: 1, peakTaps: 1 });
+  assert.deepEqual(body.you, { taps: 1, seeds: 1, earned: 1, peakHeld: 1, peakTaps: 1 });
+  // The two energy boards are not the same board: earned is every unit ever,
+  // held is the biggest the pile ever got.
+  assert.deepEqual(body.boards.earned, [{ name: 'Finn', value: 2.5e6 }]);
+  assert.deepEqual(body.boards.peakHeld, [{ name: 'Finn', value: 9e5 }]);
   assert.equal(body.players, 1);
   // Nothing in the public shape names the id that would let anyone else
   // write to that row.

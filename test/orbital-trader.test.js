@@ -9,7 +9,7 @@ import {
   QUESTS, DIALOG,
 } from '../public/orbital-trader/content.js';
 import * as S from '../public/orbital-trader/sim.js';
-import { createChart, railCrossings, railLead, locateOnPrediction, pathAnchors, KM_PER_AU, PALETTE, haze, bodyColour } from '../public/orbital-trader/render.js';
+import { createChart, railCrossings, railLead, locateOnPrediction, pathAnchors, KM_PER_AU, PALETTE, haze, bodyColour, fmtAu } from '../public/orbital-trader/render.js';
 import { DURATION, BREACH, BEATS, CAPTION_AT, beatAt, ascent, skyAt, ROCKET } from '../public/orbital-trader/intro.js';
 
 /* Orbital Trader has no server: everything it knows is in public/ and is
@@ -1095,6 +1095,35 @@ test('the opening film plays for a new ship and gets out of the way of every oth
 });
 
 /* ------------------------------------------------------------- chart */
+
+test('the chart goes in far enough to fly the last ten kilometres', () => {
+  const chart = stubChart();
+  try{
+    for(let i = 0; i < 400; i++) chart.zoomBy(1.5);        // wind it all the way in
+    const zoom = chart.camera.zoom;
+    /* The smallest harbour in the game is ten kilometres across, and coming
+       alongside one is the most delicate flying there is. At the old ceiling
+       that mouth was three pixels wide and the whole approach was done blind. */
+    const mouth = Math.min(...BODIES.filter(b => b.port && b.zoneRadius > 0).map(b => b.zoneRadius));
+    assert.ok(mouth * zoom >= 100,
+      `the smallest mouth is ${(mouth * zoom).toFixed(1)} px across the radius at full zoom`);
+    // And a kilometre is a thing you can see, that being the unit the last of it is flown in.
+    assert.ok(zoom / KM_PER_AU >= 5, `a kilometre is ${(zoom / KM_PER_AU).toFixed(1)} px`);
+  } finally { chart.restore(); }
+});
+
+test('a distance under a kilometre is metres, not nothing', () => {
+  /* Whole kilometres were fine when nothing was measured closer than a harbour
+     mouth thousands of kilometres wide. A ten-kilometre mouth is flown from the
+     inside, and the scale bar and every readout said "0 km" for the whole of
+     the last kilometre of it. */
+  assert.equal(fmtAu(0.85 / KM_PER_AU), '850 m');
+  assert.equal(fmtAu(0.004 / KM_PER_AU), '4 m');
+  assert.equal(fmtAu(9.4 / KM_PER_AU), '9.4 km');
+  assert.equal(fmtAu(50 / KM_PER_AU), '50 km');
+  assert.equal(fmtAu(500 / KM_PER_AU), '500 km');
+  assert.equal(fmtAu(0.5), '0.50 au');
+});
 
 /* The chart is a canvas, but its camera is arithmetic, and the arithmetic is
  * the part a player can get lost in. Enough of a canvas to make one. */

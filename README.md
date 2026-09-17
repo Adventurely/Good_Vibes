@@ -211,7 +211,7 @@ like the rest of that game, and `src/board-do.js` and the route in
 Opting in is typing a name. The id that lets a player update their own row is
 a UUID the browser makes once and keeps; whoever holds it holds the row, and
 nobody else can touch it — the room-code idea again, and no accounts for the
-same reason. Nothing but that id, the typed name and four numbers ever leaves
+same reason. Nothing but that id, the typed name and five numbers ever leaves
 the device, and the board never hands the id back to anyone. The numbers are
 self-reported and there is no way to verify one, so this is honest about what
 it is: a board for people who want to be on one. What defends it is a
@@ -1758,6 +1758,27 @@ to a hundred, which a cube root could reach and this cannot — and now runs 1
 to 10, then 12, 15, 20, 25, 30 and 40, the last of them landing on the same
 season as the last written rung.
 
+**Two of the five are energy and they are not the same number.** Earned is
+every unit that has ever arrived and it never falls, so spending a trillion on
+growers costs nothing there; held is the biggest the pile has ever been at one
+moment, which is a record of restraint as much as of income. The board had
+only the first, under the heading "most energy, all told" — which the one
+person who asked read as a maximum, and it never had been one. Both are there
+now and both say which they are. `peakHeld` is a `PEAK_KEYS` stat like the
+other two, watched wherever the pile grows: the tick, the tap, and the
+catch-up after time away.
+
+**A name is one player's.** Two rows under one name is a board where nobody
+can tell which is whose, and the owner had two of his own — one browser he
+still used and one he did not. A name already taken is a 409 and not a 429,
+because the difference matters to a client: 429 means "the same thing, later"
+and this is a thing that will never work however long it waits. Names are
+compared folded and stripped of spaces and punctuation, so `Quadmonium`,
+`quadmonium` and `Quad Monium` are one name; the rows already stored under a
+duplicate are folded on load rather than dropped, the survivor taking the best
+of each figure and the earliest arrival, so nothing anybody actually did is
+lost to the tidying.
+
 **The tree ages with each season, and never gets smaller.** The lot goes back
 to bare ground and the tree comes back a year older, drawn bigger and grander,
 with a design of its own for each of the first seven (stouter, with its roots
@@ -1793,9 +1814,10 @@ onto the new names, because removing an export is how a save or a page stops
 loading, and the leaderboard still reads a `winters` figure posted by a tab
 that has not reloaded.
 
-**The board is opt-in, and joining sends a name and four numbers.** Nothing
-else leaves the device. Four lists — most taps, most seeds, most energy
-earned all told, fastest hands — behind one Durable Object and one HTTP route,
+**The board is opt-in, and joining sends a name and five numbers.** Nothing
+else leaves the device. Five lists — most taps, most seeds, most energy ever
+earned, most energy held at once, fastest hands — behind one Durable Object
+and one HTTP route,
 the first on this site that is not a socket. The id that goes with a name is random and
 made in the browser; whoever holds it can update the row and nobody else can,
 which is as much of an account as a clicker wants, and it lives under its own

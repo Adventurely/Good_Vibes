@@ -2029,3 +2029,32 @@ test('a forged save cannot hand the tick an Infinity to walk towards', () => {
   // And the counter refuses a lifetime total that is not a number either way.
   for(const junk of [Infinity, -Infinity, NaN, undefined, null, 'lots']) assert.equal(seedsFrom(junk), 0);
 });
+
+test('a save from before "most held" existed starts its mark at the pile in hand', () => {
+  // Nobody's figure should be a zero on a board just because the stat is new:
+  // the energy sitting in the save is proof the pile was at least that big.
+  const old = toSave(newGame());
+  old.light = 4.2e9;
+  delete old.life.peakHeld;
+  delete old.run.peakHeld;
+  const back = fromSave(old);
+  assert.equal(back.life.peakHeld, 4.2e9);
+  assert.equal(back.run.peakHeld, 4.2e9);
+
+  // A mark already bigger than the pile is not walked back down by it.
+  const spent = toSave(newGame());
+  spent.light = 12;
+  spent.life.peakHeld = 9e12;
+  assert.equal(fromSave(spent).life.peakHeld, 9e12);
+
+  // And it climbs on its own from here.
+  const state = newGame();
+  state.owned.moss = 50;
+  tick(state, 60);
+  assert.ok(state.life.peakHeld > 0, 'a minute of growing sets a mark');
+  assert.equal(state.life.peakHeld, state.light);
+  const held = state.life.peakHeld;
+  state.light = 1e9;
+  plant(state, 'moss', 1);                     // spending does not lower it
+  assert.equal(state.life.peakHeld, held);
+});

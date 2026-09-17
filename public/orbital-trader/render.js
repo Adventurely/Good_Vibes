@@ -159,7 +159,17 @@ export function bodyColour(body){
 /* A lap of Tassel is 0.0007 au across and a lap of Slate is 0.00003; the chart
    has to frame both, so the ceiling is set by the smallest moon rather than
    by the biggest orbit. */
-const MIN_ZOOM = 8, MAX_ZOOM = 2e7;
+/* How far in the chart goes. Two hundred million was set when the closest
+ * thing anybody flew to was a harbour mouth thousands of kilometres across;
+ * coming alongside is ten kilometres now, which at that ceiling was a circle
+ * three pixels wide — the last and most delicate piece of flying in the game,
+ * done blind. At two thousand million the chart spans about fifty kilometres,
+ * so the mouth is a third of it and a kilometre is fourteen pixels.
+ *
+ * Nothing here minds the extra depth: positions are au in float64, and even
+ * at the far edge of the Belt a pixel at this zoom is a ten-millionth of the
+ * precision a position is carried to. */
+const MIN_ZOOM = 8, MAX_ZOOM = 2e9;
 
 /* One clock for the whole file, and one that does not throw where there is no
    window: the chart is also drawn on the title screen and in tests. */
@@ -1476,6 +1486,12 @@ export const KM_PER_AU = 147400000;
 export function fmtAu(au){
   if(au >= 0.05) return `${au.toFixed(2)} au`;
   const km = au * KM_PER_AU;
+  /* Below a kilometre, metres. Whole kilometres were fine when nothing was
+     measured closer than a harbour mouth; a ten-kilometre mouth is flown from
+     the inside, and "0 km" is what the scale bar and every readout said for
+     the whole of the last kilometre of it. */
+  if(km < 1) return `${Math.round(km * 1000).toLocaleString('en-GB')} m`;
+  if(km < 10) return `${+km.toFixed(1)} km`;
   const sig = km >= 100 ? Number(km.toPrecision(3)) : Math.round(km);
   return `${sig.toLocaleString('en-GB')} km`;
 }
