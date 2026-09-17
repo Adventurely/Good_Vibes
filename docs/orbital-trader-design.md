@@ -765,6 +765,17 @@ empty ones. Seven of them are in the sky:
 | Hull 41 | the outer Belt | a hull with a yard number and no name |
 | The Long Sweet | a wide circle above Haven | a frog cider transport, perfectly intact |
 
+**The reach is a place you can see.** A wreck's `driftReach` is a real
+boundary — cross it and the two buttons on a mark stop meaning forward-and-out
+about the world and start meaning forward-and-away about the thing you are
+coming alongside, and the corner of the HUD turns into range and closing speed
+— and for a while it drew nothing at all. A pilot could only find out where it
+was by being inside it and noticing the words had changed. It is now a dashed
+blue ring with a faint wash, inside which the harbour mouth keeps its own amber
+ring and anchor: two different questions, two different marks. "Are the axes
+about this thing" is answered a good way out from "may I tie up" — the checker
+holds the mouth inside the reach (C13), so the space is always entered first.
+
 **A wreck does not exist until somebody names it.** Eight unexplained dots on
 the chart from the first day would be eight questions with no way to ask them;
 one that appears when a salvor tells you where to look is a lead. Taking the

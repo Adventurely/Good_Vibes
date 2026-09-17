@@ -1868,6 +1868,33 @@ test('the world you are leaving is not an encounter with anything', () => {
   assert.ok(!veyra.passing, 'an encounter inside a reach should carry the solved periapsis, not a sampled pass');
 });
 
+test('the space near a drifting thing is a place you can see', () => {
+  /* A wreck's reach does everything a sphere of influence does to the flying —
+     cross it and the two buttons on a mark stop being about an orbit and start
+     being about the thing you are coming alongside, and the corner of the HUD
+     turns into range and closing speed — and it was drawing nothing at all. The
+     only way to find out where it was was to be inside it and notice the words
+     had changed. */
+  const src = readFileSync(new URL('../public/orbital-trader/render.js', import.meta.url), 'utf8');
+  const fn = src.slice(src.indexOf('function drawDriftReaches'), src.indexOf('function drawSoiRings'));
+  assert.ok(fn.length > 200, 'found the drawing pass');
+  assert.match(src, /drawDriftReaches\(chart, pos\);/, 'nothing calls it');
+  assert.match(fn, /b\.driftReach > 0/, 'it is not keyed on the reach');
+  assert.match(fn, /chart\.hidden\.has\(b\.id\)/, 'an unfound wreck puts its reach on the chart');
+  assert.match(fn, /setLineDash/, 'a reach is dashed, like every other reach on this chart');
+  assert.match(src, /driftEdge/, 'it is drawn in the harbour mouth\'s colours');
+
+  /* And the promise the drawing makes: the mouth is inside the reach at every
+     one of them, so a ship is always in the space — axes turned, numbers up —
+     a good while before it may tie up. `check-tuning` says the same thing to
+     the design table; this says it to the game that ships. */
+  for(const b of BODIES.filter(x => x.port && !(x.mu > 0) && x.parent)){
+    assert.ok(b.driftReach > 0, `${b.id} has no reach to draw`);
+    assert.ok(b.driftReach > b.zoneRadius,
+      `${b.id}: you could tie up at ${b.zoneRadius} without ever entering ${b.driftReach}`);
+  }
+});
+
 test('nothing is drawn joining the pair', () => {
   /* A dashed line between the two marks was the obvious thing to draw and the
      wrong one: a straight line across a chart of curves reads as a path you

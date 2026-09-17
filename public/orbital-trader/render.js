@@ -53,6 +53,15 @@ export const PALETTE = {
   orbitLead:  'rgba(245,234,214,0.80)',
   soi:        'rgba(245,154,46,0.05)',
   soiEdge:    'rgba(245,154,46,0.30)',
+  /* The space near a drifting thing. Not gravity and not a harbour, so neither
+     the amber of a reach nor the green of a mouth: inside it the two buttons on
+     a mark stop being about an orbit and start being about the thing you are
+     coming alongside, and the readout in the corner turns into range and
+     closing speed. That is a place, and a place a pilot has to aim at — it was
+     doing all of this and drawing nothing, so the only way to learn where it
+     was was to be inside it and notice the words had changed. */
+  drift:      'rgba(90,166,232,0.06)',
+  driftEdge:  'rgba(90,166,232,0.42)',
   /* The harbour mouth. It was dim enough to lose against a bright road drawn
      across it, which is the one moment it matters — so it is the strongest
      green on the chart, and the ring you cannot yet tie up inside is a clear
@@ -376,6 +385,7 @@ function draw(chart, view){
   drawBelt(chart, view, pos);
   drawOrbits(chart, pos, t);
   drawSoiRings(chart, pos);
+  drawDriftReaches(chart, pos);
   drawBodies(chart, view, pos, t);
   /* Where each leg of the road is pinned on the screen, worked out once and
      handed to everything that puts a mark on the road. It used to be worked
@@ -547,6 +557,34 @@ export function railLead(chart, el, centre, mu, t){
   // The last sample is the head: no second solve for the same moment.
   const angle = Math.atan2(-end.v[1], end.v[0]);    // screen y is down
   return { arc, head: arc[N], angle };
+}
+
+/* The reach round a weightless thing: the wrecks, and the Builder station at
+ * the Dancer. A sphere of influence is drawn for everything with weight, and
+ * this is the same promise for the things with none — cross it and the flying
+ * changes, so it is drawn whether or not you are inside it yet.
+ *
+ * Dashed like a reach rather than solid like a mouth, and inside the harbour
+ * mouth's own ring rather than replacing it: they are two different questions
+ * — "are the axes about this thing" and "may I tie up" — and the answer to the
+ * first is yes a good while before the answer to the second. */
+function drawDriftReaches(chart, pos){
+  const { ctx, world, camera } = chart;
+  for(const b of world.bodies){
+    if(!(b.driftReach > 0)) continue;
+    if(chart.hidden.has(b.id)) continue;
+    const at = pos.get(b.id);
+    if(!at) continue;
+    const px = b.driftReach * camera.zoom;
+    // Smaller than the dot it is round, or bigger than the sky: no use either way.
+    if(px < 10 || px > 6000) continue;
+    const p = chart.toScreen(at.r);
+    if(p[0] < -px - 40 || p[1] < -px - 40 || p[0] > chart.width + px + 40 || p[1] > chart.height + px + 40) continue;
+    ctx.beginPath(); ctx.arc(p[0], p[1], px, 0, Math.PI * 2);
+    if(px < Math.min(chart.width, chart.height) * 0.45){ ctx.fillStyle = PALETTE.drift; ctx.fill(); }
+    ctx.strokeStyle = PALETTE.driftEdge; ctx.lineWidth = 1; ctx.setLineDash([4, 5]); ctx.stroke();
+    ctx.setLineDash([]);
+  }
 }
 
 function drawSoiRings(chart, pos){
