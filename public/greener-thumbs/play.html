@@ -1651,7 +1651,90 @@ const FLY_FLOOR = 0.16;
 const ceilingAt = z =>
   GH.RIDGE - (GH.RIDGE - GH.EAVE) * Math.min(1, Math.abs(z) / (GH.D / 2)) - FLY_HEAD;
 
+/* And what it may not go through.
+ *
+ * Written out from the same constants the furniture is built from rather than
+ * measured off the meshes. The house is merged into a handful of draw calls, so
+ * a box fitted round a mesh here would be a box round the whole building; and
+ * the alternative — a ray cast at the scene every frame — is a lot of triangles
+ * to ask about sixty times a second for an answer this simple. Nine boxes and
+ * some arithmetic does it, and it cannot drift out of step with the furniture
+ * because it is reading the same numbers.
+ *
+ * The specimen is deliberately not in here. It is the one thing in the room you
+ * are meant to be able to put your eye against, and a collider round it would
+ * stop the close inspection the whole viewer exists for.
+ */
+const COLLIDERS = [];
+{
+  /* The margin is per box, because it is not a body — there is nobody here —
+     it is how much air the camera keeps between its near plane and a plank.
+     A hand's width is right for furniture you are only walking past.
+     
+     It is wrong for the pedestal, and that took a test to see: the margin
+     applies upward as well as outward, so a generous one round a 95 cm plinth
+     puts a 16 cm dome over the top of it — and the specimen stands on the top,
+     is nineteen centimetres tall, and is the one thing in this room the whole
+     viewer exists to let you look at closely. So the plinth gets almost none,
+     and you can bring your eye to the rim of the pot. */
+  const b = (m, x0, y0, z0, x1, y1, z1) => COLLIDERS.push({
+    box: new THREE.Box3(new THREE.Vector3(x0, y0, z0), new THREE.Vector3(x1, y1, z1)),
+    margin: m,
+  });
+  const WALKPAST = 0.10, CLOSEUP = 0.04;
+
+  // The staging down both long walls, from the floor to the pots standing on it.
+  for (const sz of [-1, 1]){
+    const zc = sz * (GH.D/2 - 0.48);
+    b(WALKPAST, -(GH.W - 0.55)/2, 0, zc - 0.26, (GH.W - 0.55)/2, 0.97, zc + 0.26);
+  }
+  // The two tiers of shelving above each bench, taken as one block: the gap
+  // between them is 40 cm and nobody is threading a camera through it.
+  for (const sz of [-1, 1]){
+    const zc = sz * (GH.D/2 - 0.30);
+    b(WALKPAST, -(GH.W - 1.1)/2, 1.49, zc - 0.16, (GH.W - 1.1)/2, 2.00, zc + 0.16);
+  }
+  // The pedestal, up to the top the specimen stands on.
+  b(CLOSEUP, -0.21, 0, -0.21, 0.21, PEDESTAL_TOP + 0.02, 0.21);
+  // The three lamps. The one over the plant hangs at 1.60, which is exactly
+  // head height on the way to look at the plant.
+  for (const L of LAMPS){
+    const y = GH.EAVE - L.drop;
+    b(WALKPAST, L.x - 0.17, y - 0.11, -0.17, L.x + 0.17, y + 0.09, 0.17);
+  }
+}
+
+/* Out of anything it has ended up inside, by the shortest way out. Two passes,
+   because leaving one box can put you inside its neighbour, and the shortest
+   way is what makes it slide along a bench rather than stop dead against it. */
+function pushOutOfThings(p){
+  for (let pass = 0; pass < 2; pass++){
+    let touched = false;
+    for (const { box, margin } of COLLIDERS){
+      const xr = (box.max.x + margin) - p.x, xl = p.x - (box.min.x - margin);
+      if (xr <= 0 || xl <= 0) continue;
+      const yr = (box.max.y + margin) - p.y, yl = p.y - (box.min.y - margin);
+      if (yr <= 0 || yl <= 0) continue;
+      const zr = (box.max.z + margin) - p.z, zl = p.z - (box.min.z - margin);
+      if (zr <= 0 || zl <= 0) continue;
+
+      const ax = Math.min(xr, xl), ay = Math.min(yr, yl), az = Math.min(zr, zl);
+      if (ax <= ay && ax <= az)      p.x += xr < xl ? xr : -xl;
+      else if (ay <= az)             p.y += yr < yl ? yr : -yl;
+      else                           p.z += zr < zl ? zr : -zl;
+      touched = true;
+    }
+    if (!touched) break;
+  }
+}
+
 function clampToHouse(p){
+  p.x = THREE.MathUtils.clamp(p.x, -FLY_X, FLY_X);
+  p.z = THREE.MathUtils.clamp(p.z, -FLY_Z, FLY_Z);
+  p.y = THREE.MathUtils.clamp(p.y, FLY_FLOOR, ceilingAt(p.z));
+  pushOutOfThings(p);
+  // The walls again, in case a shove off the staging put the camera in the
+  // glass. The furniture is well inside the house, so one round settles it.
   p.x = THREE.MathUtils.clamp(p.x, -FLY_X, FLY_X);
   p.z = THREE.MathUtils.clamp(p.z, -FLY_Z, FLY_Z);
   p.y = THREE.MathUtils.clamp(p.y, FLY_FLOOR, ceilingAt(p.z));
@@ -1808,7 +1891,8 @@ addEventListener('blur', () => fly.keys.clear());
 
 /* One step of flight. Separated from the loop so the loop reads as a list of
    the things that happen in a frame. */
-const FLY_AXES = { fwd: new THREE.Vector3(), side: new THREE.Vector3() };
+const FLY_AXES = { fwd: new THREE.Vector3(), side: new THREE.Vector3(),
+                   was: new THREE.Vector3(), step: new THREE.Vector3() };
 function stepFly(dt){
   camera.quaternion.setFromEuler(new THREE.Euler(fly.pitch, fly.yaw, 0, 'YXZ'));
 
@@ -1846,15 +1930,24 @@ function stepFly(dt){
 
   // Chase the wanted velocity rather than assume it, framerate-independently.
   fly.vel.lerp(want, 1 - Math.exp(-FLY_EASE * dt));
+  FLY_AXES.was.copy(camera.position);
   camera.position.addScaledVector(fly.vel, dt);
   clampToHouse(camera.position);
+  /* Whichever way the camera was stopped, it stops wanting to go that way too.
+     Without this the velocity keeps building into the bench and the moment you
+     turn away you are fired off sideways at whatever it had accumulated. Each
+     axis on its own, so a push along a wall still slides. */
+  const moved = FLY_AXES.step.subVectors(camera.position, FLY_AXES.was);
+  if (Math.abs(moved.x - fly.vel.x * dt) > 1e-6) fly.vel.x = 0;
+  if (Math.abs(moved.y - fly.vel.y * dt) > 1e-6) fly.vel.y = 0;
+  if (Math.abs(moved.z - fly.vel.z * dt) > 1e-6) fly.vel.z = 0;
 }
 
 if (DEV) window.gt = { THREE, scene, camera, renderer, controls, applyTime, house, out,
   /* The flight rig too, because "does it stop at the glass" is a question
      you want to ask in one step of a known size rather than by holding a key
      down and hoping the frame rate co-operates. */
-  fly, stepFly, setFly, clampToHouse, ceilingAt,
+  fly, stepFly, setFly, clampToHouse, ceilingAt, COLLIDERS, pushOutOfThings,
   bounds: { x: FLY_X, z: FLY_Z, floor: FLY_FLOOR, ridge: GH.RIDGE, eave: GH.EAVE } };
 
 // ---- loop -------------------------------------------------------------------

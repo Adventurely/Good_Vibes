@@ -393,6 +393,31 @@ test('the greenhouse can be walked around, and not walked out of', async () => {
   // Storage that will not store is a browser, not a bug.
   assert.match(js, /catch \{ \/\* a browser that will not store/);
 
+  /* You cannot walk through the furniture. The colliders are written from the
+     same constants the furniture is built from — the house is merged into a
+     handful of draw calls, so a box fitted round a mesh would be a box round
+     the whole building. */
+  assert.match(js, /const COLLIDERS = \[\]/);
+  assert.match(js, /pushOutOfThings\(p\)/);
+  assert.match(js, /GH\.D\/2 - 0\.48/, 'the staging collider comes from the staging');
+  assert.match(js, /GH\.EAVE - L\.drop/, 'the lamp colliders come from the lamps');
+  assert.match(js, /for \(const L of LAMPS\)/);
+
+  /* The margin is per box, and that is not fussiness. It applies upward as
+     well as outward, so a hand's width round a 95 cm plinth puts a dome over
+     the top of it — and the specimen stands on the top, is 19 cm tall, and is
+     the one thing the viewer exists to let you look at closely. */
+  assert.match(js, /const WALKPAST = [\d.]+, CLOSEUP = [\d.]+;/);
+  const walkpast = Number(/const WALKPAST = ([\d.]+)/.exec(js)[1]);
+  const closeup = Number(/CLOSEUP = ([\d.]+)/.exec(js)[1]);
+  assert.ok(closeup < walkpast, 'the plinth must hold you off less than a bench does');
+  assert.ok(closeup > 0, 'and it must still hold you off the stone');
+  assert.match(js, /b\(CLOSEUP, -0\.21/, 'the plinth is the box that gets the small margin');
+
+  // The specimen itself is not a collider, deliberately.
+  assert.ok(!/COLLIDERS[\s\S]{0,400}modelRoot/.test(js),
+    'a collider round the plant would stop the close inspection the viewer is for');
+
   // And the page says how to work it, on both kinds of screen.
   assert.match(html, /id="enter"/);
   assert.match(html, /id="cross"/);

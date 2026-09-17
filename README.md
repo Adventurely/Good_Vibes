@@ -1937,6 +1937,24 @@ button holds the key it stands for, so the movement code never learns whether a
 finger or a keyboard is asking — and a finger that slides off releases it the
 same way a key does.
 
+**You cannot walk through the furniture.** Nine boxes, written out from the
+same constants the staging, the shelving, the plinth and the lamps are built
+from rather than measured off the meshes — the house is merged into a handful
+of draw calls, so a box fitted round a mesh here would be a box round the whole
+building, and a ray cast at the scene every frame is a lot of triangles to ask
+about sixty times a second for an answer this simple. Resolution is out by the
+shortest way, twice, which is what makes it slide along a bench rather than
+stop dead against it, and the velocity is zeroed on whichever axis was stopped
+so that turning away from a wall does not fire you off sideways at whatever had
+been accumulating.
+
+**The margin is per box, and that took a test to see.** It applies upward as
+well as outward, so a hand's width round a 95 cm plinth puts a 16 cm dome over
+the top of it — and the specimen stands on that top, is nineteen centimetres
+tall, and is the one thing in the room the whole viewer exists to let you look
+at closely. The furniture holds you off by a hand; the plinth by four
+centimetres. The plant is not a collider at all.
+
 **It remembers where you were standing.** Four numbers in `localStorage`, written
 when the tab is hidden and every couple of seconds besides, because a tab that is
 closed rather than hidden does not always get a `pagehide`. A viewer that puts
