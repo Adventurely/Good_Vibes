@@ -35,6 +35,7 @@ function hatchling(level, groundY){
     fallFrom: 0,
     buildBaseY: 0,      // the height the ramp started from — see stepBuilding
     buildStep: 0,       // ticks spent building so far, up to BUILD_MAX_STEPS
+    buildLevel: false,  // true when this one is extending a ramp rather than starting one
     digLeft: 0,
     cause: null,        // set when lost: 'fell' | 'edge' | 'goosed'
   };
@@ -467,7 +468,9 @@ function stepBuilding(state, d){
   if(nextX < 0 || nextX >= level.width){ d.state = 'walking'; return; }
 
   const step = d.buildStep + 1;
-  const y = d.buildBaseY - Math.round(step * BUILD_RISE_HEIGHT / BUILD_MAX_STEPS);
+  const y = d.buildLevel
+    ? d.buildBaseY
+    : d.buildBaseY - Math.round(step * BUILD_RISE_HEIGHT / BUILD_MAX_STEPS);
 
   /* Strictly higher, not "at or above": the first few ticks of a ramp round
      to no rise at all (BUILD_RISE_HEIGHT spread over BUILD_MAX_STEPS is well
@@ -557,6 +560,15 @@ export function assignSkill(state, duckId, skill){
     d.state = 'building';
     d.buildBaseY = d.y;
     d.buildStep = 0;
+    /* Given to a duckling already standing on a ramp, this one extends it
+       rather than starting a fresh one: it carries on at the height it is
+       already at instead of climbing another BUILD_RISE_HEIGHT on top. Two
+       Builders chained the other way would end up twice as high, and the far
+       end of a ramp is a ledge everything behind it has to step off — one
+       climb's worth is FALL_SAFE, which is survivable, and two is not. So
+       the first Builder decides how high the ramp goes and every one after
+       it decides how far. */
+    d.buildLevel = state.decks[columnAt(state, d.x)].includes(d.y);
     return d;
   }
   // digger, climber: stay 'walking' until the right hazard asks for them.

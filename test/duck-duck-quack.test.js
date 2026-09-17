@@ -424,16 +424,29 @@ test('a builder\'s ramp joins a staircase rather than cutting across it, so the 
   const segments = [{ from: 0, to: 30, y: 50 }];
   for(let i = 0; i < 30; i++) segments.push({ from: 30 + i * 2, to: 32 + i * 2, y: 50 - 4 * (i + 1) });
   segments.push({ from: 90, to: SCENE_W, y: -70 });
-  const level = miniLevel({ segments, supply: { digger: 0, builder: 1, blocker: 0, climber: 0 } });
-  const state = run(newGame(level), 1);
+  const level = miniLevel({
+    segments, duckCount: 2, spawnInterval: 1,
+    supply: { digger: 0, builder: 1, blocker: 0, climber: 0 },
+  });
+  const state = run(newGame(level), 2);
   const duck = state.ducks[0];
   assignSkill(state, duck.id, 'builder');
   while(duck.state === 'building') tick(state);
 
+  /* The ramp has to hand over to the stairs without leaving a ledge the
+     flock cannot get past. A tread is four pixels, so the two meet within a
+     tread or so either way; what matters is that it is a step a duckling
+     takes rather than a wall it turns back from or a fall it dies on. Walk
+     one up and see, which is the property rather than the pixel count. */
   const last = state.decks.findLastIndex(at => at.length > 0);
-  const step = state.decks[last][0] - state.terrain[last + 1];
-  assert.ok(step >= 0 && step <= WALK_STEP,
-    `the ramp should meet the stairs within one step, not ${step}px above them`);
+  assert.ok(last > 0, 'a ramp should have been laid at all');
+  const [, follower] = state.ducks;
+  follower.x = last; follower.y = state.decks[last][0]; follower.dir = 1; follower.state = 'walking';
+  const startedAt = follower.y;
+  run(state, 20);
+  assert.notEqual(follower.state, 'lost', 'it should not die stepping off the ramp onto the stairs');
+  assert.ok(follower.x > last, 'it should get past the end of the ramp');
+  assert.ok(follower.y < startedAt, 'and be climbing the stairs beyond it');
 });
 
 test('a ramp laid across one already standing leaves both — neither clears the other away', () => {
@@ -453,7 +466,7 @@ test('a ramp laid across one already standing leaves both — neither clears the
   assert.equal(deckCount(state), BUILD_MAX_STEPS);
 
   // The second one, turned around, builds back across the first.
-  second.x = 40; second.y = 50; second.dir = -1;
+  second.x = 32; second.y = 50; second.dir = -1;
   assignSkill(state, second.id, 'builder');
   run(state, BUILD_MAX_STEPS + 2);
 
@@ -463,6 +476,41 @@ test('a ramp laid across one already standing leaves both — neither clears the
     }
   }
   assert.ok(deckCount(state) > deckColumns(state), 'and some columns should be carrying both');
+});
+
+test('a second builder given out on a ramp extends it, carrying on level rather than climbing again', () => {
+  /* What gets a flock over a gap wider than one ramp reaches — The Park's,
+   * see LEVEL_1. The first Builder decides how high the ramp goes; every one
+   * after it decides how far. If an extension climbed another
+   * BUILD_RISE_HEIGHT of its own, the far end would be twice FALL_SAFE above
+   * the ground, and the ledge at the end of a ramp is one every duckling
+   * behind has to step off.
+   */
+  const level = miniLevel({
+    duckCount: 2, spawnInterval: 1,
+    supply: { digger: 0, builder: 2, blocker: 0, climber: 0 },
+  });
+  const state = run(newGame(level), 2);
+  const [first, second] = state.ducks;
+
+  assignSkill(state, first.id, 'builder');
+  run(state, BUILD_MAX_STEPS + 2);
+  const end = state.decks.findLastIndex(at => at.length > 0);
+  const top = state.decks[end][0];
+  assert.equal(top, 50 - BUILD_RISE_HEIGHT, 'the first ramp climbs its full rise');
+
+  // Stand the second one on the end of that ramp and give it a Builder.
+  second.x = end; second.y = top; second.dir = 1; second.state = 'walking';
+  assignSkill(state, second.id, 'builder');
+  run(state, BUILD_MAX_STEPS + 2);
+
+  const newEnd = state.decks.findLastIndex(at => at.length > 0);
+  assert.ok(newEnd > end, 'the ramp should now reach further');
+  for(let x = end + 1; x <= newEnd; x++){
+    assert.ok(state.decks[x].includes(top), `column ${x} should carry the ramp on at its own height`);
+  }
+  // Which keeps the one thing that makes a ramp's far end safe true.
+  assert.equal(50 - top, FALL_SAFE, 'and the whole ramp is still only one climb above the ground');
 });
 
 test('a duckling walks under a ramp overhead rather than being lifted onto it', () => {
@@ -526,7 +574,7 @@ test('a duckling coming down one ramp changes onto another crossing it the other
   let top = { x: -1, y: Infinity };
   state.decks.forEach((at, x) => at.forEach(y => { if(y < top.y) top = { x, y }; }));
 
-  down.x = 100; down.y = 50; down.dir = -1; down.state = 'walking';  // climbs leftward
+  down.x = 75; down.y = 50; down.dir = -1; down.state = 'walking';   // climbs leftward
   assignSkill(state, down.id, 'builder');
   run(state, BUILD_MAX_STEPS + 2);
   assert.ok(state.decks.some(at => at.length > 1), 'the two should be crossing somewhere');
@@ -751,14 +799,27 @@ test('duckNear finds the closest open duckling and ignores resolved ones', () =>
  * clever player — it is the simplest policy that should be able to clear
  * this level at all, which is the property this test is actually checking.
  */
+/* The end of whatever ramp is standing, or -1. What a player aims the second
+   Builder at: the duckling out on the last column of the ramp so far. */
+function rampEnd(state){
+  return state.decks.findLastIndex(at => at.length > 0);
+}
+
 function playLevel1(){
   const state = newGame(LEVEL_1);
-  let builderUsed = false;
+  let builderUsed = false, extended = false;
   for(let i = 0; i < LEVEL_1.timeLimit && !state.ended; i++){
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
-      if(!builderUsed && d.x === 69 && assignSkill(state, d.id, 'builder')) builderUsed = true;
-      else if(!hasTrait(d, 'climber') && d.x >= 130 && d.x < 150) assignSkill(state, d.id, 'climber');
+      // The Park's gap is wider than one ramp reaches (see LEVEL_1's note):
+      // lay one at the lip, then extend it from its far end.
+      if(!builderUsed && d.x === 69 && assignSkill(state, d.id, 'builder')){ builderUsed = true; continue; }
+      const end = rampEnd(state);
+      if(builderUsed && !extended && end > 0 && d.x === end && state.decks[end].includes(d.y)){
+        if(assignSkill(state, d.id, 'builder')) extended = true;
+        continue;
+      }
+      if(!hasTrait(d, 'climber') && d.x >= 136 && d.x < 150) assignSkill(state, d.id, 'climber');
       else if(!hasTrait(d, 'flyer') && d.x >= 160 && d.x < 219) assignSkill(state, d.id, 'flyer');
     }
     tick(state);

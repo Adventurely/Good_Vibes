@@ -229,19 +229,28 @@
      own flyer for the drop off the far side of the plateau, since neither
      of those leaves anything behind for the next one. */
   let state = newGame(LEVEL_1);
-  let builderUsed = false;
+  let builderUsed = false, rampExtended = false;
 
   function playStep(){
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
-      if(!builderUsed && d.x === 69 && assignSkill(state, d.id, 'builder')) builderUsed = true;
-      else if(!hasTrait(d, 'climber') && d.x >= 130 && d.x < 150) assignSkill(state, d.id, 'climber');
+      // The Park's gap is wider than one ramp reaches, so this lays one at
+      // the lip and then extends it from its far end — see content.js's
+      // note on LEVEL_1, and BUILD_SECONDS for why it takes two.
+      if(!builderUsed && d.x === 69 && assignSkill(state, d.id, 'builder')){ builderUsed = true; continue; }
+      const end = state.decks.findLastIndex(at => at.length > 0);
+      if(builderUsed && !rampExtended && end > 0 && d.x === end && state.decks[end].includes(d.y)){
+        if(assignSkill(state, d.id, 'builder')) rampExtended = true;
+        continue;
+      }
+      if(!hasTrait(d, 'climber') && d.x >= 136 && d.x < 150) assignSkill(state, d.id, 'climber');
       else if(!hasTrait(d, 'flyer') && d.x >= 160 && d.x < 219) assignSkill(state, d.id, 'flyer');
     }
     tick(state);
     if(state.ended){
       state = newGame(LEVEL_1);
       builderUsed = false;
+      rampExtended = false;
     }
   }
 
