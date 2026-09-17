@@ -1001,8 +1001,7 @@ function refreshNodeLabel(){
   /* Direction words, not a length. "0.12 km/s" is the fuel this will burn,
      and two playtesters braking at Slate read it as their speed and were
      baffled that pressing Back made it climb. The fuel is on the gauge. */
-  const rvNow = S.rendezvous(state);
-  nodeLabel = n ? `${S.burnWords(n, rvNow ? S.portName(rvNow.target) : null)} · in ${S.fmtDays(n.t - state.t)}` : null;
+  nodeLabel = n ? `${S.burnWords(n)} · in ${S.fmtDays(n.t - state.t)}` : null;
 }
 function frame(now){
   const real = Math.min(0.1, (now - last) / 1000);
@@ -2313,9 +2312,7 @@ const AXES = {
    mark, rounded to a number a person would say out loud. */
 function stepFor(i){
   const where = nodePositions[i];
-  // Which speed, and so which fraction of it — see `burnScaleAt` and `burnStep`.
-  const f = S.burnScaleAt(state, where, state.nodes[i]?.t ?? state.t);
-  return S.burnStep(f.speed, f.relative);
+  return S.burnStep(S.norm(where ? where.v : state.ship.v), false);
 }
 
 /* The last resort, which has to live somewhere a stranded pilot can find it:
