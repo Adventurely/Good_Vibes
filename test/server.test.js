@@ -335,3 +335,75 @@ test('PUT the board is a 405, and the static 405 still holds elsewhere', async (
   assert.equal(health.status, 200);
   assert.deepEqual(await health.json(), { status: 'ok' });
 });
+
+test('the greenhouse can be walked around, and not walked out of', async () => {
+  /* The viewer opens flying: you are standing in the house at head height and
+   * you go where you are looking. Almost all of it is geometry and a pointer
+   * lock, which a test without a GPU cannot judge — but the parts that would
+   * silently break it are readable, and each of them has cost an afternoon
+   * somewhere:
+   *
+   *   - the rig referenced from `window.gt` before it was declared, which is a
+   *     temporal dead zone and takes the whole module down in dev mode;
+   *   - the bounds derived from the wrong half-width, which puts the camera
+   *     inside the glass;
+   *   - a flat ceiling clamp, which either stops you at the eaves or lets you
+   *     through the roof, because the ridge is 90 cm above them.
+   */
+  const html = await (await fetch(`${baseUrl}/greener-thumbs/play.html`)).text();
+  const js = [...html.matchAll(/<script type="module">([\s\S]*?)<\/script>/g)].map(m => m[1]).join('\n');
+  assert.ok(js.length > 1000, 'no inline module found to check');
+
+  // The rig is there, and it is what the page opens in.
+  assert.match(js, /const fly = \{/);
+  assert.match(js, /setFly\(true\)/, 'the viewer has to open flying');
+  assert.match(js, /requestPointerLock\(\)/, 'looking where the mouse points needs the pointer');
+  assert.match(js, /if \(fly\.on\)\{\s*\n\s*stepFly\(dt\);/, 'the loop has to drive it');
+
+  // Declared before it is handed to the console, or dev mode is a blank page.
+  const declared = js.indexOf('const fly = {');
+  const exported = js.indexOf('window.gt = {');
+  assert.ok(declared < exported,
+    'window.gt names the fly rig, so the rig has to be declared above it');
+
+  // Bounded by the house's own numbers rather than by figures typed twice.
+  assert.match(js, /GH\.W \/ 2 - FLY_EDGE/, 'the side walls come from GH.W');
+  assert.match(js, /GH\.D \/ 2 - FLY_EDGE/, 'the end walls come from GH.D');
+  assert.match(js, /GH\.RIDGE - \(GH\.RIDGE - GH\.EAVE\)/,
+    'the ceiling has to follow the pitch, not sit flat at one of them');
+
+  // Orbit is still there, and the two cannot both be driving.
+  assert.match(js, /controls\.enabled = !on/);
+  assert.match(js, /ui\.spin && !fly\.on/, 'auto-spin is an orbit trick and drags you sideways in flight');
+
+  /* WASD is the floor plan and nothing else. Forward following your pitch is
+     the free-fly convention and it was wrong here: looking down at a plant is
+     the ordinary thing to do in a greenhouse, and on that camera the ordinary
+     thing sends you through the floor the moment you press W. */
+  assert.match(js, /FLY_AXES\.fwd[\s\S]{0,120}\.setY\(0\)/,
+    'forward has to be levelled, or W dives whenever you look down');
+
+  /* Where you were when you closed the tab. A viewer that puts you back by the
+     door every time makes you walk to the far bench again to carry on looking
+     at the far bench. */
+  assert.match(js, /localStorage\.setItem\(SPOT_KEY/);
+  assert.match(js, /loadSpot\(\)/);
+  assert.match(js, /clampToHouse\(camera\.position\);\s*\/\/ in case the house has changed/,
+    'a saved spot must be checked against the house it is coming back into');
+  // Storage that will not store is a browser, not a bug.
+  assert.match(js, /catch \{ \/\* a browser that will not store/);
+
+  // And the page says how to work it, on both kinds of screen.
+  assert.match(html, /id="enter"/);
+  assert.match(html, /id="cross"/);
+  assert.match(html, /id="fly"/);
+  // A phone has no pointer to capture and no keys to press, so it gets arrows.
+  assert.match(html, /id="pad"/);
+  assert.match(html, /id="lift"/);
+  for(const key of ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'KeyC']){
+    assert.match(html, new RegExp(`data-key="${key}"`), `the pad has no button for ${key}`);
+  }
+  assert.match(js, /#pad button, #lift button/, 'the pad buttons have to be wired to the same keys');
+  assert.match(html, /@media \(pointer:fine\)\{ body\.flying #pad/,
+    'a mouse gets the keyboard, not a thumb pad');
+});

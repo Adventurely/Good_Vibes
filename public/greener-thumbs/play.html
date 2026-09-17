@@ -94,7 +94,6 @@
 <div id="hud" hidden>
   <h2>African Violet</h2>
   <p><i>Saintpaulia ionantha</i></p>
-  <p class="hint">Drag to look around &middot; scroll to zoom right in</p>
   <p class="hint" style="color:#9db09a">Light: <b id="timenow">—</b></p>
 </div>
 
@@ -129,6 +128,7 @@
   <fieldset>
     <legend>View</legend>
     <div class="btns">
+      <button id="fly" aria-pressed="true">Fly</button>
       <button id="spin" aria-pressed="false">Auto-spin</button>
       <button id="wire" aria-pressed="false">Wireframe</button>
       <button id="bones" aria-pressed="false">Skeleton</button>
@@ -143,7 +143,103 @@
   </div>
 </div>
 
+<!-- Only up while the pointer is captured: a crosshair on a page you are
+     reading rather than flying is a dot somebody tries to wipe off. -->
+<div id="cross" aria-hidden="true"></div>
+
+<!-- What to do, on the canvas, where the hands are. It goes the moment the
+     pointer is captured and comes back the moment it is released, so it is
+     never in the way and never absent when it is needed. -->
+<div id="enter">
+  <b class="fine">Click to walk in</b>
+  <b class="coarse">Drag to look around</b>
+  <span class="fine">WASD or arrows to walk &middot; Space / C for up and down<br>
+        Shift to hurry &middot; Alt to creep &middot; F to orbit the plant &middot; Esc to let go</span>
+  <span class="coarse">Arrows to walk &middot; + and &minus; for up and down</span>
+</div>
+
+<!-- The pad, for a screen with no keyboard. Arrows for the floor plan and a
+     pair for the height, one thumb to each: the left hand walks and the right
+     hand rises, and the whole middle of the glass is left clear to drag a
+     look around. Buttons rather than an invisible gesture, because a gesture
+     nobody is told about is a control nobody uses. -->
+<div id="pad" aria-hidden="false">
+  <button data-key="KeyW" aria-label="Forward" aria-pressed="false" style="grid-area:u">&#9650;</button>
+  <button data-key="KeyA" aria-label="Left" aria-pressed="false" style="grid-area:l">&#9664;</button>
+  <button data-key="KeyD" aria-label="Right" aria-pressed="false" style="grid-area:r">&#9654;</button>
+  <button data-key="KeyS" aria-label="Back" aria-pressed="false" style="grid-area:d">&#9660;</button>
+</div>
+<div id="lift">
+  <button data-key="Space" aria-label="Rise" aria-pressed="false">&#43;</button>
+  <button data-key="KeyC" aria-label="Sink" aria-pressed="false">&#8722;</button>
+</div>
+
 <div id="err"></div>
+
+<style>
+  /* The canvas takes the keyboard and the mouse while flying, so it says so:
+     a grab cursor before the click, nothing at all once the pointer is gone. */
+  body.flying #stage canvas { cursor: grab; }
+  body.looking #stage canvas { cursor: none; }
+
+  #cross{
+    position:fixed; left:50%; top:50%; width:14px; height:14px; margin:-7px 0 0 -7px;
+    display:none; pointer-events:none; opacity:0.75;
+  }
+  body.looking #cross{ display:block; }
+  /* Two bars and a hole, not a dot: a dot vanishes against a leaf, and the
+     gap is what lets you see the thing you are pointing at. */
+  #cross::before, #cross::after{
+    content:''; position:absolute; background:#fff; box-shadow:0 0 2px #0008;
+  }
+  #cross::before{ left:6px; top:0; width:2px; height:5px; box-shadow:0 0 2px #0008, 0 9px 0 #fff; }
+  #cross::after{ top:6px; left:0; height:2px; width:5px; box-shadow:0 0 2px #0008, 9px 0 0 #fff; }
+
+  #enter{
+    position:fixed; left:50%; top:4.5vh; transform:translateX(-50%);
+    display:none; text-align:center; pointer-events:none;
+    background:#0d140cd0; border:1px solid var(--line); border-radius:10px;
+    padding:9px 16px; color:var(--dim); font-size:12.5px; line-height:1.55;
+    max-width:min(92vw, 30rem);
+  }
+  #enter b{ color:#cfe0cb; font-size:13.5px; display:block; margin-bottom:2px; }
+  #enter .coarse{ display:none; }
+  @media (pointer:coarse){
+    #enter .fine{ display:none; }
+    #enter b.coarse{ display:block; }
+    #enter span.coarse{ display:inline; }
+  }
+  body.flying:not(.looking) #enter{ display:block; }
+  /* A phone has no pointer to capture, so the first line is a lie there. */
+  @media (pointer:coarse){
+    #enter b{ font-size:12.5px; }
+  }
+  /* The pad is for fingers, so it is up only where the pointer is coarse and
+     only while there is something to fly. A mouse gets the keyboard. */
+  #pad, #lift{ display:none; position:fixed; bottom:calc(14px + env(safe-area-inset-bottom)); z-index:6;
+               touch-action:none; user-select:none; -webkit-user-select:none; }
+  #pad{ left:14px; display:none; grid-template-areas:'. u .' 'l . r' '. d .'; gap:6px; }
+  #lift{ right:14px; flex-direction:column; gap:6px; }
+  body.flying #pad{ display:grid; }
+  body.flying #lift{ display:flex; }
+  @media (pointer:fine){ body.flying #pad, body.flying #lift{ display:none; } }
+
+  #pad button, #lift button{
+    width:54px; height:54px; border-radius:12px; font-size:17px; line-height:1;
+    background:#0d140cc0; color:#cfe0cb; border:1px solid var(--line);
+    backdrop-filter:blur(4px); cursor:pointer; padding:0;
+  }
+  #pad button[aria-pressed='true'], #lift button[aria-pressed='true']{
+    background:var(--leaf, #5d8a52); color:#0d140c;
+  }
+  #lift button{ font-size:22px; }
+  /* The label would sit under the left thumb, so on a phone it goes up top. */
+  @media (pointer:coarse){
+    #hud{ bottom:auto; top:58px; }
+  }
+
+  @media (prefers-reduced-motion: reduce){ #enter{ transition:none; } }
+</style>
 
 <script type="importmap">
 { "imports": {
@@ -1427,7 +1523,22 @@ loader.load('./' + PLANT.glb, gltf => {
   $('#panel').querySelector('.sub').innerHTML =
     '<i>' + PLANT.latin + '</i> — parametric, rigged';
 
+  /* Framed first so that the orbit target is the plant the moment anybody
+     presses F, and so the establishing shot is what a browser without a
+     keyboard still gets. Then stand up and walk in. */
   frameToFit(root, ESTABLISH);
+  const spot = loadSpot();
+  if (spot){
+    camera.position.set(spot.x, spot.y, spot.z);
+    setFly(true);
+    fly.yaw = spot.yaw;
+    fly.pitch = THREE.MathUtils.clamp(spot.pitch, -PITCH_CAP, PITCH_CAP);
+    clampToHouse(camera.position);      // in case the house has changed since
+  } else {
+    camera.position.set(0, 1.55, GH.D / 2 - 0.9);
+    camera.lookAt(0, PEDESTAL_TOP + 0.08, 0);
+    setFly(true);
+  }
   $('#load').remove();
   if (DEV) $('#panel').hidden = false;
   else     $('#hud').hidden = false;
@@ -1481,15 +1592,274 @@ applyTime(DEV ? 'midday' : timeFromClock());
    module-scoped, which is right, but it also means there is no way to ask the
    running scene a question from a console — and "is the fuzz shell actually in
    there" is exactly the question you want to ask without editing the file. */
-if (DEV) window.gt = { THREE, scene, camera, renderer, controls, applyTime, house, out };
 markTime();
 
-$('#reset').addEventListener('click', () => { if (modelRoot) frameToFit(modelRoot, ESTABLISH); });
-$('#close').addEventListener('click', () => { if (modelRoot) frameToFit(modelRoot, CLOSE); });
+/* Both of these put the camera on a rail around the specimen, so both of them
+   mean "stop flying" — framing a plant and then leaving the controls in free
+   flight is a camera that drifts off the thing it was just asked to frame. */
+$('#reset').addEventListener('click', () => {
+  if (!modelRoot) return;
+  setFly(false);
+  frameToFit(modelRoot, ESTABLISH);
+});
+$('#close').addEventListener('click', () => {
+  if (!modelRoot) return;
+  setFly(false);
+  frameToFit(modelRoot, CLOSE);
+});
+$('#fly').addEventListener('click', () => setFly(!fly.on));
+
+// ---- walking about ----------------------------------------------------------
+
+/* Two ways to look at the house, and they want different cameras.
+ *
+ * Orbiting is how you study one plant: the target is the specimen, the mouse
+ * swings you round it and the wheel takes you in until a leaf fills the frame.
+ * It is the wrong tool for a room. You cannot get behind the bench, you cannot
+ * put your eye at soil level, and every move is measured from a point in the
+ * middle of a pedestal you may not care about.
+ *
+ * So the viewer opens flying instead: you are somewhere in the house at head
+ * height, you look where the mouse points and you go where you are looking.
+ * Orbit is still one key away, because a free camera is a poor way to hold
+ * still six centimetres off a leaf.
+ */
+const fly = {
+  on: true,
+  locked: false,
+  yaw: 0, pitch: 0,
+  /* A velocity rather than a position step, so the camera has weight. Moving
+     by `speed * dt` on a key is a camera that starts and stops on the frame
+     the key does, which reads as a slide show rather than as floating. */
+  vel: new THREE.Vector3(),
+  keys: new Set(),
+};
+
+/* Where it may go. The house is centred on the origin and is 7.2 by 5.0, so
+ * the glass is at +/-3.6 and +/-2.5; the margin keeps the near plane off it,
+ * because a camera pressed against a pane sees the inside of the glass and
+ * the world through the hole its own near plane cuts.
+ *
+ * The roof is the interesting one. The ridge beam runs along X at z = 0, so
+ * the ceiling is not flat: it is 3.35 down the middle and 2.45 at the eaves,
+ * and a flat clamp at either number is either a camera in the glass or a
+ * camera that cannot reach the ridge lights. It follows the pitch instead.
+ */
+const FLY_EDGE = 0.28, FLY_HEAD = 0.18;
+const FLY_X = GH.W / 2 - FLY_EDGE, FLY_Z = GH.D / 2 - FLY_EDGE;
+const FLY_FLOOR = 0.16;
+const ceilingAt = z =>
+  GH.RIDGE - (GH.RIDGE - GH.EAVE) * Math.min(1, Math.abs(z) / (GH.D / 2)) - FLY_HEAD;
+
+function clampToHouse(p){
+  p.x = THREE.MathUtils.clamp(p.x, -FLY_X, FLY_X);
+  p.z = THREE.MathUtils.clamp(p.z, -FLY_Z, FLY_Z);
+  p.y = THREE.MathUtils.clamp(p.y, FLY_FLOOR, ceilingAt(p.z));
+}
+
+/* Where you were standing when you closed the tab.
+ *
+ * A viewer that puts you back by the door every time is a viewer that makes
+ * you walk to the far bench again to carry on looking at the far bench. The
+ * spot is four numbers, so it goes in localStorage rather than anywhere
+ * cleverer, and it is checked against the house on the way back in: a saved
+ * position from a greenhouse of a different size, or from a hand-edited
+ * string, must not put the camera inside the brickwork.
+ */
+const SPOT_KEY = 'greener-thumbs:spot';
+function saveSpot(){
+  if (!fly.on) return;
+  try {
+    localStorage.setItem(SPOT_KEY, JSON.stringify({
+      x: camera.position.x, y: camera.position.y, z: camera.position.z,
+      yaw: fly.yaw, pitch: fly.pitch,
+    }));
+  } catch { /* a browser that will not store is not a browser that breaks */ }
+}
+function loadSpot(){
+  let spot = null;
+  try { spot = JSON.parse(localStorage.getItem(SPOT_KEY) || 'null'); } catch { return null; }
+  if (!spot) return null;
+  const ok = v => typeof v === 'number' && Number.isFinite(v);
+  if (!ok(spot.x) || !ok(spot.y) || !ok(spot.z) || !ok(spot.yaw) || !ok(spot.pitch)) return null;
+  return spot;
+}
+/* `pagehide` is the window's; `visibilitychange` is the document's. It does
+   bubble, so a window listener happens to catch it, but "happens to" is how a
+   listener stops firing after a refactor nobody connected to it. */
+addEventListener('pagehide', saveSpot);
+document.addEventListener('visibilitychange', () => { if (document.hidden) saveSpot(); });
+
+const PITCH_CAP = Math.PI / 2 - 0.02;   // straight up and straight down, not past
+const LOOK_RATE = 0.0022;               // radians per pixel of mouse
+const FLY_SPEED = 2.4;                  // metres a second, walking pace
+const FLY_FAST  = 2.6;                  // times that, held shift: one end to the other in a second
+const FLY_SLOW  = 0.22;                 // times that, held alt: for the last inch
+const FLY_EASE  = 9.0;                  // how hard the velocity chases the input
+
+/* Reading the camera's own rotation back into yaw and pitch, so that stepping
+   out of orbit and into flight does not snap the view somewhere else. */
+function flyFromCamera(){
+  const e = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
+  fly.yaw = e.y;
+  fly.pitch = THREE.MathUtils.clamp(e.x, -PITCH_CAP, PITCH_CAP);
+  fly.vel.set(0, 0, 0);
+}
+
+function setFly(on){
+  fly.on = on;
+  controls.enabled = !on;
+  if (on){
+    flyFromCamera();
+    clampToHouse(camera.position);
+  } else {
+    /* Orbit needs something to orbit. Whatever is straight ahead at arm's
+       length is the honest answer — it is what you were looking at — and the
+       plant is what you were probably looking at, so it wins when it is
+       anywhere near the middle of the view. */
+    const ahead = new THREE.Vector3(0, 0, -1)
+      .applyQuaternion(camera.quaternion).multiplyScalar(1.2).add(camera.position);
+    const plant = modelRoot ? new THREE.Box3().setFromObject(modelRoot).getCenter(new THREE.Vector3()) : null;
+    const toPlant = plant ? plant.clone().sub(camera.position) : null;
+    const facing = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    controls.target.copy(plant && toPlant.normalize().dot(facing) > 0.86 ? plant : ahead);
+    controls.update();
+    if (document.pointerLockElement) document.exitPointerLock();
+  }
+  document.body.classList.toggle('flying', on);
+  document.body.classList.toggle('looking', on && fly.locked);
+  $('#fly')?.setAttribute('aria-pressed', String(on));
+}
+
+/* Pointer lock, which is what "look where the mouse points" means on a desktop:
+   the cursor is taken away and the mouse reports movement instead of position,
+   so the view keeps turning past the edge of the screen. Escape gives it back,
+   and the browser does that itself — there is no key handler for it here
+   because there cannot be one. */
+renderer.domElement.addEventListener('click', () => {
+  if (fly.on && !fly.locked) renderer.domElement.requestPointerLock();
+});
+document.addEventListener('pointerlockchange', () => {
+  fly.locked = document.pointerLockElement === renderer.domElement;
+  document.body.classList.toggle('looking', fly.on && fly.locked);
+  if (!fly.locked) fly.keys.clear();   // nothing is held down once focus goes
+});
+document.addEventListener('mousemove', e => {
+  if (!fly.on || !fly.locked) return;
+  fly.yaw -= e.movementX * LOOK_RATE;
+  fly.pitch = THREE.MathUtils.clamp(fly.pitch - e.movementY * LOOK_RATE, -PITCH_CAP, PITCH_CAP);
+});
+
+/* Touch has no pointer lock at all, so a phone drags to look and presses
+   buttons to move. A two-finger push was the first answer and it was a bad
+   one: it is an invisible control, it fights the browser's own pinch, and it
+   gives you no way to hold a direction steady while you look somewhere else.
+   Arrows on the glass are ordinary, visible, and can be held. */
+let touchLook = null;
+renderer.domElement.addEventListener('touchstart', e => {
+  if (fly.on && e.touches.length === 1){
+    touchLook = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }
+}, { passive: true });
+renderer.domElement.addEventListener('touchmove', e => {
+  if (!fly.on || !touchLook || e.touches.length !== 1) return;
+  const t = e.touches[0];
+  fly.yaw -= (t.clientX - touchLook.x) * LOOK_RATE * 1.6;
+  fly.pitch = THREE.MathUtils.clamp(fly.pitch - (t.clientY - touchLook.y) * LOOK_RATE * 1.6,
+    -PITCH_CAP, PITCH_CAP);
+  touchLook = { x: t.clientX, y: t.clientY };
+  e.preventDefault();
+}, { passive: false });
+const endTouch = () => { touchLook = null; };
+renderer.domElement.addEventListener('touchend', endTouch, { passive: true });
+renderer.domElement.addEventListener('touchcancel', endTouch, { passive: true });
+
+/* The pad. Each button holds the key it stands for, so the movement code does
+   not know or care whether a finger or a keyboard is asking — and a finger
+   that slides off the button, or a call that steals the page, releases it the
+   same way a key does. */
+for (const btn of document.querySelectorAll('#pad button, #lift button')){
+  const code = btn.dataset.key;
+  const press = e => { e.preventDefault(); fly.keys.add(code); btn.setAttribute('aria-pressed','true'); };
+  const lift  = () => { fly.keys.delete(code); btn.setAttribute('aria-pressed','false'); };
+  btn.addEventListener('pointerdown', press);
+  btn.addEventListener('pointerup', lift);
+  btn.addEventListener('pointercancel', lift);
+  btn.addEventListener('pointerleave', lift);
+  btn.addEventListener('contextmenu', e => e.preventDefault());
+}
+
+/* The keys. Held in a set and read in the loop rather than acted on here: a
+   keydown repeats at whatever rate the OS says, which is not a frame rate, and
+   moving on the repeat makes the speed depend on the keyboard. */
+const FLY_KEYS = new Set(['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','KeyC','Space',
+  'ArrowUp','ArrowDown','ArrowLeft','ArrowRight','ShiftLeft','ShiftRight','AltLeft','AltRight']);
+addEventListener('keydown', e => {
+  if (e.target.matches('input, textarea, button, select')) return;
+  if (e.code === 'KeyF'){ setFly(!fly.on); return; }
+  if (!fly.on || !FLY_KEYS.has(e.code)) return;
+  fly.keys.add(e.code);
+  // Space scrolls the page and the arrows move the caret; neither is wanted
+  // while the greenhouse has the keyboard.
+  e.preventDefault();
+});
+addEventListener('keyup', e => fly.keys.delete(e.code));
+addEventListener('blur', () => fly.keys.clear());
+
+/* One step of flight. Separated from the loop so the loop reads as a list of
+   the things that happen in a frame. */
+const FLY_AXES = { fwd: new THREE.Vector3(), side: new THREE.Vector3() };
+function stepFly(dt){
+  camera.quaternion.setFromEuler(new THREE.Euler(fly.pitch, fly.yaw, 0, 'YXZ'));
+
+  const k = fly.keys;
+  const held = (...codes) => codes.some(c => k.has(c)) ? 1 : 0;
+  let f = held('KeyW','ArrowUp') - held('KeyS','ArrowDown');
+  let s = held('KeyD','ArrowRight') - held('KeyA','ArrowLeft');
+  const u = held('Space','KeyE') - held('KeyC','KeyQ');
+
+  /* Both axes stay level. WASD is forward, back and the two sides — the floor
+     plan — and the height is Space and C and nothing else.
+     
+     The alternative is forward following your pitch, which is the free-fly
+     convention and is how this was built first. It is worse here: looking down
+     at a plant is the ordinary thing to be doing in a greenhouse, and on that
+     camera the ordinary thing sends you through the floor the moment you press
+     W. Keeping the two apart means you can study a pot from above and still
+     walk round it. */
+  FLY_AXES.fwd.set(0, 0, -1).applyQuaternion(camera.quaternion).setY(0);
+  if (FLY_AXES.fwd.lengthSq() < 1e-6) FLY_AXES.fwd.set(0, 0, -1);   // looking straight down
+  FLY_AXES.fwd.normalize();
+  FLY_AXES.side.set(1, 0, 0).applyQuaternion(camera.quaternion).setY(0);
+  if (FLY_AXES.side.lengthSq() < 1e-6) FLY_AXES.side.set(1, 0, 0);
+  FLY_AXES.side.normalize();
+
+  const want = new THREE.Vector3()
+    .addScaledVector(FLY_AXES.fwd, f)
+    .addScaledVector(FLY_AXES.side, s);
+  want.y += u;
+  if (want.lengthSq() > 1) want.normalize();
+
+  const fast = k.has('ShiftLeft') || k.has('ShiftRight');
+  const slow = k.has('AltLeft') || k.has('AltRight');
+  want.multiplyScalar(FLY_SPEED * (fast ? FLY_FAST : slow ? FLY_SLOW : 1));
+
+  // Chase the wanted velocity rather than assume it, framerate-independently.
+  fly.vel.lerp(want, 1 - Math.exp(-FLY_EASE * dt));
+  camera.position.addScaledVector(fly.vel, dt);
+  clampToHouse(camera.position);
+}
+
+if (DEV) window.gt = { THREE, scene, camera, renderer, controls, applyTime, house, out,
+  /* The flight rig too, because "does it stop at the glass" is a question
+     you want to ask in one step of a known size rather than by holding a key
+     down and hoping the frame rate co-operates. */
+  fly, stepFly, setFly, clampToHouse, ceilingAt,
+  bounds: { x: FLY_X, z: FLY_Z, floor: FLY_FLOOR, ridge: GH.RIDGE, eave: GH.EAVE } };
 
 // ---- loop -------------------------------------------------------------------
 let last = performance.now();
-let fpsT = 0, fpsN = 0;
+let fpsT = 0, fpsN = 0, spotT = 0;
 const YELLOW = new THREE.Color(0.62, 0.55, 0.16);
 
 renderer.setAnimationLoop(() => {
@@ -1532,11 +1902,19 @@ renderer.setAnimationLoop(() => {
 
   if (leafMat) leafMat.color.copy(baseColor).lerp(YELLOW, ui.chlor * 0.85);
 
-  if (ui.spin){
+  /* Auto-spin is an orbit trick — it swings the camera about the world's
+     vertical, which is only meaningful when something is being orbited. Left
+     running while flying it drags you sideways through the house with the
+     controls apparently doing nothing. */
+  if (ui.spin && !fly.on){
     const a = 0.25 * dt;
     camera.position.applyAxisAngle(new THREE.Vector3(0,1,0), a);
   }
-  controls.update();
+  if (fly.on){
+    stepFly(dt);
+    spotT += dt;
+    if (spotT > 2){ spotT = 0; saveSpot(); }
+  } else controls.update();
   renderer.render(scene, camera);
 
   fpsN++; fpsT += dt;
