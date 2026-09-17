@@ -21,7 +21,7 @@
  */
 
 import { PALETTE, hex, drawSprite, drawTextOutlined } from '../good-vibes/pixel.js';
-import { SCENE_W, SCENE_H, POOF_TICKS, goalHeading } from './content.js';
+import { SCENE_W, SCENE_H, POOF_TICKS, ZAP_TICKS, goalHeading } from './content.js';
 
 export { PALETTE, hex };
 
@@ -313,12 +313,11 @@ const isPondAt = (level, x) => {
   return heading === 1 ? x >= level.goalX : x <= level.goalX;
 };
 
-/* The terrain height array, filled column by column from its surface down to
- * either the bottom of the scene or, for a floating segment, no further than
- * its own `floor` (see content.js's header note) — open air below that is
- * the absence of ground, exactly the way a gap's columns already are. A
- * gap's columns sit far below SCENE_H (see content.js's PIT_Y), so they
- * simply paint nothing at all either way.
+/* One column of ground, from its surface at `y` down to `bottom`, in whatever
+ * cross-section that column calls for: open water on the pond's side of
+ * goalX, flat slate for a column of rock, and otherwise a shallow cap of
+ * grass over a seam over dirt, with stone under it wherever this column has
+ * a `hardBelow` seam of its own.
  *
  * Every ordinary column gets the same cross-section: a shallow cap of grass,
  * a seam, then dirt the rest of the way down. That is what turns the wall —
@@ -326,69 +325,117 @@ const isPondAt = (level, x) => {
  * that reads as a cliff with exposed dirt on its face, rather than a taller
  * rectangle of the same flat green. A rock column (`hard`) skips all of that
  * for drawStoneColumn instead — see it for why.
+ *
+ * Shared by the terrain and by the islands standing over it (see
+ * drawIslands), which are made of exactly the same stuff and should read as
+ * exactly the same stuff.
+ */
+function drawGroundColumn(ctx, level, x, y, bottom, isRock, rockBelowY){
+  const fillH = bottom - y;
+  if(fillH <= 0) return;
+
+  if(isPondAt(level, x)){
+    // The two columns nearest the shore get a wet-sand lip instead of
+    // water reaching all the way to the surface — a hard cut from grass
+    // straight to open water reads as a tile boundary, not a bank.
+    const distFromShore = goalHeading(level) === 1 ? x - level.goalX : level.goalX - x;
+    drawWaterColumn(ctx, x, y, fillH, distFromShore < 2);
+    if(bottom < SCENE_H) drawFloatingEdge(ctx, x, bottom);
+    return;
+  }
+
+  if(isRock){
+    drawStoneColumn(ctx, x, y, fillH);
+    if(bottom < SCENE_H) drawFloatingEdge(ctx, x, bottom);
+    return;
+  }
+
+  /* A column can also be dirt down to a certain height and rock below that
+     — see content.js's `hardBelow` and sim.js's rockAt. Where the two meet
+     is the whole of what such a wall is about, since a Digger can only get
+     through above it, so it is drawn as the stone it is rather than left
+     looking like ordinary dirt a tunnel ought to go straight through. */
+  const stoneTop = rockBelowY != null ? Math.max(y, Math.min(bottom, rockBelowY)) : bottom;
+  const softH = stoneTop - y;
+
+  const grassH = Math.min(GRASS_DEPTH, softH);
+  ctx.fillStyle = hex('g');
+  ctx.fillRect(x, y, 1, grassH);
+
+  const dirtH = softH - grassH;
+  if(dirtH > 0){
+    const soilH = Math.round(dirtH * SOIL_SHARE);
+    ctx.fillStyle = hex('N');
+    ctx.fillRect(x, y + grassH, 1, soilH);
+    if(dirtH > soilH){
+      ctx.fillStyle = hex('s');
+      ctx.fillRect(x, y + grassH + soilH, 1, dirtH - soilH);
+    }
+    // The seam itself, one row of ink, so the cap reads as sitting on the
+    // dirt rather than fading into it.
+    ctx.fillStyle = hex('k');
+    ctx.fillRect(x, y + grassH, 1, 1);
+  }
+  if(stoneTop < bottom) drawStoneColumn(ctx, x, stoneTop, bottom - stoneTop);
+  if(bottom < SCENE_H) drawFloatingEdge(ctx, x, bottom);
+}
+
+/* The terrain height array, painted column by column from each surface down
+ * to either the bottom of the scene or, for a floating segment, no further
+ * than its own `floor` (see content.js's header note) — open air below that
+ * is the absence of ground, exactly the way a gap's columns already are. A
+ * gap's columns sit far below SCENE_H (see content.js's PIT_Y), so they
+ * simply paint nothing at all either way.
  */
 export function drawGround(ctx, terrain, level, rock, floors, rockBelow){
-  const heading = goalHeading(level);
   for(let x = 0; x < terrain.length; x++){
     const y = terrain[x];
     if(y >= SCENE_H) continue;
     const bottom = Math.min(floors ? floors[x] : SCENE_H, SCENE_H);
-    const fillH = bottom - y;
-    if(fillH <= 0) continue;
-
-    if(isPondAt(level, x)){
-      // The two columns nearest the shore get a wet-sand lip instead of
-      // water reaching all the way to the surface — a hard cut from grass
-      // straight to open water reads as a tile boundary, not a bank.
-      const distFromShore = heading === 1 ? x - level.goalX : level.goalX - x;
-      drawWaterColumn(ctx, x, y, fillH, distFromShore < 2);
-      if(bottom < SCENE_H) drawFloatingEdge(ctx, x, bottom);
-      continue;
-    }
-
-    if(rock && rock[x]){
-      drawStoneColumn(ctx, x, y, fillH);
-      if(bottom < SCENE_H) drawFloatingEdge(ctx, x, bottom);
-      continue;
-    }
-
-    /* A column can also be dirt down to a certain height and rock below that
-       — see content.js's `hardBelow` and sim.js's rockAt. Where the two meet
-       is the whole of what such a wall is about, since a Digger can only get
-       through above it, so it is drawn as the stone it is rather than left
-       looking like ordinary dirt a tunnel ought to go straight through. */
-    const stoneTop = rockBelow && rockBelow[x] != null
-      ? Math.max(y, Math.min(bottom, rockBelow[x]))
-      : bottom;
-    const softH = stoneTop - y;
-
-    const grassH = Math.min(GRASS_DEPTH, softH);
-    ctx.fillStyle = hex('g');
-    ctx.fillRect(x, y, 1, grassH);
-
-    const dirtH = softH - grassH;
-    if(dirtH > 0){
-      const soilH = Math.round(dirtH * SOIL_SHARE);
-      ctx.fillStyle = hex('N');
-      ctx.fillRect(x, y + grassH, 1, soilH);
-      if(dirtH > soilH){
-        ctx.fillStyle = hex('s');
-        ctx.fillRect(x, y + grassH + soilH, 1, dirtH - soilH);
-      }
-      // The seam itself, one row of ink, so the cap reads as sitting on the
-      // dirt rather than fading into it.
-      ctx.fillStyle = hex('k');
-      ctx.fillRect(x, y + grassH, 1, 1);
-    }
-    if(stoneTop < bottom) drawStoneColumn(ctx, x, stoneTop, bottom - stoneTop);
-    if(bottom < SCENE_H) drawFloatingEdge(ctx, x, bottom);
+    drawGroundColumn(ctx, level, x, y, bottom,
+      Boolean(rock && rock[x]), rockBelow ? rockBelow[x] : null);
   }
   drawTufts(ctx, terrain, level, rock);
   drawFlowers(ctx, terrain, level, rock);
   drawRockSpeckle(ctx, terrain, level, rock, floors);
+  drawIslands(ctx, level);
   drawNest(ctx, level, terrain);
   drawCattails(ctx, level, terrain);
   drawLilyPads(ctx, terrain, level);
+}
+
+/* An island's slab is a stretch of ordinary ground that happens to be up in
+ * the air — same grass, same seam, same dirt, and the same hanging roots
+ * along its cut underside that any other floating segment gets. It is drawn
+ * after the terrain rather than with it because it stands over that terrain
+ * rather than replacing it: the ground below carries on underneath, and the
+ * walkway there is real (see content.js's header note on `islands`, and
+ * sim.js's surfacesAt).
+ *
+ * An island wants a `floor` — it is a slab hanging in open air, and one
+ * without a stated underside would be drawn all the way to the bottom of
+ * the scene, which is a pillar, not an island. Left off, it gets a
+ * shallow one rather than that.
+ */
+const ISLAND_DEPTH = 14;
+
+export function drawIslands(ctx, level){
+  for(const isle of level.islands ?? []){
+    const bottom = Math.min(isle.floor ?? isle.y + ISLAND_DEPTH, SCENE_H);
+    for(let x = Math.max(0, isle.from); x < Math.min(SCENE_W, isle.to); x++){
+      drawGroundColumn(ctx, level, x, isle.y, bottom, Boolean(isle.hard), null);
+    }
+    drawTufts(ctx, tuftRow(level, isle), level, null);
+  }
+}
+
+/* A height array shaped like `terrain` but empty everywhere except this one
+   island, so the same scatter that decorates the ground decorates an island
+   top too without knowing anything about islands. */
+function tuftRow(level, isle){
+  const row = new Array(SCENE_W).fill(SCENE_H + 200);
+  for(let x = Math.max(0, isle.from); x < Math.min(SCENE_W, isle.to); x++) row[x] = isle.y;
+  return row;
 }
 
 /* How tall a Digger's tunnel reads on screen — enough headroom for a duck
@@ -755,6 +802,68 @@ function drawPoof(ctx, p){
   }
 }
 
+/* A teleporter pad: a shallow dish of mint sunk into whatever it is standing
+ * on, with two posts at its corners and a spark hanging between them. Drawn
+ * in a colour nothing else in this scene uses — no grass, no dirt, no duck,
+ * no goose is mint — because the one thing a pad has to do before a player
+ * has ever seen one work is read as "this is not scenery".
+ *
+ * Both ends of a pair are drawn identically, because both ends work the same
+ * way (see sim.js's padUnder). A pad that looked like an entrance and a pad
+ * that looked like an exit would be saying something about this game that
+ * is not true.
+ */
+function drawPad(ctx, pad, ticks){
+  const x = Math.round(pad.x), y = Math.round(pad.y);
+  // The dish: a slab of mint on an ink shadow, sitting on the surface
+  // rather than hovering over it.
+  ctx.fillStyle = hex('k');
+  ctx.fillRect(x - 4, y - 1, 9, 1);
+  ctx.fillStyle = hex('t');
+  ctx.fillRect(x - 4, y - 3, 9, 2);
+  ctx.fillStyle = hex('w');
+  ctx.fillRect(x - 4, y - 3, 9, 1);
+
+  /* The posts are plum rather than anything in the mint-and-cyan family the
+     rest of the pad uses, which looks like an odd choice written down and is
+     not: the sky behind a pad standing on an island is very close to cyan,
+     and two cyan posts against it disappeared completely. Plum is the one
+     colour in this palette that holds up against both the sky and grass. */
+  ctx.fillStyle = hex('p');
+  ctx.fillRect(x - 4, y - 7, 1, 4);
+  ctx.fillRect(x + 4, y - 7, 1, 4);
+
+  // The spark between the posts, blinking on its own slow beat so a pad
+  // standing untouched still reads as something powered rather than a
+  // painted marking.
+  const lit = Math.floor(ticks / 7) % 3 !== 0;
+  ctx.fillStyle = hex(lit ? 'w' : 't');
+  ctx.fillRect(x, y - 7, 1, 1);
+  if(lit){
+    ctx.fillStyle = hex('t');
+    ctx.fillRect(x - 2, y - 6, 5, 1);
+  }
+}
+
+/* The flash at both ends of a trip, fired by sim.js the moment a duckling
+   goes through and aged out the same way a poof is. A ring opening outward
+   rather than a puff drifting up — the shape says "something arrived here",
+   which is the half of a teleport the eye would otherwise miss entirely at
+   the far end of the level. */
+function drawZap(ctx, z){
+  const t = z.age / ZAP_TICKS;
+  const r = 1 + Math.round(t * 5);
+  const cx = Math.round(z.x), cy = Math.round(z.y) - 3;
+  ctx.fillStyle = hex(t < 0.5 ? 'w' : 't');
+  ctx.fillRect(cx - r, cy, 1, 1);
+  ctx.fillRect(cx + r, cy, 1, 1);
+  ctx.fillRect(cx, cy - r, 1, 1);
+  ctx.fillRect(cx, cy + Math.min(r, 2), 1, 1);
+  const d = Math.round(r * 0.7);
+  ctx.fillRect(cx - d, cy - d, 1, 1);
+  ctx.fillRect(cx + d, cy - d, 1, 1);
+}
+
 /* ------------------------------------------------------------------ scene */
 
 /* The whole picture, in back-to-front order. `state` is a sim.js game state;
@@ -765,12 +874,14 @@ export function paintScene(ctx, state){
   drawRipples(ctx, state.terrain, state.level, state.ticks);
   drawTunnels(ctx, state);
   drawBridges(ctx, state);
+  for(const pad of state.pads) drawPad(ctx, pad, state.ticks);
   drawGoose(ctx, state);
   for(const d of state.ducks){
     if(d.state === 'saved' || d.state === 'lost') continue;
     drawDuck(ctx, d, state.ticks);
   }
   for(const p of state.poofs) drawPoof(ctx, p);
+  for(const z of state.zaps) drawZap(ctx, z);
 }
 
 /* A caption under the title screen's demo scene, drawn with the same font as

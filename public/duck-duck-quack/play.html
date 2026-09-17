@@ -525,6 +525,18 @@
     }
   }
 
+  // One zap per trip through a teleporter, however many ducklings are
+  // going through — `state.warps` only ever counts up (see sim.js), so
+  // comparing it against what was last heard is enough, and a tick that
+  // teleported two ducklings at once is still one sound rather than two
+  // landing on top of each other.
+  let zapped = 0;
+  function sfxNewWarps(){
+    if(state.warps <= zapped){ zapped = state.warps; return; }
+    zapped = state.warps;
+    audio.sfx('zap');
+  }
+
   // Plays alongside the poof (see art.js/sim.js), on the same tick a
   // duckling actually goes down rather than on every frame it stays lost.
   // A goose's catch gets its own sound (see audio.js's SFX.goosed) rather
@@ -630,6 +642,7 @@
       sfxNewHatchlings();
       quackNewArrivals();
       sfxNewLosses();
+      sfxNewWarps();
       if(state.ended){ refreshSkills(); endMessage(); }
     }
 
