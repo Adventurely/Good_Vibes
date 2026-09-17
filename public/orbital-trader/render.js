@@ -1039,15 +1039,18 @@ function drawRailCrossings(chart, view, anchors){
   }
 }
 
-/* The intercepts: the nearest the road comes to each world it passes, once
- * per world and at the first pass. This is the question a pilot is actually
- * asking while they push a burn around — not "does this reach Slate" but "how
- * close, and how fast" — so they are marked wherever the chart is zoomed, even
- * when the whole encounter is a few pixels wide.
+/* The intercepts: the nearest the road comes to each reach it passes through.
+ * This is the question a pilot is actually asking while they push a burn
+ * around — not "does this reach Slate" but "how close, and how fast" — so they
+ * are marked wherever the chart is zoomed, even when the whole encounter is a
+ * few pixels wide.
  *
- * It used to draw exactly one, for the world whose reach the road crossed
- * into. A road out of Tassel to the Belt goes past both of Tassel's moons and
- * then meets a haven that has no reach at all, and none of that was marked. */
+ * There is more than one whenever the road goes through more than one reach,
+ * which is how you arrive anywhere in the Grumm system: fall into Grumm, go on
+ * to the moon. Both passes are real and both are drawn. What is *not* here,
+ * deliberately, is a world the road merely goes near without entering its
+ * reach — see the note by `interceptsOf` for the sweep that used to do that
+ * and what it cost. */
 function drawIntercepts(chart, view, anchors, afterBurnAt, taken){
   for(const ic of view.prediction?.intercepts ?? []) drawIntercept(chart, view, anchors, afterBurnAt, ic, taken);
 }

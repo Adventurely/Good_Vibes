@@ -1802,6 +1802,49 @@ test('a road past a dozen worlds wears one crosshair at most, and only for an ar
   assert.equal(pred.intercept, pred.intercepts[0] ?? null);
 });
 
+test('a road through two reaches is marked at both of them', () => {
+  /* The ordinary way to arrive anywhere in the Grumm system: fall into Grumm,
+     and go on from there to one of its moons. The road holds both passes and
+     both are real — the pass at Grumm is the one being flown right now, and the
+     pass at the moon is the one being aimed at. Only one used to be marked, and
+     which one fell out of an index rather than out of the road: this case
+     marked Grumm and left the moon, the thing the burn was for, with nothing. */
+  const s = S.newGame(7);
+  s.dockedAt = 'tassel'; S.undock(s);
+  s.dv = s.tank = S.auDay(400);
+  assert.ok(S.trimToTarget(s, 'grumm', 20000)?.ok, 'could not plot the road this test is about');
+  let guard = 0;
+  while(s.ship.body !== 'grumm' && guard++ < 4000) S.tick(s, 0.5);
+  assert.equal(s.ship.body, 'grumm', 'never got to Grumm');
+
+  s.nodes = [];
+  assert.ok(S.trimToTarget(s, 'haven', 400)?.ok, 'could not aim at the moon from inside the reach');
+  const pred = S.planImmediate(s, true, { farSight: true });
+  const ids = (pred.intercepts ?? []).map(ic => ic.body);
+  assert.deepEqual(ids, ['grumm', 'haven'], `the road passes through two reaches and marks ${ids.join(', ') || 'none'}`);
+  /* Earliest first, and `intercept` is still the next one. */
+  assert.ok(pred.intercepts[0].t < pred.intercepts[1].t, 'they are not in the order they happen');
+  assert.equal(pred.intercept, pred.intercepts[0]);
+  for(const ic of pred.intercepts) assert.ok(!ic.passing, 'a sampled close pass came back');
+});
+
+test('a navigator does not take the crosshair away', () => {
+  /* She is the reason the road is drawn as far as the second door at all, and
+     that is what broke it: Tassel to Slate is `enter` then `exit`, the trim
+     landed on the exit, an exit is not an encounter — and the mark on the
+     opening quest of the game vanished for having a better crew. Whatever
+     else she changes about the road, the passes along it are the same passes. */
+  const road = far => {
+    const s = S.newGame(7);
+    s.dockedAt = 'tassel'; S.undock(s);
+    s.dv = s.tank = S.auDay(60);
+    assert.ok(S.trimToTarget(s, 'slate', 6000)?.ok);
+    return (S.planImmediate(s, true, { farSight: far }).intercepts ?? []).map(ic => ic.body);
+  };
+  assert.deepEqual(road(false), ['slate'], 'the road to Slate is not marked at Slate');
+  assert.deepEqual(road(true), ['slate'], 'a navigator aboard lost the mark at Slate');
+});
+
 test('the world you are leaving is not an encounter with anything', () => {
   /* A parking orbit reaches its low point once a lap, which is a real local
      minimum and completely uninteresting: it is where you already are. Cast

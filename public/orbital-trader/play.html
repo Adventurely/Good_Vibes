@@ -2225,7 +2225,9 @@ function aheadList(){
       lines.push({ t: e.t, html: `<p class="down">This path strikes ${esc(S.nameFor(e.body, unknown))} in ${S.fmtDays(e.t - state.t)}.</p>` });
     }
   }
-  /* Every world the road passes, once each, in the order they happen.
+  /* Every reach the road passes through, in the order they happen — falling
+     into Grumm and going on to one of its moons is two, and both are things
+     that happen to this ship before the road runs out.
      Two numbers, not one, because at a place with no gravity worth the name
      they are both the job: being inside the mouth of a rock you cannot fall
      into is no use whatever at five kilometres a second, and a line that says
@@ -3012,8 +3014,11 @@ function tutorialTests(){
      in the way" was being read literally: a road through the middle of the
      moon passed this card, and card nine then opened on a ship falling into
      a rock it had been told to slow down at. */
-  const hits = !!prediction?.intercept?.grazes || (prediction?.events ?? []).some(e => e.kind === 'crash');
-  const aimed = (segs.some(sg => sg.body === target) || prediction?.intercept?.body === target) && !hits;
+  /* Any of them, not just the next: a road can pass through two reaches, and a
+     graze on the second is still a road into a rock. */
+  const ics = prediction?.intercepts ?? [];
+  const hits = ics.some(ic => ic.grazes) || (prediction?.events ?? []).some(e => e.kind === 'crash');
+  const aimed = (segs.some(sg => sg.body === target) || ics.some(ic => ic.body === target)) && !hits;
   const highEnough = Number.isFinite(raAfter) && Math.abs(raAfter - moon.a) <= moon.a * 0.1;
   const dockableAt = id => state.dockedAt === id || (docking?.port === id && docking.ok);
 
