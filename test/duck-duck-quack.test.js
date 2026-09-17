@@ -13,8 +13,8 @@ import { test } from 'node:test';
 
 import {
   SCENE_W, SCENE_H, WALK_STEP, FALL_SAFE, FALL_SPEED, FLY_SPEED, TICK_RATE, BUILD_SECONDS,
-  BUILD_MAX_STEPS, BUILD_RISE_HEIGHT,
-  SKILLS, SKILL_INFO, LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5, LEVEL_6, LEVEL_7, LEVELS,
+  BUILD_MAX_STEPS, BUILD_RISE_HEIGHT, JUMP_SPAN, JUMP_RISE, PIT_Y,
+  SKILLS, SKILL_INFO, LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5, LEVEL_6, LEVEL_7, LEVEL_8, LEVELS,
   buildTerrain, buildLayer, winCount, goalHeading, formatTime,
 } from '../public/duck-duck-quack/content.js';
 
@@ -1003,43 +1003,92 @@ test('a blocker planted near The Orchard\'s nest turns the goose back for good b
 
 /* ---------------------------------------------------------------- The Grove, played */
 
-/* A greedy bot for The Grove, the same shape as The Warren's: bridge the
- * one gap, dig through the one wall. Neither Climber nor Blocker gets a
- * branch here — the level supplies no Climber at all, and nothing about a
- * single straight road calls for a Blocker (see content.js).
+/* A bot for The Grove: bridge the one gap, then the level's own trick —
+ * a ramp started well back from the wall, so the duckling that walks up it
+ * is above the rock seam when it arrives and can dig from there. `rampAt` is
+ * where that second Builder goes, which is the whole decision this level is
+ * built around.
  */
-function playLevel4(){
+function playLevel4(rampAt = 100){
   const state = newGame(LEVEL_4);
-  let builderUsed = false, diggerUsed = false;
+  let gapBuilder = false, wallRamp = false, diggerUsed = false;
   for(let i = 0; i < LEVEL_4.timeLimit && !state.ended; i++){
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
-      if(!builderUsed && d.x === 49 && assignSkill(state, d.id, 'builder')){ builderUsed = true; continue; }
-      if(!diggerUsed && d.x === 129 && assignSkill(state, d.id, 'digger')){ diggerUsed = true; continue; }
+      if(!gapBuilder && d.x === 49){ if(assignSkill(state, d.id, 'builder')) gapBuilder = true; continue; }
+      if(rampAt !== null && gapBuilder && !wallRamp && d.x === rampAt){
+        if(assignSkill(state, d.id, 'builder')) wallRamp = true;
+        continue;
+      }
+      if(!diggerUsed && !hasTrait(d, 'digger') && d.x >= 120 && d.x < 130){
+        if(assignSkill(state, d.id, 'digger')) diggerUsed = true;
+        continue;
+      }
     }
     tick(state);
   }
   return state;
 }
 
-test('The Grove can be won by a simple bot', () => {
+test('The Grove can be won by ramping up to the wall and digging above the rock', () => {
   const state = playLevel4();
   assert.equal(state.ended, 'won');
   assert.ok(state.saved >= winCount(LEVEL_4), `only ${state.saved} saved, needed ${winCount(LEVEL_4)}`);
+  // The tunnel is up in the dirt, not down at the ground the flock started on.
+  const cut = state.tunnelY.findIndex(v => v != null);
+  assert.ok(cut > 0, 'a tunnel should have been cut at all');
+  assert.ok(state.tunnelY[cut] <= 140, `the tunnel should be above the rock seam, got ${state.tunnelY[cut]}`);
 });
 
-test('The Grove cannot be won without a Digger — the wall has no other way through', () => {
+test('The Grove cannot be won without a Digger — the wall still has no other way through', () => {
   const state = newGame(LEVEL_4);
-  let builderUsed = false;
+  let gapBuilder = false, wallRamp = false;
   for(let i = 0; i < LEVEL_4.timeLimit && !state.ended; i++){
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
-      if(!builderUsed && d.x === 49 && assignSkill(state, d.id, 'builder')){ builderUsed = true; continue; }
+      if(!gapBuilder && d.x === 49){ if(assignSkill(state, d.id, 'builder')) gapBuilder = true; continue; }
+      if(gapBuilder && !wallRamp && d.x === 100){ if(assignSkill(state, d.id, 'builder')) wallRamp = true; continue; }
     }
     tick(state);
   }
   assert.equal(state.saved, 0, 'nothing should get past the wall without a Digger');
   assert.notEqual(state.ended, 'won');
+});
+
+test('The Grove\'s wall is rock at the level a duckling meets it — a Digger alone gets nowhere', () => {
+  /* The point of the level. Diggers to spare, a bridge over the gap, and no
+   * ramp at the wall: every one of them walks into rock and turns back, and
+   * not one column is ever cut. See LEVEL_4's note and content.js's
+   * `hardBelow`.
+   */
+  const state = newGame(LEVEL_4);
+  let gapBuilder = false;
+  for(let i = 0; i < LEVEL_4.timeLimit && !state.ended; i++){
+    for(const d of state.ducks){
+      if(d.state !== 'walking') continue;
+      if(!gapBuilder && d.x === 49){ if(assignSkill(state, d.id, 'builder')) gapBuilder = true; continue; }
+      if(!hasTrait(d, 'digger') && d.x >= 120 && d.x < 130) assignSkill(state, d.id, 'digger');
+    }
+    tick(state);
+  }
+  assert.ok(state.tunnelY.every(v => v == null), 'rock should refuse every one of them');
+  assert.equal(state.saved, 0);
+});
+
+test('The Grove\'s ramp has to be started far enough back to clear the seam, and not so far it stops short', () => {
+  // Too late and the ramp is still in rock when it arrives; too early and it
+  // ends before the wall and the duckling walks the rest at ground level.
+  for(const rampAt of [120, 90]){
+    const state = playLevel4(rampAt);
+    assert.ok(state.tunnelY.every(v => v == null),
+      `a ramp started at ${rampAt} should not get anyone above the seam`);
+  }
+  // And a spread of sensible spots all do work, so this is a window rather
+  // than one exact column.
+  for(const rampAt of [100, 105, 110]){
+    const state = playLevel4(rampAt);
+    assert.equal(state.ended, 'won', `a ramp started at ${rampAt} should win`);
+  }
 });
 
 /* ----------------------------------------------------------------- The Aerie, played */
@@ -1175,6 +1224,128 @@ test('a blocker planted on The Spire\'s ledge turns a wingless duckling back rat
   }
   assert.equal(state.saved, 0, 'a blocker turns ducklings back, it does not fly them down');
   assert.ok(state.ducks.some(d => d.state === 'blocking'), 'the blocker itself should still be standing there');
+});
+
+/* --------------------------------------------------------------- jumping */
+
+/* A level that is nothing but flat ground with one thing in the way, so a
+   test can say exactly what a Jumper does and does not clear. */
+function hopLevel(middle){
+  return miniLevel({
+    segments: [{ from: 0, to: 40, y: 150 }, ...middle, { from: 90, to: SCENE_W, y: 150 }],
+    nestX: 30, goalX: SCENE_W - 4, timeLimit: 2000,
+    supply: { digger: 0, builder: 0, blocker: 0, climber: 0, flyer: 0, jumper: 1 },
+  });
+}
+function runHop(level, giveJumper){
+  const state = run(newGame(level), 1);
+  const duck = state.ducks[0];
+  if(giveJumper) assert.equal(assignSkill(state, duck.id, 'jumper'), duck);
+  let hops = 0, was = null;
+  for(let i = 0; i < 1200 && !state.ended; i++){
+    tick(state);
+    if(duck.state === 'jumping' && was !== 'jumping') hops++;
+    was = duck.state;
+  }
+  return { duck, hops, state };
+}
+
+test('a jumper hops a ditch a hop can reach across, and the same duckling keeps the knack', () => {
+  const width = JUMP_SPAN - 1;   // the widest a hop reaches over — see content.js
+  const level = hopLevel([{ from: 40, to: 40 + width, y: PIT_Y }, { from: 40 + width, to: 90, y: 150 }]);
+
+  const without = runHop(level, false);
+  assert.equal(without.duck.state, 'lost', 'without one it is just a hole in the ground');
+  assert.equal(without.duck.cause, 'fell');
+
+  const with_ = runHop(level, true);
+  assert.equal(with_.duck.state, 'saved');
+  assert.ok(with_.hops >= 1, 'it should have actually left the ground');
+});
+
+test('a jumper will not hop a real gap — that is still a Builder\'s', () => {
+  const level = hopLevel([{ from: 40, to: 70, y: PIT_Y }, { from: 70, to: 90, y: 150 }]);
+  const { duck, hops } = runHop(level, true);
+  assert.equal(duck.state, 'lost');
+  assert.equal(duck.cause, 'fell');
+  assert.equal(hops, 0, 'it should not even try');
+});
+
+test('a jumper hops a step too tall to walk up, but not a wall', () => {
+  const low = hopLevel([{ from: 40, to: 90, y: 150 - JUMP_RISE }]);
+  assert.ok(JUMP_RISE > WALK_STEP, 'a hop has to be worth something over plain walking');
+  const stepped = runHop(low, true);
+  assert.equal(stepped.duck.state, 'saved');
+  assert.ok(stepped.hops >= 1);
+
+  // A real wall is still a wall: nothing in the game is between these two.
+  const wall = hopLevel([{ from: 40, to: 90, y: 150 - 40 }]);
+  const { duck, hops } = runHop(wall, true);
+  assert.notEqual(duck.state, 'saved', 'a forty-pixel wall is not a hop');
+  assert.equal(hops, 0);
+});
+
+test('a jumper hops the goose instead of being caught, and the hunt carries on', () => {
+  const level = miniLevel({
+    nestX: 6, goalX: SCENE_W - 4, timeLimit: 2000, duckCount: 1,
+    supply: { digger: 0, builder: 0, blocker: 0, climber: 0, flyer: 0, jumper: 1 },
+    goose: { x0: 100, x1: 140, y: 50, speed: 1.5, catchRadius: 1.5 },
+  });
+  const caught = runHop(level, false);
+  assert.equal(caught.duck.state, 'lost');
+  assert.equal(caught.duck.cause, 'goosed');
+
+  const hopped = runHop(level, true);
+  assert.equal(hopped.duck.state, 'saved');
+  assert.ok(hopped.hops >= 1, 'it should have jumped it');
+  // Nothing was caught, so the goose has not been fed off — see stepWalking.
+  assert.equal(hopped.state.goose.fed, false);
+});
+
+/* ------------------------------------------------------- The Hedgerow, played */
+
+/* Give every duckling its own Jumper, and the one Builder at the lip of the
+ * one gap. Both halves are switchable, because what this level is for is
+ * that neither half alone is any use at all.
+ */
+function playLevel8({ jumpers = true, builder = true } = {}){
+  const state = newGame(LEVEL_8);
+  let built = false;
+  for(let i = 0; i < LEVEL_8.timeLimit && !state.ended; i++){
+    for(const d of state.ducks){
+      if(d.state !== 'walking') continue;
+      if(jumpers && !hasTrait(d, 'jumper')) assignSkill(state, d.id, 'jumper');
+      if(builder && !built && d.x === 149){ if(assignSkill(state, d.id, 'builder')) built = true; }
+    }
+    tick(state);
+  }
+  return state;
+}
+
+test('The Hedgerow can be won with Jumpers and the one Builder', () => {
+  const state = playLevel8();
+  assert.equal(state.ended, 'won');
+  assert.ok(state.saved >= winCount(LEVEL_8), `only ${state.saved} saved, needed ${winCount(LEVEL_8)}`);
+});
+
+test('The Hedgerow cannot be won without Jumpers — the first ditch stops the flock dead', () => {
+  const state = playLevel8({ jumpers: false });
+  assert.equal(state.saved, 0);
+  assert.notEqual(state.ended, 'won');
+});
+
+test('The Hedgerow cannot be won without the Builder — no hop reaches across its gap', () => {
+  const state = playLevel8({ builder: false });
+  assert.equal(state.saved, 0);
+  assert.notEqual(state.ended, 'won');
+});
+
+test('The Hedgerow asks for nothing else at all — it supplies no Digger, Climber or Flyer', () => {
+  // Not rationing, absence: the level's whole claim is that everything on it
+  // is either small enough to hop or too wide for anything but a ramp.
+  for(const skill of ['digger', 'climber', 'flyer']){
+    assert.equal(LEVEL_8.supply[skill], 0, `The Hedgerow should supply no ${skill}`);
+  }
 });
 
 /* ------------------------------------------------------------- The Falls, played */

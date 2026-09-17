@@ -71,13 +71,14 @@ const SKILL_BADGE = {
   builder: ['...', 'www', 'w.w', 'w.w'],   // a bridge standing on its legs
   climber: ['.t.', 'ttt', '.t.', '.t.'],   // up — scales the wall
   flyer:   ['c.c', 'ccc', '.c.', '...'],   // wingtips out, gliding
+  jumper:  ['.g.', 'g.g', '...', 'ggg'],   // up off the ground, arc and all
   blocker: ['...', 'rrr', 'rrr', '...'],   // the bar a planted duckling wears
 };
 
 /* Drawn in this order wherever more than one is held, so the same pair
    always reads the same way round rather than in whatever order they were
    handed out in. Builder is not here — see drawDuck. */
-const BADGE_ORDER = ['digger', 'climber', 'flyer'];
+const BADGE_ORDER = ['digger', 'climber', 'flyer', 'jumper'];
 
 const BADGE_W = 3, BADGE_H = 4, BADGE_PAD = 1, BADGE_GAP = 1;
 export const BADGE_PLATE_W = BADGE_W + BADGE_PAD * 2;
@@ -326,7 +327,7 @@ const isPondAt = (level, x) => {
  * rectangle of the same flat green. A rock column (`hard`) skips all of that
  * for drawStoneColumn instead — see it for why.
  */
-export function drawGround(ctx, terrain, level, rock, floors){
+export function drawGround(ctx, terrain, level, rock, floors, rockBelow){
   const heading = goalHeading(level);
   for(let x = 0; x < terrain.length; x++){
     const y = terrain[x];
@@ -351,11 +352,21 @@ export function drawGround(ctx, terrain, level, rock, floors){
       continue;
     }
 
-    const grassH = Math.min(GRASS_DEPTH, fillH);
+    /* A column can also be dirt down to a certain height and rock below that
+       — see content.js's `hardBelow` and sim.js's rockAt. Where the two meet
+       is the whole of what such a wall is about, since a Digger can only get
+       through above it, so it is drawn as the stone it is rather than left
+       looking like ordinary dirt a tunnel ought to go straight through. */
+    const stoneTop = rockBelow && rockBelow[x] != null
+      ? Math.max(y, Math.min(bottom, rockBelow[x]))
+      : bottom;
+    const softH = stoneTop - y;
+
+    const grassH = Math.min(GRASS_DEPTH, softH);
     ctx.fillStyle = hex('g');
     ctx.fillRect(x, y, 1, grassH);
 
-    const dirtH = fillH - grassH;
+    const dirtH = softH - grassH;
     if(dirtH > 0){
       const soilH = Math.round(dirtH * SOIL_SHARE);
       ctx.fillStyle = hex('N');
@@ -369,6 +380,7 @@ export function drawGround(ctx, terrain, level, rock, floors){
       ctx.fillStyle = hex('k');
       ctx.fillRect(x, y + grassH, 1, 1);
     }
+    if(stoneTop < bottom) drawStoneColumn(ctx, x, stoneTop, bottom - stoneTop);
     if(bottom < SCENE_H) drawFloatingEdge(ctx, x, bottom);
   }
   drawTufts(ctx, terrain, level, rock);
@@ -749,7 +761,7 @@ function drawPoof(ctx, p){
    nothing here mutates it. */
 export function paintScene(ctx, state){
   drawSky(ctx, state.ticks);
-  drawGround(ctx, state.terrain, state.level, state.rock, state.floors);
+  drawGround(ctx, state.terrain, state.level, state.rock, state.floors, state.rockBelow);
   drawRipples(ctx, state.terrain, state.level, state.ticks);
   drawTunnels(ctx, state);
   drawBridges(ctx, state);
