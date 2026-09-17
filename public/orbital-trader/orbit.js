@@ -1142,9 +1142,22 @@ export function predictLegs(world, ship, t0, nodes = [], opts = {}){
     /* The search, bounded: a closed orbit is looked at for a few dozen laps,
        an open one for a couple of years; past that the leg is cut and the
        next one carries on. An orbit that can reach nothing needs no bound —
-       there is nothing to look for between here and the mark. */
+       there is nothing to look for between here and the mark.
+
+       `lapsLooked` is a cap in laps and is obeyed as one. The floor of two
+       days underneath it is for the *default* look, where the number of laps
+       is already generous and the point is not to give up in an afternoon on
+       something whose period is measured in minutes. In front of a caller
+       that asked for a small number of laps it is not a floor, it is an
+       override: the chart asks for the lap in front of the pilot, and on the
+       half-day orbit that a Tassel parking orbit becomes when its high point
+       is pushed out past Slate, two days is three and a half laps. That is
+       how a meeting with Slate two and four fifths laps away came to be drawn
+       on the one lap the chart draws, which is the whole thing the lap cap
+       exists to stop. */
     const look = quiet ? Infinity
-      : Number.isFinite(el.period) ? Math.max(2, el.period * (opts.lapsLooked ?? 60))
+      : Number.isFinite(el.period)
+        ? (opts.lapsLooked != null ? el.period * opts.lapsLooked : Math.max(2, el.period * 60))
       : (opts.openLegDays ?? 720);
     const cut = Math.min(span, look);
     const ev = cut > 0 ? nextEvent(world, body, r, v, t, cut, o) : null;

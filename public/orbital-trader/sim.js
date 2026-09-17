@@ -1657,15 +1657,21 @@ const IMMEDIATE_CAP = 6000;
  * mark warped to the first lap and nothing happened; tapping the mark warped
  * past the rest of the game.
  *
- * So the road shows what happens on this lap and the next, and past that says
- * the honest thing instead: you are going round. What a pilot lines up a later
- * encounter with is the rail crossings — where a world will be when the road
- * cuts its orbit — which are drawn on the lap in front of them.
+ * So the road shows what happens on the lap in front of you and nothing past
+ * it, and then says the honest thing instead: you are going round. What a
+ * pilot lines up a later encounter with is the rail crossings — where a world
+ * will be when the road cuts its orbit — which are drawn on that same lap.
+ *
+ * It was two laps, on the reasoning that the next lap round is still nearly
+ * here. It is not: the leg is *drawn* as one lap, so a meeting on the second
+ * one is painted on the first, and the picture says "just there" while the
+ * clock says a lap and a half. One lap drawn and one lap looked at are the
+ * same number or the mark is in the wrong place, so there is only one number.
  *
  * Only the chart is bounded. The flight still looks as far as it must, or a
  * ship would fly into a reach the search had stopped short of; the aim helper
  * still looks as far as it must, or it could not score a road that arrives. */
-const CHART_LAPS = 2;
+const CHART_LAPS = 1;
 const isDoor = sg => sg.reason === 'exit' || sg.reason === 'enter';
 
 /* `flown` false draws the road the ship is on *now*, as if nothing were

@@ -1903,11 +1903,14 @@ test('zooming out past a rail still takes its crossing with it', () => {
     const g = transferShip();
     const pred = S.planImmediate(g);
     const crossings = railCrossings(world, pred, 0, { minLead: S.MIN_LEAD });
-    assert.ok(crossings.some(c => c.body === 'tassel'), 'nothing crosses the rail it left from');
-    chart.camera.zoom = 10;              // Tassel's whole orbit about three pixels across
+    assert.ok(crossings.some(c => c.body === 'veyra'), 'the fall to Veyra does not cut Veyra\'s rail');
+    chart.camera.zoom = 10;              // Veyra's whole orbit about one pixel across
     chart.camera.anchor = [0, 0];
     chart.settle();
-    assert.ok(world.get('tassel').a * chart.camera.zoom < 6, 'the rail is big enough to draw after all');
+    for(const c of crossings){
+      assert.ok(world.get(c.body).a * chart.camera.zoom < 6,
+        `${c.body}'s rail is big enough to draw after all`);
+    }
     chart.draw({ t: 0, now: 0, shipAbs: { r: S.shipAbsPos(g), v: S.shipAbsVel(g) }, shipBody: 'lamp',
       prediction: pred, nodes: [], nodePositions: [], apses: [], railCrossings: crossings,
       hidden: new Set() });
@@ -5459,7 +5462,7 @@ test('an orbit that overlaps a moon\'s rail is not marked with a meeting laps aw
 
   const pred = S.planImmediate(s, true, {});
   const road = pred.end - s.t;
-  assert.ok(road <= el.period * 2.5, `the drawn road runs ${(road / el.period).toFixed(1)} laps`);
+  assert.ok(road <= el.period * 1.001, `the drawn road runs ${(road / el.period).toFixed(2)} laps`);
   for(const e of pred.events){
     assert.ok(e.t - s.t <= road + 1e-9, `${e.kind} is marked at +${(e.t - s.t).toFixed(1)} d, past the end of the road`);
   }
@@ -5470,6 +5473,45 @@ test('an orbit that overlaps a moon\'s rail is not marked with a meeting laps aw
   const rc = railCrossings(world, pred, s.t, { minLead: S.MIN_LEAD, limit: 8 });
   assert.ok(rc.length > 0, 'and nothing is left to line the meeting up with');
   for(const c of rc) assert.ok(c.t - s.t <= road + 1e-9, 'a rail crossing is off the end of the drawn road');
+});
+
+test('nor with one on the very next lap, which is still not this lap', () => {
+  /* The bound was two laps, on the reasoning that the next lap round is nearly
+     here. It is not: the leg is *drawn* as one lap, so a meeting on the second
+     is painted on the first, and the picture says "just there" while the clock
+     says a lap and a half.
+
+     And under the two laps was a floor of two days, left over from the default
+     look, which in front of a small lap count is not a floor but an override.
+     A Tassel parking orbit pushed out past Slate has a period of about a day,
+     so two days was between two and four laps and the cap never bit at all:
+     measured across this family of orbits, twenty-four marks were being drawn
+     between 1.07 and 4.80 laps out. */
+  const b = world.get('tassel'), slate = world.get('slate');
+  /* Find one whose meeting really is on the second lap, by asking the
+     unbounded search — the one the flight itself flies by — where it is. */
+  let found = null;
+  for(let k = 1.30; k <= 1.42 && !found; k += 0.002){
+    const s = S.newGame(1); S.undock(s); s.nodes = []; s.dv = s.tank = 0.02;
+    const r0 = b.dockAlt;
+    s.ship = { body: 'tassel', r: [r0, 0], v: [0, Math.sqrt(b.mu / r0) * k] };
+    const el = O.elementsFromState(b.mu, s.ship.r, s.ship.v);
+    if(!Number.isFinite(el.period) || !(el.ra > slate.a)) continue;
+    const far = S.plan(s, el.period * 6);
+    const door = far.events.find(e => e.kind === 'soi' && e.to === 'slate');
+    if(!door) continue;
+    const laps = (door.t - s.t) / el.period;
+    if(laps > 1.05 && laps < 2) found = { s, el, laps };
+  }
+  assert.ok(found, 'no orbit in this family meets Slate on its second lap');
+
+  const pred = S.planImmediate(found.s, true, {});
+  assert.equal(pred.intercept, null,
+    `a meeting ${found.laps.toFixed(2)} laps out is marked as though it were this lap`);
+  assert.ok(!pred.events.some(e => e.kind === 'soi'),
+    'and its door is drawn on the lap in front of the pilot');
+  assert.ok(pred.end - found.s.t <= found.el.period * 1.001,
+    'the road ran past the lap it draws');
 });
 
 test('but a moon the road reaches on the lap in front of you still is', () => {
