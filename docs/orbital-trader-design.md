@@ -916,6 +916,20 @@ reaches Grumm's orbit and stay while you are aiming, which is when the question
 is live; once the intercept is solved the encounter marks, the inset window and
 the arrival line take over. Aiming is what they are for.
 
+**A reach out at the Lamp is five times the size of one round a moon**, and it
+has to be. A reach is a distance, but what it buys a pilot is *time* — the
+minutes between the controls turning relative and the mouth arriving — and the
+same distance buys wildly different amounts of it depending on how fast the
+pair are moving. Round Slate the ship is doing a quarter of a kilometre a
+second and five hundred and ninety kilometres is thirty-nine minutes; round the
+Lamp it is doing twenty to thirty-six, and the same sphere is *twenty seconds*.
+You would cross the whole zero-g regime before noticing it existed.
+
+So the six wrecks on solar orbits carry 2,948 km rather than 590, which is one
+to three minutes apiece. Still the shortest approach in the game — the pair are
+simply going very fast — but a manoeuvre rather than a blink. The two on
+moon orbits keep theirs, since theirs were never the problem.
+
 **The reach is a place you can see.** A wreck's `driftReach` is a real
 boundary — cross it and the two buttons on a mark stop meaning forward-and-out
 about the world and start meaning forward-and-away about the thing you are
