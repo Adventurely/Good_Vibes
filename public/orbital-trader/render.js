@@ -1074,9 +1074,30 @@ function drawRailCrossings(chart, view, anchors){
      see is two orange diamonds floating in the dark with nothing to be
      against. */
   const drawn = new Set(chart.hits.rails.map(r => r.id));
+  /* Zooming *out* past a rail hides its crossing; zooming in does not. The
+     rule above is one rule doing two jobs, and only one of them was wanted.
+     `drawOrbits` drops a rail at both ends — under six pixels across, where it
+     is a dot and a pair of diamonds on it means nothing, and over six screen
+     diagonals, where all you would see of it is a line running off both edges.
+     The second of those is not a rail nobody can see. It is the rail you are
+     standing on, and it gets culled at exactly the zoom the last part of a run
+     to it is flown at: a wreck's is a good part of an astronomical unit across,
+     so the marks a salvage run is aimed by went out halfway through the run.
+     A planet at that zoom has its sphere of influence and an encounter mark to
+     hand over to. A wreck weighs nothing and has neither.
+
+     So a crossing outlives its rail upward. Only upward — hiding it when the
+     whole orbit has shrunk to a dot is the part of the rule that was doing its
+     job. Whether the marks are worth any ink at that point is already settled
+     below by whether either of them is on the screen. */
+  const diag = Math.hypot(chart.width, chart.height);
+  const zoomedPast = c => {
+    const b = world.get(c.body);
+    return b?.a > 0 && !chart.hidden.has(c.body) && b.a * chart.camera.zoom > diag * 6;
+  };
   ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
   for(const c of list){
-    if(!drawn.has(c.body)) continue;
+    if(!drawn.has(c.body) && !zoomedPast(c)) continue;
     const anchor = anchors[c.segIndex];
     if(!anchor) continue;
     const p = chart.toScreen(add(anchor, c.r));
