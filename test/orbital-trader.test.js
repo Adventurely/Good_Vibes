@@ -4331,6 +4331,82 @@ test('a hold that could never take the haul is refused at the board', () => {
   assert.ok(S.holdUnits(tiny) >= load, 'the smallest hold in the game still takes the biggest haul');
 });
 
+/* A ship a given distance off a wreck, closing at a given speed — with the job
+   that names it already in hand, since an unheard-of wreck is no harbour and
+   bends nothing. */
+function alongsideAt(s, id, km, ms){
+  const w = S.world.get(id), p = S.world.get(w.parent);
+  if(!s.quests?.some(q => S.questById(q.id)?.wreck === id)){
+    const job = S.QUESTS.find(q => q.wreck === id);
+    s.quests = [...(s.quests ?? []), { id: job.id, step: 0, done: false, takenAt: s.t }];
+  }
+  const st = O.railState(w, p.mu, s.t);
+  s.dockedAt = null; s.justLeft = null; s.justLeftAt = -1e9;
+  s.ship = {
+    body: w.parent,
+    r: [st.r[0] + km / KM_PER_AU, st.r[1]],
+    v: [st.v[0], st.v[1] + S.auDay(ms / 1000)],
+  };
+  s.nodes = [];
+  return s;
+}
+
+test('coming alongside is ten kilometres and ten metres a second', () => {
+  /* Was two hundred and ninety-five kilometres at five hundred metres a
+     second, which is not coming alongside a derelict so much as passing it. */
+  for(const id of [...S.WRECKS, 'lantern']){
+    const b = S.world.get(id);
+    assert.ok(Math.abs(b.zoneRadius * KM_PER_AU - 10) < 0.01, `${id}: mouth is ${b.zoneRadius * KM_PER_AU} km`);
+    assert.ok(Math.abs(S.kms(b.dockSpeed) * 1000 - 10) < 0.01, `${id}: ${S.kms(b.dockSpeed) * 1000} m/s`);
+  }
+  const can = (km, ms) => S.dockingStatus(alongsideAt(salvor(), 'cutterjaw', km, ms))?.ok === true;
+  assert.ok(can(8, 8), 'inside both and still refused');
+  assert.ok(!can(12, 8), 'tied up from twelve kilometres out');
+  assert.ok(!can(8, 12), 'tied up at twelve metres a second');
+  assert.ok(!can(300, 500), 'the old numbers still tie up');
+});
+
+test('the whole approach belongs to the wreck, not the moon behind it', () => {
+  /* The harbour a pilot is offered has to be the one the controls are already
+     about. Inside the reach the burn axes are relative to the wreck and the
+     corner counts it down, so the card saying "Slate" there is the HUD
+     answering a different question — which is what a ten-kilometre mouth did,
+     because a zone was scored against its mouth and an orbit against its own,
+     and shrinking one by thirty made every wreck lose its own approach. */
+  const inside = S.dockingStatus(alongsideAt(salvor(), 'cutterjaw', 400, 20));
+  assert.equal(inside?.port, 'cutterjaw', 'the moon took the wreck\'s approach');
+  assert.equal(inside?.ok, false, 'four hundred kilometres out is not alongside');
+
+  /* And outside it the moon is the answer again, rather than nothing at all:
+     a port that is nothing like near hands the question down. */
+  const outside = S.dockingStatus(alongsideAt(salvor(), 'cutterjaw', 900, 20));
+  assert.equal(outside?.port, 'slate', 'no harbour at all outside the reach');
+});
+
+test('a press is worth something on a rendezvous, not two hundred metres a second', () => {
+  /* The buttons size themselves off "how fast you are going", and the frame
+     decides which speed that is. Beside a wreck out at the Lamp the ship does
+     thirty-six kilometres a second round the Lamp and metres a second relative
+     to the hulk — and the press was sized off the first, so one tap was two
+     hundred metres a second and a ten-metre gate could not be reached at all. */
+  const s = alongsideAt(salvor(), 'tinwhistle', 200, 200);
+  const rel = S.burnScaleAt(s, { body: s.ship.body, r: s.ship.r, v: s.ship.v }, s.t);
+  assert.equal(rel.relative, true, 'the burn beside a wreck is not written against it');
+  assert.ok(Math.abs(S.kms(rel.speed) * 1000 - 200) < 1, `closing at ${S.kms(rel.speed) * 1000} m/s`);
+
+  /* Far from anything drifting it is the orbit again, and the old number. */
+  const far = alongsideAt(salvor(), 'tinwhistle', 5000, 200);
+  const abs = S.burnScaleAt(far, { body: far.ship.body, r: far.ship.r, v: far.ship.v }, far.t);
+  assert.equal(abs.relative, false, 'a burn out in the open is written against a drifting thing');
+  assert.ok(S.kms(abs.speed) > 10, `${S.kms(abs.speed)} km/s round the Lamp`);
+
+  /* The step is a tenth of the closing speed, so it shrinks as you slow and the
+     last few metres a second cost no more presses than the first few hundred. */
+  assert.ok(S.BURN_STEP_REL > S.BURN_STEP, 'a rendezvous nudges as gently as an orbit');
+  const press = v => S.kms(v) * 1000 * S.BURN_STEP_REL;
+  assert.ok(press(rel.speed) <= 21 && press(rel.speed) >= 5, `${press(rel.speed)} m/s a press at 200`);
+});
+
 test('a wreck is a rumour until somebody hands you the job', () => {
   const s = salvor();
   const hidden = S.unseen(s);

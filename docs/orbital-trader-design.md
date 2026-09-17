@@ -765,6 +765,33 @@ empty ones. Seven of them are in the sky:
 | Hull 41 | the outer Belt | a hull with a yard number and no name |
 | The Long Sweet | a wide circle above Haven | a frog cider transport, perfectly intact |
 
+**Coming alongside is ten kilometres and ten metres a second.** It was two
+hundred and ninety-five kilometres at five hundred, which is not coming
+alongside a derelict so much as passing one, and made tying up feel like
+something that happened rather than something flown. The reach stays at five
+hundred and ninety, so the approach is a real piece of flying: cross the space,
+kill the closing speed, and touch.
+
+That number could not simply be written down, because a press of a burn button
+is a fraction of "how fast you are going" and the frame decides which speed
+that is. Beside a wreck out at the Lamp the ship is doing thirty-six kilometres
+a second round the Lamp and metres a second relative to the hulk, and the press
+was sized off the first of those — two hundred metres a second a tap, which no
+ten-metre gate survives. A burn written in a drifting thing's frame now sizes
+itself off the closing speed, and takes a tenth of it rather than a
+two-hundredth: about ten presses to halve what you have at any scale, shrinking
+as you slow, so the last few metres a second cost no more than the first few
+hundred.
+
+Shrinking the mouth also broke who owns the approach. A rendezvous was scored
+against its own mouth and an orbit against its own, so a thirty-fold smaller
+mouth made every wreck lose to the moon it orbits from forty kilometres out —
+the axes turned to the wreck, the corner counting it down, and the card saying
+Slate. A rendezvous is scored against its *reach* now, which is the space the
+approach is actually flown in, and the question "am I near this" is asked of
+each harbour rather than of the winner, so a ship outside a wreck's reach is
+still plainly at the moon they are both going round.
+
 **The reach is a place you can see.** A wreck's `driftReach` is a real
 boundary — cross it and the two buttons on a mark stop meaning forward-and-out
 about the world and start meaning forward-and-away about the thing you are

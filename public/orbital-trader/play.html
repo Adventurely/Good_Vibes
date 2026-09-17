@@ -2160,8 +2160,9 @@ const AXES = {
    mark, rounded to a number a person would say out loud. */
 function stepFor(i){
   const where = nodePositions[i];
-  const v = where ? norm(where.v) : norm(state.ship.v);
-  const ms = S.kms(v) * 1000 * 0.005;
+  // Which speed, and so which fraction of it — see `burnScaleAt`.
+  const f = S.burnScaleAt(state, where, state.nodes[i]?.t ?? state.t);
+  const ms = S.kms(f.speed) * 1000 * (f.relative ? S.BURN_STEP_REL : S.BURN_STEP);
   const pow = Math.pow(10, Math.floor(Math.log10(Math.max(1, ms))));
   const nice = [1, 2, 5, 10].map(m => m * pow).find(x => x >= ms) ?? 10 * pow;
   return Math.max(1, Math.min(500, nice));
