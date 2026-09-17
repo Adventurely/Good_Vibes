@@ -1847,6 +1847,70 @@ test('the space near a wreck says whether you are in it', () => {
   } finally { chart.restore(); }
 });
 
+test('a wreck you have been told about is marked in orange the whole way in', () => {
+  /* The orange pair that says where the road cuts a rail and where the world
+     will be when it does is what a salvage run is aimed by, and it cannot
+     carry the last stretch: a crossing is drawn only on a rail that is on the
+     screen, and a wreck's rail is a quarter of an astronomical unit across, so
+     it is culled long before the approach starts. A world hands over to its
+     sphere of influence; a wreck weighs nothing and has none. So the diamond
+     follows the wreck itself in, and stops at the mouth. */
+  const ops = [];
+  const chart = stubChart(800, 600, ops);
+  try{
+    const w = world.get('tinwhistle'), p = world.get(w.parent);
+    const strokes = () => ops.filter(o => o[0] === 'strokeStyle').map(o => o[1]);
+    /* Closing straight in on it, from a range where the rail is long gone. */
+    const at = km => {
+      const s = salvor();
+      s.quests = [{ id: S.QUESTS.find(q => q.wreck === 'tinwhistle').id, step: 0, done: false, takenAt: 0 }];
+      s.dockedAt = null; s.justLeft = null; s.justLeftAt = -1e9; s.t = 0;
+      const st = O.railState(w, p.mu, 0), out = O.unit(st.r);
+      s.ship = { body: w.parent, r: O.add(st.r, O.scale(out, km / KM_PER_AU)), v: O.sub(st.v, O.scale(out, S.auDay(0.05))) };
+      const docking = S.dockingStatus(s);
+      chart.camera.anchor = [...O.absState(world, 'tinwhistle', 0).r];
+      chart.camera.zoom = 150 / (km / KM_PER_AU);   // the range a quarter of the screen
+      chart.settle();
+      ops.length = 0;
+      return { s, view: {
+        t: 0, now: 0, shipAbs: { r: S.shipAbsPos(s), v: S.shipAbsVel(s) }, shipBody: s.ship.body,
+        prediction: S.planImmediate(s), nodes: [], nodePositions: [], apses: [],
+        railCrossings: [], hidden: S.unseen(s), docking, nearPort: docking?.port ?? null, dockedAt: null,
+      } };
+    };
+
+    for(const km of [1e5, 2e4, 5e3, 1000, 200, 20]){
+      const { view } = at(km);
+      chart.draw(view);
+      assert.ok(!chart.hits.rails.some(r => r.id === 'tinwhistle'),
+        `at ${km} km the wreck's rail is on the screen after all — the crossing pair could have carried this`);
+      assert.ok(strokes().includes(PALETTE.railCross), `no orange mark on the wreck at ${km} km`);
+    }
+
+    // In the mouth: the ring is round you and the aiming is over.
+    const close = at(5);
+    assert.equal(close.view.docking?.inZone, true, 'five kilometres out is not in the mouth');
+    chart.draw(close.view);
+    assert.ok(!strokes().includes(PALETTE.railCross), 'still being aimed at from inside the mouth');
+
+    // Tied up to it, the same.
+    const held = at(200);
+    chart.draw({ ...held.view, dockedAt: 'tinwhistle' });
+    assert.ok(!strokes().includes(PALETTE.railCross), 'marked as somewhere to fly to while tied up to it');
+
+    // And a derelict nobody has mentioned is not on the chart at all.
+    const unheard = at(200);
+    chart.draw({ ...unheard.view, hidden: new Set(['tinwhistle']) });
+    assert.ok(!strokes().includes(PALETTE.railCross), 'an unheard-of wreck was marked');
+  } finally { chart.restore(); }
+});
+
+test('the chart is told what the ship is tied up to', () => {
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.match(PLAY, /dockedAt: state\.dockedAt \?\? null/,
+    'without it the wreck under the ship is still marked as somewhere to fly to');
+});
+
 test('the mode is announced with or without a navigator, and the numbers are hers', () => {
   const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
   assert.match(PLAY, /<small>Zero-g docking<\/small>/, 'the mode is not named anywhere');

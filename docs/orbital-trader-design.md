@@ -941,6 +941,27 @@ ring and anchor: two different questions, two different marks. "Are the axes
 about this thing" is answered a good way out from "may I tie up" — the checker
 holds the mouth inside the reach (C13), so the space is always entered first.
 
+**And it is marked in orange until you are in the mouth.** The reach ring is
+only three thousand kilometres wide; everything before that a salvage run is
+aimed by the orange pair that says where the road cuts a rail and where the
+world will be when it does — and that pair cannot carry the run. A crossing is
+drawn only on a rail that is on the screen, and a wreck's rail is a good part of
+an astronomical unit across, so it is culled as a line running off both edges
+long before the approach begins. A world in that position hands over to its
+sphere of influence and an encounter mark; a wreck weighs nothing and has
+neither. What was left in between was a grey dot two and a half pixels wide, and
+nothing orange again until the mouth ring lit.
+
+So the mark follows the wreck in. The same diamond and the same orange, drawn
+on the wreck itself, in pixels so it is the same size to find at any zoom — the
+honest continuation of the pair, because the second of those two is where the
+thing will be when you get there, and from close enough in, where it will be is
+where it is. Only for a wreck somebody has told you about, which `unseen`
+already decides, so it is one diamond for the job in hand and not eight. It
+stops at the mouth, and while you are tied up: that is where aiming ends, the
+ring is already round you, and the corner has turned into range and closing
+speed.
+
 **A wreck exists for exactly as long as there is a reason to fly to it**, and
 that is a window with two ends. It is not there until a salvor names it — see
 below — and it is gone the moment its hold is empty. A picked-over hulk left on
