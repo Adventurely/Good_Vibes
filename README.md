@@ -1891,6 +1891,61 @@ and it is drawn in horizontal spans rather than pixel by pixel precisely so it
 can be.
 ---
 
+## Greener Thumbs
+
+Still being built: one photoreal specimen in a Victorian dwarf-wall glasshouse,
+rendered in three.js, with the plant authored parametrically in Blender and
+exported as a Draco GLB. What follows is only the camera; the pipeline that
+makes the plant has its own skill under `.claude/skills/plant-assets/`.
+
+**You walk around it now, rather than turning it on a stick.** It opened
+orbiting the specimen, which is the right camera for studying one plant and the
+wrong one for a room: you cannot get behind the bench, you cannot put your eye
+at soil level, and every move is measured from a point in the middle of a
+pedestal you may not care about. It opens flying instead — standing in the
+house at head height, looking where the mouse points, going where the arrows
+say. Orbit is still there on **F** and on the two buttons that frame the
+specimen, because a free camera is a poor way to hold still six centimetres off
+a leaf.
+
+**Looking is a pointer lock and moving is not.** Clicking the glass takes the
+cursor away and the mouse reports movement rather than position, which is what
+lets the view keep turning past the edge of the screen; Escape gives it back,
+and the browser does that itself, so there is no key handler for it and there
+cannot be one.
+
+**WASD is the floor plan and nothing else.** Forward following your pitch is the
+free-fly convention and it was built that way first. It is wrong here: looking
+down at a plant is the ordinary thing to be doing in a greenhouse, and on that
+camera the ordinary thing sends you through the floor the moment you press W.
+Both horizontal axes are levelled and the height is Space and C, so you can
+study a pot from above and still walk round it.
+
+**The bounds are the building's own numbers.** `GH.W` and `GH.D` less a margin
+that keeps the near plane off the glass — a camera pressed against a pane sees
+the inside of the glass and the world through the hole its own near plane cuts.
+The ceiling is the interesting one: the ridge beam runs along X at z = 0, so the
+roof is 3.35 down the middle and 2.45 at the eaves, and a flat clamp at either
+number is either a camera in the glass or a camera that cannot reach the ridge
+lights. It follows the pitch.
+
+**A phone gets arrows on the glass.** There is no pointer to lock and no keys to
+press, so one finger drags to look and a thumb pad walks. The first answer was a
+two-finger push, which was an invisible control that fought the browser's own
+pinch and gave you no way to hold a direction while looking elsewhere. Each
+button holds the key it stands for, so the movement code never learns whether a
+finger or a keyboard is asking — and a finger that slides off releases it the
+same way a key does.
+
+**It remembers where you were standing.** Four numbers in `localStorage`, written
+when the tab is hidden and every couple of seconds besides, because a tab that is
+closed rather than hidden does not always get a `pagehide`. A viewer that puts
+you back by the door every time is a viewer that makes you walk to the far bench
+again to carry on looking at the far bench. The saved spot is clamped on the way
+back in, so a position from a greenhouse of a different size — or from a
+hand-edited string — cannot put the camera inside the brickwork.
+
+
 ## Orbital Trader
 
 A single-player game about **not steering**. You fly a small merchant ship
