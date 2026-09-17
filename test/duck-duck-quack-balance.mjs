@@ -23,6 +23,26 @@
 import { LEVEL_1, SKILLS, TICK_RATE, winCount, formatTime } from '../public/duck-duck-quack/content.js';
 import { newGame, tick, assignSkill, hasTrait } from '../public/duck-duck-quack/sim.js';
 
+/* ------------------------------------------------------------- the bridge --- */
+
+/* The Park's gap is thirty-five columns and one ramp reaches thirty-three
+   (see content.js's BUILD_SECONDS and LEVEL_1's own note), so bridging it is
+   two Builders rather than one: lay the first at the lip, then give a second
+   to a duckling standing on the far end of the ramp that one left, which
+   carries it on level rather than climbing again (see sim.js's assignSkill).
+   Every strategy below that bridges the gap at all bridges it this way, so
+   it is written once here instead of six times over. */
+function bridgeGap(state, mem, d){
+  if(!mem.bridged && d.x === 69 && assignSkill(state, d.id, 'builder')){ mem.bridged = true; return true; }
+  if(!mem.bridged || mem.extended) return false;
+  const end = state.decks.findLastIndex(at => at.length > 0);
+  if(end > 0 && d.x === end && state.decks[end].includes(d.y) && assignSkill(state, d.id, 'builder')){
+    mem.extended = true;
+    return true;
+  }
+  return false;
+}
+
 /* ------------------------------------------------------------ strategies --- */
 
 /* Every strategy is a function called once a tick, before `tick()` itself,
@@ -56,10 +76,9 @@ const STRATEGIES = {
      card play, and it has to keep winning — it is the one thing on this
      page that is also asserted, in duck-duck-quack.test.js. */
   atTheEdge(state, mem){
-    mem.builderGiven ??= false;
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
-      if(!mem.builderGiven && d.x === 69 && assignSkill(state, d.id, 'builder')){ mem.builderGiven = true; continue; }
+      if(bridgeGap(state, mem, d)) continue;
       if(!hasTrait(d, 'climber') && d.x >= 130 && d.x < 150) assignSkill(state, d.id, 'climber');
       else if(!hasTrait(d, 'flyer') && d.x === 219) assignSkill(state, d.id, 'flyer');
     }
@@ -69,10 +88,9 @@ const STRATEGIES = {
      columns before the wall rather than the whole plateau approach, and
      the gap is bridged at the last safe moment rather than the first. */
   justInTime(state, mem){
-    mem.builderGiven ??= false;
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
-      if(!mem.builderGiven && d.x === 69 && assignSkill(state, d.id, 'builder')){ mem.builderGiven = true; continue; }
+      if(bridgeGap(state, mem, d)) continue;
       if(!hasTrait(d, 'climber') && d.x >= 147 && d.x < 150) assignSkill(state, d.id, 'climber');
       else if(!hasTrait(d, 'flyer') && d.x === 219) assignSkill(state, d.id, 'flyer');
     }
@@ -83,13 +101,12 @@ const STRATEGIES = {
      the level's own supply carries for either. If The Park only wins with a
      climber or a flyer to spare, this is the strategy that says so. */
   minimalSpend(state, mem){
-    mem.builderGiven ??= false;
     mem.climbersGiven ??= 0;
     mem.flyersGiven ??= 0;
     const need = winCount(LEVEL_1);
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
-      if(!mem.builderGiven && d.x === 69 && assignSkill(state, d.id, 'builder')){ mem.builderGiven = true; continue; }
+      if(bridgeGap(state, mem, d)) continue;
       if(mem.climbersGiven < need && !hasTrait(d, 'climber') && d.x >= 130 && d.x < 150){
         if(assignSkill(state, d.id, 'climber')) mem.climbersGiven += 1;
         continue;
@@ -104,12 +121,11 @@ const STRATEGIES = {
      other side of the minimal-spend question, isolated to the wall: is 8
      really the floor for Climber, or does the level actually want a spare? */
   climberShortOne(state, mem){
-    mem.builderGiven ??= false;
     mem.climbersGiven ??= 0;
     const need = winCount(LEVEL_1) - 1;
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
-      if(!mem.builderGiven && d.x === 69 && assignSkill(state, d.id, 'builder')){ mem.builderGiven = true; continue; }
+      if(bridgeGap(state, mem, d)) continue;
       if(mem.climbersGiven < need && !hasTrait(d, 'climber') && d.x >= 130 && d.x < 150){
         if(assignSkill(state, d.id, 'climber')) mem.climbersGiven += 1;
         continue;
@@ -121,12 +137,11 @@ const STRATEGIES = {
   /* One fewer flyer than the quota needs, climbers otherwise full — the
      same question aimed at the drop instead of the wall. */
   flyerShortOne(state, mem){
-    mem.builderGiven ??= false;
     mem.flyersGiven ??= 0;
     const need = winCount(LEVEL_1) - 1;
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
-      if(!mem.builderGiven && d.x === 69 && assignSkill(state, d.id, 'builder')){ mem.builderGiven = true; continue; }
+      if(bridgeGap(state, mem, d)) continue;
       if(!hasTrait(d, 'climber') && d.x >= 130 && d.x < 150){ assignSkill(state, d.id, 'climber'); continue; }
       if(mem.flyersGiven < need && !hasTrait(d, 'flyer') && d.x === 219){
         if(assignSkill(state, d.id, 'flyer')) mem.flyersGiven += 1;
@@ -149,12 +164,11 @@ const STRATEGIES = {
      behind it the run, since a blocker never moves again; the number this
      prints is that cost, not a recommendation. */
   blockerAtGap(state, mem){
-    mem.builderGiven ??= false;
     mem.blockerGiven ??= false;
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
-      if(!mem.builderGiven && d.x === 69 && assignSkill(state, d.id, 'builder')){ mem.builderGiven = true; continue; }
-      if(mem.builderGiven && !mem.blockerGiven && d.x === 65 && assignSkill(state, d.id, 'blocker')){ mem.blockerGiven = true; continue; }
+      if(bridgeGap(state, mem, d)) continue;
+      if(mem.bridged && !mem.blockerGiven && d.x === 65 && assignSkill(state, d.id, 'blocker')){ mem.blockerGiven = true; continue; }
       if(!hasTrait(d, 'climber') && d.x >= 130 && d.x < 150) assignSkill(state, d.id, 'climber');
       else if(!hasTrait(d, 'flyer') && d.x === 219) assignSkill(state, d.id, 'flyer');
     }
