@@ -33,6 +33,7 @@ import {
   RING_FROM, RING_LAST, RING_MULT, RING_STEP, ringMult, ringFor, prestigeAt, prestigeUpTo, prestigeById, prestigeCost,
   OFFLINE_RATE, OFFLINE_CAP, offlineGain, catchUp,
   toSave, fromSave, formatLight, formatTime, formatStat, breakdown,
+  CODE_TAG, CODE_EMPTY, CODE_ALIEN, CODE_BROKEN, encodeSave, decodeSave, codeRefusal,
 } from '../public/sunward/content.js';
 
 import {
@@ -2057,4 +2058,127 @@ test('a save from before "most held" existed starts its mark at the pile in hand
   state.light = 1e9;
   plant(state, 'moss', 1);                     // spending does not lower it
   assert.equal(state.life.peakHeld, held);
+});
+
+/* ---------------------------------------------------------- the save code */
+
+/* A lot far enough along to have something to lose: every grower, every
+   upgrade, every medal, a full ladder, a full graph and a full log. */
+function playedLot(){
+  const state = newGame();
+  state.light = 1.23456789e21;
+  state.elapsed = 987654.321;
+  for(const id of GROWER_IDS){ state.owned[id] = 1234; state.earnedBy[id] = 9.87654321e15; }
+  for(const upgrade of UPGRADES) state.bought[upgrade.id] = true;
+  for(const medal of ACHIEVEMENTS) state.medals[medal.id] = true;
+  for(const rung of PRESTIGE) state.rooted[rung.id] = true;
+  state.rooted['ring-57'] = true;
+  state.seeds = 57;
+  state.prestiges = 57;
+  state.grown = 22212;
+  state.history = { at: [], rate: [], taps: [] };
+  for(let i = 0; i < HISTORY_SAMPLES; i++){
+    state.history.at.push(i * HISTORY_STEP + 0.3333333);
+    state.history.rate.push(1234567.8912345 + i);
+    state.history.taps.push(7.123456789);
+  }
+  state.log = [];
+  for(let i = 0; i < MILESTONES; i++){
+    note(state, `Season ${i}. The lot goes back to bare ground — you gained a seed.`);
+  }
+  for(const scope of ['run', 'life']){
+    for(const key of STAT_KEYS) state[scope][key] = 4321.5 + STAT_KEYS.indexOf(key);
+    // Above the pile in hand, because the loader raises it to at least that
+    // and a fixture that disagreed with the rules would fail the round trip
+    // for a reason that has nothing to do with the code.
+    state[scope].peakHeld = 2e21;
+    state[scope].earned = 3e21;
+  }
+  return state;
+}
+
+test('a save code carries the whole lot there and back', () => {
+  const save = toSave(playedLot());
+  const code = encodeSave(save);
+
+  assert.ok(code.startsWith(`${CODE_TAG}.`), 'the code says what it is');
+  assert.equal(codeRefusal(code), null);
+  assert.deepEqual(decodeSave(code), save);
+
+  // And through the loader, which is what the page actually does with it.
+  const back = fromSave(decodeSave(code));
+  const again = toSave(back);
+  assert.deepEqual(again, save);
+  assert.equal(again.seeds, 57);
+  assert.equal(Object.keys(again.medals).length, ACHIEVEMENTS.length);
+  assert.equal(again.rooted['ring-57'], true);
+});
+
+test('a save code survives the things that happen to text in transit', () => {
+  const save = toSave(playedLot());
+  const code = encodeSave(save);
+
+  // Wrapped by a mail client, spaced by a chat window, padded by a paste.
+  assert.deepEqual(decodeSave(code.replace(/(.{72})/g, '$1\n')), save);
+  assert.deepEqual(decodeSave(`  \n${code}\t\n `), save);
+  assert.deepEqual(decodeSave(code.toUpperCase().slice(0, CODE_TAG.length) + code.slice(CODE_TAG.length)), save);
+
+  // No character that a URL, a shell or a spreadsheet would eat.
+  assert.match(code, /^[A-Za-z0-9._-]+$/);
+});
+
+test('a save code that is not whole is refused, and nothing is loaded', () => {
+  const code = encodeSave(toSave(playedLot()));
+
+  assert.equal(codeRefusal(''), CODE_EMPTY);
+  assert.equal(codeRefusal('   \n  '), CODE_EMPTY);
+  assert.equal(codeRefusal(null), CODE_EMPTY);
+  assert.equal(codeRefusal(undefined), CODE_EMPTY);
+
+  // Something else entirely.
+  assert.equal(codeRefusal('hello'), CODE_ALIEN);
+  assert.equal(codeRefusal('{"light":12}'), CODE_ALIEN);
+  // Checksums, decodes, is an object — and is not a save. Loading it would
+  // hand `fromSave` something it would turn into a brand new game.
+  assert.equal(codeRefusal(encodeSave({ light: 5 })), CODE_ALIEN);
+  assert.equal(codeRefusal(encodeSave([1, 2, 3])), CODE_ALIEN);
+  assert.equal(codeRefusal(encodeSave(null)), CODE_ALIEN);
+
+  // Cut off partway through a paste — the likeliest failure there is, and the
+  // one that must not read as "not a Sunward code".
+  assert.equal(codeRefusal(code.slice(0, code.length - 40)), CODE_BROKEN);
+  assert.equal(codeRefusal(code.slice(0, 200)), CODE_BROKEN);
+  assert.equal(codeRefusal(CODE_TAG), CODE_BROKEN);
+  // A character lost out of the middle, which still splits into three parts.
+  const bitten = code.slice(0, 500) + code.slice(501);
+  assert.equal(codeRefusal(bitten), CODE_BROKEN);
+  // A character changed, which base64 decodes happily and JSON might not.
+  const middle = Math.floor(code.length / 2);
+  const swapped = code.slice(0, middle) + (code[middle] === 'a' ? 'b' : 'a') + code.slice(middle + 1);
+  assert.equal(codeRefusal(swapped), CODE_BROKEN);
+
+  // Every one of those returns nothing to load, rather than an empty game.
+  for(const bad of ['', 'hello', code.slice(0, 200), bitten, swapped]){
+    assert.equal(decodeSave(bad), null);
+  }
+});
+
+test('a save code carries text that is not plain ASCII', () => {
+  // The log is in-world prose and the dashes in it are real em dashes, which
+  // is one byte in a JavaScript string and three in UTF-8: a code built on
+  // `btoa` alone would throw on the first one.
+  const save = toSave(newGame());
+  save.log = [{ at: 1, text: 'Away 3m — the lot made 12.4K … ✓' }];
+  assert.deepEqual(decodeSave(encodeSave(save)).log, save.log);
+});
+
+test('a save code round-trips whatever else the page tucks into it', () => {
+  // The page sends the board row along, because a code that left it behind
+  // would lose your place on the board the moment you carried it to another
+  // machine. `encodeSave` is not told about it and does not need to be.
+  const save = { ...toSave(newGame()), board: { id: 'c0ffee00-0000-4000-8000-000000000001', name: 'Rook', joined: true } };
+  const back = decodeSave(encodeSave(save));
+  assert.deepEqual(back.board, save.board);
+  // And the loader ignores it rather than choking on it.
+  assert.equal(fromSave(back).seeds, 0);
 });

@@ -1761,6 +1761,100 @@ export function fromSave(raw){
   return state;
 }
 
+/* ------------------------------------------------------------ the code */
+
+/* The lot lives in one browser's storage and nowhere else: there is no
+ * account, no server copy, and a browser is allowed to throw its own storage
+ * away. So the only backup anybody can have is one they carry themselves, and
+ * this is it — the save file, as one long line of text.
+ *
+ * It is the save written out, not a second format: a tag saying what it is, the
+ * JSON in base64url, and a checksum saying it arrived whole. The checksum is
+ * not a lock. Anyone who wants to edit their own save is welcome to and always
+ * could; what it catches is the paste that lost its last line, which would
+ * otherwise decode into half a game and overwrite the real one.
+ */
+export const CODE_TAG = 'SUNWARD1';
+
+/* Three refusals, and every one of them leaves the save on the device exactly
+   where it was. An import that cannot say why it failed is an import that
+   people retry until it eats something. */
+export const CODE_EMPTY = 'Nothing in the box to load.';
+export const CODE_ALIEN = "That doesn't look like a Sunward code.";
+export const CODE_BROKEN = 'Some of that code is missing. Copy it again and paste the whole thing.';
+
+/* FNV-1a, thirty-two bits, written in base 36 so it costs six characters. */
+const checksum = text => {
+  let h = 0x811c9dc5;
+  for(let i = 0; i < text.length; i++){
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(36);
+};
+
+/* base64url rather than base64, because a code goes through chat windows, URL
+   bars and text files, and `+ / =` are the three characters those mangle. */
+const toBase64 = text => {
+  const bytes = new TextEncoder().encode(text);
+  // A string built a byte at a time, because `String.fromCharCode(...bytes)`
+  // is a spread of twenty thousand arguments and blows the call stack.
+  let raw = '';
+  for(let i = 0; i < bytes.length; i++) raw += String.fromCharCode(bytes[i]);
+  return btoa(raw).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+};
+
+const fromBase64 = code => {
+  const raw = atob(code.replace(/-/g, '+').replace(/_/g, '/'));
+  const bytes = new Uint8Array(raw.length);
+  for(let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+};
+
+export function encodeSave(save){
+  const json = JSON.stringify(save);
+  return `${CODE_TAG}.${toBase64(json)}.${checksum(json)}`;
+}
+
+/* Whitespace goes first: a code that has been through an email client arrives
+   wrapped at seventy-two columns, and refusing that would be refusing a code
+   that is perfectly intact. */
+function readCode(code){
+  const text = String(code == null ? '' : code).replace(/\s+/g, '');
+  if(!text) return { error: CODE_EMPTY };
+
+  /* Which of the two refusals it is turns on the tag alone. A code cut off
+     halfway through a paste — far and away the likeliest thing to go wrong —
+     has lost its checksum and so has the wrong number of parts, and telling
+     somebody that their own save is not a Sunward code would send them looking
+     for the wrong problem. */
+  const parts = text.split('.');
+  if(parts[0].toUpperCase() !== CODE_TAG) return { error: CODE_ALIEN };
+  if(parts.length !== 3 || !parts[1] || !parts[2]) return { error: CODE_BROKEN };
+
+  let json;
+  try { json = fromBase64(parts[1]); }
+  catch { return { error: CODE_BROKEN }; }
+  if(checksum(json) !== parts[2].toLowerCase()) return { error: CODE_BROKEN };
+
+  let save;
+  try { save = JSON.parse(json); }
+  catch { return { error: CODE_BROKEN }; }
+  /* A save always carries its version. Something that checksums but has no
+     version is not a save, and loading it would hand `fromSave` an object it
+     would dutifully turn into a brand new game on top of a real one. */
+  if(!save || typeof save !== 'object' || Array.isArray(save) || !Number.isFinite(Number(save.version))){
+    return { error: CODE_ALIEN };
+  }
+  return { save };
+}
+
+/* The pair the rest of the game uses: why not, and what. Asking twice costs a
+   base64 decode and buys the page a refusal it can print without having to
+   know what any of the failures mean. */
+export const codeRefusal = code => readCode(code).error || null;
+export const decodeSave = code => readCode(code).save || null;
+
 /* ---------------------------------------------------------------- reading */
 
 /* Short scale, because that is what a clicker player already reads. Past
