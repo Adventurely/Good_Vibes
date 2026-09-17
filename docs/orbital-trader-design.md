@@ -792,6 +792,17 @@ approach is actually flown in, and the question "am I near this" is asked of
 each harbour rather than of the winner, so a ship outside a wreck's reach is
 still plainly at the moon they are both going round.
 
+**And the chart goes in a hundred times further.** The ceiling was two hundred
+million pixels to the au, set when the closest thing anybody flew to was a
+harbour mouth thousands of kilometres across; against a ten-kilometre mouth it
+drew a circle three pixels wide, so the last and most delicate flying in the
+game was done blind. It is two thousand million now: the chart spans about
+fifty kilometres at full zoom, the mouth is a third of it, and a kilometre is
+fourteen pixels. Nothing minds the depth — positions are au in float64, and a
+pixel at that zoom is a ten-millionth of the precision a position is carried
+to. `fmtAu` grew metres to go with it, having rounded everything under a
+kilometre to "0 km".
+
 **The reach is a place you can see.** A wreck's `driftReach` is a real
 boundary — cross it and the two buttons on a mark stop meaning forward-and-out
 about the world and start meaning forward-and-away about the thing you are
