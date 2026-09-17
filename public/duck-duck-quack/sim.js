@@ -8,10 +8,11 @@
  * whole run be played out and checked in a test with no browser near it.
  */
 
-import { SCENE_H, FALL_SAFE, WALK_STEP, FALL_SPEED, FLY_SPEED, CLIMB_SPEED,
+import { SCENE_H, FALL_SAFE, WALK_STEP, FALL_SPEED, FLY_SPEED, FLY_DRIFT, CLIMB_SPEED,
   BUILD_MAX_STEPS, BUILD_RISE_HEIGHT, DIG_MAX_STEPS, JUMP_SPAN, JUMP_RISE,
-  SKILLS, GOOSE_FLEE_SPEED,
-  GOOSE_FLEE_LIFT, POOF_TICKS, buildTerrain, buildLayer, winCount, goalHeading } from './content.js';
+  SKILLS, GOOSE_FLEE_SPEED, ZAP_TICKS,
+  GOOSE_FLEE_LIFT, POOF_TICKS, buildTerrain, buildLayer, winCount, goalHeading,
+  hatchHeading } from './content.js';
 
 /* ----------------------------------------------------------------- a duck */
 
@@ -23,10 +24,12 @@ function hatchling(level, groundY){
     x: level.nestX,
     y: groundY,
     // Toward the pond, whichever side of the nest that is — see content.js's
-    // goalHeading. Every level before The Orchard's reversal has a pond to
-    // the right of its nest, where this is just 1; it is what makes a level
-    // built the other way round walk correctly from the moment it hatches.
-    dir: goalHeading(level),
+    // goalHeading and hatchHeading. Every level before The Orchard's reversal
+    // has a pond to the right of its nest, where this is just 1; it is what
+    // makes a level built the other way round walk correctly from the moment
+    // it hatches, and what lets The Spire's nest on top of the spire send its
+    // ducklings out the only way there is down.
+    dir: hatchHeading(level),
     state: 'walking',   // walking | falling | digging | building | climbing | jumping | blocking | saved | lost
     // Digger and Climber are traits, and a duckling can hold both at once —
     // see assignSkill for why. Builder and Blocker are not in here at all:
@@ -40,6 +43,10 @@ function hatchling(level, groundY){
     // Where a hop took off from and where it is coming down — see startJump.
     jumpFromX: 0, jumpFromY: 0, jumpToX: 0, jumpToY: 0, jumpSpan: 0, jumpStep: 0,
     digLeft: 0,
+    // The teleporter pad this one is standing on because it just came out of
+    // it, or null. What keeps a two-way pair from throwing a duckling
+    // straight back where it came from, forever — see padUnder.
+    onPad: null,
     cause: null,        // set when lost: 'fell' | 'edge' | 'goosed'
   };
 }
@@ -50,6 +57,36 @@ function hatchling(level, groundY){
 export const hasTrait = (d, skill) => d.traits.has(skill);
 
 /* ---------------------------------------------------------------- the game */
+
+/* A level's islands, expanded into the per-column lists surfacesAt reads —
+   the same shape `decks` has, because to everything downstream of here an
+   island and a ramp deck are the same kind of thing: a surface standing over
+   the ground rather than replacing it. A level with no islands gets a column
+   of empty lists and nothing anywhere else has to know the difference. */
+function buildSky(islands, width){
+  const sky = Array.from({ length: width }, () => []);
+  for(const isle of islands ?? []){
+    for(let x = Math.max(0, isle.from); x < Math.min(width, isle.to); x++){
+      if(!sky[x].includes(isle.y)) sky[x].push(isle.y);
+    }
+  }
+  return sky;
+}
+
+/* A level's teleporter pairs, flattened into one pad per end with each
+   pointing at the other. Written out this way rather than searched as pairs
+   because the question actually asked, every tick, for every duckling, is
+   "is there a pad right here" — see padUnder. */
+function buildPads(teleports){
+  const pads = [];
+  for(const t of teleports ?? []){
+    const a = { x: t.ax, y: t.ay };
+    const b = { x: t.bx, y: t.by };
+    a.to = b; b.to = a;
+    pads.push(a, b);
+  }
+  return pads;
+}
 
 /* `newGame` builds its own copy of the terrain from the level's segments —
    never the same array a second game of the same level would start from —
@@ -79,6 +116,22 @@ export function newGame(level){
     // a column is all one thing.
     rockBelow: buildLayer(level.segments, 'hardBelow', null, level.width),
     floors: buildLayer(level.segments, 'floor', SCENE_H, level.width),
+    // Every island surface standing at each column, in the same shape as
+    // `decks` and for the same reason — a platform in the sky is a surface
+    // as well as the ground, not instead of it, which is what leaves the
+    // walkway underneath one walkable. See content.js's header note on
+    // `islands`, and surfacesAt below, which stops caring which is which.
+    sky: buildSky(level.islands, level.width),
+    // Teleporter pads, flattened out of the level's pairs into one list a
+    // lookup can scan — see padUnder. Two entries per pair, each pointing at
+    // the other one.
+    pads: buildPads(level.teleports),
+    // How many times a duckling has been teleported, ever, and where the
+    // flashes for the most recent ones are. The count is what the page
+    // watches to know a zap wants playing (play.html); the flashes are what
+    // art.js draws, the same way poofs work.
+    warps: 0,
+    zaps: [],
     ticks: 0,
     hatched: 0,
     nextHatch: 0,
@@ -113,14 +166,45 @@ const groundAt = (state, x) => {
   return state.terrain[col];
 };
 
-/* Everything at this column a duckling could be standing on: the ground
-   itself, plus every ramp deck crossing it. Order is not meaningful — the
-   callers below all pick out the one surface they want by height, because
-   which surface is the right one depends entirely on where the duckling
-   already is. A deck overhead is not ground to a duckling walking under it;
-   the same deck is the only ground there is to the duckling walking along
-   it. That is the whole reason this is a list. */
-const surfacesAt = (state, x) => [groundAt(state, x), ...state.decks[columnAt(state, x)]];
+/* Everything at this column a duckling could be standing on: the terrain,
+   the floor of a tunnel bored through it, any island hanging over it, and
+   every ramp deck crossing it. Order is not meaningful — the callers below
+   all pick out the one surface they want by height, because which surface
+   is the right one depends entirely on where the duckling already is. A
+   deck overhead is not ground to a duckling walking under it; the same deck
+   is the only ground there is to the duckling walking along it. That is the
+   whole reason this is a list, and it is why an island is a platform in the
+   sky rather than a hole in the ground under it. */
+const surfacesAt = (state, x) => {
+  const col = columnAt(state, x);
+  const out = [state.terrain[col]];
+  // A tunnelled column has two floors, not one: the hillside still standing
+  // over the hole (which is what art.js has always drawn — see content.js's
+  // header note) and the tunnel's own floor inside it. Both are real
+  // ground, and which one a duckling is on is decided the same way it is
+  // decided for a ramp crossing a column: by where that duckling already
+  // was. Tunnelling under a ledge used to quietly delete the ledge, which
+  // was only ever invisible because nothing had walked along the top of a
+  // hill it had also dug through.
+  if(state.tunnelY[col] != null) out.push(state.tunnelY[col]);
+  return out.concat(state.sky[col], state.decks[col]);
+};
+
+/* The teleporter pad this duckling is actually standing on, or null.
+ *
+ * Standing on, not merely passing the column of: a pad is a thing on a
+ * surface, so a duckling walking the ground under an island does not trip
+ * the pad sitting on top of the island above it. WALK_STEP is the same
+ * tolerance the walking rules use for "this is the surface I am on", which
+ * keeps a pad working where it is laid on a slope or a tread.
+ */
+function padUnder(state, d){
+  for(const pad of state.pads){
+    if(Math.round(d.x) !== pad.x) continue;
+    if(Math.abs(d.y - pad.y) <= WALK_STEP) return pad;
+  }
+  return null;
+}
 
 const setTunnelAt = (state, x, y) => { state.tunnelY[columnAt(state, x)] = y; };
 
@@ -215,6 +299,8 @@ function hatch(state){
 function stepPoofs(state){
   for(const p of state.poofs) p.age += 1;
   state.poofs = state.poofs.filter(p => p.age < POOF_TICKS);
+  for(const z of state.zaps) z.age += 1;
+  state.zaps = state.zaps.filter(z => z.age < ZAP_TICKS);
 }
 
 function stepGoose(state){
@@ -330,6 +416,29 @@ function stepWalking(state, d){
     return;
   }
 
+  /* A teleporter under its feet, and this tick is spent going through it.
+   *
+   * The pad it arrives on is remembered rather than the pad it left, which
+   * is the whole of what makes a two-way pair work: standing on the far pad
+   * is not a fresh arrival, so nothing sends it back. Walking off clears it
+   * (below), so coming back to that same pad later works exactly as it did
+   * the first time. Direction is kept — a duckling comes out of the far pad
+   * still going the way it was going, not turned around by the trip.
+   */
+  const pad = padUnder(state, d);
+  if(pad){
+    if(d.onPad !== pad){
+      state.zaps.push({ x: pad.x, y: pad.y, age: 0 }, { x: pad.to.x, y: pad.to.y, age: 0 });
+      state.warps += 1;
+      d.x = pad.to.x;
+      d.y = pad.to.y;
+      d.onPad = pad.to;
+      return;
+    }
+  } else if(d.onPad){
+    d.onPad = null;
+  }
+
   const nextX = d.x + d.dir;
   if(nextX < 0 || nextX >= level.width){ loseDuckling(state, d, 'edge'); return; }
 
@@ -408,16 +517,36 @@ function stepWalking(state, d){
  * column a ramp crosses is that ramp, not the ground far below it: falling
  * onto a deck is caught by the deck. Walking into the underside of one is
  * the case that passes through (see stepTargetAt) — coming down on top of
- * it is not. */
+ * it is not.
+ *
+ * And it comes down at a slant, not straight: FLY_DRIFT (content.js) a tick
+ * in whichever direction it was already walking, so a flight reads as a
+ * glide away from the ledge it left rather than a descent down a shaft. The
+ * drift is refused wherever the column it would slide into has something
+ * solid at the height the duckling is currently at — a flyer pinned against
+ * a cliff face comes straight down it instead of sliding into the hillside
+ * and landing on top of the thing it just fell off. A plain fall does not
+ * drift at all: it is not flying, it is dropping.
+ */
 function stepFalling(state, d){
   const flying = hasTrait(d, 'flyer');
   d.y += flying ? FLY_SPEED : FALL_SPEED;
+  if(flying){
+    const slid = d.x + d.dir * FLY_DRIFT;
+    const intoGround = surfacesAt(state, slid).some(s => s < d.y);
+    if(slid >= 0 && slid < state.level.width && !intoGround) d.x = slid;
+  }
   if(d.y > SCENE_H){ loseDuckling(state, d, 'fell'); return; }
   const reached = surfacesAt(state, d.x).filter(s => d.y >= s);
   if(reached.length){
     const ground = Math.min(...reached);
     const dropped = ground - d.fallFrom;
     d.y = ground;
+    // Back onto a whole column as it touches down. Drift is the only thing
+    // in this game that ever leaves a duckling between two of them, and a
+    // flock walking on fractions of a column would be a quiet mess
+    // everywhere something asks which column a duckling is standing in.
+    d.x = columnAt(state, d.x);
     if(!flying && dropped > FALL_SAFE) loseDuckling(state, d, 'fell');
     else d.state = 'walking';
   }
@@ -623,7 +752,15 @@ function stepJumping(state, d){
 
 function stepClimbing(state, d){
   d.y -= CLIMB_SPEED;
-  const reached = surfacesAt(state, d.x).filter(s => d.y <= s);
+  /* Surfaces below the bottom of the scene are not things to climb onto —
+     a gap's floor is set far under it on purpose (content.js's PIT_Y) and
+     is a hole, not a ledge. Without this a Climber scaling anything that
+     stands over open air would "reach" that floor on its very first tick
+     and be dropped into the pit by the line below, which takes the lowest
+     of everything the climb has passed. Nothing does that today; a level
+     with a stepped island over a chasm would, and the level builder can
+     draw one. */
+  const reached = surfacesAt(state, d.x).filter(s => d.y <= s && s < SCENE_H);
   if(reached.length){
     d.y = Math.max(...reached);
     d.state = 'walking';

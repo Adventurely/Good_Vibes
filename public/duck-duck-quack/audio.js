@@ -730,6 +730,27 @@ export function createAudio(){
       hit(t, 0.02, 0.05, 3200, 'bandpass');
       voice(950, t + 0.008, 0.08, 'triangle', 0.045, 1500, 5000);
     },
+
+    /* A teleporter taking a duckling — the one thing in this game that is
+     * not an animal or a piece of weather, so it is the one sound here
+     * allowed to be electric. A square wave sliding up two octaves in a
+     * tenth of a second is the whole of it: rising rather than falling,
+     * because a duckling is arriving somewhere rather than going down, and
+     * a square rather than the triangles and sines everything else uses,
+     * because that buzz is what makes it read as a machine.
+     *
+     * A sparkle of bright noise on top, short enough to be a spark rather
+     * than a hiss, and a quiet low thump under it so the pad sounds like it
+     * has some weight to it. Quiet overall: on a level built around a pair
+     * of pads this can fire for every duckling in the flock, thirty times
+     * in a run, and a zap that punished a player for using the mechanic the
+     * level is about would be the wrong sound however good it was.
+     */
+    zap(t){
+      voice(300, t, 0.1, 'square', 0.06, 1200, 4000);
+      hit(t, 0.06, 0.05, 2600, 'highpass');
+      voice(90, t + 0.02, 0.09, 'sine', 0.05, 60);
+    },
   };
 
   function sfx(name){
