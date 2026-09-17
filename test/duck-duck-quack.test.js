@@ -78,6 +78,13 @@ test('every registered level carries a supply for every skill, a sane nest and g
     assert.notEqual(level.nestX, level.goalX, `${level.id}: nest and goal are the same column`);
     assert.ok(!ids.has(level.id), `duplicate level id "${level.id}"`);
     ids.add(level.id);
+    // The picker (index.html) and the play screen's header both label a
+    // level by its name and its place in this array, so a level with no
+    // name, or two with the same one, would show up there as two cards a
+    // player cannot tell apart.
+    assert.ok(level.name, `${level.id}: no name to show in the level picker`);
+    assert.equal(LEVELS.filter(l => l.name === level.name).length, 1,
+      `two levels both named "${level.name}"`);
   }
 });
 
