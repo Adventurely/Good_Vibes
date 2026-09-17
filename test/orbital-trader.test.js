@@ -833,11 +833,23 @@ test('the crew menu turns a portrait into a question', () => {
   assert.match(PLAY, /class="face" data-act="say\|\$\{who\}"/, 'the portraits are not buttons');
   assert.match(PLAY, /\bsay\(who\)\{/, 'nothing is listening for a pressed face');
   assert.match(PLAY, /S\.exchangeFor\(state, who, talking\.nth\)/, 'the page never asks for the line');
-  assert.match(PLAY, /S\.speaker\(l\.who\)\.name/, 'the lines are not labelled with who said them');
+  assert.match(PLAY, /S\.speaker\(l\.who\)/, 'the lines are not labelled with who said them');
+
+  /* The answer is a popup over the sky rather than a block under the picture,
+     it plays a line at a time at reading speed, and every line wears the face
+     of whoever is saying it — an exchange is two people and the portraits are
+     how you tell them apart without reading the names. */
+  assert.match(PLAY, /id="chatter"/, 'there is nowhere for a conversation to appear');
+  assert.match(PLAY, /className = 'bubble'/, 'the lines are not bubbles');
+  assert.match(PLAY, /portraitURL\(l\.who\)/, 'a bubble does not carry the speaker\'s portrait');
+  assert.match(PLAY, /S\.sayMs\(/, 'the lines are not paced by how long they take to read');
+  assert.doesNotMatch(PLAY, /class="talk"/, 'the old inline block is still in the crew menu');
+
   /* A conversation is not a thing a save remembers, so the only record of one
      is a page-local variable that the next menu clears. */
   assert.match(PLAY, /if\(id !== tab\) talking = null;/, 'a line survives a change of menu');
   assert.doesNotMatch(PLAY, /state\.talking/, 'talking got into the save');
+  assert.doesNotMatch(PLAY, /state\.chatter/, 'a conversation got into the save');
 });
 
 test('the crew menu has a captain to show and three berths to leave empty', () => {
@@ -4242,6 +4254,30 @@ test('a wreck is a rumour until somebody hands you the job', () => {
   told.dockedAt = 'slate'; S.acceptQuest(told, 'cutterjaw');
   comeAlongside(told, 'cutterjaw');
   assert.equal(S.dockingStatus(told)?.port, 'cutterjaw', 'and a mentioned one is not');
+});
+
+test('a line is on screen for as long as it takes to read, and never less or much more', () => {
+  /* The gap before the next line. Characters rather than words: the unit that
+     matters is how far the eye has to travel, and a word is not a fixed amount
+     of that. */
+  const short = S.sayMs('Aye.'), long = S.sayMs('Nevertheless, I should like it on the record that I said so.');
+  assert.ok(long > short, 'a longer line does not get longer to read');
+  /* The slope is the rule: two lines forty characters apart are 1.6 s apart. */
+  const a = S.sayMs('x'.repeat(40)), b = S.sayMs('x'.repeat(80));
+  assert.ok(Math.abs((b - a) - 40 * 40) < 1, `forty characters should be 1600 ms, got ${b - a}`);
+
+  /* A two-word answer still lands as its own beat rather than flashing past. */
+  assert.ok(S.sayMs('Aye.') >= 900, 'a short line is gone before it is read');
+  assert.ok(S.sayMs('') >= 900 && S.sayMs(null) >= 900, 'an empty line still takes a beat');
+  /* And one long speech cannot hold the rest of the conversation. */
+  assert.ok(S.sayMs('x'.repeat(5000)) <= 6500, 'a long line holds the conversation for ever');
+
+  /* Every line anybody actually says is inside the band, so no exchange in the
+     game either flickers past or stalls. */
+  for(const x of DIALOG) for(const l of x.lines ?? []){
+    const ms = S.sayMs(l.say);
+    assert.ok(ms >= 900 && ms <= 6500, `${x.id}: "${l.say}" reads in ${ms} ms`);
+  }
 });
 
 test('an unfound wreck bends nothing: no readout, and forward is still forward', () => {

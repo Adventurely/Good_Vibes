@@ -1288,6 +1288,22 @@ export function exchangeFor(state, who, nth = 0){
   return list[((nth % list.length) + list.length) % list.length];
 }
 
+/* How long a line takes to read, which is how long the next one waits.
+ *
+ * Counted in characters rather than words because the unit that matters is how
+ * far the eye has to travel, and "Aye" and "Nevertheless" are not the same
+ * amount of reading however you count words. Forty milliseconds a character
+ * over a beat of half a second is a shade under two hundred and fifty words a
+ * minute — near enough the pace of somebody reading a caption rather than a
+ * book.
+ *
+ * Floored, so a two-word answer still lands as its own beat instead of
+ * flashing past, and capped, so one long speech cannot hold the rest of the
+ * conversation for half a minute. Here rather than in the page because it is a
+ * rule about the writing, and because a rule in a page is a rule with no
+ * test. */
+export const sayMs = text => Math.max(900, Math.min(6500, 520 + (text?.length ?? 0) * 40));
+
 /* Who a line belongs to, as a name and a berth, so the page can label it
  * without knowing how the crew table is laid out. */
 export function speaker(who){

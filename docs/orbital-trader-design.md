@@ -1073,6 +1073,35 @@ five portraits — captain, the three crew, and the empty chair — are 24×24
 character grids in `sprites.js` sharing one ink legend, drawn to a cached data
 URL by `portraitURL(id)`.
 
+**Every face aboard can be pressed, and answers.** `dialog.json` holds
+exchanges keyed to a port — `at: "cinder"`, or `"*"` for anywhere — and to the
+person whose picture starts them; a line written for the port you are tied up
+at beats a line written for anywhere, and an exchange that puts words in the
+mouth of somebody not aboard is not offered at all. Nothing about a
+conversation is saved. Talking is free, it changes nothing, and the only thing
+a game remembers about one is that it happened — and it does not remember that
+either.
+
+What comes back is a popup over the sky rather than a block in the menu,
+because a line somebody says is an event and an event belongs where the player
+is looking. One bubble per line, each wearing the face of whoever is speaking,
+stacking up rather than replacing each other so a slow reader still has the
+first line when the third arrives. They arrive one at a time, and the gap
+before the next is how long the one on screen takes to read: `sayMs`, forty
+milliseconds a character over a beat of half a second — a shade under 250
+words a minute. Characters rather than words, because the unit that matters is
+how far the eye has to travel and "Aye" and "Nevertheless" are not the same
+amount of reading however you count words. Floored at 0.9 s so a two-word
+answer still lands as its own beat, and capped at 6.5 s so one long speech
+cannot hold the rest of the conversation.
+
+A drip you cannot outrun is a drip you sit through, so pressing the face again
+— or the bubbles — brings the rest up at once; pressing a finished one gets
+the next thing they have to say about this place, and once they are out the
+popup goes away rather than looping. Under reduced motion the whole exchange
+goes up on the first press, a timed reveal being both motion and the one kind
+a player cannot simply wait out.
+
 What is still open is most of what the berths are for: whether the other two
 get effects of their own, whether anybody can be recruited outside the quest
 line, and whether three is the number. Note what the Engineer's gate does to
