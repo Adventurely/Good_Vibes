@@ -449,7 +449,7 @@
   {
    "step": "find",
    "title": "Find Slate — zoom out",
-   "body": "Slate is a little farther out. Zoom out until you can see it: scroll, pinch, or press the minus key."
+   "body": "Slate is one of Tassel's two moons: it goes round the planet you are going round, a little farther out.\n\nZoom out until you can see it and the circle it travels on — scroll, pinch, or press the minus key."
   },
   {
    "step": "focus",
@@ -479,7 +479,7 @@
   {
    "step": "aim",
    "title": "Put Slate in the way",
-   "body": "You reach Slate's circle, but not Slate — it will have moved on by the time you get out there.\n\nTwo orange diamonds show it: one on your road where it crosses Slate's circle, one where Slate will really be. Slide the burn earlier or later until they sit together.\n\nThe line under this card counts the gap down. A red cross means that road hits the ground — keep sliding."
+   "body": "You reach Slate's circle, but not Slate. It is a moon, still going round Tassel while you climb, so it will have moved on.\n\nTwo orange diamonds show it: one on your road where it crosses Slate's circle, one where Slate will really be. Slide the burn earlier or later until they sit together.\n\nThe line under this card counts the gap down. A red cross means that road hits the ground — keep sliding."
   },
   {
    "step": "skip",

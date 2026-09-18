@@ -2165,6 +2165,17 @@ now, not the moment of the offer. And the card before it sends a player zooming
 out until Slate is in frame, which leaves the parking orbit a six-pixel ring
 under the ship's own icon — see the framing hysteresis below.
 
+**Slate is a moon, and the lesson says so now.** Why the target is somewhere
+else by the time you arrive is the whole of the aiming card, and the answer is
+that it goes round the planet you are going round — which the tables have known
+since the first one (`kind`, and the body it orbits) and no card ever said. The
+card that first names it says which world it belongs to and points at the circle
+it travels on; the aiming card gives that as the reason it will have moved on.
+Tapping any body says what it is as well as what it is called — *Looking at
+Slate, a moon of Tassel* — for moons and worlds only, because a rock, a station,
+a wreck and the Maw are things the fiction would rather introduce in its own
+words.
+
 *Aiming* used to ask for "about thirty degrees ahead of Slate", which is an
 angle with no instrument, judged by eye, against a moving target. It asks for
 the **two orange diamonds** to be brought together now — where the road cuts
