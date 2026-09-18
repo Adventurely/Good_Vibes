@@ -1468,6 +1468,27 @@ test('The Spire cannot be won without a Digger, and the pen holds the flock safe
   }
 });
 
+test('The Spire cannot be tunnelled from the grass — the seam is rock down there', () => {
+  // The Digger has to be carried up by the ramp before it is looking at
+  // anything it can cut. Handed one on the pen floor and left there, it
+  // walks into the spire's foot and turns around, forever.
+  const state = newGame(LEVEL_6);
+  assert.equal(state.rockBelow[95], 145, 'the spire has a seam at 145');
+  let ticks = 0;
+  for(let i = 0; i < LEVEL_6.timeLimit && !state.ended; i++){
+    for(const d of state.ducks){
+      if(d.state !== 'walking') continue;
+      if(!hasTrait(d, 'flyer') && d.y <= 40) assignSkill(state, d.id, 'flyer');
+      if(!hasTrait(d, 'digger') && d.y >= 150) assignSkill(state, d.id, 'digger');
+    }
+    tick(state);
+    ticks++;
+  }
+  assert.ok(ticks > 0);
+  assert.ok(state.tunnelY.every(v => v == null), 'not one column cut from the grass');
+  assert.equal(state.saved, 0);
+});
+
 test('The Spire\'s bluff is rock — a Digger sent at it never starts', () => {
   const state = newGame(LEVEL_6);
   assert.ok(state.rock[30], 'the bluff should be stone');
