@@ -18,6 +18,11 @@ import { ECONOMY } from './data/economy.js';
 import { NARRATIVE } from './data/text.js';
 import { QUESTBOOK } from './data/quests.js';
 import { DIALOGUE } from './data/dialog.js';
+import { EVENTBOOK } from './data/events.js';
+
+/* What can happen on the way, and how often. See events.json for the shape. */
+export const EVENTS = EVENTBOOK.events;
+export const EVENT_RULES = EVENTBOOK.rules;
 
 /* ------------------------------------------------------------ constants */
 
