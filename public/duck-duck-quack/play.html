@@ -342,6 +342,7 @@
   import { newGame, tick, assignSkill, assignRefusal, duckNear, releaseBlocker } from './sim.js';
   import { paintScene, drawSkillBadge, BADGE_PLATE_W, BADGE_PLATE_H } from './art.js';
   import { createAudio } from './audio.js';
+  import { createStats } from './stats.js';
   import { fitCanvas, context2d } from '../good-vibes/pixel.js';
 
   // How much bigger the badge on a skill button is than the one a duckling
@@ -580,11 +581,28 @@
     if(autoAdvanceTimer){ clearInterval(autoAdvanceTimer); autoAdvanceTimer = null; }
   }
 
+  /* Whose run this is, chosen on the front page and kept in this browser
+     (see stats.js). Null when nobody picked a name, which is the default
+     and costs the run nothing — the level plays exactly the same, it just
+     goes unrecorded. */
+  const stats = createStats();
+
   function endMessage(){
     const won = state.ended === 'won';
     ui.overlayTitle.textContent = won ? 'The flock made it!' : 'Out of time';
-    ui.overlayBody.textContent = `${state.saved} of ${LEVEL.duckCount} saved`
+
+    /* Filed before the line is written, so the line can say what it was
+       worth. A losing run still counts: nine saved on a level that wanted
+       ten is a better nine than a win with eight, and the mark kept is the
+       most anybody has ever got home. */
+    const player = stats.current();
+    const mark = player ? stats.record(player, LEVEL.id, state.saved) : null;
+
+    let line = `${state.saved} of ${LEVEL.duckCount} saved`
       + ` — needed ${winCount(LEVEL)}. ${state.lost} lost.`;
+    if(mark && mark.improved) line += ` A new best for ${player}.`;
+    else if(mark && mark.best) line += ` ${player}'s best here: ${mark.best}.`;
+    ui.overlayBody.textContent = line;
     // A next level to go to only means anything once this one is actually
     // won — offering it on a loss would read as skipping past the level
     // that just beat you.

@@ -16,7 +16,7 @@ import {
   BUILD_MAX_STEPS, BUILD_RISE_HEIGHT, DIG_SECONDS, DIG_MAX_STEPS, JUMP_SPAN, JUMP_RISE, PIT_Y,
   FLY_DRIFT, SKILLS, SKILL_INFO,
   LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5, LEVEL_6, LEVEL_7, LEVEL_8, LEVEL_9, LEVEL_10,
-  LEVELS,
+  LEVEL_11, LEVELS,
   buildTerrain, buildLayer, stairs, winCount, goalHeading, hatchHeading, formatTime,
 } from '../public/duck-duck-quack/content.js';
 
@@ -2158,6 +2158,129 @@ test('no Digger gets through rock on any level, however many are handed out', ()
       }
     }
   }
+});
+
+/* ------------------------------------------------- The Belfry, played */
+
+/* Four floors, staggered, so the flock arrives at the end of each one going
+   the wrong way for the next: a Blocker turns it, and the ramp after that
+   is built in the other direction. The two turning Blockers stay planted —
+   they are the route. */
+const BELFRY_PLAN = [
+  { y: 150, at: 40, dir: 1 },                  // pen -> A, left to right
+  { y: 126, at: 100, dir: -1, turn: 115 },     // A -> B, right to left
+  { y: 102, at: 30, dir: 1, turn: 22 },        // B -> C: climb, left to right
+  { y: 78, at: 63, dir: 1 },                   //    ... level
+  { y: 78, at: 96, dir: 1 },                   //    ... climb, onto C
+];
+
+function playLevel11({ steps = BELFRY_PLAN.length, turns = true } = {}){
+  const state = newGame(LEVEL_11);
+  let stage = 0, held = null;
+  const kinds = [], dirs = [];
+  for(let i = 0; i < LEVEL_11.timeLimit && !state.ended; i++){
+    const move = stage < steps ? BELFRY_PLAN[stage] : null;
+    if(move){
+      if(turns && move.turn != null && !held){
+        const d = state.ducks.find(k => k.state === 'walking'
+          && Math.round(k.x) === move.turn && k.y === move.y);
+        if(d && assignSkill(state, d.id, 'blocker')) held = d;
+      }
+      if(!move.turn || !turns || held){
+        const d = state.ducks.find(k => k.state === 'walking'
+          && Math.round(k.x) === move.at && k.y === move.y && k.dir === move.dir);
+        if(d && assignSkill(state, d.id, 'builder')){
+          kinds.push(d.buildLevel ? 'level' : 'climb');
+          dirs.push(d.dir);
+          stage++;
+          held = null;
+        }
+      }
+    }
+    tick(state);
+  }
+  return { state, built: stage, kinds, dirs };
+}
+
+test('The Belfry can be won by switchbacking up its floors', () => {
+  const { state, built, kinds, dirs } = playLevel11();
+  assert.equal(built, 5, 'all five ramps should have gone in');
+  assert.deepEqual(kinds, ['climb', 'climb', 'climb', 'level', 'climb'],
+    'three single ramps, then the climb-level-climb staircase');
+  assert.equal(state.ended, 'won');
+  assert.ok(state.saved >= winCount(LEVEL_11), `only ${state.saved} saved, needed ${winCount(LEVEL_11)}`);
+});
+
+test('The Belfry is built both ways round — a ramp each direction is unavoidable', () => {
+  const { dirs } = playLevel11();
+  assert.ok(dirs.includes(1), 'something has to be built left to right');
+  assert.ok(dirs.includes(-1), 'and something right to left');
+});
+
+test('The Belfry cannot be climbed without the Blockers that turn the flock', () => {
+  const { state, built } = playLevel11({ turns: false });
+  assert.ok(built <= 1, 'nothing past the first floor can even be built');
+  assert.equal(state.saved, 0);
+  assert.notEqual(state.ended, 'won');
+});
+
+test('every one of The Belfry\'s five ramps is load-bearing', () => {
+  for(let n = 1; n < BELFRY_PLAN.length; n++){
+    const { state } = playLevel11({ steps: n });
+    assert.equal(state.saved, 0, `${n} of five ramps should save nobody`);
+    assert.notEqual(state.ended, 'won');
+  }
+});
+
+test('The Belfry crosses its chasm by teleporter and by nothing else', () => {
+  const { state } = playLevel11();
+  assert.ok(state.warps >= state.saved, 'everything saved went through the pads');
+
+  // The gap really is past anything that could be built across it: from
+  // the end of floor C to the start of floor D there is nothing at all a
+  // duckling could stand on, and it is wider than a ramp is long.
+  const [, , c, d] = LEVEL_11.islands;
+  const gap = d.from - c.to;
+  assert.ok(gap > BUILD_MAX_STEPS, `the chasm is ${gap} columns and a ramp reaches ${BUILD_MAX_STEPS}`);
+  const terrain = buildTerrain(LEVEL_11.segments, LEVEL_11.width);
+  for(let x = c.to; x < d.from; x++){
+    assert.ok(terrain[x] >= SCENE_H, `column ${x} should be open air`);
+    assert.ok(!LEVEL_11.islands.some(i => x >= i.from && x < i.to),
+      `and no floor should stand in it at ${x}`);
+  }
+  // And the pads are at the two lips of it.
+  const [pad] = LEVEL_11.teleports;
+  assert.ok(pad.ax < c.to && pad.ax >= c.from, 'the near pad stands on floor C');
+  assert.ok(pad.bx >= d.from && pad.bx < d.to, 'the far pad stands on floor D');
+});
+
+test('The Belfry supplies no Digger, and has nothing one could be spent on', () => {
+  assert.equal(LEVEL_11.supply.digger, 0);
+  const state = newGame(LEVEL_11);
+  // Every wall on the level is the pen's own rock, which refuses a tunnel.
+  const terrain = state.terrain;
+  for(let x = 1; x < LEVEL_11.width; x++){
+    const rise = terrain[x - 1] - terrain[x];
+    if(rise > WALK_STEP && terrain[x] < SCENE_H){
+      assert.ok(state.rock[x], `the wall at ${x} should be rock, not something to tunnel`);
+    }
+  }
+});
+
+test('The Belfry stacks its floors clear of each other, with the pond on the top one', () => {
+  const [a, b, c, d] = LEVEL_11.islands;
+  // Each floor is one ramp's climb above the last.
+  assert.equal(150 - a.y, BUILD_RISE_HEIGHT);
+  assert.equal(a.y - b.y, BUILD_RISE_HEIGHT);
+  assert.equal(b.y - c.y, 2 * BUILD_RISE_HEIGHT, 'B to C is the double climb');
+  // And staggered, so each is reached walking the other way.
+  assert.ok(b.from < a.from, 'B lies back to the left of A');
+  assert.ok(c.to > b.to, 'C lies back to the right of B');
+  // Headroom: nothing walks along one floor with another in its face.
+  for(const [over, under] of [[b, a], [c, b]]){
+    assert.ok(under.y - over.floor > WALK_STEP, 'a floor wants air over the one below it');
+  }
+  assert.ok(LEVEL_11.goalX > d.from && LEVEL_11.goalX < d.to, 'the pond is the end of floor D');
 });
 
 test('formatTime reads as minutes:seconds', () => {
