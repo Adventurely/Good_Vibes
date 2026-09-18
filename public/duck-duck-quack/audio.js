@@ -588,65 +588,121 @@ export function createAudio(){
 
   /* ---- sound effects ------------------------------------------------ */
 
-  /* A quack, built the way a quack actually works rather than as one blip —
-   * which is what an earlier pass of this was, and it sounded like a
-   * microwave because that is what a bare sawtooth through one filter is.
+  /* A quack, built out of what a duck actually is.
    *
-   * Three formants in parallel rather than one bandpass: a single filter
-   * gives a nasal "wah", but a bank of them is what gives a sound a throat.
-   * The middle of the note dips and comes back up rather than holding flat,
-   * which is what makes it land as "qua-ack" — two syllables of one call —
-   * instead of one flat blast. And a slow warble on the frequency supplies
-   * the rasp; a perfectly steady pitch is a synth patch, never an animal.
+   * The first pass at this was a sawtooth through three formants at
+   * 850/1900/3000 Hz with the pitch swooping 430 -> 590 -> 240, which is a
+   * human "a" vowel sung by a kazoo. It is not what a mallard does, and it
+   * sounded like it. This one is built from the published acoustics
+   * instead, and every number below is either measured from a bird or
+   * derived from one:
+   *
+   *   Source. The syrinx is a pair of membranes slapping shut, so the
+   *   source is a pulse train — near-flat in the harmonics, not a
+   *   sawtooth's 6 dB an octave, which is why the old one had nothing left
+   *   above 2 kHz and a quack has energy out past 6. F0 sits around 200 Hz
+   *   and barely moves: 230 falling to 178 over the note. The old swoop up
+   *   through 590 was most of why it read as cartoon rather than bird.
+   *
+   *   Filter. A mallard's trachea is 14-18 cm, open at one end, which is a
+   *   quarter-wave tube: its resonances are the odd series c/4L, 3c/4L,
+   *   5c/4L... At 16 cm that is 536, 1608, 2680 and 3752 Hz, and those are
+   *   the formants. Their Q is low, because a tube is a broad resonator —
+   *   narrow bands leave canyons between the formants that no animal has.
+   *   The levels climb up the series to pay back the source's own rolloff:
+   *   the tube does not favour its first resonance, the source does.
+   *
+   *   Rasp. A quack is broadband, roughly 0.1 to 8 kHz. A little noise
+   *   around 2.2 kHz rides the same envelope, as its own layer rather than
+   *   pushed through the formants — noise through narrow bandpasses comes
+   *   out as a hum.
+   *
+   *   Shape. A hard onset, a brief hold and a decay. One note struck, not a
+   *   syllable that dips in the middle the way the old one did; and the
+   *   formants slide down a fifth over the note, which is the bill closing.
    */
-  const QUACK_FORMANTS = [[850, 7, 1], [1900, 9, 0.55], [3000, 11, 0.28]];
+  const TRACHEA_CM = 16;
+  const QUACK_F1 = 34300 / (4 * TRACHEA_CM);   // 536 Hz, and the series off it
 
-  function quackSyllable(t, dur, vol){
-    const o = ctx.createOscillator();
-    o.type = 'sawtooth';
-    o.frequency.setValueAtTime(430, t);
-    o.frequency.exponentialRampToValueAtTime(590, t + 0.022);
-    o.frequency.exponentialRampToValueAtTime(240, t + dur);
+  /* [which resonance of the series, Q, level]. The Qs were picked by
+     rendering the thing offline and looking at where the energy actually
+     landed: at 2 and above there is a hole between the first and second
+     resonances twenty-four decibels deep, which no animal has, and at 1.2
+     the resonances smear together and the tube stops being a tube. At 1.6
+     the spectrum runs unbroken from 250 Hz to 6 kHz — which is the band a
+     mallard's quack is measured to occupy — with the series still legible
+     in it. */
+  const QUACK_TUBE = [[1, 1.6, 1], [3, 1.92, 0.9], [5, 2.24, 0.7], [7, 2.56, 0.45]];
 
-    // The rasp: a slow warble either side of the note, not enough to read
-    // as vibrato, just enough to stop it sitting perfectly still.
-    const rasp = ctx.createOscillator();
-    rasp.type = 'sine';
-    rasp.frequency.value = 50;
-    const raspDepth = ctx.createGain();
-    raspDepth.gain.value = 26;
-    rasp.connect(raspDepth).connect(o.frequency);
+  // Built once and reused: the harmonics of the syringeal pulse, rolled off
+  // at 1/n^0.35 — about 3 dB an octave, near enough flat to carry the tube's
+  // upper resonances.
+  let quackWave = null;
+  function pulseWave(){
+    if(quackWave) return quackWave;
+    const N = 40;
+    const real = new Float32Array(N), imag = new Float32Array(N);
+    for(let n = 1; n < N; n++) imag[n] = 1 / Math.pow(n, 0.35);
+    quackWave = ctx.createPeriodicWave(real, imag);
+    return quackWave;
+  }
 
-    // The articulation: a dip a third of the way through and back up. This
-    // is the "qu-ack" split, not the pitch bend above — that shapes the
-    // note, this shapes the syllable.
-    const env = ctx.createGain();
-    env.gain.setValueAtTime(0.0001, t);
-    env.gain.exponentialRampToValueAtTime(1, t + 0.012);
-    env.gain.exponentialRampToValueAtTime(0.32, t + dur * 0.32);
-    env.gain.exponentialRampToValueAtTime(1, t + dur * 0.48);
-    env.gain.setValueAtTime(1, t + dur * 0.62);
-    env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-
+  function quackSyllable(t, dur, vol, f0 = 230, fEnd = 178){
     const out = ctx.createGain();
     out.gain.value = vol;
-    env.connect(out).connect(bus);
+    out.connect(bus);
 
-    // Each formant falls with the pitch as the bill closes, same as the
-    // note itself, just centred at a different resonance.
-    for(const [freq, q, level] of QUACK_FORMANTS){
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.exponentialRampToValueAtTime(1, t + 0.006);
+    env.gain.setValueAtTime(1, t + dur * 0.18);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    env.connect(out);
+
+    const o = ctx.createOscillator();
+    o.setPeriodicWave(pulseWave());
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(fEnd, t + dur);
+
+    // Jitter: a real pair of membranes never holds a perfectly steady
+    // pitch, and a perfectly steady one is always a synth.
+    const jitter = ctx.createOscillator();
+    jitter.type = 'sine';
+    jitter.frequency.value = 44;
+    const jitterDepth = ctx.createGain();
+    jitterDepth.gain.value = 12;
+    jitter.connect(jitterDepth).connect(o.frequency);
+
+    for(const [mult, q, level] of QUACK_TUBE){
+      const f = QUACK_F1 * mult;
       const band = ctx.createBiquadFilter();
       band.type = 'bandpass';
-      band.frequency.setValueAtTime(freq, t);
-      band.frequency.exponentialRampToValueAtTime(freq * 0.62, t + dur);
+      band.frequency.setValueAtTime(f, t);
+      band.frequency.exponentialRampToValueAtTime(f * 0.82, t + dur);
       band.Q.value = q;
-      const fg = ctx.createGain();
-      fg.gain.value = level;
-      o.connect(band).connect(fg).connect(env);
+      const g = ctx.createGain();
+      g.gain.value = level;
+      o.connect(band).connect(g).connect(env);
     }
 
+    // The rasp.
+    const nz = ctx.createBufferSource();
+    const n = Math.floor(ctx.sampleRate * (dur + 0.05));
+    const buf = ctx.createBuffer(1, n, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for(let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    nz.buffer = buf;
+    const raspBand = ctx.createBiquadFilter();
+    raspBand.type = 'bandpass';
+    raspBand.frequency.value = 2200;
+    raspBand.Q.value = 0.7;
+    const raspGain = ctx.createGain();
+    raspGain.gain.value = 0.12;
+    nz.connect(raspBand).connect(raspGain).connect(env);
+
     o.start(t); o.stop(t + dur + 0.02);
-    rasp.start(t); rasp.stop(t + dur + 0.02);
+    jitter.start(t); jitter.stop(t + dur + 0.02);
+    nz.start(t); nz.stop(t + dur + 0.02);
   }
 
   /* The duckling that just made it.
@@ -662,14 +718,20 @@ export function createAudio(){
     // than evenly spaced, and a little quieter and shorter — an echo of the
     // first, not a repeat of it.
     quack(t){
+      /* The decrescendo call, which is the one a mallard is famous for: a
+         run of notes with the accent on the first and each one after it
+         quieter, shorter and a shade lower. Two of them here rather than
+         the two-to-ten a real bird uses — this fires once per duckling
+         saved, up to twenty times in a run, and a full descrescendo every
+         time would be the loudest thing in the game by a distance. */
       // A short puff of breath on the attack, under the note rather than
       // in front of it — this is the air, not the voice.
-      hit(t, 0.03, 0.05, 1400, 'bandpass');
-      quackSyllable(t, 0.18, 0.6);
+      hit(t, 0.02, 0.04, 1800, 'bandpass');
+      quackSyllable(t, 0.20, 0.62, 230, 178);
 
-      const t2 = t + 0.19;
-      hit(t2, 0.025, 0.04, 1400, 'bandpass');
-      quackSyllable(t2, 0.15, 0.48);
+      const t2 = t + 0.23;
+      hit(t2, 0.018, 0.03, 1800, 'bandpass');
+      quackSyllable(t2, 0.16, 0.43, 216, 172);
     },
 
     /* The duckling that didn't — two sounds, not one, matching the poof it
