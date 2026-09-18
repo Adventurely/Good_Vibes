@@ -233,6 +233,15 @@
   #gear-tabs .tab{ flex:0 0 auto; padding:.45rem .7rem; }
   #gear-body{ padding:.55rem; display:flex; flex-direction:column; gap:.35rem; }
   #gear-body .btn{ width:100%; text-align:left; }
+  /* The Sound tab: a switch and a slider, each with its word on the left. The
+     switch is a button that says which way it is, rather than a checkbox,
+     because it is the same shape as every other control in this menu. */
+  #gear-body .row{ display:flex; align-items:center; justify-content:space-between; gap:.6rem; font-size:.82rem; color:var(--dim); }
+  #gear-body .row .btn{ width:auto; min-width:4.2rem; text-align:center; flex:0 0 auto; }
+  #gear-body .row .btn[aria-pressed="true"]{ color:var(--gold-ink); border-color:var(--gold-2); }
+  #gear-body input[type=range]{ flex:1 1 auto; min-width:0; accent-color:var(--gold); cursor:pointer; margin:0; }
+  #gear-body input[type=range]:disabled{ opacity:.4; cursor:default; }
+  #gear-body .row output{ flex:0 0 2.4em; text-align:right; font-variant-numeric:tabular-nums; color:var(--ink); }
 
   /* ---- The panel: right column on wide screens, a sheet on narrow ---- */
   #panel{
@@ -746,6 +755,7 @@
 <div id="gearmenu" role="dialog" aria-label="Settings" hidden>
   <div id="gear-tabs" role="tablist" aria-label="Settings sections">
     <button class="tab" role="tab" data-gtab="game" aria-selected="true" aria-controls="gear-body">Game</button>
+    <button class="tab" role="tab" data-gtab="sound" aria-selected="false" aria-controls="gear-body">Sound</button>
   </div>
   <div id="gear-body" role="tabpanel"></div>
 </div>
@@ -811,6 +821,7 @@ import * as S from './sim.js';
 import { CONST, PORTS, GOODS, UPGRADES, TEXT, SPECIES, GLOSSARY, BELT_ROCKS, ARC_DEBRIS } from './content.js';
 import { segmentApses, norm, sub, add, unit, dist, absState, elementsFromState } from './orbit.js';
 import { playIntro } from './intro.js';
+import { createAudio } from './audio.js';
 
 const world = S.world;
 const $ = id => document.getElementById(id);
@@ -1018,6 +1029,7 @@ function frame(now){
     else if(events.length) replan(true);
     else replan(false);
   }
+  syncMusic();
   /* Crossing into a moon's reach changes what the chart is about by four
      orders of magnitude. The lock follows it; so must the zoom, or the new
      orbit is a dot or a wall. */
@@ -1453,10 +1465,19 @@ $('m-dock').addEventListener('click', () => openMenu('dock'));
    and starts again exactly as it was — not simply running — so that opening
    the gear while paused and closing it again does not quietly set the ship
    moving. */
-/* The sections, and what is in each. One today; the shape is here so the next
-   one is a line rather than a rebuild. */
+/* The sections, and what is in each: the game, and the sound of it. */
 const GEAR_TABS = {
   game: () => `<button class="btn sm" id="gear-quit">&larr; Quit to title screen</button>`,
+  /* The music: on or off, and how loud. Both are remembered per browser, not
+     per save — a volume is a fact about the room the game is played in. */
+  sound: () => {
+    const on = audio.isOn(), pct = Math.round(audio.level() * 100);
+    return `<label class="row" for="gear-music"><span>Music</span>
+        <button class="btn sm" id="gear-music" aria-pressed="${on}">${on ? 'On' : 'Off'}</button></label>
+      <label class="row" for="gear-level"><span>Volume</span>
+        <input type="range" id="gear-level" min="0" max="100" step="5" value="${pct}" ${on ? '' : 'disabled'} aria-label="Music volume">
+        <output for="gear-level" id="gear-level-out">${pct}</output></label>`;
+  },
 };
 let gearTab = 'game';
 function renderGearTab(){
@@ -1467,6 +1488,18 @@ function renderGearTab(){
   /* It saves as you play, but not necessarily in the last few seconds of it,
      so the way out writes the game down before it takes it. */
   $('gear-quit')?.addEventListener('click', () => { save(); location.href = './'; });
+  $('gear-music')?.addEventListener('click', () => {
+    audio.setOn(!audio.isOn());
+    /* The press is a gesture, so a browser that has been waiting for one to
+       let the music start has now had it. */
+    audio.unlock();
+    renderGearTab();
+    $('gear-music').focus();
+  });
+  $('gear-level')?.addEventListener('input', e => {
+    audio.setLevel(Number(e.target.value) / 100);
+    $('gear-level-out').textContent = e.target.value;
+  });
 }
 $('gear-tabs').addEventListener('click', e => {
   const b = e.target.closest('[data-gtab]');
@@ -3459,6 +3492,37 @@ $('grab').addEventListener('keydown', e => {
   else if(e.key === 'ArrowDown'){ e.preventDefault(); stepSheet(-1); }
 });
 
+/* ------------------------------------------------------------- music */
+
+/* Two tracks, and which one plays is the one fact the music needs from the
+   game: tied up somewhere with a market, or not. A hulk and a wreck are
+   alongside, not in port — the open-sky theme stays with them. See audio.js
+   for the tracks themselves and for the fade between them. */
+const audio = createAudio();
+function musicFor(){
+  const at = state.dockedAt;
+  return at && !S.isHulk(at) && !S.isWreck(at) ? 'port' : 'flight';
+}
+function syncMusic(){ audio.play(musicFor()); }
+syncMusic();
+
+/* Browsers let a page make sound only once somebody has touched it, and they
+   do not agree on which touch counts: Safari has always honoured `touchend`
+   and `click` most reliably, `pointerdown` being newer and less certain. So
+   the first attempt is made now — a player who clicked through from the
+   title screen has usually touched the site enough for the browser — and
+   then every kind of gesture keeps trying until the context confirms it is
+   running, since the first `resume()` can fail silently. `unlock()` no-ops
+   once it has worked. */
+const UNLOCK_EVENTS = ['pointerdown', 'touchend', 'mousedown', 'click', 'keydown'];
+const tryUnlock = () => {
+  audio.unlock();
+  if(!audio.isRunning()) return;
+  for(const type of UNLOCK_EVENTS) removeEventListener(type, tryUnlock, true);
+};
+for(const type of UNLOCK_EVENTS) addEventListener(type, tryUnlock, true);
+tryUnlock();
+
 renderTabs();
 togglePanel(panelOpen, true);
 replan(true);
@@ -3476,8 +3540,13 @@ if(state.pending?.kind === 'toll') showToll(state.pending);
 if(state.pending?.kind === 'crash') showCrash(state.pending.body);
 if(filmWanted(fresh)) rollFilm(startClock);
 else startClock();
-addEventListener('pagehide', save);
-document.addEventListener('visibilitychange', () => { if(document.hidden) save(); else last = performance.now(); });
+addEventListener('pagehide', () => { save(); audio.stop(); });
+document.addEventListener('visibilitychange', () => {
+  if(document.hidden) save(); else last = performance.now();
+  /* The clock stops with the tab; so does the music, and for the same reason
+     — see `hidden` in audio.js. */
+  audio.hidden(document.hidden);
+});
 </script>
 </body>
 </html>

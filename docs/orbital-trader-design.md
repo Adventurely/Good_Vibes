@@ -1458,6 +1458,12 @@ A fully hand-drawn navigation chart was considered and ruled out as unrealistic 
 
 **Decided since the first draft.** The bodies are sixteen-pixel sprites — generated for the spheres, hand-drawn for everything that is not one — and a new game opens with a six-and-a-half-second pixel film of a harbour lighter leaving Tassel's ocean: out of the water, through the cloud deck, and into the dark. It is a cutscene over an orbital rendezvous rather than a landing (2.3): the lighter touches water, the merchant ship never does, and the player still starts in orbit with nothing to cast off from. It plays for a new ship only, it is skippable with any key, and the clock waits for it.
 
+### 7.6.1 Music — built
+
+Two tracks, synthesised in the page the way the other games here do it, with nothing to fetch. **Flight** is the open sky: slow, mostly sustained chords in D with ninths, a pentatonic line that rests more than it plays, no drums, because most of a voyage is a coast and the tune should coast too. **Port** is being tied up: warmer and busier, G major with sixths, a bass walking root and fifth under every bar, brushes on the backbeats. A hulk or a wreck is *alongside*, not in port, so the sky's theme stays with them. A change of state cross-fades between the two rather than cutting: a docking is an arrival and should sound like one.
+
+Nothing plays until the browser allows it, which is a gesture on most of them; the page tries at boot for the ones that count the click through from the title screen, and keeps trying on every kind of gesture until the context confirms it is running. The tab going hidden suspends the music the way it stops the clock. The two controls — on or off, and how loud — live in the gear menu under a **Sound** tab, and persist per browser rather than per save: how loud a game is is a fact about the room, not the ship.
+
 ### 7.7 Open Technical Questions
 
 **Decided since the first draft**, and recorded above rather than here: burns are instantaneous impulses (2.2); the control is four buttons on two axes, reached by tapping the road (2.2); there is no landing and the game starts in orbit (2.3); the clock is tuned to a lap of the low orbit the game opens in, about eleven real minutes, with no warp ladder and skipping by pointing at a place (2.6); the chart is locked to the body the ship orbits and draws only the immediate orbit plus the next crossing (2.6.1); the opening mission is a single errand to Slate.

@@ -11,6 +11,7 @@ import {
 import * as S from '../public/orbital-trader/sim.js';
 import { createChart, railCrossings, railLead, locateOnPrediction, pathAnchors, KM_PER_AU, PALETTE, haze, bodyColour, fmtAu } from '../public/orbital-trader/render.js';
 import { DURATION, BREACH, BEATS, CAPTION_AT, beatAt, ascent, skyAt, ROCKET } from '../public/orbital-trader/intro.js';
+import { SONGS, QUALITIES, MUSIC_KEY, readMusicPrefs, writeMusicPrefs, createAudio } from '../public/orbital-trader/audio.js';
 
 /* Orbital Trader has no server: everything it knows is in public/ and is
  * imported here as the browser imports it. These tests are the gate that a
@@ -5665,4 +5666,90 @@ test('a transfer that just touches a rail is marked where it touches', () => {
     const railR = b.e ? b.a * (1 - b.e * b.e) / (1 + b.e * Math.cos(Math.atan2(c.r[1], c.r[0]) - (b.omega ?? 0))) : b.a;
     assert.ok(Math.abs(O.norm(c.r) - railR) < Math.max(1e-9, railR * 1e-6), `${b.name}: the mark is not on its rail`);
   }
+});
+
+/* ------------------------------------------------------------- music */
+
+/* The tracks are data the scheduler walks, and every way of getting a note
+ * wrong fails the same silent way: an exception inside a setInterval, in a
+ * console nobody has open, and a page that is simply quiet. So the shape is
+ * checked here rather than by listening.
+ */
+test('every track is playable data rather than a silent typo', () => {
+  assert.ok(SONGS.flight && SONGS.port, 'the sky and the port each need a theme');
+  for(const [name, song] of Object.entries(SONGS)){
+    const where = `track "${name}"`;
+    assert.ok(song.bpm > 40 && song.bpm < 220, `${where}: ${song.bpm} bpm is not a tempo`);
+    assert.ok(Array.isArray(song.bars) && song.bars.length, `${where}: no bars`);
+    assert.ok(!song.arpEvery || song.arpEvery >= 1, `${where}: the arpeggio would divide by zero`);
+    assert.ok(Array.isArray(song.brushAt) && Array.isArray(song.tickAt), `${where}: percussion is a list of steps`);
+    for(const bar of song.bars){
+      const [root, quality] = bar.chord;
+      assert.ok(QUALITIES[quality], `${where}: unknown chord quality "${quality}"`);
+      assert.ok(root > 20 && root < 100, `${where}: root ${root} is off the keyboard`);
+    }
+    const steps = song.bars.length * 16;
+    for(const [at, note, len] of song.lead){
+      assert.ok(at >= 0 && at < steps, `${where}: a note at step ${at} never plays (${steps} steps)`);
+      assert.ok(note > 20 && note < 120, `${where}: note ${note} is off the keyboard`);
+      assert.ok(len > 0, `${where}: a note of length ${len} is silence`);
+    }
+    for(const [at, semis, len] of song.bass){
+      assert.ok(at >= 0 && at < 16, `${where}: a bass note at step ${at} of a sixteen-step bar`);
+      assert.ok(semis >= -12 && semis <= 24, `${where}: bass interval ${semis} is nowhere near the root`);
+      assert.ok(len > 0, `${where}: a bass note of length ${len} is silence`);
+    }
+    for(const s of [...song.brushAt, ...song.tickAt]) assert.ok(s >= 0 && s < 16, `${where}: a hit at step ${s} of sixteen`);
+  }
+});
+
+/* The two settings live in the browser, not in the save: how loud a game is
+   is a fact about the room, and it should survive a new ship. */
+test('music preferences round-trip through a store and shrug off a bad one', () => {
+  const mem = new Map();
+  const st = { getItem: k => mem.has(k) ? mem.get(k) : null, setItem: (k, v) => mem.set(k, v) };
+  assert.deepEqual(readMusicPrefs(st), { on: true, level: 0.7 }, 'nothing stored is the defaults');
+  assert.ok(writeMusicPrefs({ on: false, level: 0.25 }, st));
+  assert.deepEqual(readMusicPrefs(st), { on: false, level: 0.25 });
+  writeMusicPrefs({ on: 'yes', level: 4 }, st);
+  assert.deepEqual(readMusicPrefs(st), { on: true, level: 1 }, 'a level past the top is the top');
+  mem.set(MUSIC_KEY, 'not json');
+  assert.deepEqual(readMusicPrefs(st), { on: true, level: 0.7 }, 'garbage in the store is the defaults, not a throw');
+  mem.set(MUSIC_KEY, JSON.stringify({ level: 'loud' }));
+  assert.deepEqual(readMusicPrefs(st), { on: true, level: 0.7 }, 'a field of the wrong kind is its default');
+  const broken = { getItem(){ throw new Error('blocked'); }, setItem(){ throw new Error('blocked'); } };
+  assert.deepEqual(readMusicPrefs(broken), { on: true, level: 0.7 });
+  assert.equal(writeMusicPrefs({ on: true, level: 0.5 }, broken), false);
+});
+
+/* Without a window there is no AudioContext, and the engine has to be a
+   quiet object rather than a thrown error — the page builds it before the
+   first gesture, and a private window may never grant one. */
+test('the engine remembers what it was asked for while it cannot play', () => {
+  const mem = new Map();
+  const st = { getItem: k => mem.has(k) ? mem.get(k) : null, setItem: (k, v) => mem.set(k, v) };
+  const audio = createAudio({ store: st });
+  assert.equal(audio.isOn(), true);
+  assert.equal(audio.current(), null);
+  audio.play('flight');
+  audio.unlock();                                  // no AudioContext here: nothing to build
+  assert.equal(audio.isRunning(), false);
+  assert.equal(audio.current(), null, 'nothing plays without a context');
+  audio.setLevel(0.3);
+  audio.setOn(false);
+  assert.deepEqual(readMusicPrefs(st), { on: false, level: 0.3 }, 'the switch and the slider are written down');
+  audio.setOn(true);
+  audio.hidden(true); audio.hidden(false);
+  audio.stop();
+  assert.equal(audio.current(), null);
+});
+
+test('the play page has the music, and its controls are in the gear menu', () => {
+  const html = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.match(html, /import \{ createAudio \} from '\.\/audio\.js'/);
+  assert.match(html, /data-gtab="sound"/, 'a Sound tab in the settings menu');
+  assert.match(html, /id="gear-music"/, 'a switch for the music');
+  assert.match(html, /id="gear-level"[^>]*type="range"|type="range"[^>]*id="gear-level"/, 'a volume slider');
+  assert.match(html, /audio\.play\(/, 'the page asks for a track');
+  assert.match(html, /audio\.stop\(\)/, 'and lets go of it when the page goes');
 });
