@@ -130,6 +130,22 @@ for(const [i, x] of (dialogue.exchanges ?? []).entries()){
   const mustBeAboard = new Set([x?.who, ...(x?.needs ?? []), ...(x?.lines ?? []).map(l => l?.who)]);
   mustBeAboard.delete('captain');
   for(const id of mustBeAboard) need(berths.has(id), at, `nobody fills the berth ${id}`);
+  /* What is said when one of them is not there. A fallback may only name a
+     berth the exchange actually leans on — the speaker's own is not one, they
+     are the one pressing — and may only be spoken by the two people certain
+     to be aboard, or it would need a fallback of its own. */
+  if(x?.without !== undefined){
+    need(x.without && typeof x.without === 'object' && !Array.isArray(x.without), at, '`without` is a map of berth to lines');
+    const leansOn = new Set(mustBeAboard); leansOn.delete(x?.who);
+    for(const [berth, lines] of Object.entries(x.without ?? {})){
+      need(leansOn.has(berth), at, `without: the exchange does not need the ${berth}`);
+      need(Array.isArray(lines) && lines.length > 0, at, `without ${berth}: nothing is said instead`);
+      for(const l of lines ?? []){
+        need(l?.who === x?.who || l?.who === 'captain', at, `without ${berth}: only ${x?.who} and the captain are certain to be there to say it, not ${l?.who}`);
+        need(typeof l?.say === 'string' && l.say.length > 0, at, `without ${berth}: ${l?.who} has nothing to say`);
+      }
+    }
+  }
 }
 
 if(problems.length){

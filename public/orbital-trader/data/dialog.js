@@ -3,71 +3,414 @@
 export const DIALOGUE = {
  "exchanges": [
   {
-   "id": "any-captain",
+   "id": "any-captain-1",
    "at": "*",
    "who": "captain",
    "lines": [
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "Nothing to do but watch the worlds go round. Uncle Theo says that is not nothing. Uncle Theo has never left the raft."
     }
    ]
   },
   {
-   "id": "any-engineer",
+   "id": "any-captain-2",
+   "at": "*",
+   "who": "captain",
+   "needs": [
+    "engineer"
+   ],
+   "lines": [
+    {
+     "who": "captain",
+     "say": "Kiran. Is that noise the engine?"
+    },
+    {
+     "who": "engineer",
+     "say": "That noise is the hull cooling. The engine is the one you cannot hear, which is how you want it."
+    },
+    {
+     "who": "captain",
+     "say": "Good. Carry on not hearing it."
+    }
+   ],
+   "without": {
+    "engineer": [
+     {
+      "who": "captain",
+      "say": "That noise is either the hull cooling or something I ought to have an engineer for."
+     },
+     {
+      "who": "captain",
+      "say": "There is a forge on Cinder, the Ninth. Theo says the engineers there take things apart for fun, and one of them has run out of things."
+     }
+    ]
+   }
+  },
+  {
+   "id": "any-captain-3",
+   "at": "*",
+   "who": "captain",
+   "needs": [
+    "navigator"
+   ],
+   "lines": [
+    {
+     "who": "captain",
+     "say": "Tsuki. Where are we?"
+    },
+    {
+     "who": "navigator",
+     "say": "Where you put us."
+    },
+    {
+     "who": "captain",
+     "say": "And where is that?"
+    },
+    {
+     "who": "navigator",
+     "say": "Look at the chart. I did."
+    }
+   ],
+   "without": {
+    "navigator": [
+     {
+      "who": "captain",
+      "say": "I could ask somebody where we are, if there were anybody to ask."
+     },
+     {
+      "who": "captain",
+      "say": "The cats at Nail read the sky for a living. The bar at the middle of the rock is where you would start."
+     }
+    ]
+   }
+  },
+  {
+   "id": "any-captain-4",
+   "at": "*",
+   "who": "captain",
+   "needs": [
+    "appraiser"
+   ],
+   "lines": [
+    {
+     "who": "captain",
+     "say": "Wicket. What is that humming?"
+    },
+    {
+     "who": "appraiser",
+     "say": "Me. It helps the coast go by."
+    },
+    {
+     "who": "captain",
+     "say": "It is a four-month coast."
+    },
+    {
+     "who": "appraiser",
+     "say": "Then I am glad I started early."
+    }
+   ],
+   "without": {
+    "appraiser": [
+     {
+      "who": "captain",
+      "say": "Quiet ship. A frog would hum through this, I am told."
+     },
+     {
+      "who": "captain",
+      "say": "There is one on the rafts at Brine who wants three odd things brought to one table. I should go and ask what."
+     }
+    ]
+   }
+  },
+  {
+   "id": "any-engineer-1",
    "at": "*",
    "who": "engineer",
    "lines": [
     {
      "who": "engineer",
-     "say": "Hello Captain!"
+     "say": "The tank reads a shade under what you paid for. It always does. Nobody has ever sold an honest tank."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "Should I worry?"
+    },
+    {
+     "who": "engineer",
+     "say": "You should stop asking me on a coast. Ask me when we burn."
     }
    ]
   },
   {
-   "id": "any-navigator",
+   "id": "any-engineer-2",
+   "at": "*",
+   "who": "engineer",
+   "lines": [
+    {
+     "who": "engineer",
+     "say": "Eleven days of nothing. On Cinder the year would be a fifth gone."
+    },
+    {
+     "who": "captain",
+     "say": "You could take something apart."
+    },
+    {
+     "who": "engineer",
+     "say": "I have. I put it back before you noticed."
+    }
+   ]
+  },
+  {
+   "id": "any-engineer-3",
+   "at": "*",
+   "who": "engineer",
+   "needs": [
+    "appraiser"
+   ],
+   "lines": [
+    {
+     "who": "engineer",
+     "say": "Wicket. The hull is ringing."
+    },
+    {
+     "who": "appraiser",
+     "say": "The hull is always ringing. You have only just stopped moving long enough to hear it."
+    },
+    {
+     "who": "engineer",
+     "say": "Is it a bad note?"
+    },
+    {
+     "who": "appraiser",
+     "say": "It is a hull. There are no bad notes, only ones you were not expecting."
+    }
+   ],
+   "without": {
+    "appraiser": [
+     {
+      "who": "engineer",
+      "say": "The hull is ringing. I can tell you what it is made of and not what the note means."
+     },
+     {
+      "who": "captain",
+      "say": "Who could?"
+     },
+     {
+      "who": "engineer",
+      "say": "A frog. There is one on the rafts at Brine who taps things for a living, if you believe the apothecaries."
+     }
+    ]
+   }
+  },
+  {
+   "id": "any-navigator-1",
    "at": "*",
    "who": "navigator",
    "lines": [
     {
      "who": "navigator",
-     "say": "Hello Captain!"
+     "say": "Go round it. Not past it."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "Round what?"
+    },
+    {
+     "who": "navigator",
+     "say": "You will see it before I have to say."
     }
    ]
   },
   {
-   "id": "any-appraiser",
+   "id": "any-navigator-2",
+   "at": "*",
+   "who": "navigator",
+   "lines": [
+    {
+     "who": "navigator",
+     "say": "The road ahead is safe."
+    },
+    {
+     "who": "captain",
+     "say": "That is good."
+    },
+    {
+     "who": "navigator",
+     "say": "I did not say it was good."
+    }
+   ]
+  },
+  {
+   "id": "any-navigator-3",
+   "at": "*",
+   "who": "navigator",
+   "needs": [
+    "engineer"
+   ],
+   "lines": [
+    {
+     "who": "navigator",
+     "say": "Your engine is loud."
+    },
+    {
+     "who": "engineer",
+     "say": "My engine is working. Yours would be quieter."
+    },
+    {
+     "who": "navigator",
+     "say": "Yes."
+    }
+   ],
+   "without": {
+    "engineer": [
+     {
+      "who": "navigator",
+      "say": "Something is loose in the engine room. I can hear it from here."
+     },
+     {
+      "who": "captain",
+      "say": "I have nobody to send."
+     },
+     {
+      "who": "navigator",
+      "say": "The Ninth Forge, on Cinder. Somebody there will want to leave."
+     }
+    ]
+   }
+  },
+  {
+   "id": "any-appraiser-1",
    "at": "*",
    "who": "appraiser",
    "lines": [
     {
      "who": "appraiser",
-     "say": "Hello Captain!"
+     "say": "The slow road is the honest road. It arrives with everything it left with."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "Including us, ideally."
+    },
+    {
+     "who": "appraiser",
+     "say": "Ideally."
     }
    ]
   },
   {
-   "id": "cinder-captain",
+   "id": "any-appraiser-2",
+   "at": "*",
+   "who": "appraiser",
+   "lines": [
+    {
+     "who": "appraiser",
+     "say": "I have been listening to the ship. Every ship rings, if you are patient."
+    },
+    {
+     "who": "captain",
+     "say": "What note is ours?"
+    },
+    {
+     "who": "appraiser",
+     "say": "A little flat. Do not take it personally."
+    }
+   ]
+  },
+  {
+   "id": "any-appraiser-3",
+   "at": "*",
+   "who": "appraiser",
+   "needs": [
+    "navigator"
+   ],
+   "lines": [
+    {
+     "who": "appraiser",
+     "say": "Tsuki. What are you looking at?"
+    },
+    {
+     "who": "navigator",
+     "say": "The thing you are about to ask about."
+    },
+    {
+     "who": "appraiser",
+     "say": "I had not decided yet."
+    },
+    {
+     "who": "navigator",
+     "say": "You had."
+    }
+   ],
+   "without": {
+    "navigator": [
+     {
+      "who": "appraiser",
+      "say": "There is a point of empty sky out there that is not empty. I can feel it and I cannot point at it."
+     },
+     {
+      "who": "captain",
+      "say": "Who could?"
+     },
+     {
+      "who": "appraiser",
+      "say": "A cat. They have known where it is for nine generations. Ask at the bar on Nail; a cat captain there had a word she wanted carried."
+     }
+    ]
+   }
+  },
+  {
+   "id": "cinder-captain-1",
    "at": "cinder",
    "who": "captain",
    "lines": [
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "Half this city is seeing in the New Year and the other half is fitting engines. Nobody has told me which half we are in."
     }
    ]
+  },
+  {
+   "id": "cinder-captain-2",
+   "at": "cinder",
+   "who": "captain",
+   "needs": [
+    "engineer"
+   ],
+   "lines": [
+    {
+     "who": "captain",
+     "say": "Home, Kiran."
+    },
+    {
+     "who": "engineer",
+     "say": "The Forge is home. This is a dock with a party attached."
+    },
+    {
+     "who": "captain",
+     "say": "Do you want to look in?"
+    },
+    {
+     "who": "engineer",
+     "say": "I have seen it. I took most of it apart."
+    }
+   ],
+   "without": {
+    "engineer": [
+     {
+      "who": "captain",
+      "say": "The best engines anywhere, and I could not tell you which part of ours is which."
+     },
+     {
+      "who": "captain",
+      "say": "The Ninth Forge is somewhere in this twilight, here on Cinder. Theo says an engineer there has nothing left to take apart."
+     },
+     {
+      "who": "captain",
+      "say": "That sounds like an offer."
+     }
+    ]
+   }
   },
   {
    "id": "cinder-engineer",
@@ -76,11 +419,15 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "engineer",
-     "say": "Hello Captain!"
+     "say": "Every engine on this dock was built by somebody I have argued with."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "Did you win?"
+    },
+    {
+     "who": "engineer",
+     "say": "Look at ours. Then look at theirs. Yes."
     }
    ]
   },
@@ -91,11 +438,15 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "navigator",
-     "say": "Hello Captain!"
+     "say": "Too much ground. Too much light."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "We are docked. You do not have to go down."
+    },
+    {
+     "who": "navigator",
+     "say": "I know what docked means."
     }
    ]
   },
@@ -106,24 +457,62 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "appraiser",
-     "say": "Hello Captain!"
+     "say": "A coil wound here by hand, nine days in the making, rings a note. Listen."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "I cannot hear anything over the party."
+    },
+    {
+     "who": "appraiser",
+     "say": "That is the other thing this world makes."
     }
    ]
   },
   {
-   "id": "scorch-captain",
+   "id": "scorch-captain-1",
    "at": "scorch",
    "who": "captain",
    "lines": [
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "Everybody here is counting days. I asked a foreman how many. She told me to the hour."
     }
    ]
+  },
+  {
+   "id": "scorch-captain-2",
+   "at": "scorch",
+   "who": "captain",
+   "needs": [
+    "appraiser"
+   ],
+   "lines": [
+    {
+     "who": "captain",
+     "say": "Wicket. Are the fire crystals worth what they are asking?"
+    },
+    {
+     "who": "appraiser",
+     "say": "Kept cold, one is worth a week of light. Warm, it is worth a very short story."
+    },
+    {
+     "who": "captain",
+     "say": "Cold, then."
+    }
+   ],
+   "without": {
+    "appraiser": [
+     {
+      "who": "captain",
+      "say": "Fire crystals, cut cold, sold by the stone. I have no idea what one is worth, and I am not sure the foreman does."
+     },
+     {
+      "who": "captain",
+      "say": "There is a frog on the rafts at Brine who knows what things are, they say. Wicket. He wants three odd things on one table before he will talk."
+     }
+    ]
+   }
   },
   {
    "id": "scorch-engineer",
@@ -132,11 +521,15 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "engineer",
-     "say": "Hello Captain!"
+     "say": "The big hoist. Listen to it. That bearing is the one I put in."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "It sounds fine."
+    },
+    {
+     "who": "engineer",
+     "say": "It sounds like eleven minutes of my life, and it is welcome to them."
     }
    ]
   },
@@ -147,11 +540,15 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "navigator",
-     "say": "Hello Captain!"
+     "say": "Grey. Dust in the lock."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "The people are kind."
+    },
+    {
+     "who": "navigator",
+     "say": "The people are counting."
     }
    ]
   },
@@ -162,24 +559,66 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "appraiser",
-     "say": "Hello Captain!"
+     "say": "Emberstone. Warm a year out of the ground, and nobody will say why."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "Do you know why?"
+    },
+    {
+     "who": "appraiser",
+     "say": "I know that it is a question, which is further than most have got."
     }
    ]
   },
   {
-   "id": "veyra-captain",
+   "id": "veyra-captain-1",
    "at": "veyra",
    "who": "captain",
    "lines": [
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "Somebody wrote down that we arrived. Somebody else wrote down that it was written. I feel very documented."
     }
    ]
+  },
+  {
+   "id": "veyra-captain-2",
+   "at": "veyra",
+   "who": "captain",
+   "needs": [
+    "navigator"
+   ],
+   "lines": [
+    {
+     "who": "captain",
+     "say": "Tsuki. The steward wants to know who we are not speaking to."
+    },
+    {
+     "who": "navigator",
+     "say": "Nobody. Yet."
+    },
+    {
+     "who": "captain",
+     "say": "I will tell him that."
+    },
+    {
+     "who": "navigator",
+     "say": "Do not. It is a bid."
+    }
+   ],
+   "without": {
+    "navigator": [
+     {
+      "who": "captain",
+      "say": "The steward wants to know who I am not speaking to. A navigator, because I have not got one."
+     },
+     {
+      "who": "captain",
+      "say": "The cats at Nail have a bar at the centre of the rock. I am told that is where you ask."
+     }
+    ]
+   }
   },
   {
    "id": "veyra-engineer",
@@ -188,11 +627,15 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "engineer",
-     "say": "Hello Captain!"
+     "say": "Shade is property here. On Cinder we would have built something in it."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "You did not like it?"
+    },
+    {
+     "who": "engineer",
+     "say": "I liked it. I did not say I approved."
     }
    ]
   },
@@ -203,11 +646,15 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "navigator",
-     "say": "Hello Captain!"
+     "say": "Somebody is bidding against you."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "For what?"
+    },
+    {
+     "who": "navigator",
+     "say": "You have not decided yet. They have."
     }
    ]
   },
@@ -218,22 +665,37 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "appraiser",
-     "say": "Hello Captain!"
+     "say": "Three prices. The first two are theatre, and I enjoy theatre."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "And the third?"
+    },
+    {
+     "who": "appraiser",
+     "say": "The third is what it costs. Take your time over the first two."
     }
    ]
   },
   {
-   "id": "tassel-captain",
+   "id": "tassel-captain-1",
    "at": "tassel",
    "who": "captain",
    "lines": [
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "Three people offered me tea before the end of the pier, and one of them was a cousin. Nobody mentioned the raft. Everybody meant it."
+    }
+   ]
+  },
+  {
+   "id": "tassel-captain-2",
+   "at": "tassel",
+   "who": "captain",
+   "lines": [
+    {
+     "who": "captain",
+     "say": "Aunt Nellie waved from the dry-dock raft. Uncle Theo pretended not to, and then did."
     }
    ]
   },
@@ -244,11 +706,15 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "engineer",
-     "say": "Hello Captain!"
+     "say": "A hundred hulls lashed together, and not one of them rated for it."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "It has held for four hundred years."
+    },
+    {
+     "who": "engineer",
+     "say": "Then somebody is doing the sums and not telling anyone."
     }
    ]
   },
@@ -259,39 +725,119 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "navigator",
-     "say": "Hello Captain!"
+     "say": "Water. All of it moving."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "It is where I grew up."
+    },
+    {
+     "who": "navigator",
+     "say": "I am staying on the ship."
     }
    ]
   },
   {
-   "id": "tassel-appraiser",
+   "id": "tassel-appraiser-1",
    "at": "tassel",
    "who": "appraiser",
    "lines": [
     {
      "who": "appraiser",
-     "say": "Hello Captain!"
+     "say": "Every rumour lands here first and leaves improved. That is a kind of workshop."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "What are they saying about us?"
+    },
+    {
+     "who": "appraiser",
+     "say": "That you have a frog aboard. It was true before I heard it."
     }
    ]
   },
   {
-   "id": "slate-captain",
+   "id": "tassel-appraiser-2",
+   "at": "tassel",
+   "who": "appraiser",
+   "needs": [
+    "navigator"
+   ],
+   "lines": [
+    {
+     "who": "appraiser",
+     "say": "The pearls here. Three to a wedding, so most of them never leave the water."
+    },
+    {
+     "who": "navigator",
+     "say": "Cats do not marry."
+    },
+    {
+     "who": "appraiser",
+     "say": "That is a great deal of pearl going begging."
+    }
+   ],
+   "without": {
+    "navigator": [
+     {
+      "who": "appraiser",
+      "say": "The pearls here. Three to a wedding, so most never leave the water. Somebody with quick eyes could tell a fourth from the three."
+     },
+     {
+      "who": "captain",
+      "say": "Nobody aboard has eyes like that."
+     },
+     {
+      "who": "appraiser",
+      "say": "The cats at Nail do. Ask at the bar there; a cat captain had a word she wanted carried, and that is how these things start."
+     }
+    ]
+   }
+  },
+  {
+   "id": "slate-captain-1",
    "at": "slate",
    "who": "captain",
    "lines": [
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "Two shipwrights are arguing about our hull. Neither has looked at me. One of them is my aunt."
     }
    ]
+  },
+  {
+   "id": "slate-captain-2",
+   "at": "slate",
+   "who": "captain",
+   "needs": [
+    "engineer"
+   ],
+   "lines": [
+    {
+     "who": "captain",
+     "say": "The yard says the tank they fitted is the biggest they have."
+    },
+    {
+     "who": "engineer",
+     "say": "It is the biggest they have. It is not the biggest there is. Haven fits the one that reaches the Maw."
+    },
+    {
+     "who": "captain",
+     "say": "Later."
+    }
+   ],
+   "without": {
+    "engineer": [
+     {
+      "who": "captain",
+      "say": "The yard wants to fit a bigger tank, and I cannot tell if they are right or being kind."
+     },
+     {
+      "who": "captain",
+      "say": "An engineer would know. The Ninth Forge on Cinder is full of them, Theo says, and one of them is bored."
+     }
+    ]
+   }
   },
   {
    "id": "slate-engineer",
@@ -300,11 +846,15 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "engineer",
-     "say": "Hello Captain!"
+     "say": "Somebody is sanding our paint."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "They do that."
+    },
+    {
+     "who": "engineer",
+     "say": "I know. I am going out to help. The colour was wrong."
     }
    ]
   },
@@ -315,11 +865,15 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "navigator",
-     "say": "Hello Captain!"
+     "say": "The cranes swing before you are tied up."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "They are helpful."
+    },
+    {
+     "who": "navigator",
+     "say": "They are fast. Say it properly."
     }
    ]
   },
@@ -330,24 +884,66 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "appraiser",
-     "say": "Hello Captain!"
+     "say": "The masonry. They carve the faces that will be buried."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "Why?"
+    },
+    {
+     "who": "appraiser",
+     "say": "Because the stone knows, and so do they. I like this moon."
     }
    ]
   },
   {
-   "id": "moss-captain",
+   "id": "moss-captain-1",
    "at": "moss",
    "who": "captain",
    "lines": [
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "Cut hedge and wet soil. A ship never smells of anything. I stood in the lock a while."
     }
    ]
+  },
+  {
+   "id": "moss-captain-2",
+   "at": "moss",
+   "who": "captain",
+   "needs": [
+    "appraiser"
+   ],
+   "lines": [
+    {
+     "who": "captain",
+     "say": "Wicket. The riverfish. Fresh, or apology?"
+    },
+    {
+     "who": "appraiser",
+     "say": "Fresh, if the hold is cold. Otherwise the second word."
+    },
+    {
+     "who": "captain",
+     "say": "The hold is cold."
+    },
+    {
+     "who": "appraiser",
+     "say": "Then it is magnificent, and it is ours."
+    }
+   ],
+   "without": {
+    "appraiser": [
+     {
+      "who": "captain",
+      "say": "Riverfish, quick enough that catching one is a story. I do not know what one is worth warm, and I suspect the answer is less."
+     },
+     {
+      "who": "captain",
+      "say": "A frog who knows what a thing is would be useful. There is one on the rafts at Brine, I hear, with a shelf and a lamp and a list."
+     }
+    ]
+   }
   },
   {
    "id": "moss-engineer",
@@ -356,11 +952,15 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "engineer",
-     "say": "Hello Captain!"
+     "say": "Grain, loaded by hand, badly, and refusing help."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "Did you offer?"
+    },
+    {
+     "who": "engineer",
+     "say": "Twice. I am now being followed by a dog that is not a dog."
     }
    ]
   },
@@ -371,11 +971,15 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "navigator",
-     "say": "Hello Captain!"
+     "say": "The fruit goes bad in twenty days."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "We can make Tassel in three."
+    },
+    {
+     "who": "navigator",
+     "say": "I know. I was giving you a number, not a worry."
     }
    ]
   },
@@ -386,24 +990,66 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "appraiser",
-     "say": "Hello Captain!"
+     "say": "Glowmoss. Grown in sheds nobody opens by daylight, and it never goes out."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "Is it worth carrying?"
+    },
+    {
+     "who": "appraiser",
+     "say": "Anyone who lives underground thinks so. Ask a cat."
     }
    ]
   },
   {
-   "id": "nail-captain",
+   "id": "nail-captain-1",
    "at": "nail",
    "who": "captain",
    "lines": [
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "Somebody caught our line before I threw it. Everybody saw. I am told that was the point."
     }
    ]
+  },
+  {
+   "id": "nail-captain-2",
+   "at": "nail",
+   "who": "captain",
+   "needs": [
+    "navigator"
+   ],
+   "lines": [
+    {
+     "who": "captain",
+     "say": "Captain Kaede is at the bar."
+    },
+    {
+     "who": "navigator",
+     "say": "I know. She saw us come in."
+    },
+    {
+     "who": "captain",
+     "say": "Did we do well?"
+    },
+    {
+     "who": "navigator",
+     "say": "She is still watching. That is how a cat says yes."
+    }
+   ],
+   "without": {
+    "navigator": [
+     {
+      "who": "captain",
+      "say": "A cat captain at the bar here on Nail has a word she wants carried out to Whisker, by somebody who is not a cat."
+     },
+     {
+      "who": "captain",
+      "say": "It weighs nothing. I think that is how you get a navigator round here: you carry it, and see who is sitting on the cradle when you arrive."
+     }
+    ]
+   }
   },
   {
    "id": "nail-engineer",
@@ -412,28 +1058,78 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "engineer",
-     "say": "Hello Captain!"
+     "say": "Rebuilt thrusters. They come back better than they left the factory."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "Does that bother you?"
+    },
+    {
+     "who": "engineer",
+     "say": "Yes. I am going to find out how."
     }
    ]
   },
   {
-   "id": "nail-navigator",
+   "id": "nail-navigator-1",
    "at": "nail",
    "who": "navigator",
    "lines": [
     {
      "who": "navigator",
-     "say": "Hello Captain!"
+     "say": "Home."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "You said Whisker was home."
+    },
+    {
+     "who": "navigator",
+     "say": "Whisker is where I was. This is home."
     }
    ]
+  },
+  {
+   "id": "nail-navigator-2",
+   "at": "nail",
+   "who": "navigator",
+   "needs": [
+    "engineer"
+   ],
+   "lines": [
+    {
+     "who": "navigator",
+     "say": "The bar is arguing about your approach."
+    },
+    {
+     "who": "engineer",
+     "say": "My approach was fine."
+    },
+    {
+     "who": "navigator",
+     "say": "Two of them are right."
+    },
+    {
+     "who": "engineer",
+     "say": "Which two?"
+    }
+   ],
+   "without": {
+    "engineer": [
+     {
+      "who": "navigator",
+      "say": "The bar is arguing about your approach. Two of them are right."
+     },
+     {
+      "who": "captain",
+      "say": "I would like somebody aboard who could argue back."
+     },
+     {
+      "who": "navigator",
+      "say": "Cinder. The Ninth Forge. They argue for a living."
+     }
+    ]
+   }
   },
   {
    "id": "nail-appraiser",
@@ -442,24 +1138,66 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "appraiser",
-     "say": "Hello Captain!"
+     "say": "Every sheet of plating here was somebody's ship. They do not say whose."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "Manners?"
+    },
+    {
+     "who": "appraiser",
+     "say": "Manners. And some of the ships are still listening."
     }
    ]
   },
   {
-   "id": "whisker-captain",
+   "id": "whisker-captain-1",
    "at": "whisker",
    "who": "captain",
    "lines": [
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "No hail. A light came on where the cradle is. I said hello to it, which I now think was wrong."
     }
    ]
+  },
+  {
+   "id": "whisker-captain-2",
+   "at": "whisker",
+   "who": "captain",
+   "needs": [
+    "appraiser"
+   ],
+   "lines": [
+    {
+     "who": "captain",
+     "say": "Somebody wants to sell me Arc technology the salvagers say never came off the Arc."
+    },
+    {
+     "who": "appraiser",
+     "say": "Then it did not. Or the Arc is bigger than they think."
+    },
+    {
+     "who": "captain",
+     "say": "Which?"
+    },
+    {
+     "who": "appraiser",
+     "say": "Tap it. I will tell you which."
+    }
+   ],
+   "without": {
+    "appraiser": [
+     {
+      "who": "captain",
+      "say": "Somebody wants to sell me Arc technology the salvagers say never came off the Arc. I cannot tell, and this is not a dock that explains."
+     },
+     {
+      "who": "captain",
+      "say": "The frog on the deep shelf at Brine could tell by tapping it, they say. He wants a piece of the Arc himself, among other things."
+     }
+    ]
+   }
   },
   {
    "id": "whisker-engineer",
@@ -468,11 +1206,15 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "engineer",
-     "say": "Hello Captain!"
+     "say": "New seals in a dark dock. Somebody here does careful work and does not want it seen."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "Is that bad?"
+    },
+    {
+     "who": "engineer",
+     "say": "It is Cinder work with the name filed off. I could tell you whose."
     }
    ]
   },
@@ -483,11 +1225,15 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "navigator",
-     "say": "Hello Captain!"
+     "say": "The one with the grey ear is watching."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "Should I wave?"
+    },
+    {
+     "who": "navigator",
+     "say": "She has already counted your hull numbers. Waving is late."
     }
    ]
   },
@@ -498,24 +1244,66 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "appraiser",
-     "say": "Hello Captain!"
+     "say": "Medals struck this morning and aged this afternoon. The houses buy them back."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "Is that funny?"
+    },
+    {
+     "who": "appraiser",
+     "say": "It depends on the house. Some of it is sad."
     }
    ]
   },
   {
-   "id": "arc-captain",
+   "id": "arc-captain-1",
    "at": "arc",
    "who": "captain",
    "lines": [
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "None of the surfaces are floors. A salvager drifted past upside down and nodded. I nodded back and lost the ship for a moment."
     }
    ]
+  },
+  {
+   "id": "arc-captain-2",
+   "at": "arc",
+   "who": "captain",
+   "needs": [
+    "navigator"
+   ],
+   "lines": [
+    {
+     "who": "captain",
+     "say": "Tsuki. The tail goes on further than the chart draws."
+    },
+    {
+     "who": "navigator",
+     "say": "The chart stops. The wreckage does not."
+    },
+    {
+     "who": "captain",
+     "say": "How far?"
+    },
+    {
+     "who": "navigator",
+     "say": "Further than fuel."
+    }
+   ],
+   "without": {
+    "navigator": [
+     {
+      "who": "captain",
+      "say": "The tail goes on further than the chart draws, and I have nobody who can hold the ship still beside a piece of it."
+     },
+     {
+      "who": "captain",
+      "say": "The cats at Nail can. Carrying a word from their bar out to Whisker is how you come to have one aboard, I am told."
+     }
+    ]
+   }
   },
   {
    "id": "arc-engineer",
@@ -524,11 +1312,15 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "engineer",
-     "say": "Hello Captain!"
+     "say": "No join. No tooling mark. Nothing I know how to take apart."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "Does that frighten you?"
+    },
+    {
+     "who": "engineer",
+     "say": "It interests me. Being frightened is for later."
     }
    ]
   },
@@ -539,11 +1331,15 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "navigator",
-     "say": "Hello Captain!"
+     "say": "Nothing to fall into. Good."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "You like it here?"
+    },
+    {
+     "who": "navigator",
+     "say": "I was born for this. Everybody else is visiting."
     }
    ]
   },
@@ -554,39 +1350,89 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "appraiser",
-     "say": "Hello Captain!"
+     "say": "Tap it. Any piece. The same note as every other piece, ever."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "What does that mean?"
+    },
+    {
+     "who": "appraiser",
+     "say": "That whoever built this had one note. Or one instrument. I have been asking which for forty years."
     }
    ]
   },
   {
-   "id": "grumm-captain",
+   "id": "grumm-captain-1",
    "at": "grumm",
    "who": "captain",
    "lines": [
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "The city rose to meet us out of cloud that goes down forever. I stopped looking down at about the second minute."
     }
    ]
   },
   {
-   "id": "grumm-engineer",
+   "id": "grumm-engineer-1",
    "at": "grumm",
    "who": "engineer",
    "lines": [
     {
      "who": "engineer",
-     "say": "Hello Captain!"
+     "say": "Filters, built by people who have thought about air for a very long time."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "Better than Cinder's?"
+    },
+    {
+     "who": "engineer",
+     "say": "Yes. I asked how. They told me twice. I still cannot."
     }
    ]
+  },
+  {
+   "id": "grumm-engineer-2",
+   "at": "grumm",
+   "who": "engineer",
+   "needs": [
+    "appraiser"
+   ],
+   "lines": [
+    {
+     "who": "engineer",
+     "say": "A storm crystal. Still ticking. What is it?"
+    },
+    {
+     "who": "appraiser",
+     "say": "Weather that was running before anybody came to watch it."
+    },
+    {
+     "who": "engineer",
+     "say": "That is not an answer."
+    },
+    {
+     "who": "appraiser",
+     "say": "It is the only one so far."
+    }
+   ],
+   "without": {
+    "appraiser": [
+     {
+      "who": "engineer",
+      "say": "A storm crystal, still ticking, and I cannot tell you what it is. I can tell you it is not an engine part."
+     },
+     {
+      "who": "captain",
+      "say": "Who could?"
+     },
+     {
+      "who": "engineer",
+      "say": "A frog on the rafts at Brine wants one under his lamp, they say. He might tell you, once he has looked."
+     }
+    ]
+   }
   },
   {
    "id": "grumm-navigator",
@@ -595,11 +1441,15 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "navigator",
-     "say": "Hello Captain!"
+     "say": "No ground. Only cloud."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "You look pale."
+    },
+    {
+     "who": "navigator",
+     "say": "Cats do not go pale. Cats sit down."
     }
    ]
   },
@@ -610,24 +1460,70 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "appraiser",
-     "say": "Hello Captain!"
+     "say": "The dockmaster's greeting runs forty seconds. It is a good one."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "I interrupted it."
+    },
+    {
+     "who": "appraiser",
+     "say": "Yes. We are staying an extra day for that."
     }
    ]
   },
   {
-   "id": "brine-captain",
+   "id": "brine-captain-1",
    "at": "brine",
    "who": "captain",
    "lines": [
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "The whole raft smells sharp and clean and faintly of a headache. Nobody would be hurried to greet us. I waited. It was fine."
     }
    ]
+  },
+  {
+   "id": "brine-captain-2",
+   "at": "brine",
+   "who": "captain",
+   "needs": [
+    "appraiser"
+   ],
+   "lines": [
+    {
+     "who": "captain",
+     "say": "Brine amber. Six arms, folded, and a seam."
+    },
+    {
+     "who": "appraiser",
+     "say": "Nothing in that sea has bones. Nothing in that sea has ever had bones."
+    },
+    {
+     "who": "captain",
+     "say": "Then what is it?"
+    },
+    {
+     "who": "appraiser",
+     "say": "Something that came here. Buy the pieces where you can see the seam."
+    }
+   ],
+   "without": {
+    "appraiser": [
+     {
+      "who": "captain",
+      "say": "Amber with something folded inside that is not a leaf, and the apothecaries will not say what."
+     },
+     {
+      "who": "captain",
+      "say": "One of them, Wicket, on the deep shelf here on Brine, wants three things under one lamp before he says anything at all."
+     },
+     {
+      "who": "captain",
+      "say": "A piece of the Arc, a storm crystal off Grumm, a reactor coil from Cinder. I have written it down."
+     }
+    ]
+   }
   },
   {
    "id": "brine-engineer",
@@ -636,11 +1532,15 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "engineer",
-     "say": "Hello Captain!"
+     "say": "Resin that sets in vacuum and stays soft forever. Buy a crate."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "Will it fix the hull?"
+    },
+    {
+     "who": "engineer",
+     "say": "It will fix everything. Slowly. In front of you."
     }
    ]
   },
@@ -651,11 +1551,15 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "navigator",
-     "say": "Hello Captain!"
+     "say": "The sea is the wrong colour and moves wrong."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "It is ammonia."
+    },
+    {
+     "who": "navigator",
+     "say": "I know what it is. I am telling you what it does."
     }
    ]
   },
@@ -666,22 +1570,26 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "appraiser",
-     "say": "Hello Captain!"
+     "say": "The deep shelf is still there. My lamp is still on it."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "Do you want to go back?"
+    },
+    {
+     "who": "appraiser",
+     "say": "I had the three things under it. That was the question. You are the next one."
     }
    ]
   },
   {
-   "id": "glass-captain",
+   "id": "glass-captain-1",
    "at": "glass",
    "who": "captain",
    "lines": [
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "A scholar asked what I had seen before she asked my name. I told her about Grumm. She wrote down Grumm and underlined it."
     }
    ]
   },
@@ -692,11 +1600,15 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "engineer",
-     "say": "Hello Captain!"
+     "say": "Cryo fuel in double-walled crates. They think it is dull."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "Is it?"
+    },
+    {
+     "who": "engineer",
+     "say": "Everything cold in the sky runs on it. Dull is what you call a thing that works."
     }
    ]
   },
@@ -707,39 +1619,127 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "navigator",
-     "say": "Hello Captain!"
+     "say": "The ice rings when you walk on it."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "You walked on it?"
+    },
+    {
+     "who": "navigator",
+     "say": "No. I listened to somebody else."
     }
    ]
   },
   {
-   "id": "glass-appraiser",
+   "id": "glass-appraiser-1",
    "at": "glass",
    "who": "appraiser",
    "lines": [
     {
      "who": "appraiser",
-     "say": "Hello Captain!"
+     "say": "Somebody here has been recording the same sound for thirty years."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "Did you listen?"
+    },
+    {
+     "who": "appraiser",
+     "say": "I have been listening to it for forty. We compared notes. It is the same note."
     }
    ]
   },
   {
-   "id": "croak-captain",
+   "id": "glass-appraiser-2",
+   "at": "glass",
+   "who": "appraiser",
+   "needs": [
+    "navigator"
+   ],
+   "lines": [
+    {
+     "who": "appraiser",
+     "say": "They say the way into the Builder halls is not a door."
+    },
+    {
+     "who": "navigator",
+     "say": "Then it is a fall."
+    },
+    {
+     "who": "appraiser",
+     "say": "Or a note."
+    },
+    {
+     "who": "navigator",
+     "say": "Or a fall."
+    }
+   ],
+   "without": {
+    "navigator": [
+     {
+      "who": "appraiser",
+      "say": "They say the way into the Builder halls is not a door. I would like somebody aboard who could hold us still beside a thing that is not a door."
+     },
+     {
+      "who": "captain",
+      "say": "Where do you find somebody like that?"
+     },
+     {
+      "who": "appraiser",
+      "say": "Nail. The cats. One of them is sitting on a cradle at Whisker, waiting for a word from the bar to arrive."
+     }
+    ]
+   }
+  },
+  {
+   "id": "croak-captain-1",
    "at": "croak",
    "who": "captain",
    "lines": [
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "Nobody came out. The lock was open and there was tea by it. I have never felt so welcome by nobody."
     }
    ]
+  },
+  {
+   "id": "croak-captain-2",
+   "at": "croak",
+   "who": "captain",
+   "needs": [
+    "engineer"
+   ],
+   "lines": [
+    {
+     "who": "captain",
+     "say": "The approach cost more than I meant it to."
+    },
+    {
+     "who": "engineer",
+     "say": "Everything here does. That is doctrine, not a mistake."
+    },
+    {
+     "who": "captain",
+     "say": "So you are not cross."
+    },
+    {
+     "who": "engineer",
+     "say": "I am cross at the doctrine."
+    }
+   ],
+   "without": {
+    "engineer": [
+     {
+      "who": "captain",
+      "say": "The approach cost more than I meant it to. Somebody who understood the tank would have told me before, not after."
+     },
+     {
+      "who": "captain",
+      "say": "Cinder. The Ninth Forge. I keep saying it and not going."
+     }
+    ]
+   }
   },
   {
    "id": "croak-engineer",
@@ -748,11 +1748,15 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "engineer",
-     "say": "Hello Captain!"
+     "say": "Backwards round a world. It cost twice. You knew that."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "They say that is the point."
+    },
+    {
+     "who": "engineer",
+     "say": "I have been listening to the hull cool for an hour. I am starting to see it."
     }
    ]
   },
@@ -763,11 +1767,15 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "navigator",
-     "say": "Hello Captain!"
+     "say": "Quiet."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "Do you like it?"
+    },
+    {
+     "who": "navigator",
+     "say": "Yes."
     }
    ]
   },
@@ -778,24 +1786,66 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "appraiser",
-     "say": "Hello Captain!"
+     "say": "The shard that kills sound within a hand's width. I held my hand there."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "And?"
+    },
+    {
+     "who": "appraiser",
+     "say": "It is the same note as the Arc. Only this time it is the silence that rings."
     }
    ]
   },
   {
-   "id": "haven-captain",
+   "id": "haven-captain-1",
    "at": "haven",
    "who": "captain",
    "lines": [
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "I was given something to eat before I was asked a single question. That was the third street. I have not reached the fourth."
     }
    ]
+  },
+  {
+   "id": "haven-captain-2",
+   "at": "haven",
+   "who": "captain",
+   "needs": [
+    "appraiser"
+   ],
+   "lines": [
+    {
+     "who": "captain",
+     "say": "Frogwood instruments. Heavy, slow, and worth what is asked."
+    },
+    {
+     "who": "appraiser",
+     "say": "Tuned over a lifetime, and then the next one. Buy one and you are the next one."
+    },
+    {
+     "who": "captain",
+     "say": "I do not play."
+    },
+    {
+     "who": "appraiser",
+     "say": "Nobody does, at first."
+    }
+   ],
+   "without": {
+    "appraiser": [
+     {
+      "who": "captain",
+      "say": "Frogwood instruments, worth what is asked, and I cannot tell what is asked from what is meant."
+     },
+     {
+      "who": "captain",
+      "say": "A frog who knows what a thing is would earn his berth here alone. The rafts at Brine, the deep shelf: three things under a lamp."
+     }
+    ]
+   }
   },
   {
    "id": "haven-engineer",
@@ -804,11 +1854,15 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "engineer",
-     "say": "Hello Captain!"
+     "say": "The shipwrights here fit a tank that reaches the Maw."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "Are we serious?"
+    },
+    {
+     "who": "engineer",
+     "say": "You tell me. I will fit it either way and complain either way."
     }
    ]
   },
@@ -819,11 +1873,15 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "navigator",
-     "say": "Hello Captain!"
+     "say": "Something is being sung four streets over."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "It has been since we arrived."
+    },
+    {
+     "who": "navigator",
+     "say": "It is about a cat. I am not going to tell you which."
     }
    ]
   },
@@ -834,24 +1892,58 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "appraiser",
-     "say": "Hello Captain!"
+     "say": "Every trade ends with a gift, and refusing is the one offence."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "What did they give you?"
+    },
+    {
+     "who": "appraiser",
+     "say": "A question. I will need about a generation."
     }
    ]
   },
   {
-   "id": "maw-captain",
+   "id": "maw-captain-1",
    "at": "maw",
    "who": "captain",
    "lines": [
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "There is no light except what is falling in, and it falls in a circle. I have written that down twice and it has not helped."
     }
    ]
+  },
+  {
+   "id": "maw-captain-2",
+   "at": "maw",
+   "who": "captain",
+   "needs": [
+    "engineer"
+   ],
+   "lines": [
+    {
+     "who": "captain",
+     "say": "Kiran. Is the ship all right?"
+    },
+    {
+     "who": "engineer",
+     "say": "The ship is fine. The ship is the only thing out here that is."
+    }
+   ],
+   "without": {
+    "engineer": [
+     {
+      "who": "captain",
+      "say": "I would like somebody to tell me the ship is fine. I would like anybody to."
+     },
+     {
+      "who": "captain",
+      "say": "The Forge on Cinder, next time. Before, not after."
+     }
+    ]
+   }
   },
   {
    "id": "maw-engineer",
@@ -860,11 +1952,15 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "engineer",
-     "say": "Hello Captain!"
+     "say": "The station holds its distance exactly, and nothing is holding it."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "Could you take it apart?"
+    },
+    {
+     "who": "engineer",
+     "say": "I could not find the first bolt. I have looked for an hour. There is not one."
     }
    ]
   },
@@ -875,11 +1971,15 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "navigator",
-     "say": "Hello Captain!"
+     "say": "Nothing to fall into. Nothing at all."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "That should please you."
+    },
+    {
+     "who": "navigator",
+     "say": "It should."
     }
    ]
   },
@@ -890,11 +1990,15 @@ export const DIALOGUE = {
    "lines": [
     {
      "who": "appraiser",
-     "say": "Hello Captain!"
+     "say": "The frogs count something here in sevens. I have counted. It is not seven."
     },
     {
      "who": "captain",
-     "say": "Hello Captain!"
+     "say": "What is it?"
+    },
+    {
+     "who": "appraiser",
+     "say": "One. One note, from here to the Arc to the shard on Croak. I came all this way to hear it hold."
     }
    ]
   }

@@ -5753,3 +5753,77 @@ test('the play page has the music, and its controls are in the gear menu', () =>
   assert.match(html, /audio\.play\(/, 'the page asks for a track');
   assert.match(html, /audio\.stop\(\)/, 'and lets go of it when the page goes');
 });
+
+/* ---------------------------------------------- crew dialog: who is missing */
+
+/* An exchange that turns to somebody not aboard says its other thing instead:
+   the `without` lines, which point at where that person would be found. The
+   whole table keeps that promise, so a player with an empty chair is never
+   shown a silence where a hint was possible. */
+const FOUND_AT = { engineer: 'Cinder', navigator: 'Nail', appraiser: 'Brine' };
+const leansOn = x => [...new Set([...(x.needs ?? []), ...(x.lines ?? []).map(l => l.who)])]
+  .filter(id => id !== 'captain' && id !== x.who);
+
+test('every exchange that turns to somebody says where to find them when they are not there', () => {
+  let turned = 0;
+  for(const x of DIALOG){
+    const others = leansOn(x);
+    for(const berth of others){
+      turned++;
+      const lines = x.without?.[berth];
+      assert.ok(lines?.length, `${x.id} needs the ${berth} and says nothing when the berth is empty`);
+      for(const l of lines){
+        assert.ok(l.who === x.who || l.who === 'captain', `${x.id} without ${berth}: ${l.who} might not be there to say it`);
+        assert.ok(l.say, `${x.id} without ${berth}: an empty line`);
+      }
+      const said = lines.map(l => l.say).join(' ');
+      assert.ok(said.includes(FOUND_AT[berth]), `${x.id} without ${berth}: nobody says to look at ${FOUND_AT[berth]}`);
+    }
+    for(const berth of Object.keys(x.without ?? {})){
+      assert.ok(others.includes(berth), `${x.id}: a fallback for the ${berth}, who is not in the exchange`);
+    }
+  }
+  assert.ok(turned >= 12, `only ${turned} exchanges turn to somebody else; the crew should talk to each other more than that`);
+  // Somebody is asked after in every berth, so every empty chair gets pointed at.
+  for(const berth of Object.keys(FOUND_AT)){
+    assert.ok(DIALOG.some(x => x.without?.[berth]), `nothing in the table ever points at the ${berth}`);
+  }
+});
+
+test('an empty chair is answered with where to look, and a filled one with the exchange itself', () => {
+  const s = S.newGame(1);
+  s.dockedAt = 'cinder';
+  const alone = S.exchangesFor(s, 'captain');
+  const standIn = alone.find(x => x.missing === 'engineer');
+  assert.ok(standIn, 'the captain at Cinder with no engineer was not told where to find one');
+  assert.ok(standIn.lines.every(l => l.who === 'captain'), 'the stand-in gives a line to somebody not aboard');
+  assert.match(standIn.lines.map(l => l.say).join(' '), /Cinder/, 'the stand-in does not say where');
+  assert.equal(standIn.without, undefined, 'a stand-in carries a fallback of its own');
+  assert.ok(!alone.some(x => x.needs?.includes('engineer') && !x.missing), 'the real exchange played to an empty chair');
+  // Asked twice, it is the same object: the page counts presses by list position.
+  assert.equal(S.exchangesFor(s, 'captain').find(x => x.missing === 'engineer'), standIn);
+  assert.equal(S.exchangeFor(s, 'captain', alone.indexOf(standIn)), standIn);
+
+  s.crew.engineer = { role: 'engineer', from: 'test', joinedAt: 0 };
+  const crewed = S.exchangesFor(s, 'captain');
+  assert.ok(!crewed.some(x => x.missing), 'the engineer is aboard and still being looked for');
+  const real = crewed.find(x => x.id === standIn.id.split('~')[0]);
+  assert.ok(real && real.lines.some(l => l.who === 'engineer'), 'the engineer is aboard and does not get his line');
+  assert.equal(crewed.length, alone.length, 'filling a berth changed how many things there are to say');
+
+  // The crew point at each other, too: the navigator at Nail, with no engineer.
+  const t = S.newGame(2);
+  t.dockedAt = 'nail';
+  t.crew.navigator = { role: 'navigator', from: 'test', joinedAt: 0 };
+  const nav = S.exchangesFor(t, 'navigator').find(x => x.missing === 'engineer');
+  assert.ok(nav, 'the navigator at Nail has nothing to say about the empty engine room');
+  assert.ok(nav.lines.some(l => l.who === 'navigator') && nav.lines.every(l => S.isAboard(t, l.who)));
+  // And an exchange that needs somebody else is never handed to an empty berth.
+  assert.equal(S.exchangesFor(t, 'engineer').length, 0);
+
+  // Every fallback in the table reads in the same band as every other line.
+  for(const x of DIALOG) for(const lines of Object.values(x.without ?? {})) for(const l of lines){
+    const ms = S.sayMs(l.say);
+    assert.ok(ms >= 900 && ms <= 6500, `${x.id}: "${l.say}" reads in ${ms} ms`);
+  }
+});

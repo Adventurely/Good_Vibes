@@ -1348,13 +1348,40 @@ export function aboard(state){
   return ['captain', ...(TEXT.crew?.roles ?? []).map(r => r.id).filter(id => state?.crew?.[id])];
 }
 
+/* Everybody an exchange leans on besides the one pressing: the berths it says
+ * it needs, and anybody it gives a line to, in that order. */
+const leansOn = x => [...new Set([...(x.needs ?? []), ...(x.lines ?? []).map(l => l.who)])]
+  .filter(id => id !== 'captain' && id !== x.who);
+
+/* An exchange with somebody missing, said the way the table wrote it for that
+ * case: the same record with its `without` lines in place of its own, so the
+ * page plays it like any other. Built once per exchange and berth rather than
+ * on every press, so the list is the same objects each time it is asked for. */
+const standIns = new Map();
+function standIn(x, berth){
+  const key = `${x.id} ${berth}`;
+  if(!standIns.has(key)){
+    standIns.set(key, { ...x, id: `${x.id}~without-${berth}`, lines: x.without[berth], without: undefined, missing: berth });
+  }
+  return standIns.get(key);
+}
+
+/* What one exchange comes to with this crew: itself when everybody it leans on
+ * is aboard; what it says instead when the first person missing has a
+ * `without` written for them — a line that says where that person would be
+ * found — and nothing at all otherwise. */
+function offered(state, x){
+  const missing = leansOn(x).filter(id => !isAboard(state, id));
+  if(!missing.length) return x;
+  return x.without?.[missing[0]] ? standIn(x, missing[0]) : null;
+}
+
 export function exchangesFor(state, who){
   if(!isAboard(state, who)) return [];
-  const sayable = x => x.who === who
-    && [...(x.needs ?? []), ...(x.lines ?? []).map(l => l.who)].every(id => isAboard(state, id));
   const here = state?.dockedAt ?? null;
-  const atPort = here ? DIALOG.filter(x => x.at === here && sayable(x)) : [];
-  return atPort.length ? atPort : DIALOG.filter(x => x.at === '*' && sayable(x));
+  const from = at => DIALOG.filter(x => x.at === at && x.who === who).map(x => offered(state, x)).filter(Boolean);
+  const atPort = here ? from(here) : [];
+  return atPort.length ? atPort : from('*');
 }
 
 /* The one to show, given how many times that face has been pressed already.

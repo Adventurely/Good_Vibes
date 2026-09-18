@@ -1350,11 +1350,21 @@ URL by `portraitURL(id)`.
 **Every face aboard can be pressed, and answers.** `dialog.json` holds
 exchanges keyed to a port — `at: "cinder"`, or `"*"` for anywhere — and to the
 person whose picture starts them; a line written for the port you are tied up
-at beats a line written for anywhere, and an exchange that puts words in the
-mouth of somebody not aboard is not offered at all. Nothing about a
-conversation is saved. Talking is free, it changes nothing, and the only thing
-a game remembers about one is that it happened — and it does not remember that
-either.
+at beats a line written for anywhere. An exchange that turns to somebody not
+aboard — Finn asking Kiran about a noise, Wicket asking Tsuki what she is
+looking at — is said its other way instead: every such exchange carries a
+`without` block, one entry per person it leans on, spoken only by whoever was
+pressed and the captain, in which they say where that person would be found.
+The engineer is at the Ninth Forge on Cinder; the navigator is a word carried
+from the bar at Nail to Whisker; the appraiser is on the deep shelf of the
+rafts at Brine. So the menu still reads only **Missing Engineer**, but the crew
+you do have will tell you where to look, which is how a person finds out
+something in this game: by asking. An exchange with no `without` for a missing
+berth is not offered at all, and the build refuses a `without` that names a
+berth the exchange does not need or puts words in a mouth that might not be
+there. Nothing about a conversation is saved. Talking is free, it changes
+nothing, and the only thing a game remembers about one is that it happened —
+and it does not remember that either.
 
 What comes back is a popup over the sky rather than a block in the menu,
 because a line somebody says is an event and an event belongs where the player
