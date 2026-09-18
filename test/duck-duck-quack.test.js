@@ -21,7 +21,7 @@ import {
 } from '../public/duck-duck-quack/content.js';
 
 import {
-  newGame, tick, assignSkill, assignRefusal, releaseBlocker, duckNear, hasTrait,
+  newGame, tick, assignSkill, assignRefusal, releaseBlocker, duckNear, hasTrait, endRun,
 } from '../public/duck-duck-quack/sim.js';
 
 /* A minimal level for a test that only cares about one mechanic. Every field
@@ -2283,6 +2283,82 @@ test('The Belfry stacks its floors clear of each other, with the pond on the top
   assert.ok(LEVEL_11.goalX > d.from && LEVEL_11.goalX < d.to, 'the pond is the end of floor D');
 });
 
+/* ------------------------------------------- when a run is over, and why */
+
+/* A level whose hatch is four ducklings on flat ground, all of which walk
+   into the pond on their own. The quota is half of them, so there is a long
+   stretch of the run where the goal is already met and ducklings are still
+   walking — which is exactly the window this group is about. */
+const strollLevel = (overrides = {}) => miniLevel({
+  duckCount: 4, spawnInterval: 12, winRatio: 0.5, timeLimit: 600, ...overrides,
+});
+
+test('reaching the quota does not end the run', () => {
+  const state = newGame(strollLevel());
+  const need = winCount(state.level);
+  for(let i = 0; i < 600 && state.saved < need; i++) tick(state);
+  assert.ok(state.saved >= need, 'the quota should have been met');
+  assert.equal(state.ended, null, 'and the run should still be going');
+  assert.ok(state.ducks.some(d => d.state !== 'saved' && d.state !== 'lost'),
+    'because there are still ducklings out there');
+});
+
+test('a run ends once every duckling is in the pond or gone, and counts them all', () => {
+  const level = strollLevel();
+  const state = newGame(level);
+  run(state, 600);
+  assert.equal(state.ended, 'won');
+  assert.equal(state.saved, level.duckCount,
+    'every duckling that got home is counted, not just the quota');
+  assert.ok(state.ticks < level.timeLimit, 'and it did not have to wait out the clock');
+});
+
+test('a duckling still standing holds the run open until the clock', () => {
+  // A planted Blocker is neither saved nor lost, and the run is not over
+  // while it is standing there — the flock behind it may still be let past.
+  const level = strollLevel({ supply: { digger: 0, builder: 0, blocker: 1, climber: 0, flyer: 0 } });
+  const state = newGame(level);
+  tick(state);
+  const first = state.ducks[0];
+  assert.ok(assignSkill(state, first.id, 'blocker'));
+  run(state, level.timeLimit + 5);
+  assert.equal(first.state, 'blocking', 'it is still there');
+  assert.ok(state.ticks >= level.timeLimit, 'so the clock is what ended it');
+});
+
+test('endRun stops a run by hand and judges it exactly as the clock would', () => {
+  const level = strollLevel();
+  const state = newGame(level);
+  for(let i = 0; i < 600 && state.saved < winCount(level); i++) tick(state);
+  assert.equal(state.ended, null);
+  assert.equal(endRun(state), 'won', 'the quota is met, so stopping here is a win');
+  assert.equal(state.ended, 'won');
+  assert.ok(state.ticks < level.timeLimit);
+});
+
+test('endRun on a run that has saved too few is a loss, not an escape', () => {
+  const state = newGame(strollLevel());
+  tick(state);
+  assert.equal(state.saved, 0);
+  assert.equal(endRun(state), 'lost');
+  assert.equal(state.ended, 'lost');
+});
+
+test('endRun leaves an already-finished run alone', () => {
+  const state = newGame(strollLevel());
+  run(state, 600);
+  assert.equal(state.ended, 'won');
+  assert.equal(endRun(state), null, 'nothing to end');
+  assert.equal(state.ended, 'won', 'and the verdict it already had stands');
+});
+
+test('a run out of time is judged on what got home by then', () => {
+  const state = newGame(strollLevel({ timeLimit: 30 }));
+  run(state, 60);
+  assert.equal(state.ended, 'lost');
+  assert.equal(state.ticks, 30);
+});
+
 /* ------------------------------------------------- The Errand, played */
 
 /* One duckling does the whole level and the rest stand still for it. The
@@ -2291,7 +2367,7 @@ test('The Belfry stacks its floors clear of each other, with the pond on the top
    and back. Then the Blocker comes off. */
 function playLevel12({ blockAt = 90, buildAt = 55, release = true, skip = null } = {}){
   const state = newGame(LEVEL_12);
-  let blocker = null, errand = null, built = false, released = false;
+  let blocker = null, errand = null, built = false, released = false, warpsAtBridge = null;
 
   for(let i = 0; i < LEVEL_12.timeLimit && !state.ended; i++){
     if(!blocker && skip !== 'blocker'){
@@ -2313,22 +2389,25 @@ function playLevel12({ blockAt = 90, buildAt = 55, release = true, skip = null }
     // And the bridge, once the pad has put it back on the far shelf.
     if(errand && !built && skip !== 'builder' && errand.state === 'walking'
        && errand.y === 144 && Math.round(errand.x) === buildAt){
-      if(assignSkill(state, errand.id, 'builder')) built = true;
+      if(assignSkill(state, errand.id, 'builder')){ built = true; warpsAtBridge = state.warps; }
     }
     if(built && release && !released && errand.state === 'walking'){
       if(releaseBlocker(state, blocker.id)) released = true;
     }
     tick(state);
   }
-  return { state, built, released, errand };
+  return { state, built, released, errand, warpsAtBridge };
 }
 
 test('The Errand can be won by sending one duckling the long way round', () => {
-  const { state, built } = playLevel12();
+  const { state, built, warpsAtBridge } = playLevel12();
   assert.ok(built, 'the bridge should have gone in');
   assert.equal(state.ended, 'won');
   assert.ok(state.saved >= winCount(LEVEL_12), `only ${state.saved} saved, needed ${winCount(LEVEL_12)}`);
-  assert.equal(state.warps, 1, 'and exactly one duckling ever took the pad');
+  // One duckling runs the errand: when the bridge goes in, the pad has
+  // carried exactly that one. (It is free to wander its own route again
+  // afterwards, which is why this is read at the bridge and not at the end.)
+  assert.equal(warpsAtBridge, 1, 'exactly one duckling had taken the pad by then');
 });
 
 test('The Errand spends one of each of the three skills it is built around', () => {
