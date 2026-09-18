@@ -88,7 +88,7 @@
    straight off the page whether they have the latest build, rather than
    having to guess from behavior alone. Bump it on every change that ships,
    however small. */
-export const GAME_VERSION = '1.15';
+export const GAME_VERSION = '1.16';
 
 export const SCENE_W = 320;
 export const SCENE_H = 180;
@@ -286,7 +286,7 @@ export const SKILL_INFO = {
   flyer: { name: 'Flyer', verb: 'Fly',
     blurb: 'Flaps down to a soft landing from any height. One duckling only.' },
   jumper: { name: 'Jumper', verb: 'Jump',
-    blurb: 'Hops a ditch, a low step or the goose itself — small things only, and it keeps the knack. One duckling.' },
+    blurb: 'Hops a ditch, a low step, or the goose itself — and a goose hopped over gives up and flies off without anybody. Small things only, and it keeps the knack. One duckling.' },
 };
 
 /* ----------------------------------------------------------------- terrain */
@@ -421,7 +421,7 @@ export const LEVEL_1 = {
      is four: two to reach across the gap (see the level's note above) and
      two more, because getting a ramp wrong on the level that teaches ramps
      should cost a Builder, not the run. Digger is zero: see the note too. */
-  supply: { digger: 0, builder: 4, blocker: 2, climber: 9, flyer: 9, jumper: 0 },
+  supply: { digger: 0, builder: 4, blocker: 2, climber: 9, flyer: 9, jumper: 1 },
 
   /* Patrols the near half of the pond's approach. `speed` is columns a tick,
      `catchRadius` is how close a duckling has to be to it, in columns, to get
@@ -499,7 +499,7 @@ export const LEVEL_2 = {
      point is that the wall gets tunnelled, not climbed. Blocker: present,
      same as everywhere else, with nothing here that calls for it (see the
      note above). */
-  supply: { digger: 3, builder: 2, blocker: 2, climber: 0, flyer: 0, jumper: 0 },
+  supply: { digger: 3, builder: 2, blocker: 2, climber: 0, flyer: 0, jumper: 1 },
 
   goose: { x0: 260, x1: 299, y: 150, speed: 1.5, catchRadius: 1.5 },
 };
@@ -658,7 +658,7 @@ export const LEVEL_3 = {
      flourish — a duckling that has flown down is still walking towards the
      pond, and turning it round to face the ledge it came off is the only
      way to build back towards it. */
-  supply: { digger: 3, builder: 10, blocker: 5, climber: 24, flyer: 3, jumper: 0 },
+  supply: { digger: 3, builder: 10, blocker: 5, climber: 24, flyer: 3, jumper: 1 },
 
   // Patrols right past the nest rather than the far end of the walk — see
   // the note above on why that moved. Starts at x0 and heads toward x1
@@ -737,7 +737,7 @@ export const LEVEL_4 = {
      climbing the wall and nothing here falls, so the ramp is the only way to
      get high enough to dig. Blocker: present, without a winning use, same as
      The Warren. */
-  supply: { digger: 3, builder: 4, blocker: 2, climber: 0, flyer: 0, jumper: 0 },
+  supply: { digger: 3, builder: 4, blocker: 2, climber: 0, flyer: 0, jumper: 1 },
 
   goose: { x0: 200, x1: 239, y: 150, speed: 1.5, catchRadius: 1.5 },
 };
@@ -813,7 +813,7 @@ export const LEVEL_5 = {
      Builder: one spare over its two required bridges. Flyer: zero, nothing
      here falls. Blocker: present, without a winning use, same as
      everywhere else. */
-  supply: { digger: 2, builder: 3, blocker: 2, climber: 9, flyer: 0, jumper: 0 },
+  supply: { digger: 2, builder: 3, blocker: 2, climber: 9, flyer: 0, jumper: 1 },
 
   goose: { x0: 240, x1: 279, y: 50, speed: 1.5, catchRadius: 1.5 },
 };
@@ -935,8 +935,9 @@ export const LEVEL_6 = {
      its own mandatory digs. Blocker: two, present with nothing here that
      needs it — the bluff already does the turning-around a Blocker would
      be for. Climber: zero; the only wall worth climbing is rock and leads
-     off the left edge of the level. Jumper: zero. */
-  supply: { digger: 4, builder: 3, blocker: 2, climber: 0, flyer: 3, jumper: 0 },
+     off the left edge of the level. Jumper: one, as everywhere now
+     — a hop over the goose sends it off empty-beaked. */
+  supply: { digger: 4, builder: 3, blocker: 2, climber: 0, flyer: 3, jumper: 1 },
 
   goose: { x0: 250, x1: 299, y: 150, speed: 1.5, catchRadius: 1.5 },
 };
@@ -1050,7 +1051,7 @@ export const LEVEL_7 = {
      a level with a real choice rations its supply. Builder: one spare
      over its two required bridges. Blocker: present, same as most levels,
      with nothing here that calls for it specially. */
-  supply: { digger: 3, builder: 3, blocker: 2, climber: 19, flyer: 19, jumper: 0 },
+  supply: { digger: 3, builder: 3, blocker: 2, climber: 19, flyer: 19, jumper: 1 },
 
   goose: { x0: 175, x1: 205, y: 100, speed: 1.5, catchRadius: 1.5 },
 };
@@ -1131,7 +1132,7 @@ export const LEVEL_8 = {
      not as something held back — there is genuinely nothing here for any of
      them. Blocker: present, same as everywhere, and here it would only wall
      the one road home. */
-  supply: { digger: 0, builder: 2, blocker: 2, climber: 0, flyer: 0, jumper: 15 },
+  supply: { digger: 0, builder: 2, blocker: 2, climber: 0, flyer: 0, jumper: 16 },
 
   goose: { x0: 230, x1: 280, y: 150, speed: 1.5, catchRadius: 1.5 },
 };
@@ -1227,8 +1228,9 @@ export const LEVEL_9 = {
      should get to find that out. Flyer: two, for the shelf's own edge (see
      the note above). Climber: zero — one would take a single duckling up
      the bluff and leave the other seventeen at the bottom of it. Blocker:
-     two. Jumper: zero; nothing here is hop-sized. */
-  supply: { digger: 2, builder: 4, blocker: 2, climber: 0, flyer: 2, jumper: 0 },
+     two. Jumper: one, as everywhere now
+     — a hop over the goose sends it off empty-beaked. */
+  supply: { digger: 2, builder: 4, blocker: 2, climber: 0, flyer: 2, jumper: 1 },
 
   goose: { x0: 270, x1: 299, y: 150, speed: 1.5, catchRadius: 1.5 },
 };
@@ -1335,8 +1337,9 @@ export const LEVEL_10 = {
      else here to tunnel. Climber: zero; the walls are the only things to
      climb and the top of either one is the void. Flyer: two, which save a
      duckling that has already walked off something rather than opening any
-     route of their own. Jumper: zero, nothing here is hop-sized. */
-  supply: { digger: 0, builder: 10, blocker: 6, climber: 0, flyer: 2, jumper: 0 },
+     route of their own. Jumper: one, as everywhere now
+     — a hop over the goose sends it off empty-beaked. */
+  supply: { digger: 0, builder: 10, blocker: 6, climber: 0, flyer: 2, jumper: 1 },
 
   goose: { x0: 90, x1: 150, y: 150, speed: 1.5, catchRadius: 1.5 },
 };
@@ -1432,8 +1435,9 @@ export const LEVEL_11 = {
      holding a working edge while a ramp goes in. Digger: zero, and there is
      nothing here one could be spent on — no wall on this level, only air.
      Climber: zero; the only walls are the pen's own rock. Flyer: two, which
-     save a duckling that has already walked off something. Jumper: zero. */
-  supply: { digger: 0, builder: 10, blocker: 6, climber: 0, flyer: 2, jumper: 0 },
+     save a duckling that has already walked off something. Jumper: one, as everywhere now
+     — a hop over the goose sends it off empty-beaked. */
+  supply: { digger: 0, builder: 10, blocker: 6, climber: 0, flyer: 2, jumper: 1 },
 
   goose: { x0: 60, x1: 120, y: 150, speed: 1.5, catchRadius: 1.5 },
 };
@@ -1566,8 +1570,9 @@ export const LEVEL_12 = {
      off something. Blocker: three, for the one the pen cannot do without,
      the one that buys the goose off, and one spare. Flyer: zero, and it
      would be the answer to the hilltop drop if there were any — there is
-     not, and that drop is meant to cost. Jumper: zero. */
-  supply: { digger: 1, builder: 1, blocker: 3, climber: 1, flyer: 0, jumper: 0 },
+     not, and that drop is meant to cost. Jumper: one, as everywhere now
+     — a hop over the goose sends it off empty-beaked. */
+  supply: { digger: 1, builder: 1, blocker: 3, climber: 1, flyer: 0, jumper: 1 },
 
   goose: { x0: 90, x1: 140, y: 120, speed: 1.1, catchRadius: 1.5 },
 };

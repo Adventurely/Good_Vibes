@@ -1842,7 +1842,7 @@ test('a jumper hops a step too tall to walk up, but not a wall', () => {
   assert.equal(hops, 0);
 });
 
-test('a jumper hops the goose instead of being caught, and the hunt carries on', () => {
+test('a jumper hops the goose, and the goose gives up and leaves empty-beaked', () => {
   const level = miniLevel({
     nestX: 6, goalX: SCENE_W - 4, timeLimit: 2000, duckCount: 1,
     supply: { digger: 0, builder: 0, blocker: 0, climber: 0, flyer: 0, jumper: 1 },
@@ -1855,8 +1855,38 @@ test('a jumper hops the goose instead of being caught, and the hunt carries on',
   const hopped = runHop(level, true);
   assert.equal(hopped.duck.state, 'saved');
   assert.ok(hopped.hops >= 1, 'it should have jumped it');
-  // Nothing was caught, so the goose has not been fed off — see stepWalking.
-  assert.equal(hopped.state.goose.fed, false);
+  /* Being hopped over calls the hunt off, the same way a catch or a Blocker
+     does — but with nobody in its beak. The flock behind walks through. */
+  assert.equal(hopped.state.goose.fed, true, 'the goose should have given up');
+  assert.equal(hopped.state.lost, 0, 'and taken nobody with it');
+});
+
+test('a goose hopped over leaves the scene, and lets the rest of the flock past', () => {
+  const level = miniLevel({
+    nestX: 6, goalX: SCENE_W - 4, timeLimit: 4000, duckCount: 5, spawnInterval: 30,
+    supply: { digger: 0, builder: 0, blocker: 0, climber: 0, flyer: 0, jumper: 1 },
+    goose: { x0: 100, x1: 140, y: 50, speed: 1.5, catchRadius: 1.5 },
+  });
+  const state = newGame(level);
+  let hopper = null;
+  for(let i = 0; i < level.timeLimit && !state.ended; i++){
+    // One Jumper, to the duckling in front. Everyone behind it is ordinary.
+    if(!hopper && state.ducks.length){
+      const first = state.ducks[0];
+      if(first.state === 'walking' && assignSkill(state, first.id, 'jumper')) hopper = first;
+    }
+    tick(state);
+  }
+  assert.equal(state.saved, level.duckCount,
+    'one hop should clear the goose for the whole flock');
+  assert.equal(state.lost, 0);
+  assert.ok(state.goose.gone, 'and the goose should have flown off the scene entirely');
+});
+
+test('every level carries at least one Jumper', () => {
+  for(const level of LEVELS){
+    assert.ok(level.supply.jumper >= 1, `${level.id} should have a Jumper`);
+  }
 });
 
 /* ------------------------------------------------------- The Hedgerow, played */
@@ -2399,6 +2429,26 @@ test('a duckling still standing holds the run open until the clock', () => {
   run(state, level.timeLimit + 5);
   assert.equal(first.state, 'blocking', 'it is still there');
   assert.ok(state.ticks >= level.timeLimit, 'so the clock is what ended it');
+});
+
+test('the hatched count is the flock, and a finished run has hatched all of it', () => {
+  /* What the HUD's "Hatched X / N" reads off. Two things have to hold for it
+     to mean anything: the number must be exactly how many ducklings exist,
+     every tick, and a run that plays out must actually reach the whole
+     hatch. The second one is what the quota used to break — it ended the
+     run the moment the goal was met, which froze this counter partway
+     through the flock and made it look like it was lagging. */
+  const level = strollLevel();
+  const state = newGame(level);
+  for(let i = 0; i < level.timeLimit && !state.ended; i++){
+    tick(state);
+    assert.equal(state.hatched, state.ducks.length,
+      `hatched drifted from the flock at tick ${state.ticks}`);
+    assert.ok(state.hatched <= level.duckCount, 'and never runs past the hatch');
+  }
+  assert.equal(state.ended, 'won');
+  assert.equal(state.hatched, level.duckCount, 'the whole flock should have hatched');
+  assert.equal(state.saved + state.lost, level.duckCount, 'and all of it accounted for');
 });
 
 test('endRun stops a run by hand and judges it exactly as the clock would', () => {

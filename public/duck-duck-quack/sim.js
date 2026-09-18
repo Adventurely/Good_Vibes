@@ -457,11 +457,19 @@ function stepWalking(state, d){
     /* A Jumper goes over the top of it. The goose is a thing in the way of
        about the size of everything else a Jumper hops, and a duckling that
        can clear a ditch can clear a goose — it is the one hazard here that
-       is answered by not being where it is for a moment. The hunt is not
-       called off by a jump: nothing was caught, so the goose is still
-       hunting whoever comes next, which is what makes a Jumper a thing you
-       spend per duckling rather than once. */
-    if(hasTrait(d, 'jumper') && startJump(state, d, true)) return;
+       is answered by not being where it is for a moment.
+
+       And being hopped over calls the hunt off. A goose that has just had a
+       duckling go clean over its head has been got the better of, and it
+       leaves the same way it leaves after a catch or after walking into a
+       Blocker (`fed`, see stepGoose) — only this time without a duckling.
+       That makes one Jumper worth the same to a flock as one Blocker
+       planted in the goose's path, bought a different way: the hop costs a
+       skill rather than costing a duckling its walk. */
+    if(hasTrait(d, 'jumper') && startJump(state, d, true)){
+      state.goose.fed = true;
+      return;
+    }
     loseDuckling(state, d, 'goosed');
     // Ordinarily one catch is the whole hunt — see goosedAt above. A
     // relentless goose (content.js's goose.relentless) keeps hunting after
