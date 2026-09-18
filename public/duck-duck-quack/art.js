@@ -276,15 +276,37 @@ const GRASS_DEPTH = 11;
    fixed depth would swallow the whole dirt band. */
 const SOIL_SHARE = 0.55;
 
+/* How far apart rock's strata run. Small enough that even a short face
+   shows two or three of them, which is what the banding is for: it has to
+   be legible on a twenty-four-pixel bluff, not just on The Aerie's cliff. */
+const STONE_BAND = 5;
+
 /* A column of actual rock (content.js's segment `hard`) reads nothing like a
- * column of dirt — no grass cap, no seam, nothing grown on it — flat slate
- * the whole way down but for a paler top edge catching the light, plainer
- * than the strata a dirt wall's face gets because there is only the one
- * material here to show. */
+ * column of dirt — no grass cap, no seam, nothing grown on it — pale slate
+ * the whole way down, banded with darker strata and capped with a line of
+ * shadow at the top.
+ *
+ * The strata are the point of this, and they are the fix for a real
+ * complaint: a Digger appeared to tunnel straight through rock. It never
+ * did (see sim.js's rockAt, which has always refused), but the bottom band
+ * of an ordinary dirt column used to be drawn in exactly this slate, so the
+ * purple a player saw a tunnel bored through on The Warren looked precisely
+ * like the purple they could not dig on The Aerie. Dirt goes darker with
+ * depth now, and rock is the lighter one, layered. Two materials, two
+ * pictures.
+ *
+ * The bands are anchored to absolute height rather than to the top of each
+ * column, so they run level across a whole formation instead of following
+ * its surface up and down — which is what makes them read as strata rather
+ * than as a pattern painted on a slope.
+ */
 function drawStoneColumn(ctx, x, y, fillH){
   ctx.fillStyle = hex('s');
   ctx.fillRect(x, y, 1, fillH);
   ctx.fillStyle = hex('v');
+  for(let band = Math.ceil(y / STONE_BAND) * STONE_BAND; band < y + fillH; band += STONE_BAND){
+    ctx.fillRect(x, band, 1, 1);
+  }
   ctx.fillRect(x, y, 1, Math.min(2, fillH));
 }
 
@@ -368,7 +390,10 @@ function drawGroundColumn(ctx, level, x, y, bottom, isRock, rockBelowY){
     ctx.fillStyle = hex('N');
     ctx.fillRect(x, y + grassH, 1, soilH);
     if(dirtH > soilH){
-      ctx.fillStyle = hex('s');
+      // Subsoil, and deliberately darker than the slate rock is drawn in
+      // rather than the same colour it used to be — see drawStoneColumn for
+      // what that cost.
+      ctx.fillStyle = hex('v');
       ctx.fillRect(x, y + grassH + soilH, 1, dirtH - soilH);
     }
     // The seam itself, one row of ink, so the cap reads as sitting on the
@@ -397,7 +422,7 @@ export function drawGround(ctx, terrain, level, rock, floors, rockBelow){
   }
   drawTufts(ctx, terrain, level, rock);
   drawFlowers(ctx, terrain, level, rock);
-  drawRockSpeckle(ctx, terrain, level, rock, floors);
+  drawSubsoilSpeckle(ctx, terrain, level, rock, floors);
   drawIslands(ctx, level);
   drawNest(ctx, level, terrain);
   // The pond's own decoration follows the pond, which is not always the
@@ -622,16 +647,16 @@ function drawFlowers(ctx, terrain, level, rock){
   }
 }
 
-/* A scatter of dark flecks in the rock band under ordinary dirt — the same
-   fixed-count hash technique as the tufts and flowers, seeded a third way,
-   so the slate below the soil reads as stone grain rather than a second
-   flat fill. Only ever a few dozen pixels regardless of how much rock is on
+/* A scatter of dark flecks through the subsoil under ordinary dirt — the
+   same fixed-count hash technique as the tufts and flowers, seeded a third
+   way, so the band below the soil reads as grit rather than a second flat
+   fill. Only ever a few dozen pixels regardless of how much ground is on
    screen, same as every other scatter here. Skipped on an actual rock
-   column (`hard`) — drawStoneColumn already has its own top edge and does
-   not have the grass-then-soil-then-rock band this is speckling. */
+   column (`hard`): that has its own strata (see drawStoneColumn) and none
+   of the grass-then-soil-then-subsoil banding this is speckling. */
 const SPECKLE_COUNT = 40;
 
-function drawRockSpeckle(ctx, terrain, level, rock, floors){
+function drawSubsoilSpeckle(ctx, terrain, level, rock, floors){
   ctx.fillStyle = hex('k');
   for(let i = 0; i < SPECKLE_COUNT; i++){
     const h = Math.imul(i + 1109, 2246822519) >>> 0;

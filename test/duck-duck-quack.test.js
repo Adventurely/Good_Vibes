@@ -2111,6 +2111,34 @@ test('The Stepping Stones puts its pond on the top island, past everything else'
   }
 });
 
+test('no Digger gets through rock on any level, however many are handed out', () => {
+  /* The sweep behind a bug report that turned out to be a drawing fault
+     rather than a rule one: a player watched a tunnel go through a purple
+     band and reasonably concluded Diggers could cut rock. They could not,
+     and this is the version of that claim a test can hold — every level,
+     every duckling handed a Digger every tick it is able to take one, and
+     not one column of stone ever cut. (The picture is fixed too: rock is
+     banded slate now and subsoil is darker, see art.js's drawStoneColumn.) */
+  for(const level of LEVELS){
+    const state = newGame(level);
+    state.supply.digger = 999;
+    for(let i = 0; i < level.timeLimit && !state.ended; i++){
+      for(const d of state.ducks){
+        if(d.state === 'walking' && !hasTrait(d, 'digger')) assignSkill(state, d.id, 'digger');
+      }
+      tick(state);
+      for(let x = 0; x < level.width; x++){
+        const cut = state.tunnelY[x];
+        if(cut == null) continue;
+        assert.ok(!state.rock[x], `${level.name}: a tunnel was cut through rock at column ${x}`);
+        const seam = state.rockBelow[x];
+        assert.ok(seam == null || cut <= seam,
+          `${level.name}: a tunnel at ${cut} ran under the rock seam at ${seam}, column ${x}`);
+      }
+    }
+  }
+});
+
 test('formatTime reads as minutes:seconds', () => {
   assert.equal(formatTime(0), '0:00');
   assert.equal(formatTime(TICK_RATE * 65), '1:05');
