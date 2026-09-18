@@ -431,9 +431,180 @@ export const FALLS_SONG = {
   openHatAt: [3, 7, 11, 15],
 };
 
+/* Everything from The Hedgerow on had no song at all. `play()` looks the
+ * level's id up in SONGS and quietly sets `song = null` when it misses, so
+ * five levels ran in silence with a Music button that claimed to be on —
+ * the failure mode of a lookup table that nobody made add up to the list it
+ * is indexed by. There is a test now that the two match.
+ */
+
+/* Hops. Short notes, nothing held, the bass jumping off the beat as much as
+   on it — the one level built entirely out of small leaps. */
+export const HEDGEROW_SONG = {
+  bpm: 126,
+  swing: 0.1,
+  bars: [
+    { chord: [62, 'min7'] }, { chord: [67, 'dom7'] },
+    { chord: [60, 'maj'] },  { chord: [57, 'dom7'] },
+    { chord: [62, 'min7'], lead: 'response' }, { chord: [67, 'dom7'], lead: 'response' },
+    { chord: [60, 'maj'],  lead: 'response' }, { chord: [57, 'dom7'], lead: 'response', fill: true },
+  ],
+  bass: [[0, 0, 1], [3, 0, 1], [6, 7, 1], [8, 0, 1], [11, 0, 1], [14, 5, 1]],
+  bassType: 'triangle',
+  bassCut: 1100,
+  bassLevel: 0.15,
+  lead: [[0, 12, 1], [2, 16, 1], [4, 19, 2], [8, 12, 1], [10, 16, 1], [12, 21, 2]],
+  leadResponse: [[0, 19, 1], [2, 24, 1], [4, 21, 1], [6, 19, 2], [10, 16, 1], [12, 19, 1], [14, 24, 2]],
+  leadType: 'square',
+  leadCut: 3200,
+  leadLevel: 0.05,
+  stabAt: [5, 13],
+  stabType: 'triangle',
+  stabCut: 1700,
+  stabLevel: 0.04,
+  kickAt: [0, 8],
+  snareAt: [4, 12],
+  hatAt: [2, 6, 10, 14],
+  openHatAt: [7, 15],
+};
+
+/* Height and air. The slowest thing here, long held notes and open fifths,
+   a kick that lands twice a bar and mostly gets out of the way. */
+export const OVERLOOK_SONG = {
+  bpm: 96,
+  swing: 0.04,
+  bars: [
+    { chord: [65, 'maj'] },  { chord: [60, 'maj'] },
+    { chord: [67, 'maj'] },  { chord: [57, 'min7'] },
+    { chord: [65, 'maj'], lead: 'response' },  { chord: [60, 'maj'], lead: 'response' },
+    { chord: [67, 'maj'], lead: 'response' },  { chord: [57, 'min7'], lead: 'response', fill: true },
+  ],
+  bass: [[0, 0, 4], [8, 7, 4]],
+  bassType: 'sine',
+  bassCut: 900,
+  bassLevel: 0.16,
+  lead: [[0, 12, 4], [4, 16, 4], [8, 19, 6]],
+  leadResponse: [[0, 19, 4], [6, 24, 4], [12, 21, 4]],
+  leadType: 'triangle',
+  leadCut: 4600,
+  leadLevel: 0.075,
+  stabAt: [6, 14],
+  stabType: 'triangle',
+  stabCut: 2200,
+  stabLevel: 0.035,
+  kickAt: [0, 8],
+  snareAt: [8],
+  hatAt: [4, 12],
+  openHatAt: [14],
+};
+
+/* The staircase, written as one: the bass walks up in whole steps and the
+   lead climbs a scale a step at a time, then comes back down on the answer.
+   The only tune here whose shape is the level's shape. */
+export const STONES_SONG = {
+  bpm: 110,
+  swing: 0.08,
+  bars: [
+    { chord: [60, 'maj'] },  { chord: [62, 'min7'] },
+    { chord: [65, 'maj'] },  { chord: [67, 'dom7'] },
+    { chord: [60, 'maj'], lead: 'response' },  { chord: [62, 'min7'], lead: 'response' },
+    { chord: [65, 'maj'], lead: 'response' },  { chord: [67, 'dom7'], lead: 'response', fill: true },
+  ],
+  bass: [[0, 0, 2], [4, 4, 2], [8, 7, 2], [12, 12, 2]],
+  bassType: 'triangle',
+  bassCut: 1000,
+  bassLevel: 0.15,
+  lead: [
+    [0, 0, 1], [2, 2, 1], [4, 4, 1], [6, 5, 1],
+    [8, 7, 1], [10, 9, 1], [12, 11, 1], [14, 12, 2],
+  ],
+  leadResponse: [
+    [0, 12, 1], [2, 11, 1], [4, 9, 1], [6, 7, 2],
+    [10, 4, 1], [12, 2, 1], [14, 0, 2],
+  ],
+  leadType: 'triangle',
+  leadCut: 3800,
+  leadLevel: 0.07,
+  stabAt: [3, 11],
+  stabType: 'triangle',
+  stabCut: 1800,
+  stabLevel: 0.04,
+  kickAt: [0, 8],
+  snareAt: [4, 12],
+  hatAt: [2, 6, 10, 14],
+  openHatAt: [15],
+};
+
+/* A tower, so: bells. A tolling bass held half a bar at a time under a
+   sparse, very high triangle, and almost no kit — one kick at the top of
+   the bar and one snare in the middle, which is as close to a bell tower as
+   four voices and a noise burst get. */
+export const BELFRY_SONG = {
+  bpm: 88,
+  swing: 0,
+  bars: [
+    { chord: [57, 'min7'] }, { chord: [65, 'maj'] },
+    { chord: [60, 'maj'] },  { chord: [67, 'dom7'] },
+    { chord: [57, 'min7'], lead: 'response' }, { chord: [65, 'maj'], lead: 'response' },
+    { chord: [60, 'maj'], lead: 'response' },  { chord: [67, 'dom7'], lead: 'response', fill: true },
+  ],
+  bass: [[0, 0, 6], [8, 0, 6]],
+  bassType: 'sine',
+  bassCut: 800,
+  bassLevel: 0.17,
+  lead: [[0, 24, 3], [4, 19, 3], [8, 28, 3], [12, 24, 3]],
+  leadResponse: [[0, 31, 3], [4, 28, 3], [8, 24, 4], [14, 19, 2]],
+  leadType: 'triangle',
+  leadCut: 5200,
+  leadLevel: 0.07,
+  stabAt: [6, 14],
+  stabType: 'sine',
+  stabCut: 2400,
+  stabLevel: 0.045,
+  kickAt: [0],
+  snareAt: [8],
+  hatAt: [4, 12],
+  openHatAt: [15],
+};
+
+/* One duckling walking a very long way round, so a walking bass — eight
+   notes a bar, up and back down, never stopping — with a lead that strolls
+   over the top of it rather than hurrying. */
+export const ERRAND_SONG = {
+  bpm: 104,
+  swing: 0.12,
+  bars: [
+    { chord: [57, 'min7'] }, { chord: [62, 'dom7'] },
+    { chord: [67, 'maj'] },  { chord: [64, 'min7'] },
+    { chord: [57, 'min7'], lead: 'response' }, { chord: [62, 'dom7'], lead: 'response' },
+    { chord: [67, 'maj'], lead: 'response' },  { chord: [64, 'min7'], lead: 'response', fill: true },
+  ],
+  bass: [
+    [0, 0, 1], [2, 2, 1], [4, 4, 1], [6, 5, 1],
+    [8, 7, 1], [10, 5, 1], [12, 4, 1], [14, 2, 1],
+  ],
+  bassType: 'triangle',
+  bassCut: 1000,
+  bassLevel: 0.15,
+  lead: [[0, 7, 2], [3, 9, 1], [4, 12, 2], [8, 11, 1], [10, 9, 2], [13, 7, 3]],
+  leadResponse: [[0, 12, 2], [3, 14, 1], [4, 16, 2], [8, 14, 1], [10, 12, 2], [13, 9, 3]],
+  leadType: 'triangle',
+  leadCut: 3600,
+  leadLevel: 0.075,
+  stabAt: [6, 14],
+  stabType: 'triangle',
+  stabCut: 1700,
+  stabLevel: 0.04,
+  kickAt: [0, 8],
+  snareAt: [4, 12],
+  hatAt: [2, 6, 10, 14],
+  openHatAt: [7],
+};
+
 export const SONGS = {
   park: PARK_SONG, warren: WARREN_SONG, orchard: ORCHARD_SONG, grove: GROVE_SONG, aerie: AERIE_SONG,
-  spire: SPIRE_SONG, falls: FALLS_SONG,
+  spire: SPIRE_SONG, falls: FALLS_SONG, hedgerow: HEDGEROW_SONG, overlook: OVERLOOK_SONG,
+  stones: STONES_SONG, belfry: BELFRY_SONG, errand: ERRAND_SONG,
 };
 
 /* ------------------------------------------------------------------ engine --- */
@@ -788,9 +959,15 @@ export function createAudio(){
      * one short peep gliding up rather than down — an entrance, the
      * opposite shape from `lost`'s falling puff.
      */
+    /* It was there all along and nobody could hear it: measured against the
+       others it peaked at eight per cent of the quack, which under the music
+       and out of a phone speaker is silence. "Sits under everything else"
+       had been taken as far as inaudible. Four times the level and half
+       again the length of the peep — still the quietest thing here after the
+       zap, and still well under the quack, but now actually a sound. */
     hatch(t){
-      hit(t, 0.02, 0.05, 3200, 'bandpass');
-      voice(950, t + 0.008, 0.08, 'triangle', 0.045, 1500, 5000);
+      hit(t, 0.025, 0.2, 3200, 'bandpass');
+      voice(950, t + 0.008, 0.12, 'triangle', 0.19, 1500, 5000);
     },
 
     /* A teleporter taking a duckling — the one thing in this game that is
