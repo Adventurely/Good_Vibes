@@ -269,44 +269,91 @@ export function drawSky(ctx, ticks = 0){
    its face reads as a green wall, not a cut edge. */
 const GRASS_DEPTH = 11;
 
-/* Below the soil, rock — a second cross-section split rather than one flat
-   dirt fill, so a deep column (the wall's face, fifty pixels of it) reads
-   as strata rather than a slab of one colour. Proportional this time, not
-   capped: unlike the grass cap, there is no shallow-column case where a
-   fixed depth would swallow the whole dirt band. */
-const SOIL_SHARE = 0.55;
+/* Under the topsoil, subsoil: a second cross-section split rather than one
+   flat dirt fill, so a deep column reads as layered ground rather than a
+   slab of one colour.
+
+   Capped, like the grass, and that cap matters more than it sounds. It used
+   to be a flat 45% of the dirt, which on a hundred-pixel column put a
+   fifty-pixel slab of near-black at the bottom of everything — The Spire
+   was a brown tower standing on a dark block half its own height, and the
+   block read as the more solid thing of the two. Sixteen pixels is a seam
+   between the soil and whatever is under it, which is what subsoil is.
+   `SUBSOIL_SHARE` still governs a shallow column, where sixteen pixels
+   would be the whole of the dirt. */
+const SUBSOIL_DEPTH = 16;
+const SUBSOIL_SHARE = 0.45;
+
+/* Terrain wants a few tones the shared sixteen-colour palette does not
+   carry: a lit and a shadowed oak for the rim of an exposed soil face, and
+   a lit green for the same rim through the grass cap. Stated here for the
+   same reason the stone greys below are — no other game in this repo has a
+   use for them, and the alternative is a cross-section drawn in flat
+   bands with no light on it at all. */
+const SOIL_LIT = '#d99270';
+const SOIL_DARK = '#9c6144';
+const GRASS_LIT = '#5cc067';
+
+/* How far the light on an exposed face runs down it. A lip, not a stripe:
+   the first pass ran the rim the whole height of the dirt and The Spire's
+   stepped face came out looking like paint had run down it. Five pixels
+   catches the turn of the edge and stops. */
+const EDGE_LIP = 5;
+
+/* Rock's own three shades, and the one place in this game that reaches
+ * outside the shared Good Vibes palette (../good-vibes/pixel.js).
+ *
+ * That palette has no grey. Every dark it carries — ink, deep violet,
+ * violet, slate — is purple, which is right for soil in shadow and wrong
+ * for stone: rock drawn in slate read as "more dirt, but darker", which is
+ * most of how a Digger came to look like it was tunnelling through rock.
+ * Three cool greys, stated here rather than added to the shared palette
+ * because no other game in this repo has any use for them.
+ */
+const STONE_FACE = '#4a505c';   // the body of a rock column
+const STONE_BAND_INK = '#31363f'; // its strata, and the cap of shadow on top
+const STONE_LIT = '#5d6472';    // the odd catch of light in the grain
 
 /* How far apart rock's strata run. Small enough that even a short face
    shows two or three of them, which is what the banding is for: it has to
    be legible on a twenty-four-pixel bluff, not just on The Aerie's cliff. */
 const STONE_BAND = 5;
 
-/* A column of actual rock (content.js's segment `hard`) reads nothing like a
- * column of dirt — no grass cap, no seam, nothing grown on it — pale slate
- * the whole way down, banded with darker strata and capped with a line of
- * shadow at the top.
+/* A column of actual rock (content.js's segment `hard` or the band under a
+ * `hardBelow` seam) reads nothing like a column of dirt — no grass cap, no
+ * seam, nothing grown on it — cool grey the whole way down, banded with
+ * darker strata and capped with a line of shadow at the top.
  *
- * The strata are the point of this, and they are the fix for a real
- * complaint: a Digger appeared to tunnel straight through rock. It never
- * did (see sim.js's rockAt, which has always refused), but the bottom band
- * of an ordinary dirt column used to be drawn in exactly this slate, so the
- * purple a player saw a tunnel bored through on The Warren looked precisely
- * like the purple they could not dig on The Aerie. Dirt goes darker with
- * depth now, and rock is the lighter one, layered. Two materials, two
- * pictures.
+ * Both of those are the fix for a real complaint: a Digger appeared to
+ * tunnel straight through rock. It never did (see sim.js's rockAt, which
+ * has always refused), but rock used to be drawn in the same slate as the
+ * bottom band of an ordinary dirt column, so the purple a player saw a
+ * tunnel bored through on The Warren looked precisely like the purple they
+ * could not dig on The Aerie. Dirt is brown going dark violet with depth
+ * now, and rock is grey and layered. Two materials, two pictures.
  *
  * The bands are anchored to absolute height rather than to the top of each
  * column, so they run level across a whole formation instead of following
  * its surface up and down — which is what makes them read as strata rather
- * than as a pattern painted on a slope.
+ * than as a pattern painted on a slope. The lit fleck rides the band above
+ * each stratum, on a scatter of columns, so the grain has a direction
+ * without anything having to be stored.
  */
 function drawStoneColumn(ctx, x, y, fillH){
-  ctx.fillStyle = hex('s');
+  ctx.fillStyle = STONE_FACE;
   ctx.fillRect(x, y, 1, fillH);
-  ctx.fillStyle = hex('v');
+
+  const grain = Math.imul(x + 7717, 2246822519) >>> 0;
   for(let band = Math.ceil(y / STONE_BAND) * STONE_BAND; band < y + fillH; band += STONE_BAND){
+    ctx.fillStyle = STONE_BAND_INK;
     ctx.fillRect(x, band, 1, 1);
+    if(band + 1 < y + fillH && (grain >>> (band % 11)) % 3 === 0){
+      ctx.fillStyle = STONE_LIT;
+      ctx.fillRect(x, band + 1, 1, 1);
+    }
   }
+
+  ctx.fillStyle = STONE_BAND_INK;
   ctx.fillRect(x, y, 1, Math.min(2, fillH));
 }
 
@@ -352,7 +399,7 @@ const isPondAt = (level, x) => {
  * drawIslands), which are made of exactly the same stuff and should read as
  * exactly the same stuff.
  */
-function drawGroundColumn(ctx, level, x, y, bottom, isRock, rockBelowY){
+function drawGroundColumn(ctx, level, x, y, bottom, isRock, rockBelowY, edge = 0){
   const fillH = bottom - y;
   if(fillH <= 0) return;
 
@@ -383,18 +430,26 @@ function drawGroundColumn(ctx, level, x, y, bottom, isRock, rockBelowY){
   const grassH = Math.min(GRASS_DEPTH, softH);
   ctx.fillStyle = hex('g');
   ctx.fillRect(x, y, 1, grassH);
+  // The underside of the turf, where it is in its own shadow. Two rows of
+  // pine before the ink seam is what stops a cut edge reading as a flat
+  // green rectangle sitting on a flat brown one.
+  if(grassH > 3){
+    ctx.fillStyle = hex('G');
+    ctx.fillRect(x, y + grassH - 2, 1, 2);
+  }
 
   const dirtH = softH - grassH;
   if(dirtH > 0){
-    const soilH = Math.round(dirtH * SOIL_SHARE);
+    const subsoilH = Math.min(SUBSOIL_DEPTH, Math.round(dirtH * SUBSOIL_SHARE));
+    const soilH = dirtH - subsoilH;
     ctx.fillStyle = hex('N');
     ctx.fillRect(x, y + grassH, 1, soilH);
-    if(dirtH > soilH){
-      // Subsoil, and deliberately darker than the slate rock is drawn in
-      // rather than the same colour it used to be — see drawStoneColumn for
-      // what that cost.
+    if(subsoilH > 0){
+      // Subsoil, and deliberately darker than the grey rock is drawn in
+      // rather than the same colour it used to be — see drawStoneColumn
+      // for what that cost.
       ctx.fillStyle = hex('v');
-      ctx.fillRect(x, y + grassH + soilH, 1, dirtH - soilH);
+      ctx.fillRect(x, y + grassH + soilH, 1, subsoilH);
     }
     // The seam itself, one row of ink, so the cap reads as sitting on the
     // dirt rather than fading into it.
@@ -402,8 +457,44 @@ function drawGroundColumn(ctx, level, x, y, bottom, isRock, rockBelowY){
     ctx.fillRect(x, y + grassH, 1, 1);
   }
   if(stoneTop < bottom) drawStoneColumn(ctx, x, stoneTop, bottom - stoneTop);
+
+  /* The rim of an exposed face, lit from the right because that is where
+     the sun is (see SUN_X). `edge` is +1 for a face whose right-hand side
+     is open air and -1 for one whose left is; a column with ground either
+     side of it gets neither. One pixel wide, which at this scale is the
+     difference between a cliff with a shape and a stack of coloured
+     rectangles. */
+  if(edge !== 0 && !isRock){
+    ctx.fillStyle = edge > 0 ? GRASS_LIT : hex('G');
+    ctx.fillRect(x, y, 1, Math.min(2, fillH));
+    const dirtTop = y + grassH;
+    const lip = Math.min(Math.max(0, stoneTop - dirtTop - 1), EDGE_LIP);
+    if(lip > 0){
+      ctx.fillStyle = edge > 0 ? SOIL_LIT : SOIL_DARK;
+      ctx.fillRect(x, dirtTop + 1, 1, lip);
+    }
+  }
+
   if(bottom < SCENE_H) drawFloatingEdge(ctx, x, bottom);
 }
+
+/* Which way an exposed face at this column looks, or 0 for a column with
+   ground of about its own height either side. A neighbour a real step lower
+   (or missing entirely, which is what a gap is) leaves this column's side
+   showing, and the side that shows is the one that catches the light or
+   loses it. Right-hand faces are lit; left-hand ones are in shadow. */
+function faceEdge(terrain, x, y){
+  const right = x + 1 < terrain.length ? terrain[x + 1] : SCENE_H + 200;
+  const left = x > 0 ? terrain[x - 1] : SCENE_H + 200;
+  if(right - y > WALK_FACE) return 1;
+  if(left - y > WALK_FACE) return -1;
+  return 0;
+}
+
+/* How much lower a neighbour has to be before this column counts as having
+   a face rather than a slope. Matched to the game's own WALK_STEP: what a
+   duckling steps over without noticing should not be drawn as a cliff. */
+const WALK_FACE = 4;
 
 /* The terrain height array, painted column by column from each surface down
  * to either the bottom of the scene or, for a floating segment, no further
@@ -418,10 +509,12 @@ export function drawGround(ctx, terrain, level, rock, floors, rockBelow){
     if(y >= SCENE_H) continue;
     const bottom = Math.min(floors ? floors[x] : SCENE_H, SCENE_H);
     drawGroundColumn(ctx, level, x, y, bottom,
-      Boolean(rock && rock[x]), rockBelow ? rockBelow[x] : null);
+      Boolean(rock && rock[x]), rockBelow ? rockBelow[x] : null,
+      faceEdge(terrain, x, y));
   }
   drawTufts(ctx, terrain, level, rock);
   drawFlowers(ctx, terrain, level, rock);
+  drawSoilGrain(ctx, terrain, level, rock, floors);
   drawSubsoilSpeckle(ctx, terrain, level, rock, floors);
   drawIslands(ctx, level);
   drawNest(ctx, level, terrain);
@@ -450,8 +543,11 @@ const ISLAND_DEPTH = 14;
 export function drawIslands(ctx, level){
   for(const isle of level.islands ?? []){
     const bottom = Math.min(isle.floor ?? isle.y + ISLAND_DEPTH, SCENE_H);
-    for(let x = Math.max(0, isle.from); x < Math.min(SCENE_W, isle.to); x++){
-      drawGroundColumn(ctx, level, x, isle.y, bottom, Boolean(isle.hard), null);
+    const from = Math.max(0, isle.from), to = Math.min(SCENE_W, isle.to);
+    for(let x = from; x < to; x++){
+      // An island is all face: open air at both ends of it.
+      const edge = x === to - 1 ? 1 : (x === from ? -1 : 0);
+      drawGroundColumn(ctx, level, x, isle.y, bottom, Boolean(isle.hard), null, edge);
     }
     drawTufts(ctx, tuftRow(level, isle), level, null);
   }
@@ -656,6 +752,32 @@ function drawFlowers(ctx, terrain, level, rock){
    of the grass-then-soil-then-subsoil banding this is speckling. */
 const SPECKLE_COUNT = 40;
 
+/* And a second, larger scatter of darker oak through the topsoil above it.
+   The soil band is the biggest flat area in the whole picture — The
+   Warren's wall is eighty pixels of one brown — and a fill that size with
+   nothing in it reads as a painted rectangle rather than as a cut through
+   ground. Same fixed-count hash, seeded a fourth way. */
+const GRAIN_COUNT = 90;
+
+function drawSoilGrain(ctx, terrain, level, rock, floors){
+  ctx.fillStyle = SOIL_DARK;
+  for(let i = 0; i < GRAIN_COUNT; i++){
+    const h = Math.imul(i + 3313, 2654435761) >>> 0;
+    const x = h % terrain.length;
+    const y = terrain[x];
+    if(y >= SCENE_H || isPondAt(level, x) || (rock && rock[x])) continue;
+    const bottom = Math.min(floors ? floors[x] : SCENE_H, SCENE_H);
+    const fillH = bottom - y;
+    if(fillH <= 0) continue;
+    const grassH = Math.min(GRASS_DEPTH, fillH);
+    const dirtH = fillH - grassH;
+    const soilH = dirtH - Math.min(SUBSOIL_DEPTH, Math.round(dirtH * SUBSOIL_SHARE));
+    if(soilH <= 2) continue;
+    const dy = 1 + (h >>> 9) % (soilH - 1);
+    ctx.fillRect(x, y + grassH + dy, 1, 1);
+  }
+}
+
 function drawSubsoilSpeckle(ctx, terrain, level, rock, floors){
   ctx.fillStyle = hex('k');
   for(let i = 0; i < SPECKLE_COUNT; i++){
@@ -669,11 +791,10 @@ function drawSubsoilSpeckle(ctx, terrain, level, rock, floors){
     const grassH = Math.min(GRASS_DEPTH, fillH);
     const dirtH = fillH - grassH;
     if(dirtH <= 0) continue;
-    const soilH = Math.round(dirtH * SOIL_SHARE);
-    const rockH = dirtH - soilH;
-    if(rockH <= 0) continue;
-    const dy = (h >>> 11) % rockH;
-    ctx.fillRect(x, y + grassH + soilH + dy, 1, 1);
+    const subsoilH = Math.min(SUBSOIL_DEPTH, Math.round(dirtH * SUBSOIL_SHARE));
+    if(subsoilH <= 0) continue;
+    const dy = (h >>> 11) % subsoilH;
+    ctx.fillRect(x, y + grassH + (dirtH - subsoilH) + dy, 1, 1);
   }
 }
 
@@ -793,6 +914,18 @@ export function drawDuck(ctx, d, ticks = 0){
 
   if(d.state === 'falling' && d.traits.has('flyer')){
     drawWings(ctx, x, y, ticks);
+  }
+
+  /* A scrap of shadow on whatever it is standing on. Four pixels of ink at
+     a third strength, and it is the single cheapest thing in this file:
+     without it a duckling is a yellow shape floating a pixel above the
+     grass, and with it the flock is standing on the level. Skipped while
+     one is in the air, where there is nothing under it to cast onto. */
+  if(d.state !== 'falling' && d.state !== 'jumping'){
+    ctx.globalAlpha = 0.28;
+    ctx.fillStyle = hex('k');
+    ctx.fillRect(x + 1, Math.round(d.y), 4, 1);
+    ctx.globalAlpha = 1;
   }
 
   drawSprite(ctx, DUCK_ART, x, y, d.dir < 0);

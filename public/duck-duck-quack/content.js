@@ -88,7 +88,7 @@
    straight off the page whether they have the latest build, rather than
    having to guess from behavior alone. Bump it on every change that ships,
    however small. */
-export const GAME_VERSION = '1.9.1';
+export const GAME_VERSION = '1.9.2';
 
 export const SCENE_W = 320;
 export const SCENE_H = 180;
@@ -790,12 +790,26 @@ export const LEVEL_5 = {
  * first twenty columns of open ground does it, and the far end of the pen
  * does not.
  *
- * Then the spire itself: thirty columns of plain earth between the ground
- * on the left and the ground on the right, and a face too tall to walk up
- * on either side. One Digger tunnels it (thirty is inside a tunnel's
- * thirty-three, see DIG_SECONDS) and the flock walks through to the pond.
- * Nothing here is `hard` — the spire is earth, and it draws as earth for
- * exactly that reason.
+ * Then the spire itself: thirty columns between the ground on the left and
+ * the ground on the right, and a face too tall to walk up on either side.
+ * One Digger tunnels it (thirty is inside a tunnel's thirty-three, see
+ * DIG_SECONDS) and the flock walks through to the pond.
+ *
+ * But not at any height it likes. The spire is earth standing on rock, and
+ * the seam runs level through it at 145 (`hardBelow`), which is the bottom
+ * thirty-five pixels of the thing — where a column of this depth draws its
+ * subsoil, and now draws stone instead. A Digger down on the grass at 150
+ * is under that seam and gets nowhere, the same lesson The Grove teaches
+ * with the same field. A Digger up on the ramp is above it, and cuts.
+ *
+ * So the ramp is not only how the flock survives the drop, it is how the
+ * tunnel gets dug at all, and the order stops being a thing a player can
+ * get wrong: a Digger handed out early simply holds the trait, walks into
+ * rock, turns around, and cuts the moment the ramp has carried it up to
+ * earth it can actually get through. The ramp wants starting in the first
+ * twenty columns of the pen for the other reason too — a ramp begun much
+ * past that ends its climb below the seam, and then the Digger riding it
+ * is looking at stone as well.
  *
  * The bluff at the far left is `hard`, and it is the level's one piece of
  * real rock: forty pixels of undiggable stone that turns a duckling around
@@ -806,16 +820,15 @@ export const LEVEL_5 = {
  * that killed the flock while it waited would be a level about clicking
  * fast.
  *
- * Ramp first or tunnel first both work, and it is worth saying why, because
- * it very nearly did not. A tunnel is dug at whatever height the duckling
- * that cut it was standing at, so a Digger sent in from the ground cuts at
- * ground level and one sent up the finished ramp cuts twenty-odd pixels
- * higher. Either way the flock gets through: a ramp laid over an existing
- * tunnel ends a step above its mouth, not a wall above it, so ducklings
- * walking up the ramp step straight down off the end into the hole. See
- * sim.js's surfacesAt, which is what makes a tunnelled column two floors —
- * the hillside over the hole and the hole itself — rather than only the
- * lower one.
+ * A tunnel is dug at whatever height the duckling that cut it was standing
+ * at, which here is always the ramp's own deck: somewhere between a hundred
+ * and twenty-nine and a hundred and forty-five, depending on where the ramp
+ * was started. All of that band is earth. And a ramp laid over a tunnel
+ * that already exists ends a step above its mouth rather than a wall above
+ * it, so ducklings walking up the ramp step straight down off the end into
+ * the hole — see sim.js's surfacesAt, which is what makes a tunnelled
+ * column two floors, the hillside over the hole and the hole itself,
+ * rather than only the lower one.
  */
 export const LEVEL_6 = {
   id: 'spire',
@@ -836,8 +849,10 @@ export const LEVEL_6 = {
   segments: [
     { from: 0, to: 60, y: 110, hard: true },
     { from: 60, to: 90, y: 150 },
-    ...stairs(90, 120, 45, 15, 2),
-    { from: 102, to: 120, y: 30 },
+    // The spire is earth on top of rock, and the seam runs level right
+    // through it at 145 — see the note above on what that costs a Digger.
+    ...stairs(90, 120, 45, 15, 2).map(seg => ({ ...seg, hardBelow: 145 })),
+    { from: 102, to: 120, y: 30, hardBelow: 145 },
     { from: 120, to: 320, y: 150 },
   ],
 
