@@ -12,6 +12,7 @@ import * as S from '../public/orbital-trader/sim.js';
 import { createChart, railCrossings, railLead, locateOnPrediction, pathAnchors, KM_PER_AU, PALETTE, haze, bodyColour, fmtAu } from '../public/orbital-trader/render.js';
 import { DURATION, BREACH, BEATS, CAPTION_AT, beatAt, ascent, skyAt, ROCKET } from '../public/orbital-trader/intro.js';
 import { SONGS, QUALITIES, MUSIC_KEY, readMusicPrefs, writeMusicPrefs, createAudio } from '../public/orbital-trader/audio.js';
+import { EVENTS, EVENT_RULES } from '../public/orbital-trader/content.js';
 
 /* Orbital Trader has no server: everything it knows is in public/ and is
  * imported here as the browser imports it. These tests are the gate that a
@@ -5826,4 +5827,222 @@ test('an empty chair is answered with where to look, and a filled one with the e
     const ms = S.sayMs(l.say);
     assert.ok(ms >= 900 && ms <= 6500, `${x.id}: "${l.say}" reads in ${ms} ms`);
   }
+});
+
+/* ------------------------------------------------------------- events */
+
+/* What can happen on the way. Rolled at a change of reach, once a leg at most,
+   never during the lesson — and everything a choice will do is worked out when
+   the card goes up, so the buttons say what they cost and a reload cannot
+   re-roll a result. */
+const design_events = () => design('events.json');
+
+test('the events the game ships are the events in the table, and the table keeps to its shape', () => {
+  assert.deepEqual(EVENTS, design_events().events, 'data/events.js was not rebuilt');
+  assert.deepEqual(EVENT_RULES, design_events().rules);
+  assert.ok(EVENT_RULES.chance > 0 && EVENT_RULES.chance <= 0.25, `a ${EVENT_RULES.chance} chance per crossing is not a small one`);
+  assert.ok(EVENTS.length >= 8, 'a table this short repeats itself in an afternoon');
+  const goods = new Set(GOODS.map(g => g.id)), cats = new Set(GOODS.map(g => g.category));
+  for(const ev of EVENTS){
+    assert.ok(ev.id && ev.title && ev.text && ev.choices?.length, `event ${ev.id} is malformed`);
+    assert.ok(ev.choices.some(c => !c.requires), `${ev.id}: every choice needs something, so a ship with nothing is stuck on the card`);
+    for(const c of ev.choices){
+      assert.ok(c.label, `${ev.id}: a button with no word on it`);
+      assert.ok(c.text || c.outcomes?.length, `${ev.id}: "${c.label}" leads nowhere`);
+      if(c.outcomes) assert.ok(c.outcomes.some(o => !o.when), `${ev.id}: "${c.label}" can come to nothing`);
+    }
+    for(const k of [...(ev.when?.carrying ?? []), ...(ev.when?.notCarrying ?? [])]) assert.ok(goods.has(k) || cats.has(k), `${ev.id} looks for ${k}, which nothing is`);
+  }
+  assert.equal(new Set(EVENTS.map(e => e.id)).size, EVENTS.length, 'two events share an id');
+  // The one the brief named: a Veyra hull that scans for counterfeit crests and fines you.
+  const scan = EVENTS.find(e => e.id === 'veyra-scan');
+  assert.ok(scan && scan.when.regions.includes('inner') && scan.when.carrying.includes('contraband'));
+  assert.ok(scan.choices[0].effects.money.fraction < 0 && scan.choices[0].effects.cargo.take === 'contraband', 'the fine is not a fine');
+});
+
+test('a crossing is placed in a region by the reach it enters, or the one it leaves', () => {
+  assert.equal(S.crossingRegion('tassel', 'lamp'), 'home', 'leaving Tassel is a home-system crossing');
+  assert.equal(S.crossingRegion('lamp', 'grumm'), 'outer');
+  assert.equal(S.crossingRegion('cinder', 'scorch'), 'inner');
+  assert.equal(S.crossingRegion('lamp', 'nail'), 'belt');
+  assert.equal(S.crossingRegion('grumm', 'brine'), 'outer');
+});
+
+/* A ship set up for an event: past the lesson, in the open, with a purse. */
+function shipFor(region, extra = {}){
+  const s = S.newGame(11);
+  s.flags.tutorialDone = true;
+  s.dockedAt = null; s.justLeft = null;
+  s.money = 500;
+  Object.assign(s, extra);
+  return s;
+}
+const carry = (s, good, qty, more = {}) => s.cargo.push({ good, qty, t: 0, price: 0, from: null, ...more });
+
+test('nothing happens during the lesson, and at most one thing between dockings', () => {
+  const lesson = S.newGame(3);
+  lesson.dockedAt = null; lesson.justLeft = null;
+  assert.ok(S.tutorialRunning(lesson));
+  for(let i = 0; i < 400; i++) S.rollEncounter(lesson, 'tassel', 'lamp', []);
+  assert.equal(lesson.pending, null, 'an event interrupted Uncle Theo');
+
+  const s = shipFor('home');
+  let fired = 0, tries = 0;
+  const events = [];
+  for(let i = 0; i < 400; i++){
+    if(s.pending){ fired++; s.pending = null; s.encounters.legDone = false; }
+    tries++;
+    S.rollEncounter(s, 'tassel', 'lamp', events);
+  }
+  const rate = fired / tries;
+  assert.ok(rate > EVENT_RULES.chance * 0.5 && rate < EVENT_RULES.chance * 1.6, `events came up on ${(rate * 100).toFixed(0)}% of crossings against a chance of ${EVENT_RULES.chance * 100}%`);
+  assert.ok(events.every(e => e.kind === 'encounter' && e.pending?.kind === 'encounter'));
+
+  // One a leg: with the card answered but the leg not over, nothing more comes.
+  const t = shipFor('home');
+  for(let i = 0; i < 400 && !t.pending; i++) S.rollEncounter(t, 'tassel', 'lamp', []);
+  assert.ok(t.pending, 'four hundred crossings and nothing happened');
+  assert.ok(t.encounters.legDone);
+  S.resolveEncounter(t, t.pending.choices.findIndex(c => !c.disabled));
+  assert.equal(t.pending, null);
+  for(let i = 0; i < 400; i++) S.rollEncounter(t, 'tassel', 'lamp', []);
+  assert.equal(t.pending, null, 'a second event on the same leg');
+  // And docking opens the next leg.
+  const b = world.get('slate'); const st = O.circularState(b.mu, b.dockAlt, 0);
+  t.ship = { body: 'slate', r: st.r, v: st.v };
+  assert.ok(S.dock(t).ok, 'could not tie up at Slate');
+  assert.equal(t.encounters.legDone, false, 'docking did not end the leg');
+  // A card that is up blocks the roll, too: one thing at a time.
+  const u = shipFor('home');
+  u.pending = { kind: 'toll' };
+  for(let i = 0; i < 200; i++) S.rollEncounter(u, 'tassel', 'lamp', []);
+  assert.equal(u.pending.kind, 'toll');
+});
+
+test('an event fits a crossing by region and by what the ship is carrying', () => {
+  const s = shipFor('inner');
+  const fits = (id, region) => S.eventFits(s, EVENTS.find(e => e.id === id), region);
+  assert.equal(fits('veyra-scan', 'inner'), false, 'a scan for contraband with none aboard');
+  assert.equal(fits('veyra-scan-clean', 'inner'), true);
+  carry(s, 'fakemedals', 3);
+  assert.equal(fits('veyra-scan', 'inner'), true);
+  assert.equal(fits('veyra-scan-clean', 'inner'), false, 'a clean scan of a hold with counterfeit medals in it');
+  assert.equal(fits('veyra-scan', 'belt'), false, 'a Veyra warship in the Belt');
+  assert.equal(fits('beacon', 'belt'), true, 'a beacon is anywhere');
+  assert.equal(fits('flare', 'inner'), false, 'a flare with nothing cold aboard');
+  carry(s, 'gel', 2);
+  assert.equal(fits('flare', 'inner'), true);
+  assert.equal(fits('bank-launch', 'home'), false); s.debt = 100;
+  assert.equal(fits('bank-launch', 'home'), true);
+  assert.equal(fits('cat-mechanic', 'belt'), false); s.hull = 2;
+  assert.equal(fits('cat-mechanic', 'belt'), true);
+  // Something seen is drawn less often, so a long game meets the whole table.
+  const before = S.eligibleEvents(s, 'inner').find(x => x.ev.id === 'veyra-scan').weight;
+  s.encounters.seen['veyra-scan'] = 2;
+  assert.equal(S.eligibleEvents(s, 'inner').find(x => x.ev.id === 'veyra-scan').weight, before / 4);
+});
+
+test('the Veyra scan: crates named, the fine a number, the run greyed when the tank is short', () => {
+  const s = shipFor('inner');
+  carry(s, 'fakemedals', 4);
+  carry(s, 'hotweapons', 1, { questId: 'x' });   // somebody's errand: never taken
+  carry(s, 'steel', 2);
+  s.dv = S.auDay(0.3);
+  const p = S.stageEvent(s, EVENTS.find(e => e.id === 'veyra-scan'), 'inner');
+  assert.equal(p.kind, 'encounter');
+  const [hand, bluff, run] = p.choices;
+  assert.deepEqual(hand.effects.take, [{ good: 'fakemedals', qty: 4 }], 'the consigned weapons were taken, or the steel');
+  assert.ok(hand.effects.money < 0 && -hand.effects.money <= s.money * 0.6, 'the fine is not bounded by the purse');
+  assert.ok(-hand.effects.money <= 400, 'the fine is over its cap');
+  assert.ok(!/\{/.test(hand.text) && hand.text.includes('Counterfeit faction medals'), `the text is not filled in: ${hand.text}`);
+  assert.equal(hand.effects.rep.emberkin, -1);
+  assert.ok(bluff.text && bluff.effects, 'the bluff was not rolled when the card went up');
+  assert.match(run.disabled, /in the tank/, 'a burn the tank cannot pay for is on offer');
+  assert.equal(hand.disabled, null);
+
+  s.pending = p;
+  assert.equal(S.resolveEncounter(s, 2).ok, false, 'a greyed choice went through');
+  assert.equal(S.resolveEncounter(s, 9).ok, false);
+  const money = s.money, rep = s.rep.emberkin;
+  const r = S.resolveEncounter(s, 0);
+  assert.ok(r.ok && r.text === hand.text);
+  assert.equal(s.pending, null);
+  assert.equal(s.money, money + hand.effects.money);
+  assert.equal(s.rep.emberkin, Math.max(0, rep - 1), 'standing went below nothing');
+  assert.ok(!s.cargo.some(c => c.good === 'fakemedals'), 'the medals are still aboard');
+  assert.ok(s.cargo.some(c => c.good === 'hotweapons' && c.qty === 1), 'they took a crate that was somebody else\'s');
+  assert.ok(s.cargo.some(c => c.good === 'steel' && c.qty === 2), 'they took the steel');
+  assert.equal(s.log.at(-1).text, hand.text, 'the outcome is not in the log');
+});
+
+test('what the other effects come to: fuel, cold cargo, a found crate, the bank, the hull, a stranger\'s thanks', () => {
+  // A flare with the cold hold fitted is nothing; without it, half of what is cold.
+  const cold = shipFor('inner'); carry(cold, 'gel', 3); carry(cold, 'riverfish', 1);
+  const flare = EVENTS.find(e => e.id === 'flare');
+  const ride = S.stageEvent(cold, flare, 'inner').choices[1];
+  assert.deepEqual(ride.effects.take, [{ good: 'gel', qty: 2 }, { good: 'riverfish', qty: 1 }], 'half, rounded up, of each cold stack');
+  cold.keys.tempControl = true;
+  assert.equal(S.stageEvent(cold, flare, 'inner').choices[1].effects.take, undefined, 'the cold hold did not do what a cold hold is for');
+  const shade = S.stageEvent(cold, flare, 'inner').choices[0];
+  assert.ok(Math.abs(S.kms(shade.effects.dv) + 0.2) < 1e-9, 'shading the hold costs 200 m/s');
+
+  // A stranger's thanks go to the people of the region.
+  const belt = shipFor('belt');
+  const beacon = S.stageEvent(belt, EVENTS.find(e => e.id === 'beacon'), 'belt');
+  assert.deepEqual(beacon.choices[0].effects.rep, { cat: 1 });
+  assert.match(beacon.choices[0].text, /The cats/);
+  const deep = S.stageEvent(belt, EVENTS.find(e => e.id === 'beacon'), 'deep');
+  assert.deepEqual(deep.choices[0].effects.rep, {}, 'thanks from nobody at the Maw');
+  belt.pending = beacon; const dv = belt.dv;
+  S.resolveEncounter(belt, 0);
+  assert.ok(Math.abs(S.kms(dv - belt.dv) - 0.3) < 1e-9, 'the fuel was not handed across');
+  assert.equal(belt.rep.cat, 1);
+
+  // A crate found is a crate aboard, if there is room; otherwise the button says so.
+  const crate = EVENTS.find(e => e.id === 'drift-crate');
+  const room = shipFor('belt');
+  room.pending = S.stageEvent(room, crate, 'belt');
+  S.resolveEncounter(room, 0);
+  assert.ok(room.cargo.some(c => c.good === 'hullplate' && c.qty === 1), 'the crate never came aboard');
+  const full = shipFor('belt'); carry(full, 'steel', 999);
+  assert.match(S.stageEvent(full, crate, 'belt').choices[0].disabled, /hold/);
+
+  // The bank: a quarter of the purse against the debt, or five percent more owed.
+  const owing = shipFor('home', { debt: 200, money: 400 });
+  const bank = EVENTS.find(e => e.id === 'bank-launch');
+  owing.pending = S.stageEvent(owing, bank, 'home');
+  assert.equal(owing.pending.choices[0].effects.debt, -100);
+  assert.match(owing.pending.choices[0].text, /100 /);
+  S.resolveEncounter(owing, 0);
+  assert.equal(owing.debt, 100); assert.equal(owing.money, 300);
+  owing.pending = S.stageEvent(owing, bank, 'home');
+  S.resolveEncounter(owing, 1);
+  assert.equal(owing.debt, 105);
+
+  // A mechanic mends a grade; the hull never goes below sound.
+  const dented = shipFor('belt', { hull: 1 });
+  dented.pending = S.stageEvent(dented, EVENTS.find(e => e.id === 'cat-mechanic'), 'belt');
+  S.resolveEncounter(dented, 0);
+  assert.equal(dented.hull, 0); assert.equal(dented.money, 440);
+});
+
+test('a save from before there were events restores with the field, and a stale card is dropped', () => {
+  const s = shipFor('home');
+  delete s.encounters;
+  const back = S.importSave(S.exportSave(s));
+  assert.deepEqual(back.encounters, { legDone: false, seen: {} });
+  const t = shipFor('home');
+  t.pending = { kind: 'encounter', id: 'no-such-event', title: 'x', text: 'x', choices: [] };
+  assert.equal(S.importSave(S.exportSave(t)).pending, null, 'a card nothing in this build can answer');
+  const u = shipFor('home');
+  for(let i = 0; i < 400 && !u.pending; i++) S.rollEncounter(u, 'tassel', 'lamp', []);
+  const kept = S.importSave(S.exportSave(u));
+  assert.deepEqual(kept.pending, u.pending, 'a live card did not survive the save');
+});
+
+test('the play page puts an event up as a card and answers it through the sim', () => {
+  const html = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.match(html, /e\.kind === 'encounter'.*showEncounter\(e\.pending\)/, 'the tick\'s event never reaches the page');
+  assert.match(html, /state\.pending\?\.kind === 'encounter'\) showEncounter\(state\.pending\)/, 'a card up at save time does not come back at load');
+  assert.match(html, /S\.resolveEncounter\(state, Number\(b\.dataset\.choice\)\)/, 'the page answers the card itself');
 });

@@ -23,7 +23,7 @@ import {
 } from './orbit.js';
 import {
   CONST, BODIES, GOODS, PORTS, UPGRADES, FORMULAS, TEXT, SPECIES,
-  REGION_OF, wantsGood, lovesGood, QUESTS as QUESTBOOK, RELICS as RELICBOOK, DIALOG,
+  REGION_OF, wantsGood, lovesGood, QUESTS as QUESTBOOK, RELICS as RELICBOOK, DIALOG, EVENTS, EVENT_RULES,
 } from './content.js';
 
 export const world = makeWorld(BODIES);
@@ -111,6 +111,10 @@ export function newGame(seed = 1){
     log: [],
     flags: { tutorial: 0 },
     toll: { lastT: -1e9, inBelt: false },
+    /* What has happened on the way: whether this leg has had its event, and
+       how often each has come up, so the table is met in full before it
+       repeats. */
+    encounters: { legDone: false, seen: {} },
     pending: null,
     hull: 0,
     faults: {},
@@ -377,6 +381,7 @@ export function dock(state){
   state.stats.farthest = Math.max(state.stats.farthest, dAbs);
   logLine(state, 'docked', TEXT.logTemplates.docked, { port: portName(port) });
   const events = [{ kind: 'docked', port }];
+  legEnds(state);
   questCheck(state, events);
   milestonesOnDock(state, port, events);
   return { ok: true, port, events };
@@ -925,6 +930,7 @@ export function tick(state, dtDays){
          before — but there is no longer a line of story attached to it, so
          crossing a reach says nothing beyond the log entry above. */
       flag(state, 'firstSoiChange', events);
+      rollEncounter(state, e.from, e.to, events);
       if(e.to === 'lamp' && from.kind === 'planet') flag(state, 'firstTransfer', events);
       if(e.from === 'grumm' && e.to === 'lamp'){
         // Leaving Grumm faster than we came, in the Lamp's frame? That is an assist.
@@ -3227,6 +3233,206 @@ export function resolveToll(state, choice){
   return { ok: true, text };
 }
 
+/* ------------------------------------------------------------- events */
+
+/* What can happen on the way: events.json, rolled where a ship crosses from
+ * one reach into another. That is the one moment on a voyage where something
+ * is already changing — the chart re-frames, the road re-draws — so a hail
+ * there is an arrival rather than an interruption in the middle of nothing.
+ *
+ * Three bounds, and they are the whole of the pacing. A crossing turns into
+ * an event with `rules.chance`, and only if something in the table fits it.
+ * There is at most one between one docking and the next, whatever the road
+ * does. And nothing fires while Uncle Theo is still teaching: the lesson has
+ * enough in it.
+ *
+ * Everything an event will do is worked out when it comes up, not when the
+ * choice is made — the fine as a number, the crates by name, the roll of a
+ * chancy outcome already rolled — and written into `state.pending`. So the
+ * card can say exactly what each button costs, a reload cannot re-roll a
+ * result, and answering is bookkeeping rather than arithmetic. */
+
+const REGION_PEOPLE = { inner: 'emberkin', home: 'otter', belt: 'cat', outer: 'frog', deep: null };
+
+/* The region a reach belongs to: the port on it, or the port on whatever it
+ * goes round. The Lamp belongs to nobody, so a crossing into the Lamp's frame
+ * is placed by the world just left. */
+function regionOfBody(id){
+  for(let b = world.get(id); b; b = b.parent ? world.get(b.parent) : null){
+    if(REGION_OF[b.id]) return REGION_OF[b.id];
+  }
+  return null;
+}
+export const crossingRegion = (from, to) => regionOfBody(to) ?? regionOfBody(from) ?? null;
+
+/* Docking ends the leg: the next road may have an event of its own. */
+function legEnds(state){
+  state.encounters ??= { legDone: false, seen: {} };
+  state.encounters.legDone = false;
+}
+
+const isKind = (good, kind) => good.id === kind || good.category === kind;
+const aboardOfKind = (state, kind) => state.cargo.filter(s => !isConsigned(s) && s.qty > 0 && isKind(goodById(s.good), kind));
+const coldAboard = state => state.cargo.filter(s => !isConsigned(s) && s.qty > 0 && goodById(s.good).needsTempControl);
+const stacksValue = stacks => stacks.reduce((sum, s) => sum + goodById(s.good).basePrice * s.qty, 0);
+
+/* Does an event fit this crossing, with this ship? */
+export function eventFits(state, ev, region){
+  const w = ev.when ?? {};
+  if(w.regions && !w.regions.includes(region)) return false;
+  if(w.carrying && !w.carrying.some(k => aboardOfKind(state, k).length)) return false;
+  if(w.notCarrying && w.notCarrying.some(k => aboardOfKind(state, k).length)) return false;
+  if(w.coldCargo && !coldAboard(state).length) return false;
+  if(w.debt && !(state.debt > 0)) return false;
+  if(w.hull && !(hullLevel(state) > 0)) return false;
+  return true;
+}
+
+/* Everything that fits, each with the weight it will be drawn at: what the
+ * table says, halved for every time this ship has seen it. */
+export function eligibleEvents(state, region){
+  return EVENTS.filter(ev => eventFits(state, ev, region))
+    .map(ev => ({ ev, weight: (ev.weight ?? 1) / Math.pow(2, state.encounters?.seen?.[ev.id] ?? 0) }));
+}
+
+function draw(state, list, weightOf){
+  const total = list.reduce((s, x) => s + weightOf(x), 0);
+  if(!(total > 0)) return null;
+  let r = rnd(state) * total;
+  for(const x of list){ r -= weightOf(x); if(r <= 0) return x; }
+  return list[list.length - 1];
+}
+
+/* Money and crates as they will actually be, so the card can say so. Costs
+ * are bounded here rather than at the till: never more than six tenths of
+ * the purse, never a crate somebody else is owed, never below empty. */
+function resolveEffects(state, fx = {}, region){
+  const out = {};
+  const vars = {};
+  if(fx.money !== undefined){
+    let amount = typeof fx.money === 'number' ? fx.money : (() => {
+      const of = fx.money.of === 'purse' ? Math.max(0, state.money)
+        : fx.money.of === 'contraband' ? stacksValue(aboardOfKind(state, 'contraband'))
+        : cargoValue(state);
+      const raw = of * fx.money.fraction;
+      return fx.money.cap != null ? Math.sign(raw) * Math.min(Math.abs(raw), fx.money.cap) : raw;
+    })();
+    if(amount < 0) amount = -Math.min(-amount, Math.max(0, state.money) * 0.6);
+    out.money = Math.round(amount);
+    vars.amount = fmtMoney(Math.abs(out.money));
+  }
+  if(fx.dv !== undefined){
+    const want = auDay(fx.dv);
+    out.dv = want < 0 ? -Math.min(-want, state.dv) : Math.min(want, Math.max(0, usableTank(state) - state.dv));
+  }
+  if(fx.rep){
+    out.rep = {};
+    for(const [who, d] of Object.entries(fx.rep)){
+      const people = who === 'here' ? REGION_PEOPLE[region] : who;
+      if(people) out.rep[people] = (out.rep[people] ?? 0) + d;
+    }
+  }
+  if(fx.cargo){
+    const taken = [];
+    if(fx.cargo.take !== undefined){
+      for(const s of aboardOfKind(state, fx.cargo.take)){
+        const qty = fx.cargo.qty != null ? Math.min(s.qty, Math.max(0, fx.cargo.qty - taken.reduce((n, t) => n + t.qty, 0))) : s.qty;
+        if(qty > 0) taken.push({ good: s.good, qty });
+      }
+    }else if(fx.cargo.takeCold !== undefined){
+      for(const s of coldAboard(state)){
+        const qty = Math.ceil(s.qty * fx.cargo.takeCold);
+        if(qty > 0) taken.push({ good: s.good, qty });
+      }
+    }
+    if(fx.cargo.give !== undefined) out.give = { good: fx.cargo.give, qty: fx.cargo.qty };
+    if(taken.length) out.take = taken;
+    const named = (out.take ?? (out.give ? [out.give] : [])).map(t => `${t.qty} ${goodById(t.good).name}`);
+    vars.cargo = named.join(', ') || 'nothing';
+  }
+  if(fx.hull !== undefined) out.hull = fx.hull;
+  if(fx.debt){
+    if(fx.debt.pay != null) out.debt = -Math.round(Math.min(state.debt, Math.max(0, state.money) * fx.debt.pay));
+    else out.debt = Math.round(state.debt * fx.debt.add);
+    vars.amount = fmtMoney(Math.abs(out.debt));
+  }
+  vars.here = SPECIES[REGION_PEOPLE[region] ?? 'none']?.plural ?? 'They';
+  return { effects: out, vars };
+}
+
+function unmet(state, req = {}){
+  if(req.dv != null && kms(state.dv) < req.dv - 1e-9) return `needs ${fmtKms(auDay(req.dv))} in the tank`;
+  if(req.money != null && state.money < req.money) return `needs ${fmtMoney(req.money)}`;
+  if(req.holdUnits != null && freeUnits(state) < req.holdUnits) return `needs ${req.holdUnits} unit${req.holdUnits === 1 ? '' : 's'} of hold`;
+  return null;
+}
+
+/* One event, worked out for this ship and this crossing. Exported for the
+ * tests; the game reaches it through the tick. */
+export function stageEvent(state, ev, region){
+  const choices = ev.choices.map(ch => {
+    let picked = ch;
+    if(ch.outcomes){
+      /* An outcome written for a fitted key is what happens when the key is
+         fitted; the plain ones are for a ship without it. */
+      const holds = ch.outcomes.filter(o => o.when?.key && state.keys?.[o.when.key]);
+      const open = holds.length ? holds : ch.outcomes.filter(o => !o.when);
+      picked = draw(state, open, o => o.weight ?? 1) ?? ch.outcomes[ch.outcomes.length - 1];
+    }
+    const { effects, vars } = resolveEffects(state, picked.effects, region);
+    return { label: ch.label, disabled: unmet(state, ch.requires), text: fill(picked.text, vars), effects };
+  });
+  return { kind: 'encounter', id: ev.id, title: ev.title, text: ev.text, region, choices };
+}
+
+export function rollEncounter(state, from, to, events){
+  state.encounters ??= { legDone: false, seen: {} };
+  if(state.encounters.legDone || state.pending || state.dockedAt) return;
+  if(tutorialRunning(state)) return;
+  if(rnd(state) >= (EVENT_RULES?.chance ?? 0)) return;
+  const region = crossingRegion(from, to);
+  const pick = draw(state, eligibleEvents(state, region), x => x.weight);
+  if(!pick) return;
+  state.encounters.legDone = true;
+  state.encounters.seen[pick.ev.id] = (state.encounters.seen[pick.ev.id] ?? 0) + 1;
+  state.pending = stageEvent(state, pick.ev, region);
+  logLine(state, 'story', pick.ev.title);
+  events.push({ kind: 'encounter', pending: state.pending });
+}
+
+/* The choice made. Everything was decided when the card went up; this is
+ * the ledger. */
+export function resolveEncounter(state, index){
+  const p = state.pending;
+  if(!p || p.kind !== 'encounter') return { ok: false };
+  const ch = p.choices[index];
+  if(!ch) return { ok: false, reason: 'That is not one of the choices.' };
+  if(ch.disabled) return { ok: false, reason: ch.disabled };
+  const fx = ch.effects ?? {};
+  if(fx.money) state.money += fx.money;
+  if(fx.dv) state.dv = Math.max(0, Math.min(usableTank(state), state.dv + fx.dv));
+  for(const [who, d] of Object.entries(fx.rep ?? {})){
+    state.rep[who] = Math.max(0, Math.min(FORMULAS.reputation.maxPoints ?? 10, (state.rep[who] ?? 0) + d));
+  }
+  for(const t of fx.take ?? []){
+    let left = t.qty;
+    for(const s of state.cargo){
+      if(s.good !== t.good || isConsigned(s) || left <= 0) continue;
+      const n = Math.min(s.qty, left); s.qty -= n; left -= n;
+    }
+  }
+  if(fx.take) state.cargo = state.cargo.filter(s => s.qty > 0);
+  if(fx.give && freeUnits(state) >= goodById(fx.give.good).units * fx.give.qty){
+    state.cargo.push({ good: fx.give.good, qty: fx.give.qty, t: state.t, price: 0, from: null });
+  }
+  if(fx.hull) state.hull = Math.max(0, Math.min(HULL_WRECKED - 1, hullLevel(state) + fx.hull));
+  if(fx.debt) state.debt = Math.max(0, state.debt + fx.debt);
+  if(fx.debt < 0) state.money = Math.max(0, state.money + fx.debt);
+  state.pending = null;
+  logLine(state, 'story', ch.text);
+  return { ok: true, text: ch.text };
+}
+
 /* ------------------------------------------------------------- rescue */
 
 export function nearestPort(state){
@@ -3356,6 +3562,7 @@ export function callDistress(state){
   /* Arriving on somebody else's rope is still arriving, and the hold arrived
      with you: a delivery that ends at this port is delivered. */
   const events = [{ kind: 'docked', port: q.port }];
+  legEnds(state);
   questCheck(state, events);
   milestonesOnDock(state, q.port, events);
   return { ...q, story, events };
@@ -3534,6 +3741,11 @@ export function restore(json){
   s.rep = { emberkin: 0, otter: 0, cat: 0, frog: 0, ...(s.rep ?? {}) };
   s.pending ??= null; s.flags ??= {}; s.stats ??= {}; s.visited ??= [s.dockedAt].filter(Boolean);
   s.toll ??= { lastT: -1e9, inBelt: false };
+  s.encounters = { legDone: false, seen: {}, ...(s.encounters ?? {}) };
+  /* A pending event from a table this build no longer has is an event that
+     cannot be answered, and a modal that cannot be closed is worse than a
+     story that never happened. */
+  if(s.pending?.kind === 'encounter' && !EVENTS.some(ev => ev.id === s.pending.id)) s.pending = null;
   s.quests ??= QUESTS.map(q => ({ id: q.id, step: 0, done: false }));
   s.debt ??= 0; s.hull ??= 0; s.faults ??= {}; s.farSight ??= true;
   /* A save from before rewards were collected by hand has already been paid

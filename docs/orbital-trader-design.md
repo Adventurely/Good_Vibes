@@ -1397,19 +1397,52 @@ Crew reacting to the player's burns is a desired feature, working as characteriz
 
 How crew relate to the player's standing with each species is also unsettled: each of the three comes from the people whose region their quest crosses, so reputation and crew already move together in the fiction without being wired together in the code.
 
-### 7.3 Events — TBD, and now the only wanted system still outstanding
+### 7.3 Events — built
 
-**Still on the agenda, as an addition rather than a gap.** With the closing line
-built (§7.5) and rivalry ruled out (§7.4), events are the one system the design
-still wants and does not have. Nothing else depends on them, which is why they
-keep getting deferred and why they are safe to defer again: the game is
-finishable without them.
+**Built, in the shape the brainstorm asked for and one size smaller.** An
+event is rolled at the moment the ship crosses from one world's reach into
+another's — the one place on a voyage where something is already changing:
+the chart re-frames, the road re-draws — and never anywhere else. Coasting is
+still the pacing gap the design wanted filled; a change of reach is where a
+coast has a seam in it.
 
-Coasting stretches are natural pacing gaps and the likely home for events. The guiding principle is that events should ask for **orbital decisions** where possible, not just text choices.
+Three bounds are the whole of the pacing, and all three are in `events.json`
+or the sim rather than in a card. A crossing turns into an event with a small
+chance (`rules.chance`, twelve in a hundred), and only if something in the
+table fits — the region of the reach, what is in the hold, whether the bank
+is owed or the hull is dented. There is **at most one between one docking and
+the next**, whatever the road does, so a long road with six crossings on it
+is not six interruptions. And **nothing fires while Uncle Theo is still
+teaching**.
 
-Candidates from brainstorming include distress beacons (requiring a rendezvous), rival traders racing to the same market, stowaways in the hold, solar flares threatening sensitive cargo, hitchhikers on passing asteroids, cat toll intercepts in the Belt (escapable through maneuvering), and letters or radio chatter that advance character stories mid-flight.
+An event is a card over the sky with a line of what is happening and one to
+three choices, the shape the cat toll already had. A choice can need
+something — fuel in the tank, coin in the purse, room in the hold — and a
+choice the ship cannot make is there but greyed, with the reason on it, so a
+player sees the road they could not take rather than a shorter list; every
+event has at least one choice that needs nothing, and the build refuses one
+that does not. What a choice does is money, fuel, standing with a people,
+crates taken or given, a grade of hull, or the debt — never the ship and
+never the save: a fine is bounded by the purse the way a toll is, and a crate
+somebody else is owed is never taken.
 
-Open questions include event frequency, trigger conditions (location, cargo, reputation, time), and how events tie into species relationships.
+Everything a choice will do is worked out **when the card goes up**, not when
+the button is pressed: the fine as a number, the crates by name, a chancy
+outcome already rolled. So the buttons say exactly what they cost, a reload
+cannot re-roll a result, and answering is bookkeeping. The table has twelve
+today — a Veyra house warship that scans for counterfeit crests and fines the
+ship that has them, a courier's wager, a flare with cold cargo aboard, a dry
+lighter's beacon, a frog pilgrim in the hold, a crate on the road, a cat
+mechanic with an opinion, the harbour bank's launch, a Glass scholar's
+recording, a letter from the raft, a cat with a better road — and each one a
+ship has seen is drawn at half the weight after, so a long game meets the
+whole table before it repeats.
+
+What the brainstorm wanted and this does not do: ask for an **orbital**
+decision. Every choice here is a button. A distress beacon that needs a
+rendezvous, or a rival that needs to be beaten to a market, would be an event
+whose answer is a burn, and the machinery for that — an event that plants a
+target and waits — is the next size up.
 
 ### 7.4 Competition and Rivalry — ruled out
 

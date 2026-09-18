@@ -1155,6 +1155,7 @@ function handleEvents(events){
     if(e.kind === 'soi'){ toast(`Now in ${S.nameFor(e.to, S.unseen(state))}'s gravity.`); renderTab(); tutorialCheck(); }
     if(e.kind === 'story') toast(e.text, 'story', 9000);
     if(e.kind === 'toll'){ stopSkip(); showToll(e.pending); }
+    if(e.kind === 'encounter'){ stopSkip(); showEncounter(e.pending); }
     if(e.kind === 'crash'){ stopSkip(); showCrash(e.body); }
     if(e.kind === 'dry'){ stopSkip(); toast(`${TEXT.captainLines.onStranded[1] ?? 'The tank is dry.'} The ship menu has the distress call.`, 'bad', 9000); if(tab === 'ship') renderTab(); }
     if(e.kind === 'missed'){ toast(e.count > 1 ? `${e.count} burns went by unspent.` : 'That burn went by unspent.', 'bad'); if(tab === 'ship') renderTab(); }
@@ -2968,6 +2969,29 @@ function showToll(p){
     m.querySelector('#m-cargo').addEventListener('click', () => { const r = S.resolveToll(state, 'cargo'); closeModal(); toast(r.text, 'story', 8000); save(); });
   });
 }
+/* Something on the way. The card says what is happening and offers the
+   choices, each button already knowing what it will cost — the sim worked
+   that out when the event came up — and a choice the ship cannot make is
+   there but greyed, with the reason on it, so a player sees the road they
+   could not take rather than a shorter list. */
+function showEncounter(p){
+  const btns = p.choices.map((c, i) =>
+    `<button class="btn${i === 0 ? ' primary' : ''}" data-choice="${i}" ${c.disabled ? 'disabled' : ''} title="${esc(c.disabled ?? '')}">${esc(c.label)}${c.disabled ? ` <small>(${esc(c.disabled)})</small>` : ''}</button>`).join('');
+  openModal(`<h2>${esc(p.title)}</h2><p class="say">${esc(p.text)}</p><div class="btns">${btns}</div>`, m => {
+    for(const b of m.querySelectorAll('[data-choice]')){
+      b.addEventListener('click', () => {
+        const r = S.resolveEncounter(state, Number(b.dataset.choice));
+        if(!r.ok){ toast(r.reason ?? 'Not that.', 'bad'); return; }
+        closeModal();
+        toast(r.text, 'story', 9000);
+        replan(true); renderTab(); save();
+      });
+    }
+    /* The first button is the primary one and takes focus, unless the ship
+       cannot afford it; then the first it can. */
+    m.querySelector('[data-choice]:not([disabled])')?.focus();
+  });
+}
 function showCrash(bodyId){
   const b = world.get(bodyId);
   const atmo = state.pending?.atmosphere;
@@ -3537,6 +3561,7 @@ setRate(state.warp ?? 1);
 tutorialCheck();
 setTutFolded(!!state.flags.tutorialFolded);
 if(state.pending?.kind === 'toll') showToll(state.pending);
+if(state.pending?.kind === 'encounter') showEncounter(state.pending);
 if(state.pending?.kind === 'crash') showCrash(state.pending.body);
 if(filmWanted(fresh)) rollFilm(startClock);
 else startClock();
