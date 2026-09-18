@@ -1211,61 +1211,38 @@ test('sliding a mark is refused where writing one is', () => {
   assert.equal(S.slideNode(h, 0, S.MIN_LEAD), false, 'a tied-up ship rewrote its plan');
 });
 
-test('the page gives earlier and later a button and a key, and the chart draws them', () => {
+test('sliding a mark has a control of its own, and the card names the ones it has', () => {
   /* The second playtester stopped on the aiming card, where the lesson asks for
-     the one adjustment that had no button: every other nudge in the game is a
-     press you can repeat, and phasing was a pointer dragged along a curve. */
+     the one adjustment that had no press behind it: every other nudge in the
+     game is a button you can repeat, and phasing was a pointer dragged along a
+     curve.
+     
+     It had a pair of labelled pills on the chart for a day. They worked, and
+     they were cut anyway: two of them beside every selected burn is a lot of
+     furniture to carry for ever for one card of one lesson, and the chart is
+     already carrying four arrows and a scrap cross. So the step lives on the
+     keyboard, the pointer drags, and the card is the thing that has to say so —
+     a control nobody is told about is a control nobody has. */
   const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
   const RENDER = readFileSync(new URL('../public/orbital-trader/render.js', import.meta.url), 'utf8');
 
-  assert.match(PLAY, /function slideBurn\(/, 'nothing presses earlier or later');
+  assert.match(PLAY, /function slideBurn\(/, 'nothing steps a mark along its orbit');
   assert.match(PLAY, /S\.slideNode\(state, i, dir \* scale \* slideStep\(i\)\)/,
-    'the button does not go through the rule that clamps it');
-  // The chart's buttons and the keyboard share one door, so neither can drift.
-  assert.match(PLAY, /function nudge\(i, axis, scale = 1\)/, 'the two kinds of nudge have split again');
-  assert.match(PLAY, /nudge\(i, axis, n > 12 \? 4 : n > 5 \? 2 : 1\)/, 'a held slide button does not repeat');
+    'the step does not go through the rule that clamps it');
   assert.match(PLAY, /case ',': case '<':/, 'earlier has no key');
   assert.match(PLAY, /case '\.': case '>':/, 'later has no key');
-  // And the chart has to draw something to press.
-  assert.match(RENDER, /\['earlier', '‹ earlier', -SLIDE_DX\], \['later', 'later ›', SLIDE_DX\]/,
-    'the chart draws no slide buttons');
-  assert.ok(RENDER.includes('axis, x: c[0], y: c[1], w: SLIDE_W + 12, h: SLIDE_H + 12'),
-    'the slide buttons cannot be hit');
-  assert.match(RENDER, /const hit = k\.w/, 'a wide handle is still hit-tested as a disc');
-  /* Above the flame, not below it. Theo's card is fixed to the bottom of the
-     screen and the burn being flown is usually near the middle, so buttons
-     under the flame came up underneath the card telling the player to press
-     them — which a playtest in a browser found and no assertion here could
-     have. */
-  assert.match(RENDER, /SLIDE_DY = -92/, 'the slide buttons are back under Theo\'s card');
-});
 
-test('the lesson stops choosing the zoom the moment the player reaches for it', () => {
-  /* The framing follows the road; it must not overrule the person. With a burn
-     open on the opening orbit the road fills about 0.195 of the frame, a
-     whisker over FRAME_SHRINK, so one press of the zoom-out key put it under
-     the floor and the next tick put it straight back: the zoom looked stuck,
-     because it was. Every way a person can change the scale now says so, the
-     framing stands down when they have, and the flag is cleared at the seam
-     between the lesson's two halves — the chart cards are four instructions to
-     move the view by hand, so a flag that were not cleared there would mean the
-     framing never helped anybody it was written for. */
-  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
-  assert.match(PLAY, /let zoomByHand = false;/, 'nothing records that the zoom is the player\'s');
-  assert.match(PLAY, /!state\.dockedAt && !zoomByHand && S\.tutorialRunning\(state\)/,
-    'the lesson frames the chart over the top of the player again');
+  // The chart draws no buttons for it, and carries no rectangular handles.
+  assert.doesNotMatch(RENDER, /SLIDE_/, 'the slide buttons are back on the chart');
+  assert.doesNotMatch(RENDER, /‹ earlier|later ›/, 'the chart still draws the slide buttons');
+  assert.doesNotMatch(PLAY, /function nudge\(/, 'the two-kinds-of-nudge dispatch outlived the buttons it was for');
 
-  // All three ways in: the keys, the wheel and a pinch.
-  assert.match(PLAY, /case '\+': case '=': zoomByHand = true;/, 'the zoom-in key does not claim the zoom');
-  assert.match(PLAY, /case '-': case '_': zoomByHand = true;/, 'the zoom-out key does not claim the zoom');
-  assert.match(PLAY, /zoomByHand = true; chart\.zoomBy\(Math\.pow\(1\.0015/, 'the wheel does not claim the zoom');
-  assert.match(PLAY, /pinch\.d > 0\)\{ zoomByHand = true;/, 'a pinch does not claim the zoom');
-
-  // And the two places it is handed back.
-  assert.match(PLAY, /if\(!state\.flags\.lookedBack\) zoomByHand = false;/,
-    'the chart half never hands the zoom back, so the framing helps nobody');
-  assert.match(PLAY, /zoomByHand = false;\n    frameShipOrbit\(\);/,
-    'a change of reach does not hand the zoom back');
+  /* And the card has to name both ways in, or the removal costs the lesson the
+     thing the buttons were bought with. */
+  const slide = TEXT.tutorial.find(t => t.step === 'slide');
+  assert.match(slide.body, /[Dd]rag/, 'the card does not say a mark can be dragged');
+  assert.match(slide.body, /comma and full-stop/, 'the card does not name the keys');
+  assert.doesNotMatch(slide.body, /button/, 'the card still points at buttons that are gone');
 });
 
 test('the aiming card is given the number it asks for, and it is the only one', () => {

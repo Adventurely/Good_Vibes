@@ -1661,7 +1661,7 @@ canvas.addEventListener('pointerdown', e => {
       drag = null; return;
     }
     drag = { kind: 'arrow' };
-    nudge(hit.index, hit.axis);
+    pushAxis(hit.index, hit.axis);
     startRepeat(hit.index, hit.axis);
     return;
   }
@@ -2361,9 +2361,15 @@ function slideStep(i){
   return Math.max(S.LEAD_FLOOR, (own ? own.t1 - own.t0 : 1) / 72);
 }
 
-/* One press of earlier or later. The counterpart of pushAxis: that one changes
-   what the engine does, this one changes when it does it, and until now the
-   second had no button at all — only a drag. */
+/* One step of earlier or later. The counterpart of pushAxis: that one changes
+   what the engine does, this one changes when it does it.
+   
+   It had a pair of buttons on the chart for a day. They were the answer to a
+   playtester who quit fighting a drag — every other adjustment in the game is a
+   press you repeat, and phasing was a pointer dragged along a curve — but two
+   labelled pills beside every selected burn is a lot of furniture to carry
+   permanently for one card of one lesson, and they were cut as clutter. So this
+   is the keyboard's route now, and dragging the flame is the pointer's. */
 function slideBurn(i, dir, scale = 1){
   if(!state.nodes[i]) return;
   /* slideNode clamps a mark between its neighbours, so it can never cross one
@@ -2378,14 +2384,6 @@ function slideBurn(i, dir, scale = 1){
   save();
 }
 
-/* The chart's buttons and the keyboard both come through here, so neither has
-   to know which of the two kinds of nudge it is asking for. */
-function nudge(i, axis, scale = 1){
-  if(axis === 'earlier') slideBurn(i, -1, scale);
-  else if(axis === 'later') slideBurn(i, 1, scale);
-  else pushAxis(i, axis, scale);
-}
-
 /* Hold an arrow down and it repeats, slowly at first so a single tap is never
    two, then faster, because pushing a big orbit around takes more than four
    presses and nobody should have to tap forty times. */
@@ -2396,7 +2394,7 @@ function startRepeat(i, axis){
   let n = 0;
   const tick = () => {
     n++;
-    nudge(i, axis, n > 12 ? 4 : n > 5 ? 2 : 1);
+    pushAxis(i, axis, n > 12 ? 4 : n > 5 ? 2 : 1);
     repeat.timer = setTimeout(tick, n < 3 ? 260 : 90);
   };
   repeat = { timer: setTimeout(tick, 340) };

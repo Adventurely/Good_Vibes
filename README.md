@@ -2189,10 +2189,21 @@ Aiming also wanted a control that did not exist. Every other adjustment in the
 game is a button pressed and pressed again; sliding a mark around its orbit was
 a pointer dragged accurately along a curve, and it arrived at the hardest card.
 `slideNode` is that move as a step, clamped the way a drag is clamped — never
-inside the lead, never past a neighbour — with **‹ earlier** and **later ›**
-above the flame on the chart and `,` and `.` on the keyboard. A card of its own
-now teaches it with nothing riding on it, before the card that needs it and the
+inside the lead, never past a neighbour — on `,` and `.`. A card of its own now
+teaches it with nothing riding on it, before the card that needs it and the
 height control at the same time.
+
+**It had buttons for a day.** Two labelled pills, **‹ earlier** and **later ›**,
+sat above the flame; they worked, and they were cut as clutter. Two of them
+beside every selected burn is a lot of furniture to carry for ever for one card
+of one lesson, on a chart already holding four arrows and a scrap cross. What
+that costs is worth naming rather than forgetting: the pills were the answer to
+a playtester who quit *fighting the drag*, and with them gone a beginner on a
+mouse is back to dragging a flame along a curve. What is left standing against
+that is the other half of the fix — the diamonds, the gauge, and a card that
+teaches sliding with nothing riding on it — and the keys, which only work for
+somebody the card has told about them, which is why the card names them and a
+test holds it there.
 
 The card on screen is **the first one whose test is false**, and the tests
 watch the game rather than the clicks, so doing a card your own way still
