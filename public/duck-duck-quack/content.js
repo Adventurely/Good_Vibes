@@ -88,7 +88,7 @@
    straight off the page whether they have the latest build, rather than
    having to guess from behavior alone. Bump it on every change that ships,
    however small. */
-export const GAME_VERSION = '1.11';
+export const GAME_VERSION = '1.12';
 
 export const SCENE_W = 320;
 export const SCENE_H = 180;
@@ -1380,8 +1380,142 @@ export const LEVEL_11 = {
   goose: { x0: 60, x1: 120, y: 150, speed: 1.5, catchRadius: 1.5 },
 };
 
+/* ------------------------------------------------------------ 12: The Errand */
+
+/* One duckling does all the work, and the rest stand still until it is done.
+ *
+ * The flock hatches on a shelf with a chasm off its left-hand end and a rock
+ * tower off its right. The tower is a wall that turns them around, so the
+ * only thing on this level that can kill them is the chasm — and they walk
+ * straight at it. A Blocker is not a tactic here, it is the first move: plant
+ * one and the whole hatch is safe indefinitely, pacing between it and the
+ * tower. Leave it a few seconds too long and the level is already lost.
+ *
+ * That is the "everyone waits" half. The other half is that exactly one
+ * duckling can leave, and it is the Climber that decides which: one Climber,
+ * one tower, one duckling over it. Every other skill on this level is spent
+ * by that same duckling, because it is the only one that is anywhere near
+ * the work.
+ *
+ *   the tower      rock, so a Digger will not touch it (see rockAt) and
+ *                  climbing is the only way up. Sixty-four pixels, which is
+ *                  also taller than any ramp climbs, so a Builder spent here
+ *                  is a Builder wasted
+ *   the hill       dirt at the height the shelf runs at, so the Digger cuts
+ *                  straight through it. A Climber could go over the top
+ *                  instead — it still holds the trait, and stepWalking offers
+ *                  climbing to anything that cannot dig — and the far side of
+ *                  that hilltop is a thirty-six pixel drop onto the shelf
+ *                  below. Over the top is the wrong answer and it costs the
+ *                  duckling, which is the whole point of the hill being
+ *                  exactly this shape
+ *   the pads       what turns the errand around. A duckling cannot turn
+ *                  itself around: a wall it can climb is not a wall, and the
+ *                  one thing that reverses a walk is a Blocker, which needs a
+ *                  second duckling there to be it. So the way back is a pad
+ *                  at the end of the far shelf and its pair over the water,
+ *                  and the duckling comes out of it still walking right —
+ *                  which, on that side of the chasm, is now pointing home
+ *   the perch      the island the far pad sits on, twenty pixels over the
+ *                  shelf. It is there so the flock can walk underneath it at
+ *                  the end without stepping on the pad and being posted back
+ *                  across the level (padUnder wants the duckling within a
+ *                  step of the pad's own height, and twenty is not). The
+ *                  duckling steps off its right-hand end onto the shelf,
+ *                  facing the chasm, with forty columns to spare
+ *   the bridge     and there it is: the Builder, laid right to left across
+ *                  the chasm, climbing the twenty-four pixels back up to the
+ *                  shelf the flock is still standing on. A bridge built from
+ *                  the far side, back to the others
+ *
+ * Then the Blocker comes off and the hatch walks down the bridge it did not
+ * build, over the chasm it could not cross, and left along the far shelf to
+ * the water — passing under the perch on the way.
+ *
+ * The bridge is the one piece of timing in it. A ramp reaches thirty-three
+ * columns and the chasm's far lip is ten of them away, so a Builder given
+ * early enough runs out of ramp in mid-air, and a flock walked onto a bridge
+ * that stops short is a flock walked into the chasm. There is a window of
+ * about two seconds where the ramp lands, and it is the last thing that
+ * happens on the level.
+ *
+ * The Blocker has to stand between the nest and the chasm — anywhere right of
+ * the nest and the hatch is turned the wrong way, into the drop, which is the
+ * mistake this level is most likely to be lost to. That leaves about twenty
+ * columns to choose from, and the goose is what makes the choice interesting:
+ * it patrols from the middle of the pen rightwards, so a Blocker planted hard
+ * against the chasm is out of its reach and the pen stays as big as it gets,
+ * while one planted a little further right is something the goose walks into
+ * and flees for good (see stepGoose). Floor, or the bird. Three Blockers, so
+ * that is a choice and not a gamble.
+ */
+export const LEVEL_12 = {
+  id: 'errand',
+  name: 'The Errand',
+  width: SCENE_W,
+  height: SCENE_H,
+
+  /* [0, 70)    the far shelf, with the water off its left-hand end. Where
+                the errand comes out, and where the flock ends up
+     [70, 80)   the chasm. Ten columns, and the only thing here that kills
+     [80, 150)  the pen floor, with the nest in the middle of it
+     [150, 158) the rock tower — sixty-four pixels, `hard`, and the only way
+                out of the pen
+     [158, 190) the high shelf along the top
+     [190, 218) the hill. Dirt, twenty-eight columns thick, cut through at
+                the height the shelf runs at — a tunnel is thirty-three, so
+                it breaks through with five to spare
+     [218, 250) the far end of the high shelf, with the pad on it
+     [250, 312) the rest of it, which nothing ever walks
+     [312, 320) rock, so nothing walks off the edge of the world */
+  segments: [
+    { from: 0, to: 70, y: 144 },
+    { from: 70, to: 80, y: PIT_Y },
+    { from: 80, to: 150, y: 120 },
+    { from: 150, to: 158, y: 56, hard: true },
+    { from: 158, to: 190, y: 56 },
+    { from: 190, to: 218, y: 28 },
+    { from: 218, to: 250, y: 56 },
+    { from: 250, to: 312, y: 56 },
+    { from: 312, to: 320, y: 28, hard: true },
+  ],
+
+  /* The perch. Twenty pixels over the far shelf, which is what keeps the
+     flock's walk to the water clear of the pad sitting on it. */
+  islands: [
+    { from: 14, to: 28, y: 124, floor: 134 },
+  ],
+
+  teleports: [
+    { ax: 240, ay: 56, bx: 16, by: 124 },
+  ],
+
+  nestX: 100,
+  /* Out of the nest walking right, at the tower rather than at the chasm.
+     The flock gets the length of the pen and back before the drop is a
+     problem, which is the time the first Blocker has to go in. */
+  hatchDir: 1,
+  goalX: 8,
+
+  duckCount: 18,
+  spawnInterval: TICK_RATE * 3,
+  timeLimit: TICK_RATE * 300,       // five minutes: the errand alone is most of one
+
+  winRatio: 0.5,
+
+  /* One of each of the three the errand spends, which is what makes it an
+     errand: there is no second duckling to send if the first one is walked
+     off something. Blocker: three, for the one the pen cannot do without,
+     the one that buys the goose off, and one spare. Flyer: zero, and it
+     would be the answer to the hilltop drop if there were any — there is
+     not, and that drop is meant to cost. Jumper: zero. */
+  supply: { digger: 1, builder: 1, blocker: 3, climber: 1, flyer: 0, jumper: 0 },
+
+  goose: { x0: 90, x1: 140, y: 120, speed: 1.1, catchRadius: 1.5 },
+};
+
 export const LEVELS = [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5, LEVEL_6, LEVEL_7, LEVEL_8,
-  LEVEL_9, LEVEL_10, LEVEL_11];
+  LEVEL_9, LEVEL_10, LEVEL_11, LEVEL_12];
 
 export const winCount = level => Math.ceil(level.duckCount * level.winRatio);
 
