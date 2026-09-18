@@ -2,20 +2,25 @@ import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { serve, migrateStore, MAX_BODY, TOO_LARGE, BAD_JSON } from './sunward-board.js';
+import * as Sunward from './sunward-board.js';
+import * as DuckBoard from './duck-board.js';
 
 const publicDir = fileURLToPath(new URL('../public/', import.meta.url));
 
 const BOARD_PATH = '/api/sunward/board';
+const DUCK_BOARD_PATH = '/api/duck-duck-quack/board';
 
-/* Sunward's board, locally.
+/* The boards, locally.
  *
- * In production it is one Durable Object; here it is this object, and it
- * forgets everything when the process stops. That is the right behaviour for a
- * dev server — the rooms do the same — and the rules are the same module
- * either way, so what passes here passes there. */
+ * In production each is one Durable Object; here each is one of these objects,
+ * and they forget everything when the process stops. That is the right
+ * behaviour for a dev server — the rooms do the same — and the rules are the
+ * same module either way, so what passes here passes there. */
 const board = { players: {} };
-migrateStore(board);   // nothing to move in an empty one; here so the two paths match
+Sunward.migrateStore(board);   // nothing to move in an empty one; here so the two paths match
+
+const duckBoard = { players: {} };
+DuckBoard.migrateStore(duckBoard);
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -89,24 +94,27 @@ function readBody(req, cap) {
   });
 }
 
-/* The board route, same shape as the Durable Object's fetch: read, parse, hand
- * to `serve`, write JSON. Everything that decides anything is in the module
- * it calls. `no-store` because a GET a second later may well be different and
- * a cached 429 would be a player told to wait who did not have to. */
-async function handleBoard(req, res, url) {
+/* A board route, same shape as the Durable Object's fetch: read, parse, hand to
+ * the rules module's `serve`, write JSON. Everything that decides anything is
+ * in `rules`, which is the same module the Worker loads — so what passes here
+ * passes there. Both boards go through this; they differ only in which module
+ * and which store they are given. `no-store` because a GET a second later may
+ * well be different and a cached 429 would be a player told to wait who did
+ * not have to. */
+async function handleBoard(req, res, url, rules, store) {
   const query = Object.fromEntries(url.searchParams);
   let reply;
   if (req.method === 'POST' || req.method === 'DELETE') {
-    const raw = await readBody(req, MAX_BODY);
+    const raw = await readBody(req, rules.MAX_BODY);
     if (raw === null) {
-      reply = TOO_LARGE;
+      reply = rules.TOO_LARGE;
     } else {
       let body;
-      try { body = JSON.parse(raw.toString('utf8')); } catch { reply = BAD_JSON; }
-      if (!reply) reply = serve(board, req.method, body, query, Date.now());
+      try { body = JSON.parse(raw.toString('utf8')); } catch { reply = rules.BAD_JSON; }
+      if (!reply) reply = rules.serve(store, req.method, body, query, Date.now());
     }
   } else {
-    reply = serve(board, req.method, null, query, Date.now());
+    reply = rules.serve(store, req.method, null, query, Date.now());
   }
 
   const headers = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' };
@@ -123,7 +131,8 @@ async function handleBoard(req, res, url) {
  * GET /<dir>/    -> that directory's index.html
  * GET /<file>    -> that file from public/
  * GET /healthz -> {"status":"ok"}
- * GET|POST|DELETE /api/sunward/board -> the leaderboard, in memory
+ * GET|POST|DELETE /api/sunward/board -> Sunward's leaderboard, in memory
+ * GET|POST|DELETE /api/duck-duck-quack/board -> the duck leaderboard, in memory
  * anything else -> 404
  *
  * In production the same files come out of Cloudflare's asset store without the
@@ -134,9 +143,10 @@ export async function handleRequest(req, res) {
   const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`);
   const { pathname } = url;
 
-  // Before the method check: this is the one path that takes a POST, and the
-  // module behind it has its own answer for every other method.
-  if (pathname === BOARD_PATH) return handleBoard(req, res, url);
+  // Before the method check: these are the paths that take a POST, and the
+  // modules behind them have their own answer for every other method.
+  if (pathname === BOARD_PATH) return handleBoard(req, res, url, Sunward, board);
+  if (pathname === DUCK_BOARD_PATH) return handleBoard(req, res, url, DuckBoard, duckBoard);
 
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     res.writeHead(405, { 'Content-Type': 'text/plain; charset=utf-8', Allow: 'GET, HEAD' });

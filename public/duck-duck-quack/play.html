@@ -343,6 +343,7 @@
   import { paintScene, drawSkillBadge, BADGE_PLATE_W, BADGE_PLATE_H } from './art.js';
   import { createAudio } from './audio.js';
   import { createStats } from './stats.js';
+  import { syncPlayer } from './board.js';
   import { fitCanvas, context2d } from '../good-vibes/pixel.js';
 
   // How much bigger the badge on a skill button is than the one a duckling
@@ -603,6 +604,13 @@
     if(mark && mark.improved) line += ` A new best for ${player}.`;
     else if(mark && mark.best) line += ` ${player}'s best here: ${mark.best}.`;
     ui.overlayBody.textContent = line;
+
+    /* And up it goes. Deliberately not awaited and deliberately not reported:
+       the mark is already kept in this browser, the post carries every level
+       rather than this one, and the next run will carry it again if this post
+       does not land. There is nothing here worth making a player read, and
+       nothing worth holding the overlay open for. */
+    if(player) syncPlayer(stats, player);
     // A next level to go to only means anything once this one is actually
     // won — offering it on a loss would read as skipping past the level
     // that just beat you.

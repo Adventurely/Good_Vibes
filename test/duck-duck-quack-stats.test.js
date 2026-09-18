@@ -24,10 +24,17 @@ function fakeStorage(seed = null){
 
 /* ----------------------------------------------------------------- names */
 
-test('a name is tidied, not rejected, wherever it can be', () => {
+test('a name is tidied where it can be and refused where it cannot', () => {
+  /* The rules are the board's own (names.js, which the Worker imports too), so
+     a name the picker takes is a name the board takes. Before there was a
+     server this file tidied a too-long name down to size instead of refusing
+     it; it refuses now, because quietly renaming somebody and then putting
+     that name on a public list is worse than telling them. */
   assert.equal(cleanName('  Ada  '), 'Ada');
   assert.equal(cleanName('Ada   Lovelace'), 'Ada Lovelace');
-  assert.equal(cleanName('a'.repeat(40)), 'a'.repeat(NAME_MAX));
+  assert.equal(cleanName('a'.repeat(NAME_MAX)), 'a'.repeat(NAME_MAX));
+  assert.equal(cleanName('a'.repeat(NAME_MAX + 1)), null);
+  assert.equal(cleanName('a'), null, 'one character is not a name');
   assert.equal(cleanName(''), null);
   assert.equal(cleanName('   '), null);
   assert.equal(cleanName(null), null);
@@ -173,11 +180,77 @@ test('rubbish in storage reads as no stats rather than as a broken page', () => 
 test('a hand-edited score is taken only where it makes sense', () => {
   const book = parseBook(JSON.stringify({
     current: 'Ada',
-    players: { Ada: { park: 9, warren: -3, grove: 'lots', aerie: 2.7, spire: 0 } },
+    players: { Ada: { bests: { park: 9, warren: -3, grove: 'lots', aerie: 2.7, spire: 0 } } },
   }));
-  assert.deepEqual(book.players.Ada, { park: 9, aerie: 2 },
+  assert.deepEqual(book.players.Ada.bests, { park: 9, aerie: 2 },
     'negative, non-numeric and zero marks are dropped; a fraction floors');
   assert.equal(book.current, 'Ada');
+});
+
+/* ------------------------------------------------------------- the board id */
+
+test('every player gets an id, and keeps it', () => {
+  const storage = fakeStorage();
+  const stats = createStats(storage);
+  stats.use('Ada');
+  const mine = stats.idFor('Ada');
+  assert.match(mine, /^[0-9a-f-]{36}$/, 'a UUID, made here and never shown');
+
+  stats.use('Bo');
+  assert.notEqual(stats.idFor('Bo'), mine, 'one per name, so a household gets a row each');
+
+  stats.use('ADA');
+  assert.equal(stats.idFor('Ada'), mine, 'picking a name again does not mint a new row');
+  assert.equal(createStats(storage).idFor('Ada'), mine, 'and it survives the visit');
+});
+
+test('a name nobody has picked has no id', () => {
+  const stats = createStats(fakeStorage());
+  assert.equal(stats.idFor('Ghost'), null);
+});
+
+/* ------------------------------------------------- what the board sends back */
+
+test('the board can fill in marks this browser never had', () => {
+  const stats = createStats(fakeStorage());
+  stats.use('Ada');
+  stats.record('Ada', 'park', 8);
+
+  assert.equal(stats.merge('Ada', { park: 5, belfry: 12 }), true);
+  assert.equal(stats.best('Ada', 'park'), 8, 'a worse server mark never walks a local one back');
+  assert.equal(stats.best('Ada', 'belfry'), 12, 'and one this browser never had is taken');
+  assert.equal(stats.merge('Ada', { park: 1 }), false, 'nothing moved, so nothing was written');
+});
+
+test('merging onto a name that is not here does nothing', () => {
+  const stats = createStats(fakeStorage());
+  assert.equal(stats.merge('Ghost', { park: 9 }), false);
+  assert.equal(stats.merge(null, { park: 9 }), false);
+  assert.deepEqual(stats.players(), []);
+});
+
+test('rubbish from the board is ignored the same as rubbish from storage', () => {
+  const stats = createStats(fakeStorage());
+  stats.use('Ada');
+  assert.equal(stats.merge('Ada', { park: -3, warren: 'lots', grove: 0 }), false);
+  assert.deepEqual(stats.bests('Ada'), {});
+  assert.equal(stats.merge('Ada', null), false);
+});
+
+/* ------------------------------------------------------------- what was here */
+
+test('marks made before there was a server are kept', () => {
+  /* The shape this file wrote for a fortnight: a player WAS their marks, with
+     no id beside them. Nobody should lose a best to the upgrade. */
+  const old = JSON.stringify({ current: 'Ada', players: { Ada: { park: 9, belfry: 12 } } });
+  const stats = createStats(fakeStorage(old));
+  assert.equal(stats.current(), 'Ada');
+  assert.equal(stats.best('Ada', 'park'), 9);
+  assert.deepEqual(stats.bests('Ada'), { park: 9, belfry: 12 });
+  assert.equal(stats.idFor('Ada'), null, 'the id comes when they are next picked');
+  stats.use('Ada');
+  assert.match(stats.idFor('Ada'), /^[0-9a-f-]{36}$/);
+  assert.equal(stats.best('Ada', 'park'), 9, 'and minting it costs them nothing');
 });
 
 test('a current player who is not in the book is nobody', () => {

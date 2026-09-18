@@ -31,14 +31,18 @@
   // would put a Good Vibes party and a Solarium party in the same room whenever
   // they picked the same four letters, and memorable codes invite exactly that.
   //
-  // BOARD is the odd one out: not a room but Sunward's leaderboard, and there
-  // is exactly one of it — the Worker always asks for the object named for the
-  // game, so the class only ever has a single instance.
+  // BOARD and DUCK_BOARD are the odd ones out: not rooms but leaderboards, one
+  // for Sunward and one for Duck Duck Quack, and there is exactly one of each —
+  // the Worker always asks for the object named for the game, so those classes
+  // only ever have a single instance. They are separate classes because they
+  // hold different shapes (five counters against a map of levels), and a class
+  // serving both is a class where a change for one game breaks the other.
   "durable_objects": {
     "bindings": [
       { "name": "ROOM", "class_name": "GameRoom" },
       { "name": "SOLARIUM", "class_name": "SolariumRoom" },
-      { "name": "BOARD", "class_name": "SunwardBoard" }
+      { "name": "BOARD", "class_name": "SunwardBoard" },
+      { "name": "DUCK_BOARD", "class_name": "DuckBoard" }
     ]
   },
 
@@ -48,7 +52,8 @@
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["GameRoom"] },
     { "tag": "v2", "new_sqlite_classes": ["SolariumRoom"] },
-    { "tag": "v3", "new_sqlite_classes": ["SunwardBoard"] }
+    { "tag": "v3", "new_sqlite_classes": ["SunwardBoard"] },
+    { "tag": "v4", "new_sqlite_classes": ["DuckBoard"] }
   ],
 
   "observability": {
