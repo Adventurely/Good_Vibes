@@ -1582,6 +1582,41 @@ export function addNode(state, t, lead = MIN_LEAD){
 }
 export function removeNode(state, index){ state.nodes.splice(index, 1); }
 
+/* Sliding a mark along the orbit it sits on, one press at a time.
+ *
+ * Dragging is the other way to do this and it was the only way, which is what
+ * the second playtester stopped on: every other adjustment in the lesson is a
+ * button you press and press again, and then the card that asks where the
+ * burn goes round the orbit asks for a pointer dragged accurately along a
+ * curve. Two controls, one skill, and the harder one arriving at the harder
+ * card.
+ *
+ * So the same move, as a step. `days` is signed — earlier is negative — and
+ * the clamps are the drag's clamps, because a mark that cannot be dragged
+ * somewhere should not arrive there by button either: never inside the lead,
+ * never past a neighbour. Returns whether it moved, so a caller can tell a
+ * press that did something from one that hit a wall. */
+export function slideNode(state, index, days, lead = MIN_LEAD){
+  const n = state.nodes[index];
+  if(!n || state.dockedAt || !Number.isFinite(days) || !days) return false;
+  const floor = Math.max(LEAD_FLOOR, Math.min(lead, MIN_LEAD));
+  let t = n.t + days;
+  /* Its neighbours, by time rather than by index: the list is kept sorted, but
+     a caller holding an index across a move should not have to know that. */
+  let lo = state.t + floor, hi = Infinity;
+  for(let i = 0; i < state.nodes.length; i++){
+    if(i === index) continue;
+    const o = state.nodes[i];
+    if(o.t < n.t) lo = Math.max(lo, o.t + 1e-3);
+    else hi = Math.min(hi, o.t - 1e-3);
+  }
+  t = Math.max(lo, Math.min(hi, t));
+  if(Math.abs(t - n.t) < 1e-12) return false;
+  n.t = t;
+  state.nodes.sort((a, b) => a.t - b.t);
+  return true;
+}
+
 /* Where each mark sits on the current plan, and what it will really cost when
  * it fires. The two numbers on a mark's card are measured along axes that lean
  * together, so their triangle is not the burn: only the state at the moment of
