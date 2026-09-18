@@ -481,6 +481,13 @@
      a break on the screen, because eight sentences in one block is a card
      nobody reads to the end of. */
   #tut p + p{ margin-top:.5rem; }
+  /* The one live number in the lesson, and it has to look like one: a reading
+     off the chart rather than another sentence from Theo, or it is read once
+     as part of the card and never looked at again while it moves. */
+  #tut #tut-gauge{
+    margin-top:.6rem; padding-top:.5rem; border-top:1px solid var(--gold-2);
+    color:var(--gold-ink); font-variant-numeric:tabular-nums; font-size:.84rem;
+  }
   #tut .btns{ margin-top:.5rem; justify-content:flex-end; }
   /* The last card asks for nothing, so it stops wearing the gold the working
      cards use to say "you are in the middle of something". */
@@ -801,6 +808,7 @@
   <small id="tut-step"></small>
   <h3 id="tut-title"></h3>
   <div id="tut-body"></div>
+  <p id="tut-gauge" hidden></p>
   <div class="btns"><button class="btn sm" id="tut-skip">Stop writing, Theo</button></div>
 </div>
 
@@ -1044,6 +1052,29 @@ function frame(now){
     chart.focus('ship', null, false);
     replan(true);
     frameShipOrbit();
+  }
+  /* And the zoom follows the road, while the lesson is flying it.
+
+     FRAME_SPILL and FRAME_SHRINK have been sitting above frameShipOrbit with a
+     comment explaining the hysteresis they were for, and nothing has ever read
+     them: the chart re-framed on a change of reach and at no other time. A
+     playtest of the lesson is what turned that up. Card two sends a beginner
+     zooming out until Slate is in the frame, which at Slate's distance leaves
+     the parking orbit a six-pixel ring under the ship's own icon — and card
+     five then says "tap the white line". Pushing the far side out to Slate in
+     card six has the opposite fault: the road grows thirteen times and leaves
+     the screen, so the card that asks whether the yellow line has reached
+     Slate's circle is asking about something off the edge of it.
+
+     So it is wired, and for now only here: from the moment the lesson's chart
+     half is done until the lesson is over. Inside the band between the two
+     thresholds the zoom is still the player's, which is what the band is for.
+     Whether the rest of the game should have it too is a bigger question than
+     this change, and the constants are ready for the day it is answered. */
+  if(!state.dockedAt && S.tutorialRunning(state) && state.flags.lookedBack){
+    const span = roadSpan(), half = usableHalf();
+    const fill = span > 0 && half > 0 ? span * chart.camera.zoom / half : null;
+    if(fill != null && (fill > FRAME_SPILL || fill < FRAME_SHRINK)) frameShipOrbit();
   }
   saveTimer += real;
   if(saveTimer > 30){ saveTimer = 0; save(); }
@@ -1419,7 +1450,14 @@ function askAtPath(t, lead = S.MIN_LEAD){
     m.querySelector('#m-close').addEventListener('click', closeModal);
     m.querySelector('#m-burn').addEventListener('click', () => {
       closeModal();
-      const ix = S.addNode(state, t, lead);
+      /* Written at the moment the button is pressed, not the moment the card
+         went up. The clock does not stop for this card, so a tap near the ship
+         and a couple of seconds of reading is enough for the moment it offered
+         to slide inside the lead — and then the press did nothing at all, with
+         the card closing behind it as though it had worked. That is the same
+         silence the dead zone had, one step further along, and it is the rest
+         of what the first playtester was fighting. */
+      const ix = S.addNode(state, Math.max(t, state.t + lead), lead);
       if(ix < 0) return;   // the button is already disabled when there is no room
       /* The chart is the editor, so writing a burn down leaves the panel
          exactly as it was: shoving the side menu open over the sky is the
@@ -1612,7 +1650,7 @@ canvas.addEventListener('pointerdown', e => {
       drag = null; return;
     }
     drag = { kind: 'arrow' };
-    pushAxis(hit.index, hit.axis);
+    nudge(hit.index, hit.axis);
     startRepeat(hit.index, hit.axis);
     return;
   }
@@ -1687,13 +1725,35 @@ function endPointer(e){
       replan(true); if(tab === 'ship') renderTab();
       return;
     }
-    const p = prediction && !state.dockedAt ? chart.nearestPathPoint(e.clientX, e.clientY, prediction, state.t) : null;
+    /* Picked without the time floor, deliberately. nearestPathPoint refuses a
+       point at or before the moment it is given, and the drawn road *starts*
+       at the ship — so a finger beside the ship resolves to the very first
+       point of the road, at t exactly now, and came back as nothing at all.
+       That refusal was the real swallower, not the lead test below it: the
+       snap underneath never ran, because there was nothing to snap. There is
+       no past on this road to pick by mistake, since it begins where the ship
+       is, so dropping the floor costs nothing and the clamp below does the
+       work. */
+    const p = prediction && !state.dockedAt ? chart.nearestPathPoint(e.clientX, e.clientY, prediction) : null;
     const onBody = d.hit?.kind === 'body';
     const insideDrawn = onBody && d.hit.d <= (d.hit.drawn ?? 0) + 2;
     /* How much road beside the ship is out of bounds. A thumb's width of it,
        or a minute, whichever comes first — see `leadForTap`. */
     const lead = S.leadForTap(S.norm(state.ship.v) * chart.camera.zoom);
-    if(p && !insideDrawn && p.t > state.t + lead){ askAtPath(p.t, lead); return; }
+    /* A tap on the road inside the lead snaps forward to the first moment that
+       will take a mark, instead of being swallowed.
+
+       The lead is a ring of road just ahead of the ship that may not be written
+       on — a mark inside it fires before it can be touched. That rule is right
+       and it stays. What was wrong was the silence: the first playtester stalled
+       on the card that says "tap the white line", because the stretch of line a
+       beginner aims at is the stretch beside their own ship, which is exactly
+       the stretch that did nothing at all. No modal, no toast, no reason given —
+       they tapped, and the game declined to react, twice.
+
+       The tap is not ambiguous. A finger on the road wants a mark on the road,
+       so put one at the nearest place that can hold it. */
+    if(p && !insideDrawn){ askAtPath(Math.max(p.t, state.t + lead), lead); return; }
     if(onBody){ lookAt(d.hit.id); return; }
     /* Last, after the road and after the worlds: a tap on the ring a world
        travels on asks the clock to wait until that world gets there. It is
@@ -1768,6 +1828,11 @@ addEventListener('keydown', e => {
        down are the two thrusters — the one place on this chart where an arrow
        does something that happens *now*. Left and right still pan there, since
        there is no third thruster for them to be. */
+    /* Earlier and later, for the hands that would rather not leave the keys.
+       The arrows are taken by the four axes, so these are the two keys that sit
+       where "back a bit" and "on a bit" sit on every other timeline there is. */
+    case ',': case '<': e.preventDefault(); if(state.nodes[selectedNode]) slideBurn(selectedNode, -1, fine); break;
+    case '.': case '>': e.preventDefault(); if(state.nodes[selectedNode]) slideBurn(selectedNode, 1, fine); break;
     case 'ArrowRight': e.preventDefault(); if(state.nodes[selectedNode]) pushAxis(selectedNode, 'pro', fine); else keyPan(-panStep(e), 0); break;
     case 'ArrowLeft': e.preventDefault(); if(state.nodes[selectedNode]) pushAxis(selectedNode, 'retro', fine); else keyPan(panStep(e), 0); break;
     case 'ArrowUp': e.preventDefault(); if(state.nodes[selectedNode]) pushAxis(selectedNode, 'out', fine); else if(!$('thrust').hidden) fireThruster('toward', fine); else keyPan(0, panStep(e)); break;
@@ -2244,6 +2309,45 @@ function pushAxis(i, k, scale = 1){
   save();
 }
 
+/* How far one press slides a mark along its orbit: five degrees of the lap it
+   sits on. Phasing is an angle — "thirty degrees ahead of Slate" — so the step
+   has to be an angle too, or it would mean one thing in a parking orbit and
+   something else entirely out at Grumm. */
+function slideStep(i){
+  const n = state.nodes[i];
+  const segs = prediction?.segments ?? [];
+  const own = segs.find(sg => n && n.t >= sg.t0 - 1e-9 && n.t <= sg.t1 + 1e-9) ?? segs[0];
+  const P = own?.elements?.period;
+  if(Number.isFinite(P) && P > 0) return P / 72;
+  // An open leg has no lap to take a fraction of, so take a fraction of itself.
+  return Math.max(S.LEAD_FLOOR, (own ? own.t1 - own.t0 : 1) / 72);
+}
+
+/* One press of earlier or later. The counterpart of pushAxis: that one changes
+   what the engine does, this one changes when it does it, and until now the
+   second had no button at all — only a drag. */
+function slideBurn(i, dir, scale = 1){
+  if(!state.nodes[i]) return;
+  /* slideNode clamps a mark between its neighbours, so it can never cross one
+     and the sort can never reorder the list: the index a button was pressed at
+     is still the index afterwards, and a held button keeps pushing the mark it
+     started on. */
+  if(!S.slideNode(state, i, dir * scale * slideStep(i))) return;
+  replan(true);
+  if(tab === 'ship') renderTab();
+  noteLook('slidBurn');
+  tutorialCheck();
+  save();
+}
+
+/* The chart's buttons and the keyboard both come through here, so neither has
+   to know which of the two kinds of nudge it is asking for. */
+function nudge(i, axis, scale = 1){
+  if(axis === 'earlier') slideBurn(i, -1, scale);
+  else if(axis === 'later') slideBurn(i, 1, scale);
+  else pushAxis(i, axis, scale);
+}
+
 /* Hold an arrow down and it repeats, slowly at first so a single tap is never
    two, then faster, because pushing a big orbit around takes more than four
    presses and nobody should have to tap forty times. */
@@ -2254,7 +2358,7 @@ function startRepeat(i, axis){
   let n = 0;
   const tick = () => {
     n++;
-    pushAxis(i, axis, n > 12 ? 4 : n > 5 ? 2 : 1);
+    nudge(i, axis, n > 12 ? 4 : n > 5 ? 2 : 1);
     repeat.timer = setTimeout(tick, n < 3 ? 260 : 90);
   };
   repeat = { timer: setTimeout(tick, 340) };
@@ -2895,7 +2999,6 @@ const actions = {
   skipto(t, what){ askSkip(Number(t), typeof what === 'string' ? what : undefined); },
   push(i, k){ pushAxis(Number(i), k); },
   zeronode(i){ const n = state.nodes[Number(i)]; if(!n) return; n.prograde = 0; n.radial = 0; replan(true); renderTab(); save(); },
-  shift(i, d){ const n = state.nodes[Number(i)]; n.t = Math.max(state.t + 1e-3, n.t + Number(d)); state.nodes.sort((a, b) => a.t - b.t); selectedNode = state.nodes.indexOf(n); replan(true); renderTab(); },
   tow(){ showTow('dry'); },
   distress(){ showDistress(); },
   newgame(){ confirmNew(); },
@@ -3251,7 +3354,7 @@ function tutorialTests(){
      those four are latched where they happen — see noteLook — and only read
      back here.
 
-     Thirteen tests for fourteen cards, because the last card is not a step.
+     Fourteen tests for fifteen cards, because the last card is not a step.
      It is a goodbye, and the only thing that clears it is the button on it. */
   const f = state.flags;
   const raw = [
@@ -3261,6 +3364,14 @@ function tutorialTests(){
     !!f.lookedBack,                                   // and come back to the ship
     state.nodes.length > 0,                           // write a mark down
     highEnough,                                       // push it out to the moon's height
+    /* Sliding the mark at all, before being asked to slide it anywhere in
+       particular. Like the four chart cards this is a gesture rather than a
+       state — a mark slid out and back leaves nothing behind — so it is
+       latched where it happens and only read here. The card it passes teaches
+       the second control on its own, with no target to hit, because the card
+       after it needs both controls at once and that was the one a playtester
+       stopped on. */
+    !!f.slidBurn,                                     // find out what earlier and later do
     aimed,                                            // slide it until the road finds the moon
     reached,                                          // warp into its gravity
     atTarget && !!el && Number.isFinite(el.period),   // brake until the path closes
@@ -3289,6 +3400,49 @@ function tutorialTests(){
      is also what makes undoing something walk the lesson back on its own. */
   for(let i = raw.length - 2; i >= 0; i--) raw[i] = raw[i] || raw[i + 1];
   return raw;
+}
+
+/* How far off the aim is, in one line, for the card that asks for it.
+ *
+ * Two answers, because the road reaches the moon in two stages. Before it gets
+ * anywhere near, the honest measure is the pair of orange diamonds the chart is
+ * already drawing — where the road cuts the moon's rail, and where the moon
+ * will actually be when the ship gets there. The gap between them *is* the
+ * phasing error, and closing it is the whole of the card. Once the road does
+ * find the moon, closest approach takes over, which is the number the panel
+ * has always had and the number that decides the card.
+ *
+ * Both are distances and both get smaller as the aim gets better, so a player
+ * pressing a button has something that moves the right way. "About thirty
+ * degrees" had nothing. */
+function aimGauge(){
+  const target = FIRST_TARGET;
+  const name = S.nameFor(target, S.unseen(state));
+  const ic = (prediction?.intercepts ?? []).find(i => i.body === target && !i.grazes);
+  if(ic){
+    return `Closest approach to ${name}: ${fmtAu(ic.altitude)}.`
+      + (ic.inMouth ? ' That is close enough.' : ' Smaller is better.');
+  }
+  const c = (crossedRails ?? []).find(x => x.body === target);
+  if(c){
+    const d = Math.hypot(c.ghost[0] - c.r[0], c.ghost[1] - c.r[1]);
+    return `The two orange diamonds are ${fmtAu(d)} apart: that is how far ${name} still is from where you would cross. Bring them together.`;
+  }
+  /* And the case the card cannot see coming: no diamonds at all, because the
+     road does not reach the rail to cross it. The card before this one passes
+     at a tenth of the way out, which is close enough to see but not always
+     close enough to touch — so the aiming card can arrive while the thing it
+     tells the player to look for is not drawn. Then the honest answer is not
+     about phase at all, and neither is the fix: push the far side out a bit
+     further first. */
+  const segs = prediction?.segments ?? [];
+  const afterBurn = segs.find((sg, i) => i > 0 && segs[i - 1].reason === 'burn');
+  const ra = afterBurn?.elements?.ra;
+  const moon = world.get(target);
+  if(Number.isFinite(ra) && moon && ra < moon.a){
+    return `No diamonds yet: the far side is still ${fmtAu(moon.a - ra)} inside ${name}'s circle. A little more green first.`;
+  }
+  return null;
 }
 
 /* Whether the moon the lesson is about is somewhere a player can actually see
@@ -3355,6 +3509,20 @@ function tutorialCheck(){
   }
   /* Nothing is left to do on the last card, so the way out of it stops being
      a way of shutting Theo up and becomes the end of the lesson. */
+  /* The card that asks for a number gets the number, on the card.
+
+     Aiming is the one card in the lesson whose progress a player cannot see:
+     pushing an arrow moves a line you can watch, but sliding a mark around an
+     orbit to meet a moon that is also moving looks the same whether it helped
+     or not. The game knows the answer to within a kilometre and was keeping it
+     in the panel, behind a tab, which is not where somebody aiming is looking.
+     So it goes under the card, and it is the only card that gets one: a gauge
+     on every card would be a dashboard, and the rest of them do not need one. */
+  const gauge = $('tut-gauge');
+  const g = s.step === 'aim' ? aimGauge() : null;
+  gauge.hidden = !g;
+  gauge.textContent = g ?? '';
+
   $('tut-skip').textContent = last ? 'Thanks, Theo' : 'Stop writing, Theo';
   $('tut').classList.toggle('done', last);
   $('tut').classList.toggle('min', !!state.flags.tutorialFolded);

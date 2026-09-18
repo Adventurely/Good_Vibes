@@ -2139,13 +2139,49 @@ by hand and `?intro=0` refuses it.
 
 ### The lesson
 
-Fourteen cards from Uncle Theo, in `narrative.json` and shown one at a time in
+Fifteen cards from Uncle Theo, in `narrative.json` and shown one at a time in
 the bottom card. Four of them are about the chart before any of them is about
 flying: drag the map, zoom out until Slate is in the frame, tap Slate and watch
 the chart follow it, press F to come back. Then the errand — write a burn
-down, push it out to Slate's height, aim it thirty degrees ahead of the moon
-because the moon moves while you cross, warp, brake, dock, buy the pebble,
-climb out, bring it home — and a last card that says well done and goes away.
+down, push the far side out to Slate's height, find out what sliding the burn
+around the orbit does, aim it so the moon is there when you arrive, warp,
+brake, dock, buy the pebble, climb out, bring it home — and a last card that
+says well done and goes away.
+
+**Two playtesters and what they cost.** One stalled writing the burn down, the
+other gave up aiming, and both were beaten by the way in rather than by the
+physics — the card in between, the one with the genuinely counter-intuitive
+idea in it, neither of them had trouble with.
+
+*Writing it down* asks for a tap on the road, and three things were in the way
+of that. The drawn road **starts** at the ship, so `nearestPathPoint` — which
+refuses a point at or before the moment it is given — returned nothing at all
+for a finger beside the ship, which is exactly where a beginner aims; the tap
+now snaps forward to the first moment that will hold a mark instead of being
+swallowed. The clock does not stop for the card that opens, so the moment it
+offered could go stale while it was being read and the button would then close
+the card having done nothing; the mark is written at the moment of the press
+now, not the moment of the offer. And the card before it sends a player zooming
+out until Slate is in frame, which leaves the parking orbit a six-pixel ring
+under the ship's own icon — see the framing hysteresis below.
+
+*Aiming* used to ask for "about thirty degrees ahead of Slate", which is an
+angle with no instrument, judged by eye, against a moving target. It asks for
+the **two orange diamonds** to be brought together now — where the road cuts
+the moon's rail, and where the moon will be when the ship gets there — which is
+the same question with a gradient on it. Under the card is the only live
+readout in the lesson: the gap in kilometres, or closest approach once the road
+finds the moon, or, when the road does not reach the rail at all, how far short
+the far side still is and that the fix is more green rather than more sliding.
+
+Aiming also wanted a control that did not exist. Every other adjustment in the
+game is a button pressed and pressed again; sliding a mark around its orbit was
+a pointer dragged accurately along a curve, and it arrived at the hardest card.
+`slideNode` is that move as a step, clamped the way a drag is clamped — never
+inside the lead, never past a neighbour — with **‹ earlier** and **later ›**
+above the flame on the chart and `,` and `.` on the keyboard. A card of its own
+now teaches it with nothing riding on it, before the card that needs it and the
+height control at the same time.
 
 The card on screen is **the first one whose test is false**, and the tests
 watch the game rather than the clicks, so doing a card your own way still
@@ -2159,7 +2195,22 @@ undone leaves no trace in the save, so those are latched as the gesture
 happens (`noteLook`), and whether the moon is in the frame is answered by the
 draw loop, which is the only thing that knows. Zooming counts as looking
 around too — the card is teaching that the view moves, and somebody who
-scrolled instead of dragging has learned it.
+scrolled instead of dragging has learned it. The slide card is latched the same
+way and for the same reason: a mark slid out and back leaves nothing behind.
+
+**The framing hysteresis, wired at last.** `FRAME_SPILL` and `FRAME_SHRINK` sat
+above `frameShipOrbit` with a comment explaining the band they were for, and
+nothing ever read them — the chart re-framed on a change of reach and at no
+other time. That is what leaves the parking orbit a six-pixel ring after the
+zoom-out card, and it has the opposite fault three cards later, when pushing
+the far side out to Slate grows the road thirteen times and takes it off the
+screen while the card is asking whether it has reached Slate's circle yet. So
+the zoom follows the road: outside the band the chart re-frames, inside it the
+zoom is still the player's, which is what the band is for. For now this runs
+**only while the lesson is flying** — from the moment its chart half is done
+until it is over — because whether the rest of the game wants it is a larger
+question than the lesson's, and the constants are sitting there for the day it
+is answered.
 
 ### The road, the lock, and the clock
 
