@@ -136,6 +136,11 @@
   .overlay[hidden]{ display: none; }
   .overlay h2{ margin: 0; font-size: 1.5rem; line-height: 1.15; }
   .overlay p{ margin: 0; font-size: 0.95rem; max-width: 24rem; }
+  /* The score line sits under the tally as a quieter second thought, and
+     empty it takes no room at all — a player with no name picked should not
+     get a blank gap where a sentence would have been. */
+  .overlay .score{ font-size: 0.88rem; color: #ffd9a8; max-width: 26rem; }
+  .overlay .score:empty{ display: none; }
   /* A little more air above the buttons than between the two lines of text,
      so the overlay reads as "here is what happened" and then "here is what
      you can do about it" rather than as three things in a stack. */
@@ -313,6 +318,10 @@
         <div class="overlay" id="overlay" hidden>
           <h2 id="overlay-title"></h2>
           <p id="overlay-body"></p>
+          <!-- What the run was worth against this player's best. Its own line
+               because it is a different question from what just happened, and
+               because it is the one a player comes back for. -->
+          <p id="overlay-score" class="score"></p>
           <div class="overlay-actions">
             <button class="btn btn-go" id="again" type="button">Play again</button>
             <a class="btn" id="next-level" href="#" hidden></a>
@@ -330,7 +339,7 @@
 
       <div class="controls">
         <button class="btn" id="pause" type="button">Pause</button>
-        <button class="btn" id="restart" type="button">Restart level</button>
+        <button class="btn" id="restart" type="button">End the run</button>
         <button class="btn" id="sound" type="button" aria-pressed="false">Music off</button>
       </div>
     </aside>
@@ -339,7 +348,7 @@
 
 <script type="module">
   import { LEVELS, SKILLS, SKILL_INFO, TICK_RATE, GAME_VERSION, winCount, formatTime } from './content.js';
-  import { newGame, tick, assignSkill, assignRefusal, duckNear, releaseBlocker } from './sim.js';
+  import { newGame, tick, assignSkill, assignRefusal, duckNear, releaseBlocker, endRun } from './sim.js';
   import { paintScene, drawSkillBadge, BADGE_PLATE_W, BADGE_PLATE_H } from './art.js';
   import { createAudio } from './audio.js';
   import { createStats } from './stats.js';
@@ -371,6 +380,7 @@
     scene: els('scene'), hudSaved: els('hud-saved'), hudLost: els('hud-lost'),
     hudHatched: els('hud-hatched'), hudTime: els('hud-time'),
     overlay: els('overlay'), overlayTitle: els('overlay-title'), overlayBody: els('overlay-body'),
+    overlayScore: els('overlay-score'),
     again: els('again'), nextLevel: els('next-level'), status: els('status'), pause: els('pause'), restart: els('restart'),
     sound: els('sound'), skills: document.querySelector('.skills'),
     countdown: els('countdown'), countdownNum: els('countdown-num'), hudHint: els('hud-hint'),
@@ -588,29 +598,62 @@
      goes unrecorded. */
   const stats = createStats();
 
+  /* File the run and say what it was worth.
+   *
+   * Every ending files: won, lost, out of time, or stopped by hand. The high
+   * score is read BEFORE the run is recorded, because the whole of what this
+   * line has to say is the comparison, and `record` has overwritten the old
+   * mark by the time it returns.
+   *
+   * "Nothing to save" is a real outcome and is said plainly rather than left
+   * as silence — a player who did not beat their best should be told that is
+   * what happened, not left wondering whether the scoreboard is broken.
+   */
+  function fileRun(){
+    const player = stats.current();
+    if(!player){
+      return 'Nobody is keeping score. Pick a name on the front page and every run counts.';
+    }
+
+    const was = stats.best(player, LEVEL.id);
+    const mark = stats.record(player, LEVEL.id, state.saved);
+
+    /* Up it goes, and only when there is something new to send: a run that
+       did not beat the mark has nothing the board does not already hold.
+       Deliberately not awaited and deliberately not reported — the mark is
+       already kept in this browser, the post carries every level rather than
+       this one, and the front page posts again on its next load if this one
+       does not land. */
+    if(mark.improved) syncPlayer(stats, player);
+
+    if(mark.improved){
+      return was
+        ? `A new best for ${player} — you beat your previous high score of ${was}`
+          + ` with ${state.saved} saved. Recorded.`
+        : `A new best for ${player}: ${state.saved} saved, and the first mark on this level.`;
+    }
+    if(!was){
+      return `Nothing got home, so there is nothing to record for ${player} yet.`;
+    }
+    return `${state.saved} saved did not beat ${player}'s high score of ${was}`
+      + ' on this level, so there is nothing to save.';
+  }
+
   function endMessage(){
     const won = state.ended === 'won';
-    ui.overlayTitle.textContent = won ? 'The flock made it!' : 'Out of time';
+    /* A loss has two different causes now that the quota no longer stops the
+       run, and they want different words: the clock beat you, or the flock
+       did not get there. Saying "Out of time" over a run the player ended
+       themselves with four minutes left would be nonsense. */
+    ui.overlayTitle.textContent = won ? 'The flock made it!'
+      : state.ticks >= LEVEL.timeLimit ? 'Out of time'
+      : 'The flock fell short';
 
-    /* Filed before the line is written, so the line can say what it was
-       worth. A losing run still counts: nine saved on a level that wanted
-       ten is a better nine than a win with eight, and the mark kept is the
-       most anybody has ever got home. */
-    const player = stats.current();
-    const mark = player ? stats.record(player, LEVEL.id, state.saved) : null;
-
-    let line = `${state.saved} of ${LEVEL.duckCount} saved`
+    /* Two lines: what happened, then what it was worth. They were one
+       sentence and it had grown to four clauses. */
+    ui.overlayBody.textContent = `${state.saved} of ${LEVEL.duckCount} saved`
       + ` — needed ${winCount(LEVEL)}. ${state.lost} lost.`;
-    if(mark && mark.improved) line += ` A new best for ${player}.`;
-    else if(mark && mark.best) line += ` ${player}'s best here: ${mark.best}.`;
-    ui.overlayBody.textContent = line;
-
-    /* And up it goes. Deliberately not awaited and deliberately not reported:
-       the mark is already kept in this browser, the post carries every level
-       rather than this one, and the next run will carry it again if this post
-       does not land. There is nothing here worth making a player read, and
-       nothing worth holding the overlay open for. */
-    if(player) syncPlayer(stats, player);
+    ui.overlayScore.textContent = fileRun();
     // A next level to go to only means anything once this one is actually
     // won — offering it on a loss would read as skipping past the level
     // that just beat you.
@@ -681,6 +724,7 @@
       if(remaining <= 0){
         starting = false;
         ui.countdown.hidden = true;
+        refreshRestartLabel();
       } else {
         ui.countdownNum.textContent = String(Math.ceil(remaining));
       }
@@ -691,7 +735,7 @@
       quackNewArrivals();
       sfxNewLosses();
       sfxNewWarps();
-      if(state.ended){ refreshSkills(); endMessage(); }
+      if(state.ended){ refreshSkills(); endMessage(); refreshRestartLabel(); }
     }
 
     paintScene(ctx, state);
@@ -716,8 +760,35 @@
     say('');
     refreshSkills();
     beginCountdown();
+    refreshRestartLabel();
   }
-  ui.restart.addEventListener('click', restart);
+  /* Restarting mid-run ends that run first, rather than throwing it away.
+   *
+   * A run abandoned quietly was a run that never got filed, and on a level
+   * where the flock is already home and a Blocker is holding the clock open,
+   * quietly throwing it away is exactly what a player would have done. So the
+   * button stops the run, judges it the way the clock would, shows the same
+   * screen any other ending shows, and files the score. The screen's own
+   * "Play again" is what actually starts the level over, which is why this
+   * button says what it is going to do rather than "Restart level" at a
+   * moment when it is not going to restart anything.
+   */
+  function stopRun(){
+    if(state.ended) return false;
+    endRun(state);
+    paused = false;
+    ui.pause.textContent = 'Pause';
+    refreshSkills();
+    endMessage();
+    refreshRestartLabel();
+    return true;
+  }
+
+  function refreshRestartLabel(){
+    ui.restart.textContent = state.ended || starting ? 'Restart level' : 'End the run';
+  }
+
+  ui.restart.addEventListener('click', () => { if(!stopRun()) restart(); });
   ui.again.addEventListener('click', restart);
 
   /* `.screen` is `width: max-content`, sized to whatever the canvas already

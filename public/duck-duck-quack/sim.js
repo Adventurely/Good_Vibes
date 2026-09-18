@@ -376,16 +376,41 @@ function stepGoose(state){
   if(state.goose.x <= g.x0){ state.goose.x = g.x0; state.goose.dir = 1; }
 }
 
+/* When a run is over, and what it was.
+ *
+ * Over means every duckling is accounted for — in the pond or gone — or the
+ * clock has run out. Reaching the quota is NOT the end of it, which it used
+ * to be, and that was wrong twice over. It cut a level off mid-flock the
+ * instant the eighth of twenty got home, so the rest of a hatch a player had
+ * already set up never arrived; and because the run stopped there, the score
+ * filed against it was always exactly the quota. A player who got fifteen
+ * home saw the same eight recorded as the run before, which reads as a
+ * scoreboard that does not work, and was.
+ *
+ * The quota decides what the run was called, not when it ended.
+ *
+ * A duckling planted as a Blocker is neither in the pond nor gone, and it
+ * holds the run open on purpose: something is still standing there, and the
+ * flock behind it may yet be let through. A player who is finished anyway
+ * ends the run from the button rather than waiting the clock out (see
+ * play.html), and that counts and is filed exactly like any other ending.
+ */
 function evaluate(state){
   const level = state.level;
-  const need = winCount(level);
-  if(state.saved >= need){ state.ended = 'won'; return; }
-
   const resolved = state.hatched >= level.duckCount &&
     state.ducks.every(d => d.state === 'saved' || d.state === 'lost');
   if(resolved || state.ticks >= level.timeLimit){
-    state.ended = state.saved >= need ? 'won' : 'lost';
+    state.ended = state.saved >= winCount(level) ? 'won' : 'lost';
   }
+}
+
+/* Ending a run by hand, from the button. Judged exactly the way the clock
+   running out would judge it, so stopping early is not a way to dodge a
+   loss — it is the same run, called at the moment it is called. */
+export function endRun(state){
+  if(state.ended) return null;
+  state.ended = state.saved >= winCount(state.level) ? 'won' : 'lost';
+  return state.ended;
 }
 
 /* ------------------------------------------------------------------- a duck */

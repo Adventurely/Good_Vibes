@@ -89,6 +89,7 @@ export const LEVEL_CAPS = {
   overlook: 18,
   stones: 24,
   belfry: 24,
+  errand: 18,
 };
 
 export const LEVEL_IDS = Object.keys(LEVEL_CAPS);
