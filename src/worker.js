@@ -15,12 +15,14 @@
 import { GameRoom } from './room-do.js';
 import { SolariumRoom } from './solarium-do.js';
 import { SunwardBoard } from './board-do.js';
+import { DuckBoard } from './duck-board-do.js';
 
-export { GameRoom, SolariumRoom, SunwardBoard };
+export { GameRoom, SolariumRoom, SunwardBoard, DuckBoard };
 
 const WS_PATH = '/api/good-vibes/ws';
 const SOLARIUM_WS = '/api/solarium/ws';
 const BOARD_PATH = '/api/sunward/board';
+const DUCK_BOARD_PATH = '/api/duck-duck-quack/board';
 const CODE_RE = /^[A-Z0-9]{4,6}$/;
 
 // Where the root used to be a single game, before there were two of them.
@@ -82,6 +84,21 @@ export default {
        merge of several that each saw a different set of players. */
     if(url.pathname === BOARD_PATH){
       return env.BOARD.get(env.BOARD.idFromName('sunward')).fetch(request);
+    }
+
+    /* Duck Duck Quack's board, the same idea for a game that is nothing like a
+       clicker. Its rows are a map of levels rather than a handful of counters,
+       which is why it is a second object class and not a second name on the
+       first: one class serving two shapes is one class where a change for one
+       game can break the other.
+
+       A single player game with a leaderboard is still a single player game.
+       Nothing here is needed to play — the browser keeps its own copy of every
+       best, posts it when a level ends, and carries on unbothered when the
+       post does not land. A failed deploy on this route loses a leaderboard,
+       not a game. */
+    if(url.pathname === DUCK_BOARD_PATH){
+      return env.DUCK_BOARD.get(env.DUCK_BOARD.idFromName('duck-duck-quack')).fetch(request);
     }
 
     /* The game used to be the whole site, so its pages sat at the root. Anyone

@@ -181,20 +181,23 @@ One Worker on **good-vibe-games.com** serves the shelf and every game on it.
       ├── /sunward/            Sunward          — no socket; the save is the browser's
       ├── /orbital-trader/     Orbital Trader   — no socket either
       ├── /greener-thumbs/     Greener Thumbs   — nor that
+      ├── /duck-duck-quack/    Duck Duck Quack  — nor that
       ├── /api/good-vibes/ws   src/worker.js → GameRoom,     one per room code
       ├── /api/solarium/ws     src/worker.js → SolariumRoom, one per room code
-      └── /api/sunward/board   src/worker.js → SunwardBoard, one for the whole game
-                               GET reads it, POST puts a row up, DELETE takes
-                               one off — the id in the body is the authority
-                               for both of the last two
+      ├── /api/sunward/board   src/worker.js → SunwardBoard, one for the whole game
+      └── /api/duck-duck-quack/board
+                               src/worker.js → DuckBoard,    one for the whole game
+                               Both boards: GET reads, POST puts a row up,
+                               DELETE takes one off — the id in the body is the
+                               authority for both of the last two
 
-**Three of the five play without the Worker.** Sunward, Orbital Trader and
-Greener Thumbs are one player and a save file, so the games are files in
-`public/` and nothing else — no socket, no room, and nothing to go down. A
-single-player game that needs a server to be played is a single-player game
-that stops working when somebody else's deploy fails. Sunward has one route
-now, for its leaderboard, and it is built to that rule: the game never waits on
-it and plays the same with it gone.
+**Four of the six play without the Worker.** Sunward, Orbital Trader, Greener
+Thumbs and Duck Duck Quack are one player and a save file, so the games are
+files in `public/` and nothing else — no socket, no room, and nothing to go
+down. A single-player game that needs a server to be played is a single-player
+game that stops working when somebody else's deploy fails. Two of them have one
+route each now, for their leaderboards, and both are built to that rule: the
+game never waits on the board, and plays the same with it gone.
 
 **Sunward's board is one Durable Object, named for the game.**
 `/api/sunward/board` is the first route here that is not a socket. A
@@ -235,6 +238,46 @@ because past it whole numbers are not exact and "a record only goes up" stops
 meaning anything, and the two measures stop at `Number.MAX_VALUE`. What is
 still refused is a figure that is broken rather than big — not a number, not
 finite, negative, or a count with a fraction in it.
+
+**Duck Duck Quack has a board of its own**, `/api/duck-duck-quack/board`, built
+to the same pattern and for the same reasons: one Durable Object named for the
+game, pure rules in `src/duck-board.js`, a thin object and a thin dev route
+around them, and a game that plays exactly the same with the whole thing gone.
+It is a separate class from `SunwardBoard` rather than a second name on it,
+because the two hold different shapes — five counters against a map of levels —
+and one class serving both is a class where a change for one game breaks the
+other.
+
+A row is one number per level: the most ducklings that player has ever got to
+the pond on it. The board ranks on the total across every level, so it rewards
+playing the whole game as well as playing it well, and ties break on how many
+levels the total is spread over. A losing run still counts — nine saved on a
+level that wanted ten is a better nine than a win with eight.
+
+Two things differ from Sunward, both because the game differs. There is an id
+per NAME rather than per browser, since this game has always let a household
+keep several players on one machine and pick between them, so two people
+sharing a laptop get a row each. And the client posts its WHOLE map of bests
+every time rather than the one just made, with the server taking the maximum
+per level — which is what makes it self-healing. A post refused for being too
+soon, a level finished on a train, a browser in private mode: none of them lose
+a score, because the next post that lands carries the lot. There is nothing to
+retry and no queue to keep, only a five-second rate limit to wait out.
+
+The per-level ceiling here is exact rather than guessed, which is the one place
+this board can be stricter than Sunward's without repeating its mistake: you
+cannot save more ducklings than hatch, so the cap is the level's own
+`duckCount` and there is no judgement in it. `LEVEL_CAPS` is a copy of what
+`content.js` already knows — the Worker should not carry seventy kilobytes of
+level geometry to reach eleven numbers — and `test/duck-board.test.js` asserts
+the copy against the real levels, so a level added, renamed or rebalanced
+without it is a failing test rather than a quietly wrong answer.
+
+The name rules are the one thing genuinely shared between the client and the
+Worker, in `public/duck-duck-quack/names.js`, which the Worker imports across.
+Two copies of a validator is two validators, and the day they drift is the day
+a name the picker accepted is refused by the board with nothing on screen to
+explain it.
 
 `public/` ships verbatim, no build step. The Worker is not invoked for files at
 all — assets are matched first — so the clients cost zero Worker calls and each
@@ -374,6 +417,7 @@ PORT=8080 HOST=127.0.0.1 npm start
 | `/`        | The title screen                  |
 | `/healthz` | `{"status":"ok"}`                 |
 | `/api/sunward/board` | Sunward's leaderboard: `GET` reads it, `POST` a score to it |
+| `/api/duck-duck-quack/board` | Duck Duck Quack's leaderboard, the same three verbs |
 | anything else | `404 Not Found`                |
 
 ## Tests
