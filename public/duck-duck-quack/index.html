@@ -355,6 +355,15 @@
   let shared = null;
   let sharedReach = true;
 
+  /* Why this player's scores are not on the shared board, when they are not.
+   *
+   * A post that fails used to leave nothing behind at all: the GET that
+   * followed it a moment later succeeded, so the page said the board was
+   * fine, and a player whose scores were never reaching it had no way to
+   * tell. That is how a missing board id went unnoticed for two versions.
+   * A failed post now says so, and keeps saying so until one lands. */
+  let postProblem = null;
+
   function say(text, bad = false){
     ui.note.textContent = text;
     ui.note.dataset.bad = String(bad);
@@ -428,10 +437,10 @@
     if(!shared) return 'Fetching the board…';
     const you = shared.you;
     const players = shared.players === 1 ? '1 player' : `${shared.players} players`;
-    if(you?.rank && you.rank > shared.board.length){
-      return `${players} so far. You are ${you.rank}th as ${you.name}.`;
-    }
-    return `${players} so far.`;
+    const where = you?.rank && you.rank > shared.board.length
+      ? `${players} so far. You are ${you.rank}th as ${you.name}.`
+      : `${players} so far.`;
+    return postProblem ? `${where} ${postProblem}` : where;
   }
 
   const drawAll = () => { drawPicker(); drawBests(); drawBoard(); };
@@ -482,6 +491,7 @@
 
     if(reply.ok && reply.data){
       sharedReach = true;
+      postProblem = null;
       if(take(reply.data, n)) drawAll();
       return;
     }
@@ -489,11 +499,14 @@
     // must not be swallowed: they are keeping score under a name somebody else
     // already has, and only the shared list is affected.
     if(reply.status === 409){
+      postProblem = `${current} is taken on the shared board.`;
       say(`Playing as ${current} on this browser — but somebody else is on the shared board `
         + 'under that name. Add a different one to appear on it.', true);
     }else if(reply.status === 400){
+      postProblem = `The board would not take ${current}'s scores.`;
       say(`Playing as ${current} on this browser. The shared board would not take it: ${reply.error}`, true);
     }else{
+      postProblem = `${current}'s scores have not reached the board yet.`;
       sharedReach = reply.status !== 0;
     }
     refreshBoard();

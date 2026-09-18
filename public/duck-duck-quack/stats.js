@@ -143,10 +143,29 @@ export function createStats(storage = globalThis.localStorage){
       return stored;
     },
 
-    /* The board id for a name, or null if there is none — which happens on a
-       browser with no crypto at all, and means "keep the marks, skip the
-       board" rather than anything the player has to hear about. */
-    idFor(name){ return rowOf(name)?.id ?? null; },
+    /* The board id for a name, minted here if that name has not got one yet.
+     *
+     * Minting on demand rather than only when a name is picked, because
+     * "only when it is picked" is a trap: a player carried over from before
+     * there was a board has a row and marks and no id, and they are ALREADY
+     * the current player, so nothing ever picks them again. Their scores
+     * saved locally exactly as they always had, the board post quietly
+     * returned early on the missing id, and the whole thing looked like a
+     * leaderboard that had stopped working — which is what it was, for
+     * everybody who had played before the board shipped.
+     *
+     * Null only where there is no crypto to make one with, which means
+     * "keep the marks, skip the board" rather than anything to report.
+     */
+    idFor(name){
+      const row = rowOf(name);
+      if(!row) return null;
+      if(!row.id){
+        row.id = newId();
+        if(row.id) save();
+      }
+      return row.id;
+    },
 
     /* Stops tracking against anybody, without forgetting them. */
     clearCurrent(){

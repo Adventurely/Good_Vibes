@@ -247,10 +247,36 @@ test('marks made before there was a server are kept', () => {
   assert.equal(stats.current(), 'Ada');
   assert.equal(stats.best('Ada', 'park'), 9);
   assert.deepEqual(stats.bests('Ada'), { park: 9, belfry: 12 });
-  assert.equal(stats.idFor('Ada'), null, 'the id comes when they are next picked');
-  stats.use('Ada');
-  assert.match(stats.idFor('Ada'), /^[0-9a-f-]{36}$/);
-  assert.equal(stats.best('Ada', 'park'), 9, 'and minting it costs them nothing');
+  assert.match(stats.idFor('Ada'), /^[0-9a-f-]{36}$/, 'and they get a board id on the spot');
+  assert.equal(stats.best('Ada', 'park'), 9, 'which costs them nothing');
+});
+
+test('a player carried over from before the board gets an id without being re-picked', () => {
+  /* The bug this is here for: the id used to be minted only inside `use()`,
+     so a player who already WAS the current player — which is everybody who
+     picked a name before the board shipped — never got one. Their marks kept
+     saving locally and the board post returned early on the missing id every
+     single time, silently. It looked like a leaderboard that had stopped
+     working, and for those players it was. */
+  const storage = fakeStorage(JSON.stringify({
+    current: 'Curtis',
+    players: { Curtis: { belfry: 3, errand: 17 } },
+  }));
+  const stats = createStats(storage);
+
+  assert.equal(stats.current(), 'Curtis', 'already the current player, so nothing picks them again');
+  const id = stats.idFor('Curtis');
+  assert.match(id, /^[0-9a-f-]{36}$/, 'asking for the id is enough to mint one');
+  assert.equal(stats.idFor('Curtis'), id, 'and asking twice does not mint a second');
+  assert.equal(createStats(storage).idFor('Curtis'), id, 'it is written down, not just in memory');
+  assert.deepEqual(stats.bests('Curtis'), { belfry: 3, errand: 17 },
+    'with every mark they already had intact, so nothing has to be replayed');
+});
+
+test('minting an id for a name nobody has picked is not a way to create them', () => {
+  const stats = createStats(fakeStorage());
+  assert.equal(stats.idFor('Ghost'), null);
+  assert.deepEqual(stats.players(), []);
 });
 
 test('a current player who is not in the book is nobody', () => {
