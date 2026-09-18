@@ -1261,6 +1261,97 @@ test('the aiming card is given the number it asks for, and it is the only one', 
     'the aiming card still asks for an angle nobody can measure');
 });
 
+/* ------------------------------------------- the errand cannot be lost */
+
+/* Two ways a new game could end itself in its first ten minutes, both found in
+ * play. Theo hands over twelve cowries and a pebble costs eleven, so a pilot
+ * who tops the tank up first can never buy the thing the errand is about; and a
+ * pilot who sells the pebble back cannot afford a second, because no stall buys
+ * at what it sells for. The quest step does not come back either — questCheck
+ * only ever counts forward — so the second one left the lesson on its last card
+ * for ever. "Nothing here can cost the save" is the rule the tow and the bank
+ * already keep, and it has to cover the errand too. */
+function atSlateWithTheErrand(){
+  const s = S.newGame(5);
+  s.dockedAt = 'slate';
+  s.ship = { ...s.ship, body: 'slate' };
+  return s;
+}
+
+test('the errand is affordable even when the purse is not', () => {
+  const s = atSlateWithTheErrand();
+  s.dv = s.dv * 0.5;                                  // room in the tank after the trip out
+  assert.ok(S.refuel(s, 99).ok, 'could not spend the coin on fuel');
+  assert.equal(s.money, 0, 'the fuel did not take the purse');
+
+  const r = S.buy(s, 'pebble', 1);
+  assert.ok(r.ok, `the errand was priced out: ${r.reason}`);
+  assert.ok(r.borrowed > 0, 'the bank did not front anything');
+  assert.equal(s.money, 0, 'money went negative instead of becoming a debt');
+  assert.ok(s.debt > 0, 'the coin was conjured rather than borrowed');
+  assert.equal(S.carrying(s, 'pebble'), 1);
+
+  // And the job pays it straight back off.
+  s.dockedAt = 'tassel'; s.ship = { ...s.ship, body: 'tassel' };
+  S.questCheck(s, []);
+  assert.ok(S.claimQuest(s, 'pebble').ok, 'the job could not be collected');
+  S.settleDebt(s);
+  assert.equal(s.debt, 0, 'the bank was not paid back out of the fee');
+  assert.ok(s.money > 0);
+});
+
+test('the bank fronts what a job needs and not a crate more', () => {
+  const s = atSlateWithTheErrand();
+  s.money = 0;
+  assert.equal(S.questWants(s, 'pebble'), 1, 'a retrieval counts its good twice');
+  assert.equal(S.questCredit(s, 'pebble'), 1);
+  assert.equal(S.buy(s, 'pebble', 5).ok, false, 'the tab could be traded on');
+  assert.ok(S.buy(s, 'pebble', 1).ok);
+  // Once it is aboard there is nothing outstanding, so there is no more credit.
+  assert.equal(S.questCredit(s, 'pebble'), 0);
+  assert.equal(S.buy(s, 'pebble', 1).ok, false, 'the credit refilled itself');
+});
+
+test('a crate a job is for cannot be sold out from under it', () => {
+  const s = atSlateWithTheErrand();
+  assert.ok(S.buy(s, 'pebble', 1).ok);
+  const r = S.sell(s, 'pebble', 1);
+  assert.equal(r.ok, false, 'the errand was sold');
+  assert.match(r.reason, /give the job up/i, 'the refusal does not name the way out');
+  assert.equal(S.carrying(s, 'pebble'), 1);
+
+  // The way out it names really opens.
+  s.quests = s.quests.filter(q => q.id !== 'pebble');
+  assert.ok(S.sell(s, 'pebble', 1).ok, 'giving the job up did not free the crate');
+});
+
+test('only the crates a job needs are held back; the rest are yours', () => {
+  const s = atSlateWithTheErrand();
+  s.money = 500;
+  assert.ok(S.buy(s, 'pebble', 4).ok);
+  assert.equal(S.questReserved(s, 'pebble'), 1, 'a whole hold was impounded for one errand');
+  assert.ok(S.sell(s, 'pebble', 3).ok, 'the surplus was held back too');
+  assert.equal(S.sell(s, 'pebble', 1).ok, false, 'the last one was not the errand\'s');
+});
+
+test('a delivery is untouched by either rule: its crates were never bought', () => {
+  /* A consignment is already unsellable and already aboard, so there is nothing
+     to front and nothing to reserve out of the crates you own. */
+  const s = S.newGame(5);
+  s.flags.tutorialSkipped = true;
+  s.dockedAt = 'tassel';
+  const del = S.QUESTS.find(q => q.type === 'delivery' && q.goods?.length);
+  assert.ok(del, 'no delivery to check');
+  assert.equal(S.questCredit(s, del.goods[0].good), 0, 'a delivery opened a line of credit');
+});
+
+/* And the page has to say when it has borrowed on somebody's behalf. */
+test('the buy button says so when the bank covered it', () => {
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.match(PLAY, /r\.borrowed > 0/, 'a player can be put into debt without being told');
+  assert.match(PLAY, /harbour bank covers/, 'the toast does not say who is owed');
+});
+
 test('the lesson says Slate is a moon before it asks anybody to aim at one', () => {
   /* Why Slate is somewhere else by the time you get there is the whole of the
      aiming card, and the answer is that it is going round the planet you are

@@ -2977,7 +2977,16 @@ const actions = {
     toast(what === 'fuelCell' ? 'New cell fitted.' : 'Hull made good.', 'story', 5000);
     renderTab(); renderHud(); save();
   },
-  buy(gid, q){ const r = S.buy(state, gid, Number(q)); if(!r.ok) toast(r.reason, 'bad'); renderTab(); save(); },
+  /* Going into debt is never silent. The bank will front what a job still
+     needs so an errand cannot be priced out of reach, but a player who presses
+     +1 with an empty purse has just borrowed, and has to be told so in the
+     place they pressed rather than only in the log. */
+  buy(gid, q){
+    const r = S.buy(state, gid, Number(q));
+    if(!r.ok) toast(r.reason, 'bad');
+    else if(r.borrowed > 0) toast(`The harbour bank covers ${S.fmtMoney(r.borrowed)} of that, for the job. You owe them.`, 'story', 7000);
+    renderTab(); save();
+  },
   sell(gid, q){ const r = S.sell(state, gid, Number(q)); if(!r.ok) toast(r.reason, 'bad'); else toast(`Sold for ${S.fmtMoney(r.total)} (${r.profit >= 0 ? '+' : ''}${S.fmtMoney(r.profit)}).`); renderTab(); save(); },
   takequest(id){
     const r = S.acceptQuest(state, id);
