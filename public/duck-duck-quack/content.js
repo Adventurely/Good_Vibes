@@ -88,7 +88,7 @@
    straight off the page whether they have the latest build, rather than
    having to guess from behavior alone. Bump it on every change that ships,
    however small. */
-export const GAME_VERSION = '1.9.4';
+export const GAME_VERSION = '1.10';
 
 export const SCENE_W = 320;
 export const SCENE_H = 180;
@@ -1283,8 +1283,105 @@ export const LEVEL_10 = {
   goose: { x0: 90, x1: 150, y: 150, speed: 1.5, catchRadius: 1.5 },
 };
 
+/* "The Belfry": four floors stacked over one another, a chasm nothing can
+ * bridge, and not a Digger on the page.
+ *
+ * The flock hatches in a pen on the ground — a rock wall at each end, so
+ * nothing down there is in any danger — and every floor above it is one
+ * ramp's climb above the last. That is the whole of the height: four
+ * twenty-four-pixel steps, no wall to tunnel and nothing to fall down that
+ * a Builder cannot answer. What makes it work is that the floors are
+ * staggered left and right of each other, so the flock arrives at the end
+ * of one going the wrong way for the next.
+ *
+ * A ramp climbs in whichever direction the duckling given it was already
+ * walking, and the only thing that turns a duckling around in mid-air is a
+ * Blocker (see sim.js's releaseBlocker for the other half of that). So the
+ * climb alternates, and it has to:
+ *
+ *   pen -> floor A    a ramp left to right, off the pen floor
+ *   A -> B            a Blocker at A's right-hand end, then a ramp built
+ *                     right to left by a duckling walking back
+ *   B -> C            a Blocker at B's left-hand end, then a ramp left to
+ *                     right again — and this one is forty-eight pixels, so
+ *                     it is the climb-level-climb staircase, three Builders
+ *                     of it (see assignSkill)
+ *
+ * Two of those Blockers are the route rather than a safety net, and they
+ * stay planted: stand either down while ducklings are still coming and the
+ * flock walks the wrong way off the end of the floor it is on. Falling off
+ * floor A lands in the pen unhurt, which is the one free mistake here.
+ * Falling off B or C does not.
+ *
+ * And then the chasm. Fifty-one columns of open air between floor C and the
+ * far platform, where a ramp reaches thirty-three — this is the one gap in
+ * the game that is not a question of building it right, it is a question of
+ * not building at all. The pads at either end of it are the way across, and
+ * a duckling that walks onto one comes out of the other still going the way
+ * it was going, which on floor C is rightward, towards the water. That is
+ * the whole of the last move, and it needs nothing spent on it: getting a
+ * flock to the pad is the level.
+ */
+export const LEVEL_11 = {
+  id: 'belfry',
+  name: 'The Belfry',
+  width: SCENE_W,
+  height: SCENE_H,
+
+  /* [0, 10)    the left rock wall — `hard`, so nothing walks off the edge
+     [10, 140)  the pen floor, with the nest at one end
+     [140, 150) the right rock wall. Forty pixels, taller than one ramp
+                climbs, so the pen stays a pen
+     [150, 320) the chasm, and the open air the floors stand in */
+  segments: [
+    { from: 0, to: 10, y: 110, hard: true },
+    { from: 10, to: 140, y: 150 },
+    { from: 140, to: 150, y: 110, hard: true },
+    { from: 150, to: 320, y: PIT_Y },
+  ],
+
+  /* Four floors. A, B and C are staggered so that each one is reached
+     walking the opposite way to the last; D is across the chasm and has the
+     water on the end of it. */
+  islands: [
+    { from: 30, to: 120, y: 126, floor: 136 },   // A: one ramp off the pen
+    { from: 20, to: 110, y: 102, floor: 112 },   // B: back to the left
+    { from: 60, to: 150, y: 54, floor: 64 },     // C: right again, and twice the climb
+    { from: 200, to: 300, y: 54, floor: 64 },    // D: over the chasm, with the pond
+  ],
+
+  /* The one way across fifty-one columns of nothing. Both ends work, as
+     always, which matters only if a player sends the flock over before it
+     is ready — walking back onto the far pad brings them home again. */
+  teleports: [
+    { ax: 145, ay: 54, bx: 205, by: 54 },
+  ],
+
+  nestX: 20,
+  /* Inside floor D, so its right-hand end is open water. */
+  goalX: 270,
+
+  duckCount: 24,
+  spawnInterval: TICK_RATE * 3,
+  timeLimit: TICK_RATE * 420,       // seven minutes: five ramps and a lot of walking
+
+  winRatio: 0.5,
+
+  /* Builder: ten, for the five the climb needs — one onto A, one onto B,
+     and three for the staircase up to C. Five spare, because every one of
+     them is a placement decision and a ramp cannot be taken back. Blocker:
+     six, for the two turns the route cannot be walked without and four for
+     holding a working edge while a ramp goes in. Digger: zero, and there is
+     nothing here one could be spent on — no wall on this level, only air.
+     Climber: zero; the only walls are the pen's own rock. Flyer: two, which
+     save a duckling that has already walked off something. Jumper: zero. */
+  supply: { digger: 0, builder: 10, blocker: 6, climber: 0, flyer: 2, jumper: 0 },
+
+  goose: { x0: 60, x1: 120, y: 150, speed: 1.5, catchRadius: 1.5 },
+};
+
 export const LEVELS = [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5, LEVEL_6, LEVEL_7, LEVEL_8,
-  LEVEL_9, LEVEL_10];
+  LEVEL_9, LEVEL_10, LEVEL_11];
 
 export const winCount = level => Math.ceil(level.duckCount * level.winRatio);
 

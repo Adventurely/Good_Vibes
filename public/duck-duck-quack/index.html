@@ -130,6 +130,61 @@
     .levels a:hover, .levels a:focus-visible{ transform: none; }
   }
 
+  /* Who is playing, and how everybody has done. Both sit in the same glass
+     panel language as the rest of the page rather than looking like a form
+     bolted onto a game. */
+  .player{
+    margin: 1.4rem auto 0; max-width: 34rem; padding: .7rem .9rem;
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+    gap: .45rem;
+    font-size: .82rem; color: var(--muted);
+    background: var(--gv-glass); border: 1px solid var(--edge); border-radius: 10px;
+  }
+  .player label{ font-weight: 600; }
+  .player select, .player input{
+    font: inherit; font-size: .82rem; padding: .3rem .5rem;
+    background: var(--gv-glass); color: var(--gv-text);
+    border: 1px solid var(--edge); border-radius: 6px;
+    max-width: 11rem;
+  }
+  .player button{
+    font: inherit; font-size: .78rem; padding: .32rem .8rem; cursor: pointer;
+    background: var(--gv-glass); border: 1px solid var(--edge); border-radius: 999px;
+    color: var(--muted);
+  }
+  .player button:hover, .player button:focus-visible{ color: var(--gv-text); border-color: var(--leaf); }
+  .player .who{ color: var(--leaf); font-weight: 700; }
+  .player .note{ flex-basis: 100%; text-align: center; font-size: .74rem; min-height: 1.1em; }
+  .player .note[data-bad='true']{ color: var(--gv-bad); }
+
+  .board{
+    margin: 1.2rem auto 0; max-width: 26rem; padding: .7rem .9rem;
+    background: var(--gv-glass); border: 1px solid var(--edge); border-radius: 10px;
+  }
+  .board h2{
+    margin: 0 0 .45rem; font-size: .76rem; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--muted); font-weight: 700;
+  }
+  .board ol{ margin: 0; padding: 0; list-style: none; }
+  .board li{
+    display: grid; grid-template-columns: 1.6rem 1fr auto;
+    gap: .5rem; align-items: baseline;
+    padding: .2rem 0; font-size: .84rem;
+  }
+  .board li + li{ border-top: 1px solid var(--edge); }
+  .board .rank{ color: var(--muted); font-variant-numeric: tabular-nums; }
+  .board .name{ font-weight: 700; color: var(--gv-text); overflow-wrap: anywhere; }
+  .board li.me .name{ color: var(--leaf); }
+  .board .score{ color: var(--muted); font-variant-numeric: tabular-nums; }
+  .board .empty{ margin: 0; font-size: .8rem; color: var(--muted); }
+
+  /* A player's own best on each level card, tucked at the end of the
+     caption so it reads as part of the label rather than as a badge. */
+  .levels .best{
+    margin-left: auto; font-weight: 700; color: var(--sun);
+    font-variant-numeric: tabular-nums; font-size: .74rem;
+  }
+
   .facts{
     margin: 1.6rem auto 0; padding: 0; list-style: none;
     display: flex; flex-wrap: wrap; gap: .4rem; justify-content: center;
@@ -181,11 +236,28 @@
     <p class="more-levels" id="levels-label">or start anywhere &mdash; every level, as it actually looks</p>
     <ul class="levels" id="levels" aria-labelledby="levels-label"></ul>
 
+    <div class="player" id="player">
+      <label for="who">Playing as</label>
+      <select id="who" aria-describedby="player-note">
+        <option value="">Nobody — don't keep score</option>
+      </select>
+      <input type="text" id="new-name" maxlength="16" placeholder="or a new name"
+             aria-label="A new name to play as">
+      <button type="button" id="add-name">Add</button>
+      <p class="note" id="player-note" role="status"></p>
+    </div>
+
+    <div class="board" id="board">
+      <h2>Top ten — ducklings saved</h2>
+      <ol id="board-list"></ol>
+      <p class="empty" id="board-empty">Nobody has finished a level yet.</p>
+    </div>
+
     <ul class="facts">
       <li>Single player</li>
       <li class="sun">Puzzle</li>
-      <li>Ten levels, six skills</li>
-      <li>Nothing saved, nothing sent anywhere</li>
+      <li>Eleven levels, six skills</li>
+      <li>Scores kept in this browser, sent nowhere</li>
     </ul>
     <button type="button" id="sound" class="sound" aria-pressed="false">Music off</button>
   </div>
@@ -205,6 +277,7 @@
   import { newGame, tick, assignSkill, hasTrait } from './sim.js';
   import { paintScene } from './art.js';
   import { createAudio } from './audio.js';
+  import { createStats } from './stats.js';
 
   document.getElementById('game-version').textContent = `v${GAME_VERSION}`;
 
@@ -215,6 +288,7 @@
      honest. There is no image to re-export when a level's shape changes;
      move a gap in content.js and the picture here moves with it. */
   const levelList = document.getElementById('levels');
+  const bestSlots = new Map();
   LEVELS.forEach((level, i) => {
     const link = document.createElement('a');
     link.href = `./play.html?level=${level.id}`;
@@ -235,13 +309,109 @@
     num.textContent = String(i + 1);
     const name = document.createElement('span');
     name.textContent = level.name;
-    cap.append(num, name);
+    const best = document.createElement('span');
+    best.className = 'best';
+    cap.append(num, name, best);
+    bestSlots.set(level.id, { best, link, label: `Level ${i + 1} of ${LEVELS.length}, ${level.name}` });
 
     link.append(shot, cap);
     const card = document.createElement('li');
     card.append(link);
     levelList.append(card);
   });
+
+  /* ---------------------------------------------------------- the player */
+
+  /* Whose run this is, and everybody's best. All of it lives in this
+     browser (see stats.js) — there is no account and nothing leaves the
+     machine, which is why the picker is a plain list anyone can choose from
+     rather than anything that asks for a password. */
+  const stats = createStats();
+  const ui = {
+    who: document.getElementById('who'),
+    newName: document.getElementById('new-name'),
+    add: document.getElementById('add-name'),
+    note: document.getElementById('player-note'),
+    boardList: document.getElementById('board-list'),
+    boardEmpty: document.getElementById('board-empty'),
+  };
+
+  function say(text, bad = false){
+    ui.note.textContent = text;
+    ui.note.dataset.bad = String(bad);
+  }
+
+  function drawPicker(){
+    const current = stats.current();
+    ui.who.textContent = '';
+    const none = document.createElement('option');
+    none.value = '';
+    none.textContent = "Nobody — don't keep score";
+    ui.who.append(none);
+    for(const name of stats.players()){
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      if(name === current) opt.selected = true;
+      ui.who.append(opt);
+    }
+    ui.who.value = current ?? '';
+  }
+
+  function drawBests(){
+    const current = stats.current();
+    for(const [id, slot] of bestSlots){
+      const best = current ? stats.best(current, id) : 0;
+      slot.best.textContent = best ? `best ${best}` : '';
+      // The card's own label carries it too, so it is not colour-only.
+      slot.link.setAttribute('aria-label',
+        best ? `${slot.label}. Your best: ${best} saved.` : slot.label);
+    }
+  }
+
+  function drawBoard(){
+    const rows = stats.leaderboard(10);
+    const current = stats.current();
+    ui.boardList.textContent = '';
+    ui.boardEmpty.hidden = rows.length > 0;
+    rows.forEach((row, i) => {
+      const li = document.createElement('li');
+      if(row.name === current) li.className = 'me';
+      const rank = document.createElement('span');
+      rank.className = 'rank';
+      rank.textContent = `${i + 1}.`;
+      const name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = row.name;
+      const score = document.createElement('span');
+      score.className = 'score';
+      score.textContent = `${row.total} over ${row.levels} ${row.levels === 1 ? 'level' : 'levels'}`;
+      li.append(rank, name, score);
+      ui.boardList.append(li);
+    });
+  }
+
+  const drawAll = () => { drawPicker(); drawBests(); drawBoard(); };
+
+  ui.who.addEventListener('change', () => {
+    const picked = ui.who.value;
+    if(picked) stats.use(picked); else stats.clearCurrent();
+    say(picked ? `Playing as ${picked}. Every run counts from here.` : 'Not keeping score.');
+    drawAll();
+  });
+
+  function addName(){
+    const added = stats.use(ui.newName.value);
+    if(!added){ say('Type a name first.', true); return; }
+    ui.newName.value = '';
+    say(`Playing as ${added}. Every run counts from here.`);
+    drawAll();
+  }
+  ui.add.addEventListener('click', addName);
+  ui.newName.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); addName(); } });
+
+  drawAll();
+  if(stats.current()) say(`Playing as ${stats.current()}.`);
 
   /* Autoplay policy decides when sound can start, not us: the context cannot
      exist until a gesture, so the button reflects intent and the first click
