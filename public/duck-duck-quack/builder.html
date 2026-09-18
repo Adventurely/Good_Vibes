@@ -85,11 +85,24 @@
   .overlay{
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
     background: rgba(13, 11, 31, 0.72); color: #fdf6e3; text-align: center;
-    flex-direction: column; gap: 0.6rem; padding: 1rem;
+    flex-direction: column; gap: 0.9rem; padding: 1.25rem;
+    /* `.screen` sets `line-height: 0` to collapse the whitespace around the
+       canvas, and it inherits into everything inside it — the same trap the
+       HUD above had to climb out of. Left alone here, every line in this
+       overlay was a zero-height box: the title and the line under it landed
+       on top of each other, and the buttons sat in the wreckage. The flex
+       `gap` was doing all of the spacing there was. */
+    line-height: 1.45;
   }
   .overlay[hidden]{ display: none; }
-  .overlay h2{ margin: 0; font-size: 1.4rem; }
+  .overlay h2{ margin: 0; font-size: 1.4rem; line-height: 1.15; }
   .overlay p{ margin: 0; font-size: 0.88rem; max-width: 22rem; }
+
+  /* While the playtest's end-of-run overlay is up, the HUD behind it is
+     noise — the overlay already says how many were saved and lost, in more
+     words — and on a narrow screen the overlay's own text lands on top of
+     it. Browsers without `:has()` simply keep the old behaviour. */
+  .screen:has(#overlay:not([hidden])) .hud{ opacity: 0; }
 
   .toolbar{
     display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.5rem;
