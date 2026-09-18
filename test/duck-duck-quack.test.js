@@ -1112,62 +1112,137 @@ test('The Warren cannot be won without a Digger — neither wall has any other w
 
 /* ------------------------------------------------------------ The Orchard, played */
 
-/* A bot for The Orchard that climbs the wall rather than digging it — the
- * level supplies both, and this is the one way to check Climber genuinely
- * still works there too, not just the Digger path the other helpers below
- * exercise. Flyer and Climber are both given at hatch rather than at any
- * particular column: this level is walked heading -1 (content.js's
- * goalHeading), so "given early" means given anywhere on the flat run out
- * of the nest, long before either the wall or its own real drop on the far
- * side. No Blocker here on purpose — see the "no blocker at all" case
- * below for why the goose alone never costs this bot more than one
- * duckling, the same as it would with one planted.
+/* The Orchard, on three Flyers.
+ *
+ * The drop into the low plain is twenty-five pixels — one more than a
+ * duckling survives — and there are three Flyers for twenty-five of them,
+ * so the answer cannot be to hand everybody one. Two go down, the first
+ * stands so the second can turn at it, and the second builds a ramp back up
+ * to within a step of the ledge. Then both stand down and the flock walks
+ * down what it used to fall.
+ *
+ * `wall` picks how the wall itself is crossed, because the level supplies
+ * both and both still have to work.
  */
-function playLevel3Climbing(){
+function playLevel3({ wall = 'digger', turnAt = 60, rampAt = 110, holdAt = 140,
+                      skip = null } = {}){
   const state = newGame(LEVEL_3);
-  let builder1Used = false, builder2Used = false;
+  let gap1 = false, gap2 = false, crossed = false;
+  const flyers = [];
+  let turner = null, ramped = false, holder = null, freed = false, scarer = null, scared = false;
+
   for(let i = 0; i < LEVEL_3.timeLimit && !state.ended; i++){
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
-      if(!hasTrait(d, 'climber')) assignSkill(state, d.id, 'climber');
-      if(!hasTrait(d, 'flyer')) assignSkill(state, d.id, 'flyer');
-      if(!builder1Used && d.x === 250){ if(assignSkill(state, d.id, 'builder')) builder1Used = true; continue; }
-      if(!builder2Used && d.x === 35){ if(assignSkill(state, d.id, 'builder')) builder2Used = true; continue; }
+
+      /* The goose meets a planted Blocker and leaves for good; standing it
+         down again a moment later leaves the road out of the nest clear. */
+      if(!scarer && Math.round(d.x) === 290 && d.y === 150){
+        if(assignSkill(state, d.id, 'blocker')) scarer = d;
+        continue;
+      }
+      if(!gap1 && d.x === 250){
+        if(assignSkill(state, d.id, 'builder')) gap1 = true;
+        continue;
+      }
+      // The wall, once, for the whole flock either way.
+      if(wall === 'digger'){
+        if(!crossed && d.y === 150 && d.x > 206 && d.x < 229){
+          if(assignSkill(state, d.id, 'digger')) crossed = true;
+          continue;
+        }
+      } else if(!hasTrait(d, 'climber')){
+        assignSkill(state, d.id, 'climber');
+        crossed = true;
+      }
+      // The two that go down, taken as soon as they are past the wall.
+      if(skip !== 'flyer' && flyers.length < 2 && crossed && d.y === 150
+         && d.x > 140 && d.x < 174 && !hasTrait(d, 'flyer')){
+        if(assignSkill(state, d.id, 'flyer')) flyers.push(d);
+        continue;
+      }
+      /* And everybody else held off the ledge — but only once those two are
+         past, because a Blocker planted any earlier turns them round too. */
+      if(skip !== 'hold' && flyers.length === 2 && !holder && !hasTrait(d, 'flyer')
+         && d.y === 150 && Math.round(d.x) === holdAt
+         && flyers.every(f => f.x < holdAt || f.y > 150)){
+        if(assignSkill(state, d.id, 'blocker')) holder = d;
+        continue;
+      }
+      // One stands; the other turns at it, facing the ledge again.
+      if(skip !== 'turn' && !turner && hasTrait(d, 'flyer') && d.y === 175
+         && Math.round(d.x) === turnAt){
+        if(assignSkill(state, d.id, 'blocker')) turner = d;
+        continue;
+      }
+      if(skip !== 'ramp' && turner && !ramped && d.y === 175 && d.dir === 1
+         && Math.round(d.x) === rampAt){
+        if(assignSkill(state, d.id, 'builder')) ramped = true;
+        continue;
+      }
+      if(ramped && !gap2 && d.x === 35){
+        if(assignSkill(state, d.id, 'builder')) gap2 = true;
+        continue;
+      }
+    }
+    /* Once only. That duckling goes on to walk the rest of the level, and
+       may well end up being the one planted to turn the flock later — at
+       which point an unguarded "release the scarer" would stand the turner
+       back up again, which is exactly what it did. */
+    if(scarer && !scared && scarer.state === 'blocking' && state.goose.fed){
+      releaseBlocker(state, scarer.id);
+      scared = true;
+    }
+    if(ramped && !freed && !state.ducks.some(d => d.state === 'building')){
+      for(const b of [turner, holder]) if(b && b.state === 'blocking') releaseBlocker(state, b.id);
+      freed = true;
     }
     tick(state);
   }
-  return state;
+  return { state, ramped };
 }
 
-test('The Orchard can be won by climbing the wall instead of digging it', () => {
-  const state = playLevel3Climbing();
+test('The Orchard is won by building the way down, not by flying it', () => {
+  const { state, ramped } = playLevel3();
+  assert.ok(ramped, 'the ramp back up to the ledge should have gone in');
   assert.equal(state.ended, 'won');
   assert.ok(state.saved >= winCount(LEVEL_3), `only ${state.saved} saved, needed ${winCount(LEVEL_3)}`);
+  assert.ok(state.saved > LEVEL_3.supply.flyer,
+    'more got home than there were Flyers, so they did not fly down');
 });
 
-/* And the Digger path, for the same reason The Park keeps its "at the
- * edge" bot honest: a digger given anywhere before the wall should tunnel
- * it for the whole flock, needing no Climber at all. */
-function playLevel3Digging(){
-  const state = newGame(LEVEL_3);
-  let builder1Used = false, builder2Used = false;
-  for(let i = 0; i < LEVEL_3.timeLimit && !state.ended; i++){
-    for(const d of state.ducks){
-      if(d.state !== 'walking') continue;
-      if(!hasTrait(d, 'digger')) assignSkill(state, d.id, 'digger');
-      if(!hasTrait(d, 'flyer')) assignSkill(state, d.id, 'flyer');
-      if(!builder1Used && d.x === 250){ if(assignSkill(state, d.id, 'builder')) builder1Used = true; continue; }
-      if(!builder2Used && d.x === 35){ if(assignSkill(state, d.id, 'builder')) builder2Used = true; continue; }
-    }
-    tick(state);
-  }
-  return state;
-}
+test('The Orchard\'s wall is the Digger\'s now — climbing it strands the flock', () => {
+  /* It used to be a real choice, and it was a choice that Flyer paid for:
+     climbing leaves a duckling at the wall's own height, and the plateau
+     runs out in a fifty-pixel drop that only a Flyer answers. That was free
+     when every duckling could have one. On three Flyers it is not, so the
+     tunnel is the way through and the Climbers in the supply no longer buy
+     a second route. */
+  assert.equal(playLevel3({ wall: 'digger' }).state.ended, 'won');
 
-test('The Orchard can also be won by digging the wall instead of climbing it', () => {
-  const state = playLevel3Digging();
-  assert.equal(state.ended, 'won');
-  assert.ok(state.saved >= winCount(LEVEL_3), `only ${state.saved} saved, needed ${winCount(LEVEL_3)}`);
+  const { state } = playLevel3({ wall: 'climber' });
+  assert.notEqual(state.ended, 'won', 'climbing cannot carry the flock any more');
+
+  const level = newGame(LEVEL_3);
+  const plateauDrop = level.terrain[174] - level.terrain[175];
+  assert.ok(plateauDrop > FALL_SAFE,
+    `the drop off the plateau is ${plateauDrop}, which is why climbing needs a Flyer each`);
+});
+
+test('The Orchard\'s way down needs the Flyers, the turn and the ramp alike', () => {
+  for(const skip of ['flyer', 'turn', 'ramp']){
+    const { state } = playLevel3({ skip });
+    assert.equal(state.saved, 0, `without the ${skip} nothing should reach the pond`);
+    assert.notEqual(state.ended, 'won');
+  }
+});
+
+test('The Orchard hands out far fewer Flyers than it hatches ducklings', () => {
+  // The whole point of the rework: the drop cannot be paid for one duckling
+  // at a time any more.
+  assert.equal(LEVEL_3.supply.flyer, 3);
+  assert.equal(LEVEL_3.supply.builder, 10);
+  assert.ok(LEVEL_3.supply.flyer < LEVEL_3.duckCount / 2);
 });
 
 test('The Orchard cannot be won without a Builder — neither gap has any other answer', () => {

@@ -88,7 +88,7 @@
    straight off the page whether they have the latest build, rather than
    having to guess from behavior alone. Bump it on every change that ships,
    however small. */
-export const GAME_VERSION = '1.14';
+export const GAME_VERSION = '1.15';
 
 export const SCENE_W = 320;
 export const SCENE_H = 180;
@@ -540,9 +540,36 @@ export const LEVEL_2 = {
  * That asymmetry does not extend to the second hazard: the mandatory drop
  * into the low plain sits far enough past the wall that no dig started at
  * the wall can run into it, so every duckling reaches it on its own two
- * feet whichever way the wall was crossed. Confirmed by actually running it
- * five ways: climb-and-flyer, dig-and-flyer, no-builder, no-flyer-at-all,
- * and an early Blocker all come out exactly as their names say they should.
+ * feet whichever way the wall was crossed.
+ *
+ * And that drop is now the level. It is twenty-five pixels, one more than a
+ * duckling survives, and there are three Flyers for twenty-five ducklings —
+ * so the answer cannot be "give everybody a Flyer" any more. It is:
+ *
+ *   one duckling Flies down, and is planted where it lands. It is not
+ *     holding anything back; it is there to be walked into
+ *   a second Flies down, meets it, turns, and is now the only duckling in
+ *     the level facing back towards the ledge it just came off
+ *   that one builds. A ramp laid towards the ledge climbs the
+ *     twenty-four pixels back up to within a step of it, and the drop
+ *     stops being a drop — the flock walks down what it used to fall
+ *   both Blockers then stand down, and the low plain is a road again
+ *
+ * Which leaves the third Flyer spare, and it is meant to be: something has
+ * to be forgiven if the first duckling down is walked into the second gap
+ * before the ramp is in.
+ *
+ * The rest of the flock has to be held off the ledge while that happens,
+ * and cannot be held until the two that fly are past — a Blocker planted
+ * any earlier turns THEM round too, and then nobody goes down at all. The
+ * hatch keeps arriving through all of it, which is where the quota went:
+ * see winRatio below.
+ *
+ * Confirmed by actually running it: the route above wins, and removing any
+ * one of the Flyers, the turning Blocker or the ramp drops it to nobody
+ * home at all. The older cases still read the same — no-builder,
+ * no-flyer-at-all and an early Blocker at the nest all come out exactly as
+ * their names say they should.
  *
  * And the pond sits apart from everything else — a second gap, right at
  * the end, bridged the same way the first one is, with the same Builder:
@@ -585,22 +612,53 @@ export const LEVEL_3 = {
   nestX: 296,
   goalX: 20,
 
-  /* Twenty-five hatch, nineteen needed — the same three-quarter margin
-     The Orchard has always carried, just against a bigger hatch. */
   duckCount: 25,
   spawnInterval: TICK_RATE * 2,
   timeLimit: TICK_RATE * 300,       // five minutes — more ducklings, more time
 
-  winRatio: 0.75,
+  /* Three quarters for as long as every duckling could be handed a Flyer,
+     because then nothing about the drop cost anything: the toll was clicks,
+     not ducklings. Three Flyers makes it cost ducklings. Two have to be down
+     on the low plain before the rest can be held back from the ledge, and
+     the hatch keeps coming at one every two seconds while that is arranged,
+     so somewhere around six of them walk off the edge before there is
+     anything to walk down. That is the price of the route, not a mistake in
+     playing it — a bot playing the whole thing perfectly saves nineteen.
+     Asking for nineteen would therefore be asking for perfect, on the third
+     level of the game. Fifteen leaves the four ducklings of room that the
+     rest of the level's margins have always had. */
+  winRatio: 0.6,
 
-  /* Climber and Digger both fully supplied — a real choice for the wall,
-     not a rationed one. Flyer generous too: it is needed regardless of
-     that choice (see the note above), so there is no reason to make it
-     scarce on top of being mandatory. Builder: two required bridges, one
-     spare over both, same margin as everywhere else. Blocker: five rather
-     than the usual two — the featured tool for the goose at the nest, worth
-     having enough of to actually try, not just one to prove it exists. */
-  supply: { digger: 3, builder: 3, blocker: 5, climber: 24, flyer: 24, jumper: 0 },
+  /* Climber and Digger are both still fully supplied, but they stopped being
+     an even choice the moment Flyer stopped being free. Climbing leaves a
+     duckling standing at the wall's own height, and that plateau runs out in
+     a fifty-pixel drop that only a Flyer answers — one Flyer per duckling
+     that climbed. That cost nothing when there were twenty-five of them. On
+     three, the tunnel is the way through, and the Climbers here now buy a
+     scouting trip rather than a second route for the flock.
+
+     Flyer used to be unlimited, because the twenty-five pixel drop past the
+     wall is one pixel more than a duckling survives (FALL_SAFE) and every
+     single one of them has to get down it. Handing out twenty-five Flyers
+     is not a puzzle, though, it is a toll: the same click, twenty-five
+     times, on the one hazard that cannot be solved once for the whole
+     flock. Three of them now, and ten Builders instead, which turns that
+     toll into the level's real question — the first duckling down is the
+     only one that needs to fly, and what it does when it gets there is
+     build the way down for everybody else. A ramp laid back up towards the
+     ledge puts a deck within a step of it, and the flock walks down what it
+     used to have to fall.
+
+     Ten Builders because that answer costs three of them (two bridges and
+     the way down) and finding it costs a few more: a ramp is spent where it
+     is started and cannot be taken back, and the run-up for this one is
+     about thirty columns.
+
+     Blocker: five, and now one of them is load-bearing rather than a
+     flourish — a duckling that has flown down is still walking towards the
+     pond, and turning it round to face the ledge it came off is the only
+     way to build back towards it. */
+  supply: { digger: 3, builder: 10, blocker: 5, climber: 24, flyer: 3, jumper: 0 },
 
   // Patrols right past the nest rather than the far end of the walk — see
   // the note above on why that moved. Starts at x0 and heads toward x1
