@@ -2223,6 +2223,21 @@ until it is over — because whether the rest of the game wants it is a larger
 question than the lesson's, and the constants are sitting there for the day it
 is answered.
 
+The band is not enough on its own, which shipping it proved within the hour.
+With a burn open on the opening orbit the road fills about **0.195** of the
+frame — a whisker over `FRAME_SHRINK` — so one press of the zoom-out key put it
+under the floor and the next tick put it straight back, pinned to
+`frameShipOrbit`'s own 2e7 ceiling. The zoom looked stuck because it was. A rule
+that re-frames whenever the road is outside its band does not follow the road,
+it overrules the person. So `zoomByHand` records that the player has worked the
+scale themselves — the keys, the wheel and a pinch all set it — and the framing
+stands down for good once they have. It is handed back at two seams and no
+others: when the lesson's chart half ends, because those four cards are
+instructions to move the view by hand and a flag left set there would mean the
+framing never helped anybody it was written for, and on a change of reach, where
+the chart re-frames wholesale anyway and the old choice was about a world four
+orders of magnitude away.
+
 ### The road, the lock, and the clock
 
 Three rules decide what the chart shows, and all three are about showing less.

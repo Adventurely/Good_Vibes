@@ -1240,6 +1240,34 @@ test('the page gives earlier and later a button and a key, and the chart draws t
   assert.match(RENDER, /SLIDE_DY = -92/, 'the slide buttons are back under Theo\'s card');
 });
 
+test('the lesson stops choosing the zoom the moment the player reaches for it', () => {
+  /* The framing follows the road; it must not overrule the person. With a burn
+     open on the opening orbit the road fills about 0.195 of the frame, a
+     whisker over FRAME_SHRINK, so one press of the zoom-out key put it under
+     the floor and the next tick put it straight back: the zoom looked stuck,
+     because it was. Every way a person can change the scale now says so, the
+     framing stands down when they have, and the flag is cleared at the seam
+     between the lesson's two halves — the chart cards are four instructions to
+     move the view by hand, so a flag that were not cleared there would mean the
+     framing never helped anybody it was written for. */
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.match(PLAY, /let zoomByHand = false;/, 'nothing records that the zoom is the player\'s');
+  assert.match(PLAY, /!state\.dockedAt && !zoomByHand && S\.tutorialRunning\(state\)/,
+    'the lesson frames the chart over the top of the player again');
+
+  // All three ways in: the keys, the wheel and a pinch.
+  assert.match(PLAY, /case '\+': case '=': zoomByHand = true;/, 'the zoom-in key does not claim the zoom');
+  assert.match(PLAY, /case '-': case '_': zoomByHand = true;/, 'the zoom-out key does not claim the zoom');
+  assert.match(PLAY, /zoomByHand = true; chart\.zoomBy\(Math\.pow\(1\.0015/, 'the wheel does not claim the zoom');
+  assert.match(PLAY, /pinch\.d > 0\)\{ zoomByHand = true;/, 'a pinch does not claim the zoom');
+
+  // And the two places it is handed back.
+  assert.match(PLAY, /if\(!state\.flags\.lookedBack\) zoomByHand = false;/,
+    'the chart half never hands the zoom back, so the framing helps nobody');
+  assert.match(PLAY, /zoomByHand = false;\n    frameShipOrbit\(\);/,
+    'a change of reach does not hand the zoom back');
+});
+
 test('the aiming card is given the number it asks for, and it is the only one', () => {
   const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
   assert.match(PLAY, /function aimGauge\(\)/, 'the aiming card has no gauge');
