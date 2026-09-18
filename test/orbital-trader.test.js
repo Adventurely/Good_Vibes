@@ -1256,6 +1256,38 @@ test('the aiming card is given the number it asks for, and it is the only one', 
     'the aiming card still asks for an angle nobody can measure');
 });
 
+test('the lesson says Slate is a moon before it asks anybody to aim at one', () => {
+  /* Why Slate is somewhere else by the time you get there is the whole of the
+     aiming card, and the answer is that it is going round the planet you are
+     going round. The tables have known since the first one — kind, and the
+     body it orbits — and no card ever said it. */
+  const steps = TEXT.tutorial.map(t => t.step);
+  const find = TEXT.tutorial[steps.indexOf('find')];
+  const aim = TEXT.tutorial[steps.indexOf('aim')];
+  assert.match(find.body, /moons?\b/, 'the card that first names Slate does not say what it is');
+  assert.match(find.body, /Tassel/, 'the card does not say which world Slate goes round');
+  assert.match(aim.body, /moon/, 'the aiming card does not say why the target moves');
+  assert.ok(steps.indexOf('find') < steps.indexOf('aim'), 'the lesson aims before it explains');
+
+  // And the body it names really is one, so the words and the sky agree.
+  const slate = BODIES.find(b => b.id === 'slate');
+  assert.equal(slate.kind, 'moon');
+  assert.equal(slate.parent, 'tassel');
+});
+
+test('tapping a body says what kind of thing it is, where the data knows', () => {
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.match(PLAY, /function bodyIs\(id\)/, 'nothing says what a body is');
+  assert.match(PLAY, /a moon of \$\{p\.name\}/, 'a moon does not name the world it goes round');
+  assert.match(PLAY, /Looking at \$\{esc\(world\.get\(id\)\.name\)\}\$\{esc\(bodyIs\(id\)\)\}/,
+    'looking at something does not say what it is');
+  /* Only moons and worlds. A rock, a station, a wreck and the Maw are things
+     the fiction introduces in its own words, and a toast calling the Maw a
+     zone would be the game explaining its own table to the player. */
+  const kinds = new Set(BODIES.map(b => b.kind));
+  assert.ok(kinds.has('rock') && kinds.has('wreck'), 'the kinds this deliberately stays quiet about are gone');
+});
+
 /* ------------------------------------------------------------- chart */
 
 test('the chart goes in far enough to fly the last ten kilometres', () => {

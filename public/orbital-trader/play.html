@@ -1948,10 +1948,27 @@ function frameShipOrbit(){
    for when you do want the scale chosen for you. Looking somewhere also ends
    any drag away from the last thing looked at: the new centre is the new
    thing, and the next pan is measured from it. */
+/* What a thing is, and not only what it is called.
+ *
+ * A moon and a world are the same dot on this chart at the wrong zoom, and
+ * which of the two Slate is decides why it moves while you cross to it — which
+ * is the whole of the aiming card. The data has known since the first table
+ * (`kind`, and the body it goes round); nothing ever said it out loud. Only
+ * these two kinds get a line: a rock, a station, a wreck and the Maw are things
+ * the fiction would rather introduce in its own words. */
+function bodyIs(id){
+  const b = world.get(id);
+  if(b?.kind === 'moon'){
+    const p = world.get(b.parent);
+    return p ? `, a moon of ${p.name}` : ', a moon';
+  }
+  if(b?.kind === 'planet') return ', a world going round the Lamp';
+  return '';
+}
 function lookAt(id){
   chart.focus(id, null, false);
   if(id === FIRST_TARGET) noteLook('lookedAtTarget');
-  toast(`Looking at ${esc(world.get(id).name)}. Press f for your ship.`);
+  toast(`Looking at ${esc(world.get(id).name)}${esc(bodyIs(id))}. Press f for your ship.`);
 }
 
 /* ------------------------------------------------------------- panel */
