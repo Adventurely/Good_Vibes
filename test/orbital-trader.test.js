@@ -440,9 +440,14 @@ test('the text has every line the game asks for', () => {
   assert.ok(/\?\s*$/.test(TEXT.events.mawArrival.trim()), 'the Maw ends on a question, as the design leaves it');
   /* The lesson is nine steps now and each one is a step of the opening quest,
      so the two lists have to stay the same shape as each other. */
-  /* Fourteen cards: four about reading the chart, nine about flying the
-     errand, and one that says well done and goes away. */
-  assert.equal(TEXT.tutorial.length, 14);
+  /* Fifteen cards: four about reading the chart, ten about flying the
+     errand, and one that says well done and goes away. The tenth is `slide`,
+     which teaches what earlier and later do before the card that needs them —
+     a playtester quit on the aiming card, and aiming was asking for a second
+     control nothing had introduced. */
+  assert.equal(TEXT.tutorial.length, 15);
+  assert.deepEqual(TEXT.tutorial.map(t => t.step).slice(4, 8), ['mark', 'push', 'slide', 'aim'],
+    'the flying half no longer goes write it down, push it out, find out what sliding does, then aim');
   for(const t of TEXT.tutorial) assert.ok(t.step && t.title && t.body, `tutorial step ${t.step}`);
   assert.deepEqual(TEXT.tutorial.slice(0, 4).map(t => t.step), ['look', 'find', 'focus', 'back'],
     'the lesson no longer opens by teaching the chart');
@@ -1142,9 +1147,113 @@ test('the tap on the road asks the screen, and the card writes on the same terms
   const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
   assert.match(PLAY, /S\.leadForTap\(S\.norm\(state\.ship\.v\) \* chart\.camera\.zoom\)/,
     'the tap is judged by the clock again');
-  assert.match(PLAY, /askAtPath\(p\.t, lead\)/, 'the card is not told what the tap was allowed under');
-  assert.match(PLAY, /S\.addNode\(state, t, lead\)/,
+  /* A tap inside the lead snaps forward to the first moment that will hold a
+     mark, rather than being discarded in silence — the stretch of road a
+     beginner aims at is the stretch beside their own ship, and that was the
+     stretch that did nothing. The lead itself is unchanged and is still handed
+     to the card, so the card cannot open on terms the write will then refuse. */
+  assert.match(PLAY, /askAtPath\(Math\.max\(p\.t, state\.t \+ lead\), lead\)/,
+    'a tap inside the lead is swallowed in silence again, or the card is not told what the tap was allowed under');
+  /* And the mark is written at the moment the button is pressed rather than the
+     moment the card went up: the clock does not stop for this card, so the
+     offer can go stale while it is being read, and a stale offer used to close
+     the card having done nothing. */
+  assert.match(PLAY, /S\.addNode\(state, Math\.max\(t, state\.t \+ lead\), lead\)/,
     'the card opens on a tap it will then refuse to write');
+});
+
+/* ------------------------------------------- sliding a mark along its orbit */
+
+test('a mark slides along its orbit by the step, and stops where a drag would', () => {
+  const g = transferShip();
+  const t0 = g.t + S.MIN_LEAD * 4;
+  assert.equal(S.addNode(g, t0), 0);
+  const step = S.MIN_LEAD;
+
+  assert.equal(S.slideNode(g, 0, step), true, 'later did nothing');
+  assert.ok(Math.abs(g.nodes[0].t - (t0 + step)) < 1e-12, 'later moved it somewhere else');
+  assert.equal(S.slideNode(g, 0, -step), true, 'earlier did nothing');
+  assert.ok(Math.abs(g.nodes[0].t - t0) < 1e-12, 'earlier and later do not undo each other');
+
+  // Never inside the lead, however hard it is pushed.
+  assert.equal(S.slideNode(g, 0, -1000), true);
+  assert.ok(g.nodes[0].t >= g.t + S.MIN_LEAD - 1e-12, 'a mark was slid inside the minute');
+  // And once it is against the wall, a press is honest about doing nothing.
+  assert.equal(S.slideNode(g, 0, -1000), false, 'a press against the wall claimed to move it');
+});
+
+test('a sliding mark never crosses its neighbours, so a held button keeps its own mark', () => {
+  const g = transferShip();
+  // Two marks at once, which the lesson does not allow: it teaches one at a time.
+  g.flags.tutorialSkipped = true;
+  const a = g.t + S.MIN_LEAD * 4, b = g.t + S.MIN_LEAD * 8;
+  assert.equal(S.addNode(g, a), 0);
+  assert.equal(S.addNode(g, b), 1);
+
+  S.slideNode(g, 0, S.MIN_LEAD * 40);
+  assert.ok(g.nodes[0].t < g.nodes[1].t, 'a mark overtook the one in front of it');
+  assert.deepEqual(g.nodes.map(n => n.t), [...g.nodes.map(n => n.t)].sort((x, y) => x - y),
+    'the list came back out of order');
+  /* The clamp is what lets the page hold an index across a press: if a mark
+     cannot cross a neighbour, the sort cannot reorder the list. */
+  assert.ok(Math.abs(g.nodes[1].t - b) < 1e-12, 'the mark in front was moved by its neighbour');
+});
+
+test('sliding a mark is refused where writing one is', () => {
+  const g = transferShip();
+  assert.equal(S.addNode(g, g.t + S.MIN_LEAD * 4), 0);
+  assert.equal(S.slideNode(g, 1, S.MIN_LEAD), false, 'a mark that is not there was slid');
+  assert.equal(S.slideNode(g, 0, 0), false, 'a step of nothing claimed to be a move');
+  assert.equal(S.slideNode(g, 0, NaN), false, 'a step of nothing in particular was taken');
+  const h = transferShip();
+  assert.equal(S.addNode(h, h.t + S.MIN_LEAD * 4), 0);
+  h.dockedAt = 'tassel';
+  assert.equal(S.slideNode(h, 0, S.MIN_LEAD), false, 'a tied-up ship rewrote its plan');
+});
+
+test('the page gives earlier and later a button and a key, and the chart draws them', () => {
+  /* The second playtester stopped on the aiming card, where the lesson asks for
+     the one adjustment that had no button: every other nudge in the game is a
+     press you can repeat, and phasing was a pointer dragged along a curve. */
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  const RENDER = readFileSync(new URL('../public/orbital-trader/render.js', import.meta.url), 'utf8');
+
+  assert.match(PLAY, /function slideBurn\(/, 'nothing presses earlier or later');
+  assert.match(PLAY, /S\.slideNode\(state, i, dir \* scale \* slideStep\(i\)\)/,
+    'the button does not go through the rule that clamps it');
+  // The chart's buttons and the keyboard share one door, so neither can drift.
+  assert.match(PLAY, /function nudge\(i, axis, scale = 1\)/, 'the two kinds of nudge have split again');
+  assert.match(PLAY, /nudge\(i, axis, n > 12 \? 4 : n > 5 \? 2 : 1\)/, 'a held slide button does not repeat');
+  assert.match(PLAY, /case ',': case '<':/, 'earlier has no key');
+  assert.match(PLAY, /case '\.': case '>':/, 'later has no key');
+  // And the chart has to draw something to press.
+  assert.match(RENDER, /\['earlier', '‹ earlier', -SLIDE_DX\], \['later', 'later ›', SLIDE_DX\]/,
+    'the chart draws no slide buttons');
+  assert.ok(RENDER.includes('axis, x: c[0], y: c[1], w: SLIDE_W + 12, h: SLIDE_H + 12'),
+    'the slide buttons cannot be hit');
+  assert.match(RENDER, /const hit = k\.w/, 'a wide handle is still hit-tested as a disc');
+  /* Above the flame, not below it. Theo's card is fixed to the bottom of the
+     screen and the burn being flown is usually near the middle, so buttons
+     under the flame came up underneath the card telling the player to press
+     them — which a playtest in a browser found and no assertion here could
+     have. */
+  assert.match(RENDER, /SLIDE_DY = -92/, 'the slide buttons are back under Theo\'s card');
+});
+
+test('the aiming card is given the number it asks for, and it is the only one', () => {
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.match(PLAY, /function aimGauge\(\)/, 'the aiming card has no gauge');
+  assert.match(PLAY, /s\.step === 'aim' \? aimGauge\(\) : null/,
+    'the gauge is on every card, or on none');
+  /* Two answers, because the road reaches the moon in two stages: the gap
+     between the diamonds until it gets near, then closest approach. */
+  assert.match(PLAY, /Closest approach to \$\{name\}/, 'the gauge cannot say how close the road gets');
+  assert.match(PLAY, /orange diamonds are \$\{fmtAu\(d\)\} apart/, 'the gauge cannot say how far out of phase it is');
+  // The card has to be the one that actually names them, or the gauge is orphaned.
+  const aim = TEXT.tutorial.find(t => t.step === 'aim');
+  assert.match(aim.body, /diamonds/, 'the aiming card does not name the instrument that answers it');
+  assert.doesNotMatch(aim.body, /thirty degrees/,
+    'the aiming card still asks for an angle nobody can measure');
 });
 
 /* ------------------------------------------------------------- chart */
