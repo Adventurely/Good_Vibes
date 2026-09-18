@@ -1211,33 +1211,38 @@ test('sliding a mark is refused where writing one is', () => {
   assert.equal(S.slideNode(h, 0, S.MIN_LEAD), false, 'a tied-up ship rewrote its plan');
 });
 
-test('the page gives earlier and later a button and a key, and the chart draws them', () => {
+test('sliding a mark has a control of its own, and the card names the ones it has', () => {
   /* The second playtester stopped on the aiming card, where the lesson asks for
-     the one adjustment that had no button: every other nudge in the game is a
-     press you can repeat, and phasing was a pointer dragged along a curve. */
+     the one adjustment that had no press behind it: every other nudge in the
+     game is a button you can repeat, and phasing was a pointer dragged along a
+     curve.
+     
+     It had a pair of labelled pills on the chart for a day. They worked, and
+     they were cut anyway: two of them beside every selected burn is a lot of
+     furniture to carry for ever for one card of one lesson, and the chart is
+     already carrying four arrows and a scrap cross. So the step lives on the
+     keyboard, the pointer drags, and the card is the thing that has to say so —
+     a control nobody is told about is a control nobody has. */
   const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
   const RENDER = readFileSync(new URL('../public/orbital-trader/render.js', import.meta.url), 'utf8');
 
-  assert.match(PLAY, /function slideBurn\(/, 'nothing presses earlier or later');
+  assert.match(PLAY, /function slideBurn\(/, 'nothing steps a mark along its orbit');
   assert.match(PLAY, /S\.slideNode\(state, i, dir \* scale \* slideStep\(i\)\)/,
-    'the button does not go through the rule that clamps it');
-  // The chart's buttons and the keyboard share one door, so neither can drift.
-  assert.match(PLAY, /function nudge\(i, axis, scale = 1\)/, 'the two kinds of nudge have split again');
-  assert.match(PLAY, /nudge\(i, axis, n > 12 \? 4 : n > 5 \? 2 : 1\)/, 'a held slide button does not repeat');
+    'the step does not go through the rule that clamps it');
   assert.match(PLAY, /case ',': case '<':/, 'earlier has no key');
   assert.match(PLAY, /case '\.': case '>':/, 'later has no key');
-  // And the chart has to draw something to press.
-  assert.match(RENDER, /\['earlier', '‹ earlier', -SLIDE_DX\], \['later', 'later ›', SLIDE_DX\]/,
-    'the chart draws no slide buttons');
-  assert.ok(RENDER.includes('axis, x: c[0], y: c[1], w: SLIDE_W + 12, h: SLIDE_H + 12'),
-    'the slide buttons cannot be hit');
-  assert.match(RENDER, /const hit = k\.w/, 'a wide handle is still hit-tested as a disc');
-  /* Above the flame, not below it. Theo's card is fixed to the bottom of the
-     screen and the burn being flown is usually near the middle, so buttons
-     under the flame came up underneath the card telling the player to press
-     them — which a playtest in a browser found and no assertion here could
-     have. */
-  assert.match(RENDER, /SLIDE_DY = -92/, 'the slide buttons are back under Theo\'s card');
+
+  // The chart draws no buttons for it, and carries no rectangular handles.
+  assert.doesNotMatch(RENDER, /SLIDE_/, 'the slide buttons are back on the chart');
+  assert.doesNotMatch(RENDER, /‹ earlier|later ›/, 'the chart still draws the slide buttons');
+  assert.doesNotMatch(PLAY, /function nudge\(/, 'the two-kinds-of-nudge dispatch outlived the buttons it was for');
+
+  /* And the card has to name both ways in, or the removal costs the lesson the
+     thing the buttons were bought with. */
+  const slide = TEXT.tutorial.find(t => t.step === 'slide');
+  assert.match(slide.body, /[Dd]rag/, 'the card does not say a mark can be dragged');
+  assert.match(slide.body, /comma and full-stop/, 'the card does not name the keys');
+  assert.doesNotMatch(slide.body, /button/, 'the card still points at buttons that are gone');
 });
 
 test('the aiming card is given the number it asks for, and it is the only one', () => {
@@ -1254,6 +1259,97 @@ test('the aiming card is given the number it asks for, and it is the only one', 
   assert.match(aim.body, /diamonds/, 'the aiming card does not name the instrument that answers it');
   assert.doesNotMatch(aim.body, /thirty degrees/,
     'the aiming card still asks for an angle nobody can measure');
+});
+
+/* ------------------------------------------- the errand cannot be lost */
+
+/* Two ways a new game could end itself in its first ten minutes, both found in
+ * play. Theo hands over twelve cowries and a pebble costs eleven, so a pilot
+ * who tops the tank up first can never buy the thing the errand is about; and a
+ * pilot who sells the pebble back cannot afford a second, because no stall buys
+ * at what it sells for. The quest step does not come back either — questCheck
+ * only ever counts forward — so the second one left the lesson on its last card
+ * for ever. "Nothing here can cost the save" is the rule the tow and the bank
+ * already keep, and it has to cover the errand too. */
+function atSlateWithTheErrand(){
+  const s = S.newGame(5);
+  s.dockedAt = 'slate';
+  s.ship = { ...s.ship, body: 'slate' };
+  return s;
+}
+
+test('the errand is affordable even when the purse is not', () => {
+  const s = atSlateWithTheErrand();
+  s.dv = s.dv * 0.5;                                  // room in the tank after the trip out
+  assert.ok(S.refuel(s, 99).ok, 'could not spend the coin on fuel');
+  assert.equal(s.money, 0, 'the fuel did not take the purse');
+
+  const r = S.buy(s, 'pebble', 1);
+  assert.ok(r.ok, `the errand was priced out: ${r.reason}`);
+  assert.ok(r.borrowed > 0, 'the bank did not front anything');
+  assert.equal(s.money, 0, 'money went negative instead of becoming a debt');
+  assert.ok(s.debt > 0, 'the coin was conjured rather than borrowed');
+  assert.equal(S.carrying(s, 'pebble'), 1);
+
+  // And the job pays it straight back off.
+  s.dockedAt = 'tassel'; s.ship = { ...s.ship, body: 'tassel' };
+  S.questCheck(s, []);
+  assert.ok(S.claimQuest(s, 'pebble').ok, 'the job could not be collected');
+  S.settleDebt(s);
+  assert.equal(s.debt, 0, 'the bank was not paid back out of the fee');
+  assert.ok(s.money > 0);
+});
+
+test('the bank fronts what a job needs and not a crate more', () => {
+  const s = atSlateWithTheErrand();
+  s.money = 0;
+  assert.equal(S.questWants(s, 'pebble'), 1, 'a retrieval counts its good twice');
+  assert.equal(S.questCredit(s, 'pebble'), 1);
+  assert.equal(S.buy(s, 'pebble', 5).ok, false, 'the tab could be traded on');
+  assert.ok(S.buy(s, 'pebble', 1).ok);
+  // Once it is aboard there is nothing outstanding, so there is no more credit.
+  assert.equal(S.questCredit(s, 'pebble'), 0);
+  assert.equal(S.buy(s, 'pebble', 1).ok, false, 'the credit refilled itself');
+});
+
+test('a crate a job is for cannot be sold out from under it', () => {
+  const s = atSlateWithTheErrand();
+  assert.ok(S.buy(s, 'pebble', 1).ok);
+  const r = S.sell(s, 'pebble', 1);
+  assert.equal(r.ok, false, 'the errand was sold');
+  assert.match(r.reason, /give the job up/i, 'the refusal does not name the way out');
+  assert.equal(S.carrying(s, 'pebble'), 1);
+
+  // The way out it names really opens.
+  s.quests = s.quests.filter(q => q.id !== 'pebble');
+  assert.ok(S.sell(s, 'pebble', 1).ok, 'giving the job up did not free the crate');
+});
+
+test('only the crates a job needs are held back; the rest are yours', () => {
+  const s = atSlateWithTheErrand();
+  s.money = 500;
+  assert.ok(S.buy(s, 'pebble', 4).ok);
+  assert.equal(S.questReserved(s, 'pebble'), 1, 'a whole hold was impounded for one errand');
+  assert.ok(S.sell(s, 'pebble', 3).ok, 'the surplus was held back too');
+  assert.equal(S.sell(s, 'pebble', 1).ok, false, 'the last one was not the errand\'s');
+});
+
+test('a delivery is untouched by either rule: its crates were never bought', () => {
+  /* A consignment is already unsellable and already aboard, so there is nothing
+     to front and nothing to reserve out of the crates you own. */
+  const s = S.newGame(5);
+  s.flags.tutorialSkipped = true;
+  s.dockedAt = 'tassel';
+  const del = S.QUESTS.find(q => q.type === 'delivery' && q.goods?.length);
+  assert.ok(del, 'no delivery to check');
+  assert.equal(S.questCredit(s, del.goods[0].good), 0, 'a delivery opened a line of credit');
+});
+
+/* And the page has to say when it has borrowed on somebody's behalf. */
+test('the buy button says so when the bank covered it', () => {
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.match(PLAY, /r\.borrowed > 0/, 'a player can be put into debt without being told');
+  assert.match(PLAY, /harbour bank covers/, 'the toast does not say who is owed');
 });
 
 test('the lesson says Slate is a moon before it asks anybody to aim at one', () => {

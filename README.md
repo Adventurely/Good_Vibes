@@ -2189,10 +2189,21 @@ Aiming also wanted a control that did not exist. Every other adjustment in the
 game is a button pressed and pressed again; sliding a mark around its orbit was
 a pointer dragged accurately along a curve, and it arrived at the hardest card.
 `slideNode` is that move as a step, clamped the way a drag is clamped — never
-inside the lead, never past a neighbour — with **‹ earlier** and **later ›**
-above the flame on the chart and `,` and `.` on the keyboard. A card of its own
-now teaches it with nothing riding on it, before the card that needs it and the
+inside the lead, never past a neighbour — on `,` and `.`. A card of its own now
+teaches it with nothing riding on it, before the card that needs it and the
 height control at the same time.
+
+**It had buttons for a day.** Two labelled pills, **‹ earlier** and **later ›**,
+sat above the flame; they worked, and they were cut as clutter. Two of them
+beside every selected burn is a lot of furniture to carry for ever for one card
+of one lesson, on a chart already holding four arrows and a scrap cross. What
+that costs is worth naming rather than forgetting: the pills were the answer to
+a playtester who quit *fighting the drag*, and with them gone a beginner on a
+mouse is back to dragging a flame along a curve. What is left standing against
+that is the other half of the fix — the diamonds, the gauge, and a card that
+teaches sliding with nothing riding on it — and the keys, which only work for
+somebody the card has told about them, which is why the card names them and a
+test holds it there.
 
 The card on screen is **the first one whose test is false**, and the tests
 watch the game rather than the clicks, so doing a card your own way still
@@ -2222,6 +2233,21 @@ zoom is still the player's, which is what the band is for. For now this runs
 until it is over — because whether the rest of the game wants it is a larger
 question than the lesson's, and the constants are sitting there for the day it
 is answered.
+
+The band is not enough on its own, which shipping it proved within the hour.
+With a burn open on the opening orbit the road fills about **0.195** of the
+frame — a whisker over `FRAME_SHRINK` — so one press of the zoom-out key put it
+under the floor and the next tick put it straight back, pinned to
+`frameShipOrbit`'s own 2e7 ceiling. The zoom looked stuck because it was. A rule
+that re-frames whenever the road is outside its band does not follow the road,
+it overrules the person. So `zoomByHand` records that the player has worked the
+scale themselves — the keys, the wheel and a pinch all set it — and the framing
+stands down for good once they have. It is handed back at two seams and no
+others: when the lesson's chart half ends, because those four cards are
+instructions to move the view by hand and a flag left set there would mean the
+framing never helped anybody it was written for, and on a change of reach, where
+the chart re-frames wholesale anyway and the old choice was about a world four
+orders of magnitude away.
 
 ### The road, the lock, and the clock
 
@@ -2591,6 +2617,29 @@ nothing worth taking. Money can go below zero, and then it is a debt to the
 Tassel harbour bank, who are delighted. A skip ends at every change of reach, every burn and every
 harbour mouth — and a step of flight *stops* at the first of those, so even the
 fastest skip can never carry you clean through a moon you were aiming at.
+
+**The errand cannot be lost either**, which it could be for a while, twice over
+and inside the first ten minutes of a new game. Theo hands over twelve cowries
+and a pebble at Slate costs eleven, so a pilot who topped the tank up first had
+nine of them gone and could never buy the thing the errand was about. And a
+pilot who sold the pebble back could not afford a second one, because no stall
+anywhere buys at what it sells for — while `questCheck` only ever counts
+forward, so the step did not come back and the job could never be finished.
+
+Both are shut with machinery the game already had. The harbour bank **fronts
+what a live job still needs and not a crate more**, exactly as it fronts fuel:
+`state.money` never goes negative, the debt carries it, `settleDebt` takes it
+back out of the next coin in, and the page says so where the button was pressed
+rather than only in the log. And a crate a job in hand still has to hand over is
+**spoken for** — the rule a delivery's consignment has always kept, applied to
+the one you paid for yourself — counted so that only what the job needs is held
+back and any surplus is still yours to sell. The refusal names the way out,
+which is the one the game already has: give the job up, and the crate is yours.
+
+`questWants` is the shared answer both rules ask for, and it takes the *maximum*
+across a job's remaining steps rather than the sum, because a retrieval names
+its good twice — once to fetch it, once to hand it over — and it is the same
+crate both times.
 
 ### Playing it
 

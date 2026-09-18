@@ -982,6 +982,16 @@ let last = performance.now();
 let saveTimer = 0;
 let firstStoryDone = false;
 let lockedTo = null;
+/* Whether the player has worked the zoom themselves since the chart last chose
+ * it for them. The lesson's framing (below) reads this and stands down: a rule
+ * that re-frames whenever the road is outside its band does not just follow the
+ * road, it overrules the person. With a burn open on the opening orbit the road
+ * fills about 0.195 of the frame, which is a whisker above FRAME_SHRINK, so a
+ * single press of the zoom-out key put it under the floor and the next tick put
+ * it straight back — the zoom looked stuck, because it was. Cleared on a change
+ * of reach, where the chart re-frames wholesale anyway and the old choice is
+ * about a world four orders of magnitude away. */
+let zoomByHand = false;
 /* The one number the on-chart editor shows. Recomputed when the burn changes,
    not every frame: solving what a mark costs is not free. */
 let nodeLabel = null, nodeLabelKey = '', interceptLabel = null, insetLabel = null;
@@ -1051,6 +1061,7 @@ function frame(now){
        place to keep looking from. */
     chart.focus('ship', null, false);
     replan(true);
+    zoomByHand = false;
     frameShipOrbit();
   }
   /* And the zoom follows the road, while the lesson is flying it.
@@ -1071,7 +1082,7 @@ function frame(now){
      thresholds the zoom is still the player's, which is what the band is for.
      Whether the rest of the game should have it too is a bigger question than
      this change, and the constants are ready for the day it is answered. */
-  if(!state.dockedAt && S.tutorialRunning(state) && state.flags.lookedBack){
+  if(!state.dockedAt && !zoomByHand && S.tutorialRunning(state) && state.flags.lookedBack){
     const span = roadSpan(), half = usableHalf();
     const fill = span > 0 && half > 0 ? span * chart.camera.zoom / half : null;
     if(fill != null && (fill > FRAME_SPILL || fill < FRAME_SHRINK)) frameShipOrbit();
@@ -1650,7 +1661,7 @@ canvas.addEventListener('pointerdown', e => {
       drag = null; return;
     }
     drag = { kind: 'arrow' };
-    nudge(hit.index, hit.axis);
+    pushAxis(hit.index, hit.axis);
     startRepeat(hit.index, hit.axis);
     return;
   }
@@ -1673,7 +1684,7 @@ canvas.addEventListener('pointermove', e => {
     const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
     const m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
     // Two fingers do both at once: the gap is the scale, the middle is the pan.
-    if(d > 0 && pinch.d > 0) chart.zoomBy(d / pinch.d, m);
+    if(d > 0 && pinch.d > 0){ zoomByHand = true; chart.zoomBy(d / pinch.d, m); }
     chart.panBy(m[0] - pinch.m[0], m[1] - pinch.m[1]);
     noteLook('chartPanned');
     pinch.d = d; pinch.m = m; return;
@@ -1780,7 +1791,7 @@ function endPointer(e){
 }
 canvas.addEventListener('pointerup', endPointer);
 canvas.addEventListener('pointercancel', endPointer);
-canvas.addEventListener('wheel', e => { e.preventDefault(); chart.zoomBy(Math.pow(1.0015, -e.deltaY), [e.clientX, e.clientY]); noteLook('chartPanned'); }, { passive: false });
+canvas.addEventListener('wheel', e => { e.preventDefault(); zoomByHand = true; chart.zoomBy(Math.pow(1.0015, -e.deltaY), [e.clientX, e.clientY]); noteLook('chartPanned'); }, { passive: false });
 canvas.addEventListener('dblclick', e => { const hit = chart.hitTest(e.clientX, e.clientY); if(hit?.kind === 'body') lookAt(hit.id); });
 
 /* A shortcut must never fire while somebody is typing into a control, and must
@@ -1804,8 +1815,8 @@ addEventListener('keydown', e => {
   const fine = e.shiftKey ? 0.2 : 1;   // a fraction of one pull of an arrow
   switch(e.key){
     case ' ': e.preventDefault(); setPaused(!state.paused); break;
-    case '+': case '=': chart.zoomBy(1.4); noteLook('chartPanned'); break;
-    case '-': case '_': chart.zoomBy(1 / 1.4); noteLook('chartPanned'); break;
+    case '+': case '=': zoomByHand = true; chart.zoomBy(1.4); noteLook('chartPanned'); break;
+    case '-': case '_': zoomByHand = true; chart.zoomBy(1 / 1.4); noteLook('chartPanned'); break;
     case 'f': backToShip(); break;
     case 'v': if(S.canSeePast(state)) setFarSight(state.farSight === false); break;
     /* One key for both: it opens the ship, and at a port it steps on to the
@@ -1932,7 +1943,17 @@ function lookAtEncounter(){
    pan goes back to nothing, so one press undoes any amount of wandering. */
 function backToShip(fit = false){
   chart.focus('ship', null, false);
-  if(state.flags.lookedAtTarget) noteLook('lookedBack');
+  if(state.flags.lookedAtTarget){
+    /* Coming home is the seam between the lesson's two halves, and the zoom
+       changes hands on it. The chart cards are four instructions to move the
+       view yourself — the second one is "zoom out until you can see Slate" —
+       so every player arrives here having worked the zoom by hand, and a flag
+       that stays set would mean the framing never helped anybody it was
+       written for. Cleared once, here, and the moment the player reaches for
+       the zoom again it is theirs for good. */
+    if(!state.flags.lookedBack) zoomByHand = false;
+    noteLook('lookedBack');
+  }
   if(fit) frameShipOrbit();
 }
 function frameShipOrbit(){
@@ -2340,9 +2361,15 @@ function slideStep(i){
   return Math.max(S.LEAD_FLOOR, (own ? own.t1 - own.t0 : 1) / 72);
 }
 
-/* One press of earlier or later. The counterpart of pushAxis: that one changes
-   what the engine does, this one changes when it does it, and until now the
-   second had no button at all — only a drag. */
+/* One step of earlier or later. The counterpart of pushAxis: that one changes
+   what the engine does, this one changes when it does it.
+   
+   It had a pair of buttons on the chart for a day. They were the answer to a
+   playtester who quit fighting a drag — every other adjustment in the game is a
+   press you repeat, and phasing was a pointer dragged along a curve — but two
+   labelled pills beside every selected burn is a lot of furniture to carry
+   permanently for one card of one lesson, and they were cut as clutter. So this
+   is the keyboard's route now, and dragging the flame is the pointer's. */
 function slideBurn(i, dir, scale = 1){
   if(!state.nodes[i]) return;
   /* slideNode clamps a mark between its neighbours, so it can never cross one
@@ -2357,14 +2384,6 @@ function slideBurn(i, dir, scale = 1){
   save();
 }
 
-/* The chart's buttons and the keyboard both come through here, so neither has
-   to know which of the two kinds of nudge it is asking for. */
-function nudge(i, axis, scale = 1){
-  if(axis === 'earlier') slideBurn(i, -1, scale);
-  else if(axis === 'later') slideBurn(i, 1, scale);
-  else pushAxis(i, axis, scale);
-}
-
 /* Hold an arrow down and it repeats, slowly at first so a single tap is never
    two, then faster, because pushing a big orbit around takes more than four
    presses and nobody should have to tap forty times. */
@@ -2375,7 +2394,7 @@ function startRepeat(i, axis){
   let n = 0;
   const tick = () => {
     n++;
-    nudge(i, axis, n > 12 ? 4 : n > 5 ? 2 : 1);
+    pushAxis(i, axis, n > 12 ? 4 : n > 5 ? 2 : 1);
     repeat.timer = setTimeout(tick, n < 3 ? 260 : 90);
   };
   repeat = { timer: setTimeout(tick, 340) };
@@ -2958,7 +2977,16 @@ const actions = {
     toast(what === 'fuelCell' ? 'New cell fitted.' : 'Hull made good.', 'story', 5000);
     renderTab(); renderHud(); save();
   },
-  buy(gid, q){ const r = S.buy(state, gid, Number(q)); if(!r.ok) toast(r.reason, 'bad'); renderTab(); save(); },
+  /* Going into debt is never silent. The bank will front what a job still
+     needs so an errand cannot be priced out of reach, but a player who presses
+     +1 with an empty purse has just borrowed, and has to be told so in the
+     place they pressed rather than only in the log. */
+  buy(gid, q){
+    const r = S.buy(state, gid, Number(q));
+    if(!r.ok) toast(r.reason, 'bad');
+    else if(r.borrowed > 0) toast(`The harbour bank covers ${S.fmtMoney(r.borrowed)} of that, for the job. You owe them.`, 'story', 7000);
+    renderTab(); save();
+  },
   sell(gid, q){ const r = S.sell(state, gid, Number(q)); if(!r.ok) toast(r.reason, 'bad'); else toast(`Sold for ${S.fmtMoney(r.total)} (${r.profit >= 0 ? '+' : ''}${S.fmtMoney(r.profit)}).`); renderTab(); save(); },
   takequest(id){
     const r = S.acceptQuest(state, id);

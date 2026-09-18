@@ -1268,10 +1268,6 @@ function drawTapMark(chart, view, pos, anchors){
  * radius is bigger than the glyph.
  */
 const HANDLE_OFFSET = 54;
-/* The two step buttons that slide a mark along its orbit: far enough above the
- * flame to clear every one of the four arrows whichever way the orbit has
- * turned them, and the scrap cross with them. */
-const SLIDE_W = 76, SLIDE_H = 26, SLIDE_DX = 44, SLIDE_DY = -92;
 const NODE_HIT = 26;
 /* How near a tap on the road or a rail has to land to a burn to be taken as
  * a tap on the burn: a finger going for the flame that lands on the line it
@@ -1372,39 +1368,6 @@ function drawNodes(chart, view, pos, anchors){
     ctx.moveTo(x[0] + 5, x[1] - 5); ctx.lineTo(x[0] - 5, x[1] + 5);
     ctx.stroke();
     chart.hits.handles.push({ index: i, axis: 'delete', x: x[0], y: x[1], r: 24 });
-
-    /* Earlier and later: the same move a drag makes, as two presses.
-
-       They are words rather than chevrons because the card that needs them is
-       the card a playtester quit on, and a beginner reading "earlier" has
-       nothing left to work out.
-
-       They sit square above the flame at a fixed screen offset rather than on
-       one of the burn's own axes: the four arrows rotate with the orbit and
-       would collide with anything placed in the frame they live in, and
-       ninety-two pixels clears the furthest any of them reaches — fifty-four
-       out plus a nineteen-pixel button. Above rather than below because Theo's
-       card is fixed to the bottom of the screen and the burn being flown is
-       usually near the middle of it, so buttons under the flame came up
-       underneath the card that was telling the player to press them. The scrap
-       cross is up here too, at fifty-eight by fifty-eight, and the pills clear
-       it by seven pixels. */
-    const slide = [['earlier', '‹ earlier', -SLIDE_DX], ['later', 'later ›', SLIDE_DX]];
-    ctx.font = '600 12px ui-sans-serif, system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    for(const [axis, label, dx] of slide){
-      const c = [p[0] + dx, p[1] + SLIDE_DY];
-      ctx.fillStyle = PALETTE.node; ctx.globalAlpha = 0.18;
-      ctx.beginPath(); roundRect(ctx, c[0] - SLIDE_W / 2, c[1] - SLIDE_H / 2, SLIDE_W, SLIDE_H, 13); ctx.fill();
-      ctx.globalAlpha = 0.85;
-      ctx.strokeStyle = PALETTE.node; ctx.lineWidth = 1.5;
-      ctx.beginPath(); roundRect(ctx, c[0] - SLIDE_W / 2, c[1] - SLIDE_H / 2, SLIDE_W, SLIDE_H, 13); ctx.stroke();
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = PALETTE.node;
-      ctx.fillText(label, c[0], c[1] + 4);
-      chart.hits.handles.push({ index: i, axis, x: c[0], y: c[1], w: SLIDE_W + 12, h: SLIDE_H + 12, r: 0 });
-    }
-    ctx.textAlign = 'left';
 
     // What it costs, in a word, where the eye already is.
     if(view.nodeLabel){
@@ -1577,15 +1540,7 @@ function hitTest(chart, x, y){
   /* Spread first, name after. A handle record carries its own axis, and
      spreading it over `kind` was how every handle came back as something else
      and dragging one panned the chart. */
-  /* A handle is a disc unless it carries a width, in which case it is the
-     rectangle it is drawn as: the slide buttons are wider than they are tall
-     and a disc round one either misses its ends or swallows its neighbour. */
-  for(const k of h.handles){
-    const hit = k.w
-      ? Math.abs(k.x - x) <= k.w / 2 && Math.abs(k.y - y) <= k.h / 2
-      : Math.hypot(k.x - x, k.y - y) <= k.r;
-    if(hit) return { ...k, kind: 'handle' };
-  }
+  for(const k of h.handles){ if(Math.hypot(k.x - x, k.y - y) <= k.r) return { ...k, kind: 'handle' }; }
   for(const n of h.nodes){ if(Math.hypot(n.x - x, n.y - y) <= n.r) return { ...n, kind: 'node' }; }
   // Bodies: nearest within its drawn size, so a moon beats the planet it is in
   // front of. The generous margin is for fingers.

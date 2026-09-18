@@ -476,7 +476,7 @@ export const NARRATIVE = {
   {
    "step": "slide",
    "title": "Now slide the burn itself",
-   "body": "That was how high. This is when.\n\nThe two buttons under the flame — 'earlier' and 'later' — slide the burn around your orbit. The comma and full-stop keys do the same.\n\nPress one a few times and watch: the flame travels round, and the far side travels with it, always opposite. Nothing is riding on this one. Just see it move."
+   "body": "That was how high. This is when.\n\nThe burn does not have to fire where you put it. Drag the flame along your path to move it round the orbit — or press the comma and full-stop keys, which do the same a step at a time.\n\nHave a go and watch: the flame travels round, and the far side of the yellow line travels with it, always opposite. Nothing is riding on this one."
   },
   {
    "step": "aim",

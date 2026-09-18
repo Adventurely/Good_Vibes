@@ -1138,6 +1138,55 @@ export const isConsigned = stack => stack.questId != null;
 export function sellable(state, goodId){
   return state.cargo.reduce((n, c) => n + (c.good === goodId && !isConsigned(c) ? c.qty : 0), 0);
 }
+
+/* What a job still has to hand over, and the two things that follow from it.
+ *
+ * A retrieval is the one shape of job that sends you to *buy* the thing, which
+ * makes it the one shape that a purse can defeat. Theo hands over twelve
+ * cowries and a pebble costs eleven; a pilot who tops the tank up first has
+ * nine of them gone and can never buy the thing the errand is about, and a
+ * pilot who sells the pebble back cannot afford a second one, because no stall
+ * anywhere buys at what it sells for. Neither is a mistake the game should be
+ * able to end on — "nothing here can cost the save" is the rule the tow and
+ * the bank already keep — and both were reachable in the first ten minutes of
+ * a new game.
+ *
+ * The maximum across a job's remaining steps rather than the sum: a retrieval
+ * names its good twice, once to fetch it and once to hand it over, and it is
+ * the same crate both times. */
+export function questWants(state, goodId){
+  let want = 0;
+  for(const live of activeQuests(state)){
+    const q = questById(live.id);
+    if(!q) continue;
+    const steps = questSteps(q);
+    let most = 0;
+    for(let i = live.step; i < steps.length; i++){
+      const st = steps[i];
+      const n = st.kind === 'acquire' ? (st.good === goodId ? st.qty : 0)
+        : st.kind === 'handover' ? (st.goods ?? []).reduce((a, g) => a + (g.good === goodId ? g.qty : 0), 0)
+        : 0;   // a recovery puts its own crates aboard; there is nothing to buy
+      if(n > most) most = n;
+    }
+    want += most;
+  }
+  return want;
+}
+
+/* How many crates the harbour bank will front, because the job needs them and
+ * the purse cannot reach them. Bounded to exactly what is outstanding: this is
+ * a floor under an errand, not a line of credit to trade on. */
+export function questCredit(state, goodId){
+  return Math.max(0, questWants(state, goodId) - carrying(state, goodId));
+}
+
+/* And how many of the ones already aboard are spoken for. A delivery's own
+ * consignment covers its handover and is unsellable anyway, so only what the
+ * job still needs *beyond* that comes out of the crates you own. */
+export function questReserved(state, goodId){
+  const consigned = carrying(state, goodId) - sellable(state, goodId);
+  return Math.max(0, questWants(state, goodId) - consigned);
+}
 /* Take `qty` of a good out of the hold, the quest's own crates first, then the
  * oldest of your own. */
 function handOver(state, goodId, qty = 1, questId = null){
@@ -2983,7 +3032,10 @@ export function canBuy(state, goodId, qty){
   if(g.needsTempControl && !state.keys.tempControl) return { ok: false, reason: 'Needs temperature control.' };
   if(stockAvailable(state, port, goodId) < qty) return { ok: false, reason: 'Not enough in stock.' };
   if(freeUnits(state) < qty * g.units) return { ok: false, reason: 'No room in the hold.' };
-  if(state.money < price * qty) return { ok: false, reason: 'Not enough coin.' };
+  /* The bank fronts what a job still needs and not a crate more, so the errand
+     is always reachable and nobody can trade on the tab. */
+  const credit = price * Math.min(qty, questCredit(state, goodId));
+  if(state.money + credit < price * qty) return { ok: false, reason: 'Not enough coin.' };
   return { ok: true, price };
 }
 
@@ -2993,6 +3045,11 @@ export function buy(state, goodId, qty){
   const port = state.dockedAt;
   const total = c.price * qty;
   state.money -= total;
+  /* Past the bottom of the purse is the bank's, exactly as it is for fuel and
+     for a tow: money never goes negative, the debt carries it, and settleDebt
+     takes it back out of the next coin that comes in. */
+  const borrowed = Math.max(0, -state.money);
+  if(state.money < 0){ state.debt += -state.money; state.money = 0; }
   // What is missing off the shelf this visit, until the shelves are rolled again.
   market(state, port).bought[goodId] = shortfall(state, port, goodId) + qty;
   // Stacks are split by what was paid, so the hold remembers each buy.
@@ -3001,8 +3058,9 @@ export function buy(state, goodId, qty){
   state.stats.bought += qty;
   if(PORTS[port].species === 'frog') state.rep.frog += 0.05 * qty;   // frogs give; taking is how you let them
   logLine(state, 'bought', TEXT.logTemplates.bought, { qty, good: goodById(goodId).name, price: fmtMoney(total), port: portName(port) });
+  if(borrowed > 0) logLine(state, 'story', TEXT.events.bankDebt);
   const events = questCheck(state, []);
-  return { ok: true, total, events };
+  return { ok: true, total, borrowed, events };
 }
 
 /* Sell from the oldest stack first: the crate going off is the one to move. */
@@ -3019,6 +3077,16 @@ export function sell(state, goodId, qty){
   const stacks = state.cargo.filter(s => s.good === goodId && !isConsigned(s)).sort((a, b) => a.t - b.t);
   const have = stacks.reduce((s, c) => s + c.qty, 0);
   if(have < qty) return { ok: false, reason: have ? 'The rest of those belong to somebody.' : 'Not that many aboard.' };
+  /* And a crate a job in hand still has to hand over is spoken for, even though
+     you paid for it yourself. Selling the thing you were sent to fetch is the
+     other way the errand ended: the step does not come back — questCheck only
+     ever counts forward — so the job could never be finished and the lesson sat
+     on its last card for ever. The way out is the one the game already has, and
+     the refusal names it. */
+  const reserved = questReserved(state, goodId);
+  if(have - reserved < qty){
+    return { ok: false, reason: 'A job you have in hand is for those. Give the job up first, if you mean to sell them.' };
+  }
   /* One price for the whole sale. It used to walk down as the crates came off
      the ship, which is the last of the supply-and-demand rules and is gone with
      the rest of them: what a stall pays is what a stall pays. The stacks are
