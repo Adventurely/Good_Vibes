@@ -2618,6 +2618,29 @@ Tassel harbour bank, who are delighted. A skip ends at every change of reach, ev
 harbour mouth — and a step of flight *stops* at the first of those, so even the
 fastest skip can never carry you clean through a moon you were aiming at.
 
+**The errand cannot be lost either**, which it could be for a while, twice over
+and inside the first ten minutes of a new game. Theo hands over twelve cowries
+and a pebble at Slate costs eleven, so a pilot who topped the tank up first had
+nine of them gone and could never buy the thing the errand was about. And a
+pilot who sold the pebble back could not afford a second one, because no stall
+anywhere buys at what it sells for — while `questCheck` only ever counts
+forward, so the step did not come back and the job could never be finished.
+
+Both are shut with machinery the game already had. The harbour bank **fronts
+what a live job still needs and not a crate more**, exactly as it fronts fuel:
+`state.money` never goes negative, the debt carries it, `settleDebt` takes it
+back out of the next coin in, and the page says so where the button was pressed
+rather than only in the log. And a crate a job in hand still has to hand over is
+**spoken for** — the rule a delivery's consignment has always kept, applied to
+the one you paid for yourself — counted so that only what the job needs is held
+back and any surplus is still yours to sell. The refusal names the way out,
+which is the one the game already has: give the job up, and the crate is yours.
+
+`questWants` is the shared answer both rules ask for, and it takes the *maximum*
+across a job's remaining steps rather than the sum, because a retrieval names
+its good twice — once to fetch it, once to hand it over — and it is the same
+crate both times.
+
 ### Playing it
 
 ```bash
