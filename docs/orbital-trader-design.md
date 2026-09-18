@@ -158,6 +158,12 @@ Anything worth being awake for cancels the skip and drops the clock back to ×1:
 
 A cap on the rate means the longest hauls take proportionally more than ten seconds; the confirmation says so rather than promising ten.
 
+**A skip stops a minute of ×1 short of what it was sent to, and that is one number for every skip.** The run-in is flown at ×1, so the only honest unit for it is real seconds of watching — and it used to be two per cent of the trip capped at a fiftieth of a day, which is neither. A fiftieth of a day is nine real minutes of ×1: skip one day ahead and the game handed back nine minutes of staring before anything happened. Past about ten days the margin stopped meaning anything at all, because a frame of a skip is a six-hundredth of the trip and by then one frame was longer than the whole margin — measured, a twenty-day skip and a three-hundred-day skip both landed *past* the moment they were sent to. Two faults with one shape: a margin in game time cannot describe a wait in real seconds.
+
+So the margin is `MIN_LEAD`, the number the rest of the game already uses for "enough notice" — what a burn wants to be caught and pushed before it fires, and the reason a mark cannot be written inside it. Landing exactly there is the shortest run-in that leaves the thing you skipped to still yours to change. A quarter of the trip is the floor under a very short skip, which should not be a skip that goes nowhere. And the last frame of a skip is cut to the distance left, so a skip ends where it said it would rather than a frame's worth either side of it: measured in the browser, a one-day skip, a twenty-day skip and a three-hundred-day skip now all stop sixty real seconds of ×1 short, each in the ten seconds it promised.
+
+**Skip to it** on a burn used to ask to be sent to a twentieth of a day *before* the burn, on top of all that — a hand-cut lead doing the margin's job twenty-two times over, since a twentieth of a day is twenty-two real minutes of ×1. It sent you to the burn's own moment now, and the margin does the rest.
+
 ### 2.6.1 The Chart
 
 Two rules keep the chart readable, and both of them are about refusing to show things.
@@ -184,6 +190,10 @@ The road has three voices and they always mean the same thing: the orbit you are
 
 A road that predicts nine encounters is a road nobody can read, and every prediction past the first is a guess that a single burn will erase anyway. One crossing at a time is enough.
 
+**And one lap at a time.** A leg is *drawn* as a single lap however long it runs for — fifty turns of the same ellipse laid on top of one another is a scribble, not a road — so anything the road finds on a later lap gets painted onto the lap in front of the pilot, and the picture says "just there" while the clock says four days. So the search that feeds the chart is capped at the lap it draws: the road shows what happens on this lap and then says the honest thing instead, which is that you are going round. What lines up a later meeting is the rail crossings, which are on that same lap.
+
+The cap has to be a cap in *laps* and nothing else. It was two laps with a floor of two days underneath it, left over from the unbounded look — and against a Tassel parking orbit pushed out past Slate, whose period is about a day, two days is between two and four laps, so the floor overrode the cap and the cap never bit. Measured across that family of orbits, twenty-four marks were being drawn between 1.07 and 4.80 laps out. Only the chart is bounded: the flight still looks as far as it must, or a ship would fly into a reach the search had stopped short of, and the aim helper still looks as far as it must, or it could not score a road that arrives.
+
 **Every drawn rail carries a lead: a short bright stretch just ahead of its world, ending in a chevron.** Which way a moon is going is the first thing an aiming card asks a player to know — "thirty degrees ahead of Slate" — and on a faint grey circle two new players could not tell ahead from behind. The lead is sampled from the same function that places the world, so it sits on the rail rather than on a tangent to it, and it is left off rails too small on screen to carry one.
 
 **Where the road first cuts a world's rail, the chart says where that world
@@ -195,14 +205,18 @@ crossing has always been visible — but crossing it with Veyra a quarter of a
 lap away means you left too early, and the gap between the marks is how much
 too early.
 
-The same refusal as the road itself: **one crossing, the soonest, and no
-more.** A long ellipse cuts five rails going out and the same five coming
-back, and ten honest pairs of diamonds is a chart nobody can read. The rail
-also has to be on the screen — a crossing of a ring nobody can see is two
-marks in the dark with nothing to be against. And the pair is left unjoined
-on purpose: a dashed line between them was the obvious thing to draw and the
-wrong one, because a straight line across a chart of curves reads as a path
-you could fly.
+**One pair per world, the soonest.** A long ellipse cuts five rails going out
+and the same five coming back, and ten honest pairs of diamonds is a chart
+nobody can read — but the cap used to be one pair for the whole road, which
+punished the wrong thing: flying Tassel to Grumm, the single mark you got was
+where you cut the rail of a moon of the world you had just left, and Grumm's
+own was not drawn. So the doubles are what the cap is on. The rest is left to
+the zoom: a pair hides when you zoom *out* past its rail, where a whole orbit
+is three pixels and two marks on it have nothing to be against, and not when
+you zoom in, where the rail that leaves the screen is the one you are aiming
+at. And the pair is left unjoined on purpose: a dashed line between them was
+the obvious thing to draw and the wrong one, because a straight line across a
+chart of curves reads as a path you could fly.
 
 **A world you are already going round is not an encounter — unless you have just fallen into it.** A parking orbit reaches its low point once a lap; that is where you already are, and marking it would put a crosshair under the ship in the opening frame of every game. But a skip ends at every change of reach, so the door into a world is exactly where a pilot gets put down, and on the hyperbola they arrived on the low point ahead *is* the encounter — at a rendezvous it is the one moment the ship can be tied up. Suppressing it left the panel offering nothing but the way out the far side, and at ×1 the crossing of Nail's reach is nine real minutes of watching. So the rule is keyed on the orbit being closed, not on it being yours.
 

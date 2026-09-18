@@ -1837,6 +1837,41 @@ returning player is handed the whole shop at once on their second run and the
 middle of the game disappears. Medals are the opposite: a record you can lose is
 not a record. A test pins which keys each may be written against.
 
+**The save is in one browser and nowhere else, so the code is the only backup
+there is.** There is no account and no server copy: the lot lives under
+`localStorage['sunward:save']` on the machine that played it, and everything a
+browser stores is evictable by default — Chrome clears it when the disk runs
+short, Safari after seven days of not visiting. Two answers, both at the bottom
+of the Record tab. The page asks `navigator.storage.persist()` on the first tap
+of a sitting, which is what takes the lot off that list; on the first tap rather
+than at load because Firefox puts the question to the player, and a permission
+prompt is fairer once somebody has touched the tree. And the save can be written
+out as a code — the save file itself, UTF-8, base64url, tagged `SUNWARD1` with
+an FNV-1a checksum on the end — which is the one backup nobody else can lose for
+you. `encodeSave` and `decodeSave` are in `content.js` and are pure, so the
+round trip is tested in Node with no browser near it.
+
+**A pasted code is refused before anything is written.** The checksum is not a
+lock — anybody who wants to edit their own save is welcome to and always could.
+It is there for the paste that lost its last line, which decodes into half a
+game and would otherwise overwrite a real one; `codeRefusal` names which of the
+three failures it was, and the one that matters is telling somebody their code
+is *incomplete* rather than that it is not a Sunward code, so they go looking
+for the right problem. Then the confirm, then the write, in that order, and the
+autosave is stopped before the write: the ten-second timer and the `pagehide`
+handler are both holding the lot that is on screen, and either of them firing
+between the write and the reload puts the old lot straight back. That is not
+hypothetical — it is exactly what Start over had been doing since it was
+written, which is why it now silences the autosave too.
+
+**The code carries your place on the board.** The board id lives under its own
+key rather than in the save, so starting the lot over does not orphan a row —
+but a code that left it behind would be a backup that loses your name the moment
+you carried it to another machine. So it travels, and the panel says in as many
+words that the code is private: it is the id that authorises writing to and
+deleting your row. A code from somebody who never joined has no board in it, and
+loading one does not clear the id on the device it lands on.
+
 **The record is the second half of the game.** Ten counters in three scopes at
 once — this sitting, this run, all time — because they answer three different
 questions and "am I doing better than yesterday" is not served by a number that

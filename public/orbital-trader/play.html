@@ -1006,7 +1006,7 @@ function refreshNodeLabel(){
 function frame(now){
   const real = Math.min(0.1, (now - last) / 1000);
   last = now;
-  const dt = S.dtForFrame(state, real);
+  const dt = S.dtForFrame(state, real, warpTarget);
   if(dt > 0){
     const wasDocked = state.dockedAt;
     const events = S.tick(state, dt);
@@ -1331,13 +1331,14 @@ function setPaused(on){
   setRate(state.paused ? 1 : state.warp);
 }
 
-/* Run to a moment and stop just short of it. The rate is chosen once, from
-   the whole distance, so the ten seconds it promised are the ten seconds it
-   takes; a crossing part way through simply ends the skip. */
+/* Run to a moment and stop just short of it — `skipNotice` says how short, in
+   the real seconds of ×1 it leaves you. The rate is chosen once, from the
+   whole distance, so the ten seconds it promised are the ten seconds it takes;
+   a crossing part way through simply ends the skip. */
 function skipTo(t){
   const plan = S.skipPlan(state, t);
   if(!plan) return false;
-  warpTarget = plan.t - Math.min(0.02, plan.days * 0.02);
+  warpTarget = plan.stopAt;
   state.paused = false;
   /* Remember where this skip started. The harbour rule below wakes you when
      a harbour comes into sight, which is worth waking for when it belongs to
@@ -2849,7 +2850,14 @@ const actions = {
   dock(){ doDock(); },
   closenode(){ selectNode(-1); replan(true); renderTab(); save(); },
   delnode(i){ S.removeNode(state, Number(i)); selectNode(-1); replan(true); renderTab(); save(); },
-  warpnode(i){ const n = state.nodes[Number(i)]; if(n) askSkip(n.t - 0.05, `Burn ${Number(i) + 1}`); },
+  /* To the burn, not to a twentieth of a day before it. That hand-cut lead was
+     doing `skipNotice`'s job and doing it twenty-two times over: a twentieth of
+     a day is twenty-two real minutes of ×1, stacked on top of the margin the
+     skip already leaves, so "Skip to it" on a burn handed back half an hour of
+     staring and a card that understated the wait. The skip stops a lead short
+     of wherever it is sent, and for a burn that lead is exactly the notice the
+     burn wants to still be catchable. */
+  warpnode(i){ const n = state.nodes[Number(i)]; if(n) askSkip(n.t, `Burn ${Number(i) + 1}`); },
   skipto(t, what){ askSkip(Number(t), typeof what === 'string' ? what : undefined); },
   push(i, k){ pushAxis(Number(i), k); },
   zeronode(i){ const n = state.nodes[Number(i)]; if(!n) return; n.prograde = 0; n.radial = 0; replan(true); renderTab(); save(); },

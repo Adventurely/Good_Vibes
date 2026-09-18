@@ -490,9 +490,18 @@ export function daysToPeriapsis(bodyId, t){
 export const MAX_WARP = CONST.MAX_WARP;
 export const SKIP_SECONDS = CONST.SKIP_SECONDS;
 export function warpRate(state){ return Math.max(1, Math.min(MAX_WARP, state.warp ?? 1)); }
-export function dtForFrame(state, realSeconds){
+export function dtForFrame(state, realSeconds, until = null){
   if(state.paused || state.pending) return 0;
-  return realSeconds * CONST.BASE_RATE_DAYS_PER_SEC * warpRate(state);
+  const dt = realSeconds * CONST.BASE_RATE_DAYS_PER_SEC * warpRate(state);
+  /* Never step past the end of a skip. A frame of a skip is a six-hundredth
+     of the whole trip — that is what running it in ten seconds at sixty
+     frames means — so on a long one a single frame is hours of game time, and
+     a loop that steps a whole frame and *then* notices it has arrived lands
+     wherever that frame happened to put it. Measured on a twenty-day skip it
+     landed past the moment it was sent to; on a three-hundred-day skip it did
+     too. The last step is cut to the distance left, so a skip ends where it
+     said it would and not a frame's worth either side. */
+  return until == null ? dt : Math.max(0, Math.min(dt, until - state.t));
 }
 
 /* What skipping to a moment would cost: the rate to use, and the real seconds
@@ -503,7 +512,29 @@ export function skipPlan(state, t){
   if(!(days > 1e-9)) return null;
   const ideal = days / (SKIP_SECONDS * CONST.BASE_RATE_DAYS_PER_SEC);
   const rate = Math.max(1, Math.min(MAX_WARP, ideal));
-  return { t, days, rate, seconds: days / (rate * CONST.BASE_RATE_DAYS_PER_SEC), capped: ideal > MAX_WARP };
+  return {
+    t, days, rate, stopAt: t - skipNotice(days),
+    seconds: days / (rate * CONST.BASE_RATE_DAYS_PER_SEC), capped: ideal > MAX_WARP,
+  };
+}
+/* How far short of the moment a skip stops, so you are awake for the thing you
+ * were sent to rather than arriving in the middle of it.
+ *
+ * The run-in is flown at ×1, so the only honest unit for it is real seconds of
+ * watching — and it used to be two per cent of the trip, capped at a fiftieth
+ * of a day, which is neither. A fiftieth of a day is nine real minutes of ×1:
+ * skip one day ahead and the game handed back nine minutes of staring before
+ * anything happened. Past about ten days it stopped meaning anything at all,
+ * because by then a single frame of the skip was longer than the whole margin.
+ *
+ * `MIN_LEAD` is the number the rest of the game already uses for "enough
+ * notice": it is what a burn wants to be caught and pushed before it fires, and
+ * the reason a mark cannot be written inside it. Landing exactly there is the
+ * shortest run-in that leaves the thing you skipped to still yours to change.
+ * A quarter is the floor under a very short skip, which should not be a skip
+ * that goes nowhere. */
+function skipNotice(days){
+  return Math.min(MIN_LEAD, days * 0.25);
 }
 
 /* Whether a ship skims air rather than burning up in it. A heat shield is the
@@ -1657,15 +1688,21 @@ const IMMEDIATE_CAP = 6000;
  * mark warped to the first lap and nothing happened; tapping the mark warped
  * past the rest of the game.
  *
- * So the road shows what happens on this lap and the next, and past that says
- * the honest thing instead: you are going round. What a pilot lines up a later
- * encounter with is the rail crossings — where a world will be when the road
- * cuts its orbit — which are drawn on the lap in front of them.
+ * So the road shows what happens on the lap in front of you and nothing past
+ * it, and then says the honest thing instead: you are going round. What a
+ * pilot lines up a later encounter with is the rail crossings — where a world
+ * will be when the road cuts its orbit — which are drawn on that same lap.
+ *
+ * It was two laps, on the reasoning that the next lap round is still nearly
+ * here. It is not: the leg is *drawn* as one lap, so a meeting on the second
+ * one is painted on the first, and the picture says "just there" while the
+ * clock says a lap and a half. One lap drawn and one lap looked at are the
+ * same number or the mark is in the wrong place, so there is only one number.
  *
  * Only the chart is bounded. The flight still looks as far as it must, or a
  * ship would fly into a reach the search had stopped short of; the aim helper
  * still looks as far as it must, or it could not score a road that arrives. */
-const CHART_LAPS = 2;
+const CHART_LAPS = 1;
 const isDoor = sg => sg.reason === 'exit' || sg.reason === 'enter';
 
 /* `flown` false draws the road the ship is on *now*, as if nothing were

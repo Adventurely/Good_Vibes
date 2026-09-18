@@ -1903,11 +1903,14 @@ test('zooming out past a rail still takes its crossing with it', () => {
     const g = transferShip();
     const pred = S.planImmediate(g);
     const crossings = railCrossings(world, pred, 0, { minLead: S.MIN_LEAD });
-    assert.ok(crossings.some(c => c.body === 'tassel'), 'nothing crosses the rail it left from');
-    chart.camera.zoom = 10;              // Tassel's whole orbit about three pixels across
+    assert.ok(crossings.some(c => c.body === 'veyra'), 'the fall to Veyra does not cut Veyra\'s rail');
+    chart.camera.zoom = 10;              // Veyra's whole orbit about one pixel across
     chart.camera.anchor = [0, 0];
     chart.settle();
-    assert.ok(world.get('tassel').a * chart.camera.zoom < 6, 'the rail is big enough to draw after all');
+    for(const c of crossings){
+      assert.ok(world.get(c.body).a * chart.camera.zoom < 6,
+        `${c.body}'s rail is big enough to draw after all`);
+    }
     chart.draw({ t: 0, now: 0, shipAbs: { r: S.shipAbsPos(g), v: S.shipAbsVel(g) }, shipBody: 'lamp',
       prediction: pred, nodes: [], nodePositions: [], apses: [], railCrossings: crossings,
       hidden: new Set() });
@@ -2458,6 +2461,83 @@ test('the game opens in a low orbit, clear of the air, and a lap of it is about 
   const r0 = [...s.ship.r];
   for(let left = lapSeconds; left > 0; left -= 1) S.tick(s, S.dtForFrame(s, Math.min(1, left)));
   assert.ok(O.dist(s.ship.r, r0) < el.ra * 1e-6, 'one lap of ×1 is back where it started');
+});
+
+test('a skip ends the same distance from the thing it was sent to, whatever the trip', () => {
+  /* The run-in is flown at ×1, so the only honest unit for it is real seconds
+     of watching. It used to be two per cent of the trip capped at a fiftieth of
+     a day, which is neither: a fiftieth of a day is nine real minutes of ×1, so
+     a one-day skip handed back nine minutes of staring at nothing. And past
+     about ten days the margin stopped meaning anything, because a frame of a
+     skip is a six-hundredth of the trip and by then one frame was longer than
+     the whole margin — measured, a twenty-day skip and a three-hundred-day skip
+     both landed *past* the moment they were sent to. */
+  const B = CONST.BASE_RATE_DAYS_PER_SEC;
+  const coaster = () => {
+    const g = S.newGame(5);
+    g.dockedAt = null; g.justLeft = null; g.justLeftAt = -1e9; g.t = 0; g.nodes = [];
+    const start = O.absState(world, 'tassel', 0);
+    const mu = world.get('lamp').mu;
+    g.ship = { body: 'lamp', r: [...start.r],
+      v: O.scale(O.unit(start.v), Math.sqrt(mu / O.norm(start.r)) * 1.02) };
+    return g;
+  };
+  for(const days of [0.05, 0.2, 1, 5, 20, 70, 300]){
+    const g = coaster();
+    const target = g.t + days;
+    const plan = S.skipPlan(g, target);
+    g.warp = plan.rate;
+    /* The loop the browser runs, at sixty frames a second. */
+    let frames = 0;
+    while(g.t < plan.stopAt && frames++ < 2e5){
+      const dt = S.dtForFrame(g, 1 / 60, plan.stopAt);
+      if(dt <= 0) break;
+      S.tick(g, dt);
+    }
+    const short = target - g.t;
+    assert.ok(short > 0, `a ${days}-day skip landed past the moment it was sent to`);
+    assert.ok(Math.abs(short - S.MIN_LEAD) < 1e-9,
+      `a ${days}-day skip left ${(short / B).toFixed(0)} real seconds of ×1, not the ${(S.MIN_LEAD / B).toFixed(0)} every other one leaves`);
+  }
+
+  /* Except a skip too short to spare it, which still has to go somewhere. */
+  const tiny = coaster();
+  const plan = S.skipPlan(tiny, tiny.t + S.MIN_LEAD * 2);
+  assert.ok(plan.stopAt > tiny.t, 'a very short skip has nowhere to go');
+  assert.ok(plan.stopAt < tiny.t + S.MIN_LEAD * 2, 'and it does not land on top of the thing');
+});
+
+test('skipping to a burn lands a lead short of the burn, not half an hour short', () => {
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  /* It used to ask to be sent to a twentieth of a day before the burn, on top
+     of the margin the skip already leaves. A twentieth of a day is twenty-two
+     real minutes of ×1, so pressing "Skip to it" on a burn gave back half an
+     hour of staring — and the card, which reads the plan, understated the wait
+     by all of it. */
+  assert.match(PLAY, /warpnode\(i\)\{ const n = state\.nodes\[Number\(i\)\]; if\(n\) askSkip\(n\.t,/,
+    'the burn skip still cuts its own lead');
+  assert.doesNotMatch(PLAY, /askSkip\(n\.t - 0\.05/, 'the old hand-cut lead is back');
+});
+
+test('a frame of a skip never steps past the end of it', () => {
+  /* The guarantee the above rests on. A frame of a long skip is hours of game
+     time; the step is cut to what is left. */
+  const g = S.newGame(5); S.undock(g); g.warp = 5e4;
+  const until = g.t + 0.01;
+  const full = S.dtForFrame(g, 1 / 60);
+  assert.ok(full > 0.01, 'this frame is too small for the test to mean anything');
+  assert.equal(S.dtForFrame(g, 1 / 60, until), until - g.t, 'the last step was not cut to fit');
+  g.t = until;
+  assert.equal(S.dtForFrame(g, 1 / 60, until), 0, 'a step was offered past the end');
+  assert.equal(S.dtForFrame(g, 1 / 60, null), full, 'a frame with no end to reach was cut anyway');
+});
+
+test('the loop hands the skip\'s end to the clock, and skips to where the plan says', () => {
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.match(PLAY, /S\.dtForFrame\(state, real, warpTarget\)/,
+    'the frame steps without knowing where the skip ends');
+  assert.match(PLAY, /warpTarget = plan\.stopAt;/,
+    'the stopping point is worked out somewhere other than the plan');
 });
 
 test('undocking puts the ship in a prograde parking orbit at the docking altitude', () => {
@@ -5459,7 +5539,7 @@ test('an orbit that overlaps a moon\'s rail is not marked with a meeting laps aw
 
   const pred = S.planImmediate(s, true, {});
   const road = pred.end - s.t;
-  assert.ok(road <= el.period * 2.5, `the drawn road runs ${(road / el.period).toFixed(1)} laps`);
+  assert.ok(road <= el.period * 1.001, `the drawn road runs ${(road / el.period).toFixed(2)} laps`);
   for(const e of pred.events){
     assert.ok(e.t - s.t <= road + 1e-9, `${e.kind} is marked at +${(e.t - s.t).toFixed(1)} d, past the end of the road`);
   }
@@ -5470,6 +5550,45 @@ test('an orbit that overlaps a moon\'s rail is not marked with a meeting laps aw
   const rc = railCrossings(world, pred, s.t, { minLead: S.MIN_LEAD, limit: 8 });
   assert.ok(rc.length > 0, 'and nothing is left to line the meeting up with');
   for(const c of rc) assert.ok(c.t - s.t <= road + 1e-9, 'a rail crossing is off the end of the drawn road');
+});
+
+test('nor with one on the very next lap, which is still not this lap', () => {
+  /* The bound was two laps, on the reasoning that the next lap round is nearly
+     here. It is not: the leg is *drawn* as one lap, so a meeting on the second
+     is painted on the first, and the picture says "just there" while the clock
+     says a lap and a half.
+
+     And under the two laps was a floor of two days, left over from the default
+     look, which in front of a small lap count is not a floor but an override.
+     A Tassel parking orbit pushed out past Slate has a period of about a day,
+     so two days was between two and four laps and the cap never bit at all:
+     measured across this family of orbits, twenty-four marks were being drawn
+     between 1.07 and 4.80 laps out. */
+  const b = world.get('tassel'), slate = world.get('slate');
+  /* Find one whose meeting really is on the second lap, by asking the
+     unbounded search — the one the flight itself flies by — where it is. */
+  let found = null;
+  for(let k = 1.30; k <= 1.42 && !found; k += 0.002){
+    const s = S.newGame(1); S.undock(s); s.nodes = []; s.dv = s.tank = 0.02;
+    const r0 = b.dockAlt;
+    s.ship = { body: 'tassel', r: [r0, 0], v: [0, Math.sqrt(b.mu / r0) * k] };
+    const el = O.elementsFromState(b.mu, s.ship.r, s.ship.v);
+    if(!Number.isFinite(el.period) || !(el.ra > slate.a)) continue;
+    const far = S.plan(s, el.period * 6);
+    const door = far.events.find(e => e.kind === 'soi' && e.to === 'slate');
+    if(!door) continue;
+    const laps = (door.t - s.t) / el.period;
+    if(laps > 1.05 && laps < 2) found = { s, el, laps };
+  }
+  assert.ok(found, 'no orbit in this family meets Slate on its second lap');
+
+  const pred = S.planImmediate(found.s, true, {});
+  assert.equal(pred.intercept, null,
+    `a meeting ${found.laps.toFixed(2)} laps out is marked as though it were this lap`);
+  assert.ok(!pred.events.some(e => e.kind === 'soi'),
+    'and its door is drawn on the lap in front of the pilot');
+  assert.ok(pred.end - found.s.t <= found.el.period * 1.001,
+    'the road ran past the lap it draws');
 });
 
 test('but a moon the road reaches on the lap in front of you still is', () => {

@@ -432,3 +432,60 @@ test('the greenhouse can be walked around, and not walked out of', async () => {
   assert.match(html, /@media \(pointer:fine\)\{ body\.flying #pad/,
     'a mouse gets the keyboard, not a thumb pad');
 });
+
+test('the lot can be carried off the device, and a broken code cannot eat it', async () => {
+  /* The save is in one browser's storage and nowhere else, and a browser is
+   * allowed to throw its own storage away. Two things follow, and both of them
+   * are in the page rather than in `content.js`, so this is where they are
+   * checked:
+   *
+   *   - the browser is asked to keep the save, which the game never did;
+   *   - the code that gets pasted back in is refused before anything is
+   *     written, because the failure that costs somebody their lot is the one
+   *     where a half-pasted code quietly becomes a brand new game.
+   */
+  const html = await (await fetch(`${baseUrl}/sunward/play.html`)).text();
+  const js = [...html.matchAll(/<script type="module">([\s\S]*?)<\/script>/g)].map(m => m[1]).join('\n');
+  assert.ok(js.length > 1000, 'no inline module found to check');
+
+  // Off the browser's disposable list.
+  assert.match(js, /navigator\.storage\?\.persist\?\.\(\)/,
+    'nothing else takes the save off the list of things a browser may evict');
+  assert.match(js, /keepTheSave\(\);/, 'asking for it and never calling it is worse than not asking');
+
+  // The panel, and both directions of it.
+  assert.match(html, /<h2>Your save code<\/h2>/);
+  assert.match(html, /id="code-out"[\s\S]{0,200}readonly/, 'your own code is not an editable box');
+  assert.match(html, /id="code-line"[\s\S]{0,80}role="status"/,
+    'a refusal nobody hears is a button that silently does nothing with a save');
+
+  /* Refused first, and nothing written. Ordered, not merely present: a confirm
+     that came before the refusal would put the question to somebody about a
+     code that was never going to load. */
+  const refused = js.indexOf('const why = codeRefusal(typed);');
+  const asked = js.indexOf('There is no undo. Continue?');
+  const written = js.indexOf('localStorage.setItem(SAVE_KEY, JSON.stringify(data));');
+  assert.ok(refused > 0 && asked > refused && written > asked,
+    'the order has to be refuse, ask, then write');
+
+  /* The autosave holds the lot that is on screen. Left running, it fires
+     between the write and the reload and puts the old lot back over the new
+     one — which would read as an import that silently did nothing. */
+  const stopped = js.indexOf('canSave = false;\n        try {');
+  assert.ok(stopped > 0 && stopped < written, 'the autosave has to be stopped before the write');
+
+  // The board id travels, and only when the code has one.
+  assert.match(js, /board: board\.id \? \{ id: board\.id, name: board\.name, joined: board\.joined \}/);
+  assert.match(js, /if\(row && typeof row\.id === 'string' && row\.id\)\{/,
+    'a code from somebody who never joined must not clear this device\'s row');
+
+  /* Start over has the same problem and needs the same answer. It removes the
+     key and reloads, and the reload fires `pagehide` on the way out — which
+     saved the lot that was still on screen straight back into the hole, so the
+     button did nothing at all. */
+  const wipe = js.indexOf("ui.wipe.addEventListener");
+  const hushed = js.indexOf('canSave = false;', wipe);
+  const removed = js.indexOf('localStorage.removeItem(SAVE_KEY)', wipe);
+  assert.ok(wipe > 0 && hushed > wipe && hushed < removed,
+    'the autosave has to be stopped before the save is thrown away, or the reload writes it back');
+});
