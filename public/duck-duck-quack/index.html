@@ -118,6 +118,7 @@
   }
   .levels .cap{
     display: flex; align-items: baseline; gap: .4rem;
+    flex-wrap: wrap;
     padding: .35rem .5rem;
     font-size: .78rem; font-weight: 700; color: var(--gv-text);
   }
@@ -180,9 +181,13 @@
 
   /* A player's own best on each level card, tucked at the end of the
      caption so it reads as part of the label rather than as a badge. */
+  /* "best 9 of 10" is one thing and breaks badly in the middle, so it
+     drops onto its own line under the level's name rather than splitting
+     when a narrow card cannot hold both side by side. */
   .levels .best{
     margin-left: auto; font-weight: 700; color: var(--sun);
     font-variant-numeric: tabular-nums; font-size: .74rem;
+    white-space: nowrap;
   }
 
   .facts{
@@ -316,7 +321,8 @@
     const best = document.createElement('span');
     best.className = 'best';
     cap.append(num, name, best);
-    bestSlots.set(level.id, { best, link, label: `Level ${i + 1} of ${LEVELS.length}, ${level.name}` });
+    bestSlots.set(level.id, { best, link, hatch: level.duckCount,
+      label: `Level ${i + 1} of ${LEVELS.length}, ${level.name}` });
 
     link.append(shot, cap);
     const card = document.createElement('li');
@@ -390,10 +396,13 @@
     const current = stats.current();
     for(const [id, slot] of bestSlots){
       const best = current ? stats.best(current, id) : 0;
-      slot.best.textContent = best ? `best ${best}` : '';
+      /* Out of the whole hatch, not on its own: "best 9" is a number with
+         nothing to measure it against, and nine is a rout on a level that
+         hatches ten and a poor showing on one that hatches thirty. */
+      slot.best.textContent = best ? `best ${best} of ${slot.hatch}` : '';
       // The card's own label carries it too, so it is not colour-only.
       slot.link.setAttribute('aria-label',
-        best ? `${slot.label}. Your best: ${best} saved.` : slot.label);
+        best ? `${slot.label}. Your best: ${best} of ${slot.hatch} saved.` : slot.label);
     }
   }
 
