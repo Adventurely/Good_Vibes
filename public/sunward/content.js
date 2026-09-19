@@ -139,6 +139,26 @@ export const GROWERS = [
     flavour: 'A mega greenhouse environment. Shields your tree day or night against predators.' },
   { id: 'canopy', name: 'Canopy tower', cost: 3.0e9, rate: 280000, phase: 'any', art: 'canopy',
     flavour: 'A tower with its own forest ecosystem. Surplus energy is delivered straight to your tree.' },
+  /* Three tiers past the tower, and they are here because the shop ran out
+     before the ladder did. With the canopy tower on top, a lot in its eleventh
+     season has one live row and every copy of it costs fifteen percent more
+     than the last: the simulation had season eleven taking twenty-one hours,
+     season fifteen taking five days and season sixteen taking a fortnight,
+     all of it spent buying the seventieth of the same thing. Three more rows
+     hold seasons ten to eighteen at nine to eighteen hours each, which is
+     where seasons six to nine already sit.
+
+     Every one keeps the ratios the nine below it keep — eleven times the price
+     and six and a half times the output of the row beneath, which lands each
+     payback about seventy percent slower than the last. Nothing before the
+     canopy tower moves, and the opening is untouched: first seed at 1h 24m,
+     same as it was. */
+  { id: 'mist', name: 'Mist net', cost: 3.4e10, rate: 1.8e6, phase: 'night', art: 'mist',
+    flavour: 'Acres of fine mesh strung between the ridges. It combs the night fog for everything the day missed and lets it down onto the roots.' },
+  { id: 'mycelium', name: 'Mycelial web', cost: 3.8e11, rate: 1.2e7, phase: 'any', art: 'mycelium',
+    flavour: 'A single fungus joining every root in the valley into one system. What any of them has to spare travels to whoever is short of it, and a tree this size both gives and takes a great deal.' },
+  { id: 'weather', name: 'Weather engine', cost: 4.3e12, rate: 7.7e7, phase: 'any', art: 'weather',
+    flavour: 'A machine for making the season you want. The valley now gets the weather your tree would have asked for, every day of the year.' },
 ];
 
 export const GROWER_IDS = GROWERS.map(g => g.id);
@@ -364,6 +384,12 @@ export const UPGRADES = [
     need: { owned: { id: 'glasshouse', count: 10 } }, flavour: 'The night stops taking back what the day made.' },
   { id: 'higher-floors', name: 'Higher floors', cost: 7.5e10, effect: { grower: 'canopy', mult: 2 },
     need: { owned: { id: 'canopy', count: 10 } }, flavour: 'The lift goes up into the leaves.' },
+  { id: 'finer-weave', name: 'A finer weave', cost: 8.5e11, effect: { grower: 'mist', mult: 2 },
+    need: { owned: { id: 'mist', count: 10 } }, flavour: 'The drops that used to go straight through do not any more.' },
+  { id: 'more-partners', name: 'More partners', cost: 9.5e12, effect: { grower: 'mycelium', mult: 2 },
+    need: { owned: { id: 'mycelium', count: 10 } }, flavour: 'Every tree that joins makes the web worth more to all of them.' },
+  { id: 'longer-season', name: 'A longer season', cost: 1.075e14, effect: { grower: 'weather', mult: 2 },
+    need: { owned: { id: 'weather', count: 10 } }, flavour: 'Spring starts in February, and autumn is asked to wait.' },
 ];
 
 export const UPGRADE_BY_ID = Object.fromEntries(UPGRADES.map(u => [u.id, u]));

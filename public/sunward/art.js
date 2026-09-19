@@ -407,6 +407,58 @@ export const PROP_ART = {
     '...sswss.....',
     '..sssssss....',
   ],
+  /* Fine mesh on two posts, strung down the slope. The mesh is drawn as
+     alternating pixels rather than a solid panel on purpose: solid reads as a
+     window, and this has to read as something the fog goes through. */
+  mist: [
+    's............s',
+    'swwwwwwwwwwwws',
+    's.c.c.c.c.c..s',
+    'sc.c.c.c.c.c.s',
+    's.c.c.c.c.c..s',
+    'sc.c.c.c.c.c.s',
+    's.c.c.c.c.c..s',
+    'sc.c.c.c.c.c.s',
+    'swwwwwwwwwwwws',
+    's............s',
+    's............s',
+    'NN..........NN',
+  ],
+  /* Soil with the threads showing through it, and the two pale fruiting bodies
+     that are the only part of the thing anybody ever sees. The caps take two
+     rows each: at one row they read as plus signs. */
+  mycelium: [
+    '....www....www..',
+    '...wwwww..wwwww.',
+    '.....w......w...',
+    '..NNNNNNNNNNNN..',
+    '.NwNNwNNNwNNNwN.',
+    'NNwNNNwNNNwNNNNN',
+    'NwNNNwNNNwNNNwNN',
+  ],
+  /* A cloud of its own making, held in an open dish above the housing. The
+     cloud is the whole silhouette: the first cut had the dish as a solid block
+     and the thing read as a pylon with a hat on. */
+  weather: [
+    '.....wwwww......',
+    '...wwwwwwwww....',
+    '..wwwwwwwwwww...',
+    '...wwwwwwwww....',
+    '................',
+    '..c..........c..',
+    '..cc........cc..',
+    '...cc......cc...',
+    '....cc....cc....',
+    '.....cccccc.....',
+    '.......ss.......',
+    '.......ss.......',
+    '.......ss.......',
+    '....ssssssss....',
+    '....syyyyyys....',
+    '....ssssssss....',
+    '...NNNNNNNNNN...',
+    '....NN....NN....',
+  ],
 };
 
 /* A sprite, drawn through the same light the rest of the scene is drawn
@@ -458,6 +510,15 @@ export const PROP_SPOTS = {
   moss:       [{ x: 20, y: 234 }, { x: 40, y: 226 }, { x: 4, y: 221 }, { x: 58, y: 238 }],
   mushroom:   [{ x: 92, y: 229 }, { x: 108, y: 238 }, { x: 76, y: 235 }, { x: 122, y: 226 }],
   fern:       [{ x: 246, y: 227 }, { x: 262, y: 237 }, { x: 230, y: 235 }, { x: 278, y: 229 }],
+  /* The three late kinds go where the lot was still empty: the engines back on
+     the hillside beside the tree, the nets down the open slope in front of
+     them, the web up through the grass at the very front. All twelve were
+     checked against every sprite already placed and against the trunk, which
+     meets the ground across x 143 to 176 — measured off a render rather than
+     guessed, because the first guess put a box through the glasshouse. */
+  weather:    [{ x: 120, y: 210 }, { x: 84, y: 188 }, { x: 103, y: 188 }, { x: 122, y: 188 }],
+  mist:       [{ x: 163, y: 228 }, { x: 180, y: 226 }, { x: 146, y: 216 }, { x: 180, y: 211 }],
+  mycelium:   [{ x: 160, y: 238 }, { x: 200, y: 238 }, { x: 140, y: 235 }, { x: 180, y: 235 }],
 };
 
 /* How many you have to own before the second, third and fourth copies appear.

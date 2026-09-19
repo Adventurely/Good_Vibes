@@ -928,6 +928,49 @@ test('nothing on the lot is drawn off the edge of it', () => {
   }
 });
 
+test('no two things on the lot are drawn on top of each other', () => {
+  /* `spot.y` is the sprite's GROUND line, not its top: `lotPieces` draws the
+   * rows at `spot.y - rows.length`. Getting that backwards is silent — every
+   * sprite still stands on the grass, just a sprite-height too high — and it
+   * is exactly the mistake that put three new kinds a foot in the air the
+   * first time they were placed. So the boxes here are built the way the
+   * renderer builds them, and then compared pixel by pixel rather than by
+   * bounding box: these sprites are half transparent, and two boxes that graze
+   * each other are usually two things that do not touch at all.
+   *
+   * Forty-eight sprites are hand-placed on a 320x240 lot with a tree in the
+   * middle of it. Exactly one pixel is painted twice — a turbine mast crossing
+   * a glasshouse eave, which nobody will ever see — and that is the number
+   * pinned here. A sprite actually dropped on top of another shares tens of
+   * pixels, not one, so this fires long before the picture looks wrong.
+   */
+  const owner = new Map();
+  const both = new Map();
+  for(const [id, spots] of Object.entries(PROP_SPOTS)){
+    const rows = PROP_ART[id];
+    for(const spot of spots){
+      const top = spot.y - rows.length;
+      assert.ok(spot.y > GROUND_Y, `"${id}" has its feet at ${spot.y}, above the horizon at ${GROUND_Y}`);
+      for(let r = 0; r < rows.length; r++){
+        for(let c = 0; c < rows[r].length; c++){
+          if(rows[r][c] === '.') continue;
+          const key = `${spot.x + c},${top + r}`;
+          const held = owner.get(key);
+          if(held === undefined){ owner.set(key, id); continue; }
+          const pair = held < id ? `${held} and ${id}` : `${id} and ${held}`;
+          both.set(pair, (both.get(pair) || 0) + 1);
+        }
+      }
+    }
+  }
+  for(const [pair, n] of both){
+    assert.ok(n <= 1, `${pair} paint ${n} of the same pixels — one of them has been placed on the other`);
+  }
+  const total = [...both.values()].reduce((a, b) => a + b, 0);
+  assert.equal(total, 1,
+    `${total} pixels on the lot are painted twice; the layout has room for exactly one and it is spoken for`);
+});
+
 test('the lot fills up as it is planted, and stops', () => {
   assert.equal(propCount(0), 0, 'nothing owned is nothing drawn');
   assert.equal(propCount(1), 1);

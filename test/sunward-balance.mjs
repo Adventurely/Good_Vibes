@@ -135,7 +135,24 @@ if(HORIZON >= 24 * 3600){
   assert.ok(firstSeed !== null && firstSeed < 6 * 3600,
     `the first seed took ${firstSeed === null ? 'longer than the run' : formatTime(firstSeed)};`
     + ' a reset nobody reaches in an evening is a reset nobody reaches');
+  /* What a first run should open, and what it must not.
+   *
+   * The first nine rows are the whole shop as it stood before the late tiers
+   * were added, and a day should very nearly finish them: a shop that opens
+   * slower than that is a shop most players never see the bottom of.
+   *
+   * The last three are priced for a lot ten seasons in. If a first day — on
+   * ground that has never had a seed — reaches the top of the shop, those rows
+   * are underpriced by orders of magnitude and the late game they were added
+   * for has been given away to somebody who has not got there yet. Both ends
+   * are checked, because turning the cost of a late tier down is the obvious
+   * thing to do when the late game feels slow, and it is the wrong one.
+   */
+  const OPENING = 9;
   const day = rows.find(row => row.at === 24 * 3600);
-  assert.ok(day && day.kinds >= GROWERS.length - 1,
-    `a day in, only ${day ? day.kinds : 0} of ${GROWERS.length} kinds are planted`);
+  assert.ok(day && day.kinds >= OPENING,
+    `a day in, only ${day ? day.kinds : 0} of the opening ${OPENING} kinds are planted`);
+  assert.ok(day && day.kinds < GROWERS.length,
+    `a day in, a lot that has never replanted already owns all ${GROWERS.length} kinds —`
+    + ' the late rows are meant to be out of reach until the seasons stack up');
 }
