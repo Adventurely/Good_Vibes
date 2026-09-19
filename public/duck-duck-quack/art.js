@@ -18,9 +18,16 @@
  * The palette and the pixel font are the shared ones from Good Vibes rather
  * than a copy — this game ships in the same deploy, so there is no reason for
  * a second copy of sixteen hex values to drift out of step with the first.
+ * Everything that is a sprite, a badge or a piece of built timber is drawn
+ * out of those sixteen. The scenery — turf, earth, rock, sky, hills, water —
+ * is drawn out of the ramps in ./palette.js, which fill in the steps between
+ * them; see that file for why a hillside needs four greens where a duckling
+ * needs one. No hex value is written down in here: palette.js holds them all,
+ * and a test keeps it that way.
  */
 
 import { PALETTE, hex, drawSprite, drawTextOutlined } from '../good-vibes/pixel.js';
+import { GRASS, SOIL, SUBSOIL, STONE, SKY, HILLS, HILL_CROWN, WATER } from './palette.js';
 import { SCENE_W, SCENE_H, POOF_TICKS, ZAP_TICKS, goalHeading } from './content.js';
 
 export { PALETTE, hex };
@@ -166,24 +173,27 @@ const SKY_SEAM_H = 4;
  *
  * Green, not the slate/violet this used to be — a purple dome against a blue
  * sky reads as a second, unrelated shape floating in the air, not as a hill,
- * since nothing else in the scene is that colour to anchor it. Pine (`G`) is
+ * since nothing else in the scene is that colour to anchor it. Pine is
  * already what a tree-covered ridge looks like everywhere else this palette
- * is used. `haze` is how far each one blends toward the sky's own cyan —
- * `0` for the nearest hill, closer to `1` for the furthest — the ordinary
- * trick of aerial perspective: what is far away is paler and cooler, which is
- * what actually tells three overlapping domes apart as near, middle and far
- * rather than as one flat frieze.
+ * is used, and palette.js's HILLS is that pine blended a step further toward
+ * the horizon's own cyan for each ridge that stands further off — the
+ * ordinary trick of aerial perspective: what is far away is paler and
+ * cooler, which is what actually tells three overlapping domes apart as
+ * near, middle and far rather than as one flat frieze.
+ *
+ * Furthest first, which is both the order HILLS runs in (palest first) and
+ * the order they have to be painted in, so a nearer ridge covers the one
+ * standing behind it.
  */
-const HILLS = [
-  // Pine mixed toward the horizon's cyan, a step further for each one that
-  // stands further off. Solid, for the same reason the sky above is.
-  { cx: 44, w: 100, h: 15, tone: '#33816f' },
-  { cx: 168, w: 130, h: 22, tone: '#40a2a0' },
-  { cx: 274, w: 110, h: 17, tone: '#3a9288' },
+const HILL_SHAPES = [
+  { cx: 168, w: 130, h: 22 },
+  { cx: 274, w: 110, h: 17 },
+  { cx: 44, w: 100, h: 15 },
 ];
 
 function drawHills(ctx){
-  for(const hill of HILLS){
+  for(let i = 0; i < HILL_SHAPES.length; i++){
+    const hill = HILL_SHAPES[i];
     for(let row = 0; row < hill.h; row++){
       const y = SKY_SEAM_Y + SKY_SEAM_H + hill.h - row;
       if(y >= SCENE_H) continue;
@@ -194,13 +204,16 @@ function drawHills(ctx){
       const width = Math.round(hill.w * Math.sqrt(Math.max(0, 1 - t * t)));
       if(width <= 0) continue;
       const left = Math.round(hill.cx - width / 2);
-      ctx.fillStyle = hill.tone;
+      ctx.fillStyle = HILLS[i];
       ctx.fillRect(left, y, width, 1);
     }
     // A single brighter row along the crown — sunlight catching the ridge
-    // line, the same reasoning drawStoneColumn's paler top edge uses.
+    // line, the same reasoning drawStoneColumn's paler top edge uses. In this
+    // ridge's own light rather than one shared mint pixel on all three: the
+    // same highlight on a far hill and a near one flattens exactly what the
+    // haze is there to separate.
     const crownY = SKY_SEAM_Y + SKY_SEAM_H + 1;
-    ctx.fillStyle = hex('t');
+    ctx.fillStyle = HILL_CROWN[i];
     ctx.fillRect(Math.round(hill.cx - 1), crownY, 2, 1);
   }
 }
@@ -269,30 +282,33 @@ function drawBirds(ctx, ticks){
 }
 
 /* The ramp from the deep blue overhead down to the cyan at the horizon.
-   One dithered seam put the whole change of colour on four rows, which at
-   any scale above life size is a checkerboard stripe ruled across the sky
-   rather than a sky that gets lighter as it goes down. Five steps over
-   twenty-five rows is still only twenty-five rows of dither, and it reads
-   as air. */
-/* Stated rather than dithered. Blue and cyan sit a long way apart in the
-   shared palette, so a checkerboard between them is not a blend, it is a
-   checkerboard — five bands of it ruled across the sky were more visible
-   than the one hard seam they replaced. These are the four steps of that
-   blend mixed properly and named here, the same licence the soil and the
-   rock already take where the sixteen colours have no answer. */
-const SKY_RAMP = ['#3078b5', '#3584ba', '#3a91bf', '#409ec4', '#45abc9', '#4ab7ce'];
-const SKY_RAMP_H = 4;
-
+ *
+ * Stated rather than dithered. Blue and cyan sit a long way apart in the
+ * shared palette, so a checkerboard between them is not a blend, it is a
+ * checkerboard — bands of it ruled across the sky were more visible than the
+ * one hard seam they replaced. palette.js's SKY is that blend mixed properly
+ * instead, and it runs lightest first like every ramp there, so it is read
+ * from the back: the last entry is the deep overhead, the first is the
+ * horizon, and the eight between them are the bands.
+ *
+ * And spread over the WHOLE sky rather than over the two dozen rows above
+ * the horizon. That was all six steps would stretch to without the banding
+ * showing, which left seventy rows of flat blue overhead with a gradient
+ * squeezed underneath it, and a flat sky with a graded strip at the bottom
+ * reads as a flat sky with a strip at the bottom. Nine steps over ninety-six
+ * rows is about ten rows to a band, which is gentle enough that no edge
+ * announces itself, and it is still nine fillRects.
+ */
 export function drawSky(ctx, ticks = 0){
-  const rampTop = SKY_SEAM_Y + SKY_SEAM_H - SKY_RAMP.length * SKY_RAMP_H;
-  ctx.fillStyle = hex('b');
-  ctx.fillRect(0, 0, SCENE_W, rampTop);
-  for(let i = 0; i < SKY_RAMP.length; i++){
-    ctx.fillStyle = SKY_RAMP[i];
-    ctx.fillRect(0, rampTop + i * SKY_RAMP_H, SCENE_W, SKY_RAMP_H);
+  const horizon = SKY_SEAM_Y + SKY_SEAM_H;
+  const bands = SKY.length - 1;   // the lightest is the flat band below the horizon
+  for(let i = 0; i < bands; i++){
+    const top = Math.round(i * horizon / bands);
+    ctx.fillStyle = SKY[SKY.length - 1 - i];
+    ctx.fillRect(0, top, SCENE_W, Math.round((i + 1) * horizon / bands) - top);
   }
-  ctx.fillStyle = hex('c');
-  ctx.fillRect(0, SKY_SEAM_Y + SKY_SEAM_H, SCENE_W, SCENE_H - SKY_SEAM_Y - SKY_SEAM_H);
+  ctx.fillStyle = SKY[0];
+  ctx.fillRect(0, horizon, SCENE_W, SCENE_H - horizon);
   drawClouds(ctx, ticks);
   drawHills(ctx);
   drawBirds(ctx, ticks);
@@ -323,22 +339,6 @@ const GRASS_DEPTH = 11;
 const SUBSOIL_DEPTH = 16;
 const SUBSOIL_SHARE = 0.45;
 
-/* Terrain wants a few tones the shared sixteen-colour palette does not
-   carry: a lit and a shadowed oak for the rim of an exposed soil face, and
-   a lit green for the same rim through the grass cap. Stated here for the
-   same reason the stone greys below are — no other game in this repo has a
-   use for them, and the alternative is a cross-section drawn in flat
-   bands with no light on it at all. */
-const SOIL_LIT = '#d99270';
-const SOIL_DARK = '#9c6144';
-const GRASS_LIT = '#5cc067';
-
-/* The body of the soil, a shade deeper and browner than the shared oak it
-   used to be filled with. Oak is the colour of a nest and a ladder and a
-   bridge deck — cut earth is darker than the timber standing on it, and
-   filling both with one tone was most of why a platform read as a plank. */
-const SOIL_BASE = '#b06e4a';
-
 /* The soil's own weave.
  *
  * Flat oak with a scatter of specks in it was the one part of this scene
@@ -359,28 +359,38 @@ const SOIL_BASE = '#b06e4a';
 const BRICK_H = 4;
 const BRICK_W = 7;
 
-/* Half a step either side of the oak the soil is filled with. The first cut
-   of this used the same lit and shadowed tones the cut faces do, and at full
-   contrast a course reads as a course of BRICKS — the platforms came out
-   looking like garden walls. Soil is not masonry: the weave wants to be felt
-   rather than counted, so the light and the shade are pulled in to about
-   half their reach and the lit edge is a fleck at the head of each strand
-   rather than a stripe along all of it. */
-const SOIL_COURSE_DARK = '#9b5f3f';
-const SOIL_COURSE_LIT = '#c1815a';
-
+/* One step either side of the body of the soil — SOIL[1] and SOIL[3] around
+ * SOIL[2] — rather than the lit and shadowed tones at either end of the
+ * ramp, which the cut faces use. The first cut of this did use those, and at
+ * full contrast a course reads as a course of BRICKS: the platforms came out
+ * looking like garden walls. Soil is not masonry. The weave wants to be felt
+ * rather than counted, so the light and the shade are pulled in to about
+ * half their reach and the lit edge is a fleck at the head of each strand
+ * rather than a stripe along all of it.
+ *
+ * Contrast was only half of it, though. A seam drawn under every row of
+ * every course and a joint down every column of every brick closes each
+ * clod into a box, and a wall of boxes is masonry at any contrast — the tall
+ * columns still came out as brickwork. So neither line is ever drawn whole:
+ * the seam is a dash under the middle of a clod rather than a rule across
+ * the course, the joint is a two-pixel tick rather than a full height, and
+ * the same hash the tufts and the rock grain use drops about a fifth of it
+ * again. What is left is clods packed against each other with the light
+ * catching their heads, which is what a cut bank of earth looks like.
+ */
 function drawSoilWeave(ctx, x, top, h){
   for(let py = top; py < top + h; py++){
     const course = Math.floor(py / BRICK_H);
     const row = py - course * BRICK_H;
-    // Every other course steps half a brick along, which is what stops the
-    // vertical joints lining up into columns.
+    // Every other course steps half a clod along, which is what stops the
+    // joints lining up into columns.
     const along = ((x + (course % 2) * Math.floor(BRICK_W / 2)) % BRICK_W + BRICK_W) % BRICK_W;
-    if(row === BRICK_H - 1 || along === 0){
-      ctx.fillStyle = SOIL_COURSE_DARK;   // the seam under a strand, and between two
+    if((Math.imul(x * 31 + course * 131 + 5381, 2246822519) >>> 0) % 5 === 0) continue;
+    if(row === BRICK_H - 1 ? along >= 1 && along <= 3 : along === 0 && row >= 1 && row <= 2){
+      ctx.fillStyle = SOIL[3];   // the shadow under a clod, and between two
       ctx.fillRect(x, py, 1, 1);
-    }else if(row === 0 && along < 3){
-      ctx.fillStyle = SOIL_COURSE_LIT;    // a catch of light at the head of it
+    }else if(row === 0 && along >= 1 && along <= 2){
+      ctx.fillStyle = SOIL[1];   // a catch of light on the head of it
       ctx.fillRect(x, py, 1, 1);
     }
   }
@@ -391,20 +401,6 @@ function drawSoilWeave(ctx, x, top, h){
    stepped face came out looking like paint had run down it. Five pixels
    catches the turn of the edge and stops. */
 const EDGE_LIP = 5;
-
-/* Rock's own three shades, and the one place in this game that reaches
- * outside the shared Good Vibes palette (../good-vibes/pixel.js).
- *
- * That palette has no grey. Every dark it carries — ink, deep violet,
- * violet, slate — is purple, which is right for soil in shadow and wrong
- * for stone: rock drawn in slate read as "more dirt, but darker", which is
- * most of how a Digger came to look like it was tunnelling through rock.
- * Three cool greys, stated here rather than added to the shared palette
- * because no other game in this repo has any use for them.
- */
-const STONE_FACE = '#4a505c';   // the body of a rock column
-const STONE_BAND_INK = '#31363f'; // its strata, and the cap of shadow on top
-const STONE_LIT = '#5d6472';    // the odd catch of light in the grain
 
 /* How far apart rock's strata run. Small enough that even a short face
    shows two or three of them, which is what the banding is for: it has to
@@ -427,25 +423,30 @@ const STONE_BAND = 5;
  * The bands are anchored to absolute height rather than to the top of each
  * column, so they run level across a whole formation instead of following
  * its surface up and down — which is what makes them read as strata rather
- * than as a pattern painted on a slope. The lit fleck rides the band above
- * each stratum, on a scatter of columns, so the grain has a direction
- * without anything having to be stored.
+ * than as a pattern painted on a slope. Every fifth row is a stratum, but
+ * not every stratum is the same one: they alternate between the deepest grey
+ * and a softer one by height, so a tall face shows beds of different
+ * hardness rather than one rule repeated all the way down it. The lit fleck
+ * rides the band under each stratum, on a scatter of columns and in the
+ * matching brightness, so the grain has a direction without anything having
+ * to be stored.
  */
 function drawStoneColumn(ctx, x, y, fillH){
-  ctx.fillStyle = STONE_FACE;
+  ctx.fillStyle = STONE[2];
   ctx.fillRect(x, y, 1, fillH);
 
   const grain = Math.imul(x + 7717, 2246822519) >>> 0;
   for(let band = Math.ceil(y / STONE_BAND) * STONE_BAND; band < y + fillH; band += STONE_BAND){
-    ctx.fillStyle = STONE_BAND_INK;
+    const deep = Math.floor(band / STONE_BAND) % 2 === 0;
+    ctx.fillStyle = deep ? STONE[4] : STONE[3];
     ctx.fillRect(x, band, 1, 1);
     if(band + 1 < y + fillH && (grain >>> (band % 11)) % 3 === 0){
-      ctx.fillStyle = STONE_LIT;
+      ctx.fillStyle = deep ? STONE[0] : STONE[1];
       ctx.fillRect(x, band + 1, 1, 1);
     }
   }
 
-  ctx.fillStyle = STONE_BAND_INK;
+  ctx.fillStyle = STONE[4];
   ctx.fillRect(x, y, 1, Math.min(2, fillH));
 }
 
@@ -461,7 +462,7 @@ function drawFloatingEdge(ctx, x, bottom){
   ctx.fillRect(x, bottom - 1, 1, 1);
   const h = Math.imul(x + 2917, 2246822519) >>> 0;
   if(h % 5 !== 0) return;
-  ctx.fillStyle = hex('N');
+  ctx.fillStyle = SOIL[3];
   ctx.fillRect(x, bottom, 1, 1 + (h >>> 29));
 }
 
@@ -520,7 +521,7 @@ function drawGroundColumn(ctx, level, x, y, bottom, isRock, rockBelowY, edge = 0
   const softH = stoneTop - y;
 
   const grassH = Math.min(GRASS_DEPTH, softH);
-  ctx.fillStyle = hex('g');
+  ctx.fillStyle = GRASS[2];
   ctx.fillRect(x, y, 1, grassH);
   /* The turf's sunlit crown, and a lip of it hanging a pixel over the edge
      on the swell of a slow wave. A platform's top used to be ruled dead
@@ -528,34 +529,72 @@ function drawGroundColumn(ctx, level, x, y, bottom, isRock, rockBelowY, edge = 0
      nothing in nature draws: grass sits on soil in a rolling scallop, and
      four pixels of wavelength is enough to read as one without costing the
      flock a single pixel of the surface they actually walk on — the lip is
-     drawn above `y`, never into it. */
+     drawn above `y`, never into it. The lip is a step brighter than the
+     crown, because a blade standing clear of the turf is catching the light
+     from more than one side. */
   if(grassH > 1){
-    ctx.fillStyle = GRASS_LIT;
+    ctx.fillStyle = GRASS[1];
     ctx.fillRect(x, y, 1, 1);
-    if(Math.sin(x * 0.68) + Math.sin(x * 0.23) > 0.75) ctx.fillRect(x, y - 1, 1, 1);
+    if(Math.sin(x * 0.68) + Math.sin(x * 0.23) > 0.75){
+      ctx.fillStyle = GRASS[0];
+      ctx.fillRect(x, y - 1, 1, 1);
+    }
   }
-  // The underside of the turf, where it is in its own shadow. Two rows of
-  // pine before the ink seam is what stops a cut edge reading as a flat
-  // green rectangle sitting on a flat brown one.
-  if(grassH > 3){
-    ctx.fillStyle = hex('G');
+  /* The underside of the turf, going into its own shadow in steps rather
+     than in one drop. Grass used to fall straight from its body colour to
+     pine, which is nearly black beside it, and a cut bank of it read as a
+     green rectangle sitting on a brown one. Three tones over the lower half
+     of the cap — a couple of rows each, so the light rolls off rather than
+     stopping — is a cap of turf with a thickness to it. */
+  if(grassH > 6){
+    ctx.fillStyle = GRASS[3];
+    ctx.fillRect(x, y + grassH - 6, 1, 2);
+    ctx.fillStyle = GRASS[4];
+    ctx.fillRect(x, y + grassH - 4, 1, 2);
+    ctx.fillStyle = GRASS[5];
     ctx.fillRect(x, y + grassH - 2, 1, 2);
+  }else if(grassH > 3){
+    ctx.fillStyle = GRASS[4];
+    ctx.fillRect(x, y + grassH - 2, 1, 1);
+    ctx.fillStyle = GRASS[5];
+    ctx.fillRect(x, y + grassH - 1, 1, 1);
   }
 
   const dirtH = softH - grassH;
   if(dirtH > 0){
     const subsoilH = Math.min(SUBSOIL_DEPTH, Math.round(dirtH * SUBSOIL_SHARE));
     const soilH = dirtH - subsoilH;
-    ctx.fillStyle = SOIL_BASE;
+    ctx.fillStyle = SOIL[2];
     ctx.fillRect(x, y + grassH, 1, soilH);
     // The courses, over the flat fill and under everything else.
     if(soilH > 2) drawSoilWeave(ctx, x, y + grassH + 1, soilH - 1);
+    // The last rows of the soil, darkening into whatever is under it, so
+    // the two bands meet in a gradation rather than a cut. Without it the
+    // boundary was as hard as the ink seam at the top of the dirt, and
+    // read as a third material rather than as the bottom of the second.
+    if(soilH > 4){
+      ctx.fillStyle = SOIL[4];
+      ctx.fillRect(x, y + grassH + soilH - 2, 1, 1);
+      ctx.fillStyle = SOIL[5];
+      ctx.fillRect(x, y + grassH + soilH - 1, 1, 1);
+    }
     if(subsoilH > 0){
       // Subsoil, and deliberately darker than the grey rock is drawn in
       // rather than the same colour it used to be — see drawStoneColumn
-      // for what that cost.
-      ctx.fillStyle = hex('v');
-      ctx.fillRect(x, y + grassH + soilH, 1, subsoilH);
+      // for what that cost. Lighter where it meets the soil and deeper at
+      // the bottom, the same reasoning as the turf above it: a band with
+      // its own light in it reads as a layer, a flat one as a slab.
+      const top = y + grassH + soilH;
+      ctx.fillStyle = SUBSOIL[1];
+      ctx.fillRect(x, top, 1, subsoilH);
+      ctx.fillStyle = SUBSOIL[0];
+      ctx.fillRect(x, top, 1, 1);
+      if(subsoilH > 3){
+        ctx.fillStyle = SUBSOIL[2];
+        ctx.fillRect(x, top + subsoilH - 2, 1, 1);
+        ctx.fillStyle = SUBSOIL[3];
+        ctx.fillRect(x, top + subsoilH - 1, 1, 1);
+      }
     }
     // The seam itself, one row of ink, so the cap reads as sitting on the
     // dirt rather than fading into it.
@@ -571,12 +610,12 @@ function drawGroundColumn(ctx, level, x, y, bottom, isRock, rockBelowY, edge = 0
      difference between a cliff with a shape and a stack of coloured
      rectangles. */
   if(edge !== 0 && !isRock){
-    ctx.fillStyle = edge > 0 ? GRASS_LIT : hex('G');
+    ctx.fillStyle = edge > 0 ? GRASS[0] : GRASS[5];
     ctx.fillRect(x, y, 1, Math.min(2, fillH));
     const dirtTop = y + grassH;
     const lip = Math.min(Math.max(0, stoneTop - dirtTop - 1), EDGE_LIP);
     if(lip > 0){
-      ctx.fillStyle = edge > 0 ? SOIL_LIT : SOIL_DARK;
+      ctx.fillStyle = edge > 0 ? SOIL[0] : SOIL[4];
       ctx.fillRect(x, dirtTop + 1, 1, lip);
     }
   }
@@ -697,9 +736,10 @@ const TUNNEL_HEADROOM = 16;
  * rather than `terrain` itself getting shorter. Ink rather than sky: this is
  * the inside of a hillside, not a view out of one, and a bore this small
  * reading as open air would look like the wall had simply been erased.
- * A sliver of slate along the floor is what keeps the cut edge legible
- * against the ink — without it the hole and the duck walking through it
- * blur into the same flat black.
+ * A sliver of the deepest soil along the floor is what keeps the cut edge
+ * legible against the ink — without it the hole and the duck walking through
+ * it blur into the same flat black — and it is soil rather than the slate it
+ * used to be because the floor of a bore through a hillside is the hillside.
  */
 function drawTunnels(ctx, state){
   const { terrain, tunnelY } = state;
@@ -710,7 +750,7 @@ function drawTunnels(ctx, state){
     if(floor <= top) continue;
     ctx.fillStyle = hex('k');
     ctx.fillRect(x, top, 1, floor - top);
-    ctx.fillStyle = hex('s');
+    ctx.fillStyle = SOIL[4];
     ctx.fillRect(x, floor - 1, 1, 1);
   }
 }
@@ -754,32 +794,43 @@ function drawBridges(ctx, state){
   }
 }
 
-/* The pond: three bands rather than a flat rectangle of blue — a wet-sand
- * lip where the shore actually meets the water, then shallow cyan lit from
- * above, then a dithered seam down into the same deep blue the sky's own
- * horizon uses, so a pond reads as a body of water with a bed sloping away
+/* The pond: a wet-sand lip where the shore actually meets the water, a lit
+ * line along the surface, and then bands stepping down palette.js's WATER
+ * into the deep, so a pond reads as a body of water with a bed sloping away
  * from its edge rather than a tinted floor tile. `bank` is only true for the
  * column or two right at the shoreline (see drawGround) — everywhere else
- * the shallow band starts right at the surface, same as before.
+ * the shallows start right at the surface.
+ *
+ * Stated rather than dithered, for the same reason the sky above it is: the
+ * step from cyan to blue used to be a two-row checkerboard, which is a
+ * checkerboard, not a blend. WATER carries the step between them now.
  */
+const WATER_BANDS = [3, 2, 3];   // shallow, mid, deep — the bed takes the rest
+
 function drawWaterColumn(ctx, x, y, fillH, bank){
   let top = y, remaining = fillH;
   if(bank && remaining > 1){
-    ctx.fillStyle = hex('N');
+    ctx.fillStyle = SOIL[1];
     ctx.fillRect(x, top, 1, 1);
     top += 1;
     remaining -= 1;
   }
-  const shallow = Math.min(3, remaining);
-  ctx.fillStyle = hex('c');
-  ctx.fillRect(x, top, 1, shallow);
-  if(remaining > shallow){
-    ditherSeam(ctx, x, top + shallow, 1, Math.min(2, remaining - shallow), 'c', 'b', 0.5);
-    const deepY = top + shallow + Math.min(2, remaining - shallow);
-    if(deepY < top + remaining){
-      ctx.fillStyle = hex('b');
-      ctx.fillRect(x, deepY, 1, top + remaining - deepY);
-    }
+  let py = top;
+  for(let i = 0; i < WATER_BANDS.length && py < top + remaining; i++){
+    const h = Math.min(WATER_BANDS[i], top + remaining - py);
+    ctx.fillStyle = WATER[i + 1];
+    ctx.fillRect(x, py, 1, h);
+    py += h;
+  }
+  if(py < top + remaining){
+    ctx.fillStyle = WATER[WATER.length - 1];
+    ctx.fillRect(x, py, 1, top + remaining - py);
+  }
+  // The surface itself, one lit row, which is what tells the top of the
+  // water from the next band down at a glance.
+  if(remaining > 0){
+    ctx.fillStyle = WATER[0];
+    ctx.fillRect(x, top, 1, 1);
   }
 }
 
@@ -796,7 +847,7 @@ function drawRipples(ctx, terrain, level, ticks){
   const heading = goalHeading(level);
   const span = heading === 1 ? terrain.length - level.goalX : level.goalX;
   if(span <= 1) return;
-  ctx.fillStyle = hex('t');
+  ctx.fillStyle = WATER[0];
   for(let i = 0; i < RIPPLE_COUNT; i++){
     const speed = 0.18 + (i % 3) * 0.05;
     // Drifts the same direction as the goose's own patrol reads on this
@@ -825,7 +876,10 @@ function drawTufts(ctx, terrain, level, rock){
     const x = h % terrain.length;
     const y = terrain[x];
     if(y >= SCENE_H || isPondAt(level, x) || (rock && rock[x])) continue;
-    ctx.fillStyle = hex((h >>> 17) & 1 ? 't' : 'g');
+    // Two greens off the top of the turf's own ramp. These used to be grass
+    // and mint, and mint is the pond's colour: a lawn speckled with it read
+    // as wet rather than as long in places.
+    ctx.fillStyle = (h >>> 17) & 1 ? GRASS[0] : GRASS[1];
     ctx.fillRect(x, y - 1, 1, 1);
   }
 }
@@ -866,7 +920,7 @@ const SPECKLE_COUNT = 40;
 const GRAIN_COUNT = 90;
 
 function drawSoilGrain(ctx, terrain, level, rock, floors){
-  ctx.fillStyle = SOIL_DARK;
+  ctx.fillStyle = SOIL[3];
   for(let i = 0; i < GRAIN_COUNT; i++){
     const h = Math.imul(i + 3313, 2654435761) >>> 0;
     const x = h % terrain.length;
@@ -939,7 +993,7 @@ function drawCattails(ctx, level, terrain){
   for(const dx of CATTAIL_DX){
     const x = level.goalX + dx * heading;
     if(x < 0 || x >= terrain.length) continue;
-    ctx.fillStyle = hex('G');
+    ctx.fillStyle = GRASS[5];
     ctx.fillRect(x, bankY - 7, 1, 7);
     ctx.fillStyle = hex('N');
     ctx.fillRect(x, bankY - 9, 1, 3);
@@ -972,7 +1026,7 @@ function drawLilyPads(ctx, terrain, level){
     if(y >= SCENE_H) continue;
     const w = Math.min(3, heading === 1 ? terrain.length - x : x + 1);
     const left = heading === 1 ? x : x - w + 1;
-    ctx.fillStyle = hex('G');
+    ctx.fillStyle = GRASS[4];
     ctx.fillRect(left, y, w, 1);
     ctx.fillStyle = hex('k');
     ctx.fillRect(heading === 1 ? left : left + w - 1, y, 1, 1);
