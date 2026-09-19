@@ -28,7 +28,8 @@ import {
   learnXp, jamXp, XP_PER_STAR, XP_PER_NEW_STAR,
   TRACKS, TRACK_BY_ID, secondsPerBeat, trackSpan,
   toSave, fromSave, SAVE_VERSION, OFFSET_MIN, OFFSET_MAX,
-  CAL_CLICKS, CAL_MIN_TAPS, calibrationFrom,
+  CAL_CLICKS, CAL_INTERVAL, CAL_WARMUP, CAL_MIN_TAPS, CAL_WOBBLE, calibrationFrom,
+  LATENCY_HIGH,
 } from '../public/gvb/content.js';
 
 const SPB = 60 / 104;                       // Funk world, and an awkward number
@@ -468,23 +469,73 @@ test('a save goes there and back, and a broken one loads as a fresh start', () =
   assert.equal(fromSave({ offset: 'late' }).offset, null);
 });
 
-test('calibration takes the median, and refuses to guess from too little', () => {
-  assert.equal(calibrationFrom([]), null);
-  assert.equal(calibrationFrom(null), null);
-  assert.equal(calibrationFrom(new Array(CAL_MIN_TAPS - 1).fill(0.05)), null,
+test('calibration is right at any latency, including the ones that broke it', () => {
+  /* The bug this replaced: taps were matched to whichever click they were
+   * NEAREST to, which folds over at half the click interval. At 120 BPM that
+   * was 250 ms — squarely inside Bluetooth range — so a player 300 ms behind
+   * had every tap attributed to the NEXT click, measured as minus fifty, and
+   * the game then ADDED fifty milliseconds to every hit on top of the three
+   * hundred they already had. It never returned null and it was wrong by up to
+   * 450 ms. The clicks are a second apart now, so the fold sits past anything
+   * real hardware does.
+   */
+  const clicks = [];
+  for(let i = 0; i < CAL_CLICKS; i++) clicks.push(100 + i * CAL_INTERVAL);
+  const perfect = ms => clicks.map(c => c + ms / 1000);
+
+  for(const ms of [0, 10, 40, 80, 150, 200, 249, 251, 300, 400, 450]){
+    const got = calibrationFrom(perfect(ms), clicks);
+    assert.ok(got, `${ms} ms should be measurable`);
+    assert.ok(Math.abs(got.offset * 1000 - ms) < 1,
+      `${ms} ms measured as ${Math.round(got.offset * 1000)}`);
+  }
+
+  // The fold has to sit past any real device, or the bug is only moved.
+  assert.ok(CAL_INTERVAL / 2 > 0.4,
+    'half the click interval is the highest latency this can measure, and Bluetooth reaches 300 ms');
+});
+
+test('calibration survives a real person tapping', () => {
+  const clicks = [];
+  for(let i = 0; i < CAL_CLICKS; i++) clicks.push(50 + i * CAL_INTERVAL);
+  const near = (got, ms, why) => {
+    assert.ok(got, `${why}: should still have measured something`);
+    assert.ok(Math.abs(got.offset * 1000 - ms) <= 30,
+      `${why}: measured ${Math.round(got.offset * 1000)} when the truth was ${ms}`);
+  };
+  for(const ms of [40, 300]){
+    const lat = ms / 1000;
+    // Wobble, in both directions, without any two taps the same.
+    const wobbly = clicks.map((c, i) => c + lat + ((i % 5) - 2) * 0.018);
+    near(calibrationFrom(wobbly, clicks), ms, 'jitter');
+    // Did not start tapping until the fourth click.
+    near(calibrationFrom(clicks.slice(3).map(c => c + lat), clicks), ms, 'a late start');
+    // Missed one in the middle — every tap after it would slip a whole beat
+    // if they were paired in order, which is why they are not.
+    near(calibrationFrom(clicks.filter((c, i) => i !== 7).map(c => c + lat), clicks), ms, 'a missed click');
+    // A couple of wild ones.
+    near(calibrationFrom(clicks.map((c, i) => c + lat + (i === 9 ? 0.45 : i === 5 ? -0.35 : 0)), clicks), ms, 'wild taps');
+    // Double-tapped a few.
+    near(calibrationFrom(clicks.concat(clicks.slice(0, 3)).map(c => c + lat), clicks), ms, 'double taps');
+  }
+});
+
+test('calibration says it cannot tell rather than guessing', () => {
+  const clicks = [];
+  for(let i = 0; i < CAL_CLICKS; i++) clicks.push(i * CAL_INTERVAL);
+  assert.equal(calibrationFrom([], clicks), null, 'no taps');
+  assert.equal(calibrationFrom(null, clicks), null);
+  assert.equal(calibrationFrom(clicks.map(c => c + 0.04), null), null);
+  assert.equal(calibrationFrom(clicks.slice(0, CAL_MIN_TAPS - 1).map(c => c + 0.04), clicks), null,
     'too few taps is no answer, not a bad one');
+  // Mashing: nothing near any click, consistently.
+  const mash = Array.from({ length: 30 }, (_, i) => i * 0.137);
+  const got = calibrationFrom(mash, clicks);
+  if(got) assert.ok(false, `mashing was read as a ${Math.round(got.offset * 1000)} ms calibration`);
 
-  const steady = new Array(CAL_MIN_TAPS).fill(0.08);
-  assert.ok(Math.abs(calibrationFrom(steady) - 0.08) < 1e-12);
-
-  /* One tap missed entirely would drag a mean across the whole calibration.
-     The median does not care, which is the reason it is the median. */
-  const withWild = [0.08, 0.08, 0.08, 0.08, 0.09, 0.07, 9.0];
-  assert.ok(Math.abs(calibrationFrom(withWild) - 0.08) < 0.02);
-
-  assert.equal(calibrationFrom(new Array(8).fill(2)), OFFSET_MAX, 'clamped at the top');
-  assert.equal(calibrationFrom(new Array(8).fill(-2)), OFFSET_MIN, 'and at the bottom');
-  assert.ok(CAL_CLICKS > CAL_MIN_TAPS, 'there must be more clicks than the minimum it needs');
+  assert.ok(CAL_WARMUP >= 1, 'the first taps are always ragged');
+  assert.ok(CAL_WOBBLE > 0 && CAL_WOBBLE < CAL_INTERVAL / 2);
+  assert.ok(LATENCY_HIGH < 0.25, 'past this the game tells you it is probably Bluetooth');
 });
 
 /* ----------------------------------------------------------- the whole thing */

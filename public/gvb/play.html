@@ -206,7 +206,7 @@ button:focus-visible,.pad:focus-visible{outline:3px solid var(--down);outline-of
   <section id="cal" class="hidden play">
     <button class="back" data-go="home">Back</button>
     <h2>Calibrate timing</h2>
-    <p class="muted" id="calInfo">You'll hear 16 clicks. Tap the pad (or press Space) on each one.</p>
+    <p class="muted" id="calInfo">You'll hear 12 clicks, one a second. Tap the pad (or press Space) on each one.</p>
     <button class="tapbig" id="calPad">Start</button>
     <div class="actions"><button class="secondary" id="calReset">Reset to default</button></div>
   </section>
@@ -238,7 +238,7 @@ import {
   snap, scoreHit, slotKey, pushedInto, filledInto, barBonus,
   PUSH_POINTS, FILL_POINTS, jamXp, LESSON_MS,
   STEPS_PER_BEAT, BEATS_PER_BAR, STEPS_PER_BAR,
-  CAL_CLICKS, CAL_INTERVAL, CAL_WARMUP, CAL_NEAR, calibrationFrom,
+  CAL_CLICKS, CAL_INTERVAL, calibrationFrom, LATENCY_HIGH,
   OUT_OF_SONG, ALREADY_PLAYED, OFF_THE_GRID,
   toSave, fromSave,
 } from './content.js';
@@ -328,7 +328,11 @@ function drawTracks(){
 
 $('#goLearn').addEventListener('click', () => { drawLessons(); show('learn'); });
 $('#goJam').addEventListener('click', () => { drawTracks(); show('jam'); });
-$('#goCal').addEventListener('click', () => { $('#calPad').textContent = 'Start'; show('cal'); });
+$('#goCal').addEventListener('click', () => {
+  $('#calPad').textContent = 'Start';
+  $('#calInfo').textContent = CAL_OPENING;
+  show('cal');
+});
 
 /* ---- the pads ----------------------------------------------------------- */
 
@@ -741,13 +745,21 @@ $('#nextBtn').addEventListener('click', () => {
 
 /* ---- calibration ---------------------------------------------------------- */
 
-/* Sixteen clicks at 120 BPM. The first four are warm-up and thrown away —
- * everybody is late on the first one, and on a four-count that is a quarter of
- * the sample. What is measured is how late the taps are against clicks the
- * player can already hear coming, which is exactly the number to subtract from
- * every hit afterwards.
+/* Twelve clicks, a second apart. What is measured is how late the taps are
+ * against clicks the player can already hear coming, which is exactly the
+ * number to take off every hit afterwards.
+ *
+ * Nothing is decided here. Which click a tap answered, and what to do about
+ * the ones that answered none, is content.js's problem — and it has to be,
+ * because the version that decided it here was catastrophically wrong above a
+ * quarter of a second and there was no way to test it.
  */
 let cal = null;
+
+const CAL_OPENING = `You'll hear ${CAL_CLICKS} clicks, one a second. Tap the pad (or press Space) on each one.`;
+const CAL_TAPPING = 'Keep tapping along. The first three clicks are warm-up.';
+const CAL_UNSURE = 'Could not tell from that — too few taps landed near a click. Try again.';
+
 function calStart(){
   ensureAudio(); stopSession();
   const ctx = audioCtx();
@@ -757,46 +769,60 @@ function calStart(){
     clicks.push(t0 + i * CAL_INTERVAL);
     click(t0 + i * CAL_INTERVAL, i % 4 === 0, 0.25, b);
   }
-  cal = { clicks, taps: [], end: t0 + CAL_CLICKS * CAL_INTERVAL + 0.3 };
+  cal = { clicks, taps: [], end: t0 + CAL_CLICKS * CAL_INTERVAL + 0.4 };
   $('#calPad').textContent = 'Tap on each click';
-  $('#calInfo').textContent = 'Keep tapping along. The first four clicks are warm-up.';
+  $('#calInfo').textContent = CAL_TAPPING;
   setTimeout(calFinish, (cal.end - ctx.currentTime) * 1000);
 }
+
 function calTap(){
   if(!cal){ calStart(); return; }
-  const t = audioCtx().currentTime;
-  let best = null;
-  cal.clicks.forEach((c, i) => {
-    if(i >= CAL_WARMUP && (best === null || Math.abs(t - c) < Math.abs(t - best))) best = c;
-  });
-  if(best !== null && Math.abs(t - best) < CAL_NEAR) cal.taps.push(t - best);
+  // The raw time, and no judgement about it. That is the whole change.
+  cal.taps.push(audioCtx().currentTime);
   const el = $('#calPad');
   el.style.setProperty('--glow', 'var(--down)');
   el.classList.remove('pulse');
   void el.offsetWidth;
   el.classList.add('pad', 'pulse');
 }
+
 function calFinish(){
   if(!cal) return;
-  const taps = cal.taps;
+  const { taps, clicks } = cal;
   cal = null;
   $('#calPad').classList.remove('pad', 'pulse');
-  const found = calibrationFrom(taps);
+
+  const found = calibrationFrom(taps, clicks);
   if(found === null){
-    $('#calInfo').textContent = 'Not enough taps landed near the clicks. Try again.';
+    $('#calInfo').textContent = CAL_UNSURE;
     $('#calPad').textContent = 'Start';
     return;
   }
-  save.offset = found;
+  save.offset = found.offset;
   writeSave();
-  $('#calInfo').textContent = `Done. Your device offset is ${Math.round(found * 1000)} ms.`;
+  $('#calInfo').textContent = latencyWords(found.offset);
   $('#calPad').textContent = 'Run again';
 }
+
+/* The figure, and nothing else — until there is something the player can
+   actually do, which is the one case worth spending words on. A delay this
+   big is almost never the browser and almost always a wireless connection,
+   and telling somebody their number is 260 without telling them that leaves
+   them stuck with a fact they cannot use. */
+function latencyWords(seconds){
+  const ms = Math.round(seconds * 1000);
+  if(seconds <= LATENCY_HIGH) return `Done. Correcting by ${ms} ms.`;
+  return `${ms} ms behind. If you're on Bluetooth headphones, switch to wired or the speakers —`
+    + ' that delay is the headphones, not the game, and no browser can shorten it.'
+    + ' Your scoring is corrected for it either way.';
+}
+
 $('#calPad').addEventListener('pointerdown', e => { e.preventDefault(); calTap(); });
 $('#calReset').addEventListener('click', () => {
   save.offset = null;
   writeSave();
-  $('#calInfo').textContent = 'Reset to your device’s reported latency.';
+  $('#calInfo').textContent = CAL_OPENING;
+  $('#calPad').textContent = 'Start';
 });
 
 /* ---- the keyboard --------------------------------------------------------- */

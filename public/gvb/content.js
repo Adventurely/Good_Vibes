@@ -433,22 +433,82 @@ export function fromSave(raw){
 }
 
 /* What a calibration is allowed to come out as. Below zero means the player
-   taps before the click they are copying, which happens and is small; the top
-   end is a Bluetooth speaker, which is genuinely a third of a second. */
+ * taps a fraction before the click they are copying, which happens and is
+ * small. The top used to be 0.3 on the grounds that a third of a second was
+ * the worst anything got; Bluetooth reaches past that, and clamping a real
+ * 450 ms down to 300 does not protect anybody, it just makes the scoring
+ * wrong by 150 ms and says nothing. It is a sanity bound now and nothing more.
+ */
 export const OFFSET_MIN = -0.05;
-export const OFFSET_MAX = 0.3;
+export const OFFSET_MAX = 1.0;
 
-export const CAL_CLICKS = 16;
-export const CAL_INTERVAL = 0.5;      // 120 BPM
-export const CAL_WARMUP = 4;          // the first four are not counted
-export const CAL_NEAR = 0.25;         // a tap further than this is not a tap at a click
-export const CAL_MIN_TAPS = 6;
+/* Where a delay stops being something you live with and starts being something
+   worth doing about. Past this it is audible on every hit, and on a laptop or a
+   phone it almost always means Bluetooth — which is the one cause a player can
+   actually act on, so it is the one the game mentions. */
+export const LATENCY_HIGH = 0.15;
 
-/* The median, not the mean: one tap missed entirely would drag a mean across
-   the whole calibration, and the median does not care. */
-export function calibrationFrom(taps){
-  if(!Array.isArray(taps) || taps.length < CAL_MIN_TAPS) return null;
-  const sorted = taps.slice().sort((a, b) => a - b);
-  const mid = sorted[Math.floor(sorted.length / 2)];
-  return Math.min(OFFSET_MAX, Math.max(OFFSET_MIN, mid));
+/* Twelve clicks a second apart, and the interval is the whole design.
+ *
+ * Each tap is judged on its own against whichever click it is nearest to,
+ * which is what makes the measurement survive a real person: a missed click, a
+ * late start, a double tap and a sneeze all cost one tap rather than corrupting
+ * everything after them. The catch with nearest-click is that it folds over at
+ * half the interval — beyond that it starts answering with the NEXT click. At
+ * 120 BPM that fold was at 250 ms, which is squarely inside Bluetooth range,
+ * and it turned a measured 300 ms into minus fifty: the game then ADDED fifty
+ * milliseconds to every hit on top of the three hundred the player already had.
+ * The calibration was worst for exactly the people who needed it.
+ *
+ * So the clicks are a second apart instead. The fold moves to half a second,
+ * past anything real hardware does — bad Bluetooth tops out around 300 ms —
+ * and the ambiguity stops existing rather than being worked around. It costs
+ * twelve seconds of tapping at a tempo nobody struggles to keep.
+ */
+export const CAL_CLICKS = 12;
+export const CAL_INTERVAL = 1.0;      // 60 BPM
+export const CAL_WARMUP = 3;          // everybody is ragged on the first few
+export const CAL_MIN_TAPS = 5;
+export const CAL_WOBBLE = 0.15;       // how far from the median is still a tap
+
+const median = xs => {
+  const sorted = xs.slice().sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)];
+};
+
+/* How far behind the player's device is, from a run of clicks and the taps
+ * that answered them. Both arrays are absolute times on the audio clock.
+ *
+ * Returns null when it cannot tell, which is an honest answer and a far better
+ * one than a confident wrong number — the previous version never returned null
+ * and was wrong by up to 450 ms.
+ */
+export function calibrationFrom(taps, clicks){
+  if(!Array.isArray(taps) || !Array.isArray(clicks)) return null;
+  const counted = clicks.slice(CAL_WARMUP).map(c => num(c));
+  if(!counted.length) return null;
+
+  const diffs = [];
+  for(const raw of taps){
+    const t = num(raw);
+    let near = counted[0];
+    for(const c of counted) if(Math.abs(t - c) < Math.abs(t - near)) near = c;
+    const d = t - near;
+    // Further than half an interval from every click is not a tap at a click.
+    // It is a warm-up tap, or somebody putting their phone down.
+    if(Math.abs(d) < CAL_INTERVAL / 2) diffs.push(d);
+  }
+  if(diffs.length < CAL_MIN_TAPS) return null;
+
+  /* The median, and then everything far from it thrown away and the median
+     taken again. One tap missed entirely would drag a mean across the whole
+     run; the median does not care, and the second pass stops a handful of
+     wild ones widening the answer. */
+  const mid = median(diffs);
+  const kept = diffs.filter(d => Math.abs(d - mid) < CAL_WOBBLE);
+  if(kept.length < CAL_MIN_TAPS) return null;
+
+  const measured = median(kept);
+  if(measured < OFFSET_MIN || measured > OFFSET_MAX) return null;
+  return { offset: measured, taps: kept.length, of: diffs.length };
 }
