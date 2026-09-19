@@ -607,6 +607,52 @@ export const SONGS = {
   stones: STONES_SONG, belfry: BELFRY_SONG, errand: ERRAND_SONG,
 };
 
+/* ------------------------------------------------------------------ room --- */
+
+/* The space each level sounds like it is in.
+ *
+ * Every note in this game used to run oscillator -> filter -> gain -> one bus
+ * -> speakers. Dry, mono, and with nothing to sit in. That is the real reason
+ * it sounded small: not the waveforms, which are fine, but that a tunnel and
+ * an open lawn were being played in exactly the same nowhere. A reverb is the
+ * one effect that says where a sound is happening, and this game already
+ * knows — it has twelve levels and each one is a place.
+ *
+ * So one room per level, keyed the same way SONGS is, and checked against the
+ * level list by the same two-way test: a level with a song but no room would
+ * fall back to a default and nobody would ever hear that it had.
+ *
+ *   seconds  how long the tail runs. Distance, roughly: a hedgerow is close
+ *            around you, The Belfry is a stone tower.
+ *   decay    how fast it falls away inside that time. High is a room that
+ *            swallows sound (soft, cluttered, full of leaves); low is one
+ *            that hands it back (stone, water, rock).
+ *   tone     where the tail is rolled off. Air absorbs the top end with
+ *            distance and so does anything soft, so a close dead room and a
+ *            long bright one differ here as much as in `seconds`.
+ *   mix      how much of it comes back at all.
+ *   echo     and how much of the tempo-synced delay does — the repeat on the
+ *            lead line. Generous in a tower, almost nothing in a hedge.
+ */
+export const ROOMS = {
+  park:     { seconds: 1.0, decay: 2.8, tone: 3600, mix: 0.50, echo: 0.40 },
+  warren:   { seconds: 1.9, decay: 1.6, tone: 1400, mix: 0.95, echo: 0.55 },  // underground
+  orchard:  { seconds: 1.2, decay: 2.4, tone: 3000, mix: 0.60, echo: 0.35 },
+  grove:    { seconds: 1.4, decay: 2.2, tone: 2600, mix: 0.65, echo: 0.35 },
+  aerie:    { seconds: 2.4, decay: 3.2, tone: 4200, mix: 0.75, echo: 0.50 },  // open sky
+  spire:    { seconds: 2.0, decay: 1.9, tone: 2200, mix: 0.85, echo: 0.45 },  // a shaft of rock
+  falls:    { seconds: 1.6, decay: 2.6, tone: 3800, mix: 0.70, echo: 0.40 },
+  hedgerow: { seconds: 0.7, decay: 3.4, tone: 2400, mix: 0.40, echo: 0.12 },  // leaves, close in
+  overlook: { seconds: 2.2, decay: 3.0, tone: 4000, mix: 0.70, echo: 0.45 },
+  stones:   { seconds: 2.0, decay: 2.8, tone: 3900, mix: 0.70, echo: 0.50 },  // water, wide
+  belfry:   { seconds: 3.0, decay: 1.7, tone: 2800, mix: 1.00, echo: 0.60 },  // a stone tower
+  errand:   { seconds: 1.3, decay: 2.6, tone: 3400, mix: 0.55, echo: 0.38 },
+};
+
+/* What a level with no room of its own would get. Nothing uses it while the
+   table above is complete, and a test keeps it complete. */
+const DEFAULT_ROOM = ROOMS.park;
+
 /* Every sound effect there is, by the name a caller asks for it with.
  *
  * Declared out here so it can be checked from Node without an audio context:
@@ -621,26 +667,186 @@ export const SFX_NAMES = ['quack', 'lost', 'goosed', 'hatch', 'zing'];
 /* ------------------------------------------------------------------ engine --- */
 
 export function createAudio(){
-  let ctx = null, bus = null;
+  let ctx = null, bus = null, master = null;
+  let revIn = null, revConv = null, revOut = null;
+  let delayNode = null, delayIn = null, delayOut = null, delayFeedback = null;
+  let room = DEFAULT_ROOM;
   let timer = null, step = 0, nextTime = 0;
   let song = null, songName = null;
   let muted = false;
   try{ muted = localStorage.getItem('ddq-muted') === '1'; }catch{ /* private mode */ }
 
+  /* A room, as a buffer, generated rather than fetched.
+   *
+   * A convolution reverb needs an impulse response, and the usual way to get
+   * one is to ship a recording of a real hall. This game ships no audio files
+   * at all — every sound in it is synthesised on the fly — and a second or
+   * two of stereo noise falling away exponentially is what a real impulse
+   * response mostly IS once the first few reflections have gone. It costs
+   * about fifteen lines and nothing to download.
+   *
+   * Two channels of independent noise rather than one copied to both, which
+   * is what makes the tail stereo: the left and right ears get different
+   * reflections, exactly as they would in a room, and the width comes out for
+   * free without a single panner.
+   *
+   * Two things this needs that a plain noise burst does not have:
+   *
+   * EARLY REFLECTIONS. A room is not a smooth wash — the first thing that
+   * comes back is a handful of discrete slaps off the nearest surfaces, and
+   * those are most of what tells the ear how big the place is. Without them
+   * even a long tail reads as "reverb effect" rather than as a room. A dozen
+   * spikes in the first fifth of the buffer, at different offsets in each
+   * ear, is enough.
+   *
+   * NORMALISATION, done here rather than left to the ConvolverNode. Its own
+   * `normalize` is meant for recorded impulse responses and scales by a rule
+   * that has little to do with what this generator produces: the first cut of
+   * this measured a tail at a fiftieth of the dry signal in the largest room
+   * in the game, which is a reverb nobody can hear. Scaling each channel to
+   * unit energy instead makes convolution roughly preserve level, so `mix`
+   * below means what it says — and the twelve rooms can be tuned against each
+   * other rather than against whatever the browser decided.
+   */
+  function impulse(seconds, decay){
+    const rate = ctx.sampleRate;
+    const n = Math.max(1, Math.floor(rate * seconds));
+    const buf = ctx.createBuffer(2, n, rate);
+    for(let ch = 0; ch < 2; ch++){
+      const d = buf.getChannelData(ch);
+      for(let i = 0; i < n; i++){
+        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, decay);
+      }
+      // The early reflections, laid over the wash: the nearer surfaces, whose
+      // spacing is what the ear actually measures a room by.
+      const early = Math.floor(n / 5);
+      for(let k = 0; k < 12; k++){
+        const at = Math.floor((k + 1) * early / 13 + (ch ? 53 : 0) + k * 17);
+        if(at < n) d[at] += (k % 2 ? -1 : 1) * 0.9 * Math.pow(1 - at / n, decay * 0.5);
+      }
+      let energy = 0;
+      for(let i = 0; i < n; i++) energy += d[i] * d[i];
+      const scale = energy > 0 ? 1 / Math.sqrt(energy) : 0;
+      for(let i = 0; i < n; i++) d[i] *= scale;
+    }
+    return buf;
+  }
+
+  /* The whole signal path, built once:
+   *
+   *            ┌─────────────→ reverb ──→ revOut ─┐
+   *   voices ──┤                                  ├─→ glue ─→ limit ─→ master
+   *            ├─ (dry) ─────────────────────────→┤
+   *            └─────────────→ delay ───→ delayOut┘
+   *
+   * `glue` is a gentle bus compressor and `limit` a brick wall above it. Both
+   * are new and both are needed: the game can put a quack, a hatch and a
+   * downbeat on the same millisecond, and three envelopes summing into one
+   * gain node is how a mix clips. The compressor rides the peaks so the music
+   * ducks a little under an effect rather than fighting it, and the limiter
+   * catches whatever still gets through.
+   */
   function ensure(){
     if(!ctx){
       ctx = new (window.AudioContext || window.webkitAudioContext)();
-      bus = ctx.createGain();
-      bus.gain.value = muted ? 0 : 0.5;
-      bus.connect(ctx.destination);
+
+      bus = ctx.createGain();          // where every voice lands, dry
+      bus.gain.value = 1;
+
+      // The reverb send, rolled off top and bottom before it ever reaches the
+      // tail. Low end in a reverb is mud — it is the first thing to cut on a
+      // real desk — and the top is what air absorbs with distance, which is
+      // most of what makes a long tail sound far away rather than merely long.
+      revIn = ctx.createGain();
+      revIn.gain.value = 1;
+      const revLow = ctx.createBiquadFilter();
+      revLow.type = 'highpass'; revLow.frequency.value = 260;
+      const revHigh = ctx.createBiquadFilter();
+      revHigh.type = 'lowpass'; revHigh.frequency.value = room.tone;
+      revConv = ctx.createConvolver();
+      revConv.normalize = false;   // see impulse(): we scale it ourselves
+      revConv.buffer = impulse(room.seconds, room.decay);
+      revOut = ctx.createGain();
+      revOut.gain.value = room.mix;
+      revIn.connect(revLow).connect(revHigh).connect(revConv).connect(revOut);
+      revIn._tone = revHigh;           // kept so a room change can reach it
+
+      /* The delay send: one repeat chasing the lead line, fed back on itself
+         through a low-pass so each repeat is darker than the one before —
+         which is what a repeat does in any real space, and what stops a
+         feedback line turning into a drone. Its time is set from the song's
+         own bpm (see setRoom), so the echo lands on the beat rather than
+         somewhere near it. */
+      delayIn = ctx.createGain();
+      delayNode = ctx.createDelay(2);
+      delayNode.delayTime.value = 0.32;
+      const damp = ctx.createBiquadFilter();
+      damp.type = 'lowpass'; damp.frequency.value = 2400;
+      delayFeedback = ctx.createGain();
+      delayFeedback.gain.value = 0.32;
+      delayOut = ctx.createGain();
+      delayOut.gain.value = room.echo;
+      delayIn.connect(delayNode);
+      delayNode.connect(damp).connect(delayFeedback).connect(delayNode);
+      delayNode.connect(delayOut);
+
+      const glue = ctx.createDynamicsCompressor();
+      glue.threshold.value = -16; glue.knee.value = 26; glue.ratio.value = 3.2;
+      glue.attack.value = 0.006; glue.release.value = 0.2;
+
+      const limit = ctx.createDynamicsCompressor();
+      limit.threshold.value = -1.5; limit.knee.value = 0; limit.ratio.value = 20;
+      limit.attack.value = 0.001; limit.release.value = 0.06;
+
+      master = ctx.createGain();
+      master.gain.value = muted ? 0 : 0.5;
+
+      bus.connect(glue);
+      revOut.connect(glue);
+      delayOut.connect(glue);
+      glue.connect(limit).connect(master).connect(ctx.destination);
     }
-    if(ctx.state === 'suspended') ctx.resume();
+    // iOS can reject this rather than merely not take (see isRunning below);
+    // an unhandled rejection helps nobody, and the page keeps listening for
+    // another gesture either way.
+    if(ctx.state === 'suspended') Promise.resolve(ctx.resume()).catch(() => {});
     return ctx;
   }
 
+  /* Where a finished voice goes: into the dry bus, and into whichever sends
+   * it asked for.
+   *
+   * `opt` is `{ pan, rev, dly }`, all optional, all zero by default — so
+   * anything that does not say otherwise comes out exactly where it used to,
+   * dead centre and dry. Panning is per-voice rather than per-part because
+   * the parts share `voice()`: the lead sits a little right of centre and the
+   * chord stabs a little left, which is the cheapest width there is and most
+   * of why a two-channel tracker loop sounds wider than the sum of its notes.
+   * Bass and kick stay centred, always — low end belongs in the middle.
+   */
+  function route(node, opt){
+    let out = node;
+    if(opt && opt.pan){
+      const p = ctx.createStereoPanner();
+      p.pan.value = opt.pan;
+      node.connect(p);
+      out = p;
+    }
+    out.connect(bus);
+    if(opt && opt.rev){
+      const g = ctx.createGain(); g.gain.value = opt.rev;
+      out.connect(g).connect(revIn);
+    }
+    if(opt && opt.dly){
+      const g = ctx.createGain(); g.gain.value = opt.dly;
+      out.connect(g).connect(delayIn);
+    }
+  }
+
   /* One note. `cut` is optional — a low-pass cutoff that gives the funk bass
-     its rounded, plucked shape instead of a raw sawtooth buzz. */
-  function voice(freq, t, dur, type, vol, glideTo, cut){
+     its rounded, plucked shape instead of a raw sawtooth buzz. `send` is the
+     `{ pan, rev, dly }` above. */
+  function voice(freq, t, dur, type, vol, glideTo, cut, send){
     const o = ctx.createOscillator(), g = ctx.createGain();
     o.type = type;
     o.frequency.setValueAtTime(freq, t);
@@ -657,7 +863,8 @@ export function createAudio(){
       o.connect(f);
       out = f;
     }
-    out.connect(g).connect(bus);
+    out.connect(g);
+    route(g, send);
     o.start(t); o.stop(t + dur + 0.02);
   }
 
@@ -665,7 +872,7 @@ export function createAudio(){
      `sweepTo` is optional — a filter that opens or closes as the noise
      plays, rather than sitting at one fixed cutoff, which is what turns a
      click into a puff of air with a shape to it. */
-  function hit(t, dur, vol, cut, type = 'highpass', sweepTo){
+  function hit(t, dur, vol, cut, type = 'highpass', sweepTo, send){
     const n = Math.floor(ctx.sampleRate * dur);
     const buf = ctx.createBuffer(1, n, ctx.sampleRate);
     const d = buf.getChannelData(0);
@@ -677,11 +884,49 @@ export function createAudio(){
     const g = ctx.createGain();
     g.gain.setValueAtTime(vol, t);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    src.connect(f).connect(g).connect(bus);
+    src.connect(f).connect(g);
+    route(g, send);
     src.start(t);
   }
 
+  /* Move the whole rig into a different room, which is what changing level
+     does. The impulse is rebuilt rather than crossfaded — this only ever
+     happens between levels, with nothing playing through it. */
+  function setRoom(next, bpm){
+    room = next || DEFAULT_ROOM;
+    if(!ctx) return;
+    revConv.buffer = impulse(room.seconds, room.decay);
+    revIn._tone.frequency.value = room.tone;
+    revOut.gain.value = room.mix;
+    delayOut.gain.value = room.echo;
+    // A dotted eighth, the repeat that falls between the beats rather than on
+    // them — the oldest trick there is for making one delay sound like a part.
+    if(bpm) delayNode.delayTime.value = (60 / bpm) * 0.75;
+  }
+
   /* ---- the sequencer ---------------------------------------------------- */
+
+  /* Where each part sits in the picture: `pan` across, `rev` how far back,
+   * `dly` whether it repeats.
+   *
+   * The rules are the ordinary ones. Bass and kick are centred and nearly
+   * dry, because low end belongs in the middle and reverb on it is mud. The
+   * lead and the chord stabs sit either side of centre and carry most of the
+   * reverb, which is what opens the picture up. Only the lead is fed to the
+   * delay — a repeat on everything is a smear, a repeat on the one part
+   * carrying the tune is an arrangement. The hats sit slightly off-centre on
+   * opposite sides, which is free width on the part that can afford it.
+   */
+  const SEND = {
+    bass:    { rev: 0.05 },
+    lead:    { pan: 0.22, rev: 0.30, dly: 0.30 },
+    stab:    { pan: -0.26, rev: 0.36 },
+    kick:    { rev: 0.04 },
+    snare:   { rev: 0.24 },
+    hat:     { pan: 0.16, rev: 0.12 },
+    openHat: { pan: -0.20, rev: 0.20 },
+    fill:    { rev: 0.24 },
+  };
 
   function scheduleStep(s, t){
     const cfg = song;
@@ -695,28 +940,28 @@ export function createAudio(){
     const [root, quality] = barCfg.chord;
 
     for(const [at, semis, len] of cfg.bass){
-      if(at === inBar) voice(midi(root - 12 + semis), t, stepLen * len * 0.92, cfg.bassType, cfg.bassLevel, null, cfg.bassCut);
+      if(at === inBar) voice(midi(root - 12 + semis), t, stepLen * len * 0.92, cfg.bassType, cfg.bassLevel, null, cfg.bassCut, SEND.bass);
     }
 
     const leadPattern = barCfg.lead === 'response' ? cfg.leadResponse : cfg.lead;
     for(const [at, semis, len] of leadPattern){
-      if(at === inBar) voice(midi(root + semis), t, stepLen * len * 0.85, cfg.leadType, cfg.leadLevel, null, cfg.leadCut);
+      if(at === inBar) voice(midi(root + semis), t, stepLen * len * 0.85, cfg.leadType, cfg.leadLevel, null, cfg.leadCut, SEND.lead);
     }
 
     // The chord's own shape, finally audible — see the header note above.
     if(cfg.stabAt && cfg.stabAt.includes(inBar)){
       for(const interval of QUALITIES[quality]){
         if(interval === 0) continue; // the bass already has the root
-        voice(midi(root + interval), t, stepLen * 0.9, cfg.stabType, cfg.stabLevel, null, cfg.stabCut);
+        voice(midi(root + interval), t, stepLen * 0.9, cfg.stabType, cfg.stabLevel, null, cfg.stabCut, SEND.stab);
       }
     }
 
-    if(cfg.kickAt.includes(inBar)) voice(112, t, 0.09, 'sine', 0.2, 42);
-    if(cfg.snareAt.includes(inBar)) hit(t, 0.09, 0.13, 2200);
-    if(cfg.hatAt.includes(inBar)) hit(t, 0.035, 0.05, 8500);
-    if(cfg.openHatAt.includes(inBar)) hit(t, 0.15, 0.045, 7500);
+    if(cfg.kickAt.includes(inBar)) voice(112, t, 0.09, 'sine', 0.2, 42, null, SEND.kick);
+    if(cfg.snareAt.includes(inBar)) hit(t, 0.09, 0.13, 2200, 'highpass', null, SEND.snare);
+    if(cfg.hatAt.includes(inBar)) hit(t, 0.035, 0.05, 8500, 'highpass', null, SEND.hat);
+    if(cfg.openHatAt.includes(inBar)) hit(t, 0.15, 0.045, 7500, 'highpass', null, SEND.openHat);
     // The turnaround: a quick pickup into the loop's start, on the last bar only.
-    if(barCfg.fill && inBar >= 12) hit(t, 0.05, 0.085, 2600);
+    if(barCfg.fill && inBar >= 12) hit(t, 0.05, 0.085, 2600, 'highpass', null, SEND.fill);
   }
 
   function pump(){
@@ -733,9 +978,11 @@ export function createAudio(){
 
   function play(name){
     if(songName === name) return;
+    room = ROOMS[name] || DEFAULT_ROOM;
     if(!ctx){ songName = name; song = SONGS[name] || null; return; } // starts on first gesture
     songName = name;
     song = SONGS[name] || null;
+    setRoom(room, song && song.bpm);
     clearInterval(timer);
     timer = null;
     if(!song) return;
@@ -745,9 +992,12 @@ export function createAudio(){
   }
 
   /* Called from the first user gesture: builds the context and starts
-     whatever play() was asked for while the page had no audio yet. */
+     whatever play() was asked for while the page had no audio yet. The room
+     is set again here because `play()` may well have been called before there
+     was a context to set it on. */
   function unlock(){
     ensure();
+    setRoom(room, song && song.bpm);
     if(song && !timer){
       step = 0;
       nextTime = ctx.currentTime + 0.05;
@@ -765,7 +1015,7 @@ export function createAudio(){
   function setMuted(next){
     muted = !!next;
     try{ localStorage.setItem('ddq-muted', muted ? '1' : '0'); }catch{ /* fine */ }
-    if(bus) bus.gain.value = muted ? 0 : 0.5;
+    if(master) master.gain.value = muted ? 0 : 0.5;
   }
 
   /* ---- sound effects ------------------------------------------------ */
@@ -829,10 +1079,10 @@ export function createAudio(){
     return quackWave;
   }
 
-  function quackSyllable(t, dur, vol, f0 = 230, fEnd = 178){
+  function quackSyllable(t, dur, vol, f0 = 230, fEnd = 178, send){
     const out = ctx.createGain();
     out.gain.value = vol;
-    out.connect(bus);
+    route(out, send);
 
     const env = ctx.createGain();
     env.gain.setValueAtTime(0.0001, t);
@@ -894,6 +1144,30 @@ export function createAudio(){
    * "a duckling just made it home", and it was getting lost under the
    * backing track instead of landing as a payoff.
    */
+  /* And where the effects sit. Every one of them was bone dry before, which
+   * is why they read as pasted over the music rather than happening in the
+   * same place as it: a quack in a tunnel and a quack on an open lawn were
+   * the same recording.
+   *
+   * They carry MORE reverb than the music, not less, and deliberately. The
+   * music is a bed and wants to stay behind the game; an effect is a thing
+   * that just happened somewhere in the scene, and the tail is what puts it
+   * there. The zing is the only one fed to the delay — it is a machine, it
+   * is the one sound here allowed to ring.
+   */
+  const FX_SEND = {
+    quack:   { rev: 0.38 },
+    breath:  { rev: 0.22 },
+    lost:    { rev: 0.42 },
+    thump:   { rev: 0.14 },              // the landing stays close and dry
+    honk:    { pan: -0.18, rev: 0.40 },
+    caught:  { pan: 0.14, rev: 0.42 },
+    hatch:   { rev: 0.30 },
+    shell:   { rev: 0.18 },
+    zing:    { rev: 0.45, dly: 0.38 },
+    spark:   { rev: 0.30, dly: 0.20 },
+  };
+
   const SFX = {
     // "Quack quack" — one call on its own reads as a blip; a duck actually
     // says it twice, the second call close on the heel of the first rather
@@ -908,12 +1182,12 @@ export function createAudio(){
          time would be the loudest thing in the game by a distance. */
       // A short puff of breath on the attack, under the note rather than
       // in front of it — this is the air, not the voice.
-      hit(t, 0.02, 0.04, 1800, 'bandpass');
-      quackSyllable(t, 0.20, 0.62, 230, 178);
+      hit(t, 0.02, 0.04, 1800, 'bandpass', null, FX_SEND.breath);
+      quackSyllable(t, 0.20, 0.62, 230, 178, FX_SEND.quack);
 
       const t2 = t + 0.23;
-      hit(t2, 0.018, 0.03, 1800, 'bandpass');
-      quackSyllable(t2, 0.16, 0.43, 216, 172);
+      hit(t2, 0.018, 0.03, 1800, 'bandpass', null, FX_SEND.breath);
+      quackSyllable(t2, 0.16, 0.43, 216, 172, FX_SEND.quack);
     },
 
     /* The duckling that didn't — two sounds, not one, matching the poof it
@@ -925,10 +1199,10 @@ export function createAudio(){
     lost(t){
       // The puff: noise swept bright to dark as it settles, rather than
       // sitting at one muffled cutoff the whole time.
-      hit(t, 0.2, 0.17, 2400, 'bandpass', 420);
+      hit(t, 0.2, 0.17, 2400, 'bandpass', 420, FX_SEND.lost);
       // The thump: a low sine falling under the puff, for the landing
       // rather than for the feathers.
-      voice(150, t, 0.12, 'sine', 0.14, 62, 300);
+      voice(150, t, 0.12, 'sine', 0.14, 62, 300, FX_SEND.thump);
     },
 
     /* The goose actually catching one — its own sound, not the generic
@@ -955,12 +1229,13 @@ export function createAudio(){
       g.gain.setValueAtTime(0.0001, t);
       g.gain.exponentialRampToValueAtTime(0.24, t + 0.015);
       g.gain.exponentialRampToValueAtTime(0.0001, t + 0.19);
-      o.connect(band).connect(g).connect(bus);
+      o.connect(band).connect(g);
+      route(g, FX_SEND.honk);
       o.start(t); o.stop(t + 0.2);
 
       // The catch, hard on the honk's heel — short and sharp rather than
       // the two full, rounded syllables a safe arrival gets.
-      quackSyllable(t + 0.1, 0.09, 0.55);
+      quackSyllable(t + 0.1, 0.09, 0.55, 230, 178, FX_SEND.caught);
     },
 
     /* A new duckling, right as it steps out of the nest — quick and light,
@@ -977,8 +1252,8 @@ export function createAudio(){
        again the length of the peep — still the quietest thing here after the
        zap, and still well under the quack, but now actually a sound. */
     hatch(t){
-      hit(t, 0.025, 0.2, 3200, 'bandpass');
-      voice(950, t + 0.008, 0.12, 'triangle', 0.19, 1500, 5000);
+      hit(t, 0.025, 0.2, 3200, 'bandpass', null, FX_SEND.shell);
+      voice(950, t + 0.008, 0.12, 'triangle', 0.19, 1500, 5000, FX_SEND.hatch);
     },
 
     /* A teleporter taking a duckling — the one thing in this game that is
@@ -1010,10 +1285,10 @@ export function createAudio(){
      * the old one was not, and no louder.
      */
     zing(t){
-      voice(1400, t, 0.09, 'triangle', 0.13, 5200);
-      voice(2600, t + 0.02, 0.22, 'sine', 0.085, 2100);
-      voice(3880, t + 0.025, 0.17, 'sine', 0.045, 3200);
-      hit(t, 0.045, 0.09, 4200, 'highpass');
+      voice(1400, t, 0.09, 'triangle', 0.13, 5200, null, FX_SEND.zing);
+      voice(2600, t + 0.02, 0.22, 'sine', 0.085, 2100, null, FX_SEND.zing);
+      voice(3880, t + 0.025, 0.17, 'sine', 0.045, 3200, null, FX_SEND.zing);
+      hit(t, 0.045, 0.09, 4200, 'highpass', null, FX_SEND.spark);
     },
   };
 

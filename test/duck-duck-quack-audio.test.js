@@ -20,7 +20,7 @@ import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 
 import { LEVELS } from '../public/duck-duck-quack/content.js';
-import { SONGS, SFX_NAMES, createAudio } from '../public/duck-duck-quack/audio.js';
+import { SONGS, ROOMS, SFX_NAMES, createAudio } from '../public/duck-duck-quack/audio.js';
 
 /* The chord shapes the sequencer knows how to voice. Named here rather than
    imported because QUALITIES is private to the module — if one is ever
@@ -115,6 +115,63 @@ test('every song plays itself out and then turns around', () => {
   }
 });
 
+
+/* -------------------------------------------------------------- the rooms */
+
+/* ROOMS is indexed by level id exactly as SONGS is, and it can go wrong in
+ * exactly the same silent way: a level missing from it falls back to the
+ * park's room and plays a tunnel as if it were a lawn, with nothing to say
+ * so. Same two-way check, then the numbers, because an impulse response is
+ * generated from them at runtime — a negative length or a decay of zero is a
+ * buffer full of NaN and a level that plays silence.
+ */
+
+test('every level has a room, and no room is left over', () => {
+  for(const level of LEVELS){
+    assert.ok(ROOMS[level.id], `${level.id} ("${level.name}") has no room`);
+  }
+  const ids = new Set(LEVELS.map(l => l.id));
+  for(const name of Object.keys(ROOMS)){
+    assert.ok(ids.has(name), `ROOMS has "${name}", which is not a level`);
+  }
+});
+
+test('every room is a space a reverb can actually be built from', () => {
+  for(const [name, r] of Object.entries(ROOMS)){
+    // Long enough to be a tail, short enough that the buffer stays sane: at
+    // 48kHz stereo, six seconds is already half a megabyte of float.
+    assert.ok(r.seconds > 0.2 && r.seconds <= 6, `${name}: ${r.seconds}s is not a room`);
+    assert.ok(r.decay > 0.5 && r.decay <= 8, `${name}: decay ${r.decay}`);
+    assert.ok(r.tone > 500 && r.tone < 20000, `${name}: tone ${r.tone}Hz`);
+    assert.ok(r.mix > 0 && r.mix <= 1.2, `${name}: mix ${r.mix}`);
+    assert.ok(r.echo >= 0 && r.echo <= 1, `${name}: echo ${r.echo}`);
+  }
+});
+
+/* The one thing a table of twelve hand-tuned rooms is really for. If every
+   level ends up in the same space, the table is doing nothing that a single
+   constant would not do, and the levels stop sounding like different places
+   — which is the whole reason it exists. */
+test('the levels are not all in the same room', () => {
+  for(const field of ['seconds', 'decay', 'tone', 'mix', 'echo']){
+    const values = new Set(Object.values(ROOMS).map(r => r[field]));
+    assert.ok(values.size >= 4,
+      `every level has nearly the same ${field} (${values.size} distinct) — ` +
+      'the rooms are not telling the places apart');
+  }
+});
+
+/* The two the rest are judged against: a tunnel is the closest, darkest
+   space in the game and a bell tower the largest, and if those two ever stop
+   being at opposite ends of the table something has drifted. */
+test('the tunnel sounds enclosed and the tower sounds enormous', () => {
+  assert.ok(ROOMS.warren.tone < ROOMS.park.tone, 'a tunnel should be darker than a lawn');
+  assert.ok(ROOMS.belfry.seconds > ROOMS.warren.seconds, 'a bell tower should ring longer than a burrow');
+  assert.equal(ROOMS.belfry.seconds, Math.max(...Object.values(ROOMS).map(r => r.seconds)),
+    'the bell tower should be the largest space in the game');
+  assert.equal(ROOMS.hedgerow.seconds, Math.min(...Object.values(ROOMS).map(r => r.seconds)),
+    'a hedgerow should be the closest space in the game');
+});
 
 /* ------------------------------------------------------------ the effects */
 
