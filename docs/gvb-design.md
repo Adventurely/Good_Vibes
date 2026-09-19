@@ -153,6 +153,34 @@ Tempo and time signature come from song metadata, not audio analysis. Hits are a
   rather than working around it, and it fits "make up your own percussion jams"
   well. Worth revisiting.
 
+## 8c. The Beat Looper (new, shipped)
+
+Asked for as "a mode where the user can just make beats without the music, then
+play them back". Three independent designs were put up — a loop station, a tape
+recorder and a teaching sandbox — and judged by three lenses. Jack picked the
+most ambitious combination of the open questions:
+
+- **Loop and overdub**, not one take. A fixed loop runs, Record commits one lap,
+  layers stack, Undo removes the last one.
+- **Raw, with a Straighten lens.** Playback is exactly what was played until the
+  switch is flicked; the take underneath is never altered.
+- **Four slots**, kept under their own `gvb:loops` key.
+- Plus **velocity**, from where on the pad the finger landed.
+
+Three things the judges caught, all of them acted on:
+
+- `snap()` is a scorer, not a recorder. Per-hit grid choice scatters evenly
+  played hits across two grids and puts a permanent stumble in the loop. A take
+  picks one grid for itself; pinned by a test with the exact failing case.
+- `offsetSec()` is not stable within a session — it changes the moment somebody
+  calibrates. Loops therefore store positions ALREADY corrected, in beats, so a
+  mid-session recalibration cannot rewrite a recording.
+- Every hit in the game was velocity 1, though the `v` parameter has been on
+  every drum in audio.js since it was written.
+
+Open: whether a loop can become the backing for a scored Jam. It was the best
+idea in the design that lost, and it is the obvious next step.
+
 ## 9. Open items / next steps
 
 1. Pick the drumless music source and licensing (section 6).

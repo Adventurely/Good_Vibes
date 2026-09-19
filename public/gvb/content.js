@@ -530,3 +530,174 @@ export function calibrationFrom(taps, clicks){
   if(measured < OFFSET_MIN || measured > OFFSET_MAX) return null;
   return { offset: measured, taps: kept.length, of: diffs.length };
 }
+
+/* ------------------------------------------------------- the Beat Looper
+ *
+ * The loop pedal: no song, no score, no grade. A loop of a fixed length runs
+ * round and round, everything you play is heard as you play it, and pressing
+ * Record puts one lap of it into the loop so it comes back at you. Stack laps
+ * until it is a beat.
+ *
+ * A loop is layers, not one flat list, because the thing you most want when you
+ * have put four passes down is to take the last one off without losing the
+ * other three.
+ *
+ * --- Positions are in BEATS, never seconds ---------------------------------
+ *
+ * A hit is `{ pad, at, level }` where `at` counts beats from the top of the
+ * loop. That is what lets the same loop play at a different tempo and still be
+ * the same loop, and it is why nothing below takes a BPM.
+ *
+ * --- And they are stored already corrected ---------------------------------
+ *
+ * The page takes the player's measured latency off a hit before handing it
+ * here, so what is stored is where they MEANT it, not when the tap arrived.
+ * That matters for more than tidiness: `offsetSec()` changes the moment
+ * somebody runs the calibration, so a loop that stored raw times and corrected
+ * them later would quietly rewrite itself half way through a session.
+ */
+
+export const LOOP_BPM = [72, 84, 96, 110];
+export const LOOP_BPM_DEFAULT = 84;
+export const LOOP_BARS = [1, 2, 4];
+export const LOOP_BARS_DEFAULT = 2;
+
+export const LOOP_SLOTS = 4;
+export const MAX_LAYERS = 16;
+export const MAX_HITS = 512;          // a full bar of 32nds on six pads, and then some
+
+export const loopBeats = (bars, beatsPerBar = BEATS_PER_BAR) => bars * beatsPerBar;
+export const loopSeconds = (bars, bpm, beatsPerBar = BEATS_PER_BAR) =>
+  loopBeats(bars, beatsPerBar) * secondsPerBeat(bpm);
+
+/* Into the loop, from anywhere — including from before it started, which is
+   where a hit lands when somebody plays a fraction ahead of the one. */
+export const wrapBeats = (beats, total) =>
+  total > 0 ? ((beats % total) + total) % total : 0;
+
+export const emptyLoop = (bpm = LOOP_BPM_DEFAULT, bars = LOOP_BARS_DEFAULT) => ({ bpm, bars, layers: [] });
+export const loopHits = loop => (loop && loop.layers ? loop.layers.flat() : []);
+export const loopIsEmpty = loop => loopHits(loop).length === 0;
+
+/* How hard, from where the pad was struck: the middle is the middle of the
+ * drum and the edge is the rim. There is no pressure to read on a laptop and
+ * `PointerEvent.pressure` is a flat 0.5 on a mouse, so position is the only
+ * expression available on every device the game runs on — and it is the one a
+ * drummer already has in their hands.
+ *
+ * The range is deliberately narrow. A pad that went silent at the edges would
+ * read as a dead spot rather than as dynamics, and somebody tapping anywhere
+ * without knowing about this should never think the game has missed them.
+ */
+export const LEVEL_SOFT = 0.62;
+export const levelAt = (dx, dy) => {
+  // dx, dy are -1..1 from the centre of the pad.
+  const out = Math.min(1, Math.hypot(num(dx), num(dy)));
+  return LEVEL_SOFT + (1 - LEVEL_SOFT) * (1 - out * out);
+};
+
+/* ---- straightening ------------------------------------------------------- */
+
+/* Which grid a take is on, decided ONCE for the whole take.
+ *
+ * Not per hit. `snap()` decides per hit because it is scoring, and "what was
+ * this one hit nearest to" is the right question for a score. It is the wrong
+ * question for a recorder: two hits played evenly can fall either side of the
+ * tie-break, come back on different grids, and put an audible stumble in the
+ * bar — which a loop then plays again every pass, for ever. So the take is
+ * measured against both grids as a whole and every hit goes on the winner.
+ *
+ * Sixteenths unless the triplet grid fits clearly better, for the same reason
+ * `snap` leans that way: most playing is straight, and a grid that captures
+ * ties turns ordinary sixteenths into swing nobody played.
+ */
+export const TRIPLET_EDGE = 0.9;
+
+export function gridError(hits, per){
+  if(!hits.length) return 0;
+  let total = 0;
+  for(const h of hits){
+    const beats = num(h.at) * per;
+    total += Math.abs(beats - Math.round(beats)) / per;
+  }
+  return total / hits.length;
+}
+
+export function bestGrid(hits){
+  if(!hits.length) return 's';
+  const straight = gridError(hits, STEPS_PER_BEAT);
+  const swung = gridError(hits, TRIPLETS_PER_BEAT);
+  return swung < straight * TRIPLET_EDGE ? 't' : 's';
+}
+
+/* Every hit onto that one grid. Wrapped afterwards, because a hit a hair before
+   the top of the loop rounds up onto the end of it and belongs at the start. */
+export function straighten(hits, total, grid = null){
+  if(!hits.length) return [];
+  const per = (grid || bestGrid(hits)) === 't' ? TRIPLETS_PER_BEAT : STEPS_PER_BEAT;
+  return hits.map(h => ({ ...h, at: wrapBeats(Math.round(num(h.at) * per) / per, total) }));
+}
+
+/* What to play, given whether the player has asked for it to be tidied. The
+   raw take is never touched — straightening is a lens over it, so it can be
+   turned off again and the playing is still there underneath. */
+export function playable(loop, straightened){
+  const hits = loopHits(loop);
+  if(!straightened) return hits;
+  const total = loopBeats(loop.bars);
+  // Each layer on its own grid: a swung hat pass over a straight kick pass is
+  // a thing people play on purpose, and one grid for the lot would flatten it.
+  return (loop.layers || []).flatMap(layer => straighten(layer, total));
+}
+
+/* ---- keeping them ------------------------------------------------------- */
+
+export const loopToSave = loop => ({
+  bpm: loop.bpm,
+  bars: loop.bars,
+  layers: (loop.layers || []).map(layer =>
+    layer.map(h => [h.pad, Math.round(num(h.at) * 1000) / 1000, Math.round(num(h.level) * 100) / 100])),
+});
+
+/* Merged onto an empty loop rather than trusted. A loop is the only thing this
+   game stores that a person might paste in from somewhere, and a pad id that no
+   longer exists must drop out rather than take the whole slot with it. */
+export function loopFromSave(raw){
+  if(!raw || typeof raw !== 'object') return null;
+  const bpm = LOOP_BPM.includes(raw.bpm) ? raw.bpm : LOOP_BPM_DEFAULT;
+  const bars = LOOP_BARS.includes(raw.bars) ? raw.bars : LOOP_BARS_DEFAULT;
+  const total = loopBeats(bars);
+  const layers = [];
+  let kept = 0;
+  for(const layer of Array.isArray(raw.layers) ? raw.layers : []){
+    if(layers.length >= MAX_LAYERS || !Array.isArray(layer)) continue;
+    const hits = [];
+    for(const h of layer){
+      if(kept >= MAX_HITS) break;
+      const [pad, at, level] = Array.isArray(h) ? h : [h && h.pad, h && h.at, h && h.level];
+      if(!PAD_BY_ID[pad]) continue;
+      hits.push({ pad, at: wrapBeats(num(at), total), level: Math.min(1, Math.max(0.05, num(level, 1))) });
+      kept++;
+    }
+    if(hits.length) layers.push(hits);
+  }
+  return { bpm, bars, layers };
+}
+
+export const slotsToSave = slots =>
+  slots.slice(0, LOOP_SLOTS).map(s => (s ? loopToSave(s) : null));
+
+export function slotsFromSave(raw){
+  const out = new Array(LOOP_SLOTS).fill(null);
+  if(!Array.isArray(raw)) return out;
+  for(let i = 0; i < LOOP_SLOTS; i++){
+    const loop = raw[i] ? loopFromSave(raw[i]) : null;
+    out[i] = loop && !loopIsEmpty(loop) ? loop : null;
+  }
+  return out;
+}
+
+/* What a slot says about itself on the list, without opening it. */
+export const loopSummary = loop => loop
+  ? { layers: (loop.layers || []).length, hits: loopHits(loop).length, bpm: loop.bpm, bars: loop.bars }
+  : null;

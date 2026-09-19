@@ -30,6 +30,10 @@ import {
   toSave, fromSave, SAVE_VERSION, OFFSET_MIN, OFFSET_MAX,
   CAL_CLICKS, CAL_INTERVAL, CAL_WARMUP, CAL_MIN_TAPS, CAL_WOBBLE, calibrationFrom,
   LATENCY_HIGH, beatVisible,
+  LOOP_BPM, LOOP_BPM_DEFAULT, LOOP_BARS, LOOP_BARS_DEFAULT, LOOP_SLOTS,
+  MAX_LAYERS, MAX_HITS, LEVEL_SOFT, levelAt,
+  loopBeats, loopSeconds, wrapBeats, emptyLoop, loopHits, loopIsEmpty, loopSummary,
+  bestGrid, straighten, playable, loopToSave, loopFromSave, slotsToSave, slotsFromSave,
 } from '../public/gvb/content.js';
 
 const SPB = 60 / 104;                       // Funk world, and an awkward number
@@ -583,4 +587,183 @@ test('a bar played the way the game asks pays more than the same bar played flat
   /* And the flat bar is not punished for being flat — it still scores well.
      No-fail means the plain thing works, it just does not win. */
   assert.ok(flat > 0);
+});
+
+/* --------------------------------------------------------------------- Make */
+
+test('a loop measures itself in beats, so the same loop at a new tempo is the same loop', () => {
+  assert.equal(loopBeats(2), 2 * BEATS_PER_BAR);
+  assert.equal(loopBeats(4), 4 * BEATS_PER_BAR);
+  assert.ok(Math.abs(loopSeconds(2, 84) - 8 * 60 / 84) < 1e-12);
+  // Twice the tempo, half the seconds, same number of beats.
+  assert.ok(Math.abs(loopSeconds(2, 168) * 2 - loopSeconds(2, 84)) < 1e-12);
+
+  // Into the loop from anywhere, including from before it started — which is
+  // where a hit lands when somebody plays a fraction ahead of the one.
+  assert.equal(wrapBeats(0, 8), 0);
+  assert.equal(wrapBeats(8, 8), 0);
+  assert.ok(Math.abs(wrapBeats(-0.02, 8) - 7.98) < 1e-9);
+  assert.ok(Math.abs(wrapBeats(8.01, 8) - 0.01) < 1e-9);
+  assert.equal(wrapBeats(3, 0), 0, 'a loop of no length cannot be indexed into');
+
+  assert.ok(LOOP_BPM.length >= 2 && LOOP_BPM.every(b => b >= 60 && b <= 200));
+  assert.ok(LOOP_BARS.includes(LOOP_BARS_DEFAULT) && LOOP_BPM.includes(LOOP_BPM_DEFAULT));
+});
+
+test('how hard a hit is comes from where the pad was struck, gently', () => {
+  assert.equal(levelAt(0, 0), 1, 'dead centre is full');
+  assert.ok(Math.abs(levelAt(1, 0) - LEVEL_SOFT) < 1e-12, 'the rim is the quietest it gets');
+  assert.ok(Math.abs(levelAt(0, -1) - LEVEL_SOFT) < 1e-12);
+  assert.ok(levelAt(0.5, 0) > levelAt(0.9, 0), 'further out is softer');
+  // Never silent and never past full, whatever a browser reports.
+  for(const [x, y] of [[9, 9], [-9, 0], [NaN, 0], ['a', 'b'], [0, undefined]]){
+    const v = levelAt(x, y);
+    assert.ok(v >= LEVEL_SOFT && v <= 1, `levelAt(${x}, ${y}) gave ${v}`);
+  }
+  /* The range is deliberately narrow: a pad that went silent at the edges
+     would read as a dead spot rather than as dynamics, and somebody who does
+     not know about this must never think the game missed them. */
+  assert.ok(LEVEL_SOFT > 0.5, 'the rim has to stay clearly audible');
+});
+
+test('a take is straightened onto ONE grid, because snap() is a scorer not a recorder', () => {
+  /* The bug this exists to avoid, with the exact case that finds it.
+   *
+   * `snap()` decides per hit, which is right for scoring — "what was this one
+   * hit nearest to" — and wrong for a recorder. Four hits played evenly, a
+   * tenth of a beat apart, come out of snap() on grids s, s, s, t: spaced
+   * 0.000, 0.250, 0.083. That is an audible stumble, and a loop plays it again
+   * every pass for ever.
+   */
+  const evenly = [0, 0.1, 0.2, 0.3].map(at => ({ pad: 'hat', at, level: 1 }));
+  const spb = secondsPerBeat(84);
+  const scattered = new Set(evenly.map(h => snap(h.at * spb, spb).grid));
+  assert.equal(scattered.size, 2, 'this is the case where per-hit snapping disagrees with itself');
+
+  // One grid for the take, so whatever it does to one hit it does to all of them.
+  const tidy = straighten(evenly, 8);
+  const per = bestGrid(evenly) === 't' ? TRIPLETS_PER_BEAT : STEPS_PER_BEAT;
+  for(const h of tidy){
+    assert.ok(Math.abs(h.at * per - Math.round(h.at * per)) < 1e-9,
+      `${h.at} is not on the ${per}-per-beat grid the take chose`);
+  }
+});
+
+test('straightening picks the grid the take is actually on', () => {
+  const beats = xs => xs.map(at => ({ pad: 'hat', at, level: 1 }));
+
+  // Straight sixteenths, played a little loose.
+  const straightRun = beats([0.01, 0.26, 0.49, 0.76, 1.02]);
+  assert.equal(bestGrid(straightRun), 's');
+  assert.deepEqual(straighten(straightRun, 8).map(h => h.at), [0, 0.25, 0.5, 0.75, 1]);
+
+  // Swung eighths, played a little loose. Sixteenths would flatten the swing.
+  const swung = beats([0.0, 0.66, 1.01, 1.68, 2.0, 2.65]);
+  assert.equal(bestGrid(swung), 't');
+  for(const h of straighten(swung, 8)){
+    assert.ok(Math.abs(h.at * 3 - Math.round(h.at * 3)) < 1e-9, `${h.at} is not on the triplet grid`);
+  }
+
+  /* Sixteenths unless the triplets fit CLEARLY better, for the same reason
+     snap leans that way: most playing is straight, and a grid that takes ties
+     turns ordinary sixteenths into swing nobody played. */
+  assert.equal(bestGrid(beats([0, 0.25, 0.5, 0.75])), 's');
+  assert.equal(bestGrid([]), 's', 'nothing played is not swing');
+
+  // A hit a hair before the top of the loop rounds up onto the end of it and
+  // belongs at the start.
+  assert.equal(straighten(beats([7.99]), 8)[0].at, 0);
+});
+
+test('straightening is a lens, never a rewrite', () => {
+  const loop = { bpm: 84, bars: 2, layers: [
+    [{ pad: 'kick', at: 0.04, level: 1 }, { pad: 'kick', at: 2.03, level: 1 }],
+    [{ pad: 'hat', at: 0.0, level: 1 }, { pad: 'hat', at: 0.66, level: 1 }],
+  ] };
+  const raw = JSON.parse(JSON.stringify(loop));
+
+  const asPlayed = playable(loop, false);
+  assert.deepEqual(asPlayed.map(h => h.at), [0.04, 2.03, 0, 0.66], 'off means exactly what was played');
+
+  const tidied = playable(loop, true);
+  // Compared with a tolerance: a third of a beat is not a number a double holds
+  // exactly, and 0.6666666666666661 is the same musical instant as 2/3.
+  const want = [0, 2, 0, 2 / 3];
+  tidied.forEach((h, i) => assert.ok(Math.abs(h.at - want[i]) < 1e-9,
+    `hit ${i} landed at ${h.at}, wanted ${want[i]}`));
+  assert.deepEqual(loop, raw, 'the take itself must not have been touched');
+
+  /* Each layer on its own grid. A swung hat pass over a straight kick pass is
+     a thing people play on purpose, and one grid for the lot would flatten it:
+     the kicks land on whole beats and the hats keep their triplet. */
+  assert.equal(tidied[1].at, 2);
+  assert.ok(Math.abs(tidied[3].at - 2 / 3) < 1e-9);
+});
+
+test('a loop goes to storage and back, and a broken one does not take the slot with it', () => {
+  const loop = { bpm: 96, bars: 4, layers: [
+    [{ pad: 'kick', at: 0, level: 1 }, { pad: 'snare', at: 2.5, level: 0.74 }],
+    [{ pad: 'tom', at: 1.125, level: 0.62 }],
+  ] };
+  const back = loopFromSave(loopToSave(loop));
+  assert.equal(back.bpm, 96);
+  assert.equal(back.bars, 4);
+  assert.equal(back.layers.length, 2);
+  assert.equal(loopHits(back).length, 3);
+  assert.ok(Math.abs(back.layers[0][1].level - 0.74) < 0.01, 'how hard it was hit survives');
+  assert.ok(Math.abs(back.layers[1][0].at - 1.125) < 0.01);
+
+  assert.equal(loopFromSave(null), null);
+  assert.equal(loopFromSave('hello'), null);
+
+  // A tempo or a length that is not one of the offered ones is not a loop this
+  // game made, so it falls back rather than playing at 3 BPM.
+  assert.equal(loopFromSave({ bpm: 3, bars: 99, layers: [] }).bpm, LOOP_BPM_DEFAULT);
+  assert.equal(loopFromSave({ bpm: 3, bars: 99, layers: [] }).bars, LOOP_BARS_DEFAULT);
+
+  // A pad that no longer exists drops out; the rest of the layer survives.
+  const stale = loopFromSave({ bpm: 84, bars: 2, layers: [[['kick', 0, 1], ['didgeridoo', 1, 1], ['hat', 2, 1]]] });
+  assert.equal(loopHits(stale).length, 2);
+  assert.deepEqual(loopHits(stale).map(h => h.pad), ['kick', 'hat']);
+
+  // Junk positions and levels are clamped into the loop rather than trusted.
+  const junk = loopFromSave({ bpm: 84, bars: 2, layers: [[['kick', 99, 50], ['snare', -1, -9], ['hat', 'x', 'y']]] });
+  for(const h of loopHits(junk)){
+    assert.ok(h.at >= 0 && h.at < loopBeats(2), `${h.at} is outside the loop`);
+    assert.ok(h.level > 0 && h.level <= 1, `${h.level} is not a level`);
+  }
+});
+
+test('a loop cannot grow without limit', () => {
+  const fat = { bpm: 84, bars: 2, layers: [] };
+  for(let i = 0; i < MAX_LAYERS + 8; i++) fat.layers.push([{ pad: 'kick', at: i % 8, level: 1 }]);
+  assert.equal(loopFromSave(loopToSave(fat)).layers.length, MAX_LAYERS);
+
+  const busy = { bpm: 84, bars: 2, layers: [[]] };
+  for(let i = 0; i < MAX_HITS + 200; i++) busy.layers[0].push({ pad: 'hat', at: (i % 64) / 8, level: 1 });
+  assert.ok(loopHits(loopFromSave(loopToSave(busy))).length <= MAX_HITS);
+});
+
+test('the slots hold a few loops and refuse to hold rubbish', () => {
+  const one = { bpm: 84, bars: 2, layers: [[{ pad: 'kick', at: 0, level: 1 }]] };
+  const slots = slotsFromSave(null);
+  assert.equal(slots.length, LOOP_SLOTS);
+  assert.ok(slots.every(s => s === null), 'a fresh browser has no loops in it');
+
+  slots[1] = one;
+  const back = slotsFromSave(slotsToSave(slots));
+  assert.equal(back.length, LOOP_SLOTS);
+  assert.equal(back[0], null);
+  assert.equal(loopHits(back[1]).length, 1);
+
+  // An empty loop is not worth a slot — it would read as "saved" and hold nothing.
+  assert.equal(slotsFromSave([{ bpm: 84, bars: 2, layers: [] }])[0], null);
+  assert.deepEqual(slotsFromSave('nonsense'), new Array(LOOP_SLOTS).fill(null));
+  // More slots than there are is not more slots.
+  assert.equal(slotsFromSave(new Array(40).fill(loopToSave(one))).length, LOOP_SLOTS);
+
+  assert.equal(loopSummary(null), null);
+  assert.deepEqual(loopSummary(one), { layers: 1, hits: 1, bpm: 84, bars: 2 });
+  assert.ok(loopIsEmpty(emptyLoop()));
+  assert.ok(!loopIsEmpty(one));
 });
