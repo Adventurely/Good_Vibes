@@ -88,7 +88,7 @@
    straight off the page whether they have the latest build, rather than
    having to guess from behavior alone. Bump it on every change that ships,
    however small. */
-export const GAME_VERSION = '1.25';
+export const GAME_VERSION = '1.26';
 
 export const SCENE_W = 320;
 export const SCENE_H = 180;
@@ -1256,9 +1256,20 @@ export const LEVEL_9 = {
  * to the ramp up to C. Both stay planted: stand either one down while
  * ducklings are still coming and the flock simply walks the wrong way again
  * and off the far end. The two ducklings holding them are the price of the
- * level, and the last thing a player does, once the quota is safe, is click
- * them both and let them walk up after everyone else (see sim.js's
+ * level, and the last thing a player does, once everything else is up, is
+ * stand them down and let them walk up after the rest (see sim.js's
  * releaseBlocker).
+ *
+ * IN THAT ORDER, though, and this is the last thing between a good run and a
+ * perfect one. A released Blocker turns and walks back the way it came, so
+ * island A's turner sets off leftward — down island A, up the ramp to island
+ * B, and straight along B toward the drop off its left-hand end, which is
+ * forty-eight pixels and fatal. The thing that turns it round there is
+ * island B's own turner. Stand them both down together and A's turner walks
+ * past where B's used to be and off the end; stand A's down first, wait for
+ * it to be turned and carried up to island C, and then stand B's down, and
+ * the pair of them walk up behind everyone else. Two clicks in the right
+ * order is the difference between twenty-three and twenty-four.
  *
  * The other four Blockers are the safety net: the end of a half-built ramp
  * is a ledge, and everything above island A is high enough that walking off
@@ -1348,23 +1359,40 @@ export const LEVEL_10 = {
    * from. It used to carry four spare on purpose. It cannot carry any and
    * still ask for a Climber.
    *
-   * Climber: sixteen, four over the quota. The crag is forty-eight pixels
-   * of rock and every duckling that wants the water goes up it. Note that a
-   * Climber given down in the pen is a Climber wasted and a duckling with
+   * Climber: twenty-six, and the count is the point. The crag is forty-eight
+   * pixels of rock and every duckling that wants the water goes up it, so
+   * this number is a hard ceiling on how many can ever be saved. At sixteen
+   * that ceiling was sixteen, on a level that hatches twenty-four — pitched
+   * at the quota plus four, back when the quota was the thing being aimed
+   * at, which quietly made a perfect run impossible. Eight ducklings had
+   * nowhere to go but the top island and nothing to do once they got there.
+   * Twenty-four is one each. The two over are for the mistake in the next
+   * paragraph, which is an easy one to make and used to cost a duckling and
+   * the perfect run together.
+   *
+   * A Climber given down in the pen is a Climber wasted and a duckling with
    * it — it will scale the pen's own right-hand wall and walk off into the
    * chasm beyond. Where a skill is spent has always mattered here; this is
    * the level that says so out loud.
    *
-   * Jumper: sixteen, the same. The notch is three columns of nothing with
-   * the shelf level on the far side — no wall to climb, nothing to tunnel,
-   * and no ramp left to lay across it. A Flyer is no use either: it starts
-   * its glide already below the shelf it would have to reach.
+   * Jumper: twenty-six, the same arithmetic. The notch is three columns of
+   * nothing with the shelf level on the far side — no wall to climb, nothing
+   * to tunnel, and no ramp left to lay across it. A Flyer is no use either:
+   * it starts its glide already below the shelf it would have to reach.
+   *
+   * One of the twenty-six is worth spending early and a long way from the
+   * notch. The goose patrols the pen, and a duckling that can jump hops
+   * clean over it and sends it off empty-beaked (see sim.js's goose check) —
+   * and keeps its Jumper, because nothing here spends a trait but a Digger.
+   * So the Jumper that saves the flock its one certain loss is the same
+   * Jumper that carries that duckling over the notch an hour later. Without
+   * it the goose takes one and twenty-four is twenty-three.
    *
    * Blocker: six, for the two turns the climb cannot be walked without.
    * Flyer: two, which save a duckling that has walked off a ledge rather
    * than opening any route of their own. Digger: zero — every wall here is
    * rock. */
-  supply: { digger: 0, builder: 3, blocker: 6, climber: 16, flyer: 2, jumper: 16 },
+  supply: { digger: 0, builder: 3, blocker: 6, climber: 26, flyer: 2, jumper: 26 },
 
   goose: { x0: 90, x1: 150, y: 150, speed: 1.5, catchRadius: 1.5 },
 };

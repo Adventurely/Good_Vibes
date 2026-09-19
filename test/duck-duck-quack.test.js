@@ -2198,17 +2198,25 @@ const STONES_PLAN = [
   { y: 102, at: 50,  dir: 1,  turn: 33 },      // B -> C, right again
 ];
 
+/* `hopGoose` hands the first duckling in the pen a Jumper, which sends the
+   goose off empty-beaked rather than fed; `freeTurners` stands the two
+   turning Blockers down at the end, island A's first — see the note over
+   LEVEL_10 for why the order is the whole difference. `inOrder: false`
+   stands them down together, which is the mistake that order prevents. */
 function playLevel10({ steps = STONES_PLAN.length, turns = true,
-                       climbers = true, jumpers = true } = {}){
+                       climbers = true, jumpers = true,
+                       hopGoose = false, freeTurners = false, inOrder = true } = {}){
   const state = newGame(LEVEL_10);
   let stage = 0, held = null;
+  const holders = [];
+  let freed = 0;
   for(let i = 0; i < LEVEL_10.timeLimit && !state.ended; i++){
     const move = stage < steps ? STONES_PLAN[stage] : null;
     if(move){
       if(turns && move.turn != null && !held){
         const d = state.ducks.find(k => k.state === 'walking'
           && Math.round(k.x) === move.turn && k.y === move.y);
-        if(d && assignSkill(state, d.id, 'blocker')) held = d;
+        if(d && assignSkill(state, d.id, 'blocker')){ held = d; holders.push(d); }
       }
       if(move.turn == null || !turns || held){
         const d = state.ducks.find(k => k.state === 'walking'
@@ -2216,12 +2224,31 @@ function playLevel10({ steps = STONES_PLAN.length, turns = true,
         if(d && assignSkill(state, d.id, 'builder')){ stage++; held = null; }
       }
     }
+    /* The goose, dealt with where it patrols: down in the pen, long before
+       the notch that same Jumper is really for. */
+    if(hopGoose && !state.goose.fed && !state.goose.gone){
+      const d = state.ducks.find(k => k.state === 'walking' && k.y === 150 && !hasTrait(k, 'jumper'));
+      if(d) assignSkill(state, d.id, 'jumper');
+    }
     /* On the top island, and only there: a Climber given down in the pen
        scales the pen's own wall and walks into the chasm behind it. */
     for(const d of state.ducks){
       if(d.state !== 'walking' || d.y !== 78) continue;
       if(climbers && !hasTrait(d, 'climber')) assignSkill(state, d.id, 'climber');
       if(jumpers && !hasTrait(d, 'jumper')) assignSkill(state, d.id, 'jumper');
+    }
+    if(freeTurners && stage === STONES_PLAN.length && holders.length === 2
+      && state.hatched >= LEVEL_10.duckCount){
+      // Nothing left below the top island still needing to be turned.
+      const below = state.ducks.some(d => d.state !== 'saved' && d.state !== 'lost'
+        && d.state !== 'blocking' && d.y > 78);
+      if(freed === 0 && !below){
+        releaseBlocker(state, holders[0].id);
+        if(!inOrder){ releaseBlocker(state, holders[1].id); freed = 2; }else{ freed = 1; }
+      }else if(freed === 1 && (holders[0].y <= 78 || holders[0].state === 'saved')){
+        releaseBlocker(state, holders[1].id);
+        freed = 2;
+      }
     }
     tick(state);
   }
@@ -2233,6 +2260,59 @@ test('The Stepping Stones can be won by climbing the zigzag, then the crag', () 
   assert.equal(built, 3, 'all three ramps should have gone in');
   assert.equal(state.ended, 'won');
   assert.ok(state.saved >= winCount(LEVEL_10), `only ${state.saved} saved, needed ${winCount(LEVEL_10)}`);
+});
+
+/* The whole flock, not just the quota.
+ *
+ * This level used to be capped below its own duckCount by arithmetic nobody
+ * had done: sixteen Climbers and sixteen Jumpers on a level that hatches
+ * twenty-four, so eight ducklings could reach the top island and go no
+ * further however well the level was played. A quota of twelve hid it — the
+ * run said "won" either way.
+ *
+ * Three things have to come together for all twenty-four, and each one is a
+ * separate test below so a regression says which broke: enough of the two
+ * skills every duckling needs, the goose hopped rather than fed, and the two
+ * turning Blockers stood down in the right order.
+ */
+test('The Stepping Stones can be played perfectly — every duckling in the pond', () => {
+  const { state, built } = playLevel10({ hopGoose: true, freeTurners: true });
+  assert.equal(built, 3);
+  assert.equal(state.ended, 'won');
+  assert.equal(state.saved, LEVEL_10.duckCount,
+    `only ${state.saved} of ${LEVEL_10.duckCount} — a perfect run should be possible`);
+  assert.equal(state.lost, 0, 'and it should not cost a single duckling');
+});
+
+test('The Stepping Stones carries a Climber and a Jumper for every duckling', () => {
+  /* The ceiling, stated as arithmetic rather than discovered by playing:
+     every duckling that wants the water climbs the crag and hops the notch,
+     so anything less than one each here is a cap on the score that no amount
+     of skill can lift. */
+  for(const skill of ['climber', 'jumper']){
+    assert.ok(LEVEL_10.supply[skill] >= LEVEL_10.duckCount,
+      `${skill}: ${LEVEL_10.supply[skill]} for ${LEVEL_10.duckCount} ducklings caps the level below its own flock`);
+  }
+});
+
+test('The Stepping Stones loses one to the goose unless a duckling is given a Jumper', () => {
+  // And the same Jumper carries that duckling over the notch later — nothing
+  // in this game spends a trait but a Digger, which is what makes the trick
+  // free rather than a trade.
+  const { state } = playLevel10({ hopGoose: false, freeTurners: true });
+  assert.equal(state.saved, LEVEL_10.duckCount - 1);
+  assert.ok(state.ducks.some(d => d.cause === 'goosed'), 'the goose should have taken one');
+});
+
+test('The Stepping Stones wants its two turners stood down in order', () => {
+  /* A released Blocker walks back the way it came, so island A's turner sets
+     off left — up the ramp to island B and on toward the fatal drop off B's
+     left end. The thing that turns it round there is island B's own turner,
+     so B's has to be the second click, not a simultaneous one. */
+  const { state } = playLevel10({ hopGoose: true, freeTurners: true, inOrder: false });
+  assert.equal(state.saved, LEVEL_10.duckCount - 1,
+    'standing both down together should cost exactly the one that walks off island B');
+  assert.ok(state.ducks.some(d => d.cause === 'fell'));
 });
 
 test('The Stepping Stones cannot be finished without a Climber', () => {
