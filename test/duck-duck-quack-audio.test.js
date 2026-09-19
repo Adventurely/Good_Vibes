@@ -17,8 +17,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { readFileSync } from 'node:fs';
+
 import { LEVELS } from '../public/duck-duck-quack/content.js';
-import { SONGS } from '../public/duck-duck-quack/audio.js';
+import { SONGS, SFX_NAMES, createAudio } from '../public/duck-duck-quack/audio.js';
 
 /* The chord shapes the sequencer knows how to voice. Named here rather than
    imported because QUALITIES is private to the module — if one is ever
@@ -111,4 +113,39 @@ test('every song plays itself out and then turns around', () => {
     assert.equal(fills, 1, `${name} should have exactly one turnaround bar, has ${fills}`);
     assert.ok(song.bars[song.bars.length - 1].fill, `${name}'s turnaround should be its last bar`);
   }
+});
+
+
+/* ------------------------------------------------------------ the effects */
+
+/* `sfx()` does nothing at all for a name it does not know — the same silent
+ * miss that left five levels without music. A renamed effect would take its
+ * call sites down with it just as quietly, and renaming one is exactly what
+ * happened when the teleporter's buzz became a zing.
+ */
+
+test('the declared roster of effects is the one the engine actually has', () => {
+  // createAudio touches no audio API until something asks it to make a
+  // sound, so the keys can be read in Node.
+  assert.deepEqual(createAudio().names(), SFX_NAMES);
+});
+
+test('every effect the game asks for by name exists', () => {
+  const page = readFileSync(new URL('../public/duck-duck-quack/play.html', import.meta.url), 'utf8');
+  /* Every quoted name on a line that calls sfx() — which catches the
+     literal calls and the one that picks between two by a duckling's cause
+     of death, without this test needing to know which is which. */
+  const asked = page.split('\n')
+    .filter(line => line.includes('.sfx('))
+    .flatMap(line => [...line.matchAll(/'([a-z]+)'/g)].map(m => m[1]));
+  assert.ok(asked.length >= 5, `only found ${asked.length} sfx names — has the call shape changed?`);
+  for(const name of asked){
+    assert.ok(SFX_NAMES.includes(name), `play.html asks for "${name}", which is not an effect`);
+  }
+});
+
+test('the teleporter has a sound, and it is the zing', () => {
+  assert.ok(SFX_NAMES.includes('zing'));
+  const page = readFileSync(new URL('../public/duck-duck-quack/play.html', import.meta.url), 'utf8');
+  assert.match(page, /sfx\('zing'\)/, 'a duckling going through a pad should make it');
 });

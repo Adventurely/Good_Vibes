@@ -607,6 +607,17 @@ export const SONGS = {
   stones: STONES_SONG, belfry: BELFRY_SONG, errand: ERRAND_SONG,
 };
 
+/* Every sound effect there is, by the name a caller asks for it with.
+ *
+ * Declared out here so it can be checked from Node without an audio context:
+ * `sfx()` does nothing at all for a name it does not know, which is the same
+ * silent miss that left five levels without music, and a renamed effect
+ * would take its call sites down with it just as quietly. `createAudio` hands
+ * back the real keys (`names()`) so a test can hold the two against each
+ * other, and against what the pages actually call.
+ */
+export const SFX_NAMES = ['quack', 'lost', 'goosed', 'hatch', 'zing'];
+
 /* ------------------------------------------------------------------ engine --- */
 
 export function createAudio(){
@@ -972,23 +983,37 @@ export function createAudio(){
 
     /* A teleporter taking a duckling — the one thing in this game that is
      * not an animal or a piece of weather, so it is the one sound here
-     * allowed to be electric. A square wave sliding up two octaves in a
-     * tenth of a second is the whole of it: rising rather than falling,
-     * because a duckling is arriving somewhere rather than going down, and
-     * a square rather than the triangles and sines everything else uses,
-     * because that buzz is what makes it read as a machine.
+     * allowed to be electric.
      *
-     * A sparkle of bright noise on top, short enough to be a spark rather
-     * than a hiss, and a quiet low thump under it so the pad sounds like it
-     * has some weight to it. Quiet overall: on a level built around a pair
-     * of pads this can fire for every duckling in the flock, thirty times
-     * in a run, and a zap that punished a player for using the mechanic the
-     * level is about would be the wrong sound however good it was.
+     * It was a buzz before: a square wave sliding up from 300 Hz with a low
+     * thump under it, which read as a machine turning over rather than as
+     * anything going anywhere, and at 14% of the quack it barely read at
+     * all. A zing is a different shape — it is not a buzz, it is a strike
+     * and a ring:
+     *
+     *   the strike: a fast rise through the top of the register, 1400 up to
+     *     5200 in nine hundredths of a second. Rising, because a duckling
+     *     is arriving somewhere rather than going down, and fast enough
+     *     that the ear hears the arrival rather than the sweep
+     *   the ring: two sine partials a fifth or so apart, left to hang on
+     *     after the strike has gone and gliding slightly down as they fade.
+     *     Two rather than one, because a single decaying sine is a beep and
+     *     two very slightly out of tune is metal
+     *   the spark: a flick of high noise on the strike itself, short enough
+     *     to be a spark rather than a hiss
+     *
+     * Still the quietest effect here after nothing at all, and deliberately:
+     * on a level built around a pair of pads this fires for every duckling
+     * in the flock, thirty times in a run, and a sound that punished a
+     * player for using the mechanic the level is about would be the wrong
+     * sound however good it was. Loud enough to hear over the music, which
+     * the old one was not, and no louder.
      */
-    zap(t){
-      voice(300, t, 0.1, 'square', 0.06, 1200, 4000);
-      hit(t, 0.06, 0.05, 2600, 'highpass');
-      voice(90, t + 0.02, 0.09, 'sine', 0.05, 60);
+    zing(t){
+      voice(1400, t, 0.09, 'triangle', 0.13, 5200);
+      voice(2600, t + 0.02, 0.22, 'sine', 0.085, 2100);
+      voice(3880, t + 0.025, 0.17, 'sine', 0.045, 3200);
+      hit(t, 0.045, 0.09, 4200, 'highpass');
     },
   };
 
@@ -1006,5 +1031,6 @@ export function createAudio(){
      rather than assuming the first one worked. */
   const isRunning = () => Boolean(ctx) && ctx.state === 'running';
 
-  return { play, stop, unlock, sfx, setMuted, isMuted: () => muted, isRunning, current: () => songName };
+  return { play, stop, unlock, sfx, setMuted, isMuted: () => muted, isRunning,
+    current: () => songName, names: () => Object.keys(SFX) };
 }
