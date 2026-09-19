@@ -88,7 +88,7 @@
    straight off the page whether they have the latest build, rather than
    having to guess from behavior alone. Bump it on every change that ships,
    however small. */
-export const GAME_VERSION = '1.28';
+export const GAME_VERSION = '1.29';
 
 export const SCENE_W = 320;
 export const SCENE_H = 180;
@@ -164,6 +164,29 @@ export const FALL_SAFE = 24;
    converted once into ticks here rather than written as a bare count. */
 export const BUILD_SECONDS = 3;
 export const BUILD_MAX_STEPS = TICK_RATE * BUILD_SECONDS;
+
+/* How long a duckling stands at the end of a ramp it has just finished
+ * before it walks on — see sim.js's stepBuilding and stepWalking.
+ *
+ * A ramp that runs out of clock ends in open air, and the duckling that laid
+ * it is standing on the last column of it with nothing in front. It used to
+ * take its next step on the very next tick, which is a ninetieth of a
+ * second's warning: chaining a second ramp onto the end of the first — the
+ * climb, level, climb staircase that half the later levels are built on —
+ * meant clicking inside one tick, and mostly meant watching it walk off
+ * instead. That is not difficulty, it is a reflex test nobody can pass, and
+ * the level design already assumes the chain is possible (see The Stepping
+ * Stones and The Belfry).
+ *
+ * A second and a half is long enough to see the ramp stop, find the Builder
+ * button and click, and short enough that it still reads as a duckling
+ * hesitating at an edge rather than waiting for instructions. It applies
+ * however the ramp ended — out of clock, run into a wall, or run out of
+ * level — because "it stopped building" is the moment a player reacts to,
+ * not the reason it stopped.
+ */
+export const BUILD_PAUSE_SECONDS = 1.5;
+export const BUILD_PAUSE_TICKS = Math.round(TICK_RATE * BUILD_PAUSE_SECONDS);
 
 /* How high a Builder's ramp climbs over the full BUILD_MAX_STEPS, if it
    never runs into ground first — see sim.js's stepBuilding. Kept at exactly

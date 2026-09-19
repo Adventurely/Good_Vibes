@@ -14,7 +14,7 @@ import { readFileSync } from 'node:fs';
 
 import {
   SCENE_W, SCENE_H, WALK_STEP, FALL_SAFE, FALL_SPEED, FLY_SPEED, TICK_RATE, BUILD_SECONDS,
-  BUILD_MAX_STEPS, BUILD_RISE_HEIGHT, DIG_SECONDS, DIG_MAX_STEPS, JUMP_SPAN, JUMP_RISE, PIT_Y,
+  BUILD_MAX_STEPS, BUILD_PAUSE_TICKS, BUILD_RISE_HEIGHT, DIG_SECONDS, DIG_MAX_STEPS, JUMP_SPAN, JUMP_RISE, PIT_Y,
   FLY_DRIFT, SKILLS, SKILL_INFO,
   LEVEL_PARK, LEVEL_WARREN, LEVEL_ORCHARD, LEVEL_GROVE, LEVEL_AERIE, LEVEL_SPIRE, LEVEL_FALLS, LEVEL_HEDGEROW, LEVEL_OVERLOOK, LEVEL_STONES,
   LEVEL_BELFRY, LEVEL_ERRAND, LEVELS,
@@ -469,9 +469,14 @@ test('a builder starts on the click and builds the whole BUILD_SECONDS on flat g
   assert.equal(duck.state, 'walking', 'then it stops and walks on');
   assert.equal(deckCount(state), BUILD_MAX_STEPS, 'a column of ramp laid every tick of it');
 
+  // It stands at the end for a moment before stepping off — see
+  // BUILD_PAUSE_TICKS, and the test below for what that moment is for.
+  run(state, BUILD_PAUSE_TICKS - 1);
+  assert.equal(duck.y, 50 - BUILD_RISE_HEIGHT, 'still up on the end of its own ramp');
+
   // Stepping off the far end of a ramp laid over level ground is exactly
   // FALL_SAFE, never more — see content.js's BUILD_RISE_HEIGHT.
-  run(state, 4);
+  run(state, 5);
   assert.equal(duck.state, 'walking');
   assert.equal(duck.y, 50, 'back down on the ground, unhurt');
 });
@@ -500,6 +505,64 @@ test('a builder crosses a gap it happens to be aimed over, without ever being to
   assert.equal(duck.state, 'saved', 'it walked over its own ramp and on to the pond');
 });
 
+/* The moment at the end of a ramp.
+ *
+ * A ramp that runs out of clock ends in open air with the duckling that laid
+ * it standing on the last column. It used to take its next step on the very
+ * next tick — a ninetieth of a second — so chaining a second ramp onto the
+ * first meant clicking inside one tick, and mostly meant watching it walk
+ * off the end instead. The climb-level-climb staircase that The Stepping
+ * Stones and The Belfry are built on assumes that chain is possible.
+ */
+test('a duckling waits at the end of a ramp it just finished before walking off it', () => {
+  const level = miniLevel({ supply: { digger: 0, builder: 1, blocker: 0, climber: 0 } });
+  const state = run(newGame(level), 1);
+  const duck = state.ducks[0];
+  assignSkill(state, duck.id, 'builder');
+  run(state, BUILD_MAX_STEPS);
+  assert.equal(duck.state, 'walking', 'the ramp is finished');
+
+  const restingX = duck.x, restingY = duck.y;
+  for(let i = 0; i < BUILD_PAUSE_TICKS - 1; i++){
+    tick(state);
+    assert.equal(duck.x, restingX, `it should still be standing at tick ${i + 1} of the pause`);
+    assert.equal(duck.y, restingY);
+  }
+  run(state, 2);
+  assert.notEqual(duck.x, restingX, 'and then it moves on, rather than waiting forever');
+});
+
+test('the pause is long enough to be clicked in, and short enough to be a hesitation', () => {
+  /* The number itself, held to what it is for. Much under a second is the
+     reflex test this replaced; much over and a duckling that has finished
+     its ramp looks like one waiting for orders. */
+  assert.ok(BUILD_PAUSE_TICKS >= TICK_RATE, 'a player needs at least a second to see it and click');
+  assert.ok(BUILD_PAUSE_TICKS <= TICK_RATE * 3, 'but it is a hesitation, not a halt');
+});
+
+test('a second Builder given during that pause carries the ramp on from where the first stopped', () => {
+  // The whole point of the pause, played: the chain that was a reflex test.
+  const level = miniLevel({ supply: { digger: 0, builder: 2, blocker: 0, climber: 0 } });
+  const state = run(newGame(level), 1);
+  const duck = state.ducks[0];
+  assignSkill(state, duck.id, 'builder');
+  run(state, BUILD_MAX_STEPS);
+  const firstEndX = duck.x, firstEndY = duck.y;
+  assert.equal(duck.state, 'walking');
+
+  // A whole second later — hopeless before, comfortable now.
+  run(state, TICK_RATE);
+  assert.equal(duck.x, firstEndX, 'still there to be clicked');
+  assert.equal(assignSkill(state, duck.id, 'builder'), duck, 'and still able to take the next one');
+  assert.equal(duck.state, 'building');
+
+  run(state, BUILD_MAX_STEPS);
+  assert.ok(duck.x > firstEndX + BUILD_MAX_STEPS - 2,
+    'the second ramp runs on from the end of the first');
+  // Standing on a climbing deck, the next ramp runs level — see assignSkill.
+  assert.equal(duck.y, firstEndY, 'and it runs level, the way a staircase alternates');
+});
+
 test('a builder stops dead at a wall rather than climbing it, and turns back like anything else would', () => {
   const level = miniLevel({
     segments: [{ from: 0, to: 30, y: 50 }, { from: 30, to: SCENE_W, y: 10 }],  // a 40px wall
@@ -515,7 +578,7 @@ test('a builder stops dead at a wall rather than climbing it, and turns back lik
   for(let x = 30; x < 35; x++) assert.equal(state.decks[x].length, 0, 'and nothing laid into the wall itself');
   // Getting up a wall is a Climber's job and a Digger's. A Builder holding
   // neither turns back from one exactly as it would without the ramp.
-  run(state, 3);
+  run(state, BUILD_PAUSE_TICKS + 3);
   assert.equal(duck.dir, -1);
 });
 
@@ -726,7 +789,7 @@ test('a builder given right at a gap with no far bank at all stops once its own 
   // Ten seconds of ramp over a gap that never ends leaves it out over open
   // air. BUILD_RISE_HEIGHT being FALL_SAFE means the climb alone is never
   // what kills it — the gap it is still standing over is.
-  run(state, 60);
+  run(state, BUILD_PAUSE_TICKS + 60);
   assert.equal(duck.state, 'lost');
   assert.equal(duck.cause, 'fell');
 });
@@ -753,7 +816,7 @@ test('a builder ramps over an ordinary lethal drop the same as over a bottomless
   // The ramp runs its full ten seconds either way — crossing the drop is
   // something it does in passing, not something that ends it — so it is
   // still building long after the far bank is behind it.
-  run(state, BUILD_MAX_STEPS + 4);
+  run(state, BUILD_MAX_STEPS + BUILD_PAUSE_TICKS + 4);
   assert.equal(duck.state, 'saved');
   for(let x = 10; x < 20; x++) assert.equal(state.decks[x].length, 1, `column ${x} should be carrying ramp`);
 });

@@ -9,7 +9,7 @@
  */
 
 import { SCENE_H, FALL_SAFE, WALK_STEP, FALL_SPEED, FLY_SPEED, FLY_DRIFT, CLIMB_SPEED,
-  BUILD_MAX_STEPS, BUILD_RISE_HEIGHT, DIG_MAX_STEPS, JUMP_SPAN, JUMP_RISE,
+  BUILD_MAX_STEPS, BUILD_PAUSE_TICKS, BUILD_RISE_HEIGHT, DIG_MAX_STEPS, JUMP_SPAN, JUMP_RISE,
   SKILLS, GOOSE_FLEE_SPEED, ZAP_TICKS,
   GOOSE_FLEE_LIFT, POOF_TICKS, buildTerrain, buildLayer, winCount, goalHeading,
   hatchHeading } from './content.js';
@@ -42,6 +42,12 @@ function hatchling(level, groundY){
     // true when this ramp runs level instead of climbing, which depends on
     // what the duckling was standing on when it was given — see assignSkill.
     buildLevel: false,
+    /* Ticks left standing still at the end of a ramp just finished, before
+       walking on — see BUILD_PAUSE_TICKS and stepBuilding. The duckling is
+       'walking' throughout, which is the point: a paused one can still be
+       given the next Builder, and a state of its own would have made it
+       "busy" to assignSkill. */
+    buildPause: 0,
     // Where a hop took off from and where it is coming down — see startJump.
     jumpFromX: 0, jumpFromY: 0, jumpToX: 0, jumpToY: 0, jumpSpan: 0, jumpStep: 0,
     digLeft: 0,
@@ -448,6 +454,14 @@ function goosedAt(state, x){
 function stepWalking(state, d){
   const level = state.level;
 
+  /* Standing at the end of a ramp just laid, for a moment, before walking
+     off it — see BUILD_PAUSE_TICKS. Checked before anything else so the
+     duckling really does not move, but it is still 'walking' as far as the
+     rest of the game is concerned: the goose can still take it, a Blocker
+     still stops it, and, the whole point, it can still be handed the next
+     Builder. */
+  if(d.buildPause > 0){ d.buildPause -= 1; return; }
+
   // Reached or past the pond, in whichever direction it actually lies —
   // see content.js's goalHeading. `d.x >= level.goalX` on its own is only
   // ever right for a level whose pond is to the right of its nest; a
@@ -741,7 +755,7 @@ function stepDigging(state, d){
 function stepBuilding(state, d){
   const level = state.level;
   const nextX = d.x + d.dir;
-  if(nextX < 0 || nextX >= level.width){ d.state = 'walking'; return; }
+  if(nextX < 0 || nextX >= level.width){ stopBuilding(d); return; }
 
   const step = d.buildStep + 1;
   const y = d.buildLevel
@@ -763,7 +777,7 @@ function stepBuilding(state, d){
        ground is, exactly as if it had walked there — a gentle rise it steps
        up (which is how a ramp joins a hillside or a staircase without a
        seam), or a wall it turns back from. */
-    d.state = 'walking';
+    stopBuilding(d);
     return;
   }
 
@@ -771,7 +785,15 @@ function stepBuilding(state, d){
   d.x = nextX;
   d.y = y;
   d.buildStep = step;
-  if(d.buildStep >= BUILD_MAX_STEPS) d.state = 'walking';
+  if(d.buildStep >= BUILD_MAX_STEPS) stopBuilding(d);
+}
+
+/* Back to walking, but not this instant. See BUILD_PAUSE_TICKS in content.js
+   for why the pause exists; it is set here rather than at each of the three
+   places a ramp can end so that all three get it. */
+function stopBuilding(d){
+  d.state = 'walking';
+  d.buildPause = BUILD_PAUSE_TICKS;
 }
 
 /* Climbs until it reaches something to stand on — the first surface it comes
@@ -907,9 +929,15 @@ export function assignSkill(state, duckId, skill){
   const d = state.ducks.find(duck => duck.id === duckId);
   state.supply[skill] -= 1;
 
-  if(skill === 'blocker'){ d.state = 'blocking'; return d; }
+  /* Whatever it was doing, it is doing this now — including standing at the
+     end of a ramp waiting out BUILD_PAUSE_TICKS, which is the commonest
+     moment for a Builder or a Blocker to be handed out. The deferred four
+     below leave it alone on purpose: a duckling given a Jumper while it
+     pauses is still a duckling pausing. */
+  if(skill === 'blocker'){ d.state = 'blocking'; d.buildPause = 0; return d; }
   if(skill === 'builder'){
     d.state = 'building';
+    d.buildPause = 0;
     d.buildBaseY = d.y;
     d.buildStep = 0;
     /* A ramp climbs or runs level depending entirely on what this duckling
