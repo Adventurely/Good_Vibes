@@ -210,7 +210,10 @@
       <ul class="tags">
         <li>Single player</li>
         <li class="sun">Puzzle</li>
-        <li class="wip">Ten levels</li>
+        <!-- Filled in from the game's own level list below, because a count
+             written by hand here is a count that goes stale there: this said
+             ten for the whole time the game had eleven and then twelve. -->
+        <li class="wip" id="dq-levels">Twelve levels</li>
       </ul>
     </div>
   </a>
@@ -272,7 +275,7 @@ import { paintShot as gvbPaintShot } from './gvb/shot.js';
 
 /* Aliased throughout: this game's `paintScene` is not Save Solarium's, and its
    `newGame`/`tick` are names half the games here would claim if asked. */
-import { LEVEL_1 as DQ_LEVEL, TICK_RATE as DQ_TICK_RATE } from './duck-duck-quack/content.js';
+import { LEVEL_1 as DQ_LEVEL, LEVELS as DQ_LEVELS, TICK_RATE as DQ_TICK_RATE } from './duck-duck-quack/content.js';
 import { newGame as dqNewGame, tick as dqTick, assignSkill as dqAssign, hasTrait as dqHasTrait } from './duck-duck-quack/sim.js';
 import { paintScene as dqPaintScene } from './duck-duck-quack/art.js';
 
@@ -471,6 +474,18 @@ function paintOrbitalTrader(now){
 }
 
 /* ---- Duck Duck Quack: the park, being played ------------------------- */
+
+/* How many levels the game actually has, said in the words the rest of these
+   tags are written in. Read off the level list rather than typed, because
+   typed is how this card came to be advertising ten of them two levels after
+   that stopped being true. */
+const COUNT_WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight',
+  'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen',
+  'Seventeen', 'Eighteen', 'Nineteen', 'Twenty'];
+const dqLevelTag = document.getElementById('dq-levels');
+if(dqLevelTag){
+  dqLevelTag.textContent = `${COUNT_WORDS[DQ_LEVELS.length] ?? DQ_LEVELS.length} levels`;
+}
 
 const dq = document.getElementById('shot-dq').getContext('2d', { alpha: false });
 dq.imageSmoothingEnabled = false;

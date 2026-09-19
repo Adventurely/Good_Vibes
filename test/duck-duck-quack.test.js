@@ -10,6 +10,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
 
 import {
   SCENE_W, SCENE_H, WALK_STEP, FALL_SAFE, FALL_SPEED, FLY_SPEED, TICK_RATE, BUILD_SECONDS,
@@ -2658,4 +2659,35 @@ test('The Errand\'s perch keeps the pad clear of the flock walking home', () => 
 test('formatTime reads as minutes:seconds', () => {
   assert.equal(formatTime(0), '0:00');
   assert.equal(formatTime(TICK_RATE * 65), '1:05');
+});
+
+
+/* ------------------------------------------- what the pages claim about it */
+
+/* Counts written by hand go stale. The shelf's card advertised ten levels
+ * for the whole time the game had eleven and then twelve, and the game's own
+ * facts line had already drifted twice. Both are read off the level list at
+ * runtime now, and these hold the fallback text in the markup to the same
+ * standard — a literal that is wrong is still wrong on the first paint, and
+ * on any browser that never runs the script.
+ */
+const WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight',
+  'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen',
+  'seventeen', 'eighteen', 'nineteen', 'twenty'];
+const page = name => readFileSync(new URL(name, import.meta.url), 'utf8');
+
+test('the shelf says how many levels the game actually has', () => {
+  const shelf = page('../public/index.html');
+  const tag = shelf.match(/<li[^>]*id="dq-levels"[^>]*>([^<]*)<\/li>/);
+  assert.ok(tag, 'the shelf should carry the tag the count is written into');
+  assert.equal(tag[1].trim().toLowerCase(), `${WORDS[LEVELS.length]} levels`);
+  assert.match(shelf, /LEVELS as DQ_LEVELS/, 'and should count them rather than trust the literal');
+});
+
+test('the game\'s own facts line counts its levels and skills', () => {
+  const front = page('../public/duck-duck-quack/index.html');
+  const tag = front.match(/<li[^>]*id="counts"[^>]*>([^<]*)<\/li>/);
+  assert.ok(tag, 'the facts list should carry the tag the counts are written into');
+  assert.equal(tag[1].trim().toLowerCase(),
+    `${WORDS[LEVELS.length]} levels, ${WORDS[SKILLS.length]} skills`);
 });

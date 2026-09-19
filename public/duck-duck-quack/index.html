@@ -264,7 +264,9 @@
     <ul class="facts">
       <li>Single player</li>
       <li class="sun">Puzzle</li>
-      <li>Twelve levels, six skills</li>
+      <!-- Counted off the level and skill lists below, not typed: this line
+           has gone stale twice already. -->
+      <li id="counts">Twelve levels, six skills</li>
       <li>A shared board — your name and your scores, nothing else</li>
     </ul>
     <button type="button" id="sound" class="sound" aria-pressed="false">Music off</button>
@@ -281,11 +283,23 @@
   /* The plate is the park itself, running, with a slow bot playing it over
      and over — the same rule every title screen on this site follows: this is
      not a picture of the game, it is the game, and it cannot go stale. */
-  import { LEVEL_1, LEVELS, GAME_VERSION } from './content.js';
+  import { LEVEL_1, LEVELS, SKILLS, GAME_VERSION } from './content.js';
   import { newGame, tick, assignSkill, hasTrait } from './sim.js';
   import { paintScene } from './art.js';
   import { createAudio } from './audio.js';
   import { createStats, NAME_RULE, NAME_MAX } from './stats.js';
+
+  /* The facts line, counted rather than typed. */
+  const COUNT_WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven',
+    'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen',
+    'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty'];
+  const countWord = n => COUNT_WORDS[n] ?? String(n);
+  const countsLine = document.getElementById('counts');
+  if(countsLine){
+    const levels = countWord(LEVELS.length);
+    countsLine.textContent =
+      `${levels.charAt(0).toUpperCase()}${levels.slice(1)} levels, ${countWord(SKILLS.length)} skills`;
+  }
   import { fetchBoard, syncPlayer, REFRESH_AFTER, OUT_OF_REACH } from './board.js';
 
   document.getElementById('game-version').textContent = `v${GAME_VERSION}`;
