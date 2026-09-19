@@ -139,6 +139,28 @@ button:focus-visible,.pad:focus-visible{outline:3px solid var(--down);outline-of
 .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:14px;font-size:.9rem;color:var(--muted)}
 .switch{display:flex;align-items:flex-start;gap:10px;margin-top:18px;font-size:.9rem;color:var(--muted);max-width:34rem;cursor:pointer}
 .switch input{width:20px;height:20px;flex:none;margin-top:1px;accent-color:var(--down)}
+.switch.tight{margin-top:0;align-items:center}
+.tools{margin-top:16px}
+.transport{display:flex;gap:10px;flex-wrap:wrap}
+.transport button{flex:1 1 auto;min-width:96px}
+.primary.armed{background:var(--sync);color:#fff}
+.setup{display:flex;flex-wrap:wrap;gap:12px 22px;align-items:center;margin-top:14px;font-size:.9rem;color:var(--muted)}
+.pick{display:flex;align-items:center;gap:8px}
+.chips{display:inline-flex;gap:4px}
+.chip{background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:3px 11px;font-size:.85rem;font-weight:600;color:var(--muted)}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.chip:disabled{opacity:.4;cursor:not-allowed}
+.slots{display:grid;gap:8px;margin-top:16px}
+.slot{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 12px;font-size:.9rem}
+.slot b{font-weight:700;min-width:3.6rem}
+.slot .what{color:var(--muted);flex:1;font-variant-numeric:tabular-nums}
+.slot button{background:none;border:0;color:var(--down);font-weight:600;font-size:.85rem;padding:3px 6px}
+.slot button:disabled{color:var(--muted);opacity:.45;cursor:not-allowed}
+/* The lap, while a loop runs. Thicker than the song's progress line and it
+   restarts every lap, which is the only clock this mode has. */
+.progress.lap{height:5px}
+.progress.lap i{background:var(--down);opacity:1;transition:none}
+.progress.lap.rec i{background:var(--sync)}
 @media (prefers-reduced-motion: reduce){
   .count.tick{animation:none}
   .pad.press,.pad.pulse,.pad.cue{animation-duration:.01s}
@@ -159,6 +181,7 @@ button:focus-visible,.pad:focus-visible{outline:3px solid var(--down);outline-of
     <div class="menu">
       <button class="choice" id="goLearn"><strong>Learn</strong><span>Hear a groove, then play it back.</span></button>
       <button class="choice" id="goJam"><strong>Jam</strong><span>Freestyle over a song. Syncopation scores big.</span></button>
+      <button class="choice" id="goLooper"><strong>Beat Looper</strong><span>A built-in beat builder with a looper and layers.</span></button>
       <button class="choice" id="goCal"><strong>Calibrate timing</strong><span id="calText">Tap along once so hits line up with your device.</span></button>
     </div>
     <div class="legend">
@@ -197,6 +220,23 @@ button:focus-visible,.pad:focus-visible{outline:3px solid var(--down);outline-of
     <div class="stage">
       <div class="pads" id="pads"></div>
       <div class="pops" id="pops"></div>
+    </div>
+
+    <!-- Only in Make. The pads above are the same pads, which is the whole
+         reason this lives inside the play screen rather than in a fourth one. -->
+    <div class="tools hidden" id="tools">
+      <div class="transport">
+        <button class="primary" id="lpRec">Record</button>
+        <button class="secondary" id="lpUndo">Undo</button>
+        <button class="secondary" id="lpClear">Clear</button>
+      </div>
+      <div class="setup">
+        <div class="pick"><span>Tempo</span><span class="chips" id="lpBpm"></span></div>
+        <div class="pick"><span>Bars</span><span class="chips" id="lpBars"></span></div>
+        <label class="switch tight"><input type="checkbox" id="lpStraight"> Straighten</label>
+        <label class="switch tight"><input type="checkbox" id="lpClick" checked> Click</label>
+      </div>
+      <div class="slots" id="lpSlots"></div>
     </div>
   </section>
 
@@ -248,6 +288,9 @@ import {
   PADS, PAD_BY_ID, XP_PER_LEVEL, levelOf, padUnlocked, padLayout,
   LESSONS, LESSON_BY_ID, lessonNotes, gradeLesson, learnXp,
   TRACKS, TRACK_BY_ID, secondsPerBeat, trackSpan,
+  LOOP_BPM, LOOP_BARS, MAX_LAYERS, MAX_HITS, emptyLoop, loopBeats, loopSeconds,
+  wrapBeats, loopHits, playable, levelAt, loopToSave, loopFromSave,
+  slotsToSave, slotsFromSave, loopSummary,
   snap, scoreHit, slotKey, pushedInto, filledInto, barBonus,
   PUSH_POINTS, FILL_POINTS, jamXp, LESSON_MS,
   STEPS_PER_BEAT, BEATS_PER_BAR, STEPS_PER_BAR,
@@ -365,7 +408,18 @@ function drawPads(){
     b.innerHTML = `<span class="key"></span><span class="name"></span>`;
     b.querySelector('.key').textContent = p.key.toUpperCase();
     b.querySelector('.name').textContent = p.label;
-    b.addEventListener('pointerdown', e => { e.preventDefault(); if(open) hitPad(p.id); });
+    /* How hard, from where on the pad the finger landed — the middle is the
+       middle of the drum and the edge is the rim. There is no pressure to read
+       on a laptop, so position is the only expression there is on every device
+       this runs on, and it is the one a drummer already has. */
+    b.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      if(!open) return;
+      const r = b.getBoundingClientRect();
+      hitPad(p.id, levelAt(
+        (e.clientX - (r.left + r.width / 2)) / (r.width / 2),
+        (e.clientY - (r.top + r.height / 2)) / (r.height / 2)));
+    });
     return b;
   }));
 }
@@ -513,6 +567,8 @@ function later(t, fn){
 }
 
 function stopSession(){
+  $('#tools').classList.add('hidden');
+  $('#prog').parentElement.classList.remove('lap', 'rec');
   clearInterval(lookAhead);
   cancelAnimationFrame(rafId);
   for(const t of timers) clearTimeout(t);
@@ -532,20 +588,22 @@ function stopSession(){
 $('#stopBtn').addEventListener('click', () => {
   if(!S) return show('home');
   if(S.mode === 'jam') endJam();
+  else if(S.mode === 'looper'){ stopSession(); show('home'); }
   else { stopSession(); drawLessons(); show('learn'); }
 });
 
-function hitPad(id){
+function hitPad(id, level = 1){
   ensureAudio();
   const ctx = audioCtx();
   // The finger has already happened, so this one is not scheduled ahead.
-  DRUMS[id](ctx.currentTime, 1, masterOut());
+  DRUMS[id](ctx.currentTime, level, masterOut());
   press(id);
   buzz();
   if(!S){ flash(id, 'down'); return; }
   const t = ctx.currentTime - offsetSec();
   if(S.mode === 'jam') jamHit(id, t);
   else if(S.mode === 'learn') learnHit(id, t);
+  else if(S.mode === 'looper'){ looperHit(id, t, level); flash(id, S.rec ? 'sync' : 'down'); }
   else flash(id, 'down');
 }
 
@@ -827,6 +885,229 @@ $('#nextBtn').addEventListener('click', () => {
   if(last && last.mode === 'learn') startLearn(last.lesson + 1);
 });
 
+
+/* ---- Beat Looper ---------------------------------------------------------- */
+
+/* A loop pedal. The loop runs from the moment you arrive and never stops until
+ * you leave; everything you play is heard as you play it; pressing Record puts
+ * exactly one lap into the loop so it comes back round at you.
+ *
+ * One lap per press rather than "record until I say stop", which is what a real
+ * pedal does. A pedal is a foot and a stage; this is a thumb and a phone, and
+ * open-ended recording here means four laps of mush and no way to tell which
+ * pass to take off. One lap is predictable, it makes Undo mean something
+ * exact, and you can press it again the instant it lets go.
+ *
+ * Recording starts NOW rather than at the next lap line. Waiting up to five
+ * seconds for a boundary to come round is the single most annoying thing a
+ * looper does, and there is no reason for it: the lap wraps, so a pass that
+ * starts half way through is still a full lap of playing.
+ */
+
+const LOOPS_KEY = 'gvb:loops';
+
+function readLoops(){
+  try { return slotsFromSave(JSON.parse(localStorage.getItem(LOOPS_KEY))); }
+  catch { return slotsFromSave(null); }
+}
+let slots = readLoops();
+function writeLoops(){
+  try { localStorage.setItem(LOOPS_KEY, JSON.stringify(slotsToSave(slots))); }
+  catch { /* a private window; the loop lasts as long as the tab does */ }
+}
+
+function startLooper(){
+  stopSession(); ensureAudio();
+  const ctx = audioCtx();
+  const loop = (S && S.loop) || emptyLoop();
+  const b = bus();
+  S = {
+    mode: 'looper', loop, bus: b,
+    t0: ctx.currentTime + 0.25,
+    sched: ctx.currentTime,          // audio time everything is queued up to
+    rec: null, straight: false, click: true,
+  };
+  reLap();
+  drawPads(); show('play');
+  $('#tools').classList.remove('hidden');
+  $('#score').textContent = '';
+  showCounter(false);
+  $('#prog').parentElement.classList.add('lap');
+  drawLooper();
+  runLooper();
+}
+
+/* The loop's own numbers, recomputed whenever the tempo or the length change.
+   `t0` moves with them so the lap line stays where the player last heard it —
+   changing the tempo should not also jump the loop to a different place in
+   itself. */
+function reLap(){
+  const spb = secondsPerBeat(S.loop.bpm);
+  S.spb = spb;
+  S.beats = loopBeats(S.loop.bars);
+  S.lap = loopSeconds(S.loop.bars, S.loop.bpm);
+}
+
+/* Every occurrence of one repeating event inside a window. The loop has no end,
+   so there is no event list to walk — the window is asked what it contains. */
+function everyLap(first, from, to, fn){
+  let k = Math.ceil((from - first) / S.lap);
+  for(;; k++){
+    const t = first + k * S.lap;
+    if(t >= to) break;
+    if(t >= from) fn(t);
+  }
+}
+
+function runLooper(){
+  const frame = () => {
+    if(!S || S.mode !== 'looper') return;
+    const ctx = audioCtx(), now = ctx.currentTime;
+
+    /* Queued from the live layers every pass rather than built once, so a layer
+       recorded thirty seconds ago and one recorded a moment ago are queued by
+       the same code and a new one is audible on the very next lap. */
+    const to = now + LOOK_AHEAD;
+    if(to > S.sched){
+      const from = Math.max(S.sched, now);
+      if(S.click){
+        for(let n = 0; n < S.beats; n++){
+          everyLap(S.t0 + n * S.spb, from, to, t => click(t, n === 0, n === 0 ? 0.20 : 0.10, S.bus));
+        }
+      }
+      for(const h of playable(S.loop, S.straight)){
+        everyLap(S.t0 + h.at * S.spb, from, to, t => DRUMS[h.pad](t, h.level, S.bus));
+      }
+      S.sched = to;
+    }
+
+    // The lap line, where the player is hearing it.
+    const heard = now - offsetSec() - S.t0;
+    const round = ((heard % S.lap) + S.lap) % S.lap;
+    $('#prog').style.width = (round / S.lap * 100) + '%';
+
+    if(S.rec && now > S.rec.until) closeTake();
+
+    rafId = requestAnimationFrame(frame);
+  };
+  rafId = requestAnimationFrame(frame);
+}
+
+function looperHit(pad, t, level){
+  if(!S.rec) return;
+  S.rec.hits.push({ pad, at: wrapBeats((t - S.t0) / S.spb, S.beats), level });
+}
+
+function armTake(){
+  if(!S || S.mode !== 'looper') return;
+  if(S.rec){ closeTake(); return; }        // pressing it again is "never mind"
+  if(S.loop.layers.length >= MAX_LAYERS){ setStatus(LOOP_NAME, LOOP_FULL_SUB); return; }
+  // A breath of grace on the end, so a hit played right on the lap line is not
+  // cut off by the clock ticking over a millisecond first.
+  S.rec = { until: audioCtx().currentTime + S.lap + 0.06, hits: [] };
+  drawLooper();
+}
+
+function closeTake(){
+  const take = S.rec;
+  S.rec = null;
+  if(take && take.hits.length && loopHits(S.loop).length + take.hits.length <= MAX_HITS){
+    S.loop.layers.push(take.hits);
+  }
+  drawLooper();
+}
+
+function undoTake(){
+  if(!S || S.mode !== 'looper' || !S.loop.layers.length) return;
+  S.loop.layers.pop();
+  drawLooper();
+}
+function clearLoop(){
+  if(!S || S.mode !== 'looper') return;
+  S.rec = null;
+  S.loop.layers = [];
+  drawLooper();
+}
+
+/* ---- the Make screen ---- */
+
+function chips(into, values, current, onPick, locked){
+  into.replaceChildren(...values.map(v => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip';
+    b.textContent = v;
+    b.setAttribute('aria-pressed', String(v === current));
+    b.disabled = !!locked;
+    b.addEventListener('click', () => onPick(v));
+    return b;
+  }));
+}
+
+function drawLooper(){
+  if(!S || S.mode !== 'looper') return;
+  const layers = S.loop.layers.length, hits = loopHits(S.loop).length;
+
+  $('#lpRec').textContent = S.rec ? 'Recording…' : 'Record';
+  $('#lpRec').classList.toggle('armed', !!S.rec);
+  $('#lpUndo').disabled = !layers;
+  $('#lpClear').disabled = !layers;
+  $('#prog').parentElement.classList.toggle('rec', !!S.rec);
+  $('#score').textContent = layers ? `${layers} × ` + (hits === 1 ? '1 hit' : `${hits} hits`) : '';
+
+  setStatus(S.rec ? LOOP_REC : LOOP_NAME, S.rec ? LOOP_REC_SUB : (layers ? LOOP_ON : LOOP_EMPTY));
+
+  /* The tempo and the length are locked once there is anything in the loop.
+     Both are the loop's own ruler, and moving a ruler under something already
+     measured against it does not stretch the recording, it wrecks it. */
+  const locked = layers > 0;
+  chips($('#lpBpm'), LOOP_BPM, S.loop.bpm, v => { S.loop.bpm = v; reLap(); drawLooper(); }, locked);
+  chips($('#lpBars'), LOOP_BARS, S.loop.bars, v => { S.loop.bars = v; reLap(); drawLooper(); }, locked);
+
+  $('#lpSlots').replaceChildren(...slots.map((slot, i) => {
+    const row = document.createElement('div');
+    row.className = 'slot';
+    const sum = loopSummary(slot);
+    row.innerHTML = '<b></b><span class="what"></span>';
+    row.querySelector('b').textContent = `Loop ${i + 1}`;
+    row.querySelector('.what').textContent = sum
+      ? `${sum.layers} layer${sum.layers === 1 ? '' : 's'}, ${sum.hits} hits · ${sum.bpm} BPM · ${sum.bars} bar${sum.bars === 1 ? '' : 's'}`
+      : 'empty';
+    const save = document.createElement('button');
+    save.type = 'button';
+    save.textContent = sum ? 'Replace' : 'Save';
+    save.disabled = !layers;
+    save.addEventListener('click', () => {
+      slots[i] = loopFromSave(loopToSave(S.loop));
+      writeLoops(); drawLooper();
+    });
+    row.appendChild(save);
+    if(sum){
+      const load = document.createElement('button');
+      load.type = 'button';
+      load.textContent = 'Load';
+      load.addEventListener('click', () => {
+        S.loop = loopFromSave(loopToSave(slots[i]));
+        S.rec = null;
+        reLap(); drawLooper();
+      });
+      const drop = document.createElement('button');
+      drop.type = 'button';
+      drop.textContent = 'Delete';
+      drop.addEventListener('click', () => { slots[i] = null; writeLoops(); drawLooper(); });
+      row.append(load, drop);
+    }
+    return row;
+  }));
+}
+
+$('#goLooper').addEventListener('click', startLooper);
+$('#lpRec').addEventListener('click', armTake);
+$('#lpUndo').addEventListener('click', undoTake);
+$('#lpClear').addEventListener('click', clearLoop);
+$('#lpStraight').addEventListener('change', e => { if(S && S.mode === 'looper') S.straight = e.target.checked; });
+$('#lpClick').addEventListener('change', e => { if(S && S.mode === 'looper') S.click = e.target.checked; });
+
 /* ---- calibration ---------------------------------------------------------- */
 
 /* Twelve clicks, a second apart. What is measured is how late the taps are
@@ -841,6 +1122,13 @@ $('#nextBtn').addEventListener('click', () => {
 let cal = null;
 
 const CAL_OPENING = `You'll hear ${CAL_CLICKS} clicks, one a second. Tap the pad (or press Space) on each one.`;
+const LOOP_NAME = 'Beat Looper';
+const LOOP_EMPTY = 'Play anything. Record puts one lap in the loop.';
+const LOOP_ON = 'Record again to stack another layer.';
+const LOOP_REC = 'Recording';
+const LOOP_REC_SUB = 'One lap, then it stops itself.';
+const LOOP_FULL_SUB = 'Loop is full. Undo a layer to add another.';
+
 const BEAT_LABEL = 'Show the beat while I play';
 const BEAT_AUTO = ' — on, because your delay is long enough that you need something on screen that is on time.';
 const CAL_TAPPING = 'Keep tapping along. The first three clicks are warm-up.';

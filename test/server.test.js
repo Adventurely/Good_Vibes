@@ -518,6 +518,24 @@ test('Good Vibe Beats is served, and the shelf paints its card with the game', a
   assert.doesNotMatch(play, /function scoreHit|function snap\(/,
     'the scoring must live in content.js, not be copied back into the page');
 
+  /* The Beat Looper reuses the play screen's pads rather than drawing a second
+     set, which is the whole reason its controls live inside that section. If
+     they are ever pulled out into a fourth screen there will be two pad
+     renderers to keep in step, and only one of them will get fixed. */
+  assert.match(play, /<div class="tools hidden" id="tools">/);
+  assert.match(play, />Beat Looper</);
+  // Every looper control inside the tools block, and the tools block inside the
+  // play section, after the one set of pads it borrows.
+  const padsAt = play.indexOf('<div class="pads" id="pads">');
+  const toolsAt = play.indexOf('id="tools"');
+  const playEnds = play.indexOf('</section>', toolsAt);
+  assert.ok(padsAt > 0 && toolsAt > padsAt && playEnds > toolsAt);
+  for(const id of ['lpRec', 'lpUndo', 'lpClear', 'lpBpm', 'lpBars', 'lpStraight', 'lpClick', 'lpSlots']){
+    const at = play.indexOf(`id="${id}"`);
+    assert.ok(at > toolsAt && at < playEnds, `"${id}" is not inside the tools block`);
+  }
+  assert.doesNotMatch(play, /id="looperPads"|id="makePads"/, 'there is one set of pads');
+
   // The Spotify row the prototype advertised is gone: it promised a feature
   // neither Spotify nor YouTube can supply.
   assert.doesNotMatch(play, /Spotify/i);

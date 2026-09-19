@@ -2069,6 +2069,33 @@ positions, 108,000 phrase-bonus checks and 24,000 grading runs, with zero
 disagreements. That is the only reason it is safe to say the game plays the same
 as the thing Jack was playing.
 
+**The Beat Looper is a loop pedal, and it is the one mode latency cannot spoil.**
+No song and no score: a loop of a fixed length runs from the moment you arrive,
+everything you play is heard live, and Record puts exactly one lap into the loop
+so it comes back at you. Stack laps until it is a beat. One lap per press rather
+than "record until I say stop" — open-ended recording on a phone means four laps
+of mush and no way to tell which pass to take off, where one lap makes Undo mean
+something exact. And recording starts *now* rather than at the next lap line,
+because waiting five seconds for a boundary is the most annoying thing a looper
+does and the lap wraps anyway.
+
+**Straightening is a lens, never a rewrite,** and it does not use `snap()`.
+`snap()` decides per hit, which is right for scoring — "what was this one hit
+nearest to" — and wrong for a recorder: four hits played evenly a tenth of a beat
+apart come out of it on grids `s, s, s, t`, spaced 0.000, 0.250, 0.083. That is
+an audible stumble and a loop plays it again every pass for ever. So a take is
+measured against both grids as a whole and every hit goes on the winner, one grid
+per layer — a swung hat pass over a straight kick pass is a thing people play on
+purpose. The raw take is never touched, so the switch goes back off and the
+playing is still underneath.
+
+**A hit's level comes from where the pad was struck** — the middle is the middle
+of the drum and the edge is the rim. There is no pressure to read on a laptop and
+`PointerEvent.pressure` is a flat 0.5 on a mouse, so position is the only
+expression available on every device this runs on, and it is the one a drummer
+already has. The range is deliberately narrow: a pad that went silent at the
+edges would read as a dead spot rather than as dynamics.
+
 **Bluetooth is the thing this game is worst at, and it is handled rather than
 hidden.** A wireless earcup is 150–250 ms behind, all of it spent below the
 browser, and no web page can shorten it. Calibration makes the scoring correct
