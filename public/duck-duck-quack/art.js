@@ -175,9 +175,11 @@ const SKY_SEAM_H = 4;
  * rather than as one flat frieze.
  */
 const HILLS = [
-  { cx: 44, w: 100, h: 15, key: 'G', haze: 0.12 },
-  { cx: 168, w: 130, h: 22, key: 'G', haze: 0.5 },
-  { cx: 274, w: 110, h: 17, key: 'G', haze: 0.28 },
+  // Pine mixed toward the horizon's cyan, a step further for each one that
+  // stands further off. Solid, for the same reason the sky above is.
+  { cx: 44, w: 100, h: 15, tone: '#33816f' },
+  { cx: 168, w: 130, h: 22, tone: '#40a2a0' },
+  { cx: 274, w: 110, h: 17, tone: '#3a9288' },
 ];
 
 function drawHills(ctx){
@@ -192,7 +194,8 @@ function drawHills(ctx){
       const width = Math.round(hill.w * Math.sqrt(Math.max(0, 1 - t * t)));
       if(width <= 0) continue;
       const left = Math.round(hill.cx - width / 2);
-      ditherSeam(ctx, left, y, width, 1, hill.key, 'c', hill.haze);
+      ctx.fillStyle = hill.tone;
+      ctx.fillRect(left, y, width, 1);
     }
     // A single brighter row along the crown — sunlight catching the ridge
     // line, the same reasoning drawStoneColumn's paler top edge uses.
@@ -206,22 +209,39 @@ function drawHills(ctx){
    the far edge — `ticks` is the sim's own clock (see paintScene), not the
    page's, so the sky moves at the same rate the flock does regardless of
    frame rate. */
+/* A cloud is a handful of overlapping discs sitting on one flat base, not a
+ * tapered lens. That is what a fair-weather cumulus actually is and, more to
+ * the point, it is what every side-on platformer draws: a lumpy top with
+ * two or three crowns of different heights, and a bottom ruled straight
+ * where the air stops rising. The old shape — one blob, thickest in the
+ * middle, dithered edge to edge — read as a smear of static rather than as
+ * a cloud, and at four times scale the dither was the only thing you saw.
+ *
+ * Solid bone through the body with the dither kept for a single fringe row
+ * along the underside, which is where a cloud is actually soft.
+ * `[dx, dy, r]`: a lobe's offset from the cloud's own origin and its radius.
+ */
 const CLOUDS = [
-  { y: 18, w: 34, h: 6, speed: 0.32 },
-  { y: 38, w: 24, h: 5, speed: 0.5 },
+  { y: 20, speed: 0.32, lobes: [[-11, 1, 4], [-4, -2, 6], [4, -1, 5], [11, 1, 4]] },
+  { y: 40, speed: 0.5,  lobes: [[-7, 0, 3], [0, -2, 5], [7, 0, 4]] },
 ];
 
 function drawClouds(ctx, ticks){
   for(let i = 0; i < CLOUDS.length; i++){
     const c = CLOUDS[i];
-    const span = SCENE_W + c.w * 2;
-    const x = Math.round(((ticks * c.speed + i * 151) % span) - c.w);
-    for(let py = 0; py < c.h; py++){
-      const inset = Math.round(Math.abs(py - (c.h - 1) / 2) * 1.8);
-      const w = c.w - inset * 2;
-      if(w <= 0) continue;
-      ditherSeam(ctx, x + inset, c.y + py, w, 1, 'w', 'c', 0.4);
+    const span = SCENE_W + 40;
+    const x = Math.round(((ticks * c.speed + i * 151) % span) - 20);
+    ctx.fillStyle = hex('w');
+    for(const [dx, dy, r] of c.lobes){
+      for(let py = -r; py <= r; py++){
+        const yy = c.y + dy + py;
+        if(yy > c.y) continue;                     // the flat underside
+        const w = Math.floor(Math.sqrt(r * r - py * py));
+        ctx.fillRect(x + dx - w, yy, w * 2 + 1, 1);
+      }
     }
+    // One soft row under the base, so the cloud is not a cut-out.
+    for(const [dx, , r] of c.lobes) ditherSeam(ctx, x + dx - r, c.y + 1, r * 2 + 1, 1, 'w', 'c', 0.55);
   }
 }
 
@@ -248,10 +268,29 @@ function drawBirds(ctx, ticks){
   }
 }
 
+/* The ramp from the deep blue overhead down to the cyan at the horizon.
+   One dithered seam put the whole change of colour on four rows, which at
+   any scale above life size is a checkerboard stripe ruled across the sky
+   rather than a sky that gets lighter as it goes down. Five steps over
+   twenty-five rows is still only twenty-five rows of dither, and it reads
+   as air. */
+/* Stated rather than dithered. Blue and cyan sit a long way apart in the
+   shared palette, so a checkerboard between them is not a blend, it is a
+   checkerboard — five bands of it ruled across the sky were more visible
+   than the one hard seam they replaced. These are the four steps of that
+   blend mixed properly and named here, the same licence the soil and the
+   rock already take where the sixteen colours have no answer. */
+const SKY_RAMP = ['#3078b5', '#3584ba', '#3a91bf', '#409ec4', '#45abc9', '#4ab7ce'];
+const SKY_RAMP_H = 4;
+
 export function drawSky(ctx, ticks = 0){
+  const rampTop = SKY_SEAM_Y + SKY_SEAM_H - SKY_RAMP.length * SKY_RAMP_H;
   ctx.fillStyle = hex('b');
-  ctx.fillRect(0, 0, SCENE_W, SKY_SEAM_Y);
-  ditherSeam(ctx, 0, SKY_SEAM_Y, SCENE_W, SKY_SEAM_H, 'b', 'c', 0.5);
+  ctx.fillRect(0, 0, SCENE_W, rampTop);
+  for(let i = 0; i < SKY_RAMP.length; i++){
+    ctx.fillStyle = SKY_RAMP[i];
+    ctx.fillRect(0, rampTop + i * SKY_RAMP_H, SCENE_W, SKY_RAMP_H);
+  }
   ctx.fillStyle = hex('c');
   ctx.fillRect(0, SKY_SEAM_Y + SKY_SEAM_H, SCENE_W, SCENE_H - SKY_SEAM_Y - SKY_SEAM_H);
   drawClouds(ctx, ticks);
@@ -293,6 +332,59 @@ const SUBSOIL_SHARE = 0.45;
 const SOIL_LIT = '#d99270';
 const SOIL_DARK = '#9c6144';
 const GRASS_LIT = '#5cc067';
+
+/* The body of the soil, a shade deeper and browner than the shared oak it
+   used to be filled with. Oak is the colour of a nest and a ladder and a
+   bridge deck — cut earth is darker than the timber standing on it, and
+   filling both with one tone was most of why a platform read as a plank. */
+const SOIL_BASE = '#b06e4a';
+
+/* The soil's own weave.
+ *
+ * Flat oak with a scatter of specks in it was the one part of this scene
+ * with no structure at all — at any size above a thumbnail it read as a
+ * painted rectangle rather than as ground that had been cut through. Real
+ * platformer dirt is drawn as courses: a brick or a woven strand catching
+ * light along its top and losing it along its bottom, with the joints
+ * offset course to course so the eye reads a weave rather than a grid.
+ *
+ * Five rows to a course and nine columns to a brick, which at this scene's
+ * size puts two or three courses on an ordinary platform and a dozen down
+ * The Spire. Anchored to absolute height and absolute column, exactly as
+ * the rock strata are (see drawStoneColumn), so the courses run level
+ * across a whole formation instead of following its surface up and down —
+ * which is the difference between ground that was cut and a pattern that
+ * was painted on afterwards.
+ */
+const BRICK_H = 4;
+const BRICK_W = 7;
+
+/* Half a step either side of the oak the soil is filled with. The first cut
+   of this used the same lit and shadowed tones the cut faces do, and at full
+   contrast a course reads as a course of BRICKS — the platforms came out
+   looking like garden walls. Soil is not masonry: the weave wants to be felt
+   rather than counted, so the light and the shade are pulled in to about
+   half their reach and the lit edge is a fleck at the head of each strand
+   rather than a stripe along all of it. */
+const SOIL_COURSE_DARK = '#9b5f3f';
+const SOIL_COURSE_LIT = '#c1815a';
+
+function drawSoilWeave(ctx, x, top, h){
+  for(let py = top; py < top + h; py++){
+    const course = Math.floor(py / BRICK_H);
+    const row = py - course * BRICK_H;
+    // Every other course steps half a brick along, which is what stops the
+    // vertical joints lining up into columns.
+    const along = ((x + (course % 2) * Math.floor(BRICK_W / 2)) % BRICK_W + BRICK_W) % BRICK_W;
+    if(row === BRICK_H - 1 || along === 0){
+      ctx.fillStyle = SOIL_COURSE_DARK;   // the seam under a strand, and between two
+      ctx.fillRect(x, py, 1, 1);
+    }else if(row === 0 && along < 3){
+      ctx.fillStyle = SOIL_COURSE_LIT;    // a catch of light at the head of it
+      ctx.fillRect(x, py, 1, 1);
+    }
+  }
+}
 
 /* How far the light on an exposed face runs down it. A lip, not a stripe:
    the first pass ran the rim the whole height of the dirt and The Spire's
@@ -430,6 +522,18 @@ function drawGroundColumn(ctx, level, x, y, bottom, isRock, rockBelowY, edge = 0
   const grassH = Math.min(GRASS_DEPTH, softH);
   ctx.fillStyle = hex('g');
   ctx.fillRect(x, y, 1, grassH);
+  /* The turf's sunlit crown, and a lip of it hanging a pixel over the edge
+     on the swell of a slow wave. A platform's top used to be ruled dead
+     straight for its whole length, which is the one line in this scene
+     nothing in nature draws: grass sits on soil in a rolling scallop, and
+     four pixels of wavelength is enough to read as one without costing the
+     flock a single pixel of the surface they actually walk on — the lip is
+     drawn above `y`, never into it. */
+  if(grassH > 1){
+    ctx.fillStyle = GRASS_LIT;
+    ctx.fillRect(x, y, 1, 1);
+    if(Math.sin(x * 0.68) + Math.sin(x * 0.23) > 0.75) ctx.fillRect(x, y - 1, 1, 1);
+  }
   // The underside of the turf, where it is in its own shadow. Two rows of
   // pine before the ink seam is what stops a cut edge reading as a flat
   // green rectangle sitting on a flat brown one.
@@ -442,8 +546,10 @@ function drawGroundColumn(ctx, level, x, y, bottom, isRock, rockBelowY, edge = 0
   if(dirtH > 0){
     const subsoilH = Math.min(SUBSOIL_DEPTH, Math.round(dirtH * SUBSOIL_SHARE));
     const soilH = dirtH - subsoilH;
-    ctx.fillStyle = hex('N');
+    ctx.fillStyle = SOIL_BASE;
     ctx.fillRect(x, y + grassH, 1, soilH);
+    // The courses, over the flat fill and under everything else.
+    if(soilH > 2) drawSoilWeave(ctx, x, y + grassH + 1, soilH - 1);
     if(subsoilH > 0){
       // Subsoil, and deliberately darker than the grey rock is drawn in
       // rather than the same colour it used to be — see drawStoneColumn
