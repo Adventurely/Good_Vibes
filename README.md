@@ -2004,6 +2004,94 @@ and it is drawn in horizontal spans rather than pixel by pixel precisely so it
 can be.
 ---
 
+## Good Vibe Beats
+
+Served at `/gvb/`, which is what the directory, the save key and the test file
+are all named after: **G**ood **V**ibe **B**eats. Singular *Vibe*, like the site
+it is on.
+
+A rhythm game, and the first one here that never tells you what to play. There
+is no highway of notes coming down the screen: there are four pads and a song
+with the drums taken off it, you make the beat up, and the game listens to where
+your hits land against the song's own grid and pays you for the ones that are
+interesting. `public/gvb/content.js` is the rules as data and pure functions;
+`audio.js` is the kit, synthesised; `play.html` owns the clock and the save;
+`shot.js` paints the shelf card and the title screen's backdrop. It started as a
+single-file prototype built outside the repo — `docs/gvb-design.md` is the
+handoff snapshot it came with, and says which decisions are Jack's and which are
+placeholders.
+
+**The spaces are the game.** Hitting the beat is worth the least it can be worth
+and still be worth something. The "and" pays half again; the "e" and the "a" pay
+double, as does anything swung onto the triplet grid. Anticipating a beat and
+leaving the beat itself empty is a push, worth 75 on top — leaving it empty is
+the whole point, because anticipating the one and then also playing the one is
+just playing the one. A bar less than half like the one before it is Fresh and
+pays 100; a bar more than 85% like it is Locked in and pays 30. Both, because a
+game that only paid for variation would be telling drummers that repeating
+yourself is a fault, and repeating yourself is most of the job. A test pins the
+ordering rather than the numbers: the exact points are meant to be tuned from
+playtesting, but the "e" must always beat the "and", and the "and" must always
+beat the beat.
+
+**Two grids at once, and the tie-break is four milliseconds.** A hit snaps to the
+nearest sixteenth or the nearest eighth-note triplet, whichever is closer — but
+the triplet only wins if it is *clearly* closer and is not sitting on a beat
+anyway. Without the triplet grid a swung groove reads as somebody who cannot keep
+time; with it, swing is a thing the game can see and pay for. The margin is tiny
+on purpose: the two grids converge to a forty-eighth of a beat apart, so a wide
+one would hand every sixteenth to the triplet grid, and being on the beat would
+quietly pay the swing multiplier.
+
+**Above about 94 BPM, nothing can be off the grid.** A hit is off-grid only if it
+is further than the 80 ms good window from *every* line, and the furthest
+anything can be from the nearest sixteenth is half a sixteenth. Past the tempo
+where half a sixteenth is narrower than the window, every hit lands on something:
+Funk world at 104 BPM always reports `Off the grid: 0`, and its timing window has
+stopped deciding anything. Lo-fi world at 84 is below the line and behaves as
+written. This is tuning rather than a fault, but it is invisible on screen, so a
+test states both facts and fails if a new world or a new window moves them
+without anybody meaning to.
+
+**Everything is scheduled against the audio clock, and the picture is allowed to
+be late.** A look-ahead loop runs every 25 ms and queues anything due in the next
+150; `setTimeout` alone drifts by whole milliseconds under load, which in a rhythm
+game is audible on the first bar. `requestAnimationFrame` drives only the pads,
+the counter and the progress line. Hits are read off `AudioContext.currentTime`
+minus a calibrated offset — sixteen clicks, the first four thrown away because
+everybody is late on the first one, and the median of the rest, because one tap
+missed entirely would drag a mean across the whole calibration.
+
+**The port is provably the prototype.** The rules were lifted out of a single
+HTML file into a module with no DOM, no audio and no clock in it, and then the
+two were run against each other: 277,200 scoring combinations, 12,500 snap
+positions, 108,000 phrase-bonus checks and 24,000 grading runs, with zero
+disagreements. That is the only reason it is safe to say the game plays the same
+as the thing Jack was playing.
+
+**The one page on the site with its own face.** Every other game uses the system
+stack in `theme.css` and fetches nothing third-party; this one wanted Bricolage
+Grotesque, so it is served from `public/gvb/font/` rather than from Google. One
+variable file covers the three weights the game uses, which is smaller than any
+two of the statics would have been, and it means the page renders in the right
+font on first paint instead of swapping, and works with no network at all. The
+SIL Open Font License that permits this requires the licence to travel with the
+font, so `OFL.txt` sits beside it and a test fails if either goes missing.
+
+**What is still a placeholder.** The two worlds are synthesised stand-ins — bass,
+keys and a shaker — because the game this is a prototype of plays over real
+recordings with the drums taken off them. Sourcing those is the open question and
+it is a licensing one rather than a technical one; `docs/gvb-design.md` lists what
+was ruled out and why. Neither Spotify nor YouTube can supply drumless audio or a
+beat grid, so the prototype's "pick any Spotify track" row is gone rather than
+left promising something nothing can deliver. When real tracks arrive they carry
+the same header the synth ones do — tempo, beats to the bar, bars — plus a file
+and the seconds to its first downbeat, and the scorer will not know the
+difference: it never hears the music, it only ever sees how far a hit was from a
+line.
+
+---
+
 ## Greener Thumbs
 
 Still being built: one photoreal specimen in a Victorian dwarf-wall glasshouse,
