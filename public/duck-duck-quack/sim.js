@@ -376,16 +376,41 @@ function stepGoose(state){
   if(state.goose.x <= g.x0){ state.goose.x = g.x0; state.goose.dir = 1; }
 }
 
+/* When a run is over, and what it was.
+ *
+ * Over means every duckling is accounted for — in the pond or gone — or the
+ * clock has run out. Reaching the quota is NOT the end of it, which it used
+ * to be, and that was wrong twice over. It cut a level off mid-flock the
+ * instant the eighth of twenty got home, so the rest of a hatch a player had
+ * already set up never arrived; and because the run stopped there, the score
+ * filed against it was always exactly the quota. A player who got fifteen
+ * home saw the same eight recorded as the run before, which reads as a
+ * scoreboard that does not work, and was.
+ *
+ * The quota decides what the run was called, not when it ended.
+ *
+ * A duckling planted as a Blocker is neither in the pond nor gone, and it
+ * holds the run open on purpose: something is still standing there, and the
+ * flock behind it may yet be let through. A player who is finished anyway
+ * ends the run from the button rather than waiting the clock out (see
+ * play.html), and that counts and is filed exactly like any other ending.
+ */
 function evaluate(state){
   const level = state.level;
-  const need = winCount(level);
-  if(state.saved >= need){ state.ended = 'won'; return; }
-
   const resolved = state.hatched >= level.duckCount &&
     state.ducks.every(d => d.state === 'saved' || d.state === 'lost');
   if(resolved || state.ticks >= level.timeLimit){
-    state.ended = state.saved >= need ? 'won' : 'lost';
+    state.ended = state.saved >= winCount(level) ? 'won' : 'lost';
   }
+}
+
+/* Ending a run by hand, from the button. Judged exactly the way the clock
+   running out would judge it, so stopping early is not a way to dodge a
+   loss — it is the same run, called at the moment it is called. */
+export function endRun(state){
+  if(state.ended) return null;
+  state.ended = state.saved >= winCount(state.level) ? 'won' : 'lost';
+  return state.ended;
 }
 
 /* ------------------------------------------------------------------- a duck */
@@ -432,11 +457,19 @@ function stepWalking(state, d){
     /* A Jumper goes over the top of it. The goose is a thing in the way of
        about the size of everything else a Jumper hops, and a duckling that
        can clear a ditch can clear a goose — it is the one hazard here that
-       is answered by not being where it is for a moment. The hunt is not
-       called off by a jump: nothing was caught, so the goose is still
-       hunting whoever comes next, which is what makes a Jumper a thing you
-       spend per duckling rather than once. */
-    if(hasTrait(d, 'jumper') && startJump(state, d, true)) return;
+       is answered by not being where it is for a moment.
+
+       And being hopped over calls the hunt off. A goose that has just had a
+       duckling go clean over its head has been got the better of, and it
+       leaves the same way it leaves after a catch or after walking into a
+       Blocker (`fed`, see stepGoose) — only this time without a duckling.
+       That makes one Jumper worth the same to a flock as one Blocker
+       planted in the goose's path, bought a different way: the hop costs a
+       skill rather than costing a duckling its walk. */
+    if(hasTrait(d, 'jumper') && startJump(state, d, true)){
+      state.goose.fed = true;
+      return;
+    }
     loseDuckling(state, d, 'goosed');
     // Ordinarily one catch is the whole hunt — see goosedAt above. A
     // relentless goose (content.js's goose.relentless) keeps hunting after

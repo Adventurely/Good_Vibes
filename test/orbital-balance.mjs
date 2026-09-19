@@ -104,6 +104,10 @@ function fly(state, to, budgetDays){
     let guard = 0;
     while(guard++ < 200000 && state.t - t0 < budgetDays){
       S.tick(state, 0.05);
+      /* A card on the way is answered the way an unimaginative player answers
+         it: the first button that is not greyed. A toll is paid in coin. */
+      if(state.pending?.kind === 'encounter'){ S.resolveEncounter(state, state.pending.choices.findIndex(c => !c.disabled)); continue; }
+      if(state.pending?.kind === 'toll'){ S.resolveToll(state, 'coin'); continue; }
       if(state.pending){ S.callTow(state, state.pending.kind === 'crash' ? 'crash' : 'dry'); break; }
       const st = S.dockingStatus(state);
       if(st && st.port === to){

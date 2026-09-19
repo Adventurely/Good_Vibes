@@ -181,20 +181,23 @@ One Worker on **good-vibe-games.com** serves the shelf and every game on it.
       ├── /sunward/            Sunward          — no socket; the save is the browser's
       ├── /orbital-trader/     Orbital Trader   — no socket either
       ├── /greener-thumbs/     Greener Thumbs   — nor that
+      ├── /duck-duck-quack/    Duck Duck Quack  — nor that
       ├── /api/good-vibes/ws   src/worker.js → GameRoom,     one per room code
       ├── /api/solarium/ws     src/worker.js → SolariumRoom, one per room code
-      └── /api/sunward/board   src/worker.js → SunwardBoard, one for the whole game
-                               GET reads it, POST puts a row up, DELETE takes
-                               one off — the id in the body is the authority
-                               for both of the last two
+      ├── /api/sunward/board   src/worker.js → SunwardBoard, one for the whole game
+      └── /api/duck-duck-quack/board
+                               src/worker.js → DuckBoard,    one for the whole game
+                               Both boards: GET reads, POST puts a row up,
+                               DELETE takes one off — the id in the body is the
+                               authority for both of the last two
 
-**Three of the five play without the Worker.** Sunward, Orbital Trader and
-Greener Thumbs are one player and a save file, so the games are files in
-`public/` and nothing else — no socket, no room, and nothing to go down. A
-single-player game that needs a server to be played is a single-player game
-that stops working when somebody else's deploy fails. Sunward has one route
-now, for its leaderboard, and it is built to that rule: the game never waits on
-it and plays the same with it gone.
+**Four of the six play without the Worker.** Sunward, Orbital Trader, Greener
+Thumbs and Duck Duck Quack are one player and a save file, so the games are
+files in `public/` and nothing else — no socket, no room, and nothing to go
+down. A single-player game that needs a server to be played is a single-player
+game that stops working when somebody else's deploy fails. Two of them have one
+route each now, for their leaderboards, and both are built to that rule: the
+game never waits on the board, and plays the same with it gone.
 
 **Sunward's board is one Durable Object, named for the game.**
 `/api/sunward/board` is the first route here that is not a socket. A
@@ -235,6 +238,46 @@ because past it whole numbers are not exact and "a record only goes up" stops
 meaning anything, and the two measures stop at `Number.MAX_VALUE`. What is
 still refused is a figure that is broken rather than big — not a number, not
 finite, negative, or a count with a fraction in it.
+
+**Duck Duck Quack has a board of its own**, `/api/duck-duck-quack/board`, built
+to the same pattern and for the same reasons: one Durable Object named for the
+game, pure rules in `src/duck-board.js`, a thin object and a thin dev route
+around them, and a game that plays exactly the same with the whole thing gone.
+It is a separate class from `SunwardBoard` rather than a second name on it,
+because the two hold different shapes — five counters against a map of levels —
+and one class serving both is a class where a change for one game breaks the
+other.
+
+A row is one number per level: the most ducklings that player has ever got to
+the pond on it. The board ranks on the total across every level, so it rewards
+playing the whole game as well as playing it well, and ties break on how many
+levels the total is spread over. A losing run still counts — nine saved on a
+level that wanted ten is a better nine than a win with eight.
+
+Two things differ from Sunward, both because the game differs. There is an id
+per NAME rather than per browser, since this game has always let a household
+keep several players on one machine and pick between them, so two people
+sharing a laptop get a row each. And the client posts its WHOLE map of bests
+every time rather than the one just made, with the server taking the maximum
+per level — which is what makes it self-healing. A post refused for being too
+soon, a level finished on a train, a browser in private mode: none of them lose
+a score, because the next post that lands carries the lot. There is nothing to
+retry and no queue to keep, only a five-second rate limit to wait out.
+
+The per-level ceiling here is exact rather than guessed, which is the one place
+this board can be stricter than Sunward's without repeating its mistake: you
+cannot save more ducklings than hatch, so the cap is the level's own
+`duckCount` and there is no judgement in it. `LEVEL_CAPS` is a copy of what
+`content.js` already knows — the Worker should not carry seventy kilobytes of
+level geometry to reach eleven numbers — and `test/duck-board.test.js` asserts
+the copy against the real levels, so a level added, renamed or rebalanced
+without it is a failing test rather than a quietly wrong answer.
+
+The name rules are the one thing genuinely shared between the client and the
+Worker, in `public/duck-duck-quack/names.js`, which the Worker imports across.
+Two copies of a validator is two validators, and the day they drift is the day
+a name the picker accepted is refused by the board with nothing on screen to
+explain it.
 
 `public/` ships verbatim, no build step. The Worker is not invoked for files at
 all — assets are matched first — so the clients cost zero Worker calls and each
@@ -374,6 +417,7 @@ PORT=8080 HOST=127.0.0.1 npm start
 | `/`        | The title screen                  |
 | `/healthz` | `{"status":"ok"}`                 |
 | `/api/sunward/board` | Sunward's leaderboard: `GET` reads it, `POST` a score to it |
+| `/api/duck-duck-quack/board` | Duck Duck Quack's leaderboard, the same three verbs |
 | anything else | `404 Not Found`                |
 
 ## Tests
@@ -2129,13 +2173,71 @@ by hand and `?intro=0` refuses it.
 
 ### The lesson
 
-Fourteen cards from Uncle Theo, in `narrative.json` and shown one at a time in
+Fifteen cards from Uncle Theo, in `narrative.json` and shown one at a time in
 the bottom card. Four of them are about the chart before any of them is about
 flying: drag the map, zoom out until Slate is in the frame, tap Slate and watch
 the chart follow it, press F to come back. Then the errand — write a burn
-down, push it out to Slate's height, aim it thirty degrees ahead of the moon
-because the moon moves while you cross, warp, brake, dock, buy the pebble,
-climb out, bring it home — and a last card that says well done and goes away.
+down, push the far side out to Slate's height, find out what sliding the burn
+around the orbit does, aim it so the moon is there when you arrive, warp,
+brake, dock, buy the pebble, climb out, bring it home — and a last card that
+says well done and goes away.
+
+**Two playtesters and what they cost.** One stalled writing the burn down, the
+other gave up aiming, and both were beaten by the way in rather than by the
+physics — the card in between, the one with the genuinely counter-intuitive
+idea in it, neither of them had trouble with.
+
+*Writing it down* asks for a tap on the road, and three things were in the way
+of that. The drawn road **starts** at the ship, so `nearestPathPoint` — which
+refuses a point at or before the moment it is given — returned nothing at all
+for a finger beside the ship, which is exactly where a beginner aims; the tap
+now snaps forward to the first moment that will hold a mark instead of being
+swallowed. The clock does not stop for the card that opens, so the moment it
+offered could go stale while it was being read and the button would then close
+the card having done nothing; the mark is written at the moment of the press
+now, not the moment of the offer. And the card before it sends a player zooming
+out until Slate is in frame, which leaves the parking orbit a six-pixel ring
+under the ship's own icon — see the framing hysteresis below.
+
+**Slate is a moon, and the lesson says so now.** Why the target is somewhere
+else by the time you arrive is the whole of the aiming card, and the answer is
+that it goes round the planet you are going round — which the tables have known
+since the first one (`kind`, and the body it orbits) and no card ever said. The
+card that first names it says which world it belongs to and points at the circle
+it travels on; the aiming card gives that as the reason it will have moved on.
+Tapping any body says what it is as well as what it is called — *Looking at
+Slate, a moon of Tassel* — for moons and worlds only, because a rock, a station,
+a wreck and the Maw are things the fiction would rather introduce in its own
+words.
+
+*Aiming* used to ask for "about thirty degrees ahead of Slate", which is an
+angle with no instrument, judged by eye, against a moving target. It asks for
+the **two orange diamonds** to be brought together now — where the road cuts
+the moon's rail, and where the moon will be when the ship gets there — which is
+the same question with a gradient on it. Under the card is the only live
+readout in the lesson: the gap in kilometres, or closest approach once the road
+finds the moon, or, when the road does not reach the rail at all, how far short
+the far side still is and that the fix is more green rather than more sliding.
+
+Aiming also wanted a control that did not exist. Every other adjustment in the
+game is a button pressed and pressed again; sliding a mark around its orbit was
+a pointer dragged accurately along a curve, and it arrived at the hardest card.
+`slideNode` is that move as a step, clamped the way a drag is clamped — never
+inside the lead, never past a neighbour — on `,` and `.`. A card of its own now
+teaches it with nothing riding on it, before the card that needs it and the
+height control at the same time.
+
+**It had buttons for a day.** Two labelled pills, **‹ earlier** and **later ›**,
+sat above the flame; they worked, and they were cut as clutter. Two of them
+beside every selected burn is a lot of furniture to carry for ever for one card
+of one lesson, on a chart already holding four arrows and a scrap cross. What
+that costs is worth naming rather than forgetting: the pills were the answer to
+a playtester who quit *fighting the drag*, and with them gone a beginner on a
+mouse is back to dragging a flame along a curve. What is left standing against
+that is the other half of the fix — the diamonds, the gauge, and a card that
+teaches sliding with nothing riding on it — and the keys, which only work for
+somebody the card has told about them, which is why the card names them and a
+test holds it there.
 
 The card on screen is **the first one whose test is false**, and the tests
 watch the game rather than the clicks, so doing a card your own way still
@@ -2149,7 +2251,37 @@ undone leaves no trace in the save, so those are latched as the gesture
 happens (`noteLook`), and whether the moon is in the frame is answered by the
 draw loop, which is the only thing that knows. Zooming counts as looking
 around too — the card is teaching that the view moves, and somebody who
-scrolled instead of dragging has learned it.
+scrolled instead of dragging has learned it. The slide card is latched the same
+way and for the same reason: a mark slid out and back leaves nothing behind.
+
+**The framing hysteresis, wired at last.** `FRAME_SPILL` and `FRAME_SHRINK` sat
+above `frameShipOrbit` with a comment explaining the band they were for, and
+nothing ever read them — the chart re-framed on a change of reach and at no
+other time. That is what leaves the parking orbit a six-pixel ring after the
+zoom-out card, and it has the opposite fault three cards later, when pushing
+the far side out to Slate grows the road thirteen times and takes it off the
+screen while the card is asking whether it has reached Slate's circle yet. So
+the zoom follows the road: outside the band the chart re-frames, inside it the
+zoom is still the player's, which is what the band is for. For now this runs
+**only while the lesson is flying** — from the moment its chart half is done
+until it is over — because whether the rest of the game wants it is a larger
+question than the lesson's, and the constants are sitting there for the day it
+is answered.
+
+The band is not enough on its own, which shipping it proved within the hour.
+With a burn open on the opening orbit the road fills about **0.195** of the
+frame — a whisker over `FRAME_SHRINK` — so one press of the zoom-out key put it
+under the floor and the next tick put it straight back, pinned to
+`frameShipOrbit`'s own 2e7 ceiling. The zoom looked stuck because it was. A rule
+that re-frames whenever the road is outside its band does not follow the road,
+it overrules the person. So `zoomByHand` records that the player has worked the
+scale themselves — the keys, the wheel and a pinch all set it — and the framing
+stands down for good once they have. It is handed back at two seams and no
+others: when the lesson's chart half ends, because those four cards are
+instructions to move the view by hand and a flag left set there would mean the
+framing never helped anybody it was written for, and on a change of reach, where
+the chart re-frames wholesale anyway and the old choice was about a world four
+orders of magnitude away.
 
 ### The road, the lock, and the clock
 
@@ -2519,6 +2651,29 @@ nothing worth taking. Money can go below zero, and then it is a debt to the
 Tassel harbour bank, who are delighted. A skip ends at every change of reach, every burn and every
 harbour mouth — and a step of flight *stops* at the first of those, so even the
 fastest skip can never carry you clean through a moon you were aiming at.
+
+**The errand cannot be lost either**, which it could be for a while, twice over
+and inside the first ten minutes of a new game. Theo hands over twelve cowries
+and a pebble at Slate costs eleven, so a pilot who topped the tank up first had
+nine of them gone and could never buy the thing the errand was about. And a
+pilot who sold the pebble back could not afford a second one, because no stall
+anywhere buys at what it sells for — while `questCheck` only ever counts
+forward, so the step did not come back and the job could never be finished.
+
+Both are shut with machinery the game already had. The harbour bank **fronts
+what a live job still needs and not a crate more**, exactly as it fronts fuel:
+`state.money` never goes negative, the debt carries it, `settleDebt` takes it
+back out of the next coin in, and the page says so where the button was pressed
+rather than only in the log. And a crate a job in hand still has to hand over is
+**spoken for** — the rule a delivery's consignment has always kept, applied to
+the one you paid for yourself — counted so that only what the job needs is held
+back and any surplus is still yours to sell. The refusal names the way out,
+which is the one the game already has: give the job up, and the crate is yours.
+
+`questWants` is the shared answer both rules ask for, and it takes the *maximum*
+across a job's remaining steps rather than the sum, because a retrieval names
+its good twice — once to fetch it, once to hand it over — and it is the same
+crate both times.
 
 ### Playing it
 

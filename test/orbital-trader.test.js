@@ -11,6 +11,8 @@ import {
 import * as S from '../public/orbital-trader/sim.js';
 import { createChart, railCrossings, railLead, locateOnPrediction, pathAnchors, KM_PER_AU, PALETTE, haze, bodyColour, fmtAu } from '../public/orbital-trader/render.js';
 import { DURATION, BREACH, BEATS, CAPTION_AT, beatAt, ascent, skyAt, ROCKET } from '../public/orbital-trader/intro.js';
+import { SONGS, QUALITIES, MUSIC_KEY, readMusicPrefs, writeMusicPrefs, createAudio } from '../public/orbital-trader/audio.js';
+import { EVENTS, EVENT_RULES } from '../public/orbital-trader/content.js';
 
 /* Orbital Trader has no server: everything it knows is in public/ and is
  * imported here as the browser imports it. These tests are the gate that a
@@ -438,9 +440,14 @@ test('the text has every line the game asks for', () => {
   assert.ok(/\?\s*$/.test(TEXT.events.mawArrival.trim()), 'the Maw ends on a question, as the design leaves it');
   /* The lesson is nine steps now and each one is a step of the opening quest,
      so the two lists have to stay the same shape as each other. */
-  /* Fourteen cards: four about reading the chart, nine about flying the
-     errand, and one that says well done and goes away. */
-  assert.equal(TEXT.tutorial.length, 14);
+  /* Fifteen cards: four about reading the chart, ten about flying the
+     errand, and one that says well done and goes away. The tenth is `slide`,
+     which teaches what earlier and later do before the card that needs them —
+     a playtester quit on the aiming card, and aiming was asking for a second
+     control nothing had introduced. */
+  assert.equal(TEXT.tutorial.length, 15);
+  assert.deepEqual(TEXT.tutorial.map(t => t.step).slice(4, 8), ['mark', 'push', 'slide', 'aim'],
+    'the flying half no longer goes write it down, push it out, find out what sliding does, then aim');
   for(const t of TEXT.tutorial) assert.ok(t.step && t.title && t.body, `tutorial step ${t.step}`);
   assert.deepEqual(TEXT.tutorial.slice(0, 4).map(t => t.step), ['look', 'find', 'focus', 'back'],
     'the lesson no longer opens by teaching the chart');
@@ -1140,9 +1147,241 @@ test('the tap on the road asks the screen, and the card writes on the same terms
   const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
   assert.match(PLAY, /S\.leadForTap\(S\.norm\(state\.ship\.v\) \* chart\.camera\.zoom\)/,
     'the tap is judged by the clock again');
-  assert.match(PLAY, /askAtPath\(p\.t, lead\)/, 'the card is not told what the tap was allowed under');
-  assert.match(PLAY, /S\.addNode\(state, t, lead\)/,
+  /* A tap inside the lead snaps forward to the first moment that will hold a
+     mark, rather than being discarded in silence — the stretch of road a
+     beginner aims at is the stretch beside their own ship, and that was the
+     stretch that did nothing. The lead itself is unchanged and is still handed
+     to the card, so the card cannot open on terms the write will then refuse. */
+  assert.match(PLAY, /askAtPath\(Math\.max\(p\.t, state\.t \+ lead\), lead\)/,
+    'a tap inside the lead is swallowed in silence again, or the card is not told what the tap was allowed under');
+  /* And the mark is written at the moment the button is pressed rather than the
+     moment the card went up: the clock does not stop for this card, so the
+     offer can go stale while it is being read, and a stale offer used to close
+     the card having done nothing. */
+  assert.match(PLAY, /S\.addNode\(state, Math\.max\(t, state\.t \+ lead\), lead\)/,
     'the card opens on a tap it will then refuse to write');
+});
+
+/* ------------------------------------------- sliding a mark along its orbit */
+
+test('a mark slides along its orbit by the step, and stops where a drag would', () => {
+  const g = transferShip();
+  const t0 = g.t + S.MIN_LEAD * 4;
+  assert.equal(S.addNode(g, t0), 0);
+  const step = S.MIN_LEAD;
+
+  assert.equal(S.slideNode(g, 0, step), true, 'later did nothing');
+  assert.ok(Math.abs(g.nodes[0].t - (t0 + step)) < 1e-12, 'later moved it somewhere else');
+  assert.equal(S.slideNode(g, 0, -step), true, 'earlier did nothing');
+  assert.ok(Math.abs(g.nodes[0].t - t0) < 1e-12, 'earlier and later do not undo each other');
+
+  // Never inside the lead, however hard it is pushed.
+  assert.equal(S.slideNode(g, 0, -1000), true);
+  assert.ok(g.nodes[0].t >= g.t + S.MIN_LEAD - 1e-12, 'a mark was slid inside the minute');
+  // And once it is against the wall, a press is honest about doing nothing.
+  assert.equal(S.slideNode(g, 0, -1000), false, 'a press against the wall claimed to move it');
+});
+
+test('a sliding mark never crosses its neighbours, so a held button keeps its own mark', () => {
+  const g = transferShip();
+  // Two marks at once, which the lesson does not allow: it teaches one at a time.
+  g.flags.tutorialSkipped = true;
+  const a = g.t + S.MIN_LEAD * 4, b = g.t + S.MIN_LEAD * 8;
+  assert.equal(S.addNode(g, a), 0);
+  assert.equal(S.addNode(g, b), 1);
+
+  S.slideNode(g, 0, S.MIN_LEAD * 40);
+  assert.ok(g.nodes[0].t < g.nodes[1].t, 'a mark overtook the one in front of it');
+  assert.deepEqual(g.nodes.map(n => n.t), [...g.nodes.map(n => n.t)].sort((x, y) => x - y),
+    'the list came back out of order');
+  /* The clamp is what lets the page hold an index across a press: if a mark
+     cannot cross a neighbour, the sort cannot reorder the list. */
+  assert.ok(Math.abs(g.nodes[1].t - b) < 1e-12, 'the mark in front was moved by its neighbour');
+});
+
+test('sliding a mark is refused where writing one is', () => {
+  const g = transferShip();
+  assert.equal(S.addNode(g, g.t + S.MIN_LEAD * 4), 0);
+  assert.equal(S.slideNode(g, 1, S.MIN_LEAD), false, 'a mark that is not there was slid');
+  assert.equal(S.slideNode(g, 0, 0), false, 'a step of nothing claimed to be a move');
+  assert.equal(S.slideNode(g, 0, NaN), false, 'a step of nothing in particular was taken');
+  const h = transferShip();
+  assert.equal(S.addNode(h, h.t + S.MIN_LEAD * 4), 0);
+  h.dockedAt = 'tassel';
+  assert.equal(S.slideNode(h, 0, S.MIN_LEAD), false, 'a tied-up ship rewrote its plan');
+});
+
+test('sliding a mark has a control of its own, and the card names the ones it has', () => {
+  /* The second playtester stopped on the aiming card, where the lesson asks for
+     the one adjustment that had no press behind it: every other nudge in the
+     game is a button you can repeat, and phasing was a pointer dragged along a
+     curve.
+     
+     It had a pair of labelled pills on the chart for a day. They worked, and
+     they were cut anyway: two of them beside every selected burn is a lot of
+     furniture to carry for ever for one card of one lesson, and the chart is
+     already carrying four arrows and a scrap cross. So the step lives on the
+     keyboard, the pointer drags, and the card is the thing that has to say so —
+     a control nobody is told about is a control nobody has. */
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  const RENDER = readFileSync(new URL('../public/orbital-trader/render.js', import.meta.url), 'utf8');
+
+  assert.match(PLAY, /function slideBurn\(/, 'nothing steps a mark along its orbit');
+  assert.match(PLAY, /S\.slideNode\(state, i, dir \* scale \* slideStep\(i\)\)/,
+    'the step does not go through the rule that clamps it');
+  assert.match(PLAY, /case ',': case '<':/, 'earlier has no key');
+  assert.match(PLAY, /case '\.': case '>':/, 'later has no key');
+
+  // The chart draws no buttons for it, and carries no rectangular handles.
+  assert.doesNotMatch(RENDER, /SLIDE_/, 'the slide buttons are back on the chart');
+  assert.doesNotMatch(RENDER, /‹ earlier|later ›/, 'the chart still draws the slide buttons');
+  assert.doesNotMatch(PLAY, /function nudge\(/, 'the two-kinds-of-nudge dispatch outlived the buttons it was for');
+
+  /* And the card has to name both ways in, or the removal costs the lesson the
+     thing the buttons were bought with. */
+  const slide = TEXT.tutorial.find(t => t.step === 'slide');
+  assert.match(slide.body, /[Dd]rag/, 'the card does not say a mark can be dragged');
+  assert.match(slide.body, /comma and full-stop/, 'the card does not name the keys');
+  assert.doesNotMatch(slide.body, /button/, 'the card still points at buttons that are gone');
+});
+
+test('the aiming card is given the number it asks for, and it is the only one', () => {
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.match(PLAY, /function aimGauge\(\)/, 'the aiming card has no gauge');
+  assert.match(PLAY, /s\.step === 'aim' \? aimGauge\(\) : null/,
+    'the gauge is on every card, or on none');
+  /* Two answers, because the road reaches the moon in two stages: the gap
+     between the diamonds until it gets near, then closest approach. */
+  assert.match(PLAY, /Closest approach to \$\{name\}/, 'the gauge cannot say how close the road gets');
+  assert.match(PLAY, /orange diamonds are \$\{fmtAu\(d\)\} apart/, 'the gauge cannot say how far out of phase it is');
+  // The card has to be the one that actually names them, or the gauge is orphaned.
+  const aim = TEXT.tutorial.find(t => t.step === 'aim');
+  assert.match(aim.body, /diamonds/, 'the aiming card does not name the instrument that answers it');
+  assert.doesNotMatch(aim.body, /thirty degrees/,
+    'the aiming card still asks for an angle nobody can measure');
+});
+
+/* ------------------------------------------- the errand cannot be lost */
+
+/* Two ways a new game could end itself in its first ten minutes, both found in
+ * play. Theo hands over twelve cowries and a pebble costs eleven, so a pilot
+ * who tops the tank up first can never buy the thing the errand is about; and a
+ * pilot who sells the pebble back cannot afford a second, because no stall buys
+ * at what it sells for. The quest step does not come back either — questCheck
+ * only ever counts forward — so the second one left the lesson on its last card
+ * for ever. "Nothing here can cost the save" is the rule the tow and the bank
+ * already keep, and it has to cover the errand too. */
+function atSlateWithTheErrand(){
+  const s = S.newGame(5);
+  s.dockedAt = 'slate';
+  s.ship = { ...s.ship, body: 'slate' };
+  return s;
+}
+
+test('the errand is affordable even when the purse is not', () => {
+  const s = atSlateWithTheErrand();
+  s.dv = s.dv * 0.5;                                  // room in the tank after the trip out
+  assert.ok(S.refuel(s, 99).ok, 'could not spend the coin on fuel');
+  assert.equal(s.money, 0, 'the fuel did not take the purse');
+
+  const r = S.buy(s, 'pebble', 1);
+  assert.ok(r.ok, `the errand was priced out: ${r.reason}`);
+  assert.ok(r.borrowed > 0, 'the bank did not front anything');
+  assert.equal(s.money, 0, 'money went negative instead of becoming a debt');
+  assert.ok(s.debt > 0, 'the coin was conjured rather than borrowed');
+  assert.equal(S.carrying(s, 'pebble'), 1);
+
+  // And the job pays it straight back off.
+  s.dockedAt = 'tassel'; s.ship = { ...s.ship, body: 'tassel' };
+  S.questCheck(s, []);
+  assert.ok(S.claimQuest(s, 'pebble').ok, 'the job could not be collected');
+  S.settleDebt(s);
+  assert.equal(s.debt, 0, 'the bank was not paid back out of the fee');
+  assert.ok(s.money > 0);
+});
+
+test('the bank fronts what a job needs and not a crate more', () => {
+  const s = atSlateWithTheErrand();
+  s.money = 0;
+  assert.equal(S.questWants(s, 'pebble'), 1, 'a retrieval counts its good twice');
+  assert.equal(S.questCredit(s, 'pebble'), 1);
+  assert.equal(S.buy(s, 'pebble', 5).ok, false, 'the tab could be traded on');
+  assert.ok(S.buy(s, 'pebble', 1).ok);
+  // Once it is aboard there is nothing outstanding, so there is no more credit.
+  assert.equal(S.questCredit(s, 'pebble'), 0);
+  assert.equal(S.buy(s, 'pebble', 1).ok, false, 'the credit refilled itself');
+});
+
+test('a crate a job is for cannot be sold out from under it', () => {
+  const s = atSlateWithTheErrand();
+  assert.ok(S.buy(s, 'pebble', 1).ok);
+  const r = S.sell(s, 'pebble', 1);
+  assert.equal(r.ok, false, 'the errand was sold');
+  assert.match(r.reason, /give the job up/i, 'the refusal does not name the way out');
+  assert.equal(S.carrying(s, 'pebble'), 1);
+
+  // The way out it names really opens.
+  s.quests = s.quests.filter(q => q.id !== 'pebble');
+  assert.ok(S.sell(s, 'pebble', 1).ok, 'giving the job up did not free the crate');
+});
+
+test('only the crates a job needs are held back; the rest are yours', () => {
+  const s = atSlateWithTheErrand();
+  s.money = 500;
+  assert.ok(S.buy(s, 'pebble', 4).ok);
+  assert.equal(S.questReserved(s, 'pebble'), 1, 'a whole hold was impounded for one errand');
+  assert.ok(S.sell(s, 'pebble', 3).ok, 'the surplus was held back too');
+  assert.equal(S.sell(s, 'pebble', 1).ok, false, 'the last one was not the errand\'s');
+});
+
+test('a delivery is untouched by either rule: its crates were never bought', () => {
+  /* A consignment is already unsellable and already aboard, so there is nothing
+     to front and nothing to reserve out of the crates you own. */
+  const s = S.newGame(5);
+  s.flags.tutorialSkipped = true;
+  s.dockedAt = 'tassel';
+  const del = S.QUESTS.find(q => q.type === 'delivery' && q.goods?.length);
+  assert.ok(del, 'no delivery to check');
+  assert.equal(S.questCredit(s, del.goods[0].good), 0, 'a delivery opened a line of credit');
+});
+
+/* And the page has to say when it has borrowed on somebody's behalf. */
+test('the buy button says so when the bank covered it', () => {
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.match(PLAY, /r\.borrowed > 0/, 'a player can be put into debt without being told');
+  assert.match(PLAY, /harbour bank covers/, 'the toast does not say who is owed');
+});
+
+test('the lesson says Slate is a moon before it asks anybody to aim at one', () => {
+  /* Why Slate is somewhere else by the time you get there is the whole of the
+     aiming card, and the answer is that it is going round the planet you are
+     going round. The tables have known since the first one — kind, and the
+     body it orbits — and no card ever said it. */
+  const steps = TEXT.tutorial.map(t => t.step);
+  const find = TEXT.tutorial[steps.indexOf('find')];
+  const aim = TEXT.tutorial[steps.indexOf('aim')];
+  assert.match(find.body, /moons?\b/, 'the card that first names Slate does not say what it is');
+  assert.match(find.body, /Tassel/, 'the card does not say which world Slate goes round');
+  assert.match(aim.body, /moon/, 'the aiming card does not say why the target moves');
+  assert.ok(steps.indexOf('find') < steps.indexOf('aim'), 'the lesson aims before it explains');
+
+  // And the body it names really is one, so the words and the sky agree.
+  const slate = BODIES.find(b => b.id === 'slate');
+  assert.equal(slate.kind, 'moon');
+  assert.equal(slate.parent, 'tassel');
+});
+
+test('tapping a body says what kind of thing it is, where the data knows', () => {
+  const PLAY = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.match(PLAY, /function bodyIs\(id\)/, 'nothing says what a body is');
+  assert.match(PLAY, /a moon of \$\{p\.name\}/, 'a moon does not name the world it goes round');
+  assert.match(PLAY, /Looking at \$\{esc\(world\.get\(id\)\.name\)\}\$\{esc\(bodyIs\(id\)\)\}/,
+    'looking at something does not say what it is');
+  /* Only moons and worlds. A rock, a station, a wreck and the Maw are things
+     the fiction introduces in its own words, and a toast calling the Maw a
+     zone would be the game explaining its own table to the player. */
+  const kinds = new Set(BODIES.map(b => b.kind));
+  assert.ok(kinds.has('rock') && kinds.has('wreck'), 'the kinds this deliberately stays quiet about are gone');
 });
 
 /* ------------------------------------------------------------- chart */
@@ -5665,4 +5904,382 @@ test('a transfer that just touches a rail is marked where it touches', () => {
     const railR = b.e ? b.a * (1 - b.e * b.e) / (1 + b.e * Math.cos(Math.atan2(c.r[1], c.r[0]) - (b.omega ?? 0))) : b.a;
     assert.ok(Math.abs(O.norm(c.r) - railR) < Math.max(1e-9, railR * 1e-6), `${b.name}: the mark is not on its rail`);
   }
+});
+
+/* ------------------------------------------------------------- music */
+
+/* The tracks are data the scheduler walks, and every way of getting a note
+ * wrong fails the same silent way: an exception inside a setInterval, in a
+ * console nobody has open, and a page that is simply quiet. So the shape is
+ * checked here rather than by listening.
+ */
+test('every track is playable data rather than a silent typo', () => {
+  assert.ok(SONGS.flight && SONGS.port, 'the sky and the port each need a theme');
+  for(const [name, song] of Object.entries(SONGS)){
+    const where = `track "${name}"`;
+    assert.ok(song.bpm > 40 && song.bpm < 220, `${where}: ${song.bpm} bpm is not a tempo`);
+    assert.ok(Array.isArray(song.bars) && song.bars.length, `${where}: no bars`);
+    assert.ok(!song.arpEvery || song.arpEvery >= 1, `${where}: the arpeggio would divide by zero`);
+    assert.ok(Array.isArray(song.brushAt) && Array.isArray(song.tickAt), `${where}: percussion is a list of steps`);
+    for(const bar of song.bars){
+      const [root, quality] = bar.chord;
+      assert.ok(QUALITIES[quality], `${where}: unknown chord quality "${quality}"`);
+      assert.ok(root > 20 && root < 100, `${where}: root ${root} is off the keyboard`);
+    }
+    const steps = song.bars.length * 16;
+    for(const [at, note, len] of song.lead){
+      assert.ok(at >= 0 && at < steps, `${where}: a note at step ${at} never plays (${steps} steps)`);
+      assert.ok(note > 20 && note < 120, `${where}: note ${note} is off the keyboard`);
+      assert.ok(len > 0, `${where}: a note of length ${len} is silence`);
+    }
+    for(const [at, semis, len] of song.bass){
+      assert.ok(at >= 0 && at < 16, `${where}: a bass note at step ${at} of a sixteen-step bar`);
+      assert.ok(semis >= -12 && semis <= 24, `${where}: bass interval ${semis} is nowhere near the root`);
+      assert.ok(len > 0, `${where}: a bass note of length ${len} is silence`);
+    }
+    for(const s of [...song.brushAt, ...song.tickAt]) assert.ok(s >= 0 && s < 16, `${where}: a hit at step ${s} of sixteen`);
+  }
+});
+
+/* The two settings live in the browser, not in the save: how loud a game is
+   is a fact about the room, and it should survive a new ship. */
+test('music preferences round-trip through a store and shrug off a bad one', () => {
+  const mem = new Map();
+  const st = { getItem: k => mem.has(k) ? mem.get(k) : null, setItem: (k, v) => mem.set(k, v) };
+  assert.deepEqual(readMusicPrefs(st), { on: true, level: 0.7 }, 'nothing stored is the defaults');
+  assert.ok(writeMusicPrefs({ on: false, level: 0.25 }, st));
+  assert.deepEqual(readMusicPrefs(st), { on: false, level: 0.25 });
+  writeMusicPrefs({ on: 'yes', level: 4 }, st);
+  assert.deepEqual(readMusicPrefs(st), { on: true, level: 1 }, 'a level past the top is the top');
+  mem.set(MUSIC_KEY, 'not json');
+  assert.deepEqual(readMusicPrefs(st), { on: true, level: 0.7 }, 'garbage in the store is the defaults, not a throw');
+  mem.set(MUSIC_KEY, JSON.stringify({ level: 'loud' }));
+  assert.deepEqual(readMusicPrefs(st), { on: true, level: 0.7 }, 'a field of the wrong kind is its default');
+  const broken = { getItem(){ throw new Error('blocked'); }, setItem(){ throw new Error('blocked'); } };
+  assert.deepEqual(readMusicPrefs(broken), { on: true, level: 0.7 });
+  assert.equal(writeMusicPrefs({ on: true, level: 0.5 }, broken), false);
+});
+
+/* Without a window there is no AudioContext, and the engine has to be a
+   quiet object rather than a thrown error — the page builds it before the
+   first gesture, and a private window may never grant one. */
+test('the engine remembers what it was asked for while it cannot play', () => {
+  const mem = new Map();
+  const st = { getItem: k => mem.has(k) ? mem.get(k) : null, setItem: (k, v) => mem.set(k, v) };
+  const audio = createAudio({ store: st });
+  assert.equal(audio.isOn(), true);
+  assert.equal(audio.current(), null);
+  audio.play('flight');
+  audio.unlock();                                  // no AudioContext here: nothing to build
+  assert.equal(audio.isRunning(), false);
+  assert.equal(audio.current(), null, 'nothing plays without a context');
+  audio.setLevel(0.3);
+  audio.setOn(false);
+  assert.deepEqual(readMusicPrefs(st), { on: false, level: 0.3 }, 'the switch and the slider are written down');
+  audio.setOn(true);
+  audio.hidden(true); audio.hidden(false);
+  audio.stop();
+  assert.equal(audio.current(), null);
+});
+
+test('the play page has the music, and its controls are in the gear menu', () => {
+  const html = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.match(html, /import \{ createAudio \} from '\.\/audio\.js'/);
+  assert.match(html, /data-gtab="sound"/, 'a Sound tab in the settings menu');
+  assert.match(html, /id="gear-music"/, 'a switch for the music');
+  assert.match(html, /id="gear-level"[^>]*type="range"|type="range"[^>]*id="gear-level"/, 'a volume slider');
+  assert.match(html, /audio\.play\(/, 'the page asks for a track');
+  assert.match(html, /audio\.stop\(\)/, 'and lets go of it when the page goes');
+});
+
+/* ---------------------------------------------- crew dialog: who is missing */
+
+/* An exchange that turns to somebody not aboard says its other thing instead:
+   the `without` lines, which point at where that person would be found. The
+   whole table keeps that promise, so a player with an empty chair is never
+   shown a silence where a hint was possible. */
+const FOUND_AT = { engineer: 'Cinder', navigator: 'Nail', appraiser: 'Brine' };
+const leansOn = x => [...new Set([...(x.needs ?? []), ...(x.lines ?? []).map(l => l.who)])]
+  .filter(id => id !== 'captain' && id !== x.who);
+
+test('every exchange that turns to somebody says where to find them when they are not there', () => {
+  let turned = 0;
+  for(const x of DIALOG){
+    const others = leansOn(x);
+    for(const berth of others){
+      turned++;
+      const lines = x.without?.[berth];
+      assert.ok(lines?.length, `${x.id} needs the ${berth} and says nothing when the berth is empty`);
+      for(const l of lines){
+        assert.ok(l.who === x.who || l.who === 'captain', `${x.id} without ${berth}: ${l.who} might not be there to say it`);
+        assert.ok(l.say, `${x.id} without ${berth}: an empty line`);
+      }
+      const said = lines.map(l => l.say).join(' ');
+      assert.ok(said.includes(FOUND_AT[berth]), `${x.id} without ${berth}: nobody says to look at ${FOUND_AT[berth]}`);
+    }
+    for(const berth of Object.keys(x.without ?? {})){
+      assert.ok(others.includes(berth), `${x.id}: a fallback for the ${berth}, who is not in the exchange`);
+    }
+  }
+  assert.ok(turned >= 12, `only ${turned} exchanges turn to somebody else; the crew should talk to each other more than that`);
+  // Somebody is asked after in every berth, so every empty chair gets pointed at.
+  for(const berth of Object.keys(FOUND_AT)){
+    assert.ok(DIALOG.some(x => x.without?.[berth]), `nothing in the table ever points at the ${berth}`);
+  }
+});
+
+test('an empty chair is answered with where to look, and a filled one with the exchange itself', () => {
+  const s = S.newGame(1);
+  s.dockedAt = 'cinder';
+  const alone = S.exchangesFor(s, 'captain');
+  const standIn = alone.find(x => x.missing === 'engineer');
+  assert.ok(standIn, 'the captain at Cinder with no engineer was not told where to find one');
+  assert.ok(standIn.lines.every(l => l.who === 'captain'), 'the stand-in gives a line to somebody not aboard');
+  assert.match(standIn.lines.map(l => l.say).join(' '), /Cinder/, 'the stand-in does not say where');
+  assert.equal(standIn.without, undefined, 'a stand-in carries a fallback of its own');
+  assert.ok(!alone.some(x => x.needs?.includes('engineer') && !x.missing), 'the real exchange played to an empty chair');
+  // Asked twice, it is the same object: the page counts presses by list position.
+  assert.equal(S.exchangesFor(s, 'captain').find(x => x.missing === 'engineer'), standIn);
+  assert.equal(S.exchangeFor(s, 'captain', alone.indexOf(standIn)), standIn);
+
+  s.crew.engineer = { role: 'engineer', from: 'test', joinedAt: 0 };
+  const crewed = S.exchangesFor(s, 'captain');
+  assert.ok(!crewed.some(x => x.missing), 'the engineer is aboard and still being looked for');
+  const real = crewed.find(x => x.id === standIn.id.split('~')[0]);
+  assert.ok(real && real.lines.some(l => l.who === 'engineer'), 'the engineer is aboard and does not get his line');
+  assert.equal(crewed.length, alone.length, 'filling a berth changed how many things there are to say');
+
+  // The crew point at each other, too: the navigator at Nail, with no engineer.
+  const t = S.newGame(2);
+  t.dockedAt = 'nail';
+  t.crew.navigator = { role: 'navigator', from: 'test', joinedAt: 0 };
+  const nav = S.exchangesFor(t, 'navigator').find(x => x.missing === 'engineer');
+  assert.ok(nav, 'the navigator at Nail has nothing to say about the empty engine room');
+  assert.ok(nav.lines.some(l => l.who === 'navigator') && nav.lines.every(l => S.isAboard(t, l.who)));
+  // And an exchange that needs somebody else is never handed to an empty berth.
+  assert.equal(S.exchangesFor(t, 'engineer').length, 0);
+
+  // Every fallback in the table reads in the same band as every other line.
+  for(const x of DIALOG) for(const lines of Object.values(x.without ?? {})) for(const l of lines){
+    const ms = S.sayMs(l.say);
+    assert.ok(ms >= 900 && ms <= 6500, `${x.id}: "${l.say}" reads in ${ms} ms`);
+  }
+});
+
+/* ------------------------------------------------------------- events */
+
+/* What can happen on the way. Rolled at a change of reach, once a leg at most,
+   never during the lesson — and everything a choice will do is worked out when
+   the card goes up, so the buttons say what they cost and a reload cannot
+   re-roll a result. */
+const design_events = () => design('events.json');
+
+test('the events the game ships are the events in the table, and the table keeps to its shape', () => {
+  assert.deepEqual(EVENTS, design_events().events, 'data/events.js was not rebuilt');
+  assert.deepEqual(EVENT_RULES, design_events().rules);
+  assert.ok(EVENT_RULES.chance > 0 && EVENT_RULES.chance <= 0.25, `a ${EVENT_RULES.chance} chance per crossing is not a small one`);
+  assert.ok(EVENTS.length >= 8, 'a table this short repeats itself in an afternoon');
+  const goods = new Set(GOODS.map(g => g.id)), cats = new Set(GOODS.map(g => g.category));
+  for(const ev of EVENTS){
+    assert.ok(ev.id && ev.title && ev.text && ev.choices?.length, `event ${ev.id} is malformed`);
+    assert.ok(ev.choices.some(c => !c.requires), `${ev.id}: every choice needs something, so a ship with nothing is stuck on the card`);
+    for(const c of ev.choices){
+      assert.ok(c.label, `${ev.id}: a button with no word on it`);
+      assert.ok(c.text || c.outcomes?.length, `${ev.id}: "${c.label}" leads nowhere`);
+      if(c.outcomes) assert.ok(c.outcomes.some(o => !o.when), `${ev.id}: "${c.label}" can come to nothing`);
+    }
+    for(const k of [...(ev.when?.carrying ?? []), ...(ev.when?.notCarrying ?? [])]) assert.ok(goods.has(k) || cats.has(k), `${ev.id} looks for ${k}, which nothing is`);
+  }
+  assert.equal(new Set(EVENTS.map(e => e.id)).size, EVENTS.length, 'two events share an id');
+  // The one the brief named: a Veyra hull that scans for counterfeit crests and fines you.
+  const scan = EVENTS.find(e => e.id === 'veyra-scan');
+  assert.ok(scan && scan.when.regions.includes('inner') && scan.when.carrying.includes('contraband'));
+  assert.ok(scan.choices[0].effects.money.fraction < 0 && scan.choices[0].effects.cargo.take === 'contraband', 'the fine is not a fine');
+});
+
+test('a crossing is placed in a region by the reach it enters, or the one it leaves', () => {
+  assert.equal(S.crossingRegion('tassel', 'lamp'), 'home', 'leaving Tassel is a home-system crossing');
+  assert.equal(S.crossingRegion('lamp', 'grumm'), 'outer');
+  assert.equal(S.crossingRegion('cinder', 'scorch'), 'inner');
+  assert.equal(S.crossingRegion('lamp', 'nail'), 'belt');
+  assert.equal(S.crossingRegion('grumm', 'brine'), 'outer');
+});
+
+/* A ship set up for an event: past the lesson, in the open, with a purse. */
+function shipFor(region, extra = {}){
+  const s = S.newGame(11);
+  s.flags.tutorialDone = true;
+  s.dockedAt = null; s.justLeft = null;
+  s.money = 500;
+  Object.assign(s, extra);
+  return s;
+}
+const carry = (s, good, qty, more = {}) => s.cargo.push({ good, qty, t: 0, price: 0, from: null, ...more });
+
+test('nothing happens during the lesson, and at most one thing between dockings', () => {
+  const lesson = S.newGame(3);
+  lesson.dockedAt = null; lesson.justLeft = null;
+  assert.ok(S.tutorialRunning(lesson));
+  for(let i = 0; i < 400; i++) S.rollEncounter(lesson, 'tassel', 'lamp', []);
+  assert.equal(lesson.pending, null, 'an event interrupted Uncle Theo');
+
+  const s = shipFor('home');
+  let fired = 0, tries = 0;
+  const events = [];
+  for(let i = 0; i < 400; i++){
+    if(s.pending){ fired++; s.pending = null; s.encounters.legDone = false; }
+    tries++;
+    S.rollEncounter(s, 'tassel', 'lamp', events);
+  }
+  const rate = fired / tries;
+  assert.ok(rate > EVENT_RULES.chance * 0.5 && rate < EVENT_RULES.chance * 1.6, `events came up on ${(rate * 100).toFixed(0)}% of crossings against a chance of ${EVENT_RULES.chance * 100}%`);
+  assert.ok(events.every(e => e.kind === 'encounter' && e.pending?.kind === 'encounter'));
+
+  // One a leg: with the card answered but the leg not over, nothing more comes.
+  const t = shipFor('home');
+  for(let i = 0; i < 400 && !t.pending; i++) S.rollEncounter(t, 'tassel', 'lamp', []);
+  assert.ok(t.pending, 'four hundred crossings and nothing happened');
+  assert.ok(t.encounters.legDone);
+  S.resolveEncounter(t, t.pending.choices.findIndex(c => !c.disabled));
+  assert.equal(t.pending, null);
+  for(let i = 0; i < 400; i++) S.rollEncounter(t, 'tassel', 'lamp', []);
+  assert.equal(t.pending, null, 'a second event on the same leg');
+  // And docking opens the next leg.
+  const b = world.get('slate'); const st = O.circularState(b.mu, b.dockAlt, 0);
+  t.ship = { body: 'slate', r: st.r, v: st.v };
+  assert.ok(S.dock(t).ok, 'could not tie up at Slate');
+  assert.equal(t.encounters.legDone, false, 'docking did not end the leg');
+  // A card that is up blocks the roll, too: one thing at a time.
+  const u = shipFor('home');
+  u.pending = { kind: 'toll' };
+  for(let i = 0; i < 200; i++) S.rollEncounter(u, 'tassel', 'lamp', []);
+  assert.equal(u.pending.kind, 'toll');
+});
+
+test('an event fits a crossing by region and by what the ship is carrying', () => {
+  const s = shipFor('inner');
+  const fits = (id, region) => S.eventFits(s, EVENTS.find(e => e.id === id), region);
+  assert.equal(fits('veyra-scan', 'inner'), false, 'a scan for contraband with none aboard');
+  assert.equal(fits('veyra-scan-clean', 'inner'), true);
+  carry(s, 'fakemedals', 3);
+  assert.equal(fits('veyra-scan', 'inner'), true);
+  assert.equal(fits('veyra-scan-clean', 'inner'), false, 'a clean scan of a hold with counterfeit medals in it');
+  assert.equal(fits('veyra-scan', 'belt'), false, 'a Veyra warship in the Belt');
+  assert.equal(fits('beacon', 'belt'), true, 'a beacon is anywhere');
+  assert.equal(fits('flare', 'inner'), false, 'a flare with nothing cold aboard');
+  carry(s, 'gel', 2);
+  assert.equal(fits('flare', 'inner'), true);
+  assert.equal(fits('bank-launch', 'home'), false); s.debt = 100;
+  assert.equal(fits('bank-launch', 'home'), true);
+  assert.equal(fits('cat-mechanic', 'belt'), false); s.hull = 2;
+  assert.equal(fits('cat-mechanic', 'belt'), true);
+  // Something seen is drawn less often, so a long game meets the whole table.
+  const before = S.eligibleEvents(s, 'inner').find(x => x.ev.id === 'veyra-scan').weight;
+  s.encounters.seen['veyra-scan'] = 2;
+  assert.equal(S.eligibleEvents(s, 'inner').find(x => x.ev.id === 'veyra-scan').weight, before / 4);
+});
+
+test('the Veyra scan: crates named, the fine a number, the run greyed when the tank is short', () => {
+  const s = shipFor('inner');
+  carry(s, 'fakemedals', 4);
+  carry(s, 'hotweapons', 1, { questId: 'x' });   // somebody's errand: never taken
+  carry(s, 'steel', 2);
+  s.dv = S.auDay(0.3);
+  const p = S.stageEvent(s, EVENTS.find(e => e.id === 'veyra-scan'), 'inner');
+  assert.equal(p.kind, 'encounter');
+  const [hand, bluff, run] = p.choices;
+  assert.deepEqual(hand.effects.take, [{ good: 'fakemedals', qty: 4 }], 'the consigned weapons were taken, or the steel');
+  assert.ok(hand.effects.money < 0 && -hand.effects.money <= s.money * 0.6, 'the fine is not bounded by the purse');
+  assert.ok(-hand.effects.money <= 400, 'the fine is over its cap');
+  assert.ok(!/\{/.test(hand.text) && hand.text.includes('Counterfeit faction medals'), `the text is not filled in: ${hand.text}`);
+  assert.equal(hand.effects.rep.emberkin, -1);
+  assert.ok(bluff.text && bluff.effects, 'the bluff was not rolled when the card went up');
+  assert.match(run.disabled, /in the tank/, 'a burn the tank cannot pay for is on offer');
+  assert.equal(hand.disabled, null);
+
+  s.pending = p;
+  assert.equal(S.resolveEncounter(s, 2).ok, false, 'a greyed choice went through');
+  assert.equal(S.resolveEncounter(s, 9).ok, false);
+  const money = s.money, rep = s.rep.emberkin;
+  const r = S.resolveEncounter(s, 0);
+  assert.ok(r.ok && r.text === hand.text);
+  assert.equal(s.pending, null);
+  assert.equal(s.money, money + hand.effects.money);
+  assert.equal(s.rep.emberkin, Math.max(0, rep - 1), 'standing went below nothing');
+  assert.ok(!s.cargo.some(c => c.good === 'fakemedals'), 'the medals are still aboard');
+  assert.ok(s.cargo.some(c => c.good === 'hotweapons' && c.qty === 1), 'they took a crate that was somebody else\'s');
+  assert.ok(s.cargo.some(c => c.good === 'steel' && c.qty === 2), 'they took the steel');
+  assert.equal(s.log.at(-1).text, hand.text, 'the outcome is not in the log');
+});
+
+test('what the other effects come to: fuel, cold cargo, a found crate, the bank, the hull, a stranger\'s thanks', () => {
+  // A flare with the cold hold fitted is nothing; without it, half of what is cold.
+  const cold = shipFor('inner'); carry(cold, 'gel', 3); carry(cold, 'riverfish', 1);
+  const flare = EVENTS.find(e => e.id === 'flare');
+  const ride = S.stageEvent(cold, flare, 'inner').choices[1];
+  assert.deepEqual(ride.effects.take, [{ good: 'gel', qty: 2 }, { good: 'riverfish', qty: 1 }], 'half, rounded up, of each cold stack');
+  cold.keys.tempControl = true;
+  assert.equal(S.stageEvent(cold, flare, 'inner').choices[1].effects.take, undefined, 'the cold hold did not do what a cold hold is for');
+  const shade = S.stageEvent(cold, flare, 'inner').choices[0];
+  assert.ok(Math.abs(S.kms(shade.effects.dv) + 0.2) < 1e-9, 'shading the hold costs 200 m/s');
+
+  // A stranger's thanks go to the people of the region.
+  const belt = shipFor('belt');
+  const beacon = S.stageEvent(belt, EVENTS.find(e => e.id === 'beacon'), 'belt');
+  assert.deepEqual(beacon.choices[0].effects.rep, { cat: 1 });
+  assert.match(beacon.choices[0].text, /The cats/);
+  const deep = S.stageEvent(belt, EVENTS.find(e => e.id === 'beacon'), 'deep');
+  assert.deepEqual(deep.choices[0].effects.rep, {}, 'thanks from nobody at the Maw');
+  belt.pending = beacon; const dv = belt.dv;
+  S.resolveEncounter(belt, 0);
+  assert.ok(Math.abs(S.kms(dv - belt.dv) - 0.3) < 1e-9, 'the fuel was not handed across');
+  assert.equal(belt.rep.cat, 1);
+
+  // A crate found is a crate aboard, if there is room; otherwise the button says so.
+  const crate = EVENTS.find(e => e.id === 'drift-crate');
+  const room = shipFor('belt');
+  room.pending = S.stageEvent(room, crate, 'belt');
+  S.resolveEncounter(room, 0);
+  assert.ok(room.cargo.some(c => c.good === 'hullplate' && c.qty === 1), 'the crate never came aboard');
+  const full = shipFor('belt'); carry(full, 'steel', 999);
+  assert.match(S.stageEvent(full, crate, 'belt').choices[0].disabled, /hold/);
+
+  // The bank: a quarter of the purse against the debt, or five percent more owed.
+  const owing = shipFor('home', { debt: 200, money: 400 });
+  const bank = EVENTS.find(e => e.id === 'bank-launch');
+  owing.pending = S.stageEvent(owing, bank, 'home');
+  assert.equal(owing.pending.choices[0].effects.debt, -100);
+  assert.match(owing.pending.choices[0].text, /100 /);
+  S.resolveEncounter(owing, 0);
+  assert.equal(owing.debt, 100); assert.equal(owing.money, 300);
+  owing.pending = S.stageEvent(owing, bank, 'home');
+  S.resolveEncounter(owing, 1);
+  assert.equal(owing.debt, 105);
+
+  // A mechanic mends a grade; the hull never goes below sound.
+  const dented = shipFor('belt', { hull: 1 });
+  dented.pending = S.stageEvent(dented, EVENTS.find(e => e.id === 'cat-mechanic'), 'belt');
+  S.resolveEncounter(dented, 0);
+  assert.equal(dented.hull, 0); assert.equal(dented.money, 440);
+});
+
+test('a save from before there were events restores with the field, and a stale card is dropped', () => {
+  const s = shipFor('home');
+  delete s.encounters;
+  const back = S.importSave(S.exportSave(s));
+  assert.deepEqual(back.encounters, { legDone: false, seen: {} });
+  const t = shipFor('home');
+  t.pending = { kind: 'encounter', id: 'no-such-event', title: 'x', text: 'x', choices: [] };
+  assert.equal(S.importSave(S.exportSave(t)).pending, null, 'a card nothing in this build can answer');
+  const u = shipFor('home');
+  for(let i = 0; i < 400 && !u.pending; i++) S.rollEncounter(u, 'tassel', 'lamp', []);
+  const kept = S.importSave(S.exportSave(u));
+  assert.deepEqual(kept.pending, u.pending, 'a live card did not survive the save');
+});
+
+test('the play page puts an event up as a card and answers it through the sim', () => {
+  const html = readFileSync(new URL('../public/orbital-trader/play.html', import.meta.url), 'utf8');
+  assert.match(html, /e\.kind === 'encounter'.*showEncounter\(e\.pending\)/, 'the tick\'s event never reaches the page');
+  assert.match(html, /state\.pending\?\.kind === 'encounter'\) showEncounter\(state\.pending\)/, 'a card up at save time does not come back at load');
+  assert.match(html, /S\.resolveEncounter\(state, Number\(b\.dataset\.choice\)\)/, 'the page answers the card itself');
 });

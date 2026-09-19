@@ -431,9 +431,180 @@ export const FALLS_SONG = {
   openHatAt: [3, 7, 11, 15],
 };
 
+/* Everything from The Hedgerow on had no song at all. `play()` looks the
+ * level's id up in SONGS and quietly sets `song = null` when it misses, so
+ * five levels ran in silence with a Music button that claimed to be on —
+ * the failure mode of a lookup table that nobody made add up to the list it
+ * is indexed by. There is a test now that the two match.
+ */
+
+/* Hops. Short notes, nothing held, the bass jumping off the beat as much as
+   on it — the one level built entirely out of small leaps. */
+export const HEDGEROW_SONG = {
+  bpm: 126,
+  swing: 0.1,
+  bars: [
+    { chord: [62, 'min7'] }, { chord: [67, 'dom7'] },
+    { chord: [60, 'maj'] },  { chord: [57, 'dom7'] },
+    { chord: [62, 'min7'], lead: 'response' }, { chord: [67, 'dom7'], lead: 'response' },
+    { chord: [60, 'maj'],  lead: 'response' }, { chord: [57, 'dom7'], lead: 'response', fill: true },
+  ],
+  bass: [[0, 0, 1], [3, 0, 1], [6, 7, 1], [8, 0, 1], [11, 0, 1], [14, 5, 1]],
+  bassType: 'triangle',
+  bassCut: 1100,
+  bassLevel: 0.15,
+  lead: [[0, 12, 1], [2, 16, 1], [4, 19, 2], [8, 12, 1], [10, 16, 1], [12, 21, 2]],
+  leadResponse: [[0, 19, 1], [2, 24, 1], [4, 21, 1], [6, 19, 2], [10, 16, 1], [12, 19, 1], [14, 24, 2]],
+  leadType: 'square',
+  leadCut: 3200,
+  leadLevel: 0.05,
+  stabAt: [5, 13],
+  stabType: 'triangle',
+  stabCut: 1700,
+  stabLevel: 0.04,
+  kickAt: [0, 8],
+  snareAt: [4, 12],
+  hatAt: [2, 6, 10, 14],
+  openHatAt: [7, 15],
+};
+
+/* Height and air. The slowest thing here, long held notes and open fifths,
+   a kick that lands twice a bar and mostly gets out of the way. */
+export const OVERLOOK_SONG = {
+  bpm: 96,
+  swing: 0.04,
+  bars: [
+    { chord: [65, 'maj'] },  { chord: [60, 'maj'] },
+    { chord: [67, 'maj'] },  { chord: [57, 'min7'] },
+    { chord: [65, 'maj'], lead: 'response' },  { chord: [60, 'maj'], lead: 'response' },
+    { chord: [67, 'maj'], lead: 'response' },  { chord: [57, 'min7'], lead: 'response', fill: true },
+  ],
+  bass: [[0, 0, 4], [8, 7, 4]],
+  bassType: 'sine',
+  bassCut: 900,
+  bassLevel: 0.16,
+  lead: [[0, 12, 4], [4, 16, 4], [8, 19, 6]],
+  leadResponse: [[0, 19, 4], [6, 24, 4], [12, 21, 4]],
+  leadType: 'triangle',
+  leadCut: 4600,
+  leadLevel: 0.075,
+  stabAt: [6, 14],
+  stabType: 'triangle',
+  stabCut: 2200,
+  stabLevel: 0.035,
+  kickAt: [0, 8],
+  snareAt: [8],
+  hatAt: [4, 12],
+  openHatAt: [14],
+};
+
+/* The staircase, written as one: the bass walks up in whole steps and the
+   lead climbs a scale a step at a time, then comes back down on the answer.
+   The only tune here whose shape is the level's shape. */
+export const STONES_SONG = {
+  bpm: 110,
+  swing: 0.08,
+  bars: [
+    { chord: [60, 'maj'] },  { chord: [62, 'min7'] },
+    { chord: [65, 'maj'] },  { chord: [67, 'dom7'] },
+    { chord: [60, 'maj'], lead: 'response' },  { chord: [62, 'min7'], lead: 'response' },
+    { chord: [65, 'maj'], lead: 'response' },  { chord: [67, 'dom7'], lead: 'response', fill: true },
+  ],
+  bass: [[0, 0, 2], [4, 4, 2], [8, 7, 2], [12, 12, 2]],
+  bassType: 'triangle',
+  bassCut: 1000,
+  bassLevel: 0.15,
+  lead: [
+    [0, 0, 1], [2, 2, 1], [4, 4, 1], [6, 5, 1],
+    [8, 7, 1], [10, 9, 1], [12, 11, 1], [14, 12, 2],
+  ],
+  leadResponse: [
+    [0, 12, 1], [2, 11, 1], [4, 9, 1], [6, 7, 2],
+    [10, 4, 1], [12, 2, 1], [14, 0, 2],
+  ],
+  leadType: 'triangle',
+  leadCut: 3800,
+  leadLevel: 0.07,
+  stabAt: [3, 11],
+  stabType: 'triangle',
+  stabCut: 1800,
+  stabLevel: 0.04,
+  kickAt: [0, 8],
+  snareAt: [4, 12],
+  hatAt: [2, 6, 10, 14],
+  openHatAt: [15],
+};
+
+/* A tower, so: bells. A tolling bass held half a bar at a time under a
+   sparse, very high triangle, and almost no kit — one kick at the top of
+   the bar and one snare in the middle, which is as close to a bell tower as
+   four voices and a noise burst get. */
+export const BELFRY_SONG = {
+  bpm: 88,
+  swing: 0,
+  bars: [
+    { chord: [57, 'min7'] }, { chord: [65, 'maj'] },
+    { chord: [60, 'maj'] },  { chord: [67, 'dom7'] },
+    { chord: [57, 'min7'], lead: 'response' }, { chord: [65, 'maj'], lead: 'response' },
+    { chord: [60, 'maj'], lead: 'response' },  { chord: [67, 'dom7'], lead: 'response', fill: true },
+  ],
+  bass: [[0, 0, 6], [8, 0, 6]],
+  bassType: 'sine',
+  bassCut: 800,
+  bassLevel: 0.17,
+  lead: [[0, 24, 3], [4, 19, 3], [8, 28, 3], [12, 24, 3]],
+  leadResponse: [[0, 31, 3], [4, 28, 3], [8, 24, 4], [14, 19, 2]],
+  leadType: 'triangle',
+  leadCut: 5200,
+  leadLevel: 0.07,
+  stabAt: [6, 14],
+  stabType: 'sine',
+  stabCut: 2400,
+  stabLevel: 0.045,
+  kickAt: [0],
+  snareAt: [8],
+  hatAt: [4, 12],
+  openHatAt: [15],
+};
+
+/* One duckling walking a very long way round, so a walking bass — eight
+   notes a bar, up and back down, never stopping — with a lead that strolls
+   over the top of it rather than hurrying. */
+export const ERRAND_SONG = {
+  bpm: 104,
+  swing: 0.12,
+  bars: [
+    { chord: [57, 'min7'] }, { chord: [62, 'dom7'] },
+    { chord: [67, 'maj'] },  { chord: [64, 'min7'] },
+    { chord: [57, 'min7'], lead: 'response' }, { chord: [62, 'dom7'], lead: 'response' },
+    { chord: [67, 'maj'], lead: 'response' },  { chord: [64, 'min7'], lead: 'response', fill: true },
+  ],
+  bass: [
+    [0, 0, 1], [2, 2, 1], [4, 4, 1], [6, 5, 1],
+    [8, 7, 1], [10, 5, 1], [12, 4, 1], [14, 2, 1],
+  ],
+  bassType: 'triangle',
+  bassCut: 1000,
+  bassLevel: 0.15,
+  lead: [[0, 7, 2], [3, 9, 1], [4, 12, 2], [8, 11, 1], [10, 9, 2], [13, 7, 3]],
+  leadResponse: [[0, 12, 2], [3, 14, 1], [4, 16, 2], [8, 14, 1], [10, 12, 2], [13, 9, 3]],
+  leadType: 'triangle',
+  leadCut: 3600,
+  leadLevel: 0.075,
+  stabAt: [6, 14],
+  stabType: 'triangle',
+  stabCut: 1700,
+  stabLevel: 0.04,
+  kickAt: [0, 8],
+  snareAt: [4, 12],
+  hatAt: [2, 6, 10, 14],
+  openHatAt: [7],
+};
+
 export const SONGS = {
   park: PARK_SONG, warren: WARREN_SONG, orchard: ORCHARD_SONG, grove: GROVE_SONG, aerie: AERIE_SONG,
-  spire: SPIRE_SONG, falls: FALLS_SONG,
+  spire: SPIRE_SONG, falls: FALLS_SONG, hedgerow: HEDGEROW_SONG, overlook: OVERLOOK_SONG,
+  stones: STONES_SONG, belfry: BELFRY_SONG, errand: ERRAND_SONG,
 };
 
 /* ------------------------------------------------------------------ engine --- */
@@ -588,65 +759,121 @@ export function createAudio(){
 
   /* ---- sound effects ------------------------------------------------ */
 
-  /* A quack, built the way a quack actually works rather than as one blip —
-   * which is what an earlier pass of this was, and it sounded like a
-   * microwave because that is what a bare sawtooth through one filter is.
+  /* A quack, built out of what a duck actually is.
    *
-   * Three formants in parallel rather than one bandpass: a single filter
-   * gives a nasal "wah", but a bank of them is what gives a sound a throat.
-   * The middle of the note dips and comes back up rather than holding flat,
-   * which is what makes it land as "qua-ack" — two syllables of one call —
-   * instead of one flat blast. And a slow warble on the frequency supplies
-   * the rasp; a perfectly steady pitch is a synth patch, never an animal.
+   * The first pass at this was a sawtooth through three formants at
+   * 850/1900/3000 Hz with the pitch swooping 430 -> 590 -> 240, which is a
+   * human "a" vowel sung by a kazoo. It is not what a mallard does, and it
+   * sounded like it. This one is built from the published acoustics
+   * instead, and every number below is either measured from a bird or
+   * derived from one:
+   *
+   *   Source. The syrinx is a pair of membranes slapping shut, so the
+   *   source is a pulse train — near-flat in the harmonics, not a
+   *   sawtooth's 6 dB an octave, which is why the old one had nothing left
+   *   above 2 kHz and a quack has energy out past 6. F0 sits around 200 Hz
+   *   and barely moves: 230 falling to 178 over the note. The old swoop up
+   *   through 590 was most of why it read as cartoon rather than bird.
+   *
+   *   Filter. A mallard's trachea is 14-18 cm, open at one end, which is a
+   *   quarter-wave tube: its resonances are the odd series c/4L, 3c/4L,
+   *   5c/4L... At 16 cm that is 536, 1608, 2680 and 3752 Hz, and those are
+   *   the formants. Their Q is low, because a tube is a broad resonator —
+   *   narrow bands leave canyons between the formants that no animal has.
+   *   The levels climb up the series to pay back the source's own rolloff:
+   *   the tube does not favour its first resonance, the source does.
+   *
+   *   Rasp. A quack is broadband, roughly 0.1 to 8 kHz. A little noise
+   *   around 2.2 kHz rides the same envelope, as its own layer rather than
+   *   pushed through the formants — noise through narrow bandpasses comes
+   *   out as a hum.
+   *
+   *   Shape. A hard onset, a brief hold and a decay. One note struck, not a
+   *   syllable that dips in the middle the way the old one did; and the
+   *   formants slide down a fifth over the note, which is the bill closing.
    */
-  const QUACK_FORMANTS = [[850, 7, 1], [1900, 9, 0.55], [3000, 11, 0.28]];
+  const TRACHEA_CM = 16;
+  const QUACK_F1 = 34300 / (4 * TRACHEA_CM);   // 536 Hz, and the series off it
 
-  function quackSyllable(t, dur, vol){
-    const o = ctx.createOscillator();
-    o.type = 'sawtooth';
-    o.frequency.setValueAtTime(430, t);
-    o.frequency.exponentialRampToValueAtTime(590, t + 0.022);
-    o.frequency.exponentialRampToValueAtTime(240, t + dur);
+  /* [which resonance of the series, Q, level]. The Qs were picked by
+     rendering the thing offline and looking at where the energy actually
+     landed: at 2 and above there is a hole between the first and second
+     resonances twenty-four decibels deep, which no animal has, and at 1.2
+     the resonances smear together and the tube stops being a tube. At 1.6
+     the spectrum runs unbroken from 250 Hz to 6 kHz — which is the band a
+     mallard's quack is measured to occupy — with the series still legible
+     in it. */
+  const QUACK_TUBE = [[1, 1.6, 1], [3, 1.92, 0.9], [5, 2.24, 0.7], [7, 2.56, 0.45]];
 
-    // The rasp: a slow warble either side of the note, not enough to read
-    // as vibrato, just enough to stop it sitting perfectly still.
-    const rasp = ctx.createOscillator();
-    rasp.type = 'sine';
-    rasp.frequency.value = 50;
-    const raspDepth = ctx.createGain();
-    raspDepth.gain.value = 26;
-    rasp.connect(raspDepth).connect(o.frequency);
+  // Built once and reused: the harmonics of the syringeal pulse, rolled off
+  // at 1/n^0.35 — about 3 dB an octave, near enough flat to carry the tube's
+  // upper resonances.
+  let quackWave = null;
+  function pulseWave(){
+    if(quackWave) return quackWave;
+    const N = 40;
+    const real = new Float32Array(N), imag = new Float32Array(N);
+    for(let n = 1; n < N; n++) imag[n] = 1 / Math.pow(n, 0.35);
+    quackWave = ctx.createPeriodicWave(real, imag);
+    return quackWave;
+  }
 
-    // The articulation: a dip a third of the way through and back up. This
-    // is the "qu-ack" split, not the pitch bend above — that shapes the
-    // note, this shapes the syllable.
-    const env = ctx.createGain();
-    env.gain.setValueAtTime(0.0001, t);
-    env.gain.exponentialRampToValueAtTime(1, t + 0.012);
-    env.gain.exponentialRampToValueAtTime(0.32, t + dur * 0.32);
-    env.gain.exponentialRampToValueAtTime(1, t + dur * 0.48);
-    env.gain.setValueAtTime(1, t + dur * 0.62);
-    env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-
+  function quackSyllable(t, dur, vol, f0 = 230, fEnd = 178){
     const out = ctx.createGain();
     out.gain.value = vol;
-    env.connect(out).connect(bus);
+    out.connect(bus);
 
-    // Each formant falls with the pitch as the bill closes, same as the
-    // note itself, just centred at a different resonance.
-    for(const [freq, q, level] of QUACK_FORMANTS){
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.exponentialRampToValueAtTime(1, t + 0.006);
+    env.gain.setValueAtTime(1, t + dur * 0.18);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    env.connect(out);
+
+    const o = ctx.createOscillator();
+    o.setPeriodicWave(pulseWave());
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(fEnd, t + dur);
+
+    // Jitter: a real pair of membranes never holds a perfectly steady
+    // pitch, and a perfectly steady one is always a synth.
+    const jitter = ctx.createOscillator();
+    jitter.type = 'sine';
+    jitter.frequency.value = 44;
+    const jitterDepth = ctx.createGain();
+    jitterDepth.gain.value = 12;
+    jitter.connect(jitterDepth).connect(o.frequency);
+
+    for(const [mult, q, level] of QUACK_TUBE){
+      const f = QUACK_F1 * mult;
       const band = ctx.createBiquadFilter();
       band.type = 'bandpass';
-      band.frequency.setValueAtTime(freq, t);
-      band.frequency.exponentialRampToValueAtTime(freq * 0.62, t + dur);
+      band.frequency.setValueAtTime(f, t);
+      band.frequency.exponentialRampToValueAtTime(f * 0.82, t + dur);
       band.Q.value = q;
-      const fg = ctx.createGain();
-      fg.gain.value = level;
-      o.connect(band).connect(fg).connect(env);
+      const g = ctx.createGain();
+      g.gain.value = level;
+      o.connect(band).connect(g).connect(env);
     }
 
+    // The rasp.
+    const nz = ctx.createBufferSource();
+    const n = Math.floor(ctx.sampleRate * (dur + 0.05));
+    const buf = ctx.createBuffer(1, n, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for(let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    nz.buffer = buf;
+    const raspBand = ctx.createBiquadFilter();
+    raspBand.type = 'bandpass';
+    raspBand.frequency.value = 2200;
+    raspBand.Q.value = 0.7;
+    const raspGain = ctx.createGain();
+    raspGain.gain.value = 0.12;
+    nz.connect(raspBand).connect(raspGain).connect(env);
+
     o.start(t); o.stop(t + dur + 0.02);
-    rasp.start(t); rasp.stop(t + dur + 0.02);
+    jitter.start(t); jitter.stop(t + dur + 0.02);
+    nz.start(t); nz.stop(t + dur + 0.02);
   }
 
   /* The duckling that just made it.
@@ -662,14 +889,20 @@ export function createAudio(){
     // than evenly spaced, and a little quieter and shorter — an echo of the
     // first, not a repeat of it.
     quack(t){
+      /* The decrescendo call, which is the one a mallard is famous for: a
+         run of notes with the accent on the first and each one after it
+         quieter, shorter and a shade lower. Two of them here rather than
+         the two-to-ten a real bird uses — this fires once per duckling
+         saved, up to twenty times in a run, and a full descrescendo every
+         time would be the loudest thing in the game by a distance. */
       // A short puff of breath on the attack, under the note rather than
       // in front of it — this is the air, not the voice.
-      hit(t, 0.03, 0.05, 1400, 'bandpass');
-      quackSyllable(t, 0.18, 0.6);
+      hit(t, 0.02, 0.04, 1800, 'bandpass');
+      quackSyllable(t, 0.20, 0.62, 230, 178);
 
-      const t2 = t + 0.19;
-      hit(t2, 0.025, 0.04, 1400, 'bandpass');
-      quackSyllable(t2, 0.15, 0.48);
+      const t2 = t + 0.23;
+      hit(t2, 0.018, 0.03, 1800, 'bandpass');
+      quackSyllable(t2, 0.16, 0.43, 216, 172);
     },
 
     /* The duckling that didn't — two sounds, not one, matching the poof it
@@ -726,9 +959,15 @@ export function createAudio(){
      * one short peep gliding up rather than down — an entrance, the
      * opposite shape from `lost`'s falling puff.
      */
+    /* It was there all along and nobody could hear it: measured against the
+       others it peaked at eight per cent of the quack, which under the music
+       and out of a phone speaker is silence. "Sits under everything else"
+       had been taken as far as inaudible. Four times the level and half
+       again the length of the peep — still the quietest thing here after the
+       zap, and still well under the quack, but now actually a sound. */
     hatch(t){
-      hit(t, 0.02, 0.05, 3200, 'bandpass');
-      voice(950, t + 0.008, 0.08, 'triangle', 0.045, 1500, 5000);
+      hit(t, 0.025, 0.2, 3200, 'bandpass');
+      voice(950, t + 0.008, 0.12, 'triangle', 0.19, 1500, 5000);
     },
 
     /* A teleporter taking a duckling — the one thing in this game that is

@@ -176,6 +176,8 @@ So **the resolution follows the gesture.** At rest the chart paints at the full 
 
 **The view is locked to the world you are going round.** The chart is always centred on the smallest sphere of influence containing the ship, and it changes when that changes — crossing into a moon's reach swings the chart to that moon and re-frames it. The zoom follows the drawn road: it re-frames when the road grows past the edge of the screen or shrinks to a knot in the middle, and leaves the player's own zooming alone in between.
 
+**That last sentence described something that was not built.** The thresholds and the comment explaining the hysteresis were written; nothing read them, and the chart re-framed on a change of reach and nowhere else. A playtest of the lesson is what found it, because the lesson is where it hurts most: the card that sends a beginner zooming out until Slate is in frame leaves the orbit they are about to fly a six-pixel ring under their own ship's icon, and the card after it says "tap the white line". It is wired now, and for the moment **only while the lesson is flying**. Whether the rest of the game should have a zoom that moves on its own is a real question — a player who deliberately pulls back to look at the outer system would not thank a chart that snapped them home — and it is not one the lesson's failure settles.
+
 **Panning rides the lock instead of replacing it.** The chart can be dragged — one finger, two fingers, or the arrow keys when no burn is selected — but what is stored is not a position in the sky. It is an offset from the thing last focused, and the thing last focused is looked up again every frame, so a pan keeps its meaning as the world it is measured from moves: look a little ahead of your ship and it stays a little ahead of your ship; drag over a moon and the view travels with the moon. The original objection stands and is answered rather than ignored — a view that can be lost is a view somebody has to get back — so focusing anything at all (tapping a body, pressing `f`, the ◎ button) sets the offset back to nothing, and ◎ lights while the view is off its lock.
 
 **The road shows the orbit you are on and the one thing that happens next.** Never more. It is always exactly one of three pictures:
@@ -1350,11 +1352,21 @@ URL by `portraitURL(id)`.
 **Every face aboard can be pressed, and answers.** `dialog.json` holds
 exchanges keyed to a port — `at: "cinder"`, or `"*"` for anywhere — and to the
 person whose picture starts them; a line written for the port you are tied up
-at beats a line written for anywhere, and an exchange that puts words in the
-mouth of somebody not aboard is not offered at all. Nothing about a
-conversation is saved. Talking is free, it changes nothing, and the only thing
-a game remembers about one is that it happened — and it does not remember that
-either.
+at beats a line written for anywhere. An exchange that turns to somebody not
+aboard — Finn asking Kiran about a noise, Wicket asking Tsuki what she is
+looking at — is said its other way instead: every such exchange carries a
+`without` block, one entry per person it leans on, spoken only by whoever was
+pressed and the captain, in which they say where that person would be found.
+The engineer is at the Ninth Forge on Cinder; the navigator is a word carried
+from the bar at Nail to Whisker; the appraiser is on the deep shelf of the
+rafts at Brine. So the menu still reads only **Missing Engineer**, but the crew
+you do have will tell you where to look, which is how a person finds out
+something in this game: by asking. An exchange with no `without` for a missing
+berth is not offered at all, and the build refuses a `without` that names a
+berth the exchange does not need or puts words in a mouth that might not be
+there. Nothing about a conversation is saved. Talking is free, it changes
+nothing, and the only thing a game remembers about one is that it happened —
+and it does not remember that either.
 
 What comes back is a popup over the sky rather than a block in the menu,
 because a line somebody says is an event and an event belongs where the player
@@ -1387,19 +1399,52 @@ Crew reacting to the player's burns is a desired feature, working as characteriz
 
 How crew relate to the player's standing with each species is also unsettled: each of the three comes from the people whose region their quest crosses, so reputation and crew already move together in the fiction without being wired together in the code.
 
-### 7.3 Events — TBD, and now the only wanted system still outstanding
+### 7.3 Events — built
 
-**Still on the agenda, as an addition rather than a gap.** With the closing line
-built (§7.5) and rivalry ruled out (§7.4), events are the one system the design
-still wants and does not have. Nothing else depends on them, which is why they
-keep getting deferred and why they are safe to defer again: the game is
-finishable without them.
+**Built, in the shape the brainstorm asked for and one size smaller.** An
+event is rolled at the moment the ship crosses from one world's reach into
+another's — the one place on a voyage where something is already changing:
+the chart re-frames, the road re-draws — and never anywhere else. Coasting is
+still the pacing gap the design wanted filled; a change of reach is where a
+coast has a seam in it.
 
-Coasting stretches are natural pacing gaps and the likely home for events. The guiding principle is that events should ask for **orbital decisions** where possible, not just text choices.
+Three bounds are the whole of the pacing, and all three are in `events.json`
+or the sim rather than in a card. A crossing turns into an event with a small
+chance (`rules.chance`, twelve in a hundred), and only if something in the
+table fits — the region of the reach, what is in the hold, whether the bank
+is owed or the hull is dented. There is **at most one between one docking and
+the next**, whatever the road does, so a long road with six crossings on it
+is not six interruptions. And **nothing fires while Uncle Theo is still
+teaching**.
 
-Candidates from brainstorming include distress beacons (requiring a rendezvous), rival traders racing to the same market, stowaways in the hold, solar flares threatening sensitive cargo, hitchhikers on passing asteroids, cat toll intercepts in the Belt (escapable through maneuvering), and letters or radio chatter that advance character stories mid-flight.
+An event is a card over the sky with a line of what is happening and one to
+three choices, the shape the cat toll already had. A choice can need
+something — fuel in the tank, coin in the purse, room in the hold — and a
+choice the ship cannot make is there but greyed, with the reason on it, so a
+player sees the road they could not take rather than a shorter list; every
+event has at least one choice that needs nothing, and the build refuses one
+that does not. What a choice does is money, fuel, standing with a people,
+crates taken or given, a grade of hull, or the debt — never the ship and
+never the save: a fine is bounded by the purse the way a toll is, and a crate
+somebody else is owed is never taken.
 
-Open questions include event frequency, trigger conditions (location, cargo, reputation, time), and how events tie into species relationships.
+Everything a choice will do is worked out **when the card goes up**, not when
+the button is pressed: the fine as a number, the crates by name, a chancy
+outcome already rolled. So the buttons say exactly what they cost, a reload
+cannot re-roll a result, and answering is bookkeeping. The table has twelve
+today — a Veyra house warship that scans for counterfeit crests and fines the
+ship that has them, a courier's wager, a flare with cold cargo aboard, a dry
+lighter's beacon, a frog pilgrim in the hold, a crate on the road, a cat
+mechanic with an opinion, the harbour bank's launch, a Glass scholar's
+recording, a letter from the raft, a cat with a better road — and each one a
+ship has seen is drawn at half the weight after, so a long game meets the
+whole table before it repeats.
+
+What the brainstorm wanted and this does not do: ask for an **orbital**
+decision. Every choice here is a button. A distress beacon that needs a
+rendezvous, or a rival that needs to be beaten to a market, would be an event
+whose answer is a burn, and the machinery for that — an event that plants a
+target and waits — is the next size up.
 
 ### 7.4 Competition and Rivalry — ruled out
 
@@ -1457,6 +1502,12 @@ section still open.
 A fully hand-drawn navigation chart was considered and ruled out as unrealistic in scope. Visual style, UI treatment, and how species are presented (portraits, animated sprites, text only) are undecided.
 
 **Decided since the first draft.** The bodies are sixteen-pixel sprites — generated for the spheres, hand-drawn for everything that is not one — and a new game opens with a six-and-a-half-second pixel film of a harbour lighter leaving Tassel's ocean: out of the water, through the cloud deck, and into the dark. It is a cutscene over an orbital rendezvous rather than a landing (2.3): the lighter touches water, the merchant ship never does, and the player still starts in orbit with nothing to cast off from. It plays for a new ship only, it is skippable with any key, and the clock waits for it.
+
+### 7.6.1 Music — built
+
+Two tracks, synthesised in the page the way the other games here do it, with nothing to fetch. **Flight** is the open sky: slow, mostly sustained chords in D with ninths, a pentatonic line that rests more than it plays, no drums, because most of a voyage is a coast and the tune should coast too. **Port** is being tied up: warmer and busier, G major with sixths, a bass walking root and fifth under every bar, brushes on the backbeats. A hulk or a wreck is *alongside*, not in port, so the sky's theme stays with them. A change of state cross-fades between the two rather than cutting: a docking is an arrival and should sound like one.
+
+Nothing plays until the browser allows it, which is a gesture on most of them; the page tries at boot for the ones that count the click through from the title screen, and keeps trying on every kind of gesture until the context confirms it is running. The tab going hidden suspends the music the way it stops the clock. The two controls — on or off, and how loud — live in the gear menu under a **Sound** tab, and persist per browser rather than per save: how loud a game is is a fact about the room, not the ship.
 
 ### 7.7 Open Technical Questions
 

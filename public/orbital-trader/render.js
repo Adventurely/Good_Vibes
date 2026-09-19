@@ -1704,7 +1704,7 @@ export function railCrossings(world, prediction, tNow, opts = {}){
      first sample is a crossing at t = now — true, useless, and drawn right
      on top of the ship. */
   /* Every world the road cuts the rail of, and once each.
- 
+
      It used to be one mark for the whole road — the first thing that happens —
      on the reasoning that a road cutting five rails twice over earns ten pairs
      of diamonds and becomes unreadable. The reasoning was about the doubles and

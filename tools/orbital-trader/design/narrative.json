@@ -449,7 +449,7 @@
   {
    "step": "find",
    "title": "Find Slate — zoom out",
-   "body": "Slate is a little farther out. Zoom out until you can see it: scroll, pinch, or press the minus key."
+   "body": "Slate is one of Tassel's two moons: it goes round the planet you are going round, a little farther out.\n\nZoom out until you can see it and the circle it travels on — scroll, pinch, or press the minus key."
   },
   {
    "step": "focus",
@@ -464,17 +464,22 @@
   {
    "step": "mark",
    "title": "Plan a burn",
-   "body": "Good. Let's get that present. The white line is your planned route: the path you are flying now. Tap it and choose 'Plan a burn'.\n\nA burn is firing the engine to speed up, slow down or change direction. A planned burn is a point on your path where that happens. Nothing fires yet: you coast until the clock gets there, and can change it until then.\n\nDon't worry where it goes. We'll fix that next."
+   "body": "Good. Let's get that present. The white line is the path you are flying now. Tap it a little way ahead of your ship and choose 'Plan a burn'.\n\nA burn is firing the engine to speed up or slow down. A planned burn is a point on your path where that happens: nothing fires yet, and you can change it until the clock gets there.\n\nDon't worry where it goes. We'll fix that next."
   },
   {
    "step": "push",
-   "title": "Push it out to Slate's height",
-   "body": "Four arrow buttons appeared around the flame. Green adds speed. Orange takes it back.\n\nGreen pushes the far side of your orbit outward. Press green until the yellow line reaches Slate's circle. Within a tenth is close enough.\n\nThe label by the burn says what the engine will do, like 'forward 120 m/s'. What it costs you comes off the Fuel gauge at the top."
+   "title": "Push the far side out to Slate",
+   "body": "Four arrows appeared around the flame. Green adds speed, orange takes it back.\n\nHere is the whole trick, and everything after this is it again: a burn moves the FAR side of your orbit, not the side you are on. Press green once and watch — the line moves half an orbit away from the flame.\n\nKeep going until that far side reaches Slate's circle. What it costs comes off the Fuel gauge."
+  },
+  {
+   "step": "slide",
+   "title": "Now slide the burn itself",
+   "body": "That was how high. This is when.\n\nThe burn does not have to fire where you put it. Drag the flame along your path to move it round the orbit — or press the comma and full-stop keys, which do the same a step at a time.\n\nHave a go and watch: the flame travels round, and the far side of the yellow line travels with it, always opposite. Nothing is riding on this one."
   },
   {
    "step": "aim",
    "title": "Put Slate in the way",
-   "body": "Perfect. You'll reach Slate's circle, but not Slate.\n\nSlate is moving: the little arrow on its circle shows which way. Drag the burn around your orbit until the yellow line crosses Slate's circle about thirty degrees ahead of Slate, so you both arrive together.\n\nIf a red cross appears, you'd hit the ground. Nudge the burn until it goes."
+   "body": "You reach Slate's circle, but not Slate. It is a moon, still going round Tassel while you climb, so it will have moved on.\n\nTwo orange diamonds show it: one on your road where it crosses Slate's circle, one where Slate will really be. Slide the burn earlier or later until they sit together.\n\nThe line under this card counts the gap down. A red cross means that road hits the ground — keep sliding."
   },
   {
    "step": "skip",
@@ -484,12 +489,12 @@
   {
    "step": "brake",
    "title": "Fall in, then stop falling",
-   "body": "You've made it to Slate. You're just going too fast, and the path flies straight back out.\n\nPlan a burn near the low point and press orange to slow down. Slowing down here pulls the far side in. Tap orange one press at a time until the path closes into a loop.\n\nGone too far and the loop is shrinking toward the ground? Press green once."
+   "body": "You've made it to Slate, and the chart has swung round to follow it: this map is Slate's now, not Tassel's.\n\nYou are going too fast for Slate to hold you, so the path bends past and straight back out. Plan a burn at the low point, where you pass closest, and press orange one press at a time until the path closes into a loop.\n\nGone too far, and the loop shrinks toward the ground? Press green once."
   },
   {
    "step": "lower",
    "title": "Bring the loop inside docking range",
-   "body": "Wow. You're a natural.\n\nNow get close enough to dock: the high point of your orbit has to sit inside Slate's docking range.\n\nRemember, changing your speed changes the opposite side of your orbit. Burn back at the low point, then press the anchor."
+   "body": "Wow. You're a natural.\n\nNow get close enough to dock: the high point of your orbit has to sit inside Slate's docking range.\n\nSame trick as before — a burn moves the far side. Burn back at the low point, then press the anchor."
   },
   {
    "step": "buy",

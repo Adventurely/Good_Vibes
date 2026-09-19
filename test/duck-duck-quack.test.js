@@ -16,12 +16,12 @@ import {
   BUILD_MAX_STEPS, BUILD_RISE_HEIGHT, DIG_SECONDS, DIG_MAX_STEPS, JUMP_SPAN, JUMP_RISE, PIT_Y,
   FLY_DRIFT, SKILLS, SKILL_INFO,
   LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5, LEVEL_6, LEVEL_7, LEVEL_8, LEVEL_9, LEVEL_10,
-  LEVELS,
+  LEVEL_11, LEVEL_12, LEVELS,
   buildTerrain, buildLayer, stairs, winCount, goalHeading, hatchHeading, formatTime,
 } from '../public/duck-duck-quack/content.js';
 
 import {
-  newGame, tick, assignSkill, assignRefusal, releaseBlocker, duckNear, hasTrait,
+  newGame, tick, assignSkill, assignRefusal, releaseBlocker, duckNear, hasTrait, endRun,
 } from '../public/duck-duck-quack/sim.js';
 
 /* A minimal level for a test that only cares about one mechanic. Every field
@@ -1112,62 +1112,137 @@ test('The Warren cannot be won without a Digger — neither wall has any other w
 
 /* ------------------------------------------------------------ The Orchard, played */
 
-/* A bot for The Orchard that climbs the wall rather than digging it — the
- * level supplies both, and this is the one way to check Climber genuinely
- * still works there too, not just the Digger path the other helpers below
- * exercise. Flyer and Climber are both given at hatch rather than at any
- * particular column: this level is walked heading -1 (content.js's
- * goalHeading), so "given early" means given anywhere on the flat run out
- * of the nest, long before either the wall or its own real drop on the far
- * side. No Blocker here on purpose — see the "no blocker at all" case
- * below for why the goose alone never costs this bot more than one
- * duckling, the same as it would with one planted.
+/* The Orchard, on three Flyers.
+ *
+ * The drop into the low plain is twenty-five pixels — one more than a
+ * duckling survives — and there are three Flyers for twenty-five of them,
+ * so the answer cannot be to hand everybody one. Two go down, the first
+ * stands so the second can turn at it, and the second builds a ramp back up
+ * to within a step of the ledge. Then both stand down and the flock walks
+ * down what it used to fall.
+ *
+ * `wall` picks how the wall itself is crossed, because the level supplies
+ * both and both still have to work.
  */
-function playLevel3Climbing(){
+function playLevel3({ wall = 'digger', turnAt = 60, rampAt = 110, holdAt = 140,
+                      skip = null } = {}){
   const state = newGame(LEVEL_3);
-  let builder1Used = false, builder2Used = false;
+  let gap1 = false, gap2 = false, crossed = false;
+  const flyers = [];
+  let turner = null, ramped = false, holder = null, freed = false, scarer = null, scared = false;
+
   for(let i = 0; i < LEVEL_3.timeLimit && !state.ended; i++){
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
-      if(!hasTrait(d, 'climber')) assignSkill(state, d.id, 'climber');
-      if(!hasTrait(d, 'flyer')) assignSkill(state, d.id, 'flyer');
-      if(!builder1Used && d.x === 250){ if(assignSkill(state, d.id, 'builder')) builder1Used = true; continue; }
-      if(!builder2Used && d.x === 35){ if(assignSkill(state, d.id, 'builder')) builder2Used = true; continue; }
+
+      /* The goose meets a planted Blocker and leaves for good; standing it
+         down again a moment later leaves the road out of the nest clear. */
+      if(!scarer && Math.round(d.x) === 290 && d.y === 150){
+        if(assignSkill(state, d.id, 'blocker')) scarer = d;
+        continue;
+      }
+      if(!gap1 && d.x === 250){
+        if(assignSkill(state, d.id, 'builder')) gap1 = true;
+        continue;
+      }
+      // The wall, once, for the whole flock either way.
+      if(wall === 'digger'){
+        if(!crossed && d.y === 150 && d.x > 206 && d.x < 229){
+          if(assignSkill(state, d.id, 'digger')) crossed = true;
+          continue;
+        }
+      } else if(!hasTrait(d, 'climber')){
+        assignSkill(state, d.id, 'climber');
+        crossed = true;
+      }
+      // The two that go down, taken as soon as they are past the wall.
+      if(skip !== 'flyer' && flyers.length < 2 && crossed && d.y === 150
+         && d.x > 140 && d.x < 174 && !hasTrait(d, 'flyer')){
+        if(assignSkill(state, d.id, 'flyer')) flyers.push(d);
+        continue;
+      }
+      /* And everybody else held off the ledge — but only once those two are
+         past, because a Blocker planted any earlier turns them round too. */
+      if(skip !== 'hold' && flyers.length === 2 && !holder && !hasTrait(d, 'flyer')
+         && d.y === 150 && Math.round(d.x) === holdAt
+         && flyers.every(f => f.x < holdAt || f.y > 150)){
+        if(assignSkill(state, d.id, 'blocker')) holder = d;
+        continue;
+      }
+      // One stands; the other turns at it, facing the ledge again.
+      if(skip !== 'turn' && !turner && hasTrait(d, 'flyer') && d.y === 175
+         && Math.round(d.x) === turnAt){
+        if(assignSkill(state, d.id, 'blocker')) turner = d;
+        continue;
+      }
+      if(skip !== 'ramp' && turner && !ramped && d.y === 175 && d.dir === 1
+         && Math.round(d.x) === rampAt){
+        if(assignSkill(state, d.id, 'builder')) ramped = true;
+        continue;
+      }
+      if(ramped && !gap2 && d.x === 35){
+        if(assignSkill(state, d.id, 'builder')) gap2 = true;
+        continue;
+      }
+    }
+    /* Once only. That duckling goes on to walk the rest of the level, and
+       may well end up being the one planted to turn the flock later — at
+       which point an unguarded "release the scarer" would stand the turner
+       back up again, which is exactly what it did. */
+    if(scarer && !scared && scarer.state === 'blocking' && state.goose.fed){
+      releaseBlocker(state, scarer.id);
+      scared = true;
+    }
+    if(ramped && !freed && !state.ducks.some(d => d.state === 'building')){
+      for(const b of [turner, holder]) if(b && b.state === 'blocking') releaseBlocker(state, b.id);
+      freed = true;
     }
     tick(state);
   }
-  return state;
+  return { state, ramped };
 }
 
-test('The Orchard can be won by climbing the wall instead of digging it', () => {
-  const state = playLevel3Climbing();
+test('The Orchard is won by building the way down, not by flying it', () => {
+  const { state, ramped } = playLevel3();
+  assert.ok(ramped, 'the ramp back up to the ledge should have gone in');
   assert.equal(state.ended, 'won');
   assert.ok(state.saved >= winCount(LEVEL_3), `only ${state.saved} saved, needed ${winCount(LEVEL_3)}`);
+  assert.ok(state.saved > LEVEL_3.supply.flyer,
+    'more got home than there were Flyers, so they did not fly down');
 });
 
-/* And the Digger path, for the same reason The Park keeps its "at the
- * edge" bot honest: a digger given anywhere before the wall should tunnel
- * it for the whole flock, needing no Climber at all. */
-function playLevel3Digging(){
-  const state = newGame(LEVEL_3);
-  let builder1Used = false, builder2Used = false;
-  for(let i = 0; i < LEVEL_3.timeLimit && !state.ended; i++){
-    for(const d of state.ducks){
-      if(d.state !== 'walking') continue;
-      if(!hasTrait(d, 'digger')) assignSkill(state, d.id, 'digger');
-      if(!hasTrait(d, 'flyer')) assignSkill(state, d.id, 'flyer');
-      if(!builder1Used && d.x === 250){ if(assignSkill(state, d.id, 'builder')) builder1Used = true; continue; }
-      if(!builder2Used && d.x === 35){ if(assignSkill(state, d.id, 'builder')) builder2Used = true; continue; }
-    }
-    tick(state);
-  }
-  return state;
-}
+test('The Orchard\'s wall is the Digger\'s now — climbing it strands the flock', () => {
+  /* It used to be a real choice, and it was a choice that Flyer paid for:
+     climbing leaves a duckling at the wall's own height, and the plateau
+     runs out in a fifty-pixel drop that only a Flyer answers. That was free
+     when every duckling could have one. On three Flyers it is not, so the
+     tunnel is the way through and the Climbers in the supply no longer buy
+     a second route. */
+  assert.equal(playLevel3({ wall: 'digger' }).state.ended, 'won');
 
-test('The Orchard can also be won by digging the wall instead of climbing it', () => {
-  const state = playLevel3Digging();
-  assert.equal(state.ended, 'won');
-  assert.ok(state.saved >= winCount(LEVEL_3), `only ${state.saved} saved, needed ${winCount(LEVEL_3)}`);
+  const { state } = playLevel3({ wall: 'climber' });
+  assert.notEqual(state.ended, 'won', 'climbing cannot carry the flock any more');
+
+  const level = newGame(LEVEL_3);
+  const plateauDrop = level.terrain[174] - level.terrain[175];
+  assert.ok(plateauDrop > FALL_SAFE,
+    `the drop off the plateau is ${plateauDrop}, which is why climbing needs a Flyer each`);
+});
+
+test('The Orchard\'s way down needs the Flyers, the turn and the ramp alike', () => {
+  for(const skip of ['flyer', 'turn', 'ramp']){
+    const { state } = playLevel3({ skip });
+    assert.equal(state.saved, 0, `without the ${skip} nothing should reach the pond`);
+    assert.notEqual(state.ended, 'won');
+  }
+});
+
+test('The Orchard hands out far fewer Flyers than it hatches ducklings', () => {
+  // The whole point of the rework: the drop cannot be paid for one duckling
+  // at a time any more.
+  assert.equal(LEVEL_3.supply.flyer, 3);
+  assert.equal(LEVEL_3.supply.builder, 10);
+  assert.ok(LEVEL_3.supply.flyer < LEVEL_3.duckCount / 2);
 });
 
 test('The Orchard cannot be won without a Builder — neither gap has any other answer', () => {
@@ -1468,6 +1543,27 @@ test('The Spire cannot be won without a Digger, and the pen holds the flock safe
   }
 });
 
+test('The Spire cannot be tunnelled from the grass — the seam is rock down there', () => {
+  // The Digger has to be carried up by the ramp before it is looking at
+  // anything it can cut. Handed one on the pen floor and left there, it
+  // walks into the spire's foot and turns around, forever.
+  const state = newGame(LEVEL_6);
+  assert.equal(state.rockBelow[95], 145, 'the spire has a seam at 145');
+  let ticks = 0;
+  for(let i = 0; i < LEVEL_6.timeLimit && !state.ended; i++){
+    for(const d of state.ducks){
+      if(d.state !== 'walking') continue;
+      if(!hasTrait(d, 'flyer') && d.y <= 40) assignSkill(state, d.id, 'flyer');
+      if(!hasTrait(d, 'digger') && d.y >= 150) assignSkill(state, d.id, 'digger');
+    }
+    tick(state);
+    ticks++;
+  }
+  assert.ok(ticks > 0);
+  assert.ok(state.tunnelY.every(v => v == null), 'not one column cut from the grass');
+  assert.equal(state.saved, 0);
+});
+
 test('The Spire\'s bluff is rock — a Digger sent at it never starts', () => {
   const state = newGame(LEVEL_6);
   assert.ok(state.rock[30], 'the bluff should be stone');
@@ -1746,7 +1842,7 @@ test('a jumper hops a step too tall to walk up, but not a wall', () => {
   assert.equal(hops, 0);
 });
 
-test('a jumper hops the goose instead of being caught, and the hunt carries on', () => {
+test('a jumper hops the goose, and the goose gives up and leaves empty-beaked', () => {
   const level = miniLevel({
     nestX: 6, goalX: SCENE_W - 4, timeLimit: 2000, duckCount: 1,
     supply: { digger: 0, builder: 0, blocker: 0, climber: 0, flyer: 0, jumper: 1 },
@@ -1759,8 +1855,38 @@ test('a jumper hops the goose instead of being caught, and the hunt carries on',
   const hopped = runHop(level, true);
   assert.equal(hopped.duck.state, 'saved');
   assert.ok(hopped.hops >= 1, 'it should have jumped it');
-  // Nothing was caught, so the goose has not been fed off — see stepWalking.
-  assert.equal(hopped.state.goose.fed, false);
+  /* Being hopped over calls the hunt off, the same way a catch or a Blocker
+     does — but with nobody in its beak. The flock behind walks through. */
+  assert.equal(hopped.state.goose.fed, true, 'the goose should have given up');
+  assert.equal(hopped.state.lost, 0, 'and taken nobody with it');
+});
+
+test('a goose hopped over leaves the scene, and lets the rest of the flock past', () => {
+  const level = miniLevel({
+    nestX: 6, goalX: SCENE_W - 4, timeLimit: 4000, duckCount: 5, spawnInterval: 30,
+    supply: { digger: 0, builder: 0, blocker: 0, climber: 0, flyer: 0, jumper: 1 },
+    goose: { x0: 100, x1: 140, y: 50, speed: 1.5, catchRadius: 1.5 },
+  });
+  const state = newGame(level);
+  let hopper = null;
+  for(let i = 0; i < level.timeLimit && !state.ended; i++){
+    // One Jumper, to the duckling in front. Everyone behind it is ordinary.
+    if(!hopper && state.ducks.length){
+      const first = state.ducks[0];
+      if(first.state === 'walking' && assignSkill(state, first.id, 'jumper')) hopper = first;
+    }
+    tick(state);
+  }
+  assert.equal(state.saved, level.duckCount,
+    'one hop should clear the goose for the whole flock');
+  assert.equal(state.lost, 0);
+  assert.ok(state.goose.gone, 'and the goose should have flown off the scene entirely');
+});
+
+test('every level carries at least one Jumper', () => {
+  for(const level of LEVELS){
+    assert.ok(level.supply.jumper >= 1, `${level.id} should have a Jumper`);
+  }
 });
 
 /* ------------------------------------------------------- The Hedgerow, played */
@@ -2109,6 +2235,386 @@ test('The Stepping Stones puts its pond on the top island, past everything else'
     if(isle === top) continue;
     assert.ok(isle.to <= LEVEL_10.goalX, 'and no lower island reaches it either');
   }
+});
+
+test('no Digger gets through rock on any level, however many are handed out', () => {
+  /* The sweep behind a bug report that turned out to be a drawing fault
+     rather than a rule one: a player watched a tunnel go through a purple
+     band and reasonably concluded Diggers could cut rock. They could not,
+     and this is the version of that claim a test can hold — every level,
+     every duckling handed a Digger every tick it is able to take one, and
+     not one column of stone ever cut. (The picture is fixed too: rock is
+     banded slate now and subsoil is darker, see art.js's drawStoneColumn.) */
+  for(const level of LEVELS){
+    const state = newGame(level);
+    state.supply.digger = 999;
+    for(let i = 0; i < level.timeLimit && !state.ended; i++){
+      for(const d of state.ducks){
+        if(d.state === 'walking' && !hasTrait(d, 'digger')) assignSkill(state, d.id, 'digger');
+      }
+      tick(state);
+      for(let x = 0; x < level.width; x++){
+        const cut = state.tunnelY[x];
+        if(cut == null) continue;
+        assert.ok(!state.rock[x], `${level.name}: a tunnel was cut through rock at column ${x}`);
+        const seam = state.rockBelow[x];
+        assert.ok(seam == null || cut <= seam,
+          `${level.name}: a tunnel at ${cut} ran under the rock seam at ${seam}, column ${x}`);
+      }
+    }
+  }
+});
+
+/* ------------------------------------------------- The Belfry, played */
+
+/* Four floors, staggered, so the flock arrives at the end of each one going
+   the wrong way for the next: a Blocker turns it, and the ramp after that
+   is built in the other direction. The two turning Blockers stay planted —
+   they are the route. */
+const BELFRY_PLAN = [
+  { y: 150, at: 40, dir: 1 },                  // pen -> A, left to right
+  { y: 126, at: 100, dir: -1, turn: 115 },     // A -> B, right to left
+  { y: 102, at: 30, dir: 1, turn: 22 },        // B -> C: climb, left to right
+  { y: 78, at: 63, dir: 1 },                   //    ... level
+  { y: 78, at: 96, dir: 1 },                   //    ... climb, onto C
+];
+
+function playLevel11({ steps = BELFRY_PLAN.length, turns = true } = {}){
+  const state = newGame(LEVEL_11);
+  let stage = 0, held = null;
+  const kinds = [], dirs = [];
+  for(let i = 0; i < LEVEL_11.timeLimit && !state.ended; i++){
+    const move = stage < steps ? BELFRY_PLAN[stage] : null;
+    if(move){
+      if(turns && move.turn != null && !held){
+        const d = state.ducks.find(k => k.state === 'walking'
+          && Math.round(k.x) === move.turn && k.y === move.y);
+        if(d && assignSkill(state, d.id, 'blocker')) held = d;
+      }
+      if(!move.turn || !turns || held){
+        const d = state.ducks.find(k => k.state === 'walking'
+          && Math.round(k.x) === move.at && k.y === move.y && k.dir === move.dir);
+        if(d && assignSkill(state, d.id, 'builder')){
+          kinds.push(d.buildLevel ? 'level' : 'climb');
+          dirs.push(d.dir);
+          stage++;
+          held = null;
+        }
+      }
+    }
+    tick(state);
+  }
+  return { state, built: stage, kinds, dirs };
+}
+
+test('The Belfry can be won by switchbacking up its floors', () => {
+  const { state, built, kinds, dirs } = playLevel11();
+  assert.equal(built, 5, 'all five ramps should have gone in');
+  assert.deepEqual(kinds, ['climb', 'climb', 'climb', 'level', 'climb'],
+    'three single ramps, then the climb-level-climb staircase');
+  assert.equal(state.ended, 'won');
+  assert.ok(state.saved >= winCount(LEVEL_11), `only ${state.saved} saved, needed ${winCount(LEVEL_11)}`);
+});
+
+test('The Belfry is built both ways round — a ramp each direction is unavoidable', () => {
+  const { dirs } = playLevel11();
+  assert.ok(dirs.includes(1), 'something has to be built left to right');
+  assert.ok(dirs.includes(-1), 'and something right to left');
+});
+
+test('The Belfry cannot be climbed without the Blockers that turn the flock', () => {
+  const { state, built } = playLevel11({ turns: false });
+  assert.ok(built <= 1, 'nothing past the first floor can even be built');
+  assert.equal(state.saved, 0);
+  assert.notEqual(state.ended, 'won');
+});
+
+test('every one of The Belfry\'s five ramps is load-bearing', () => {
+  for(let n = 1; n < BELFRY_PLAN.length; n++){
+    const { state } = playLevel11({ steps: n });
+    assert.equal(state.saved, 0, `${n} of five ramps should save nobody`);
+    assert.notEqual(state.ended, 'won');
+  }
+});
+
+test('The Belfry crosses its chasm by teleporter and by nothing else', () => {
+  const { state } = playLevel11();
+  assert.ok(state.warps >= state.saved, 'everything saved went through the pads');
+
+  // The gap really is past anything that could be built across it: from
+  // the end of floor C to the start of floor D there is nothing at all a
+  // duckling could stand on, and it is wider than a ramp is long.
+  const [, , c, d] = LEVEL_11.islands;
+  const gap = d.from - c.to;
+  assert.ok(gap > BUILD_MAX_STEPS, `the chasm is ${gap} columns and a ramp reaches ${BUILD_MAX_STEPS}`);
+  const terrain = buildTerrain(LEVEL_11.segments, LEVEL_11.width);
+  for(let x = c.to; x < d.from; x++){
+    assert.ok(terrain[x] >= SCENE_H, `column ${x} should be open air`);
+    assert.ok(!LEVEL_11.islands.some(i => x >= i.from && x < i.to),
+      `and no floor should stand in it at ${x}`);
+  }
+  // And the pads are at the two lips of it.
+  const [pad] = LEVEL_11.teleports;
+  assert.ok(pad.ax < c.to && pad.ax >= c.from, 'the near pad stands on floor C');
+  assert.ok(pad.bx >= d.from && pad.bx < d.to, 'the far pad stands on floor D');
+});
+
+test('The Belfry supplies no Digger, and has nothing one could be spent on', () => {
+  assert.equal(LEVEL_11.supply.digger, 0);
+  const state = newGame(LEVEL_11);
+  // Every wall on the level is the pen's own rock, which refuses a tunnel.
+  const terrain = state.terrain;
+  for(let x = 1; x < LEVEL_11.width; x++){
+    const rise = terrain[x - 1] - terrain[x];
+    if(rise > WALK_STEP && terrain[x] < SCENE_H){
+      assert.ok(state.rock[x], `the wall at ${x} should be rock, not something to tunnel`);
+    }
+  }
+});
+
+test('The Belfry stacks its floors clear of each other, with the pond on the top one', () => {
+  const [a, b, c, d] = LEVEL_11.islands;
+  // Each floor is one ramp's climb above the last.
+  assert.equal(150 - a.y, BUILD_RISE_HEIGHT);
+  assert.equal(a.y - b.y, BUILD_RISE_HEIGHT);
+  assert.equal(b.y - c.y, 2 * BUILD_RISE_HEIGHT, 'B to C is the double climb');
+  // And staggered, so each is reached walking the other way.
+  assert.ok(b.from < a.from, 'B lies back to the left of A');
+  assert.ok(c.to > b.to, 'C lies back to the right of B');
+  // Headroom: nothing walks along one floor with another in its face.
+  for(const [over, under] of [[b, a], [c, b]]){
+    assert.ok(under.y - over.floor > WALK_STEP, 'a floor wants air over the one below it');
+  }
+  assert.ok(LEVEL_11.goalX > d.from && LEVEL_11.goalX < d.to, 'the pond is the end of floor D');
+});
+
+/* ------------------------------------------- when a run is over, and why */
+
+/* A level whose hatch is four ducklings on flat ground, all of which walk
+   into the pond on their own. The quota is half of them, so there is a long
+   stretch of the run where the goal is already met and ducklings are still
+   walking — which is exactly the window this group is about. */
+const strollLevel = (overrides = {}) => miniLevel({
+  duckCount: 4, spawnInterval: 12, winRatio: 0.5, timeLimit: 600, ...overrides,
+});
+
+test('reaching the quota does not end the run', () => {
+  const state = newGame(strollLevel());
+  const need = winCount(state.level);
+  for(let i = 0; i < 600 && state.saved < need; i++) tick(state);
+  assert.ok(state.saved >= need, 'the quota should have been met');
+  assert.equal(state.ended, null, 'and the run should still be going');
+  assert.ok(state.ducks.some(d => d.state !== 'saved' && d.state !== 'lost'),
+    'because there are still ducklings out there');
+});
+
+test('a run ends once every duckling is in the pond or gone, and counts them all', () => {
+  const level = strollLevel();
+  const state = newGame(level);
+  run(state, 600);
+  assert.equal(state.ended, 'won');
+  assert.equal(state.saved, level.duckCount,
+    'every duckling that got home is counted, not just the quota');
+  assert.ok(state.ticks < level.timeLimit, 'and it did not have to wait out the clock');
+});
+
+test('a duckling still standing holds the run open until the clock', () => {
+  // A planted Blocker is neither saved nor lost, and the run is not over
+  // while it is standing there — the flock behind it may still be let past.
+  const level = strollLevel({ supply: { digger: 0, builder: 0, blocker: 1, climber: 0, flyer: 0 } });
+  const state = newGame(level);
+  tick(state);
+  const first = state.ducks[0];
+  assert.ok(assignSkill(state, first.id, 'blocker'));
+  run(state, level.timeLimit + 5);
+  assert.equal(first.state, 'blocking', 'it is still there');
+  assert.ok(state.ticks >= level.timeLimit, 'so the clock is what ended it');
+});
+
+test('the hatched count is the flock, and a finished run has hatched all of it', () => {
+  /* What the HUD's "Hatched X / N" reads off. Two things have to hold for it
+     to mean anything: the number must be exactly how many ducklings exist,
+     every tick, and a run that plays out must actually reach the whole
+     hatch. The second one is what the quota used to break — it ended the
+     run the moment the goal was met, which froze this counter partway
+     through the flock and made it look like it was lagging. */
+  const level = strollLevel();
+  const state = newGame(level);
+  for(let i = 0; i < level.timeLimit && !state.ended; i++){
+    tick(state);
+    assert.equal(state.hatched, state.ducks.length,
+      `hatched drifted from the flock at tick ${state.ticks}`);
+    assert.ok(state.hatched <= level.duckCount, 'and never runs past the hatch');
+  }
+  assert.equal(state.ended, 'won');
+  assert.equal(state.hatched, level.duckCount, 'the whole flock should have hatched');
+  assert.equal(state.saved + state.lost, level.duckCount, 'and all of it accounted for');
+});
+
+test('endRun stops a run by hand and judges it exactly as the clock would', () => {
+  const level = strollLevel();
+  const state = newGame(level);
+  for(let i = 0; i < 600 && state.saved < winCount(level); i++) tick(state);
+  assert.equal(state.ended, null);
+  assert.equal(endRun(state), 'won', 'the quota is met, so stopping here is a win');
+  assert.equal(state.ended, 'won');
+  assert.ok(state.ticks < level.timeLimit);
+});
+
+test('endRun on a run that has saved too few is a loss, not an escape', () => {
+  const state = newGame(strollLevel());
+  tick(state);
+  assert.equal(state.saved, 0);
+  assert.equal(endRun(state), 'lost');
+  assert.equal(state.ended, 'lost');
+});
+
+test('endRun leaves an already-finished run alone', () => {
+  const state = newGame(strollLevel());
+  run(state, 600);
+  assert.equal(state.ended, 'won');
+  assert.equal(endRun(state), null, 'nothing to end');
+  assert.equal(state.ended, 'won', 'and the verdict it already had stands');
+});
+
+test('a run out of time is judged on what got home by then', () => {
+  const state = newGame(strollLevel({ timeLimit: 30 }));
+  run(state, 60);
+  assert.equal(state.ended, 'lost');
+  assert.equal(state.ticks, 30);
+});
+
+/* ------------------------------------------------- The Errand, played */
+
+/* One duckling does the whole level and the rest stand still for it. The
+   Blocker holds the hatch off the chasm, the Climber picks the one that
+   leaves, and that one spends the Digger and the Builder on its way round
+   and back. Then the Blocker comes off. */
+function playLevel12({ blockAt = 90, buildAt = 55, release = true, skip = null } = {}){
+  const state = newGame(LEVEL_12);
+  let blocker = null, errand = null, built = false, released = false, warpsAtBridge = null;
+
+  for(let i = 0; i < LEVEL_12.timeLimit && !state.ended; i++){
+    if(!blocker && skip !== 'blocker'){
+      const d = state.ducks.find(k => k.state === 'walking' && Math.round(k.x) === blockAt);
+      if(d && assignSkill(state, d.id, 'blocker')) blocker = d;
+    }
+    // The one that goes. Anything walking right in the pen will do — the
+    // Climber is what makes it the only one that can leave.
+    if(blocker && !errand && skip !== 'climber'){
+      const d = state.ducks.find(k => k.state === 'walking' && k.dir === 1
+        && k.id !== blocker.id && k.x > 100 && k.x < 149);
+      if(d && assignSkill(state, d.id, 'climber')) errand = d;
+    }
+    // The hill, at the height the high shelf runs at.
+    if(errand && !hasTrait(errand, 'digger') && skip !== 'digger'
+       && errand.state === 'walking' && errand.y === 56 && errand.x > 160 && errand.x < 189){
+      assignSkill(state, errand.id, 'digger');
+    }
+    // And the bridge, once the pad has put it back on the far shelf.
+    if(errand && !built && skip !== 'builder' && errand.state === 'walking'
+       && errand.y === 144 && Math.round(errand.x) === buildAt){
+      if(assignSkill(state, errand.id, 'builder')){ built = true; warpsAtBridge = state.warps; }
+    }
+    if(built && release && !released && errand.state === 'walking'){
+      if(releaseBlocker(state, blocker.id)) released = true;
+    }
+    tick(state);
+  }
+  return { state, built, released, errand, warpsAtBridge };
+}
+
+test('The Errand can be won by sending one duckling the long way round', () => {
+  const { state, built, warpsAtBridge } = playLevel12();
+  assert.ok(built, 'the bridge should have gone in');
+  assert.equal(state.ended, 'won');
+  assert.ok(state.saved >= winCount(LEVEL_12), `only ${state.saved} saved, needed ${winCount(LEVEL_12)}`);
+  // One duckling runs the errand: when the bridge goes in, the pad has
+  // carried exactly that one. (It is free to wander its own route again
+  // afterwards, which is why this is read at the bridge and not at the end.)
+  assert.equal(warpsAtBridge, 1, 'exactly one duckling had taken the pad by then');
+});
+
+test('The Errand spends one of each of the three skills it is built around', () => {
+  assert.equal(LEVEL_12.supply.climber, 1);
+  assert.equal(LEVEL_12.supply.digger, 1);
+  assert.equal(LEVEL_12.supply.builder, 1);
+  for(const skill of ['climber', 'digger', 'builder']){
+    const { state } = playLevel12({ skip: skill });
+    assert.equal(state.saved, 0, `without the ${skill} nothing should get home`);
+    assert.notEqual(state.ended, 'won');
+  }
+});
+
+test('The Errand drowns the whole hatch without a Blocker', () => {
+  const { state } = playLevel12({ skip: 'blocker' });
+  assert.equal(state.saved, 0);
+  assert.equal(state.lost, LEVEL_12.duckCount, 'every one of them walks into the chasm');
+});
+
+test('The Errand needs the Blocker taken off again, not just planted', () => {
+  const { state } = playLevel12({ release: false });
+  assert.notEqual(state.ended, 'won');
+  assert.ok(state.saved <= 1, 'only the duckling that ran the errand ever gets home');
+});
+
+test('The Errand\'s Blocker has to stand between the nest and the chasm', () => {
+  // Planted the other side of the nest it turns the hatch towards the drop
+  // instead of away from it, which is the way this level is really lost.
+  for(const at of [82, 90]){
+    assert.equal(playLevel12({ blockAt: at }).state.ended, 'won', `a Blocker at ${at} should hold`);
+  }
+  for(const at of [101, 120]){
+    const { state } = playLevel12({ blockAt: at });
+    assert.notEqual(state.ended, 'won', `a Blocker at ${at} is the wrong side of the nest`);
+  }
+});
+
+test('The Errand\'s bridge has to be started late enough to reach the far lip', () => {
+  const [, chasm] = LEVEL_12.segments;
+  const reachesFrom = chasm.to - 1 - BUILD_MAX_STEPS;   // the earliest column that still lands
+  for(const at of [30, 40, 45]){
+    assert.ok(at < reachesFrom, `x=${at} should be too early to span the chasm`);
+    const { state } = playLevel12({ buildAt: at });
+    assert.notEqual(state.ended, 'won', `a ramp from ${at} stops in mid-air`);
+  }
+  for(const at of [46, 55, 69]){
+    assert.ok(at >= reachesFrom);
+    assert.equal(playLevel12({ buildAt: at }).state.ended, 'won', `a ramp from ${at} should land`);
+  }
+});
+
+test('The Errand\'s tower is rock and its hill is not — one climb, one tunnel', () => {
+  const state = newGame(LEVEL_12);
+  // The way out of the pen: rock, so a Digger will not touch it, and taller
+  // than any ramp climbs, so a Builder is no use on it either.
+  for(let x = 150; x < 158; x++) assert.ok(state.rock[x], `the tower at ${x} should be rock`);
+  assert.ok(120 - state.terrain[150] > BUILD_RISE_HEIGHT, 'and taller than a ramp reaches');
+  // The hill: dirt, and thin enough that one tunnel breaks through it.
+  for(let x = 190; x < 218; x++) assert.ok(!state.rock[x], `the hill at ${x} should be diggable`);
+  assert.ok(218 - 190 < DIG_MAX_STEPS, 'and one Digger should reach the far side of it');
+});
+
+test('The Errand punishes climbing the hill instead of digging through it', () => {
+  // A Climber still holds the trait at the hill, and stepWalking offers
+  // climbing to anything that cannot dig — so going over the top has to be
+  // the wrong answer, and it is: the drop off the far side is lethal.
+  const state = newGame(LEVEL_12);
+  const drop = state.terrain[218] - state.terrain[217];
+  assert.ok(drop > FALL_SAFE, `the far side of the hilltop is ${drop}, which should be fatal`);
+
+  const { state: climbed } = playLevel12({ skip: 'digger' });
+  assert.equal(climbed.saved, 0, 'and the errand is lost with the duckling that walked off it');
+});
+
+test('The Errand\'s perch keeps the pad clear of the flock walking home', () => {
+  const [perch] = LEVEL_12.islands;
+  const [pad] = LEVEL_12.teleports;
+  assert.ok(pad.bx >= perch.from && pad.bx < perch.to, 'the far pad stands on the perch');
+  const shelf = LEVEL_12.segments[0].y;
+  assert.ok(shelf - pad.by > WALK_STEP,
+    'and high enough over the shelf that a duckling walking under it is not posted back');
+  assert.ok(perch.to > LEVEL_12.goalX, 'the perch sits past the water, not over it');
 });
 
 test('formatTime reads as minutes:seconds', () => {

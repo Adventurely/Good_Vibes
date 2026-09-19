@@ -233,6 +233,15 @@
   #gear-tabs .tab{ flex:0 0 auto; padding:.45rem .7rem; }
   #gear-body{ padding:.55rem; display:flex; flex-direction:column; gap:.35rem; }
   #gear-body .btn{ width:100%; text-align:left; }
+  /* The Sound tab: a switch and a slider, each with its word on the left. The
+     switch is a button that says which way it is, rather than a checkbox,
+     because it is the same shape as every other control in this menu. */
+  #gear-body .row{ display:flex; align-items:center; justify-content:space-between; gap:.6rem; font-size:.82rem; color:var(--dim); }
+  #gear-body .row .btn{ width:auto; min-width:4.2rem; text-align:center; flex:0 0 auto; }
+  #gear-body .row .btn[aria-pressed="true"]{ color:var(--gold-ink); border-color:var(--gold-2); }
+  #gear-body input[type=range]{ flex:1 1 auto; min-width:0; accent-color:var(--gold); cursor:pointer; margin:0; }
+  #gear-body input[type=range]:disabled{ opacity:.4; cursor:default; }
+  #gear-body .row output{ flex:0 0 2.4em; text-align:right; font-variant-numeric:tabular-nums; color:var(--ink); }
 
   /* ---- The panel: right column on wide screens, a sheet on narrow ---- */
   #panel{
@@ -472,6 +481,13 @@
      a break on the screen, because eight sentences in one block is a card
      nobody reads to the end of. */
   #tut p + p{ margin-top:.5rem; }
+  /* The one live number in the lesson, and it has to look like one: a reading
+     off the chart rather than another sentence from Theo, or it is read once
+     as part of the card and never looked at again while it moves. */
+  #tut #tut-gauge{
+    margin-top:.6rem; padding-top:.5rem; border-top:1px solid var(--gold-2);
+    color:var(--gold-ink); font-variant-numeric:tabular-nums; font-size:.84rem;
+  }
   #tut .btns{ margin-top:.5rem; justify-content:flex-end; }
   /* The last card asks for nothing, so it stops wearing the gold the working
      cards use to say "you are in the middle of something". */
@@ -746,6 +762,7 @@
 <div id="gearmenu" role="dialog" aria-label="Settings" hidden>
   <div id="gear-tabs" role="tablist" aria-label="Settings sections">
     <button class="tab" role="tab" data-gtab="game" aria-selected="true" aria-controls="gear-body">Game</button>
+    <button class="tab" role="tab" data-gtab="sound" aria-selected="false" aria-controls="gear-body">Sound</button>
   </div>
   <div id="gear-body" role="tabpanel"></div>
 </div>
@@ -791,6 +808,7 @@
   <small id="tut-step"></small>
   <h3 id="tut-title"></h3>
   <div id="tut-body"></div>
+  <p id="tut-gauge" hidden></p>
   <div class="btns"><button class="btn sm" id="tut-skip">Stop writing, Theo</button></div>
 </div>
 
@@ -811,6 +829,7 @@ import * as S from './sim.js';
 import { CONST, PORTS, GOODS, UPGRADES, TEXT, SPECIES, GLOSSARY, BELT_ROCKS, ARC_DEBRIS } from './content.js';
 import { segmentApses, norm, sub, add, unit, dist, absState, elementsFromState } from './orbit.js';
 import { playIntro } from './intro.js';
+import { createAudio } from './audio.js';
 
 const world = S.world;
 const $ = id => document.getElementById(id);
@@ -963,6 +982,16 @@ let last = performance.now();
 let saveTimer = 0;
 let firstStoryDone = false;
 let lockedTo = null;
+/* Whether the player has worked the zoom themselves since the chart last chose
+ * it for them. The lesson's framing (below) reads this and stands down: a rule
+ * that re-frames whenever the road is outside its band does not just follow the
+ * road, it overrules the person. With a burn open on the opening orbit the road
+ * fills about 0.195 of the frame, which is a whisker above FRAME_SHRINK, so a
+ * single press of the zoom-out key put it under the floor and the next tick put
+ * it straight back — the zoom looked stuck, because it was. Cleared on a change
+ * of reach, where the chart re-frames wholesale anyway and the old choice is
+ * about a world four orders of magnitude away. */
+let zoomByHand = false;
 /* The one number the on-chart editor shows. Recomputed when the burn changes,
    not every frame: solving what a mark costs is not free. */
 let nodeLabel = null, nodeLabelKey = '', interceptLabel = null, insetLabel = null;
@@ -1018,6 +1047,7 @@ function frame(now){
     else if(events.length) replan(true);
     else replan(false);
   }
+  syncMusic();
   /* Crossing into a moon's reach changes what the chart is about by four
      orders of magnitude. The lock follows it; so must the zoom, or the new
      orbit is a dot or a wall. */
@@ -1031,7 +1061,31 @@ function frame(now){
        place to keep looking from. */
     chart.focus('ship', null, false);
     replan(true);
+    zoomByHand = false;
     frameShipOrbit();
+  }
+  /* And the zoom follows the road, while the lesson is flying it.
+
+     FRAME_SPILL and FRAME_SHRINK have been sitting above frameShipOrbit with a
+     comment explaining the hysteresis they were for, and nothing has ever read
+     them: the chart re-framed on a change of reach and at no other time. A
+     playtest of the lesson is what turned that up. Card two sends a beginner
+     zooming out until Slate is in the frame, which at Slate's distance leaves
+     the parking orbit a six-pixel ring under the ship's own icon — and card
+     five then says "tap the white line". Pushing the far side out to Slate in
+     card six has the opposite fault: the road grows thirteen times and leaves
+     the screen, so the card that asks whether the yellow line has reached
+     Slate's circle is asking about something off the edge of it.
+
+     So it is wired, and for now only here: from the moment the lesson's chart
+     half is done until the lesson is over. Inside the band between the two
+     thresholds the zoom is still the player's, which is what the band is for.
+     Whether the rest of the game should have it too is a bigger question than
+     this change, and the constants are ready for the day it is answered. */
+  if(!state.dockedAt && !zoomByHand && S.tutorialRunning(state) && state.flags.lookedBack){
+    const span = roadSpan(), half = usableHalf();
+    const fill = span > 0 && half > 0 ? span * chart.camera.zoom / half : null;
+    if(fill != null && (fill > FRAME_SPILL || fill < FRAME_SHRINK)) frameShipOrbit();
   }
   saveTimer += real;
   if(saveTimer > 30){ saveTimer = 0; save(); }
@@ -1143,6 +1197,7 @@ function handleEvents(events){
     if(e.kind === 'soi'){ toast(`Now in ${S.nameFor(e.to, S.unseen(state))}'s gravity.`); renderTab(); tutorialCheck(); }
     if(e.kind === 'story') toast(e.text, 'story', 9000);
     if(e.kind === 'toll'){ stopSkip(); showToll(e.pending); }
+    if(e.kind === 'encounter'){ stopSkip(); showEncounter(e.pending); }
     if(e.kind === 'crash'){ stopSkip(); showCrash(e.body); }
     if(e.kind === 'dry'){ stopSkip(); toast(`${TEXT.captainLines.onStranded[1] ?? 'The tank is dry.'} The ship menu has the distress call.`, 'bad', 9000); if(tab === 'ship') renderTab(); }
     if(e.kind === 'missed'){ toast(e.count > 1 ? `${e.count} burns went by unspent.` : 'That burn went by unspent.', 'bad'); if(tab === 'ship') renderTab(); }
@@ -1406,7 +1461,14 @@ function askAtPath(t, lead = S.MIN_LEAD){
     m.querySelector('#m-close').addEventListener('click', closeModal);
     m.querySelector('#m-burn').addEventListener('click', () => {
       closeModal();
-      const ix = S.addNode(state, t, lead);
+      /* Written at the moment the button is pressed, not the moment the card
+         went up. The clock does not stop for this card, so a tap near the ship
+         and a couple of seconds of reading is enough for the moment it offered
+         to slide inside the lead — and then the press did nothing at all, with
+         the card closing behind it as though it had worked. That is the same
+         silence the dead zone had, one step further along, and it is the rest
+         of what the first playtester was fighting. */
+      const ix = S.addNode(state, Math.max(t, state.t + lead), lead);
       if(ix < 0) return;   // the button is already disabled when there is no room
       /* The chart is the editor, so writing a burn down leaves the panel
          exactly as it was: shoving the side menu open over the sky is the
@@ -1453,10 +1515,19 @@ $('m-dock').addEventListener('click', () => openMenu('dock'));
    and starts again exactly as it was — not simply running — so that opening
    the gear while paused and closing it again does not quietly set the ship
    moving. */
-/* The sections, and what is in each. One today; the shape is here so the next
-   one is a line rather than a rebuild. */
+/* The sections, and what is in each: the game, and the sound of it. */
 const GEAR_TABS = {
   game: () => `<button class="btn sm" id="gear-quit">&larr; Quit to title screen</button>`,
+  /* The music: on or off, and how loud. Both are remembered per browser, not
+     per save — a volume is a fact about the room the game is played in. */
+  sound: () => {
+    const on = audio.isOn(), pct = Math.round(audio.level() * 100);
+    return `<label class="row" for="gear-music"><span>Music</span>
+        <button class="btn sm" id="gear-music" aria-pressed="${on}">${on ? 'On' : 'Off'}</button></label>
+      <label class="row" for="gear-level"><span>Volume</span>
+        <input type="range" id="gear-level" min="0" max="100" step="5" value="${pct}" ${on ? '' : 'disabled'} aria-label="Music volume">
+        <output for="gear-level" id="gear-level-out">${pct}</output></label>`;
+  },
 };
 let gearTab = 'game';
 function renderGearTab(){
@@ -1467,6 +1538,18 @@ function renderGearTab(){
   /* It saves as you play, but not necessarily in the last few seconds of it,
      so the way out writes the game down before it takes it. */
   $('gear-quit')?.addEventListener('click', () => { save(); location.href = './'; });
+  $('gear-music')?.addEventListener('click', () => {
+    audio.setOn(!audio.isOn());
+    /* The press is a gesture, so a browser that has been waiting for one to
+       let the music start has now had it. */
+    audio.unlock();
+    renderGearTab();
+    $('gear-music').focus();
+  });
+  $('gear-level')?.addEventListener('input', e => {
+    audio.setLevel(Number(e.target.value) / 100);
+    $('gear-level-out').textContent = e.target.value;
+  });
 }
 $('gear-tabs').addEventListener('click', e => {
   const b = e.target.closest('[data-gtab]');
@@ -1601,7 +1684,7 @@ canvas.addEventListener('pointermove', e => {
     const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
     const m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
     // Two fingers do both at once: the gap is the scale, the middle is the pan.
-    if(d > 0 && pinch.d > 0) chart.zoomBy(d / pinch.d, m);
+    if(d > 0 && pinch.d > 0){ zoomByHand = true; chart.zoomBy(d / pinch.d, m); }
     chart.panBy(m[0] - pinch.m[0], m[1] - pinch.m[1]);
     noteLook('chartPanned');
     pinch.d = d; pinch.m = m; return;
@@ -1653,13 +1736,35 @@ function endPointer(e){
       replan(true); if(tab === 'ship') renderTab();
       return;
     }
-    const p = prediction && !state.dockedAt ? chart.nearestPathPoint(e.clientX, e.clientY, prediction, state.t) : null;
+    /* Picked without the time floor, deliberately. nearestPathPoint refuses a
+       point at or before the moment it is given, and the drawn road *starts*
+       at the ship — so a finger beside the ship resolves to the very first
+       point of the road, at t exactly now, and came back as nothing at all.
+       That refusal was the real swallower, not the lead test below it: the
+       snap underneath never ran, because there was nothing to snap. There is
+       no past on this road to pick by mistake, since it begins where the ship
+       is, so dropping the floor costs nothing and the clamp below does the
+       work. */
+    const p = prediction && !state.dockedAt ? chart.nearestPathPoint(e.clientX, e.clientY, prediction) : null;
     const onBody = d.hit?.kind === 'body';
     const insideDrawn = onBody && d.hit.d <= (d.hit.drawn ?? 0) + 2;
     /* How much road beside the ship is out of bounds. A thumb's width of it,
        or a minute, whichever comes first — see `leadForTap`. */
     const lead = S.leadForTap(S.norm(state.ship.v) * chart.camera.zoom);
-    if(p && !insideDrawn && p.t > state.t + lead){ askAtPath(p.t, lead); return; }
+    /* A tap on the road inside the lead snaps forward to the first moment that
+       will take a mark, instead of being swallowed.
+
+       The lead is a ring of road just ahead of the ship that may not be written
+       on — a mark inside it fires before it can be touched. That rule is right
+       and it stays. What was wrong was the silence: the first playtester stalled
+       on the card that says "tap the white line", because the stretch of line a
+       beginner aims at is the stretch beside their own ship, which is exactly
+       the stretch that did nothing at all. No modal, no toast, no reason given —
+       they tapped, and the game declined to react, twice.
+
+       The tap is not ambiguous. A finger on the road wants a mark on the road,
+       so put one at the nearest place that can hold it. */
+    if(p && !insideDrawn){ askAtPath(Math.max(p.t, state.t + lead), lead); return; }
     if(onBody){ lookAt(d.hit.id); return; }
     /* Last, after the road and after the worlds: a tap on the ring a world
        travels on asks the clock to wait until that world gets there. It is
@@ -1686,7 +1791,7 @@ function endPointer(e){
 }
 canvas.addEventListener('pointerup', endPointer);
 canvas.addEventListener('pointercancel', endPointer);
-canvas.addEventListener('wheel', e => { e.preventDefault(); chart.zoomBy(Math.pow(1.0015, -e.deltaY), [e.clientX, e.clientY]); noteLook('chartPanned'); }, { passive: false });
+canvas.addEventListener('wheel', e => { e.preventDefault(); zoomByHand = true; chart.zoomBy(Math.pow(1.0015, -e.deltaY), [e.clientX, e.clientY]); noteLook('chartPanned'); }, { passive: false });
 canvas.addEventListener('dblclick', e => { const hit = chart.hitTest(e.clientX, e.clientY); if(hit?.kind === 'body') lookAt(hit.id); });
 
 /* A shortcut must never fire while somebody is typing into a control, and must
@@ -1710,8 +1815,8 @@ addEventListener('keydown', e => {
   const fine = e.shiftKey ? 0.2 : 1;   // a fraction of one pull of an arrow
   switch(e.key){
     case ' ': e.preventDefault(); setPaused(!state.paused); break;
-    case '+': case '=': chart.zoomBy(1.4); noteLook('chartPanned'); break;
-    case '-': case '_': chart.zoomBy(1 / 1.4); noteLook('chartPanned'); break;
+    case '+': case '=': zoomByHand = true; chart.zoomBy(1.4); noteLook('chartPanned'); break;
+    case '-': case '_': zoomByHand = true; chart.zoomBy(1 / 1.4); noteLook('chartPanned'); break;
     case 'f': backToShip(); break;
     case 'v': if(S.canSeePast(state)) setFarSight(state.farSight === false); break;
     /* One key for both: it opens the ship, and at a port it steps on to the
@@ -1734,6 +1839,11 @@ addEventListener('keydown', e => {
        down are the two thrusters — the one place on this chart where an arrow
        does something that happens *now*. Left and right still pan there, since
        there is no third thruster for them to be. */
+    /* Earlier and later, for the hands that would rather not leave the keys.
+       The arrows are taken by the four axes, so these are the two keys that sit
+       where "back a bit" and "on a bit" sit on every other timeline there is. */
+    case ',': case '<': e.preventDefault(); if(state.nodes[selectedNode]) slideBurn(selectedNode, -1, fine); break;
+    case '.': case '>': e.preventDefault(); if(state.nodes[selectedNode]) slideBurn(selectedNode, 1, fine); break;
     case 'ArrowRight': e.preventDefault(); if(state.nodes[selectedNode]) pushAxis(selectedNode, 'pro', fine); else keyPan(-panStep(e), 0); break;
     case 'ArrowLeft': e.preventDefault(); if(state.nodes[selectedNode]) pushAxis(selectedNode, 'retro', fine); else keyPan(panStep(e), 0); break;
     case 'ArrowUp': e.preventDefault(); if(state.nodes[selectedNode]) pushAxis(selectedNode, 'out', fine); else if(!$('thrust').hidden) fireThruster('toward', fine); else keyPan(0, panStep(e)); break;
@@ -1833,7 +1943,17 @@ function lookAtEncounter(){
    pan goes back to nothing, so one press undoes any amount of wandering. */
 function backToShip(fit = false){
   chart.focus('ship', null, false);
-  if(state.flags.lookedAtTarget) noteLook('lookedBack');
+  if(state.flags.lookedAtTarget){
+    /* Coming home is the seam between the lesson's two halves, and the zoom
+       changes hands on it. The chart cards are four instructions to move the
+       view yourself — the second one is "zoom out until you can see Slate" —
+       so every player arrives here having worked the zoom by hand, and a flag
+       that stays set would mean the framing never helped anybody it was
+       written for. Cleared once, here, and the moment the player reaches for
+       the zoom again it is theirs for good. */
+    if(!state.flags.lookedBack) zoomByHand = false;
+    noteLook('lookedBack');
+  }
   if(fit) frameShipOrbit();
 }
 function frameShipOrbit(){
@@ -1849,10 +1969,27 @@ function frameShipOrbit(){
    for when you do want the scale chosen for you. Looking somewhere also ends
    any drag away from the last thing looked at: the new centre is the new
    thing, and the next pan is measured from it. */
+/* What a thing is, and not only what it is called.
+ *
+ * A moon and a world are the same dot on this chart at the wrong zoom, and
+ * which of the two Slate is decides why it moves while you cross to it — which
+ * is the whole of the aiming card. The data has known since the first table
+ * (`kind`, and the body it goes round); nothing ever said it out loud. Only
+ * these two kinds get a line: a rock, a station, a wreck and the Maw are things
+ * the fiction would rather introduce in its own words. */
+function bodyIs(id){
+  const b = world.get(id);
+  if(b?.kind === 'moon'){
+    const p = world.get(b.parent);
+    return p ? `, a moon of ${p.name}` : ', a moon';
+  }
+  if(b?.kind === 'planet') return ', a world going round the Lamp';
+  return '';
+}
 function lookAt(id){
   chart.focus(id, null, false);
   if(id === FIRST_TARGET) noteLook('lookedAtTarget');
-  toast(`Looking at ${esc(world.get(id).name)}. Press f for your ship.`);
+  toast(`Looking at ${esc(world.get(id).name)}${esc(bodyIs(id))}. Press f for your ship.`);
 }
 
 /* ------------------------------------------------------------- panel */
@@ -2206,6 +2343,43 @@ function pushAxis(i, k, scale = 1){
   n[a.axis] += a.sign * scale * S.auDay(stepFor(i) / 1000);
   replan(true);
   if(tab === 'ship') renderTab();
+  tutorialCheck();
+  save();
+}
+
+/* How far one press slides a mark along its orbit: five degrees of the lap it
+   sits on. Phasing is an angle — "thirty degrees ahead of Slate" — so the step
+   has to be an angle too, or it would mean one thing in a parking orbit and
+   something else entirely out at Grumm. */
+function slideStep(i){
+  const n = state.nodes[i];
+  const segs = prediction?.segments ?? [];
+  const own = segs.find(sg => n && n.t >= sg.t0 - 1e-9 && n.t <= sg.t1 + 1e-9) ?? segs[0];
+  const P = own?.elements?.period;
+  if(Number.isFinite(P) && P > 0) return P / 72;
+  // An open leg has no lap to take a fraction of, so take a fraction of itself.
+  return Math.max(S.LEAD_FLOOR, (own ? own.t1 - own.t0 : 1) / 72);
+}
+
+/* One step of earlier or later. The counterpart of pushAxis: that one changes
+   what the engine does, this one changes when it does it.
+   
+   It had a pair of buttons on the chart for a day. They were the answer to a
+   playtester who quit fighting a drag — every other adjustment in the game is a
+   press you repeat, and phasing was a pointer dragged along a curve — but two
+   labelled pills beside every selected burn is a lot of furniture to carry
+   permanently for one card of one lesson, and they were cut as clutter. So this
+   is the keyboard's route now, and dragging the flame is the pointer's. */
+function slideBurn(i, dir, scale = 1){
+  if(!state.nodes[i]) return;
+  /* slideNode clamps a mark between its neighbours, so it can never cross one
+     and the sort can never reorder the list: the index a button was pressed at
+     is still the index afterwards, and a held button keeps pushing the mark it
+     started on. */
+  if(!S.slideNode(state, i, dir * scale * slideStep(i))) return;
+  replan(true);
+  if(tab === 'ship') renderTab();
+  noteLook('slidBurn');
   tutorialCheck();
   save();
 }
@@ -2803,7 +2977,16 @@ const actions = {
     toast(what === 'fuelCell' ? 'New cell fitted.' : 'Hull made good.', 'story', 5000);
     renderTab(); renderHud(); save();
   },
-  buy(gid, q){ const r = S.buy(state, gid, Number(q)); if(!r.ok) toast(r.reason, 'bad'); renderTab(); save(); },
+  /* Going into debt is never silent. The bank will front what a job still
+     needs so an errand cannot be priced out of reach, but a player who presses
+     +1 with an empty purse has just borrowed, and has to be told so in the
+     place they pressed rather than only in the log. */
+  buy(gid, q){
+    const r = S.buy(state, gid, Number(q));
+    if(!r.ok) toast(r.reason, 'bad');
+    else if(r.borrowed > 0) toast(`The harbour bank covers ${S.fmtMoney(r.borrowed)} of that, for the job. You owe them.`, 'story', 7000);
+    renderTab(); save();
+  },
   sell(gid, q){ const r = S.sell(state, gid, Number(q)); if(!r.ok) toast(r.reason, 'bad'); else toast(`Sold for ${S.fmtMoney(r.total)} (${r.profit >= 0 ? '+' : ''}${S.fmtMoney(r.profit)}).`); renderTab(); save(); },
   takequest(id){
     const r = S.acceptQuest(state, id);
@@ -2861,7 +3044,6 @@ const actions = {
   skipto(t, what){ askSkip(Number(t), typeof what === 'string' ? what : undefined); },
   push(i, k){ pushAxis(Number(i), k); },
   zeronode(i){ const n = state.nodes[Number(i)]; if(!n) return; n.prograde = 0; n.radial = 0; replan(true); renderTab(); save(); },
-  shift(i, d){ const n = state.nodes[Number(i)]; n.t = Math.max(state.t + 1e-3, n.t + Number(d)); state.nodes.sort((a, b) => a.t - b.t); selectedNode = state.nodes.indexOf(n); replan(true); renderTab(); },
   tow(){ showTow('dry'); },
   distress(){ showDistress(); },
   newgame(){ confirmNew(); },
@@ -2933,6 +3115,29 @@ function showToll(p){
     <div class="btns"><button class="btn" id="m-cargo">Pay in cargo</button><button class="btn primary" id="m-coin">Pay in coin</button></div>`, m => {
     m.querySelector('#m-coin').addEventListener('click', () => { const r = S.resolveToll(state, 'coin'); closeModal(); toast(r.text, 'story', 8000); save(); });
     m.querySelector('#m-cargo').addEventListener('click', () => { const r = S.resolveToll(state, 'cargo'); closeModal(); toast(r.text, 'story', 8000); save(); });
+  });
+}
+/* Something on the way. The card says what is happening and offers the
+   choices, each button already knowing what it will cost — the sim worked
+   that out when the event came up — and a choice the ship cannot make is
+   there but greyed, with the reason on it, so a player sees the road they
+   could not take rather than a shorter list. */
+function showEncounter(p){
+  const btns = p.choices.map((c, i) =>
+    `<button class="btn${i === 0 ? ' primary' : ''}" data-choice="${i}" ${c.disabled ? 'disabled' : ''} title="${esc(c.disabled ?? '')}">${esc(c.label)}${c.disabled ? ` <small>(${esc(c.disabled)})</small>` : ''}</button>`).join('');
+  openModal(`<h2>${esc(p.title)}</h2><p class="say">${esc(p.text)}</p><div class="btns">${btns}</div>`, m => {
+    for(const b of m.querySelectorAll('[data-choice]')){
+      b.addEventListener('click', () => {
+        const r = S.resolveEncounter(state, Number(b.dataset.choice));
+        if(!r.ok){ toast(r.reason ?? 'Not that.', 'bad'); return; }
+        closeModal();
+        toast(r.text, 'story', 9000);
+        replan(true); renderTab(); save();
+      });
+    }
+    /* The first button is the primary one and takes focus, unless the ship
+       cannot afford it; then the first it can. */
+    m.querySelector('[data-choice]:not([disabled])')?.focus();
   });
 }
 function showCrash(bodyId){
@@ -3194,7 +3399,7 @@ function tutorialTests(){
      those four are latched where they happen — see noteLook — and only read
      back here.
 
-     Thirteen tests for fourteen cards, because the last card is not a step.
+     Fourteen tests for fifteen cards, because the last card is not a step.
      It is a goodbye, and the only thing that clears it is the button on it. */
   const f = state.flags;
   const raw = [
@@ -3204,6 +3409,14 @@ function tutorialTests(){
     !!f.lookedBack,                                   // and come back to the ship
     state.nodes.length > 0,                           // write a mark down
     highEnough,                                       // push it out to the moon's height
+    /* Sliding the mark at all, before being asked to slide it anywhere in
+       particular. Like the four chart cards this is a gesture rather than a
+       state — a mark slid out and back leaves nothing behind — so it is
+       latched where it happens and only read here. The card it passes teaches
+       the second control on its own, with no target to hit, because the card
+       after it needs both controls at once and that was the one a playtester
+       stopped on. */
+    !!f.slidBurn,                                     // find out what earlier and later do
     aimed,                                            // slide it until the road finds the moon
     reached,                                          // warp into its gravity
     atTarget && !!el && Number.isFinite(el.period),   // brake until the path closes
@@ -3232,6 +3445,49 @@ function tutorialTests(){
      is also what makes undoing something walk the lesson back on its own. */
   for(let i = raw.length - 2; i >= 0; i--) raw[i] = raw[i] || raw[i + 1];
   return raw;
+}
+
+/* How far off the aim is, in one line, for the card that asks for it.
+ *
+ * Two answers, because the road reaches the moon in two stages. Before it gets
+ * anywhere near, the honest measure is the pair of orange diamonds the chart is
+ * already drawing — where the road cuts the moon's rail, and where the moon
+ * will actually be when the ship gets there. The gap between them *is* the
+ * phasing error, and closing it is the whole of the card. Once the road does
+ * find the moon, closest approach takes over, which is the number the panel
+ * has always had and the number that decides the card.
+ *
+ * Both are distances and both get smaller as the aim gets better, so a player
+ * pressing a button has something that moves the right way. "About thirty
+ * degrees" had nothing. */
+function aimGauge(){
+  const target = FIRST_TARGET;
+  const name = S.nameFor(target, S.unseen(state));
+  const ic = (prediction?.intercepts ?? []).find(i => i.body === target && !i.grazes);
+  if(ic){
+    return `Closest approach to ${name}: ${fmtAu(ic.altitude)}.`
+      + (ic.inMouth ? ' That is close enough.' : ' Smaller is better.');
+  }
+  const c = (crossedRails ?? []).find(x => x.body === target);
+  if(c){
+    const d = Math.hypot(c.ghost[0] - c.r[0], c.ghost[1] - c.r[1]);
+    return `The two orange diamonds are ${fmtAu(d)} apart: that is how far ${name} still is from where you would cross. Bring them together.`;
+  }
+  /* And the case the card cannot see coming: no diamonds at all, because the
+     road does not reach the rail to cross it. The card before this one passes
+     at a tenth of the way out, which is close enough to see but not always
+     close enough to touch — so the aiming card can arrive while the thing it
+     tells the player to look for is not drawn. Then the honest answer is not
+     about phase at all, and neither is the fix: push the far side out a bit
+     further first. */
+  const segs = prediction?.segments ?? [];
+  const afterBurn = segs.find((sg, i) => i > 0 && segs[i - 1].reason === 'burn');
+  const ra = afterBurn?.elements?.ra;
+  const moon = world.get(target);
+  if(Number.isFinite(ra) && moon && ra < moon.a){
+    return `No diamonds yet: the far side is still ${fmtAu(moon.a - ra)} inside ${name}'s circle. A little more green first.`;
+  }
+  return null;
 }
 
 /* Whether the moon the lesson is about is somewhere a player can actually see
@@ -3298,6 +3554,20 @@ function tutorialCheck(){
   }
   /* Nothing is left to do on the last card, so the way out of it stops being
      a way of shutting Theo up and becomes the end of the lesson. */
+  /* The card that asks for a number gets the number, on the card.
+
+     Aiming is the one card in the lesson whose progress a player cannot see:
+     pushing an arrow moves a line you can watch, but sliding a mark around an
+     orbit to meet a moon that is also moving looks the same whether it helped
+     or not. The game knows the answer to within a kilometre and was keeping it
+     in the panel, behind a tab, which is not where somebody aiming is looking.
+     So it goes under the card, and it is the only card that gets one: a gauge
+     on every card would be a dashboard, and the rest of them do not need one. */
+  const gauge = $('tut-gauge');
+  const g = s.step === 'aim' ? aimGauge() : null;
+  gauge.hidden = !g;
+  gauge.textContent = g ?? '';
+
   $('tut-skip').textContent = last ? 'Thanks, Theo' : 'Stop writing, Theo';
   $('tut').classList.toggle('done', last);
   $('tut').classList.toggle('min', !!state.flags.tutorialFolded);
@@ -3459,6 +3729,37 @@ $('grab').addEventListener('keydown', e => {
   else if(e.key === 'ArrowDown'){ e.preventDefault(); stepSheet(-1); }
 });
 
+/* ------------------------------------------------------------- music */
+
+/* Two tracks, and which one plays is the one fact the music needs from the
+   game: tied up somewhere with a market, or not. A hulk and a wreck are
+   alongside, not in port — the open-sky theme stays with them. See audio.js
+   for the tracks themselves and for the fade between them. */
+const audio = createAudio();
+function musicFor(){
+  const at = state.dockedAt;
+  return at && !S.isHulk(at) && !S.isWreck(at) ? 'port' : 'flight';
+}
+function syncMusic(){ audio.play(musicFor()); }
+syncMusic();
+
+/* Browsers let a page make sound only once somebody has touched it, and they
+   do not agree on which touch counts: Safari has always honoured `touchend`
+   and `click` most reliably, `pointerdown` being newer and less certain. So
+   the first attempt is made now — a player who clicked through from the
+   title screen has usually touched the site enough for the browser — and
+   then every kind of gesture keeps trying until the context confirms it is
+   running, since the first `resume()` can fail silently. `unlock()` no-ops
+   once it has worked. */
+const UNLOCK_EVENTS = ['pointerdown', 'touchend', 'mousedown', 'click', 'keydown'];
+const tryUnlock = () => {
+  audio.unlock();
+  if(!audio.isRunning()) return;
+  for(const type of UNLOCK_EVENTS) removeEventListener(type, tryUnlock, true);
+};
+for(const type of UNLOCK_EVENTS) addEventListener(type, tryUnlock, true);
+tryUnlock();
+
 renderTabs();
 togglePanel(panelOpen, true);
 replan(true);
@@ -3473,11 +3774,17 @@ setRate(state.warp ?? 1);
 tutorialCheck();
 setTutFolded(!!state.flags.tutorialFolded);
 if(state.pending?.kind === 'toll') showToll(state.pending);
+if(state.pending?.kind === 'encounter') showEncounter(state.pending);
 if(state.pending?.kind === 'crash') showCrash(state.pending.body);
 if(filmWanted(fresh)) rollFilm(startClock);
 else startClock();
-addEventListener('pagehide', save);
-document.addEventListener('visibilitychange', () => { if(document.hidden) save(); else last = performance.now(); });
+addEventListener('pagehide', () => { save(); audio.stop(); });
+document.addEventListener('visibilitychange', () => {
+  if(document.hidden) save(); else last = performance.now();
+  /* The clock stops with the tab; so does the music, and for the same reason
+     — see `hidden` in audio.js. */
+  audio.hidden(document.hidden);
+});
 </script>
 </body>
 </html>

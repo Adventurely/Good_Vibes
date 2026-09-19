@@ -43,6 +43,7 @@ const economy = read('economy.json');
 const narrative = read('narrative.json');
 const questbook = read('quests.json');
 const dialogue = read('dialog.json');
+const eventbook = read('events.json');
 
 /* ------------------------------------------------------------- checking */
 
@@ -130,6 +131,90 @@ for(const [i, x] of (dialogue.exchanges ?? []).entries()){
   const mustBeAboard = new Set([x?.who, ...(x?.needs ?? []), ...(x?.lines ?? []).map(l => l?.who)]);
   mustBeAboard.delete('captain');
   for(const id of mustBeAboard) need(berths.has(id), at, `nobody fills the berth ${id}`);
+  /* What is said when one of them is not there. A fallback may only name a
+     berth the exchange actually leans on — the speaker's own is not one, they
+     are the one pressing — and may only be spoken by the two people certain
+     to be aboard, or it would need a fallback of its own. */
+  if(x?.without !== undefined){
+    need(x.without && typeof x.without === 'object' && !Array.isArray(x.without), at, '`without` is a map of berth to lines');
+    const leansOn = new Set(mustBeAboard); leansOn.delete(x?.who);
+    for(const [berth, lines] of Object.entries(x.without ?? {})){
+      need(leansOn.has(berth), at, `without: the exchange does not need the ${berth}`);
+      need(Array.isArray(lines) && lines.length > 0, at, `without ${berth}: nothing is said instead`);
+      for(const l of lines ?? []){
+        need(l?.who === x?.who || l?.who === 'captain', at, `without ${berth}: only ${x?.who} and the captain are certain to be there to say it, not ${l?.who}`);
+        need(typeof l?.say === 'string' && l.say.length > 0, at, `without ${berth}: ${l?.who} has nothing to say`);
+      }
+    }
+  }
+}
+
+/* The event format, as events.json describes it. */
+{
+  const regions = new Set(['inner', 'home', 'belt', 'outer', 'deep']);
+  const categories = new Set(economy.goods.map(g => g.category));
+  const kinds = id => goodIds.has(id) || categories.has(id);
+  const keys = new Set(['heatShield', 'tempControl', 'gravSensors', 'cryoCooling', 'astrolabe']);
+  const repNames = new Set([...peoples, 'here']);
+  const chance = eventbook.rules?.chance;
+  need(typeof chance === 'number' && chance >= 0 && chance <= 1, 'events rules', `chance must be 0..1, not ${chance}`);
+  const eventIds = new Set();
+  const checkEffects = (fx, at) => {
+    if(fx === undefined) return;
+    need(fx && typeof fx === 'object' && !Array.isArray(fx), at, 'effects is a map');
+    for(const k of Object.keys(fx ?? {})) need(['money', 'dv', 'rep', 'cargo', 'hull', 'debt'].includes(k), at, `unknown effect: ${k}`);
+    const m = fx?.money;
+    if(m !== undefined && typeof m !== 'number'){
+      need(typeof m?.fraction === 'number' && ['purse', 'cargo', 'contraband'].includes(m?.of), at, 'money is a number or { fraction, of, cap }');
+    }
+    if(fx?.dv !== undefined) need(typeof fx.dv === 'number', at, 'dv is a number of km/s');
+    for(const [who, d] of Object.entries(fx?.rep ?? {})) need(repNames.has(who) && typeof d === 'number', at, `rep names nobody: ${who}`);
+    const c = fx?.cargo;
+    if(c !== undefined){
+      const ways = ['take', 'takeCold', 'give'].filter(k => c?.[k] !== undefined);
+      need(ways.length === 1, at, 'cargo does exactly one of take, takeCold, give');
+      if(c?.take !== undefined) need(kinds(c.take), at, `cargo takes something that does not exist: ${c.take}`);
+      if(c?.give !== undefined) need(goodIds.has(c.give) && Number.isInteger(c.qty) && c.qty > 0, at, `cargo gives something that does not exist, or none of it: ${c.give}`);
+      if(c?.takeCold !== undefined) need(typeof c.takeCold === 'number' && c.takeCold > 0 && c.takeCold <= 1, at, 'takeCold is a fraction');
+    }
+    if(fx?.hull !== undefined) need(Number.isInteger(fx.hull) && fx.hull !== 0, at, 'hull is a whole number of grades');
+    const d = fx?.debt;
+    if(d !== undefined) need((typeof d?.pay === 'number') !== (typeof d?.add === 'number'), at, 'debt is { pay } or { add }');
+  };
+  for(const [i, ev] of (eventbook.events ?? []).entries()){
+    const at = `event ${ev?.id ?? `#${i}`}`;
+    need(typeof ev?.id === 'string' && /^[a-z0-9-]+$/.test(ev.id), at, 'id is required, lower case, no spaces');
+    need(!eventIds.has(ev?.id), at, 'two events share an id');
+    eventIds.add(ev?.id);
+    for(const k of ['title', 'text']) need(typeof ev?.[k] === 'string' && ev[k].length > 0, at, `${k} is required`);
+    if(ev?.weight !== undefined) need(typeof ev.weight === 'number' && ev.weight > 0, at, 'weight is a number above zero');
+    const w = ev?.when ?? {};
+    for(const k of Object.keys(w)) need(['regions', 'carrying', 'notCarrying', 'coldCargo', 'debt', 'hull'].includes(k), at, `unknown condition: ${k}`);
+    for(const r of w.regions ?? []) need(regions.has(r), at, `no such region: ${r}`);
+    for(const g of [...(w.carrying ?? []), ...(w.notCarrying ?? [])]) need(kinds(g), at, `carrying names nothing in the goods table: ${g}`);
+    need(Array.isArray(ev?.choices) && ev.choices.length > 0, at, 'an event with no choices is not an event');
+    /* A card every button on which is greyed is a card that cannot be closed. */
+    need((ev?.choices ?? []).some(ch => !ch?.requires || !Object.keys(ch.requires).length), at, 'every choice needs something; a ship with nothing could not answer');
+    for(const [j, ch] of (ev?.choices ?? []).entries()){
+      const where = `${at} choice ${j + 1}`;
+      need(typeof ch?.label === 'string' && ch.label.length > 0, where, 'label is required');
+      for(const [k, v] of Object.entries(ch?.requires ?? {})) need(['dv', 'money', 'holdUnits'].includes(k) && typeof v === 'number' && v > 0, where, `requires: ${k} is not a thing a choice can need`);
+      if(ch?.outcomes !== undefined){
+        need(Array.isArray(ch.outcomes) && ch.outcomes.length > 0, where, 'outcomes is a list');
+        need(ch.text === undefined && ch.effects === undefined, where, 'a choice has outcomes, or text and effects, not both');
+        need((ch.outcomes ?? []).some(o => !o?.when), where, 'every outcome is conditional, so sometimes nothing can happen');
+        for(const o of ch.outcomes ?? []){
+          need(typeof o?.text === 'string' && o.text.length > 0, where, 'an outcome with no text');
+          if(o?.weight !== undefined) need(typeof o.weight === 'number' && o.weight > 0, where, 'an outcome weight above zero');
+          if(o?.when !== undefined) need(keys.has(o.when?.key), where, `an outcome waits on a key that does not exist: ${o.when?.key}`);
+          checkEffects(o?.effects, where);
+        }
+      }else{
+        need(typeof ch?.text === 'string' && ch.text.length > 0, where, 'text is required unless there are outcomes');
+        checkEffects(ch?.effects, where);
+      }
+    }
+  }
 }
 
 if(problems.length){
@@ -162,9 +247,11 @@ for(const [i, r] of (questbook.relics ?? []).entries()){
 // The format is written down for whoever edits the table, not for the game.
 delete questbook.notes;
 delete dialogue.notes;
+delete eventbook.notes;
 
 emit('world.js', 'TUNING', tuning, 'tuning.json');
 emit('economy.js', 'ECONOMY', economy, 'economy.json');
 emit('text.js', 'NARRATIVE', narrative, 'narrative.json');
 emit('quests.js', 'QUESTBOOK', questbook, 'quests.json');
 emit('dialog.js', 'DIALOGUE', dialogue, 'dialog.json');
+emit('events.js', 'EVENTBOOK', eventbook, 'events.json');

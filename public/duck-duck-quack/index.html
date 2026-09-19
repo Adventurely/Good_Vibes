@@ -130,6 +130,61 @@
     .levels a:hover, .levels a:focus-visible{ transform: none; }
   }
 
+  /* Who is playing, and how everybody has done. Both sit in the same glass
+     panel language as the rest of the page rather than looking like a form
+     bolted onto a game. */
+  .player{
+    margin: 1.4rem auto 0; max-width: 34rem; padding: .7rem .9rem;
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+    gap: .45rem;
+    font-size: .82rem; color: var(--muted);
+    background: var(--gv-glass); border: 1px solid var(--edge); border-radius: 10px;
+  }
+  .player label{ font-weight: 600; }
+  .player select, .player input{
+    font: inherit; font-size: .82rem; padding: .3rem .5rem;
+    background: var(--gv-glass); color: var(--gv-text);
+    border: 1px solid var(--edge); border-radius: 6px;
+    max-width: 11rem;
+  }
+  .player button{
+    font: inherit; font-size: .78rem; padding: .32rem .8rem; cursor: pointer;
+    background: var(--gv-glass); border: 1px solid var(--edge); border-radius: 999px;
+    color: var(--muted);
+  }
+  .player button:hover, .player button:focus-visible{ color: var(--gv-text); border-color: var(--leaf); }
+  .player .who{ color: var(--leaf); font-weight: 700; }
+  .player .note{ flex-basis: 100%; text-align: center; font-size: .74rem; min-height: 1.1em; }
+  .player .note[data-bad='true']{ color: var(--gv-bad); }
+
+  .board{
+    margin: 1.2rem auto 0; max-width: 26rem; padding: .7rem .9rem;
+    background: var(--gv-glass); border: 1px solid var(--edge); border-radius: 10px;
+  }
+  .board h2{
+    margin: 0 0 .45rem; font-size: .76rem; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--muted); font-weight: 700;
+  }
+  .board ol{ margin: 0; padding: 0; list-style: none; }
+  .board li{
+    display: grid; grid-template-columns: 1.6rem 1fr auto;
+    gap: .5rem; align-items: baseline;
+    padding: .2rem 0; font-size: .84rem;
+  }
+  .board li + li{ border-top: 1px solid var(--edge); }
+  .board .rank{ color: var(--muted); font-variant-numeric: tabular-nums; }
+  .board .name{ font-weight: 700; color: var(--gv-text); overflow-wrap: anywhere; }
+  .board li.me .name{ color: var(--leaf); }
+  .board .score{ color: var(--muted); font-variant-numeric: tabular-nums; }
+  .board .empty{ margin: 0; font-size: .8rem; color: var(--muted); }
+
+  /* A player's own best on each level card, tucked at the end of the
+     caption so it reads as part of the label rather than as a badge. */
+  .levels .best{
+    margin-left: auto; font-weight: 700; color: var(--sun);
+    font-variant-numeric: tabular-nums; font-size: .74rem;
+  }
+
   .facts{
     margin: 1.6rem auto 0; padding: 0; list-style: none;
     display: flex; flex-wrap: wrap; gap: .4rem; justify-content: center;
@@ -181,11 +236,31 @@
     <p class="more-levels" id="levels-label">or start anywhere &mdash; every level, as it actually looks</p>
     <ul class="levels" id="levels" aria-labelledby="levels-label"></ul>
 
+    <div class="player" id="player">
+      <label for="who">Playing as</label>
+      <select id="who" aria-describedby="player-note">
+        <option value="">Nobody — don't keep score</option>
+      </select>
+      <input type="text" id="new-name" maxlength="16" placeholder="or a new name"
+             aria-label="A new name to play as">
+      <button type="button" id="add-name">Add</button>
+      <p class="note" id="player-note" role="status"></p>
+    </div>
+
+    <div class="board" id="board">
+      <h2>Top ten — ducklings saved</h2>
+      <ol id="board-list"></ol>
+      <p class="empty" id="board-empty">Nobody has finished a level yet.</p>
+      <!-- Whether this is everybody's board or only this browser's, and where
+           you stand on it when you are too far down to be shown. -->
+      <p class="empty" id="board-note" role="status"></p>
+    </div>
+
     <ul class="facts">
       <li>Single player</li>
       <li class="sun">Puzzle</li>
-      <li>Ten levels, six skills</li>
-      <li>Nothing saved, nothing sent anywhere</li>
+      <li>Twelve levels, six skills</li>
+      <li>A shared board — your name and your scores, nothing else</li>
     </ul>
     <button type="button" id="sound" class="sound" aria-pressed="false">Music off</button>
   </div>
@@ -205,6 +280,8 @@
   import { newGame, tick, assignSkill, hasTrait } from './sim.js';
   import { paintScene } from './art.js';
   import { createAudio } from './audio.js';
+  import { createStats, NAME_RULE, NAME_MAX } from './stats.js';
+  import { fetchBoard, syncPlayer, REFRESH_AFTER, OUT_OF_REACH } from './board.js';
 
   document.getElementById('game-version').textContent = `v${GAME_VERSION}`;
 
@@ -215,6 +292,7 @@
      honest. There is no image to re-export when a level's shape changes;
      move a gap in content.js and the picture here moves with it. */
   const levelList = document.getElementById('levels');
+  const bestSlots = new Map();
   LEVELS.forEach((level, i) => {
     const link = document.createElement('a');
     link.href = `./play.html?level=${level.id}`;
@@ -235,13 +313,245 @@
     num.textContent = String(i + 1);
     const name = document.createElement('span');
     name.textContent = level.name;
-    cap.append(num, name);
+    const best = document.createElement('span');
+    best.className = 'best';
+    cap.append(num, name, best);
+    bestSlots.set(level.id, { best, link, label: `Level ${i + 1} of ${LEVELS.length}, ${level.name}` });
 
     link.append(shot, cap);
     const card = document.createElement('li');
     card.append(link);
     levelList.append(card);
   });
+
+  /* ---------------------------------------------------------- the player */
+
+  /* Whose run this is, and everybody's best.
+   *
+   * Two boards, really. Every mark is kept in this browser (stats.js) and that
+   * copy is the one the game plays against — it is what the level cards read,
+   * and it never waits on anything. The shared board (board.js) is where those
+   * marks go afterwards, and where everybody else's come from.
+   *
+   * The picker is still a plain list anyone can choose from rather than
+   * anything that asks for a password: the id that owns a row is a secret the
+   * browser keeps, not a login, so picking a name here is picking a slot on
+   * this machine. Somebody else can already be on the shared board under the
+   * name you want, and the only honest answer to that is to say so. */
+  const stats = createStats();
+  const ui = {
+    who: document.getElementById('who'),
+    newName: document.getElementById('new-name'),
+    add: document.getElementById('add-name'),
+    note: document.getElementById('player-note'),
+    boardList: document.getElementById('board-list'),
+    boardEmpty: document.getElementById('board-empty'),
+    boardNote: document.getElementById('board-note'),
+  };
+
+  /* What the shared board last told us, and whether it answered at all. Null
+     means we have not heard: the local top ten stands in until we have, which
+     is what keeps the page useful offline instead of empty. */
+  let shared = null;
+  let sharedReach = true;
+
+  /* Why this player's scores are not on the shared board, when they are not.
+   *
+   * A post that fails used to leave nothing behind at all: the GET that
+   * followed it a moment later succeeded, so the page said the board was
+   * fine, and a player whose scores were never reaching it had no way to
+   * tell. That is how a missing board id went unnoticed for two versions.
+   * A failed post now says so, and keeps saying so until one lands. */
+  let postProblem = null;
+
+  function say(text, bad = false){
+    ui.note.textContent = text;
+    ui.note.dataset.bad = String(bad);
+  }
+
+  function drawPicker(){
+    const current = stats.current();
+    ui.who.textContent = '';
+    const none = document.createElement('option');
+    none.value = '';
+    none.textContent = "Nobody — don't keep score";
+    ui.who.append(none);
+    for(const name of stats.players()){
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      if(name === current) opt.selected = true;
+      ui.who.append(opt);
+    }
+    ui.who.value = current ?? '';
+  }
+
+  function drawBests(){
+    const current = stats.current();
+    for(const [id, slot] of bestSlots){
+      const best = current ? stats.best(current, id) : 0;
+      slot.best.textContent = best ? `best ${best}` : '';
+      // The card's own label carries it too, so it is not colour-only.
+      slot.link.setAttribute('aria-label',
+        best ? `${slot.label}. Your best: ${best} saved.` : slot.label);
+    }
+  }
+
+  /* The top ten: everybody's if the board answered, this browser's if it did
+     not. Which one is being shown is said under the list rather than left to
+     be guessed — a player who has just beaten their friend and cannot see it
+     deserves to know whether the board is down or their friend is losing. */
+  function drawBoard(){
+    const rows = shared ? shared.board : stats.leaderboard(10);
+    const current = stats.current();
+    const mine = shared?.you?.name ?? null;
+
+    ui.boardList.textContent = '';
+    ui.boardEmpty.hidden = rows.length > 0;
+    rows.forEach((row, i) => {
+      const li = document.createElement('li');
+      // On the shared board "me" is the row the server says is mine; locally
+      // it is simply the name picked here.
+      if(row.name === (shared ? mine : current)) li.className = 'me';
+      const rank = document.createElement('span');
+      rank.className = 'rank';
+      rank.textContent = `${i + 1}.`;
+      const name = document.createElement('span');
+      name.className = 'name';
+      // Names are typed by strangers now, not just by whoever holds this
+      // laptop: textContent, never markup.
+      name.textContent = String(row.name ?? '');
+      const score = document.createElement('span');
+      score.className = 'score';
+      const levels = Number(row.levels) || 0;
+      score.textContent = `${Number(row.total) || 0} over ${levels} ${levels === 1 ? 'level' : 'levels'}`;
+      li.append(rank, name, score);
+      ui.boardList.append(li);
+    });
+
+    ui.boardNote.textContent = boardNote();
+  }
+
+  function boardNote(){
+    if(!sharedReach) return `${OUT_OF_REACH} Showing this browser's own scores.`;
+    if(!shared) return 'Fetching the board…';
+    const you = shared.you;
+    const players = shared.players === 1 ? '1 player' : `${shared.players} players`;
+    const where = you?.rank && you.rank > shared.board.length
+      ? `${players} so far. You are ${you.rank}th as ${you.name}.`
+      : `${players} so far.`;
+    return postProblem ? `${where} ${postProblem}` : where;
+  }
+
+  const drawAll = () => { drawPicker(); drawBests(); drawBoard(); };
+
+  /* ------------------------------------------------------- the shared board */
+
+  /* Answers arrive out of order — the minute timer, a post, and the post's
+   * retry all race each other — so each request takes a number and a reply is
+   * only drawn if nothing newer has been drawn already. Without that the slow
+   * GET already in flight lands on top of the POST that just put you up, and
+   * your row vanishes a second after you earned it.
+   *
+   * The number is spent by the reply that CARRIES a board, not by the request
+   * that asked for one. A post refused as too soon has nothing to draw, and if
+   * it burned its number on the way past it would block the perfectly good GET
+   * behind it — which is exactly what left this page saying "Fetching the
+   * board…" over a board it already had. */
+  let seq = 0, drawn = 0;
+  function take(data, n){
+    if(n < drawn) return false;
+    drawn = n;
+    shared = data;
+    return true;
+  }
+
+  async function refreshBoard(){
+    const n = ++seq;
+    const current = stats.current();
+    const reply = await fetchBoard({ you: current ? stats.idFor(current) : null });
+    sharedReach = reply.ok || reply.status !== 0;
+    if(reply.ok && reply.data && take(reply.data, n)){
+      // Whatever the board knows that this browser does not, which is how a
+      // player whose storage was cleared gets their marks back.
+      if(current && reply.data.you?.bests && stats.merge(current, reply.data.you.bests)) drawBests();
+    }
+    drawBoard();
+  }
+
+  /* Put the current player up, then redraw from what came back. Called when a
+     name is picked, and once on load, so marks made before the board existed
+     (or while it was unreachable) go up at the first opportunity rather than
+     waiting for the next finished level. */
+  async function pushCurrent(){
+    const current = stats.current();
+    if(!current) return refreshBoard();
+    const n = ++seq;
+    const reply = await syncPlayer(stats, current);
+
+    if(reply.ok && reply.data){
+      sharedReach = true;
+      postProblem = null;
+      if(take(reply.data, n)) drawAll();
+      return;
+    }
+    // 409 is the one refusal a player can do something about, and the one that
+    // must not be swallowed: they are keeping score under a name somebody else
+    // already has, and only the shared list is affected.
+    if(reply.status === 409){
+      postProblem = `${current} is taken on the shared board.`;
+      say(`Playing as ${current} on this browser — but somebody else is on the shared board `
+        + 'under that name. Add a different one to appear on it.', true);
+    }else if(reply.status === 400){
+      postProblem = `The board would not take ${current}'s scores.`;
+      say(`Playing as ${current} on this browser. The shared board would not take it: ${reply.error}`, true);
+    }else{
+      postProblem = `${current}'s scores have not reached the board yet.`;
+      sharedReach = reply.status !== 0;
+    }
+    refreshBoard();
+  }
+
+  ui.who.addEventListener('change', () => {
+    const picked = ui.who.value;
+    if(picked) stats.use(picked); else stats.clearCurrent();
+    say(picked ? `Playing as ${picked}. Every run counts from here.` : 'Not keeping score.');
+    drawAll();
+    pushCurrent();
+  });
+
+  function addName(){
+    const typed = ui.newName.value;
+    const added = stats.use(typed);
+    if(!added){
+      // The rules are the shared board's own, so a name refused here is a name
+      // that would have been refused there — better to say which rules now
+      // than after a level has been played under it.
+      say(typed.trim() ? NAME_RULE : 'Type a name first.', true);
+      return;
+    }
+    ui.newName.value = '';
+    say(`Playing as ${added}. Every run counts from here.`);
+    drawAll();
+    pushCurrent();
+  }
+  ui.add.addEventListener('click', addName);
+  ui.newName.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); addName(); } });
+
+  drawAll();
+  if(stats.current()) say(`Playing as ${stats.current()}.`);
+
+  /* Read first, then post. The read is one cheap GET that fills the list
+     straight away; the post may have to wait out the rate limit left by the
+     level that was just finished, and a page that showed "Fetching the
+     board…" for those five seconds while a perfectly good board sat in
+     memory would be slower for no reason.
+     Then keep it fresh while the tab is open. A minute is not a live
+     scoreboard and is not meant to be; it is enough that a second player in
+     the same house turns up without a reload. */
+  refreshBoard();
+  if(stats.current()) pushCurrent();
+  setInterval(refreshBoard, REFRESH_AFTER);
 
   /* Autoplay policy decides when sound can start, not us: the context cannot
      exist until a gesture, so the button reflects intent and the first click
