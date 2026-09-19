@@ -1,0 +1,957 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Good Vibe Beats</title>
+<meta name="description" content="A rhythm game about the spaces between the beats. Four pads, a song with no drums on it, and points for the hits that land where a drummer would put them.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%231c2230'/%3E%3Ccircle cx='5' cy='5' r='2.1' fill='%233d5afe'/%3E%3Ccircle cx='11' cy='5' r='2.1' fill='%230fb5a5'/%3E%3Ccircle cx='5' cy='11' r='2.1' fill='%23e4388c'/%3E%3Ccircle cx='11' cy='11' r='2.1' fill='%23f2a516'/%3E%3C/svg%3E">
+<link rel="preload" href="./font/bricolage-grotesque.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+/* Bricolage Grotesque, served from this site rather than from Google Fonts —
+   every other page on Good Vibes fetches nothing third-party, and this is how
+   GVB keeps its own face without being the exception. One variable file covers
+   400, 600 and 800, which is smaller than any two of the static weights would
+   have been. `swap` so the words are readable before it lands, and the latin
+   range so it is not asked for at all by a page that has no latin on it.
+   The licence (SIL OFL 1.1) is in font/OFL.txt and has to stay there. */
+@font-face{
+  font-family: 'Bricolage Grotesque';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url('./font/bricolage-grotesque.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+</style>
+<style>
+:root{
+  --bg:#e9ecf1; --surface:#f7f8fa; --ink:#1c2230; --muted:#5d6577; --line:#d3d8e1;
+  --pad:#ffffff; --pad-ink:#2a3142; --pad-shadow:0 1px 0 #c9cfda, 0 6px 18px rgba(28,34,48,.08);
+  --down:#3d5afe; --up:#0fb5a5; --sync:#e4388c; --fill:#f2a516; --off:#9aa1af;
+  --radius-pad:22px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#151a26; --surface:#1b2130; --ink:#eef0f5; --muted:#98a0b3; --line:#2a3246;
+    --pad:#222a3b; --pad-ink:#d9deea; --pad-shadow:0 1px 0 #0d111a, 0 6px 18px rgba(0,0,0,.35);
+    --down:#6b82ff; --up:#2dd4c4; --sync:#ff5aa8; --fill:#ffbb3d; --off:#6b7386;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#151a26; --surface:#1b2130; --ink:#eef0f5; --muted:#98a0b3; --line:#2a3246;
+  --pad:#222a3b; --pad-ink:#d9deea; --pad-shadow:0 1px 0 #0d111a, 0 6px 18px rgba(0,0,0,.35);
+  --down:#6b82ff; --up:#2dd4c4; --sync:#ff5aa8; --fill:#ffbb3d; --off:#6b7386;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:"Bricolage Grotesque",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  min-height:100dvh;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+.app{max-width:760px;margin:0 auto;padding:20px 18px 28px;min-height:100dvh;display:flex;flex-direction:column}
+.hidden{display:none!important}
+h1{font-size:clamp(2rem,7vw,3.1rem);font-weight:800;letter-spacing:-.03em;line-height:1;margin:6px 0 4px}
+h2{font-size:1.5rem;font-weight:800;letter-spacing:-.02em;margin:0}
+p{line-height:1.45;margin:0}
+.muted{color:var(--muted)}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,.pad:focus-visible{outline:3px solid var(--down);outline-offset:3px}
+.row{display:flex;align-items:center;gap:12px}
+.spread{justify-content:space-between}
+.back{background:none;border:0;padding:8px 0;color:var(--muted);font-weight:600}
+.level{display:flex;align-items:center;gap:10px;margin:14px 0 26px}
+.level b{font-size:1.05rem}
+.xpbar{flex:1;height:8px;border-radius:8px;background:var(--line);overflow:hidden}
+.xpbar i{display:block;height:100%;background:var(--down);border-radius:8px;transition:width .6s}
+.menu{display:grid;gap:12px}
+.choice{display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px 18px;transition:border-color .15s}
+.choice:hover{border-color:var(--muted)}
+.choice strong{display:block;font-size:1.2rem;font-weight:700;margin-bottom:3px}
+.choice span{color:var(--muted)}
+.choice[disabled]{opacity:.55;cursor:not-allowed}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;vertical-align:1px}
+.lessons{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:16px}
+.lessons .choice{padding:14px}
+.stars{color:var(--fill);letter-spacing:2px;font-size:.95rem}
+.stars .e{color:var(--line)}
+
+/* play screen */
+.play{flex:1;display:flex;flex-direction:column}
+.status{margin:18px 0 6px;min-height:3.4rem}
+.status{min-height:auto}
+.status .big{font-size:clamp(1.8rem,6vw,2.6rem);font-weight:800;letter-spacing:-.02em;line-height:1.05}
+.status .sub{color:var(--muted);margin-top:4px}
+.score{font-size:1.6rem;font-weight:800;font-variant-numeric:tabular-nums}
+.count{font-size:clamp(4rem,20vw,8rem);font-weight:800;line-height:.9;letter-spacing:-.05em;font-variant-numeric:tabular-nums}
+.count.tick{animation:tick .45s ease-out}
+@keyframes tick{0%{transform:scale(1.25);opacity:.4}100%{transform:scale(1);opacity:1}}
+.beats{display:flex;gap:10px;margin:10px 0 4px}
+.beats i{width:14px;height:14px;border-radius:50%;background:var(--line);transition:background .08s}
+.beats i.on{background:var(--ink)}
+.beats i.go{background:var(--up)}
+/* The beat, while the song runs, for a player whose ears are too far behind to
+   use. Bigger and slower to fade than the count-in dots, because this one is
+   being watched out of the corner of an eye rather than read. */
+.beats.live i{width:16px;height:16px;transition:background .18s,transform .08s}
+.beats.live i.now{background:var(--down);transform:scale(1.35)}
+.beats.live i.one{background:var(--ink)}
+.progress{height:3px;background:var(--line);border-radius:3px;overflow:hidden;margin:8px 0 18px}
+.progress i{display:block;height:100%;width:0;background:var(--ink);opacity:.5}
+.stage{position:relative;flex:1;display:flex;align-items:center}
+.pads{width:100%;display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.pads.six{grid-template-columns:repeat(3,1fr)}
+@media (max-width:520px){ .pads.six{grid-template-columns:repeat(2,1fr)} }
+.pad{--glow:var(--down);position:relative;aspect-ratio:1/1;max-height:30vh;width:100%;border:0;border-radius:var(--radius-pad);background:var(--pad);
+  box-shadow:var(--pad-shadow);color:var(--pad-ink);touch-action:none;user-select:none;-webkit-user-select:none;
+  display:flex;flex-direction:column;justify-content:flex-end;align-items:flex-start;padding:14px 16px}
+.pads.six .pad{max-height:24vh}
+.pad .name{font-weight:700;font-size:1.05rem}
+.pad .key{position:absolute;top:12px;right:14px;font-size:.8rem;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:1px 7px}
+.pad.locked{opacity:.4;cursor:not-allowed}
+.pad.locked .name::after{content:" (locked)";font-weight:400;color:var(--muted)}
+.pad.press{animation:press .11s ease-out}
+.pad.pulse{animation:pulse .32s ease-out}
+@keyframes press{0%{transform:scale(.955)}100%{transform:scale(1)}}
+.pad.cue{animation:cue .36s ease-out}
+@keyframes pulse{
+  0%{background:color-mix(in srgb,var(--glow) 70%,var(--pad));transform:scale(.965);box-shadow:0 0 0 4px color-mix(in srgb,var(--glow) 35%,transparent)}
+  100%{background:var(--pad);transform:scale(1)}
+}
+@keyframes cue{
+  0%{background:color-mix(in srgb,var(--ink) 18%,var(--pad));box-shadow:0 0 0 3px color-mix(in srgb,var(--ink) 25%,transparent)}
+  100%{background:var(--pad)}
+}
+.pops{position:absolute;inset:0;pointer-events:none;overflow:visible}
+.pop{position:absolute;font-weight:800;font-size:1.25rem;white-space:nowrap;transform:translate(-50%,0);animation:pop .9s ease-out forwards}
+.pop.big{font-size:1.9rem}
+@keyframes pop{0%{opacity:0;transform:translate(-50%,8px) scale(.9)}15%{opacity:1;transform:translate(-50%,0) scale(1)}100%{opacity:0;transform:translate(-50%,-46px)}}
+.stop{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 14px;font-weight:600}
+.primary{background:var(--ink);color:var(--bg);border:0;border-radius:14px;padding:14px 20px;font-weight:700;font-size:1.05rem}
+.secondary{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 20px;font-weight:600;font-size:1.05rem}
+
+/* results */
+.total{font-size:clamp(3rem,13vw,5.5rem);font-weight:800;letter-spacing:-.04em;line-height:1;margin:14px 0 4px;font-variant-numeric:tabular-nums}
+.breakdown{margin:22px 0;display:grid;gap:0}
+.breakdown div{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+.breakdown div span:first-child{display:flex;align-items:center}
+.unlock{background:var(--surface);border:1px solid var(--fill);border-radius:14px;padding:12px 14px;margin-top:10px}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:auto;padding-top:18px}
+.tapbig{width:100%;height:38vh;border-radius:var(--radius-pad);border:0;background:var(--pad);box-shadow:var(--pad-shadow);font-size:1.4rem;font-weight:700;touch-action:none;margin-top:16px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:14px;font-size:.9rem;color:var(--muted)}
+.switch{display:flex;align-items:flex-start;gap:10px;margin-top:18px;font-size:.9rem;color:var(--muted);max-width:34rem;cursor:pointer}
+.switch input{width:20px;height:20px;flex:none;margin-top:1px;accent-color:var(--down)}
+@media (prefers-reduced-motion: reduce){
+  .count.tick{animation:none}
+  .pad.press,.pad.pulse,.pad.cue{animation-duration:.01s}
+  .beats.live i{transition:none}
+  .beats.live i.now{transform:none}
+  .pop{animation:none;opacity:1}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- HOME -->
+  <section id="home">
+    <h1>Good Vibe Beats</h1>
+    <p class="muted">Play the spaces between the beats.</p>
+    <div class="level"><b id="lvl">Lv 1</b><div class="xpbar"><i id="xpfill"></i></div><span class="muted" id="xptext"></span></div>
+    <div class="menu">
+      <button class="choice" id="goLearn"><strong>Learn</strong><span>Hear a groove, then play it back.</span></button>
+      <button class="choice" id="goJam"><strong>Jam</strong><span>Freestyle over a song. Syncopation scores big.</span></button>
+      <button class="choice" id="goCal"><strong>Calibrate timing</strong><span id="calText">Tap along once so hits line up with your device.</span></button>
+    </div>
+    <div class="legend">
+      <span><i class="swatch" style="background:var(--down)"></i>On the beat</span>
+      <span><i class="swatch" style="background:var(--up)"></i>Upbeat</span>
+      <span><i class="swatch" style="background:var(--sync)"></i>Syncopated</span>
+      <span><i class="swatch" style="background:var(--fill)"></i>Fill / push</span>
+    </div>
+  </section>
+
+  <!-- LESSONS -->
+  <section id="learn" class="hidden">
+    <button class="back" data-go="home">Back</button>
+    <h2>Learn</h2>
+    <p class="muted">Each lesson plays one bar. Then it's your turn.</p>
+    <div class="lessons" id="lessonList"></div>
+  </section>
+
+  <!-- JAM SELECT -->
+  <section id="jam" class="hidden">
+    <button class="back" data-go="home">Back</button>
+    <h2>Pick a world</h2>
+    <p class="muted">No fail. Play until the song ends.</p>
+    <div class="menu" id="trackList" style="margin-top:16px"></div>
+  </section>
+
+  <!-- PLAY -->
+  <section id="play" class="hidden play">
+    <div class="row spread">
+      <button class="stop" id="stopBtn">Stop</button>
+      <div class="score" id="score"></div>
+    </div>
+    <div class="status"><div class="big" id="statusBig"></div><div class="sub" id="statusSub"></div></div>
+    <div class="row" id="countRow" style="align-items:flex-end;gap:18px"><div class="count" id="count"></div><div class="beats" id="beats"><i></i><i></i><i></i><i></i></div></div>
+    <div class="progress"><i id="prog"></i></div>
+    <div class="stage">
+      <div class="pads" id="pads"></div>
+      <div class="pops" id="pops"></div>
+    </div>
+  </section>
+
+  <!-- RESULTS -->
+  <section id="results" class="hidden play">
+    <p class="muted" id="resTitle"></p>
+    <div class="total" id="resTotal"></div>
+    <p id="resXp"></p>
+    <div id="resUnlock"></div>
+    <div class="breakdown" id="resRows"></div>
+    <div class="actions">
+      <button class="primary" id="againBtn">Play again</button>
+      <button class="secondary" id="nextBtn">Next lesson</button>
+      <button class="secondary" data-go="home">Home</button>
+    </div>
+  </section>
+
+  <!-- CALIBRATE -->
+  <section id="cal" class="hidden play">
+    <button class="back" data-go="home">Back</button>
+    <h2>Calibrate timing</h2>
+    <p class="muted" id="calInfo">You'll hear 12 clicks, one a second. Tap the pad (or press Space) on each one.</p>
+    <button class="tapbig" id="calPad">Start</button>
+    <label class="switch"><input type="checkbox" id="beatSwitch"> <span id="beatWhy"></span></label>
+    <div class="actions"><button class="secondary" id="calReset">Reset to default</button></div>
+  </section>
+</div>
+
+
+<script type="module">
+/* Good Vibe Beats, in the browser.
+ *
+ * The rules are in content.js and none of them are here: this file owns the
+ * clock, the save file and the DOM, and asks content.js what every hit was
+ * worth. audio.js makes the noise. That split is what lets the whole scoring
+ * model be tested in Node with no browser anywhere near it, and it is why
+ * there is no arithmetic below that decides anything.
+ *
+ * --- Two clocks, and only one of them is trusted ----------------------------
+ *
+ * `AudioContext.currentTime` is the clock. Every note is scheduled against it
+ * by a look-ahead loop that runs every 25 ms and queues anything due in the
+ * next 150; `setTimeout` alone drifts by whole milliseconds under load, and in
+ * a rhythm game that is audible on the first bar. `performance.now()` and
+ * `requestAnimationFrame` drive the picture only, and the picture is allowed
+ * to be a frame late — the ear is not.
+ */
+import {
+  PADS, PAD_BY_ID, XP_PER_LEVEL, levelOf, padUnlocked, padLayout,
+  LESSONS, LESSON_BY_ID, lessonNotes, gradeLesson, learnXp,
+  TRACKS, TRACK_BY_ID, secondsPerBeat, trackSpan,
+  snap, scoreHit, slotKey, pushedInto, filledInto, barBonus,
+  PUSH_POINTS, FILL_POINTS, jamXp, LESSON_MS,
+  STEPS_PER_BEAT, BEATS_PER_BAR, STEPS_PER_BAR,
+  CAL_CLICKS, CAL_INTERVAL, calibrationFrom, LATENCY_HIGH, beatVisible,
+  OUT_OF_SONG, ALREADY_PLAYED, OFF_THE_GRID,
+  toSave, fromSave,
+} from './content.js';
+import {
+  ensureAudio, audioCtx, out as masterOut, bus, reportedLatency,
+  DRUMS, click, trackEvents,
+} from './audio.js';
+
+const $ = s => document.querySelector(s);
+
+/* ---- the save file ------------------------------------------------------ */
+
+/* One key, and every read and write guarded: localStorage throws outright in a
+   private window, and a game that will not save is better than a page that
+   will not render. */
+const SAVE_KEY = 'gvb:save';
+
+function readSave(){
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    return fromSave(raw ? JSON.parse(raw) : null);
+  } catch {
+    return fromSave(null);
+  }
+}
+const save = readSave();
+function writeSave(){
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(toSave(save))); }
+  catch { /* a private window; the sitting still counts, it just will not keep */ }
+}
+
+/* The latency to take off every hit. The calibration if there is one, and what
+   the device admits to otherwise — which is usually an underestimate, which is
+   why the calibration screen exists. */
+const offsetSec = () => save.offset != null ? save.offset : reportedLatency();
+
+/* ---- the screens -------------------------------------------------------- */
+
+const SCREENS = ['home', 'learn', 'jam', 'play', 'results', 'cal'];
+function show(id){
+  for(const s of SCREENS) $('#' + s).classList.toggle('hidden', s !== id);
+  if(id === 'home') drawHome();
+  scrollTo(0, 0);
+}
+for(const b of document.querySelectorAll('[data-go]')){
+  b.addEventListener('click', () => { stopSession(); show(b.dataset.go); });
+}
+
+function drawHome(){
+  const lv = levelOf(save.xp), into = save.xp % XP_PER_LEVEL;
+  $('#lvl').textContent = 'Lv ' + lv;
+  $('#xpfill').style.width = (into / XP_PER_LEVEL * 100) + '%';
+  const next = PADS.find(p => p.unlock && p.unlock > lv);
+  $('#xptext').textContent = next
+    ? `${XP_PER_LEVEL - into} XP to Lv ${lv + 1}`
+    : `${into} / ${XP_PER_LEVEL}`;
+  $('#calText').textContent = save.offset != null
+    ? `Calibrated at ${Math.round(save.offset * 1000)} ms. Tap to redo.`
+    : 'Tap along once so hits line up with your device.';
+}
+
+function drawLessons(){
+  const el = $('#lessonList');
+  el.replaceChildren(...LESSONS.map((L, i) => {
+    const got = save.stars[L.id] || 0;
+    const b = document.createElement('button');
+    b.className = 'choice';
+    b.innerHTML = `<strong></strong><span class="stars">${'★'.repeat(got)}<span class="e">${'★'.repeat(3 - got)}</span></span>`;
+    b.querySelector('strong').textContent = L.name;
+    b.addEventListener('click', () => startLearn(i));
+    return b;
+  }));
+}
+
+function drawTracks(){
+  const el = $('#trackList');
+  el.replaceChildren(...TRACKS.map(T => {
+    const b = document.createElement('button');
+    b.className = 'choice';
+    b.innerHTML = `<strong><i class="swatch" style="background:var(--${T.colour})"></i><span class="t"></span></strong><span class="s"></span>`;
+    b.querySelector('.t').textContent = T.world;
+    b.querySelector('.s').textContent = `${T.title}, ${T.bpm} BPM`;
+    b.addEventListener('click', () => startJam(T));
+    return b;
+  }));
+}
+
+$('#goLearn').addEventListener('click', () => { drawLessons(); show('learn'); });
+$('#goJam').addEventListener('click', () => { drawTracks(); show('jam'); });
+$('#goCal').addEventListener('click', () => {
+  $('#calPad').textContent = 'Start';
+  $('#calInfo').textContent = CAL_OPENING;
+  drawBeatSwitch();
+  show('cal');
+});
+
+/* ---- the pads ----------------------------------------------------------- */
+
+const COLOURS = { down: 'var(--down)', up: 'var(--up)', sync: 'var(--sync)', fill: 'var(--fill)', off: 'var(--off)' };
+
+function drawPads(){
+  const wrap = $('#pads');
+  const list = padLayout(save.xp);
+  wrap.classList.toggle('six', list.length > 4);
+  wrap.replaceChildren(...list.map(p => {
+    const open = padUnlocked(p, save.xp);
+    const b = document.createElement('button');
+    b.className = 'pad' + (open ? '' : ' locked');
+    b.dataset.pad = p.id;
+    b.setAttribute('aria-label', open ? p.label : `${p.label}, locked`);
+    b.innerHTML = `<span class="key"></span><span class="name"></span>`;
+    b.querySelector('.key').textContent = p.key.toUpperCase();
+    b.querySelector('.name').textContent = p.label;
+    b.addEventListener('pointerdown', e => { e.preventDefault(); if(open) hitPad(p.id); });
+    return b;
+  }));
+}
+const padEl = id => document.querySelector(`.pad[data-pad="${id}"]`);
+
+/* Restart the animation by hand. Removing the class and re-adding it in the
+   same frame does nothing at all — the browser never sees it leave — so the
+   layout is read in between, which forces the change through. */
+function restart(el, cls){
+  el.classList.remove('press', 'pulse', 'cue');
+  void el.offsetWidth;
+  el.classList.add(cls);
+}
+
+/* Two answers to one finger, to two different questions.
+ *
+ * The press is "I felt that" and has to be instant, or the pad is dead under
+ * the hand — that is the one thing a pad cannot be. It is only a dip, no
+ * colour, because it is not saying anything about what the hit was worth.
+ *
+ * The colour is "here is what it was worth", and it waits for the sound. On a
+ * wired device that wait is nothing and the two are one movement. On
+ * headphones a quarter of a beat behind, it is the difference between the pad
+ * lighting up in time with the drum you hear and lighting up half a beat
+ * before it, which reads as the game being broken rather than the link being
+ * slow.
+ */
+function press(id){ const el = padEl(id); if(el) restart(el, 'press'); }
+
+function flash(id, type){
+  const el = padEl(id); if(!el) return;
+  const paint = () => {
+    if(!padEl(id)) return;                    // the pads were rebuilt underneath us
+    el.style.setProperty('--glow', COLOURS[type] || COLOURS.down);
+    restart(el, 'pulse');
+  };
+  const wait = offsetSec();
+  // Below a frame there is nothing to wait for, and a timer would only make it
+  // late.
+  if(wait < 0.02) paint();
+  else timers.push(setTimeout(paint, wait * 1000));
+}
+
+/* A buzz on the hit, where the device has one. It is the only feedback in the
+   game that cannot be late: it is the hand telling the hand, and it never goes
+   through the headphones. iOS Safari has no vibration API at all, so half the
+   phones in the world get nothing and that is simply how it is. */
+function buzz(){
+  try { navigator.vibrate?.(8); } catch { /* a browser that will not buzz */ }
+}
+function cue(id){ const el = padEl(id); if(el) restart(el, 'cue'); }
+
+let lastPop = 0;
+function popup(text, type, big, padId){
+  const at = performance.now();
+  // Two labels a tenth of a second apart are one unreadable smear, so the
+  // small ones queue behind each other. The big ones always land.
+  if(!big && at - lastPop < 140) return;
+  lastPop = at;
+  const layer = $('#pops'), stage = layer.getBoundingClientRect();
+  let x = stage.width / 2, y = stage.height * 0.12;
+  const el = padId && padEl(padId);
+  if(el && !big){
+    const r = el.getBoundingClientRect();
+    x = r.left - stage.left + r.width / 2;
+    y = r.top - stage.top + r.height * 0.25;
+  }
+  const p = document.createElement('div');
+  p.className = 'pop' + (big ? ' big' : '');
+  p.textContent = text;
+  p.style.left = x + 'px';
+  p.style.top = y + 'px';
+  p.style.color = COLOURS[type] || 'var(--ink)';
+  layer.appendChild(p);
+  setTimeout(() => p.remove(), 950);
+}
+
+function setCount(n){
+  const el = $('#count');
+  el.textContent = n == null ? '' : n;
+  el.classList.remove('tick');
+  void el.offsetWidth;
+  if(n != null) el.classList.add('tick');
+}
+function setBeat(i, go){
+  document.querySelectorAll('#beats i').forEach((d, k) => {
+    d.className = k === i ? (go ? 'go' : 'on') : '';
+  });
+}
+
+/* The beat, kept on screen for the whole song. Driven off where the music is
+   being HEARD rather than where it is being queued — see `later` — because a
+   pulse that leads the sound is a pulse that teaches the player to rush. */
+let litBeat = -1;
+function liveBeat(n){
+  if(n === litBeat) return;
+  litBeat = n;
+  document.querySelectorAll('#beats i').forEach((d, k) => {
+    d.className = k === n ? (n === 0 ? 'now one' : 'now') : '';
+  });
+}
+function showBeatRow(on){
+  $('#countRow').classList.toggle('hidden', !on);
+  $('#beats').classList.toggle('live', on);
+  litBeat = -1;
+}
+function showCounter(on){ $('#countRow').classList.toggle('hidden', !on); setCount(null); setBeat(-1); }
+function setStatus(big, sub){ $('#statusBig').textContent = big || ''; $('#statusSub').textContent = sub || ''; }
+
+/* ---- the session engine -------------------------------------------------- */
+
+let S = null, lookAhead = null, rafId = null, timers = [];
+
+const LOOK_EVERY = 25;      // ms between passes of the scheduler
+const LOOK_AHEAD = 0.15;    // seconds of audio queued in front of the clock
+
+function runScheduler(){
+  clearInterval(lookAhead);
+  lookAhead = setInterval(() => {
+    if(!S) return;
+    const ctx = audioCtx();
+    while(S.i < S.events.length && S.events[S.i].t < ctx.currentTime + LOOK_AHEAD){
+      const e = S.events[S.i++];
+      // A note whose moment has already gone is dropped rather than crammed in
+      // late: a tab that was backgrounded for a second must not come back and
+      // play that second all at once.
+      if(e.t >= ctx.currentTime - 0.02) e.fn(e.t);
+    }
+  }, LOOK_EVERY);
+}
+
+/* The picture, at the moment the audio scheduled for `t` is actually HEARD —
+ * which is `t` plus however far behind the player's output is.
+ *
+ * Without the offset every count-in number, every beat dot and every lesson
+ * cue fires when the sound is QUEUED rather than when it arrives. On a wired
+ * device that is twenty milliseconds and invisible. On Bluetooth it is a
+ * quarter of a beat, and the screen spends the whole song telling the player
+ * the beat is somewhere it will not be for another two hundred milliseconds —
+ * which is worse than showing them nothing, because they believe it.
+ */
+function later(t, fn){
+  const due = (t + offsetSec() - audioCtx().currentTime) * 1000;
+  timers.push(setTimeout(fn, Math.max(0, due)));
+}
+
+function stopSession(){
+  clearInterval(lookAhead);
+  cancelAnimationFrame(rafId);
+  for(const t of timers) clearTimeout(t);
+  timers = [];
+  if(S && S.bus){
+    /* Faded, not cut. A gain dropped to zero in one sample is a click, and the
+       node is kept alive for a moment afterwards so the tail can finish. */
+    const b = S.bus;
+    try {
+      b.gain.setTargetAtTime(0, audioCtx().currentTime, 0.05);
+      setTimeout(() => b.disconnect(), 400);
+    } catch { /* the context went away underneath us */ }
+  }
+  S = null;
+}
+
+$('#stopBtn').addEventListener('click', () => {
+  if(!S) return show('home');
+  if(S.mode === 'jam') endJam();
+  else { stopSession(); drawLessons(); show('learn'); }
+});
+
+function hitPad(id){
+  ensureAudio();
+  const ctx = audioCtx();
+  // The finger has already happened, so this one is not scheduled ahead.
+  DRUMS[id](ctx.currentTime, 1, masterOut());
+  press(id);
+  buzz();
+  if(!S){ flash(id, 'down'); return; }
+  const t = ctx.currentTime - offsetSec();
+  if(S.mode === 'jam') jamHit(id, t);
+  else if(S.mode === 'learn') learnHit(id, t);
+  else flash(id, 'down');
+}
+
+/* ---- Learn --------------------------------------------------------------- */
+
+/* Four bars, and the player only plays the last one:
+ *
+ *   1  Listen in    loud count, 4 3 2 1
+ *   2  Listen       the groove, pads lighting as it goes, soft click under it
+ *   3  Your turn in loud count again
+ *   4  Play         your bar, with a steady click and four beat dots
+ *
+ * The second count is the whole reason this works. Without it the player has
+ * to guess when the bar they just heard starts again, and every lesson turns
+ * into a test of that guess rather than of the pattern.
+ */
+function startLearn(i){
+  stopSession(); ensureAudio();
+  const ctx = audioCtx();
+  const L = LESSONS[i];
+  const spb = secondsPerBeat(L.bpm), bar = spb * BEATS_PER_BAR, step = spb / STEPS_PER_BEAT;
+  const b = bus();
+
+  const t0 = ctx.currentTime + 0.6;
+  const callAt = t0 + bar, gapAt = callAt + bar, playAt = gapAt + bar;
+
+  const events = [];
+  for(let n = 0; n < BEATS_PER_BAR; n++){
+    const first = n === 0;
+    events.push({ t: t0 + n * spb,     fn: t => click(t, first, 0.22, b) });
+    events.push({ t: callAt + n * spb, fn: t => click(t, first, 0.06, b) });
+    events.push({ t: gapAt + n * spb,  fn: t => click(t, first, 0.24, b) });
+    events.push({ t: playAt + n * spb, fn: t => click(t, first, 0.12, b) });
+  }
+  const expected = lessonNotes(L);
+  for(const e of expected) events.push({ t: callAt + e.s * step, fn: t => DRUMS[e.pad](t, 0.9, b) });
+  events.sort((a, z) => a.t - z.t);
+
+  S = { mode: 'learn', lesson: i, spb, bar, step, t0, callAt, playAt, bus: b, events, i: 0, hits: [], expected };
+
+  drawPads(); show('play');
+  $('#score').textContent = '';
+  showCounter(true);
+  setStatus('Get ready', L.name);
+
+  for(let n = 0; n < BEATS_PER_BAR; n++){
+    later(t0 + n * spb,     () => { if(n === 0) setStatus('Listen in', L.name); setCount(4 - n); setBeat(n); });
+    later(callAt + n * spb, () => { if(n === 0){ setStatus('Listen', L.name); setCount(null); } setBeat(n); });
+    later(gapAt + n * spb,  () => { if(n === 0) setStatus('Your turn in', 'Get your hands ready'); setCount(4 - n); setBeat(n); });
+    later(playAt + n * spb, () => { if(n === 0){ setStatus('Play', 'Copy the groove'); setCount(null); } setBeat(n, true); });
+  }
+  for(const e of expected) later(callAt + e.s * step, () => cue(e.pad));
+
+  runScheduler();
+  const frame = () => {
+    if(!S || S.mode !== 'learn') return;
+    const at = audioCtx().currentTime;
+    $('#prog').style.width = Math.min(100, Math.max(0, (at - t0) / (bar * 4) * 100)) + '%';
+    if(at - offsetSec() > playAt + bar + 0.12){ finishLearn(); return; }
+    rafId = requestAnimationFrame(frame);
+  };
+  rafId = requestAnimationFrame(frame);
+}
+
+function learnHit(pad, t){
+  const rel = t - S.playAt;
+  // Outside the bar entirely: heard, but not counted against you either way.
+  if(rel < -0.12 || rel > S.bar - S.step / 2){ flash(pad, 'off'); return; }
+  const n = Math.round(rel / S.step), err = Math.abs(rel - n * S.step);
+  S.hits.push({ pad, n, err });
+  const right = err <= LESSON_MS / 1000 && S.expected.some(e => e.pad === pad && e.s === n);
+  flash(pad, right ? 'up' : 'off');
+}
+
+function finishLearn(){
+  const { expected, hits, lesson } = S;
+  const L = LESSONS[lesson];
+  const { matched, extras, accuracy, stars } = gradeLesson(expected, hits);
+  const had = save.stars[L.id] || 0;
+  const gained = learnXp(stars, had);
+  if(stars > had) save.stars[L.id] = stars;
+  stopSession();
+  const wasLevel = levelOf(save.xp);
+  save.xp += gained;
+  writeSave();
+  showResults({
+    mode: 'learn', lesson,
+    title: L.name,
+    total: '★'.repeat(stars) + '☆'.repeat(3 - stars),
+    xp: gained, wasLevel,
+    rows: [
+      ['Notes hit', `${matched} / ${expected.length}`],
+      ['Extra hits', extras],
+      ['Accuracy', Math.round(accuracy * 100) + '%'],
+    ],
+  });
+}
+
+/* ---- Jam ----------------------------------------------------------------- */
+
+function startJam(T){
+  stopSession(); ensureAudio();
+  const ctx = audioCtx();
+  const spb = secondsPerBeat(T.bpm), bar = spb * T.beatsPerBar;
+  const b = bus(0.85);
+
+  const t0 = ctx.currentTime + 0.4 + bar;     // one bar of count-in first
+  const events = [];
+  for(let n = 0; n < T.beatsPerBar; n++){
+    events.push({ t: t0 - bar + n * spb, fn: t => click(t, n === 0, 0.22, b) });
+  }
+  events.push(...trackEvents(T, t0, b));
+  events.sort((a, z) => a.t - z.t);
+
+  S = {
+    mode: 'jam', track: T, spb, bar, t0, span: trackSpan(T), bus: b, events, i: 0,
+    watching: beatVisible(save),
+    hits: [], taken: new Set(), score: 0, beatDone: 0, barDone: -1, lastBusy: 0,
+    stats: { perfect: 0, good: 0, off: 0, groove: 0, up: 0, sync: 0, push: 0, fill: 0, fresh: 0, locked: 0 },
+  };
+
+  drawPads(); show('play');
+  $('#score').textContent = '0';
+  showCounter(true);
+  setStatus('Starting in', `${T.world}: ${T.title}`);
+  for(let n = 0; n < T.beatsPerBar; n++) later(t0 - bar + n * spb, () => { setCount(T.beatsPerBar - n); setBeat(n); });
+  later(t0, () => {
+    setCount(null);
+    if(S && S.watching){ showBeatRow(true); setStatus('Jam', 'Play by feel. Leave some space.'); }
+    else { showCounter(false); setStatus('Jam', 'Play by feel. Leave some space.'); }
+  });
+
+  runScheduler();
+  const frame = () => {
+    if(!S || S.mode !== 'jam') return;
+    jamFrame();
+    if(S && S.mode === 'jam') rafId = requestAnimationFrame(frame);
+  };
+  rafId = requestAnimationFrame(frame);
+}
+
+function addScore(n){
+  S.score += n;
+  $('#score').textContent = S.score.toLocaleString();
+}
+
+function jamHit(pad, t){
+  const rel = t - S.t0;
+  // How many hits are already inside the last beat, which is what decides
+  // whether this one is playing or mashing.
+  const recent = S.hits.filter(h => t - h.t < S.spb).length;
+  const got = scoreHit(pad, rel, S.spb, { span: S.span, recent, taken: S.taken });
+
+  if(!got.ok){
+    if(got.why === OFF_THE_GRID) S.stats.off++;
+    flash(pad, 'off');
+    return;
+  }
+
+  S.taken.add(got.key);
+  S.stats[got.quality]++;
+  if(got.kind) S.stats[got.kind]++;
+  S.hits.push({ t, pad, grid: got.at.grid, idx: got.at.idx, s16: got.at.s16, beat: got.at.beat });
+  addScore(got.points);
+  flash(pad, got.type);
+
+  /* One nudge at a time, and not more than once every second and a half. A
+     game that says "too busy" on every hit of a roll is a game arguing with
+     you while you play. */
+  if(got.busy < 0.6 && performance.now() - S.lastBusy > 1500){
+    S.lastBusy = performance.now();
+    popup('Too busy', 'off', false, pad);
+  } else if(got.label){
+    popup(got.label, got.type, false, pad);
+  }
+}
+
+/* The three bonuses that can only be settled after the fact. A beat is judged
+   once it is a timing window past, so a hit that is merely late still counts
+   towards it. */
+const SETTLE = 0.09;
+
+function jamFrame(){
+  const ctx = audioCtx();
+  const at = ctx.currentTime - offsetSec(), rel = at - S.t0;
+  $('#prog').style.width =
+    Math.min(100, Math.max(0, (ctx.currentTime - S.t0) / S.span * 100)) + '%';
+
+  // `rel` is already where the music is being heard, which is what the pulse
+  // has to follow.
+  if(S.watching && rel >= 0) liveBeat(Math.floor(rel / S.spb) % S.track.beatsPerBar);
+
+  const beatsDone = Math.floor((rel - SETTLE) / S.spb);
+  while(S.beatDone < beatsDone){ S.beatDone++; settleBeat(S.beatDone); }
+
+  const barsDone = Math.floor((rel - SETTLE) / S.bar) - 1;
+  while(S.barDone < barsDone){ S.barDone++; settleBar(S.barDone); }
+
+  if(ctx.currentTime > S.t0 + S.span + 0.6) endJam();
+}
+
+function settleBeat(b){
+  if(b < 1) return;
+  if(pushedInto(S.hits, b)){ S.stats.push++; addScore(PUSH_POINTS); popup('Push', 'fill'); }
+  if(filledInto(S.hits, b)){ S.stats.fill++; addScore(FILL_POINTS); popup('Fill!', 'fill', true); }
+}
+
+function settleBar(n){
+  const got = barBonus(S.hits, n);
+  if(!got) return;
+  S.stats[got.kind]++;
+  addScore(got.points);
+  popup(got.label, got.type, got.kind === 'fresh');
+}
+
+function endJam(){
+  if(!S) return;
+  const { score, stats, track } = S;
+  stopSession();
+  const gained = jamXp(score);
+  const wasLevel = levelOf(save.xp);
+  save.xp += gained;
+  writeSave();
+  const sw = c => `<i class="swatch" style="background:var(--${c})"></i>`;
+  const landed = stats.perfect + stats.good;
+  showResults({
+    mode: 'jam', track,
+    title: `${track.world}: ${track.title}`,
+    total: score.toLocaleString(),
+    xp: gained, wasLevel,
+    rows: [
+      ['Perfect hits', stats.perfect],
+      ['Good hits', stats.good],
+      ['Off the grid', stats.off],
+      [sw('down') + 'Groove anchors', stats.groove],
+      [sw('up') + 'Upbeats', stats.up],
+      [sw('sync') + 'Syncopated', stats.sync],
+      [sw('fill') + 'Pushes', stats.push],
+      [sw('fill') + 'Fills', stats.fill],
+      ['Fresh bars', stats.fresh],
+      ['Locked-in bars', stats.locked],
+      ['Syncopation share', landed ? Math.round(stats.sync / landed * 100) + '%' : '0%'],
+    ],
+  });
+}
+
+/* ---- results ------------------------------------------------------------- */
+
+let last = null;
+function showResults(r){
+  last = r;
+  $('#resTitle').textContent = r.title;
+  $('#resTotal').textContent = r.total;
+  $('#resXp').textContent = `+${r.xp} XP`;
+  const now = levelOf(save.xp);
+  const fresh = PADS.filter(p => p.unlock && p.unlock > r.wasLevel && p.unlock <= now);
+  const box = $('#resUnlock');
+  if(now > r.wasLevel){
+    box.innerHTML = '<div class="unlock"><strong></strong> <span></span></div>';
+    box.querySelector('strong').textContent = `Level ${now}.`;
+    box.querySelector('span').textContent = fresh.length
+      ? 'New pad: ' + fresh.map(p => `${p.label} (${p.key.toUpperCase()})`).join(', ')
+      : 'Keep going for more pads.';
+  } else {
+    box.replaceChildren();
+  }
+  $('#resRows').innerHTML = r.rows.map(([k, v]) => `<div><span>${k}</span><span></span></div>`).join('');
+  document.querySelectorAll('#resRows div').forEach((d, i) => {
+    d.lastElementChild.textContent = String(r.rows[i][1]);
+  });
+  $('#nextBtn').classList.toggle('hidden', !(r.mode === 'learn' && r.lesson < LESSONS.length - 1));
+  show('results');
+}
+$('#againBtn').addEventListener('click', () => {
+  if(!last) return;
+  if(last.mode === 'jam') startJam(last.track); else startLearn(last.lesson);
+});
+$('#nextBtn').addEventListener('click', () => {
+  if(last && last.mode === 'learn') startLearn(last.lesson + 1);
+});
+
+/* ---- calibration ---------------------------------------------------------- */
+
+/* Twelve clicks, a second apart. What is measured is how late the taps are
+ * against clicks the player can already hear coming, which is exactly the
+ * number to take off every hit afterwards.
+ *
+ * Nothing is decided here. Which click a tap answered, and what to do about
+ * the ones that answered none, is content.js's problem — and it has to be,
+ * because the version that decided it here was catastrophically wrong above a
+ * quarter of a second and there was no way to test it.
+ */
+let cal = null;
+
+const CAL_OPENING = `You'll hear ${CAL_CLICKS} clicks, one a second. Tap the pad (or press Space) on each one.`;
+const BEAT_LABEL = 'Show the beat while I play';
+const BEAT_AUTO = ' — on, because your delay is long enough that you need something on screen that is on time.';
+const CAL_TAPPING = 'Keep tapping along. The first three clicks are warm-up.';
+const CAL_UNSURE = 'Could not tell from that — too few taps landed near a click. Try again.';
+
+function calStart(){
+  ensureAudio(); stopSession();
+  const ctx = audioCtx();
+  const b = bus();
+  const t0 = ctx.currentTime + 0.5, clicks = [];
+  for(let i = 0; i < CAL_CLICKS; i++){
+    clicks.push(t0 + i * CAL_INTERVAL);
+    click(t0 + i * CAL_INTERVAL, i % 4 === 0, 0.25, b);
+  }
+  cal = { clicks, taps: [], end: t0 + CAL_CLICKS * CAL_INTERVAL + 0.4 };
+  $('#calPad').textContent = 'Tap on each click';
+  $('#calInfo').textContent = CAL_TAPPING;
+  setTimeout(calFinish, (cal.end - ctx.currentTime) * 1000);
+}
+
+function calTap(){
+  if(!cal){ calStart(); return; }
+  // The raw time, and no judgement about it. That is the whole change.
+  cal.taps.push(audioCtx().currentTime);
+  const el = $('#calPad');
+  el.style.setProperty('--glow', 'var(--down)');
+  el.classList.remove('pulse');
+  void el.offsetWidth;
+  el.classList.add('pad', 'pulse');
+}
+
+function calFinish(){
+  if(!cal) return;
+  const { taps, clicks } = cal;
+  cal = null;
+  $('#calPad').classList.remove('pad', 'pulse');
+
+  const found = calibrationFrom(taps, clicks);
+  if(found === null){
+    $('#calInfo').textContent = CAL_UNSURE;
+    $('#calPad').textContent = 'Start';
+    return;
+  }
+  save.offset = found.offset;
+  writeSave();
+  $('#calInfo').textContent = latencyWords(found.offset);
+  $('#calPad').textContent = 'Run again';
+  drawBeatSwitch();
+}
+
+/* The figure, and nothing else — until there is something the player can
+   actually do, which is the one case worth spending words on. A delay this
+   big is almost never the browser and almost always a wireless connection,
+   and telling somebody their number is 260 without telling them that leaves
+   them stuck with a fact they cannot use. */
+function latencyWords(seconds){
+  const ms = Math.round(seconds * 1000);
+  if(seconds <= LATENCY_HIGH) return `Done. Correcting by ${ms} ms.`;
+  return `${ms} ms behind. If you're on Bluetooth headphones, switch to wired or the speakers —`
+    + ' that delay is the headphones, not the game, and no browser can shorten it.'
+    + ' Your scoring is corrected for it either way.';
+}
+
+$('#calPad').addEventListener('pointerdown', e => { e.preventDefault(); calTap(); });
+
+/* The switch lives on the timing screen rather than on the menu because it is
+   not a preference, it is a consequence: it turns itself on when the measured
+   delay is doing damage, and this is the screen where that number is found. */
+function drawBeatSwitch(){
+  const on = beatVisible(save);
+  $('#beatSwitch').checked = on;
+  const auto = typeof save.beat !== 'boolean';
+  $('#beatWhy').textContent = BEAT_LABEL + (auto && on ? BEAT_AUTO : '');
+}
+$('#beatSwitch').addEventListener('change', e => {
+  save.beat = e.target.checked;
+  writeSave();
+  drawBeatSwitch();
+});
+$('#calReset').addEventListener('click', () => {
+  save.offset = null;
+  writeSave();
+  $('#calInfo').textContent = CAL_OPENING;
+  $('#calPad').textContent = 'Start';
+  drawBeatSwitch();
+});
+
+/* ---- the keyboard --------------------------------------------------------- */
+
+addEventListener('keydown', e => {
+  if(e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if(!$('#cal').classList.contains('hidden')){
+    if(k === ' '){ e.preventDefault(); calTap(); }
+    return;
+  }
+  if($('#play').classList.contains('hidden')) return;
+  if(k === 'escape'){ $('#stopBtn').click(); return; }
+  const p = PADS.find(p => p.key === k);
+  if(p && padUnlocked(p, save.xp) && padEl(p.id)){ e.preventDefault(); hitPad(p.id); }
+});
+
+/* A session left running in a hidden tab is a session scoring nothing while
+   the audio clock carries on. Stop it rather than let somebody come back to a
+   finished song they never heard. */
+document.addEventListener('visibilitychange', () => {
+  if(document.hidden && S){ stopSession(); show('home'); }
+});
+
+drawHome();
+
+</script>
+</body>
+</html>

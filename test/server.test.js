@@ -489,3 +489,53 @@ test('the lot can be carried off the device, and a broken code cannot eat it', a
   assert.ok(wipe > 0 && hushed > wipe && hushed < removed,
     'the autosave has to be stopped before the save is thrown away, or the reload writes it back');
 });
+
+test('Good Vibe Beats is served, and the shelf paints its card with the game', async () => {
+  /* Two files outside the directory know it exists, and both are deliberate:
+     the shelf imports `gvb/shot.js` to paint its card, and the title screen
+     imports the same file for its backdrop. Either breaking is a blank canvas
+     rather than an error anybody would see, which is why they are pinned. */
+  for(const path of ['/gvb/', '/gvb/play.html', '/gvb/content.js', '/gvb/audio.js', '/gvb/shot.js']){
+    const res = await fetch(`${baseUrl}${path}`);
+    assert.equal(res.status, 200, `${path} is not being served`);
+  }
+
+  const shelf = await (await fetch(`${baseUrl}/`)).text();
+  assert.match(shelf, /href="\/gvb\/"/, 'the shelf has to link it');
+  assert.match(shelf, /from '\.\/gvb\/shot\.js'/, 'the card is painted by the game, not by a screenshot');
+  assert.match(shelf, /id="shot-gvb"/);
+
+  const title = await (await fetch(`${baseUrl}/gvb/`)).text();
+  assert.match(title, /\.\/play\.html/, 'the title screen has to lead somewhere');
+  assert.match(title, /from '\.\/shot\.js'/);
+
+  /* The rules are a module the page imports rather than a script inside it.
+     Inlined, none of the scoring could be tested, which is the whole reason
+     the split exists. */
+  const play = await (await fetch(`${baseUrl}/gvb/play.html`)).text();
+  assert.match(play, /import \{[\s\S]*?\} from '\.\/content\.js'/);
+  assert.match(play, /import \{[\s\S]*?\} from '\.\/audio\.js'/);
+  assert.doesNotMatch(play, /function scoreHit|function snap\(/,
+    'the scoring must live in content.js, not be copied back into the page');
+
+  // The Spotify row the prototype advertised is gone: it promised a feature
+  // neither Spotify nor YouTube can supply.
+  assert.doesNotMatch(play, /Spotify/i);
+
+  /* Nothing on this site fetches anything third-party, and GVB is the only page
+     with its own typeface — so it is the only one that could. The font is
+     served from here, and the SIL OFL that permits that requires the licence to
+     travel with it, which is why the file is asserted rather than assumed. */
+  for(const page of [play, title]){
+    assert.doesNotMatch(page, /fonts\.googleapis|fonts\.gstatic/,
+      'the font is self-hosted; nothing here should call out to Google');
+    assert.match(page, /@font-face/, 'and it has to actually be declared');
+    assert.match(page, /\.\/font\/bricolage-grotesque\.woff2/);
+  }
+  const font = await fetch(`${baseUrl}/gvb/font/bricolage-grotesque.woff2`);
+  assert.equal(font.status, 200);
+  assert.equal(font.headers.get('content-type'), 'font/woff2');
+  assert.ok((await font.arrayBuffer()).byteLength > 20000, 'that is not a font');
+  assert.equal((await fetch(`${baseUrl}/gvb/font/OFL.txt`)).status, 200,
+    'the licence has to ship with the font it licenses');
+});

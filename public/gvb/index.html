@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../theme.css">
+<title>Good Vibe Beats — a rhythm game about the spaces between the beats</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%231c2230'/%3E%3Ccircle cx='5' cy='5' r='2.1' fill='%233d5afe'/%3E%3Ccircle cx='11' cy='5' r='2.1' fill='%230fb5a5'/%3E%3Ccircle cx='5' cy='11' r='2.1' fill='%23e4388c'/%3E%3Ccircle cx='11' cy='11' r='2.1' fill='%23f2a516'/%3E%3C/svg%3E">
+<meta name="description" content="Welcome to GVB, make up your own percussion jams, play along with music, or test your best accuracy!">
+<link rel="preload" href="./font/bricolage-grotesque.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+  /* The game's own face, served from this site. Loaded here as well as on the
+     play page so the front door and the game agree, and so the file is already
+     in the cache by the time anybody presses the button. The licence (SIL OFL
+     1.1) is in font/OFL.txt and has to stay there. */
+  @font-face{
+    font-family: 'Bricolage Grotesque';
+    font-style: normal;
+    font-weight: 200 800;
+    font-display: swap;
+    src: url('./font/bricolage-grotesque.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+  :root{
+    --ink:   var(--gv-paper);
+    --paper: var(--gv-text);
+    --muted: var(--gv-muted);
+    --edge:  var(--gv-line);
+    /* The game's own four, so the title screen and the pads agree. */
+    --down: #3d5afe; --up: #0fb5a5; --sync: #e4388c; --fill: #f2a516;
+  }
+  *{ box-sizing: border-box; }
+  html, body{ min-height: 100%; }
+  body{
+    margin: 0;
+    background: var(--ink);
+    color: var(--paper);
+    font: 16px/1.55 'Bricolage Grotesque', var(--gv-type);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* The backdrop is the game's own renderer, running, with nobody playing it —
+     the same rule the shelf card follows. A drawn title screen goes stale the
+     first time somebody changes what a pad looks like; this one cannot. */
+  #plate{
+    position: fixed; inset: 0; margin: auto;
+    image-rendering: auto;
+    z-index: 0;
+  }
+  /* Paper over the top, not ink. The frame of every page on this site is the
+     same paper, and the first cut of this one laid a dark wash under dark text
+     and made the whole title unreadable. A pool under the words, then the
+     frame — the same two layers Sunward's title screen uses, for the same
+     reason. */
+  .veil{
+    position: fixed; inset: 0; z-index: 1;
+    background:
+      radial-gradient(62% 46% at 50% 46%, rgba(244,239,228,.94) 0%, rgba(244,239,228,.72) 58%, rgba(244,239,228,.20) 100%),
+      linear-gradient(180deg, rgba(244,239,228,.90) 0%, rgba(244,239,228,.42) 38%,
+                              rgba(244,239,228,.66) 74%, rgba(244,239,228,.96) 100%);
+  }
+
+  main{
+    position: relative; z-index: 2;
+    min-height: 100dvh; display: grid; grid-template-rows: 1fr auto auto;
+    place-items: center; padding: 2rem 1.2rem 1.4rem; text-align: center;
+  }
+  .wrap{ grid-row: 2; max-width: 34rem; }
+
+  .eyebrow{
+    margin: 0 0 .5rem; font-size: .76rem; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--muted); font-weight: 600;
+  }
+  h1{
+    margin: 0 0 .7rem; font-size: clamp(2.4rem, 9vw, 4rem); line-height: 1;
+    letter-spacing: -.035em; font-weight: 800;
+  }
+  .tag{ margin: 0 auto 1.7rem; max-width: 30rem; color: var(--paper); opacity: .92; }
+  .tag b{ color: var(--up); font-weight: 700; }
+
+  .enter{
+    /* A floor on the width, because the label is one word. A pill that shrinks
+       to fit "Jam" is a pill that stops reading as the thing to press, and it
+       would also jump a centimetre wider the moment there is a save and it
+       becomes "Continue your Jam". */
+    display: inline-block; min-width: 12rem; text-align: center;
+    padding: .82rem 1.8rem; border-radius: 999px;
+    background: linear-gradient(180deg, #6b82ff 0%, var(--down) 100%);
+    color: #fff; font: inherit; font-weight: 800; font-size: 1.12rem;
+    text-decoration: none; box-shadow: var(--gv-shadow);
+    transition: transform .12s ease, filter .12s ease;
+  }
+  .enter:hover, .enter:focus-visible{ transform: translateY(-2px); filter: brightness(1.1); }
+  .enter:focus-visible{ outline: 3px solid var(--up); outline-offset: 3px; }
+
+  .facts{
+    margin: 1.6rem auto 0; padding: 0; list-style: none;
+    display: flex; flex-wrap: wrap; gap: .4rem; justify-content: center;
+  }
+  .facts li{
+    font-size: .74rem; letter-spacing: .04em; text-transform: uppercase; font-weight: 600;
+    color: var(--muted); border: 1px solid var(--edge); border-radius: 999px;
+    padding: .18rem .7rem; background: var(--gv-glass);
+  }
+  .facts li.hot{ color: var(--sync); }
+
+  /* What each colour means, which is the one thing worth knowing before you
+     start: the game never shows a note to catch, it only ever tells you after
+     the fact what the hit you chose was worth. */
+  .key{
+    margin: 1.2rem auto 0; padding: 0; list-style: none;
+    display: flex; flex-wrap: wrap; gap: .1rem 1.1rem; justify-content: center;
+    font-size: .78rem; color: var(--muted);
+  }
+  .key i{
+    display: inline-block; width: .55rem; height: .55rem; border-radius: 50%;
+    margin-right: .4rem; vertical-align: .04rem;
+  }
+  .saved{ margin-top: 1.1rem; font-size: .74rem; color: var(--muted); }
+
+  .back{ grid-row: 3; align-self: end; color: var(--muted); font-size: .8rem; text-decoration: none; }
+  .back:hover, .back:focus-visible{ color: var(--gv-text); }
+
+  @media (prefers-reduced-motion: reduce){
+    .enter{ transition: none; }
+    .enter:hover, .enter:focus-visible{ transform: none; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="plate" width="320" height="190" aria-hidden="true"></canvas>
+<div class="veil"></div>
+
+<main>
+  <div class="wrap">
+    <p class="eyebrow">Good Vibe Games</p>
+    <h1>Good Vibe Beats</h1>
+    <p class="tag">Welcome to GVB, <b>make up your own percussion jams</b>,
+       play along with music, or test your best accuracy!</p>
+
+    <a class="enter" id="enter" href="./play.html">Jam</a>
+
+    <ul class="key">
+      <li><i style="background:var(--down)"></i>On the beat</li>
+      <li><i style="background:var(--up)"></i>Upbeat</li>
+      <li><i style="background:var(--sync)"></i>Syncopated</li>
+      <li><i style="background:var(--fill)"></i>Fill or push</li>
+    </ul>
+
+    <ul class="facts">
+      <li>Single player</li>
+      <li class="hot">Rhythm</li>
+      <li id="counts">lessons and worlds</li>
+      <li>No fail</li>
+    </ul>
+    <p class="saved" id="saved">Nothing is sent anywhere: your progress is saved in this browser.</p>
+  </div>
+
+  <a class="back" href="/">&larr; all Good Vibe Games</a>
+</main>
+
+<script type="module">
+/* The plate is the game's own card renderer, run a little slower than the game
+ * runs — this screen is a shop window, and a shop window wants the whole bar to
+ * be readable in the time it takes somebody to decide.
+ */
+import { paintShot, SHOT_W, SHOT_H } from './shot.js';
+import { LESSONS, TRACKS, levelOf, fromSave, XP_PER_LEVEL } from './content.js';
+
+/* Counted off the tables rather than typed into the markup, because a number
+   in a sentence on a landing page is a number that goes stale the first time
+   somebody adds a row and nobody thinks to look here. */
+document.getElementById('counts').textContent =
+  `${LESSONS.length} lessons, ${TRACKS.length} worlds`;
+
+const canvas = document.getElementById('plate');
+const ctx = canvas.getContext('2d', { alpha: false });
+const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+/* The light kit behind the paper frame. The game itself follows the device,
+   but this page is the site's paper either way, and the dark pads under a
+   paper wash go to mud. */
+const dark = false;
+
+/* Cover the window in both directions and let the crop fall where it likes:
+   this one is a backdrop, so overflowing is right where leaving a gap is not. */
+function fitPlate(){
+  const scale = Math.max(innerWidth / SHOT_W, innerHeight / SHOT_H);
+  canvas.style.width = `${SHOT_W * scale}px`;
+  canvas.style.height = `${SHOT_H * scale}px`;
+}
+fitPlate();
+addEventListener('resize', fitPlate);
+
+/* If there is progress here already, say so — somebody coming back should not
+   have to click through to find out their level is still there. Read through
+   the game's own loader, so a save it would refuse is a save this does not
+   boast about. */
+try {
+  const raw = localStorage.getItem('gvb:save');
+  if(raw){
+    const save = fromSave(JSON.parse(raw));
+    const stars = Object.values(save.stars).reduce((a, b) => a + b, 0);
+    if(save.xp > 0 || stars > 0){
+      document.getElementById('enter').textContent = 'Continue your Jam';
+      document.getElementById('saved').textContent =
+        `Level ${levelOf(save.xp)}, ${stars} star${stars === 1 ? '' : 's'} across ${LESSONS.length} lessons.`;
+    }
+  }
+} catch { /* a private window, or a save this build cannot read. Say nothing. */ }
+
+/* A third of speed, and frozen on the downbeat when motion is off — the
+   backdrop is behind text somebody is reading, and a pad strobing under a
+   paragraph is a pad nobody can read past. */
+function frame(now){
+  paintShot(ctx, still ? 0 : now / 3, { dark, labels: false });
+  if(!still) requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+addEventListener('keydown', event => {
+  if(event.key === 'Enter' && event.target === document.body) document.getElementById('enter').click();
+});
+</script>
+</body>
+</html>

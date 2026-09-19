@@ -32,6 +32,10 @@ const TYPES = {
   '.glb': 'model/gltf-binary',
   '.wasm': 'application/wasm',
   '.webp': 'image/webp',
+  /* The one self-hosted font on the site. Browsers sniff woff2 and would load
+     it as octet-stream anyway, but the deployed Worker serves the right type
+     and local dev should not be the odd one out. */
+  '.woff2': 'font/woff2',
 };
 
 /* Resolve a URL path to a file inside public/, or null.

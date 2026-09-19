@@ -215,6 +215,21 @@
     </div>
   </a>
 
+  <a class="game" href="/gvb/">
+    <canvas class="shot" id="shot-gvb" width="320" height="190"
+            aria-label="Four drum pads in a square, lighting up one after another in blue, teal, pink and amber as a bar goes past."></canvas>
+    <div class="about">
+      <h2>Good Vibe Beats</h2>
+      <p>Welcome to GVB, make up your own percussion jams, play along with
+         music, or test your best accuracy!</p>
+      <ul class="tags">
+        <li>Single player</li>
+        <li class="sun">Rhythm</li>
+        <li class="wip">In development</li>
+      </ul>
+    </div>
+  </a>
+
   <a class="game" href="/greener-thumbs/">
     <img class="shot photo" src="/greener-thumbs/bonsai-thumb.webp" width="640" height="380"
          loading="lazy" decoding="async"
@@ -252,6 +267,8 @@ import { makeWorld as otWorld } from './orbital-trader/orbit.js';
 import { PALETTE as SS_PAL, HERO_ART as SS_HERO, ENEMY_ART as SS_ENEMY } from './solarium/art.js';
 
 import { createLot, growthFor } from './sunward/art.js';
+
+import { paintShot as gvbPaintShot } from './gvb/shot.js';
 
 /* Aliased throughout: this game's `paintScene` is not Save Solarium's, and its
    `newGame`/`tick` are names half the games here would claim if asked. */
@@ -514,10 +531,25 @@ function paintDuckDuckQuack(now){
    wall, down the step — which is the picture the card is for. */
 if(still){ for(let i = 0; i < 300; i++) dqStep(); }
 
+/* ---- Good Vibe Beats: one bar of Funk world ---------------------------- */
+
+/* The only card that is not a scene, because the game is not one: four pads
+   lighting in the colour of what each hit was worth. The bar it plays is the
+   one the scoring likes — a kick on the one, a backbeat, hats on the "and" and
+   a kick pushed onto the "a" of three — so every colour on the card is a
+   colour the game would really have given you. */
+const gvb = document.getElementById('shot-gvb').getContext('2d', { alpha: false });
+const gvbDark = matchMedia('(prefers-color-scheme: dark)').matches;
+
+function paintGoodVibeBeats(now){
+  gvbPaintShot(gvb, still ? 0 : now, { dark: gvbDark });
+}
+
 /* One loop for all the cards. Nothing here is the game, so it can afford to be
-   lazy: the turbines, the seeds, Sunward's sky, the moons and one flock of
-   ducklings are the only things that move. */
+   lazy: the turbines, the seeds, Sunward's sky, the moons, one flock of
+   ducklings and four drum pads are the only things that move. */
 function frame(now){
+  paintGoodVibeBeats(now);
   paintGoodVibes(now);
   paintSolarium(now);
   paintSunward(now);
