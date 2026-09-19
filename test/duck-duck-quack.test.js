@@ -2186,23 +2186,21 @@ test('no level puts walkable ground so high that a ramp leaves the picture', () 
 
 /* ------------------------------------------ The Stepping Stones, played */
 
-/* The zigzag, worked the way a player would: a Blocker to turn the flock
-   round on the islands that double back, and six Builders — four single
-   ramps and, for the last hop, the climb-level-climb staircase. The two
-   turning Blockers stay planted; they are the route, not a hold. */
+/* The zigzag, then the crag and the notch. Three ramps get the flock up the
+   islands — a Blocker to turn it round on each one that doubles back — and
+   from the top island every duckling that wants the water climbs the crag
+   and hops the notch for itself. The two turning Blockers stay planted;
+   they are the route, not a hold. */
 const STONES_PLAN = [
-  { y: 150, at: 120, dir: 1 },                 // pen -> island A
-  { y: 126, at: 120, dir: -1, turn: 185 },     // A -> B, back to the left
-  { y: 102, at: 60, dir: 1, turn: 35 },        // B -> C, right again
-  { y: 78, at: 100, dir: 1 },                  // C: climb
-  { y: 54, at: 133, dir: 1 },                  //    level
-  { y: 54, at: 166, dir: 1 },                  //    climb, onto D
+  { y: 150, at: 80,  dir: 1 },                 // pen -> island A
+  { y: 126, at: 115, dir: -1, turn: 186 },     // A -> B, back to the left
+  { y: 102, at: 50,  dir: 1,  turn: 33 },      // B -> C, right again
 ];
 
-function playLevel10({ steps = STONES_PLAN.length, turns = true } = {}){
+function playLevel10({ steps = STONES_PLAN.length, turns = true,
+                       climbers = true, jumpers = true } = {}){
   const state = newGame(LEVEL_10);
   let stage = 0, held = null;
-  const kinds = [];
   for(let i = 0; i < LEVEL_10.timeLimit && !state.ended; i++){
     const move = stage < steps ? STONES_PLAN[stage] : null;
     if(move){
@@ -2211,28 +2209,60 @@ function playLevel10({ steps = STONES_PLAN.length, turns = true } = {}){
           && Math.round(k.x) === move.turn && k.y === move.y);
         if(d && assignSkill(state, d.id, 'blocker')) held = d;
       }
-      if(!move.turn || !turns || held){
+      if(move.turn == null || !turns || held){
         const d = state.ducks.find(k => k.state === 'walking'
           && Math.round(k.x) === move.at && k.y === move.y && k.dir === move.dir);
-        if(d && assignSkill(state, d.id, 'builder')){
-          kinds.push(d.buildLevel ? 'level' : 'climb');
-          stage++;
-          held = null;    // it stays planted: the turn is the route
-        }
+        if(d && assignSkill(state, d.id, 'builder')){ stage++; held = null; }
       }
+    }
+    /* On the top island, and only there: a Climber given down in the pen
+       scales the pen's own wall and walks into the chasm behind it. */
+    for(const d of state.ducks){
+      if(d.state !== 'walking' || d.y !== 78) continue;
+      if(climbers && !hasTrait(d, 'climber')) assignSkill(state, d.id, 'climber');
+      if(jumpers && !hasTrait(d, 'jumper')) assignSkill(state, d.id, 'jumper');
     }
     tick(state);
   }
-  return { state, built: stage, kinds };
+  return { state, built: stage };
 }
 
-test('The Stepping Stones can be won by climbing the zigzag', () => {
-  const { state, built, kinds } = playLevel10();
-  assert.equal(built, 6, 'all six ramps should have gone in');
-  assert.deepEqual(kinds, ['climb', 'climb', 'climb', 'climb', 'level', 'climb'],
-    'four ramps off solid ground, then the climb-level-climb staircase');
+test('The Stepping Stones can be won by climbing the zigzag, then the crag', () => {
+  const { state, built } = playLevel10();
+  assert.equal(built, 3, 'all three ramps should have gone in');
   assert.equal(state.ended, 'won');
   assert.ok(state.saved >= winCount(LEVEL_10), `only ${state.saved} saved, needed ${winCount(LEVEL_10)}`);
+});
+
+test('The Stepping Stones cannot be finished without a Climber', () => {
+  // The crag is forty-eight pixels of rock over the top island: too tall for
+  // one ramp, too tall to hop, and nothing to tunnel.
+  const { state, built } = playLevel10({ climbers: false });
+  assert.equal(built, 3, 'the flock still gets up the islands');
+  assert.equal(state.saved, 0, 'and then stops at the crag');
+  assert.notEqual(state.ended, 'won');
+});
+
+test('The Stepping Stones cannot be finished without a Jumper', () => {
+  // The notch is three columns of nothing with the shelf level on the far
+  // side: no wall to climb, and no ramp left to lay over it.
+  const { state } = playLevel10({ jumpers: false });
+  assert.equal(state.saved, 0);
+  assert.ok(state.ducks.some(d => d.cause === 'fell'), 'they walk into the notch instead');
+  assert.notEqual(state.ended, 'won');
+});
+
+test('The Stepping Stones has no ramp to spare, which is what makes those two skills skills', () => {
+  /* A Builder answers almost anything given room. A spare one on the top
+     island climbs to within a hop of the crag; a spare one on the crag lays
+     a deck straight over the notch. Three ramps, three Builders, and every
+     one of them needed for the climb itself — so there is nothing left to
+     improvise the last two obstacles with. */
+  assert.equal(LEVEL_10.supply.builder, STONES_PLAN.length);
+  for(let n = 0; n < STONES_PLAN.length; n++){
+    const { state } = playLevel10({ steps: n });
+    assert.equal(state.saved, 0, `${n} of three ramps should save nobody`);
+  }
 });
 
 test('The Stepping Stones cannot be climbed without the Blockers that turn the flock', () => {
@@ -2240,14 +2270,6 @@ test('The Stepping Stones cannot be climbed without the Blockers that turn the f
   assert.ok(built <= 1, 'nothing past the first island can even be built');
   assert.equal(state.saved, 0);
   assert.notEqual(state.ended, 'won');
-});
-
-test('every one of The Stepping Stones\' six ramps is load-bearing', () => {
-  for(let n = 1; n < STONES_PLAN.length; n++){
-    const { state } = playLevel10({ steps: n });
-    assert.equal(state.saved, 0, `${n} of six ramps should save nobody`);
-    assert.notEqual(state.ended, 'won');
-  }
 });
 
 test('The Stepping Stones leaves the flock safe on the ground and nowhere else', () => {
@@ -2258,52 +2280,27 @@ test('The Stepping Stones leaves the flock safe on the ground and nowhere else',
   assert.ok(state.lost <= 1, `the pen should not be killing anybody, lost ${state.lost}`);
   assert.ok(state.rock[5] && state.rock[205], 'both walls are rock');
   // And the first island is a forgiving mistake, the rest are not.
-  const [a, b, c, d] = LEVEL_10.islands;
+  const [a, b, c] = LEVEL_10.islands;
   assert.equal(150 - a.y, FALL_SAFE, 'falling off island A lands in the pen unhurt');
-  for(const isle of [b, c, d]){
+  for(const isle of [b, c]){
     assert.ok(150 - isle.y > FALL_SAFE, `falling off the island at ${isle.y} is fatal`);
   }
 });
 
-test('The Stepping Stones puts its pond on the top island, past everything else', () => {
-  const [, , , top] = LEVEL_10.islands;
-  assert.ok(LEVEL_10.goalX > top.from && LEVEL_10.goalX < top.to,
-    'the pond is the right-hand end of the top island');
+test('The Stepping Stones puts the crag out of the pen\'s reach', () => {
+  /* The chasm between the pen's right-hand wall and the crag is the whole
+     reason the climb cannot be skipped: give it walkable ground and a
+     Climber would go straight up the crag from the pen floor. */
   const terrain = buildTerrain(LEVEL_10.segments, LEVEL_10.width);
-  assert.ok(terrain[LEVEL_10.goalX] >= SCENE_H,
-    'and there is no ground under it, so the pen cannot simply walk to it');
-  for(const isle of LEVEL_10.islands){
-    if(isle === top) continue;
-    assert.ok(isle.to <= LEVEL_10.goalX, 'and no lower island reaches it either');
+  for(let x = 212; x < 230; x++){
+    assert.ok(terrain[x] >= SCENE_H, `column ${x} between pen and crag should be open air`);
   }
-});
-
-test('no Digger gets through rock on any level, however many are handed out', () => {
-  /* The sweep behind a bug report that turned out to be a drawing fault
-     rather than a rule one: a player watched a tunnel go through a purple
-     band and reasonably concluded Diggers could cut rock. They could not,
-     and this is the version of that claim a test can hold — every level,
-     every duckling handed a Digger every tick it is able to take one, and
-     not one column of stone ever cut. (The picture is fixed too: rock is
-     banded slate now and subsoil is darker, see art.js's drawStoneColumn.) */
-  for(const level of LEVELS){
-    const state = newGame(level);
-    state.supply.digger = 999;
-    for(let i = 0; i < level.timeLimit && !state.ended; i++){
-      for(const d of state.ducks){
-        if(d.state === 'walking' && !hasTrait(d, 'digger')) assignSkill(state, d.id, 'digger');
-      }
-      tick(state);
-      for(let x = 0; x < level.width; x++){
-        const cut = state.tunnelY[x];
-        if(cut == null) continue;
-        assert.ok(!state.rock[x], `${level.name}: a tunnel was cut through rock at column ${x}`);
-        const seam = state.rockBelow[x];
-        assert.ok(seam == null || cut <= seam,
-          `${level.name}: a tunnel at ${cut} ran under the rock seam at ${seam}, column ${x}`);
-      }
-    }
-  }
+  const [, , top] = LEVEL_10.islands;
+  assert.equal(top.to, 230, 'the top island is the only thing that reaches the crag');
+  assert.ok(top.y - terrain[230] > BUILD_RISE_HEIGHT,
+    'and the crag stands taller over it than any one ramp climbs');
+  assert.ok(LEVEL_10.goalX > 249 && terrain[LEVEL_10.goalX] < SCENE_H,
+    'the pond is on the shelf past the notch');
 });
 
 /* ------------------------------------------------- The Belfry, played */

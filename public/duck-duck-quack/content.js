@@ -88,7 +88,7 @@
    straight off the page whether they have the latest build, rather than
    having to guess from behavior alone. Bump it on every change that ships,
    however small. */
-export const GAME_VERSION = '1.20';
+export const GAME_VERSION = '1.21';
 
 export const SCENE_W = 320;
 export const SCENE_H = 180;
@@ -1293,53 +1293,78 @@ export const LEVEL_10 = {
                 back rather than let it walk off the edge of the level
      [12, 200)  the pen floor, with the nest at one end and the goose
                 patrolling the middle
-     [200, 212) the right rock wall, the same thing at the other end. Forty
-                pixels, taller than any one ramp climbs, so nothing ever
-                gets on top of it and off into the void beyond
-     [212, 320) the void under the upper islands */
+     [200, 212) the right rock wall
+     [212, 230) the chasm between the pen and the crag. It is what keeps the
+                crag off the pen's own floor: any walkable ground across
+                here and a Climber could go straight up the crag from the
+                pen and skip the whole climb
+     [230, 246) the crag. Rock, and forty-eight pixels over the top island —
+                too tall for one ramp, and too tall to hop from the deck of
+                one either, which is what makes it a Climber's and nothing
+                else's
+     [246, 249) the notch. Three columns of nothing, and the last thing
+                between a duckling and the water
+     [249, 320) the shelf the pond sits on */
   segments: [
     { from: 0, to: 12, y: 110, hard: true },
     { from: 12, to: 200, y: 150 },
     { from: 200, to: 212, y: 110, hard: true },
-    { from: 212, to: 320, y: PIT_Y },
+    { from: 212, to: 230, y: PIT_Y },
+    { from: 230, to: 246, y: 30, hard: true },
+    { from: 246, to: 249, y: PIT_Y },
+    { from: 249, to: 320, y: 30 },
   ],
 
-  /* Right, then back left, then right, then right and up again — and each
-     one higher than the last. Ten pixels thick rather than the fourteen The
-     Overlook's shelf gets: three of these stack within fifty pixels of each
-     other over the middle of the level, and a duckling walking the lower
-     one wants air over its head. */
+  /* Right, then back left, then right again — each one a single ramp above
+     the last, and the top one running all the way out over the chasm to the
+     foot of the crag. */
   islands: [
     { from: 110, to: 190, y: 126, floor: 136 },   // A: one ramp up from the pen
     { from: 30, to: 100, y: 102, floor: 112 },    // B: back to the left
-    { from: 60, to: 150, y: 78, floor: 88 },      // C: right again
-    { from: 165, to: 320, y: 30, floor: 40 },     // D: the top, with the pond on it
+    { from: 60, to: 230, y: 78, floor: 88 },      // C: right again, and out to the crag
   ],
 
   nestX: 18,
-  /* Inside the top island, so its right-hand end is open water — art.js
-     decides that off goalX alone (see isPondAt), and draws the pond on
-     whatever surface happens to be carrying it. */
   goalX: 290,
 
   duckCount: 24,
   spawnInterval: TICK_RATE * 3,
-  timeLimit: TICK_RATE * 420,       // seven minutes: six ramps and a lot of walking
+  timeLimit: TICK_RATE * 420,
   winRatio: 0.5,
 
-  /* Builder: ten, for the six the climb needs. Four spare is more margin
-     than any other level gives its mandatory skill, and this is the level
-     that wants it — every ramp is a placement decision, a ramp in the wrong
-     place cannot be taken back, and the last thing this level should be is
-     one where the sixth mistake ends a run that was going fine. Blocker:
-     six, for the two turns the route cannot be walked without and four for
-     the ledges. Digger: zero — both walls are rock and there is nothing
-     else here to tunnel. Climber: zero; the walls are the only things to
-     climb and the top of either one is the void. Flyer: two, which save a
-     duckling that has already walked off something rather than opening any
-     route of their own. Jumper: one, as everywhere now
-     — a hop over the goose sends it off empty-beaked. */
-  supply: { digger: 0, builder: 10, blocker: 6, climber: 0, flyer: 2, jumper: 1 },
+  /* Three ramps, three Builders, and not one spare — which is the whole
+   * reason the last two skills are skills rather than suggestions.
+   *
+   * A Builder is the most flexible thing in this game and it will answer
+   * almost anything given room: a spare one laid on the top island climbs
+   * to within six pixels of the crag, near enough to hop; a spare one laid
+   * on the crag sails a deck straight over the notch and lands the flock on
+   * the far shelf. Either one turns a required skill into an optional one.
+   * So every ramp here is spoken for by the climb that gets the flock onto
+   * the top island at all, and what is left over is nothing.
+   *
+   * That is a real cost and worth being plain about: this is now the one
+   * level in the game where a ramp in the wrong place cannot be recovered
+   * from. It used to carry four spare on purpose. It cannot carry any and
+   * still ask for a Climber.
+   *
+   * Climber: sixteen, four over the quota. The crag is forty-eight pixels
+   * of rock and every duckling that wants the water goes up it. Note that a
+   * Climber given down in the pen is a Climber wasted and a duckling with
+   * it — it will scale the pen's own right-hand wall and walk off into the
+   * chasm beyond. Where a skill is spent has always mattered here; this is
+   * the level that says so out loud.
+   *
+   * Jumper: sixteen, the same. The notch is three columns of nothing with
+   * the shelf level on the far side — no wall to climb, nothing to tunnel,
+   * and no ramp left to lay across it. A Flyer is no use either: it starts
+   * its glide already below the shelf it would have to reach.
+   *
+   * Blocker: six, for the two turns the climb cannot be walked without.
+   * Flyer: two, which save a duckling that has walked off a ledge rather
+   * than opening any route of their own. Digger: zero — every wall here is
+   * rock. */
+  supply: { digger: 0, builder: 3, blocker: 6, climber: 16, flyer: 2, jumper: 16 },
 
   goose: { x0: 90, x1: 150, y: 150, speed: 1.5, catchRadius: 1.5 },
 };
