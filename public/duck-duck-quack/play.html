@@ -58,6 +58,19 @@
     .rotate-hint{ display: flex; }
   }
 
+  /* The level's own hint, over the scene where it is read before the first
+     duckling is out of the nest rather than beside the skill buttons, which
+     is where a player is already looking for something else. Gold down the
+     left edge so it reads as advice rather than as another status line. */
+  .level-hint{
+    display: flex; align-items: baseline; gap: 0.5rem;
+    margin: 0 0 0.6rem; padding: 0.5rem 0.7rem;
+    background: var(--panel); border: 1px solid var(--line);
+    border-left: 3px solid #ffd34e; border-radius: 6px;
+    font-size: 0.85rem; line-height: 1.45; color: var(--muted);
+  }
+  .level-hint b{ color: var(--text); font-weight: 700; flex: none; }
+
   header{ display: flex; align-items: baseline; gap: 0.9rem; flex-wrap: wrap; padding-bottom: 0.5rem; }
   header h1{ margin: 0; font-size: 1.2rem; font-weight: 800; }
   header .level-name{ color: var(--muted); font-weight: 600; }
@@ -297,6 +310,8 @@
     Turn your phone sideways — landscape gives the flock a lot more room.
   </p>
 
+  <p class="level-hint" id="level-hint" role="note" hidden><b>Hint</b><span id="level-hint-text"></span></p>
+
   <div class="layout">
     <div class="screen-col">
       <div class="screen">
@@ -374,6 +389,14 @@
     `— Level ${levelNumber} of ${LEVELS.length}: ${LEVEL.name}`;
   document.title = `Duck Duck Quack — Level ${levelNumber}: ${LEVEL.name}`;
   document.getElementById('game-version').textContent = `v${GAME_VERSION}`;
+
+  /* The level's hint, shown if it has one. Hidden rather than empty when it
+     does not, so a level without one leaves no ruled box sitting over the
+     scene — though a test says every level has one. */
+  if(LEVEL.hint){
+    document.getElementById('level-hint-text').textContent = LEVEL.hint;
+    document.getElementById('level-hint').hidden = false;
+  }
 
   const els = id => document.getElementById(id);
   const ui = {

@@ -88,7 +88,7 @@
    straight off the page whether they have the latest build, rather than
    having to guess from behavior alone. Bump it on every change that ships,
    however small. */
-export const GAME_VERSION = '1.26';
+export const GAME_VERSION = '1.27';
 
 export const SCENE_W = 320;
 export const SCENE_H = 180;
@@ -377,11 +377,20 @@ export function stairs(from, y0, y1, rise, width = 1){
  * duckling at a time. The skill is still on the page, at zero, so it reads
  * as something held back rather than something missing.
  */
-export const LEVEL_1 = {
+export const LEVEL_PARK = {
   id: 'park',
   name: 'The Park',
   width: SCENE_W,
   height: SCENE_H,
+
+  /* What the page tells a player before they start — the obstacle that
+
+     actually stops people here and the idea that answers it, not a
+
+     walkthrough. See play.html, which prints it under the header. */
+
+  hint: 'A ramp is laid once and the whole flock walks over it; a Climber or a Flyer only ever helps the one duckling you spent it on. This gap is a little longer than one ramp reaches — lay the second from the end of the first.',
+
 
   /* [0, 70)    flat ground out of the nest
      [70, 105)  the gap — 35 columns of pit, wants a Builder
@@ -454,11 +463,20 @@ export const LEVEL_1 = {
  * being careful with, not just generous with: planted anywhere on the one
  * road out of the nest, it is a wall for the rest of the flock too.
  */
-export const LEVEL_2 = {
+export const LEVEL_WARREN = {
   id: 'warren',
   name: 'The Warren',
   width: SCENE_W,
   height: SCENE_H,
+
+  /* What the page tells a player before they start — the obstacle that
+
+     actually stops people here and the idea that answers it, not a
+
+     walkthrough. See play.html, which prints it under the header. */
+
+  hint: 'No Climbers and no Flyers down here, so every wall has to be tunnelled. A dig goes through once and stays open for everyone behind it, which is why two Diggers in the right places are most of the level.',
+
 
   /* [0, 40)    flat ground out of the nest
      [40, 65)   the gap — 25 columns of pit, wants a Builder
@@ -576,11 +594,20 @@ export const LEVEL_2 = {
  * the last thing standing between a duckling and the water is one more
  * span of open air, not a new skill.
  */
-export const LEVEL_3 = {
+export const LEVEL_ORCHARD = {
   id: 'orchard',
   name: 'The Orchard',
   width: SCENE_W,
   height: SCENE_H,
+
+  /* What the page tells a player before they start — the obstacle that
+
+     actually stops people here and the idea that answers it, not a
+
+     walkthrough. See play.html, which prints it under the header. */
+
+  hint: 'The pond is off to the left this time, and the flock hatches walking that way. Same gap, wall and drop as The Park — met in a mirror, and with a much bigger hatch to get through them.',
+
 
   /* [0, 20)    the pond
      [20, 35)   the second gap — 15 columns of pit, wants a Builder
@@ -695,11 +722,20 @@ export const LEVEL_3 = {
  * Warren's — a duckling can be planted, without anything here actually
  * asking for it.
  */
-export const LEVEL_4 = {
+export const LEVEL_GROVE = {
   id: 'grove',
   name: 'The Grove',
   width: SCENE_W,
   height: SCENE_H,
+
+  /* What the page tells a player before they start — the obstacle that
+
+     actually stops people here and the idea that answers it, not a
+
+     walkthrough. See play.html, which prints it under the header. */
+
+  hint: 'A Digger walking into the foot of that wall gets nowhere: the bottom of it is rock. The dirt is higher up, so stand a ramp against the wall and dig from the top of it.',
+
 
   /* [0, 50)    flat ground out of the nest
      [50, 78)   the gap — 28 columns of pit, wants a Builder
@@ -767,11 +803,20 @@ export const LEVEL_4 = {
  * the last stretch. It works exactly the way it does everywhere else —
  * present, one bite, done.
  */
-export const LEVEL_5 = {
+export const LEVEL_AERIE = {
   id: 'aerie',
   name: 'The Aerie',
   width: SCENE_W,
   height: SCENE_H,
+
+  /* What the page tells a player before they start — the obstacle that
+
+     actually stops people here and the idea that answers it, not a
+
+     walkthrough. See play.html, which prints it under the header. */
+
+  hint: 'That face is rock, and rock is the one thing a Digger cannot start on — it has to be climbed. Watch the far side of the climb: it is a ledge with a gap under it, not a landing.',
+
 
   /* [0, 40)    flat ground out of the nest
      [40, 65)   the gap — 25 columns of pit, wants a Builder
@@ -888,11 +933,20 @@ export const LEVEL_5 = {
  * column two floors, the hillside over the hole and the hole itself,
  * rather than only the lower one.
  */
-export const LEVEL_6 = {
+export const LEVEL_SPIRE = {
   id: 'spire',
   name: 'The Spire',
   width: SCENE_W,
   height: SCENE_H,
+
+  /* What the page tells a player before they start — the obstacle that
+
+     actually stops people here and the idea that answers it, not a
+
+     walkthrough. See play.html, which prints it under the header. */
+
+  hint: 'You start at the top and the pond is at the bottom. The steps down the spire\'s left face are short enough to walk down for nothing and too tall to walk back up, so everything here is one-way.',
+
 
   /* [0, 60)    the rock bluff — forty pixels of `hard` stone standing over
                 the pen's floor, undiggable, there to turn a duckling
@@ -989,11 +1043,20 @@ export const LEVEL_6 = {
  * there has long since stopped by the time a duckling arrives. Lengthen
  * BUILD_SECONDS much and this is the level that notices first.
  */
-export const LEVEL_7 = {
+export const LEVEL_FALLS = {
   id: 'falls',
   name: 'The Falls',
   width: SCENE_W,
   height: SCENE_H,
+
+  /* What the page tells a player before they start — the obstacle that
+
+     actually stops people here and the idea that answers it, not a
+
+     walkthrough. See play.html, which prints it under the header. */
+
+  hint: 'The whole walk runs downhill, and it is the drops rather than the gaps that cost ducklings. A Flyer saves only the duckling holding it, so keep them for the falls that are actually far enough to hurt.',
+
 
   /* Every height here is lower than it used to be, and the level's top is
      the reason: at fifteen pixels, the plateau on the wall was so close to
@@ -1083,11 +1146,20 @@ export const LEVEL_7 = {
  * knack is not spent by using it, which is the difference between Jumper and
  * every other per-duckling skill here.
  */
-export const LEVEL_8 = {
+export const LEVEL_HEDGEROW = {
   id: 'hedgerow',
   name: 'The Hedgerow',
   width: SCENE_W,
   height: SCENE_H,
+
+  /* What the page tells a player before they start — the obstacle that
+
+     actually stops people here and the idea that answers it, not a
+
+     walkthrough. See play.html, which prints it under the header. */
+
+  hint: 'Everything in the way is small — narrow ditches and one low stile — and small is the one size nothing else answers. There is no Digger, Climber or Flyer on the page because not one of them has anything to do here.',
+
 
   /* [0, 30)    flat ground out of the nest
      [30, 34)   the first ditch — four columns, a hop (see JUMP_SPAN)
@@ -1172,11 +1244,20 @@ export const LEVEL_8 = {
  * mistakes a player is likely to make, and not a way to skip anything —
  * every duckling that flies down lands back where it started.
  */
-export const LEVEL_9 = {
+export const LEVEL_OVERLOOK = {
   id: 'overlook',
   name: 'The Overlook',
   width: SCENE_W,
   height: SCENE_H,
+
+  /* What the page tells a player before they start — the obstacle that
+
+     actually stops people here and the idea that answers it, not a
+
+     walkthrough. See play.html, which prints it under the header. */
+
+  hint: 'The shelf overhead is plainly a road and plainly out of reach — no ramp climbs seventy pixels. The pads are the way up: a duckling that steps on one comes out of the other.',
+
 
   /* [0, 60)    flat ground out of the nest
      [60, 85)   the gap — 25 columns of pit, wants a Builder
@@ -1294,11 +1375,20 @@ export const LEVEL_9 = {
  * the ground. There is nothing else up there and nothing to do once a
  * duckling arrives. The whole of the level is the getting there.
  */
-export const LEVEL_10 = {
+export const LEVEL_STONES = {
   id: 'stones',
   name: 'The Stepping Stones',
   width: SCENE_W,
   height: SCENE_H,
+
+  /* What the page tells a player before they start — the obstacle that
+
+     actually stops people here and the idea that answers it, not a
+
+     walkthrough. See play.html, which prints it under the header. */
+
+  hint: 'Only a Blocker turns a duckling round, so the two that turn the flock are the route, not a safety net. Every duckling that wants the water climbs the crag and hops the notch — and a duckling with a Jumper hops the goose too, and keeps the Jumper. Stand the turners down last, the lower one first.',
+
 
   /* [0, 12)    the left rock wall — `hard`, and there to turn a duckling
                 back rather than let it walk off the edge of the level
@@ -1436,11 +1526,20 @@ export const LEVEL_10 = {
  * the whole of the last move, and it needs nothing spent on it: getting a
  * flock to the pad is the level.
  */
-export const LEVEL_11 = {
+export const LEVEL_BELFRY = {
   id: 'belfry',
   name: 'The Belfry',
   width: SCENE_W,
   height: SCENE_H,
+
+  /* What the page tells a player before they start — the obstacle that
+
+     actually stops people here and the idea that answers it, not a
+
+     walkthrough. See play.html, which prints it under the header. */
+
+  hint: 'Each floor is one ramp above the last, but they are staggered, so the flock always arrives going the wrong way for the next climb. A ramp climbs whichever way the duckling was already walking, and only a Blocker turns one around.',
+
 
   /* [0, 10)    the left rock wall — `hard`, so nothing walks off the edge
      [10, 140)  the pen floor, with the nest at one end
@@ -1564,11 +1663,20 @@ export const LEVEL_11 = {
  * and flees for good (see stepGoose). Floor, or the bird. Three Blockers, so
  * that is a choice and not a gamble.
  */
-export const LEVEL_12 = {
+export const LEVEL_ERRAND = {
   id: 'errand',
   name: 'The Errand',
   width: SCENE_W,
   height: SCENE_H,
+
+  /* What the page tells a player before they start — the obstacle that
+
+     actually stops people here and the idea that answers it, not a
+
+     walkthrough. See play.html, which prints it under the header. */
+
+  hint: 'Plant a Blocker before anything else — the flock hatches walking straight at the chasm and a few seconds is all it takes. After that exactly one duckling makes the trip, and there is no second one to send if it goes wrong.',
+
 
   /* [0, 70)    the far shelf, with the water off its left-hand end. Where
                 the errand comes out, and where the flock ends up
@@ -1630,8 +1738,29 @@ export const LEVEL_12 = {
   goose: { x0: 90, x1: 140, y: 120, speed: 1.1, catchRadius: 1.5 },
 };
 
-export const LEVELS = [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5, LEVEL_6, LEVEL_7, LEVEL_8,
-  LEVEL_9, LEVEL_10, LEVEL_11, LEVEL_12];
+/* The order they are played in, and the only place that order is written
+ * down. Everything else in the game — the board, the per-level records, the
+ * songs, the rooms, every link into a level — is keyed by a level's `id`, so
+ * this list can be rearranged without stranding a single saved score. A
+ * level's number on the page is its place in here plus one, and nothing
+ * more.
+ *
+ * The constants are named for the level rather than for a position, which
+ * they used to be (LEVEL_1 and so on). Positional names survive exactly
+ * until the first reorder: The Warren opens the game now, and `LEVEL_1`
+ * would have meant The Park sitting second, which is the kind of comment
+ * nobody reads twice and everybody trips over once.
+ *
+ * The Warren before The Park, because it is the gentler of the two and it
+ * had been second. The Park asks for eight of ten — the steepest quota in
+ * the game — and its one gap is longer than a single ramp, so a first-time
+ * player has to find the two-builder trick before they have found anything
+ * else. The Warren asks nine of twelve, every wall it has is answered by the
+ * one skill it hands out, and a tunnel stays dug for the whole flock behind
+ * it. That is a better first thing to learn.
+ */
+export const LEVELS = [LEVEL_WARREN, LEVEL_PARK, LEVEL_ORCHARD, LEVEL_GROVE, LEVEL_AERIE, LEVEL_SPIRE, LEVEL_FALLS, LEVEL_HEDGEROW,
+  LEVEL_OVERLOOK, LEVEL_STONES, LEVEL_BELFRY, LEVEL_ERRAND];
 
 export const winCount = level => Math.ceil(level.duckCount * level.winRatio);
 

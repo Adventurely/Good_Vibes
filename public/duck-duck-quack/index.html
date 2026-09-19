@@ -237,7 +237,10 @@
        <b>Dig, build, block, climb, fly or jump</b> — give it a skill before it meets a
        gap, a wall, a drop, or the goose — and get enough of the hatch to the pond.</p>
 
-    <a class="enter" href="./play.html?level=park">Hatch the flock</a>
+    <!-- Points at whatever LEVELS puts first, set below rather than written
+         here: this link named the park outright and went on pointing at it
+         when the running order changed. -->
+    <a class="enter" id="enter" href="./play.html">Hatch the flock</a>
     <p class="more-levels" id="levels-label">or start anywhere &mdash; every level, as it actually looks</p>
     <ul class="levels" id="levels" aria-labelledby="levels-label"></ul>
 
@@ -283,7 +286,7 @@
   /* The plate is the park itself, running, with a slow bot playing it over
      and over — the same rule every title screen on this site follows: this is
      not a picture of the game, it is the game, and it cannot go stale. */
-  import { LEVEL_1, LEVELS, SKILLS, GAME_VERSION } from './content.js';
+  import { LEVEL_PARK, LEVELS, SKILLS, GAME_VERSION } from './content.js';
   import { newGame, tick, assignSkill, hasTrait } from './sim.js';
   import { paintScene } from './art.js';
   import { createAudio } from './audio.js';
@@ -303,6 +306,7 @@
   import { fetchBoard, syncPlayer, REFRESH_AFTER, OUT_OF_REACH } from './board.js';
 
   document.getElementById('game-version').textContent = `v${GAME_VERSION}`;
+  document.getElementById('enter').href = `./play.html?level=${LEVELS[0].id}`;
 
   /* The level picker: one card per level, each showing that level rather
      than naming it. A fresh `newGame` is the level at tick zero — its
@@ -625,9 +629,9 @@
   const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   function fitPlate(){
-    const scale = Math.max(1, Math.ceil(Math.max(innerWidth / LEVEL_1.width, innerHeight / LEVEL_1.height)));
-    canvas.style.width = `${LEVEL_1.width * scale}px`;
-    canvas.style.height = `${LEVEL_1.height * scale}px`;
+    const scale = Math.max(1, Math.ceil(Math.max(innerWidth / LEVEL_PARK.width, innerHeight / LEVEL_PARK.height)));
+    canvas.style.width = `${LEVEL_PARK.width * scale}px`;
+    canvas.style.height = `${LEVEL_PARK.height * scale}px`;
   }
   fitPlate();
   addEventListener('resize', fitPlate);
@@ -636,7 +640,7 @@
      gap once, then give every duckling its own climber for the wall and its
      own flyer for the drop off the far side of the plateau, since neither
      of those leaves anything behind for the next one. */
-  let state = newGame(LEVEL_1);
+  let state = newGame(LEVEL_PARK);
   let builderUsed = false, rampExtended = false;
 
   function playStep(){
@@ -644,7 +648,7 @@
       if(d.state !== 'walking') continue;
       // The Park's gap is wider than one ramp reaches, so this lays one at
       // the lip and then extends it from its far end — see content.js's
-      // note on LEVEL_1, and BUILD_SECONDS for why it takes two.
+      // note on LEVEL_PARK, and BUILD_SECONDS for why it takes two.
       if(!builderUsed && d.x === 69 && assignSkill(state, d.id, 'builder')){ builderUsed = true; continue; }
       const end = state.decks.findLastIndex(at => at.length > 0);
       if(builderUsed && !rampExtended && end > 0 && d.x === end && state.decks[end].includes(d.y)){
@@ -656,7 +660,7 @@
     }
     tick(state);
     if(state.ended){
-      state = newGame(LEVEL_1);
+      state = newGame(LEVEL_PARK);
       builderUsed = false;
       rampExtended = false;
     }

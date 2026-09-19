@@ -20,13 +20,13 @@
  *   node test/duck-duck-quack-balance.mjs
  */
 
-import { LEVEL_1, SKILLS, TICK_RATE, winCount, formatTime } from '../public/duck-duck-quack/content.js';
+import { LEVEL_PARK, SKILLS, TICK_RATE, winCount, formatTime } from '../public/duck-duck-quack/content.js';
 import { newGame, tick, assignSkill, hasTrait } from '../public/duck-duck-quack/sim.js';
 
 /* ------------------------------------------------------------- the bridge --- */
 
 /* The Park's gap is thirty-five columns and one ramp reaches thirty-three
-   (see content.js's BUILD_SECONDS and LEVEL_1's own note), so bridging it is
+   (see content.js's BUILD_SECONDS and LEVEL_PARK's own note), so bridging it is
    two Builders rather than one: lay the first at the lip, then give a second
    to a duckling standing on the far end of the ramp that one left, which
    carries it on level rather than climbing again (see sim.js's assignSkill).
@@ -103,7 +103,7 @@ const STRATEGIES = {
   minimalSpend(state, mem){
     mem.climbersGiven ??= 0;
     mem.flyersGiven ??= 0;
-    const need = winCount(LEVEL_1);
+    const need = winCount(LEVEL_PARK);
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
       if(bridgeGap(state, mem, d)) continue;
@@ -122,7 +122,7 @@ const STRATEGIES = {
      really the floor for Climber, or does the level actually want a spare? */
   climberShortOne(state, mem){
     mem.climbersGiven ??= 0;
-    const need = winCount(LEVEL_1) - 1;
+    const need = winCount(LEVEL_PARK) - 1;
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
       if(bridgeGap(state, mem, d)) continue;
@@ -138,7 +138,7 @@ const STRATEGIES = {
      same question aimed at the drop instead of the wall. */
   flyerShortOne(state, mem){
     mem.flyersGiven ??= 0;
-    const need = winCount(LEVEL_1) - 1;
+    const need = winCount(LEVEL_PARK) - 1;
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
       if(bridgeGap(state, mem, d)) continue;
@@ -182,10 +182,10 @@ const STRATEGIES = {
 /* --------------------------------------------------------------- runner --- */
 
 function play(strategy){
-  const state = newGame(LEVEL_1);
+  const state = newGame(LEVEL_PARK);
   const mem = {};
   let ticks = 0;
-  while(!state.ended && ticks < LEVEL_1.timeLimit){
+  while(!state.ended && ticks < LEVEL_PARK.timeLimit){
     strategy(state, mem);
     tick(state);
     ticks += 1;
@@ -200,9 +200,9 @@ function play(strategy){
 
 /* ------------------------------------------------------------------ report --- */
 
-const need = winCount(LEVEL_1);
-console.log(`Duck Duck Quack — The Park, ${LEVEL_1.duckCount} ducklings, need ${need} saved, ` +
-  `${formatTime(LEVEL_1.timeLimit)} on the clock, ${TICK_RATE} ticks/s\n`);
+const need = winCount(LEVEL_PARK);
+console.log(`Duck Duck Quack — The Park, ${LEVEL_PARK.duckCount} ducklings, need ${need} saved, ` +
+  `${formatTime(LEVEL_PARK.timeLimit)} on the clock, ${TICK_RATE} ticks/s\n`);
 console.log(`assignSkill refuses quietly (returns null) rather than throwing, so a strategy that runs out ` +
   `of a supply or double-assigns a busy duckling will not crash here — it will just show up as a lower ` +
   `save count than the strategy intended, which is the point of running it rather than reading the code.\n`);
@@ -212,9 +212,9 @@ for(const [name, strategy] of Object.entries(STRATEGIES)){
   const verdict = state.ended === 'won' ? 'WON ' : state.ended === 'lost' ? 'lost' : 'ran out of tries';
   const causeText = Object.entries(causes).map(([c, n]) => `${c}:${n}`).join(' ') || 'none';
   console.log(
-    `${name.padEnd(16)} ${verdict}  saved ${String(state.saved).padStart(2)}/${LEVEL_1.duckCount} ` +
+    `${name.padEnd(16)} ${verdict}  saved ${String(state.saved).padStart(2)}/${LEVEL_PARK.duckCount} ` +
     `(need ${need})  lost ${String(state.lost).padStart(2)} [${causeText}]  ` +
-    `${formatTime(ticks)} of ${formatTime(LEVEL_1.timeLimit)}  ` +
+    `${formatTime(ticks)} of ${formatTime(LEVEL_PARK.timeLimit)}  ` +
     // Builder and Blocker share a first letter, so this abbreviates by verb
     // instead — dig/build/block/climb — to keep the readout unambiguous.
     `supply left: ${SKILLS.map(s => `${s.slice(0, 3)}${state.supply[s]}`).join(' ')}`,

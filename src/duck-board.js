@@ -76,10 +76,15 @@ export { cleanName, nameKey, NAME_MIN, NAME_MAX, NAME_RULE };
  * standard — `test/duck-board.test.js` asserts this table against the real
  * LEVELS and fails if a level is added, renamed or rebalanced without it.
  * A drift here is a loud test, not a quiet wrong answer.
+ *
+ * Listed in the order the levels are played, which the same test pins — the
+ * caps themselves do not care, but a table that reads in a different order
+ * from content.js's own is a table somebody will one day compare line by
+ * line and misread. Reorder the game, reorder this.
  */
 export const LEVEL_CAPS = {
-  park: 10,
   warren: 12,
+  park: 10,
   orchard: 25,
   grove: 12,
   aerie: 10,
