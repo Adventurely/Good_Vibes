@@ -501,8 +501,28 @@ function stepWalking(state, d){
     d.onPad = null;
   }
 
+  /* The edge of the world turns a duckling round. It used to swallow it,
+   * and that was never a hazard anybody designed — it was the absence of
+   * one. Every level built since The Spire puts a band of rock at each end
+   * "so nothing walks off the edge of the world"; the seven older ones
+   * simply never got that band, and ran their flat ground straight off the
+   * scene instead.
+   *
+   * Which meant one Blocker planted anywhere on those levels quietly sent
+   * everything behind it walking out the back: twenty-three of The
+   * Orchard's twenty-five, measured. Nothing about the level said so and
+   * nothing on the screen showed it — the ducklings simply walked past the
+   * nest and stopped existing. Standing a Blocker down now turns it round
+   * (see releaseBlocker), which pointed even more ducklings that way and
+   * made a bug that was always there impossible to keep ignoring.
+   *
+   * So the boundary behaves like the rock the newer levels wall themselves
+   * with, on every level, and the older seven stop needing a wall drawn in
+   * to be safe. Nothing is lost that a player could have prevented, which
+   * is the only kind of loss this game should have.
+   */
   const nextX = d.x + d.dir;
-  if(nextX < 0 || nextX >= level.width){ loseDuckling(state, d, 'edge'); return; }
+  if(nextX < 0 || nextX >= level.width){ d.dir = -d.dir; return; }
 
   // A planted Blocker is a wall nothing gets past — the goose included, see
   // stepGoose — so any other duckling that steps into its column turns
@@ -924,9 +944,18 @@ export function assignSkill(state, duckId, skill){
   return d;
 }
 
-/* Send a planted Blocker on its way again: it stops blocking and carries on
- * walking, in the direction it was facing when it was planted. Returns the
- * duckling, or null if that one was not a Blocker to begin with.
+/* Send a planted Blocker on its way again: it stops blocking and walks off
+ * back the way it came. Returns the duckling, or null if that one was not a
+ * Blocker to begin with.
+ *
+ * Back the way it came, rather than onward the way it was facing. A Blocker
+ * is planted facing whatever it was walking into — the ledge, the chasm, the
+ * goose — because that is the thing it was put there to stand in front of.
+ * Standing it down used to send it straight on into exactly that, which made
+ * releasing one a decision about whether this duckling was worth spending,
+ * when the whole point of releasing one is that it is not. Turning it round
+ * means the duckling leaves the way the flock it was holding is about to go,
+ * which is the only direction that was ever safe.
  *
  * Nothing is refunded. The Blocker is still spent — this is a Blocker
  * finishing its job rather than a Blocker being taken back — so a flock held
@@ -941,6 +970,7 @@ export function releaseBlocker(state, duckId){
   const d = state.ducks.find(duck => duck.id === duckId);
   if(!d || d.state !== 'blocking') return null;
   d.state = 'walking';
+  d.dir = -d.dir;
   return d;
 }
 
