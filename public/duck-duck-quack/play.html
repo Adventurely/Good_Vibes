@@ -58,18 +58,39 @@
     .rotate-hint{ display: flex; }
   }
 
-  /* The level's own hint, over the scene where it is read before the first
-     duckling is out of the nest rather than beside the skill buttons, which
-     is where a player is already looking for something else. Gold down the
-     left edge so it reads as advice rather than as another status line. */
-  .level-hint{
-    display: flex; align-items: baseline; gap: 0.5rem;
-    margin: 0 0 0.6rem; padding: 0.5rem 0.7rem;
-    background: var(--panel); border: 1px solid var(--line);
-    border-left: 3px solid #ffd34e; border-radius: 6px;
-    font-size: 0.85rem; line-height: 1.45; color: var(--muted);
+  /* The level's hint, as a dialog over the page.
+   *
+   * It began as a panel above the scene, which on a phone pushed the game
+   * most of the way off the screen for the whole run — for a sentence read
+   * once, before the first duckling is out of the nest. Then as an overlay
+   * inside the scene, which clipped: the scene is 180 pixels tall and the
+   * longest hint wants about three times that on a narrow screen.
+   *
+   * Fixed to the viewport it is neither. It costs the layout nothing, it has
+   * the whole screen to be legible in, and `max-height` with a scroll is
+   * there for the small-phone-in-landscape case rather than as the usual
+   * way to read it.
+   */
+  .hint-modal{
+    position: fixed; inset: 0; z-index: 30;
+    display: flex; align-items: center; justify-content: center;
+    padding: 1.1rem;
+    background: rgba(13, 11, 31, 0.72);
   }
-  .level-hint b{ color: var(--text); font-weight: 700; flex: none; }
+  .hint-modal[hidden]{ display: none; }
+  .hint-card{
+    width: 100%; max-width: 27rem; max-height: 86vh; overflow-y: auto;
+    background: var(--panel); color: var(--text);
+    border: 2px solid var(--line); border-left: 5px solid var(--sun);
+    border-radius: 10px; padding: 1rem 1.15rem;
+    box-shadow: 0 18px 44px rgb(0 0 0 / 0.38);
+  }
+  .hint-card h2{
+    margin: 0 0 0.4rem; font-size: 1.05rem; letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .hint-card p{ margin: 0; font-size: 0.98rem; line-height: 1.5; }
+  .hint-card .overlay-actions{ justify-content: flex-end; margin-top: 0.9rem; }
 
   header{ display: flex; align-items: baseline; gap: 0.9rem; flex-wrap: wrap; padding-bottom: 0.5rem; }
   header h1{ margin: 0; font-size: 1.2rem; font-weight: 800; }
@@ -310,7 +331,6 @@
     Turn your phone sideways — landscape gives the flock a lot more room.
   </p>
 
-  <p class="level-hint" id="level-hint" role="note" hidden><b>Hint</b><span id="level-hint-text"></span></p>
 
   <div class="layout">
     <div class="screen-col">
@@ -354,10 +374,26 @@
 
       <div class="controls">
         <button class="btn" id="pause" type="button">Pause</button>
+        <button class="btn" id="hint-btn" type="button" hidden>Hint</button>
         <button class="btn" id="restart" type="button">End the run</button>
         <button class="btn" id="sound" type="button" aria-pressed="false">Music off</button>
       </div>
     </aside>
+  </div>
+</div>
+
+<!-- The level's hint. A page-level dialog rather than an overlay inside the
+     scene: the scene is 180 pixels tall, and on a phone that is about a third
+     of the room the longest hint needs — the first cut of this clipped The
+     Stepping Stones' heading clean off the top. Fixed position, so it costs
+     the layout nothing and is gone the moment it is dismissed. -->
+<div class="hint-modal" id="hint-overlay" role="dialog" aria-modal="true" aria-labelledby="hint-head" hidden>
+  <div class="hint-card">
+    <h2 id="hint-head">Hint</h2>
+    <p id="hint-text"></p>
+    <div class="overlay-actions">
+      <button class="btn btn-go" id="hint-go" type="button">Start the level</button>
+    </div>
   </div>
 </div>
 
@@ -390,13 +426,6 @@
   document.title = `Duck Duck Quack — Level ${levelNumber}: ${LEVEL.name}`;
   document.getElementById('game-version').textContent = `v${GAME_VERSION}`;
 
-  /* The level's hint, shown if it has one. Hidden rather than empty when it
-     does not, so a level without one leaves no ruled box sitting over the
-     scene — though a test says every level has one. */
-  if(LEVEL.hint){
-    document.getElementById('level-hint-text').textContent = LEVEL.hint;
-    document.getElementById('level-hint').hidden = false;
-  }
 
   const els = id => document.getElementById(id);
   const ui = {
@@ -407,6 +436,8 @@
     again: els('again'), nextLevel: els('next-level'), status: els('status'), pause: els('pause'), restart: els('restart'),
     sound: els('sound'), skills: document.querySelector('.skills'),
     countdown: els('countdown'), countdownNum: els('countdown-num'), hudHint: els('hud-hint'),
+    hintOverlay: els('hint-overlay'), hintText: els('hint-text'),
+    hintGo: els('hint-go'), hintBtn: els('hint-btn'),
   };
   const ctx = context2d(ui.scene);
 
@@ -735,13 +766,66 @@
     ui.countdown.hidden = false;
   }
 
+  /* --- the hint ---------------------------------------------------------- */
+
+  /* Shown over the scene before the countdown runs, and dismissed into it.
+   *
+   * Nothing moves while it is up — not the clock, not the countdown — so a
+   * three-hundred-character hint on The Stepping Stones can be read at
+   * whatever pace it takes rather than raced against a three-second timer.
+   * That is the whole reason it gates the countdown rather than sharing it.
+   *
+   * `mode` is 'start' for the one before the level begins, which hands over
+   * to the countdown when dismissed, and 'peek' for the Hint button, which
+   * hands back to whatever was happening. A restart does NOT show it again:
+   * a player retrying a level read it a minute ago, and a dialog between
+   * every attempt is the thing that turns a hint into an obstacle.
+   */
+  let hintMode = null;
+
+  function openHint(mode){
+    if(!LEVEL.hint || hintMode) return;
+    hintMode = mode;
+    ui.hintGo.textContent = mode === 'start' ? 'Start the level' : 'Back to the level';
+    ui.hintOverlay.hidden = false;
+    ui.hintGo.focus();
+  }
+
+  function closeHint(){
+    if(!hintMode) return;
+    const wasStart = hintMode === 'start';
+    hintMode = null;
+    ui.hintOverlay.hidden = true;
+    if(wasStart) beginCountdown();
+    ui.scene.focus({ preventScroll: true });
+  }
+
+  if(LEVEL.hint){
+    ui.hintText.textContent = LEVEL.hint;
+    ui.hintBtn.hidden = false;
+  }
+  ui.hintGo.addEventListener('click', closeHint);
+  ui.hintBtn.addEventListener('click', () => openHint('peek'));
+  // Escape closes it the way it closes any dialog, and the scrim takes a
+  // click too — the button is the obvious way out, not the only one.
+  ui.hintOverlay.addEventListener('click', e => { if(e.target === ui.hintOverlay) closeHint(); });
+  addEventListener('keydown', e => {
+    if(hintMode && (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ')){
+      e.preventDefault();
+      closeHint();
+    }
+  });
+
   function frame(now){
     requestAnimationFrame(frame);
     if(last === null) last = now;
     const dt = Math.min(0.25, (now - last) / 1000);
     last = now;
 
-    if(starting){
+    if(hintMode){
+      // Nothing moves behind the hint — not the clock, not the countdown.
+      countdownAt = null;
+    } else if(starting){
       if(countdownAt === null) countdownAt = now;
       const remaining = COUNTDOWN_SECONDS - (now - countdownAt) / 1000;
       if(remaining <= 0){
@@ -869,7 +953,9 @@
   addEventListener('orientationchange', () => setTimeout(fitScene, 120));
 
   refreshSkills();
-  beginCountdown();
+  /* The hint first if there is one, and it starts the countdown itself when
+     dismissed; straight into the countdown if there is not. */
+  if(LEVEL.hint) openHint('start'); else beginCountdown();
   requestAnimationFrame(frame);
 </script>
 

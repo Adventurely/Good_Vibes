@@ -1983,11 +1983,22 @@ test('a hint never sends a player after a skill the level does not hand out', ()
   }
 });
 
-test('the hint reaches the play page', () => {
-  // The level data is only half of it: the page has to print it.
+test('the hint reaches the play page, as something that goes away', () => {
+  /* The level data is only half of it: the page has to print it, and print
+     it somewhere that does not cost the scene its room for the whole run.
+     It was a panel above the canvas to begin with, which on a phone pushed
+     the game most of the way off the screen for a sentence read once. */
   const page = readFileSync(new URL('../public/duck-duck-quack/play.html', import.meta.url), 'utf8');
   assert.match(page, /LEVEL\.hint/, 'play.html should read the level its hint');
-  assert.match(page, /id="level-hint"/, 'and have somewhere to put it');
+  assert.match(page, /id="hint-overlay"/, 'and have an overlay to put it in');
+  assert.match(page, /id="hint-overlay"[^>]*\shidden/,
+    'which starts hidden, so it cannot be left holding the scene open');
+  assert.ok(!/class="level-hint"/.test(page),
+    'the old always-on panel should be gone, not just hidden');
+  // Dismissing it is what starts the level, and the button brings it back.
+  assert.match(page, /function closeHint\(\)[^]*?beginCountdown\(\)/,
+    'dismissing the hint should hand over to the countdown');
+  assert.match(page, /id="hint-btn"/, 'and there should be a way to read it again mid-run');
 });
 
 /* -------------------------------------------------------- the running order */
