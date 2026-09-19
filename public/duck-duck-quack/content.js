@@ -88,7 +88,7 @@
    straight off the page whether they have the latest build, rather than
    having to guess from behavior alone. Bump it on every change that ships,
    however small. */
-export const GAME_VERSION = '1.17';
+export const GAME_VERSION = '1.20';
 
 export const SCENE_W = 320;
 export const SCENE_H = 180;
@@ -280,7 +280,7 @@ export const SKILL_INFO = {
   builder: { name: 'Builder', verb: 'Build',
     blurb: `Starts a ramp the way it faces, right where you click it, for ${BUILD_SECONDS} seconds. From the ground it climbs; from a climbing ramp it carries on level; from a level one it climbs again — so a chain of them is a staircase.` },
   blocker: { name: 'Blocker', verb: 'Block',
-    blurb: 'Plants itself, turning back anything that meets it — another duckling, or the goose. Click it again to stand it down and send it on its way.' },
+    blurb: 'Plants itself, turning back anything that meets it — another duckling, or the goose. Click it again to stand it down, and it walks off back the way it came.' },
   climber: { name: 'Climber', verb: 'Climb',
     blurb: 'Scales the next wall instead of turning back from it. One duckling only.' },
   flyer: { name: 'Flyer', verb: 'Fly',

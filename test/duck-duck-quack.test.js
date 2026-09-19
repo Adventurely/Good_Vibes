@@ -160,14 +160,40 @@ test('a drop past FALL_SAFE is lethal', () => {
   assert.equal(duck.cause, 'fell');
 });
 
-test('walking off either end of the level is lost, not a crash', () => {
-  const level = miniLevel({ nestX: 1 });
+test('the edge of the world turns a duckling round rather than swallowing it', () => {
+  /* It used to be a loss, and that was the absence of a hazard rather than
+     one: every level built since The Spire walls its own ends with rock for
+     exactly this, and the older seven never got the band. One Blocker on
+     those levels sent everything behind it walking out the back — 23 of The
+     Orchard's 25, measured — with nothing on screen to say so. */
+  const level = miniLevel({ nestX: 1, timeLimit: 4000 });
   const state = run(newGame(level), 1);
   const duck = state.ducks[0];
   duck.dir = -1; // send it toward the near edge instead of the goal
   run(state, 10);
-  assert.equal(duck.state, 'lost');
-  assert.equal(duck.cause, 'edge');
+  assert.equal(duck.state, 'walking', 'still going');
+  assert.equal(duck.dir, 1, 'turned back towards the level');
+  assert.ok(duck.x >= 0 && duck.x < level.width, 'and still on it');
+
+  run(state, 4000);
+  assert.equal(duck.state, 'saved', 'and it gets where it was going');
+});
+
+test('one Blocker no longer costs a level the flock behind it', () => {
+  // The measured version of the bug above, on the level it was worst on.
+  const state = newGame(LEVEL_3);
+  let planted = false;
+  for(let i = 0; i < LEVEL_3.timeLimit && !state.ended; i++){
+    if(!planted){
+      const at = LEVEL_3.nestX + goalHeading(LEVEL_3) * 20;
+      const d = state.ducks.find(k => k.state === 'walking' && Math.round(k.x) === at);
+      if(d && assignSkill(state, d.id, 'blocker')) planted = true;
+    }
+    tick(state);
+  }
+  assert.ok(planted, 'the blocker should have gone in');
+  assert.equal(state.ducks.filter(d => d.cause === 'edge').length, 0,
+    'nothing should be lost off the end of the level');
 });
 
 /* --------------------------------------------------------------- digging */
@@ -839,7 +865,11 @@ test('a blocker plants itself for good and turns other ducklings back', () => {
   assert.ok(second.x <= plantedAt, 'the second duckling should never pass the blocker');
 });
 
-test('a planted blocker can be stood down, and walks on the way it was facing', () => {
+test('a blocker stood down walks off back the way it came', () => {
+  /* Not onward the way it was facing, which is what it used to do. A Blocker
+     is planted facing the thing it was put there to stand in front of — the
+     ledge, the chasm, the goose — so sending it onward sent it into exactly
+     that. Back the way it came is the one direction that was ever safe. */
   const level = miniLevel({
     duckCount: 1, timeLimit: 400,
     supply: { digger: 0, builder: 0, blocker: 1, climber: 0 },
@@ -854,13 +884,24 @@ test('a planted blocker can be stood down, and walks on the way it was facing', 
 
   assert.equal(releaseBlocker(state, duck.id), duck);
   assert.equal(duck.state, 'walking');
-  assert.equal(duck.dir, facing, 'it carries on the way it was going');
+  assert.equal(duck.dir, -facing, 'it turns round');
   run(state, 10);
-  assert.ok(duck.x > plantedAt, 'and actually moves');
+  assert.ok(duck.x < plantedAt, 'and walks back the way it came');
+});
 
-  // It reaches the pond like any other duckling — a Blocker is no longer a
-  // duckling written off.
-  run(state, 400);
+test('a blocker stood down still reaches the pond — it is not a duckling written off', () => {
+  // It sets off away from the water, meets the wall at the far end and comes
+  // back, which costs it the walk but not the level.
+  const level = miniLevel({
+    duckCount: 1, timeLimit: 4000,
+    supply: { digger: 0, builder: 0, blocker: 1, climber: 0 },
+  });
+  const state = run(newGame(level), 5);
+  const duck = state.ducks[0];
+  assignSkill(state, duck.id, 'blocker');
+  run(state, 20);
+  releaseBlocker(state, duck.id);
+  run(state, 4000);
   assert.equal(duck.state, 'saved');
 });
 
