@@ -29,7 +29,7 @@ import {
   TRACKS, TRACK_BY_ID, secondsPerBeat, trackSpan,
   toSave, fromSave, SAVE_VERSION, OFFSET_MIN, OFFSET_MAX,
   CAL_CLICKS, CAL_INTERVAL, CAL_WARMUP, CAL_MIN_TAPS, CAL_WOBBLE, calibrationFrom,
-  LATENCY_HIGH,
+  LATENCY_HIGH, beatVisible,
 } from '../public/gvb/content.js';
 
 const SPB = 60 / 104;                       // Funk world, and an awkward number
@@ -445,12 +445,12 @@ test('a song is as long as its own header says', () => {
 /* ------------------------------------------------------------------ saving */
 
 test('a save goes there and back, and a broken one loads as a fresh start', () => {
-  const state = { xp: 1234, stars: { backbone: 3, clave: 1 }, offset: 0.042 };
+  const state = { xp: 1234, stars: { backbone: 3, clave: 1 }, offset: 0.042, beat: true };
   const back = fromSave(toSave(state));
   assert.deepEqual(back, state);
   assert.equal(toSave(state).version, SAVE_VERSION);
 
-  const blank = { xp: 0, stars: {}, offset: null };
+  const blank = { xp: 0, stars: {}, offset: null, beat: null };
   for(const junk of [null, undefined, 'hello', 42, [], { xp: 'lots' }]){
     assert.deepEqual(fromSave(junk), blank, `${JSON.stringify(junk)} should load as a fresh start`);
   }
@@ -467,6 +467,27 @@ test('a save goes there and back, and a broken one loads as a fresh start', () =
   assert.equal(fromSave({ offset: -5 }).offset, null);
   assert.equal(fromSave({ offset: OFFSET_MAX }).offset, OFFSET_MAX);
   assert.equal(fromSave({ offset: 'late' }).offset, null);
+});
+
+test('the beat comes on by itself only when the delay has made it necessary', () => {
+  /* Off by default, because playing by feel rather than reading a highway is
+     what this game is. On by itself when the measured delay is past the point
+     where the player has nothing on screen that is on time — their music is
+     late, their own drums are later, and eyes are the only channel left with
+     no latency in it. And overridable either way, because it is their game. */
+  const save = o => fromSave({ version: 1, ...o });
+  assert.equal(beatVisible(save({})), false, 'a fresh save has not measured anything yet');
+  assert.equal(beatVisible(save({ offset: 0.02 })), false, 'wired: nothing to compensate for');
+  assert.equal(beatVisible(save({ offset: LATENCY_HIGH })), false, 'right on the line is still fine');
+  assert.equal(beatVisible(save({ offset: 0.26 })), true, 'Bluetooth: they need it');
+
+  // Said so by hand beats anything worked out for them, in both directions.
+  assert.equal(beatVisible(save({ offset: 0.26, beat: false })), false);
+  assert.equal(beatVisible(save({ offset: 0.02, beat: true })), true);
+  // And the choice survives a round trip, since null and false are different answers.
+  assert.equal(fromSave(toSave(save({ beat: false }))).beat, false);
+  assert.equal(fromSave(toSave(save({}))).beat, null);
+  assert.equal(beatVisible(null), false);
 });
 
 test('calibration is right at any latency, including the ones that broke it', () => {

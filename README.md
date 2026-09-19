@@ -2069,6 +2069,22 @@ positions, 108,000 phrase-bonus checks and 24,000 grading runs, with zero
 disagreements. That is the only reason it is safe to say the game plays the same
 as the thing Jack was playing.
 
+**Bluetooth is the thing this game is worst at, and it is handled rather than
+hidden.** A wireless earcup is 150–250 ms behind, all of it spent below the
+browser, and no web page can shorten it. Calibration makes the scoring correct
+— music and hit are delayed equally — but it cannot stop a kick played on the 1
+being *heard* a quarter of a beat later. Most rhythm games shrug this off
+because their note highway is a zero-latency clock the player reads instead of
+listening; this one deliberately has no highway, so it is more exposed and the
+answer has to be explicit. Past `LATENCY_HIGH` the game puts a beat pulse on
+screen for the length of the song — a metronome you can see, not a highway —
+switches it on by itself, and says why. Every beat-synced visual is offset by
+the measured latency, because a count-in that fires when the audio is *queued*
+rather than when it is *heard* is a quarter-beat lie on exactly the device that
+can least afford one. The pad answers twice: an instant dip under the finger,
+because a pad that does not is dead, and the scoring colour held back until the
+drum actually arrives.
+
 **The one page on the site with its own face.** Every other game uses the system
 stack in `theme.css` and fetches nothing third-party; this one wanted Bricolage
 Grotesque, so it is served from `public/gvb/font/` rather than from Google. One

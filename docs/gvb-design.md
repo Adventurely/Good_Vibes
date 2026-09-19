@@ -123,6 +123,36 @@ Tempo and time signature come from song metadata, not audio analysis. Hits are a
   `public/gvb/font/`, one variable woff2 covering 200–800, latin subset, with
   the SIL OFL beside it. Settled.
 
+## 8b. Bluetooth (new)
+
+- **The delay itself cannot be reduced.** It is spent encoding, buffering across
+  the radio link and decoding in the earcup — below the browser, below the OS.
+  Standard SBC/AAC runs 150–250 ms; aptX Low Latency and LE Audio are ~40 ms;
+  a 2.4 GHz gaming dongle is ~20–40 ms. Wired is 5–40 ms. There is no middle
+  ground, which is why "that is Bluetooth" is a usable diagnosis on its own.
+- **What it actually breaks is monitoring, not scoring.** The music and the
+  player's own hit are delayed equally, so calibration makes the judgement
+  correct. What it cannot fix is that a kick played on the 1 is HEARD a quarter
+  of a beat later, at 104 BPM. The player hears a mangled version of a bar they
+  played correctly.
+- **Most rhythm games survive this because they have a note highway** — the
+  screen is a zero-latency clock and the player reads it instead of listening.
+  GVB deliberately has no highway ("play by feel", section 3), so it is more
+  exposed than osu! or Beat Saber are, and the mitigation has to be deliberate.
+- **Decided:** above `LATENCY_HIGH` the game shows a beat pulse while the song
+  runs — a visible metronome, not a highway — which comes on by itself and can
+  be switched either way on the timing screen. Plus a haptic buzz on hit
+  (Android; iOS Safari has no vibration API) and the pad's colour flash delayed
+  to agree with when the sound arrives.
+- **Every beat-synced visual is offset by the measured latency.** Without that
+  the count-in numbers, the beat dots and the lesson cues all fire when the
+  audio is QUEUED rather than when it is heard — a quarter of a beat early on
+  Bluetooth, which is worse than showing nothing because the player believes it.
+- **Rejected for now:** a loop-record mode (play a bar with monitoring muted,
+  hear it back quantised). It is the only option that removes the problem
+  rather than working around it, and it fits "make up your own percussion jams"
+  well. Worth revisiting.
+
 ## 9. Open items / next steps
 
 1. Pick the drumless music source and licensing (section 6).

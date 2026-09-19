@@ -409,6 +409,7 @@ export function toSave(state){
     xp: state.xp,
     stars: { ...state.stars },
     offset: state.offset,
+    beat: state.beat,
   };
 }
 
@@ -416,7 +417,7 @@ export function toSave(state){
    — or one naming a lesson that has since been renamed — loads with the parts
    it still has and defaults for the rest. */
 export function fromSave(raw){
-  const state = { xp: 0, stars: {}, offset: null };
+  const state = { xp: 0, stars: {}, offset: null, beat: null };
   if(!raw || typeof raw !== 'object') return state;
   state.xp = Math.max(0, Math.floor(num(raw.xp)));
   for(const [id, n] of Object.entries(raw.stars || {})){
@@ -429,8 +430,25 @@ export function fromSave(raw){
   if(typeof off === 'number' && Number.isFinite(off) && off >= OFFSET_MIN && off <= OFFSET_MAX){
     state.offset = off;
   }
+  // Null means "decide for me", which is not the same as false.
+  if(raw.beat === true || raw.beat === false) state.beat = raw.beat;
   return state;
 }
+
+/* Whether to show the beat while the song runs.
+ *
+ * Off by default, because playing by feel rather than reading a highway of
+ * notes is what this game is, and a pulse on screen is the first step towards
+ * being every other rhythm game. But a player whose headphones are a quarter
+ * of a beat behind has no usable reference at all: the music arrives late,
+ * their own drums arrive later, and there is nothing on screen that is on
+ * time. Eyes have no latency. So above the point where the delay is doing real
+ * damage it comes on by itself, and either way the player can say.
+ */
+export const beatVisible = save =>
+  save && typeof save.beat === 'boolean'
+    ? save.beat
+    : !!save && save.offset != null && save.offset > LATENCY_HIGH;
 
 /* What a calibration is allowed to come out as. Below zero means the player
  * taps a fraction before the click they are copying, which happens and is
