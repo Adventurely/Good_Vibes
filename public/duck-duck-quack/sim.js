@@ -9,7 +9,7 @@
  */
 
 import { SCENE_H, FALL_SAFE, WALK_STEP, FALL_SPEED, FLY_SPEED, FLY_DRIFT, CLIMB_SPEED,
-  BUILD_MAX_STEPS, BUILD_PAUSE_TICKS, BUILD_RISE_HEIGHT, DIG_MAX_STEPS, HATCH_RUSH_TICKS, JUMP_SPAN, JUMP_RISE,
+  BUILD_MAX_STEPS, BUILD_PAUSE_TICKS, BUILD_RISE_HEIGHT, DIG_DROP, DIG_MAX_STEPS, HATCH_RUSH_TICKS, JUMP_SPAN, JUMP_RISE,
   SKILLS, GOOSE_FLEE_SPEED, ZAP_TICKS,
   GOOSE_FLEE_LIFT, POOF_TICKS, buildTerrain, buildLayer, winCount, goalHeading,
   hatchHeading } from './content.js';
@@ -51,6 +51,10 @@ function hatchling(level, groundY){
     // Where a hop took off from and where it is coming down — see startJump.
     jumpFromX: 0, jumpFromY: 0, jumpToX: 0, jumpToY: 0, jumpSpan: 0, jumpStep: 0,
     digLeft: 0,
+    /* Where a tunnel has got to vertically, kept as a fraction because it
+       falls about half a pixel a column — see DIG_DROP. `y` is this rounded
+       to the column the duckling is actually standing in. */
+    digY: 0,
     // The teleporter pad this one is standing on because it just came out of
     // it, or null. What keeps a two-way pair from throwing a duckling
     // straight back where it came from, forever — see padUnder.
@@ -624,7 +628,7 @@ function stepWalking(state, d){
     // flock nothing: a hop leaves the wall exactly as it was, so a duckling
     // that can hop a low step should, rather than spend a tunnel on it.
     if(hasTrait(d, 'jumper') && startJump(state, d)) return;
-    if(!rockAt(state, nextX, d.y) && hasTrait(d, 'digger')){ d.state = 'digging'; d.digLeft = DIG_MAX_STEPS; return; }
+    if(!rockAt(state, nextX, d.y) && hasTrait(d, 'digger')){ d.state = 'digging'; d.digLeft = DIG_MAX_STEPS; d.digY = d.y; return; }
     if(hasTrait(d, 'climber')){ d.state = 'climbing'; d.x = nextX; return; }
     d.dir = -d.dir;
     return;
@@ -757,12 +761,28 @@ function stepDigging(state, d){
   const level = state.level;
   const nextX = d.x + d.dir;
   if(nextX < 0 || nextX >= level.width){ endDig(d); return; }
-  if(rockAt(state, nextX, d.y)){ endDig(d); return; }
 
-  if(groundAt(state, nextX) >= d.y){ endDig(d); return; }
+  /* Down as well as along — see DIG_DROP. The height is carried as a
+     fraction and rounded per column, so the slope is an even thirty degrees
+     rather than a stair of whole pixels every other column. */
+  const nextY = Math.round(d.digY + DIG_DROP);
 
-  setTunnelAt(state, nextX, d.y);
+  if(rockAt(state, nextX, nextY)){ endDig(d); return; }
+  // Dug clean out of the bottom of the scene, which nothing should do.
+  if(nextY >= SCENE_H){ endDig(d); return; }
+
+  /* Out the far side: the ground ahead has come up to meet the tunnel. A
+     level tunnel met it wherever the wall ended; one that falls away meets
+     it only where the ground beyond is LOWER than the tunnel has got to,
+     which is the whole of what changed about a Digger. Dig into a wall with
+     the same ground on both sides and the tunnel passes underneath it and
+     stops in the dark, which is a mistake a player can now make. */
+  if(groundAt(state, nextX) >= nextY){ endDig(d); return; }
+
+  setTunnelAt(state, nextX, nextY);
   d.x = nextX;
+  d.digY += DIG_DROP;
+  d.y = nextY;
   d.digLeft -= 1;
   if(d.digLeft <= 0) endDig(d);
 }

@@ -88,7 +88,7 @@
    straight off the page whether they have the latest build, rather than
    having to guess from behavior alone. Bump it on every change that ships,
    however small. */
-export const GAME_VERSION = '1.32';
+export const GAME_VERSION = '1.33';
 
 export const SCENE_W = 320;
 export const SCENE_H = 180;
@@ -236,6 +236,24 @@ export const BUILD_RISE_HEIGHT = FALL_SAFE;
 export const DIG_SECONDS = 3;
 export const DIG_MAX_STEPS = TICK_RATE * DIG_SECONDS;
 
+/* A tunnel runs DOWNHILL, at about thirty degrees — see sim.js's stepDigging.
+ *
+ * It used to run dead level, which made a Digger a hole-punch: it went in one
+ * side of a wall and came out the other at exactly the height it started,
+ * whatever the ground beyond was doing. A tunnel that falls away as it goes
+ * is a different tool. It still opens a wall, but it opens it onto ground
+ * BELOW where it started, so it answers a wall with a drop behind it and
+ * cannot answer one with a rise — and a level built for it has to fall in the
+ * direction the flock walks, which is what The Warren now does.
+ *
+ * One tick is one column, so the drop per tick is the tangent of the angle:
+ * a shade over half a pixel, nineteen pixels over a whole three-second dig.
+ * Kept as the angle rather than as the slope, because the angle is the thing
+ * anyone would want to change.
+ */
+export const DIG_ANGLE = 30;
+export const DIG_DROP = Math.tan(DIG_ANGLE * Math.PI / 180);
+
 /* What a Jumper can clear in one hop — see sim.js's stepWalking, which is
    where a jump is decided, and stepJumping, which flies it.
 
@@ -313,7 +331,7 @@ export const SKILLS = ['digger', 'builder', 'blocker', 'climber', 'flyer', 'jump
 
 export const SKILL_INFO = {
   digger: { name: 'Digger', verb: 'Dig',
-    blurb: `Tunnels straight through the next wall for ${DIG_SECONDS} seconds, leaving a way through for the rest. Then the knack is spent.` },
+    blurb: `Tunnels down through the next wall for ${DIG_SECONDS} seconds, sloping as it goes, and leaves the way through for the rest. Then the knack is spent.` },
   builder: { name: 'Builder', verb: 'Build',
     blurb: `Starts a ramp the way it faces, right where you click it, for ${BUILD_SECONDS} seconds. From the ground it climbs; from a climbing ramp it carries on level; from a level one it climbs again — so a chain of them is a staircase.` },
   blocker: { name: 'Blocker', verb: 'Block',
@@ -473,7 +491,7 @@ export const LEVEL_PARK = {
      with the flock walking in evenly-spaced lockstep the whole way here,
      "only when nearby" alone would have been exactly that: either every
      duckling's crossing lines up with the goose's sweep, or none of them do. */
-  goose: { x0: 260, x1: 299, y: 150, speed: 1.5, catchRadius: 1.5 },
+  goose: { x0: 260, x1: 299, y: 146, speed: 1.5, catchRadius: 1.5 },
 };
 
 /* "The Warren": a gap, then two walls, then the goose and the pond — the
@@ -505,29 +523,42 @@ export const LEVEL_WARREN = {
   /* What the page tells a player before they start — the obstacle that
      actually stops people here and the idea that answers it, not a
      walkthrough. See play.html, which prints it under the header. */
-  hint: 'No Climbers and no Flyers down here, so every wall has to be tunnelled. A dig goes through once and stays open for everyone behind it, which is why two Diggers in the right places are most of the level.',
+  hint: 'No Climbers and no Flyers down here, so every wall has to be tunnelled. A tunnel slopes downhill as it cuts, which is why the warren runs downhill too — each wall opens onto ground lower than the one before it. A dig stays open for everyone behind it.',
 
-  /* [0, 40)    flat ground out of the nest
-     [40, 65)   the gap — 25 columns of pit, wants a Builder
-     [65, 120)  flat ground up to the first wall
-     [120, 150) the first wall — 30 columns tall enough that only a tunnel
-                gets through it; there is no Climber supply on this level.
-                Thirty rather than the forty-five it used to be: a tunnel
-                reaches thirty-three columns now (see DIG_SECONDS), and the
-                promise this level is built on is one Digger per wall
-     [150, 220) flat ground between the two walls
-     [220, 250) the second wall — shorter, but the same deal, and the same
-                thirty columns across
-     [250, 300) flat ground, with the goose's beat in the far half of it
-     [300, 320) the pond */
+  /* The warren runs DOWNHILL, and it has to.
+   *
+   * A tunnel falls away as it cuts, about thirty degrees of it (content.js's
+   * DIG_DROP), so it comes out lower than it went in — eighteen pixels lower
+   * over a thirty-column wall. That makes one rule out of the whole level:
+   * the ground a tunnel opens onto has to be BELOW the ground it started
+   * from, or the tunnel passes underneath it and stops in the dark. So each
+   * stretch here sits eighteen pixels under the one before it, and the walk
+   * out of the nest is a walk downhill.
+   *
+   * It used to be flat at 150 throughout, which worked when a tunnel ran
+   * level and does not now: the first dig would have gone under the ground
+   * beyond it and left the flock in a dead end. Starting at 110 rather than
+   * 150 is what buys the room for two of those drops without the second one
+   * running out of the bottom of the scene.
+   *
+   *   [0, 40)    flat ground out of the nest
+   *   [40, 65)   the gap — 25 columns of pit, wants a Builder
+   *   [65, 120)  flat ground up to the first wall
+   *   [120, 150) the first wall — 30 columns, tall enough that only a tunnel
+   *              gets through it; there is no Climber supply on this level
+   *   [150, 220) eighteen pixels lower, which is where that first tunnel
+   *              comes out
+   *   [220, 250) the second wall, the same thirty columns across
+   *   [250, 320) eighteen lower again, and the pond at the end of it
+   */
   segments: [
-    { from: 0, to: 40, y: 150 },
+    { from: 0, to: 40, y: 110 },
     { from: 40, to: 65, y: PIT_Y },
-    { from: 65, to: 120, y: 150 },
-    { from: 120, to: 150, y: 70 },
-    { from: 150, to: 220, y: 150 },
-    { from: 220, to: 250, y: 90 },
-    { from: 250, to: 320, y: 150 },
+    { from: 65, to: 120, y: 110 },
+    { from: 120, to: 150, y: 30 },
+    { from: 150, to: 220, y: 128 },
+    { from: 220, to: 250, y: 50 },
+    { from: 250, to: 320, y: 146 },
   ],
 
   nestX: 6,
@@ -645,23 +676,30 @@ export const LEVEL_ORCHARD = {
                 Digger stops twelve columns short of daylight and walks back
                 out of its own hole; the way through is a second Digger,
                 given to a second duckling once it has walked in to where
-                the cutting stopped. See sim.js's stepDigging, which has
-                always supported that relay and never had a wall to use it
-                on. Climber still answers the whole thing in one, which is
-                the trade: one duckling over, or two spent opening a way
-                everything behind them walks through.
-     [205, 230) flat ground up to the wall
+                the cutting stopped. See sim.js's stepDigging. Climber still
+                answers the whole thing in one, which is the trade: one
+                duckling over, or two spent opening a way everything behind
+                them walks through.
+     [205, 230) the approach to the wall, and thirty pixels ABOVE the ledge
+                on its far side rather than level with it. A tunnel falls
+                away as it cuts (content.js's DIG_DROP) — twenty-six pixels
+                over forty-five columns — so it has to start above the
+                ground it means to come out on, or it passes underneath and
+                stops in the dark. This whole right-hand side of the level
+                dropped thirty pixels to buy that, which is also why the
+                wall's own top came down with it
      [230, 250) the first gap — 20 columns of pit, wants a Builder
-     [250, 320) flat ground out of the nest */
+     [250, 320) flat ground out of the nest, thirty pixels lower than it was
+                — see the approach above */
   segments: [
     { from: 0, to: 20, y: 175 },
     { from: 20, to: 35, y: PIT_Y },
     { from: 35, to: 130, y: 175 },
     { from: 130, to: 160, y: 150 },
-    { from: 160, to: 205, y: 100 },
-    { from: 205, to: 230, y: 150 },
+    { from: 160, to: 205, y: 70 },
+    { from: 205, to: 230, y: 120 },
     { from: 230, to: 250, y: PIT_Y },
-    { from: 250, to: 320, y: 150 },
+    { from: 250, to: 320, y: 120 },
   ],
 
   // 24 short of the far edge rather than 6, the way the old nest sat short
@@ -742,12 +780,23 @@ export const LEVEL_ORCHARD = {
  * flock walks through behind whichever duckling answers them first — but the
  * wall here does not take a tunnel where a duckling meets it.
  *
- * Its bottom fifty pixels are rock (`hardBelow: 140`, see the header note):
- * a Digger walking into it at ground level is standing below the seam and
- * gets nowhere at all, however many are spent. The dirt is higher up, so the
- * way through is to put a ramp against the wall and dig from the top of it —
- * two skills in sequence on one obstacle, which nothing before this level
- * asks for. A ramp climbs BUILD_RISE_HEIGHT, so it has to be started far
+ * Its base is rock (`hardBelow: 148`, see the header note): a Digger walking
+ * into it at ground level is standing below the seam and gets nowhere at
+ * all, however many are spent. The dirt is higher up, so the way through is
+ * to put a ramp against the wall and dig from the top of it — two skills in
+ * sequence on one obstacle, which nothing before this level asks for.
+ *
+ * A tunnel falls as it cuts now (content.js's DIG_DROP), which suits this
+ * level and also squeezes it: digging from a height is exactly what a
+ * sloping tunnel wants, but the cut has to reach the far side before it
+ * sinks past the seam. Twenty columns of wall rather than the thirty it used
+ * to be, and a seam eight pixels lower, is what leaves a working window
+ * rather than one exact column to start the ramp on. Start it too late and
+ * the tunnel dies inside the hill with the flock behind it; too early and
+ * the ramp runs out before the wall and the duckling walks the last of it at
+ * ground level, where the rock is.
+ *
+ * A ramp climbs BUILD_RISE_HEIGHT, so it has to be started far
  * enough back to actually be above the seam by the time it arrives: roughly
  * thirty columns of run-up, which is most of the flat ground between the gap
  * and the wall, and is the real puzzle here. Started too late it is still in
@@ -773,24 +822,25 @@ export const LEVEL_GROVE = {
   /* What the page tells a player before they start — the obstacle that
      actually stops people here and the idea that answers it, not a
      walkthrough. See play.html, which prints it under the header. */
-  hint: 'A Digger walking into the foot of that wall gets nowhere: the bottom of it is rock. The dirt is higher up, so stand a ramp against the wall and dig from the top of it.',
+  hint: 'A Digger walking into the foot of that wall gets nowhere: the bottom of it is rock. The dirt is higher up, so stand a ramp against the wall and dig from the top of it — and start the ramp far enough back, because a tunnel sinks as it cuts and one begun too low dies in the rock.',
 
   /* [0, 50)    flat ground out of the nest
      [50, 78)   the gap — 28 columns of pit, wants a Builder
      [78, 130)  flat ground up to the wall
-     [130, 160) the wall — 30 columns, one tunnel's worth (see DIG_SECONDS),
-                and rock for everything below y=140 (`hardBelow`, see the
-                header note): a Digger standing on the ground at 150 is
-                below the seam and gets nowhere, so the way through is to
-                come at it higher up. See the level's note.
-     [160, 320) flat ground the rest of the way, the goose's beat somewhere
+     [130, 150) the wall — 20 columns, and rock for everything below y=148
+                (`hardBelow`, see the header note): a Digger standing on the
+                ground at 150 is below the seam and gets nowhere, so the way
+                through is to come at it higher up. Twenty rather than
+                thirty because a tunnel sinks as it cuts and has to reach
+                daylight before it reaches the rock. See the level's note.
+     [150, 320) flat ground the rest of the way, the goose's beat somewhere
                 inside it, and the pond at the end of it */
   segments: [
     { from: 0, to: 50, y: 150 },
     { from: 50, to: 78, y: PIT_Y },
     { from: 78, to: 130, y: 150 },
-    { from: 130, to: 160, y: 90, hardBelow: 140 },
-    { from: 160, to: 320, y: 150 },
+    { from: 130, to: 150, y: 90, hardBelow: 148 },
+    { from: 150, to: 320, y: 150 },
   ],
 
   /* Neither number reused from The Park, The Warren or The Orchard. */
@@ -933,7 +983,7 @@ export const LEVEL_AERIE = {
  * DIG_SECONDS) and the flock walks through to the pond.
  *
  * But not at any height it likes. The spire is earth standing on rock, and
- * the seam runs level through it at 145 (`hardBelow`), which is the bottom
+ * the seam runs level through it at 150 (`hardBelow`), which is the bottom
  * thirty-five pixels of the thing — where a column of this depth draws its
  * subsoil, and now draws stone instead. A Digger down on the grass at 150
  * is under that seam and gets nowhere, the same lesson The Grove teaches
@@ -992,9 +1042,9 @@ export const LEVEL_SPIRE = {
     { from: 0, to: 60, y: 110, hard: true },
     { from: 60, to: 90, y: 150 },
     // The spire is earth on top of rock, and the seam runs level right
-    // through it at 145 — see the note above on what that costs a Digger.
-    ...stairs(90, 120, 45, 15, 2).map(seg => ({ ...seg, hardBelow: 145 })),
-    { from: 102, to: 120, y: 30, hardBelow: 145 },
+    // through it at 150 — see the note above on what that costs a Digger.
+    ...stairs(90, 120, 45, 15, 2).map(seg => ({ ...seg, hardBelow: 150 })),
+    { from: 102, to: 120, y: 30, hardBelow: 150 },
     { from: 120, to: 320, y: 150 },
   ],
 
