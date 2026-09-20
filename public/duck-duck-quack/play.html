@@ -374,6 +374,7 @@
 
       <div class="controls">
         <button class="btn" id="pause" type="button">Pause</button>
+        <button class="btn" id="hatch-all" type="button">Hatch all</button>
         <button class="btn" id="hint-btn" type="button" hidden>Hint</button>
         <button class="btn" id="restart" type="button">End the run</button>
         <button class="btn" id="sound" type="button" aria-pressed="false">Music off</button>
@@ -398,8 +399,9 @@
 </div>
 
 <script type="module">
-  import { LEVELS, SKILLS, SKILL_INFO, TICK_RATE, GAME_VERSION, winCount, formatTime } from './content.js';
-  import { newGame, tick, assignSkill, assignRefusal, duckNear, releaseBlocker, endRun } from './sim.js';
+  import { LEVELS, SKILLS, SKILL_INFO, TICK_RATE, GAME_VERSION, winCount, formatTime,
+    runBonus, runScore } from './content.js';
+  import { newGame, tick, assignSkill, assignRefusal, duckNear, releaseBlocker, endRun, hatchAll } from './sim.js';
   import { paintScene, drawSkillBadge, BADGE_PLATE_W, BADGE_PLATE_H } from './art.js';
   import { createAudio } from './audio.js';
   import { createStats } from './stats.js';
@@ -437,7 +439,7 @@
     sound: els('sound'), skills: document.querySelector('.skills'),
     countdown: els('countdown'), countdownNum: els('countdown-num'), hudHint: els('hud-hint'),
     hintOverlay: els('hint-overlay'), hintText: els('hint-text'),
-    hintGo: els('hint-go'), hintBtn: els('hint-btn'),
+    hintGo: els('hint-go'), hintBtn: els('hint-btn'), hatchAll: els('hatch-all'),
   };
   const ctx = context2d(ui.scene);
 
@@ -482,6 +484,13 @@
   let state = newGame(LEVEL);
   let armed = null;
   let paused = false;
+  /* Whether this run has ever been stopped to think. Two things count and
+     both stop the sim dead: the Pause button, and reopening the hint mid-run
+     (see openHint's 'peek'). The hint shown before the level starts does not
+     — nothing is running yet. Worth two points at the end if it stays false;
+     see runBonus in content.js. Reset by restart(), because it is a fact
+     about a run rather than about a player. */
+  let everPaused = false;
 
   /* --- the skill palette ---------------------------------------------- */
 
@@ -663,14 +672,14 @@
    * as silence — a player who did not beat their best should be told that is
    * what happened, not left wondering whether the scoreboard is broken.
    */
-  function fileRun(){
+  function fileRun(bonus, score){
     const player = stats.current();
     if(!player){
       return 'Nobody is keeping score. Pick a name on the front page and every run counts.';
     }
 
     const was = stats.best(player, LEVEL.id);
-    const mark = stats.record(player, LEVEL.id, state.saved);
+    const mark = stats.record(player, LEVEL.id, score);
 
     /* Up it goes, and only when there is something new to send: a run that
        did not beat the mark has nothing the board does not already hold.
@@ -683,14 +692,24 @@
     if(mark.improved){
       return was
         ? `A new best for ${player} — you beat your previous high score of ${was}`
-          + ` with ${state.saved} saved. Recorded.`
-        : `A new best for ${player}: ${state.saved} saved, and the first mark on this level.`;
+          + ` with ${score}. Recorded.`
+        : `A new best for ${player}: ${score}, and the first mark on this level.`;
     }
     if(!was){
       return `Nothing got home, so there is nothing to record for ${player} yet.`;
     }
-    return `${state.saved} saved did not beat ${player}'s high score of ${was}`
+    return `${score} did not beat ${player}'s high score of ${was}`
       + ' on this level, so there is nothing to save.';
+  }
+
+  /* What the run earned beyond its ducklings, in words — "+4 (never paused,
+     under 30 seconds)" — or nothing at all when there is nothing to say. A
+     score that went up without the screen saying why is a score a player has
+     to reverse-engineer. */
+  function bonusLine(bonus){
+    if(!bonus.parts.length) return '';
+    const names = bonus.parts.map(p => p.label).join(', ');
+    return ` +${bonus.total} bonus (${names}).`;
   }
 
   function endMessage(){
@@ -705,9 +724,13 @@
 
     /* Two lines: what happened, then what it was worth. They were one
        sentence and it had grown to four clauses. */
+    const bonus = runBonus({ won, ticks: state.ticks, paused: everPaused });
+    const score = runScore(state.saved, bonus);
     ui.overlayBody.textContent = `${state.saved} of ${LEVEL.duckCount} saved`
-      + ` — needed ${winCount(LEVEL)}. ${state.lost} lost.`;
-    ui.overlayScore.textContent = fileRun();
+      + ` — needed ${winCount(LEVEL)}. ${state.lost} lost.`
+      + bonusLine(bonus)
+      + (bonus.total ? ` Score ${score}.` : '');
+    ui.overlayScore.textContent = fileRun(bonus, score);
     // A next level to go to only means anything once this one is actually
     // won — offering it on a loss would read as skipping past the level
     // that just beat you.
@@ -785,6 +808,11 @@
 
   function openHint(mode){
     if(!LEVEL.hint || hintMode) return;
+    // Reopening it mid-run stops the clock exactly the way Pause does, so it
+    // costs the no-pause bonus exactly the way Pause does. A bonus a player
+    // could keep by reading the hint instead of pausing would be a bonus for
+    // knowing which button to press.
+    if(mode === 'peek') everPaused = true;
     hintMode = mode;
     ui.hintGo.textContent = mode === 'start' ? 'Start the level' : 'Back to the level';
     ui.hintOverlay.hidden = false;
@@ -843,6 +871,7 @@
       sfxNewLosses();
       sfxNewWarps();
       if(state.ended){ refreshSkills(); endMessage(); refreshRestartLabel(); }
+      refreshHatchAll();
     }
 
     paintScene(ctx, state);
@@ -851,14 +880,27 @@
 
   ui.pause.addEventListener('click', () => {
     paused = !paused;
+    if(paused) everPaused = true;
     ui.pause.textContent = paused ? 'Resume' : 'Pause';
   });
+
+  /* Empty the nest — see sim.js's hatchAll. One way and gone once used, which
+     is why the button goes away rather than staying there greyed out: there
+     is nothing left for it to do and nothing to undo. */
+  ui.hatchAll.addEventListener('click', () => {
+    if(hatchAll(state)) refreshHatchAll();
+  });
+
+  function refreshHatchAll(){
+    ui.hatchAll.hidden = state.ended || state.rushHatch || state.hatched >= LEVEL.duckCount;
+  }
 
   function restart(){
     cancelAutoAdvance();
     state = newGame(LEVEL);
     armed = null;
     paused = false;
+    everPaused = false;
     hatchedSfxed = new Set();
     quacked = new Set();
     mourned = new Set();
@@ -866,6 +908,7 @@
     ui.overlay.hidden = true;
     say('');
     refreshSkills();
+    refreshHatchAll();
     beginCountdown();
     refreshRestartLabel();
   }
@@ -953,6 +996,7 @@
   addEventListener('orientationchange', () => setTimeout(fitScene, 120));
 
   refreshSkills();
+  refreshHatchAll();
   /* The hint first if there is one, and it starts the countdown itself when
      dismissed; straight into the countdown if there is not. */
   if(LEVEL.hint) openHint('start'); else beginCountdown();

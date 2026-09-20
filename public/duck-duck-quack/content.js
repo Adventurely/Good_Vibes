@@ -88,7 +88,7 @@
    straight off the page whether they have the latest build, rather than
    having to guess from behavior alone. Bump it on every change that ships,
    however small. */
-export const GAME_VERSION = '1.29';
+export const GAME_VERSION = '1.30';
 
 export const SCENE_W = 320;
 export const SCENE_H = 180;
@@ -185,6 +185,20 @@ export const BUILD_MAX_STEPS = TICK_RATE * BUILD_SECONDS;
  * level — because "it stopped building" is the moment a player reacts to,
  * not the reason it stopped.
  */
+/* How fast "Hatch all" pours the rest of the flock out of the nest — see
+ * sim.js's hatchAll. Two ticks apart rather than none at all: a whole hatch
+ * arriving on one tick is a single stack of ducklings standing in one
+ * column, which reads as one duckling and behaves like a crowd. Two ticks is
+ * about a fifth of a second each, so twenty-four of them are out in four and
+ * a half seconds and still leave the nest as a line rather than a lump.
+ *
+ * This is also what makes the time bonuses reachable at all (see runBonus):
+ * a level that spawns one duckling every three seconds cannot be finished in
+ * under thirty however well it is played, because most of that half-minute
+ * is spent waiting for the nest.
+ */
+export const HATCH_RUSH_TICKS = 2;
+
 export const BUILD_PAUSE_SECONDS = 1.5;
 export const BUILD_PAUSE_TICKS = Math.round(TICK_RATE * BUILD_PAUSE_SECONDS);
 
@@ -1786,6 +1800,57 @@ export const LEVELS = [LEVEL_WARREN, LEVEL_PARK, LEVEL_ORCHARD, LEVEL_GROVE, LEV
   LEVEL_OVERLOOK, LEVEL_STONES, LEVEL_BELFRY, LEVEL_ERRAND];
 
 export const winCount = level => Math.ceil(level.duckCount * level.winRatio);
+
+/* ------------------------------------------------------------------ score --- */
+
+/* What a run is worth, which is no longer just how many got home.
+ *
+ * A level's score was its saved count and nothing else, which made every run
+ * that cleared the quota comfortably worth the same as every other. These are
+ * the two things a player can do beyond saving ducklings — solve it without
+ * stopping to think, and solve it fast — and they are worth a few points each
+ * on top.
+ *
+ * Both are only ever awarded on a WIN. A bonus for finishing quickly, handed
+ * out on a loss, would pay a player for ending a hopeless run early; a bonus
+ * for not pausing would pay them for not thinking about one. Neither is a
+ * thing to reward, and "fail fast for points" is the shape of an exploit
+ * rather than of a game.
+ *
+ * The clock is the sim's own tick count, not wall time, so a paused run is
+ * not quietly fast and a slow machine is not quietly slow — see sim.js's
+ * `ticks`, which only advances while the level is actually running.
+ *
+ * `paused` is decided by the page rather than by the sim, which knows nothing
+ * about pausing: see play.html, where reopening the hint mid-run counts too.
+ * It stops the clock exactly the way Pause does, and a bonus that a player
+ * could keep by reading the hint instead of pausing would be a bonus for
+ * knowing which button to press.
+ */
+export const NO_PAUSE_BONUS = 2;
+export const SPRINT_SECONDS = 30, SPRINT_BONUS = 2;
+export const BRISK_SECONDS = 60, BRISK_BONUS = 1;
+
+/* The most any run can earn beyond its ducklings — never both time bonuses,
+   they are one ladder. The board's own caps are a level's duckCount plus
+   this (see src/duck-board.js), so a perfect run is postable rather than
+   rejected for scoring too well. */
+export const MAX_BONUS = NO_PAUSE_BONUS + SPRINT_BONUS;
+
+/* The parts, not just the total, so the end-of-run screen can say what was
+   earned and what was missed rather than showing a number that went up for
+   no stated reason. */
+export function runBonus({ won, ticks, paused }){
+  if(!won) return { total: 0, parts: [] };
+  const parts = [];
+  if(!paused) parts.push({ label: 'never paused', points: NO_PAUSE_BONUS });
+  const seconds = ticks / TICK_RATE;
+  if(seconds < SPRINT_SECONDS) parts.push({ label: `under ${SPRINT_SECONDS} seconds`, points: SPRINT_BONUS });
+  else if(seconds < BRISK_SECONDS) parts.push({ label: 'under a minute', points: BRISK_BONUS });
+  return { total: parts.reduce((n, p) => n + p.points, 0), parts };
+}
+
+export const runScore = (saved, bonus) => saved + bonus.total;
 
 /* Which way a level is actually walked: +1 for a nest to the left of the
    pond, the way every level before The Orchard's reversal reads, -1 for one

@@ -19,10 +19,12 @@ import {
   LEVEL_PARK, LEVEL_WARREN, LEVEL_ORCHARD, LEVEL_GROVE, LEVEL_AERIE, LEVEL_SPIRE, LEVEL_FALLS, LEVEL_HEDGEROW, LEVEL_OVERLOOK, LEVEL_STONES,
   LEVEL_BELFRY, LEVEL_ERRAND, LEVELS,
   buildTerrain, buildLayer, stairs, winCount, goalHeading, hatchHeading, formatTime,
+  runBonus, runScore, MAX_BONUS, NO_PAUSE_BONUS, SPRINT_BONUS, SPRINT_SECONDS, BRISK_BONUS,
+  BRISK_SECONDS, HATCH_RUSH_TICKS,
 } from '../public/duck-duck-quack/content.js';
 
 import {
-  newGame, tick, assignSkill, assignRefusal, releaseBlocker, duckNear, hasTrait, endRun,
+  newGame, tick, assignSkill, assignRefusal, releaseBlocker, duckNear, hasTrait, endRun, hatchAll,
 } from '../public/duck-duck-quack/sim.js';
 
 /* A minimal level for a test that only cares about one mechanic. Every field
@@ -2938,4 +2940,143 @@ test('the game\'s own facts line counts its levels and skills', () => {
   assert.ok(tag, 'the facts list should carry the tag the counts are written into');
   assert.equal(tag[1].trim().toLowerCase(),
     `${WORDS[LEVELS.length]} levels, ${WORDS[SKILLS.length]} skills`);
+});
+
+/* ------------------------------------------------- what a run is worth */
+
+/* A level's score used to be its saved count and nothing else, so every run
+ * that cleared the quota comfortably was worth the same as every other. Two
+ * bonuses sit on top of it now — solving it without stopping to think, and
+ * solving it fast — and both of them are only ever paid on a win. That last
+ * part is the whole of the design: a time bonus handed out on a loss pays a
+ * player for ending a hopeless run early, and "fail fast for points" is the
+ * shape of an exploit rather than of a game.
+ */
+
+const bonusOf = (o) => runBonus({ won: true, ticks: 0, paused: false, ...o });
+
+test('a clean fast win earns both bonuses', () => {
+  const b = bonusOf({ ticks: TICK_RATE * 10, paused: false });
+  assert.equal(b.total, MAX_BONUS);
+  assert.equal(b.parts.length, 2);
+});
+
+test('pausing costs the no-pause bonus and nothing else', () => {
+  const quick = TICK_RATE * 10;
+  assert.equal(bonusOf({ ticks: quick, paused: false }).total, NO_PAUSE_BONUS + SPRINT_BONUS);
+  assert.equal(bonusOf({ ticks: quick, paused: true }).total, SPRINT_BONUS);
+});
+
+test('the clock pays two under thirty seconds, one under a minute, nothing after', () => {
+  const at = secs => bonusOf({ ticks: Math.round(TICK_RATE * secs), paused: true }).total;
+  assert.equal(at(SPRINT_SECONDS - 1), SPRINT_BONUS);
+  assert.equal(at(SPRINT_SECONDS + 1), BRISK_BONUS, 'past thirty it drops to the lesser one');
+  assert.equal(at(BRISK_SECONDS - 1), BRISK_BONUS);
+  assert.equal(at(BRISK_SECONDS + 1), 0, 'and past a minute there is nothing');
+  // The two are one ladder, never both.
+  const fast = bonusOf({ ticks: 0, paused: true });
+  assert.equal(fast.parts.length, 1, 'a fast run earns one time bonus, not two');
+});
+
+test('the boundaries are exact, so a run on the line is not quietly rounded', () => {
+  const at = secs => bonusOf({ ticks: Math.round(TICK_RATE * secs), paused: true }).total;
+  // Strictly under: thirty seconds dead is not "under thirty seconds".
+  assert.equal(at(SPRINT_SECONDS), BRISK_BONUS);
+  assert.equal(at(BRISK_SECONDS), 0);
+});
+
+test('a run that was not won earns nothing at all, however fast it ended', () => {
+  /* The exploit this closes: "End the run" on the first tick is a loss in
+     nought seconds, and would have been worth four points. */
+  const b = runBonus({ won: false, ticks: 0, paused: false });
+  assert.equal(b.total, 0);
+  assert.deepEqual(b.parts, []);
+});
+
+test('the score is the ducklings plus the bonus, and MAX_BONUS is really the most', () => {
+  assert.equal(runScore(9, bonusOf({ ticks: 0 })), 9 + MAX_BONUS);
+  assert.equal(runScore(9, runBonus({ won: false, ticks: 0, paused: false })), 9);
+  for(const paused of [true, false]){
+    for(const secs of [0, 29, 30, 59, 60, 200]){
+      const total = runBonus({ won: true, ticks: Math.round(TICK_RATE * secs), paused }).total;
+      assert.ok(total <= MAX_BONUS, `${secs}s paused=${paused} paid ${total}`);
+      assert.ok(total >= 0);
+    }
+  }
+});
+
+/* ---------------------------------------------------------- hatching all */
+
+test('hatch all empties the nest far faster than the level would have', () => {
+  const level = LEVEL_ORCHARD;                     // the biggest hatch in the game
+  const slow = newGame(level);
+  const fast = newGame(level);
+  assert.equal(hatchAll(fast), true);
+  for(let i = 0; i < level.duckCount * HATCH_RUSH_TICKS + 4; i++){ tick(slow); tick(fast); }
+  assert.equal(fast.hatched, level.duckCount, 'the whole flock is out');
+  assert.ok(slow.hatched < level.duckCount / 2,
+    `the level's own pace should still be mid-hatch, was ${slow.hatched}`);
+});
+
+test('hatch all is one way, and says so by refusing a second time', () => {
+  const state = newGame(LEVEL_PARK);
+  assert.equal(hatchAll(state), true);
+  assert.equal(hatchAll(state), false, 'already rushing');
+  assert.equal(state.rushHatch, true);
+});
+
+test('hatch all refuses once the nest is empty or the run is over', () => {
+  const state = newGame(LEVEL_PARK);
+  hatchAll(state);
+  while(state.hatched < LEVEL_PARK.duckCount) tick(state);
+  assert.equal(hatchAll(state), false, 'nothing left in the nest');
+
+  const ended = newGame(LEVEL_PARK);
+  endRun(ended);
+  assert.equal(hatchAll(ended), false, 'the run is over');
+});
+
+test('hatch all changes nothing but the pace — the same flock, hatched the same way', () => {
+  /* It is a decision about waiting, not about the level: the same number of
+     ducklings, out of the same nest, facing the same way. */
+  const level = LEVEL_PARK;
+  const slow = newGame(level), fast = newGame(level);
+  hatchAll(fast);
+  for(let i = 0; i < level.timeLimit && !(slow.ended && fast.ended); i++){ tick(slow); tick(fast); }
+  assert.equal(fast.hatched, slow.hatched, 'the same flock hatches either way');
+  assert.equal(fast.hatched, level.duckCount);
+  assert.ok(fast.ticks < slow.ticks, 'and the rushed run is the shorter one');
+});
+
+test('a rushed hatch is what puts the sprint bonus within reach of the big levels', () => {
+  /* The two halves of this change are one design. On a level that hatches
+     twenty-odd ducklings a few seconds apart, the nest alone outlasts the
+     sprint window — the run cannot finish inside thirty seconds however well
+     it is played, because most of that half-minute is spent waiting. Not
+     every level is like that (The Park empties in eighteen seconds at its own
+     pace), so this checks the ones that are, and that rushing answers them. */
+  const nestSeconds = level => (level.duckCount - 1) * level.spawnInterval / TICK_RATE;
+  const rushSeconds = level => (level.duckCount - 1) * HATCH_RUSH_TICKS / TICK_RATE;
+
+  const gated = LEVELS.filter(l => nestSeconds(l) >= SPRINT_SECONDS);
+  assert.ok(gated.length >= 4,
+    `only ${gated.length} levels are gated by their own nest — has spawnInterval moved?`);
+  for(const level of gated){
+    assert.ok(rushSeconds(level) < SPRINT_SECONDS / 3,
+      `${level.id} still cannot reach the sprint window even rushed`);
+  }
+});
+
+test('the page wires the score, the bonus and the hatch-all button', () => {
+  const page = readFileSync(new URL('../public/duck-duck-quack/play.html', import.meta.url), 'utf8');
+  assert.match(page, /runBonus\(/, 'the overlay should work out the bonus');
+  assert.match(page, /runScore\(/, 'and file the score rather than the raw saved count');
+  assert.match(page, /everPaused/, 'and track whether the run was ever stopped');
+  assert.match(page, /id="hatch-all"/, 'and offer the hatch-all button');
+  assert.match(page, /hatchAll\(state\)/, 'wired to the sim');
+  // Peeking at the hint stops the clock exactly the way Pause does, so it has
+  // to cost the same bonus — otherwise the bonus rewards knowing which button
+  // to press to think.
+  assert.match(page, /'peek'\) everPaused = true/,
+    'reopening the hint mid-run should count as pausing');
 });

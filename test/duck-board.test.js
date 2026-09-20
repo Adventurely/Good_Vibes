@@ -19,7 +19,7 @@ import {
   validate, merge, rank, boards, serve, migrateStore, totalOf, levelsOf,
 } from '../src/duck-board.js';
 
-import { LEVELS } from '../public/duck-duck-quack/content.js';
+import { LEVELS, MAX_BONUS } from '../public/duck-duck-quack/content.js';
 
 /* A UUID-shaped id from a small number, so a test can name five thousand of
    them and still read which one it is talking about. */
@@ -48,10 +48,21 @@ test('the caps are every level, and each is that level\'s own duckCount', () => 
      something content.js already knows, made so the Worker does not have to
      carry seventy kilobytes of level geometry — and a copy is only safe while
      something fails when it drifts. This is that something. */
-  const fromContent = Object.fromEntries(LEVELS.map(level => [level.id, level.duckCount]));
+  /* A level's own duckCount plus MAX_BONUS: a run is worth its ducklings plus
+     up to four for never pausing and finishing fast (content.js's runBonus),
+     and a cap that stopped at duckCount would refuse precisely the best runs
+     in the game. */
+  const fromContent = Object.fromEntries(
+    LEVELS.map(level => [level.id, level.duckCount + MAX_BONUS]));
   assert.deepEqual(LEVEL_CAPS, fromContent,
     'LEVEL_CAPS and the real levels disagree — a level was added, renamed or rebalanced');
   assert.deepEqual(LEVEL_IDS, LEVELS.map(level => level.id));
+  // And the bonus is genuinely in there, rather than the two sides having
+  // drifted to agree on duckCount again.
+  for(const level of LEVELS){
+    assert.ok(LEVEL_CAPS[level.id] > level.duckCount,
+      `${level.id}'s cap leaves no room for a bonus`);
+  }
 });
 
 /* ----------------------------------------------------------------- the name */

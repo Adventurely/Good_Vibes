@@ -9,7 +9,7 @@
  */
 
 import { SCENE_H, FALL_SAFE, WALK_STEP, FALL_SPEED, FLY_SPEED, FLY_DRIFT, CLIMB_SPEED,
-  BUILD_MAX_STEPS, BUILD_PAUSE_TICKS, BUILD_RISE_HEIGHT, DIG_MAX_STEPS, JUMP_SPAN, JUMP_RISE,
+  BUILD_MAX_STEPS, BUILD_PAUSE_TICKS, BUILD_RISE_HEIGHT, DIG_MAX_STEPS, HATCH_RUSH_TICKS, JUMP_SPAN, JUMP_RISE,
   SKILLS, GOOSE_FLEE_SPEED, ZAP_TICKS,
   GOOSE_FLEE_LIFT, POOF_TICKS, buildTerrain, buildLayer, winCount, goalHeading,
   hatchHeading } from './content.js';
@@ -149,6 +149,9 @@ export function newGame(level){
     zaps: [],
     ticks: 0,
     hatched: 0,
+    // Set by hatchAll: the rest of the flock comes out at HATCH_RUSH_TICKS
+    // apart rather than the level's own spawnInterval. Never unset.
+    rushHatch: false,
     nextHatch: 0,
     ducks: [],
     saved: 0,
@@ -328,7 +331,30 @@ function hatch(state){
   const d = hatchling(level, groundAt(state, level.nestX));
   state.ducks.push(d);
   state.hatched++;
-  state.nextHatch = state.ticks + level.spawnInterval;
+  state.nextHatch = state.ticks + (state.rushHatch ? HATCH_RUSH_TICKS : level.spawnInterval);
+}
+
+/* Empty the nest: every duckling still in it comes out at HATCH_RUSH_TICKS
+ * apart instead of the level's own spawnInterval, starting now.
+ *
+ * One way, on purpose. It is a decision a player makes about the run they are
+ * in — the rest of the flock is coming whether or not the front of it is in
+ * trouble — and an undo would turn that decision into a dial. It also cannot
+ * be taken back in any meaningful sense: the ducklings are already out.
+ *
+ * Nothing else changes. They hatch the way they always do, walk the way they
+ * always do, and the quota and the clock are what they were. What it buys is
+ * the waiting, which on a level that spawns one every three seconds is most
+ * of the run (see HATCH_RUSH_TICKS in content.js, and runBonus, which is
+ * only reachable because of this).
+ */
+export function hatchAll(state){
+  if(state.ended) return false;
+  if(state.rushHatch) return false;                  // already emptying
+  if(state.hatched >= state.level.duckCount) return false;
+  state.rushHatch = true;
+  state.nextHatch = state.ticks;      // the next one comes on this very tick
+  return true;
 }
 
 function stepPoofs(state){

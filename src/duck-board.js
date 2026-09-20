@@ -29,9 +29,10 @@
  * did not earn can. What there is instead:
  *
  *   - a ceiling per level that is exact rather than guessed: you cannot save
- *     more ducklings than hatch, so LEVEL_CAPS is the level's own duckCount and
- *     a figure above it is a client that has gone wrong (or a player editing
- *     JSON). Sunward learned the hard way that a cap pitched at what somebody
+ *     more ducklings than hatch, nor earn more bonus than there is bonus to
+ *     earn, so LEVEL_CAPS is the level's own duckCount plus content.js's
+ *     MAX_BONUS, and a figure above it is a client that has gone wrong (or a
+ *     player editing JSON). Sunward learned the hard way that a cap pitched at what somebody
  *     GUESSED the game could produce turns away real players on the first
  *     evening — see the long note in `sunward-board.js`. This is not that kind
  *     of cap. There is no judgement in it, only arithmetic;
@@ -81,20 +82,29 @@ export { cleanName, nameKey, NAME_MIN, NAME_MAX, NAME_RULE };
  * caps themselves do not care, but a table that reads in a different order
  * from content.js's own is a table somebody will one day compare line by
  * line and misread. Reorder the game, reorder this.
+ *
+ * Each one is that level's duckCount PLUS FOUR, which is content.js's
+ * MAX_BONUS: a run is worth its ducklings plus up to two for never pausing
+ * and two for finishing inside thirty seconds (see runBonus). The cap has to
+ * carry the bonus or the best runs in the game are exactly the ones the
+ * board refuses — which is what a cap of duckCount alone would have done the
+ * first evening bonuses shipped. Still arithmetic rather than judgement:
+ * duckCount plus the most any run can earn, and not a point of room above
+ * it. The same test as ever asserts both halves against the real levels.
  */
 export const LEVEL_CAPS = {
-  warren: 12,
-  park: 10,
-  orchard: 25,
-  grove: 12,
-  aerie: 10,
-  spire: 30,
-  falls: 20,
-  hedgerow: 16,
-  overlook: 18,
-  stones: 24,
-  belfry: 24,
-  errand: 18,
+  warren: 16,
+  park: 14,
+  orchard: 29,
+  grove: 16,
+  aerie: 14,
+  spire: 34,
+  falls: 24,
+  hedgerow: 20,
+  overlook: 22,
+  stones: 28,
+  belfry: 28,
+  errand: 22,
 };
 
 export const LEVEL_IDS = Object.keys(LEVEL_CAPS);
@@ -113,9 +123,11 @@ export const ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 /* --------------------------------------------------------------- the limits */
 
 /* Between accepted posts from one id. The client posts when a level ends, and
-   the shortest a level can take is a hatch that walks straight into the water
-   — twenty seconds or so. Five is well under that, so no honest run is ever
-   refused, and it is still short enough to make a loop pointless: a script
+   the shortest a level can take is a rushed hatch that walks straight into
+   the water — see sim.js's hatchAll, which is what made a sub-thirty-second
+   run possible at all, and ten seconds or so is about the floor of it. Five
+   is still under that, so no honest run is ever refused, and it is still
+   short enough to make a loop pointless: a script
    hammering this is refused for four seconds out of every five, and gains
    nothing by it that one post would not have given it anyway. */
 export const MIN_INTERVAL = 5000;
@@ -186,7 +198,7 @@ export function validate(body){
       return { ok: false, error: 'A score must be a whole number of ducklings, zero or more.' };
     }
     if(value > cap){
-      return { ok: false, error: `No more than ${cap} ducklings ever hatch on that level.` };
+      return { ok: false, error: `No run on that level is worth more than ${cap}.` };
     }
     // A level never finished is not a zero on the board, it is simply absent —
     // same as the client's own book, so the two agree on what "levels" counts.
