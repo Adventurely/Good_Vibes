@@ -137,6 +137,10 @@ export function newGame(level){
     // see rockAt, and content.js's header note on `hardBelow`. null wherever
     // a column is all one thing.
     rockBelow: buildLayer(level.segments, 'hardBelow', null, level.width),
+    // And the mirror of it: the height diggable ground STARTS at in a column
+    // that is rock above and earth below — a crag on an earth base, which a
+    // Digger gets under rather than over. See content.js's `hardAbove`.
+    rockAbove: buildLayer(level.segments, 'hardAbove', null, level.width),
     floors: buildLayer(level.segments, 'floor', SCENE_H, level.width),
     // Every island surface standing at each column, in the same shape as
     // `decks` and for the same reason — a platform in the sky is a surface
@@ -295,7 +299,11 @@ const rockAt = (state, x, y) => {
   const col = columnAt(state, x);
   if(state.rock[col]) return true;
   const floor = state.rockBelow[col];
-  return floor != null && y > floor;
+  if(floor != null && y > floor) return true;
+  // Rock above, earth below: everything higher than the seam is stone, and
+  // the way through is underneath it. See content.js's `hardAbove`.
+  const ceiling = state.rockAbove[col];
+  return ceiling != null && y < ceiling;
 };
 
 /* A planted Blocker standing in the way at this column, at about this

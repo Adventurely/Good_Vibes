@@ -2381,6 +2381,82 @@ test('The Falls can also be won by digging the one wall instead of climbing it',
   assert.ok(state.saved >= winCount(LEVEL_FALLS), `only ${state.saved} saved, needed ${winCount(LEVEL_FALLS)}`);
 });
 
+/* ------------------------------------------------- rock above, earth below */
+
+/* `hardAbove` is `hardBelow` the other way up: stone from the surface down to
+ * a seam, diggable ground under it. A crag on an earth base, which a Digger
+ * gets past by going UNDER rather than over — the natural partner to a tunnel
+ * that already slopes downhill.
+ */
+test('a column can be rock on top and diggable earth underneath', () => {
+  const level = miniLevel({
+    segments: [
+      { from: 0, to: 10, y: 50 },
+      { from: 10, to: 24, y: 10, hardAbove: 46 },   // stone down to 46, earth below
+      { from: 24, to: SCENE_W, y: 70 },
+    ],
+    goalX: SCENE_W - 1, timeLimit: 600,
+    supply: { digger: 1, builder: 0, blocker: 0, climber: 0, flyer: 0 },
+  });
+  const state = run(newGame(level), 1);
+  assert.equal(state.rockAbove[15], 46, 'the seam should be on the layer');
+  assert.equal(state.rockAbove[5], null, 'and nowhere else');
+
+  const duck = state.ducks[0];
+  assert.equal(assignSkill(state, duck.id, 'digger'), duck);
+  run(state, 120);
+  const cut = state.tunnelY.map((v, x) => v != null ? x : null).filter(x => x != null);
+  assert.ok(cut.length > 0, 'a Digger should get under it');
+  assert.ok(state.tunnelY[cut[0]] >= 46, 'and every column of the cut is below the seam');
+  for(const x of cut) assert.ok(state.tunnelY[x] >= 46, `column ${x} cut into the rock at ${state.tunnelY[x]}`);
+});
+
+test('a digger cannot start into the stone part of a crag', () => {
+  // Meeting it above the seam is meeting rock, and rock refuses a Digger the
+  // same way a whole column of it does.
+  const level = miniLevel({
+    segments: [
+      { from: 0, to: 10, y: 20 },                    // walking along high ground
+      { from: 10, to: 24, y: 10, hardAbove: 60 },    // stone well below where it walks
+      { from: 24, to: SCENE_W, y: 70 },
+    ],
+    goalX: SCENE_W - 1, timeLimit: 600,
+    supply: { digger: 1, builder: 0, blocker: 0, climber: 0, flyer: 0 },
+  });
+  const state = run(newGame(level), 1);
+  const duck = state.ducks[0];
+  assignSkill(state, duck.id, 'digger');
+  run(state, 120);
+  assert.ok(state.tunnelY.every(v => v == null), 'nothing should have been cut');
+  assert.notEqual(duck.state, 'saved');
+});
+
+/* ------------------------------------------------------ The Falls' crag */
+
+test('The Falls ends in a crag that has to be gone under, not over', () => {
+  const seam = newGame(LEVEL_FALLS).rockAbove[110];
+  assert.ok(seam != null, 'the crag should be rock above a seam');
+  const terrain = buildTerrain(LEVEL_FALLS.segments, LEVEL_FALLS.width);
+  assert.ok(seam - terrain[110] > 60,
+    `the stone should be a real height, was ${seam - terrain[110]} pixels`);
+  // And low enough under the seam that the ramp across the gap delivers a
+  // duckling into earth rather than into rock.
+  assert.ok(seam < 120, 'the seam has to sit above where the ramp arrives');
+});
+
+test('The Falls is won by digging under the crag, and the tunnel stays out of the stone', () => {
+  const state = playLevel7(true);
+  assert.equal(state.ended, 'won');
+  const seam = state.rockAbove[110];
+  const under = state.tunnelY
+    .map((v, x) => (v != null && x >= 100 && x < 120) ? { x, y: v } : null)
+    .filter(Boolean);
+  assert.ok(under.length >= 18, `the crag should be tunnelled end to end, got ${under.length} columns`);
+  for(const { x, y } of under){
+    assert.ok(y >= seam, `column ${x} was cut at ${y}, which is inside the stone`);
+  }
+});
+
 test('The Falls cannot be won without a Flyer — two of its three drops are real', () => {
   const state = newGame(LEVEL_FALLS);
   let builder1Used = false, builder2Used = false;

@@ -41,6 +41,12 @@
  *           stone below, for a wall a Digger can only get through over the
  *           top of the seam. `hard` is a whole column of rock; this is a
  *           band of it with diggable ground on top — see The Grove.
+ *   hardAbove  the same thing the other way up: rock from the surface down
+ *           to this height, and diggable ground below it. A crag standing on
+ *           an earth base, which a Digger gets past by going UNDER rather
+ *           than over — see The Falls. It is the natural partner to a tunnel
+ *           that slopes downhill (DIG_ANGLE): the way through is beneath the
+ *           stone, and the cut is already heading that way.
  *   floor   how far down a segment's own ground actually reaches, for a
  *           stretch that does not go all the way to the bottom of the scene
  *           the way every other column does — an island sitting in open air
@@ -88,7 +94,7 @@
    straight off the page whether they have the latest build, rather than
    having to guess from behavior alone. Bump it on every change that ships,
    however small. */
-export const GAME_VERSION = '1.33';
+export const GAME_VERSION = '1.34';
 
 export const SCENE_W = 320;
 export const SCENE_H = 180;
@@ -1132,7 +1138,7 @@ export const LEVEL_FALLS = {
   /* What the page tells a player before they start — the obstacle that
      actually stops people here and the idea that answers it, not a
      walkthrough. See play.html, which prints it under the header. */
-  hint: 'The whole walk runs downhill, and it is the drops rather than the gaps that cost ducklings. A Flyer saves only the duckling holding it, so keep them for the falls that are actually far enough to hurt.',
+  hint: 'The whole walk runs downhill, and it is the drops rather than the gaps that cost ducklings. The crag at the end is rock on top and earth underneath: nothing walks over it, and the way past is to dig under the stone. A Flyer saves only the duckling holding it.',
 
   /* Every height here is lower than it used to be, and the level's top is
      the reason: at fifteen pixels, the plateau on the wall was so close to
@@ -1147,7 +1153,26 @@ export const LEVEL_FALLS = {
      drop on the walk is still on the same side of FALL_SAFE it always was.
 
      [0, 100)    the pond and the flat approach to it, goalX well inside it
-     [100, 120)  flat ground at the foot of the second gap
+     [100, 120)  THE CRAG — ninety-four pixels of rock standing on an earth
+                 base (`hardAbove: 92`, see the header note), and the last
+                 thing between the flock and the pond. It used to be the
+                 flat ground at the foot of the second gap and simply walked
+                 across.
+                 Nothing gets over it by walking: it stands seventy-odd
+                 pixels above the ramp that crosses the gap to reach it. Its
+                 top is twenty-six rather than higher still because a ramp
+                 laid from the highest ground on a level has to stay inside
+                 the picture — BUILD_RISE_HEIGHT of room above it, which a
+                 test checks for every level. The way
+                 past is UNDER it — rock down to 92 and diggable earth below
+                 that, so a Digger coming off the ramp cuts beneath the stone
+                 and out onto the low plain. A sloping tunnel (DIG_ANGLE) is
+                 already heading that way, which is what makes this the
+                 natural obstacle for one.
+                 The seam sits above where the ramp delivers a duckling
+                 rather than level with it, because the ramp over the gap
+                 CLIMBS: a cut started at the height the old ground used to
+                 be would be starting inside the rock.
      [120, 140)  the second gap — 20 columns of pit, wants a Builder
      [140, 170)  flat ground below the last drop
      [170, 210)  the goose's terrace, twenty pixels up from the base —
@@ -1164,7 +1189,7 @@ export const LEVEL_FALLS = {
      [300, 320)  flat ground out of the nest, well short of the right edge */
   segments: [
     { from: 0, to: 100, y: 155 },
-    { from: 100, to: 120, y: 120 },
+    { from: 100, to: 120, y: 26, hardAbove: 92 },
     { from: 120, to: 140, y: PIT_Y },
     { from: 140, to: 170, y: 120 },
     { from: 170, to: 210, y: 100 },

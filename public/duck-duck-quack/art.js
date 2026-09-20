@@ -492,7 +492,7 @@ const isPondAt = (level, x) => {
  * drawIslands), which are made of exactly the same stuff and should read as
  * exactly the same stuff.
  */
-function drawGroundColumn(ctx, level, x, y, bottom, isRock, rockBelowY, edge = 0){
+function drawGroundColumn(ctx, level, x, y, bottom, isRock, rockBelowY, edge = 0, rockAboveY = null){
   const fillH = bottom - y;
   if(fillH <= 0) return;
 
@@ -508,6 +508,29 @@ function drawGroundColumn(ctx, level, x, y, bottom, isRock, rockBelowY, edge = 0
 
   if(isRock){
     drawStoneColumn(ctx, x, y, fillH);
+    if(bottom < SCENE_H) drawFloatingEdge(ctx, x, bottom);
+    return;
+  }
+
+  /* And the mirror of that: rock from the surface down to a seam, with
+   * diggable earth under it — content.js's `hardAbove`, a crag standing on an
+   * earth base. Drawn as the two things it is: a stone column down to the
+   * seam, then ordinary ground carrying on below, with no grass anywhere
+   * because nothing grows on the top of a crag. The ground below gets no
+   * grass either, since it is under a hill rather than out in the light.
+   */
+  if(rockAboveY != null && rockAboveY > y){
+    const cap = Math.min(bottom, rockAboveY);
+    drawStoneColumn(ctx, x, y, cap - y);
+    if(cap < bottom){
+      ctx.fillStyle = SOIL[2];
+      ctx.fillRect(x, cap, 1, bottom - cap);
+      if(bottom - cap > 2) drawSoilWeave(ctx, x, cap + 1, bottom - cap - 1);
+      // A line of ink where the stone sits on the earth, the same seam the
+      // turf gets where it sits on soil.
+      ctx.fillStyle = hex('k');
+      ctx.fillRect(x, cap, 1, 1);
+    }
     if(bottom < SCENE_H) drawFloatingEdge(ctx, x, bottom);
     return;
   }
@@ -648,14 +671,14 @@ const WALK_FACE = 4;
  * gap's columns sit far below SCENE_H (see content.js's PIT_Y), so they
  * simply paint nothing at all either way.
  */
-export function drawGround(ctx, terrain, level, rock, floors, rockBelow){
+export function drawGround(ctx, terrain, level, rock, floors, rockBelow, rockAbove){
   for(let x = 0; x < terrain.length; x++){
     const y = terrain[x];
     if(y >= SCENE_H) continue;
     const bottom = Math.min(floors ? floors[x] : SCENE_H, SCENE_H);
     drawGroundColumn(ctx, level, x, y, bottom,
       Boolean(rock && rock[x]), rockBelow ? rockBelow[x] : null,
-      faceEdge(terrain, x, y));
+      faceEdge(terrain, x, y), rockAbove ? rockAbove[x] : null);
   }
   drawTufts(ctx, terrain, level, rock);
   drawFlowers(ctx, terrain, level, rock);
@@ -1208,7 +1231,7 @@ function drawZap(ctx, z){
    nothing here mutates it. */
 export function paintScene(ctx, state){
   drawSky(ctx, state.ticks);
-  drawGround(ctx, state.terrain, state.level, state.rock, state.floors, state.rockBelow);
+  drawGround(ctx, state.terrain, state.level, state.rock, state.floors, state.rockBelow, state.rockAbove);
   drawRipples(ctx, pondRow(state.level, state.terrain), state.level, state.ticks);
   drawTunnels(ctx, state);
   drawBridges(ctx, state);
