@@ -88,7 +88,7 @@
    straight off the page whether they have the latest build, rather than
    having to guess from behavior alone. Bump it on every change that ships,
    however small. */
-export const GAME_VERSION = '1.31';
+export const GAME_VERSION = '1.32';
 
 export const SCENE_W = 320;
 export const SCENE_H = 180;
@@ -323,7 +323,7 @@ export const SKILL_INFO = {
   flyer: { name: 'Flyer', verb: 'Fly',
     blurb: 'Flaps down to a soft landing from any height. One duckling only.' },
   jumper: { name: 'Jumper', verb: 'Jump',
-    blurb: 'Hops a ditch, a low step, or the goose itself — and a goose hopped over gives up and flies off without anybody. Small things only, and it keeps the knack. One duckling.' },
+    blurb: 'Hops a ditch, a low step, or the goose itself — and a goose hopped clean over gives up and flies off. Small things only, and it keeps the knack. One duckling.' },
 };
 
 /* ----------------------------------------------------------------- terrain */
@@ -632,12 +632,12 @@ export const LEVEL_ORCHARD = {
   /* What the page tells a player before they start — the obstacle that
      actually stops people here and the idea that answers it, not a
      walkthrough. See play.html, which prints it under the header. */
-  hint: 'The pond is off to the left this time, and the flock hatches walking that way. The wall is thicker than one tunnel reaches, so a Digger that runs out of clock inside it walks back out — send a second one in after it to cut the rest.',
+  hint: 'The pond is off to the left. The wall is thicker than one tunnel reaches, so a Digger that runs out of clock inside it walks back out — send a second in to cut the rest. The goose guards the last stretch before the water: it turns ducklings back, and a Blocker planted in its path sends it away.',
 
   /* [0, 20)    the pond
      [20, 35)   the second gap — 15 columns of pit, wants a Builder
-     [35, 130)  the low plain the mandatory drop lands on, the goose's old
-                beat before the reversal, now just open ground
+     [35, 130)  the low plain the mandatory drop lands on, and the goose's
+                beat — the last ground the flock crosses before the pond
      [130, 160) flat ground the wall's far side opens onto — the buffer
                 past where any wall-tunnel could possibly still be cutting
      [160, 205) the wall — 45 columns, and deliberately more than one tunnel
@@ -652,8 +652,7 @@ export const LEVEL_ORCHARD = {
                 everything behind them walks through.
      [205, 230) flat ground up to the wall
      [230, 250) the first gap — 20 columns of pit, wants a Builder
-     [250, 320) flat ground out of the nest, with the goose patrolling right
-                through it */
+     [250, 320) flat ground out of the nest */
   segments: [
     { from: 0, to: 20, y: 175 },
     { from: 20, to: 35, y: PIT_Y },
@@ -719,11 +718,22 @@ export const LEVEL_ORCHARD = {
      way to build back towards it. */
   supply: { digger: 3, builder: 10, blocker: 5, climber: 24, flyer: 3, jumper: 1 },
 
-  // Patrols right past the nest rather than the far end of the walk — see
-  // the note above on why that moved. Starts at x0 and heads toward x1
-  // first (sim.js's newGame), so the very first hatchling gets a few
-  // seconds' grace before the goose actually swings back through the nest.
-  goose: { x0: 260, x1: 318, y: 150, speed: 1.5, catchRadius: 1.5 },
+  /* On the low plain, which is the ground just the other side of the pond's
+   * own gap — the last stretch every duckling walks before the water, and
+   * the one place on this level where the whole flock passes through in
+   * single file.
+   *
+   * It used to patrol the nest at the far end of the walk, which made it the
+   * first thing a hatchling met and the cheapest to deal with. Down here it
+   * is the last, and it is between the flock and the pond: a goose that
+   * turns ducklings round (see sim.js's goosedAt — it takes nobody now)
+   * costs far more standing on the way in than standing on the way out.
+   *
+   * Not so wide that it reaches the ramp back up to the ledge at 110, which
+   * is the one piece of building this level does down here, nor so far left
+   * that it stands on the gap's own lip at 35.
+   */
+  goose: { x0: 38, x1: 80, y: 175, speed: 1.5, catchRadius: 1.5 },
 };
 
 /* "The Grove": nest and pond both sit somewhere new — the first level not
@@ -1392,7 +1402,7 @@ export const LEVEL_STONES = {
   /* What the page tells a player before they start — the obstacle that
      actually stops people here and the idea that answers it, not a
      walkthrough. See play.html, which prints it under the header. */
-  hint: 'Only a Blocker turns a duckling round, so the two that turn the flock are the route, not a safety net. Every duckling that wants the water climbs the crag and hops the notch — and a duckling with a Jumper hops the goose too, and keeps the Jumper. Stand the turners down last, the lower one first.',
+  hint: 'Only a Blocker turns a duckling round in mid-air, so the two that turn the flock are the route, not a safety net. Every duckling that wants the water climbs the crag and hops the notch. Stand the turners down last, and the lower one first.',
 
   /* [0, 12)    the left rock wall — `hard`, and there to turn a duckling
                 back rather than let it walk off the edge of the level

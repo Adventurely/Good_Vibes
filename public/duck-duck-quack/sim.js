@@ -55,7 +55,10 @@ function hatchling(level, groundY){
     // it, or null. What keeps a two-way pair from throwing a duckling
     // straight back where it came from, forever — see padUnder.
     onPad: null,
-    cause: null,        // set when lost: 'fell' | 'edge' | 'goosed'
+    // Whether the goose has ever turned this one round. Only so the honk
+    // happens once a duckling rather than once a tick — see state.scares.
+    scared: false,
+    cause: null,        // set when lost: 'fell' | 'edge'
   };
 }
 
@@ -158,6 +161,9 @@ export function newGame(level){
     lost: 0,
     supply: { ...level.supply },
     goose: { x: level.goose.x0, dir: 1, fed: false, lift: 0, gone: false },
+    // How many different ducklings the goose has turned round. Never goes
+    // down, and never counts the same duckling twice.
+    scares: 0,
     poofs: [],
     ended: null,        // null | 'won' | 'lost'
   };
@@ -391,11 +397,12 @@ function stepGoose(state){
    * goose's own speed is not always a whole number, and a fast enough sweep
    * must not step clean over a duckling planted in its way.
    *
-   * It gives up the hunt outright rather than just turning around — the same
-   * `fed` flag a catch sets, so it flees the scene exactly as it would have
-   * after eating (see the branch above). On a level where a catch itself
-   * does not call the hunt off (`goose.relentless`, see content.js), this is
-   * the only thing that does.
+   * It gives up outright rather than just turning around — the same `fed`
+   * flag a hop over its head sets, so it flees the scene the same way. Those
+   * two are the only things that move a goose: walking into one has not
+   * moved it since it stopped taking ducklings and started turning them
+   * back (see goosedAt), so a flock with neither a Blocker to plant nor a
+   * Jumper to spend shares the level with it.
    */
   const from = Math.ceil(Math.min(state.goose.x, nextX));
   const to = Math.floor(Math.max(state.goose.x, nextX));
@@ -459,22 +466,35 @@ function stepDuck(state, d){
   }
 }
 
-/* Whether the goose would catch a duckling standing at `x` right now.
+/* Whether the goose is right on top of this duckling.
  *
- * Ordinarily only the *first* duckling it reaches counts, on purpose: the
- * flock walks the whole level in lockstep, evenly spaced by the same hatch
- * interval, so a sweep that can catch one duckling in a given position is
- * either in range of every duckling that ever stands there or none of them —
- * there is no "sometimes" for it to land on. One honk and a scattered
- * feather is the goose actually doing something; a hazard that is either
- * free or total is not a puzzle, it is a coin flip decided at level-design
- * time. `goose.relentless` (content.js) is the one exception: there, a catch
- * does not call the hunt off, only a Blocker does — see stepWalking and
- * stepGoose. */
-function goosedAt(state, x){
+ * It no longer takes one. A duckling that meets the goose is turned round and
+ * walks back the way it came (see stepWalking), so the goose is a hazard that
+ * costs a flock its progress rather than its members — a moving Blocker with
+ * a temper, standing between the flock and wherever it is patrolling, until
+ * something gets the better of it.
+ *
+ * That makes it a gate rather than a tax, and on most levels it is standing
+ * on the last stretch before the pond. Two things move it, both of which the
+ * game already had: a Jumper hopped clean over its head (stepWalking, below)
+ * and a Blocker planted in its path (stepGoose). Either sends it away for
+ * good; nothing else does, and walking into it a hundred times will not.
+ *
+ * HEIGHT MATTERS, which it did not use to. This only ever compared columns,
+ * so a duckling on an island ninety pixels over the goose's head counted as
+ * standing in front of it — on The Stepping Stones and The Belfry there is
+ * walkable ground directly above the patrol, and the flock up there was being
+ * taken by a goose on the floor below. It went unnoticed while the goose left
+ * after one catch; a goose that stays and turns ducklings back would have
+ * herded both levels' islands into a standstill. Same WALK_STEP of slack as
+ * blockerAt, and for the same reason.
+ */
+function goosedAt(state, d){
   if(state.goose.fed) return false;
   const g = state.level.goose;
-  return x >= g.x0 - 1 && x <= g.x1 + 1 && Math.abs(x - state.goose.x) <= g.catchRadius;
+  return d.x >= g.x0 - 1 && d.x <= g.x1 + 1
+    && Math.abs(d.x - state.goose.x) <= g.catchRadius
+    && Math.abs(d.y - g.y) <= WALK_STEP;
 }
 
 function stepWalking(state, d){
@@ -493,29 +513,38 @@ function stepWalking(state, d){
   // ever right for a level whose pond is to the right of its nest; a
   // reversed level needs the mirror image of it instead.
   if((d.x - level.goalX) * goalHeading(level) >= 0){ d.state = 'saved'; return; }
-  if(goosedAt(state, d.x)){
+  /* Nose to nose with the goose — and only nose to nose. A duckling already
+     walking away from it is walking away from it, which is what keeps a turn
+     from becoming a shudder: turned on one tick, the goose is behind it on
+     the next, and it leaves. */
+  if(goosedAt(state, d) && (state.goose.x - d.x) * d.dir >= 0){
     /* A Jumper goes over the top of it. The goose is a thing in the way of
        about the size of everything else a Jumper hops, and a duckling that
        can clear a ditch can clear a goose — it is the one hazard here that
        is answered by not being where it is for a moment.
 
-       And being hopped over calls the hunt off. A goose that has just had a
+       And being hopped over sends it away. A goose that has just had a
        duckling go clean over its head has been got the better of, and it
-       leaves the same way it leaves after a catch or after walking into a
-       Blocker (`fed`, see stepGoose) — only this time without a duckling.
-       That makes one Jumper worth the same to a flock as one Blocker
-       planted in the goose's path, bought a different way: the hop costs a
-       skill rather than costing a duckling its walk. */
+       leaves the same way it leaves after walking into a Blocker (`fed`,
+       see stepGoose). Those two are now the only things that move it, which
+       is what makes a Jumper worth the same to a flock as a Blocker planted
+       in its path — the same outcome, bought a different way. */
     if(hasTrait(d, 'jumper') && startJump(state, d, true)){
       state.goose.fed = true;
       return;
     }
-    loseDuckling(state, d, 'goosed');
-    // Ordinarily one catch is the whole hunt — see goosedAt above. A
-    // relentless goose (content.js's goose.relentless) keeps hunting after
-    // a catch instead, so only a Blocker calls it off; see stepGoose.
-    if(!level.goose.relentless) state.goose.fed = true;
-    return;
+    /* Otherwise: turned round, not taken. Counted once per duckling rather
+       than once per turn, so the page can honk at a duckling meeting the
+       goose without honking every tick the two spend in each other's way —
+       see play.html. */
+    if(!d.scared){ d.scared = true; state.scares += 1; }
+    d.dir = -d.dir;
+    /* And it walks on in the new direction this very tick, rather than
+       returning here. Turning without moving leaves it standing on the
+       goose's toes — still inside the radius, still counted as meeting it —
+       to be turned again next tick and every tick after, which is a duckling
+       vibrating in place rather than one running away. A goose standing
+       exactly on a duckling is the case that makes it happen every time. */
   }
 
   /* A teleporter under its feet, and this tick is spent going through it.

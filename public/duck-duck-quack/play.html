@@ -636,14 +636,25 @@
 
   // Plays alongside the poof (see art.js/sim.js), on the same tick a
   // duckling actually goes down rather than on every frame it stays lost.
-  // A goose's catch gets its own sound (see audio.js's SFX.goosed) rather
-  // than the generic one every other cause of loss shares.
   function sfxNewLosses(){
     for(const d of state.ducks){
       if(d.state !== 'lost' || mourned.has(d.id)) continue;
       mourned.add(d.id);
-      audio.sfx(d.cause === 'goosed' ? 'goosed' : 'lost');
+      audio.sfx('lost');
     }
+  }
+
+  /* The honk, when the goose turns a duckling back. It used to play for a
+     catch, and there are no catches any more — a goose costs a flock its
+     progress rather than its members (see sim.js's goosedAt). The sim counts
+     a meeting once per duckling rather than once per tick, so a duckling
+     pacing in front of a goose honks once instead of eleven times a second,
+     and the most a level can ever honk is once per duckling. */
+  let honked = 0;
+  function sfxNewScares(){
+    if(state.scares <= honked) return;
+    honked = state.scares;
+    audio.sfx('goosed');
   }
 
   // The countdown that carries a won run on to the next level on its own.
@@ -869,6 +880,7 @@
       sfxNewHatchlings();
       quackNewArrivals();
       sfxNewLosses();
+      sfxNewScares();
       sfxNewWarps();
       if(state.ended){ refreshSkills(); endMessage(); refreshRestartLabel(); }
       refreshHatchAll();
@@ -902,6 +914,7 @@
     paused = false;
     everPaused = false;
     hatchedSfxed = new Set();
+    honked = 0;
     quacked = new Set();
     mourned = new Set();
     ui.pause.textContent = 'Pause';

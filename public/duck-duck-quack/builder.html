@@ -275,7 +275,6 @@
         <div class="row"><label for="g-y">Height (y)</label><input type="number" id="g-y" min="0" max="180" value="150"></div>
         <div class="row"><label for="g-speed">Speed</label><input type="number" id="g-speed" min="0" max="6" step="0.1" value="1.5"></div>
         <div class="row"><label for="g-catchRadius">Catch radius</label><input type="number" id="g-catchRadius" min="0" max="10" step="0.1" value="1.5"></div>
-        <div class="row"><label for="g-relentless">Relentless</label><input type="checkbox" id="g-relentless"></div>
       </div>
 
       <div class="panel">
@@ -356,7 +355,7 @@
     nestX: 20, goalX: 300, hatchDir: '',
     duckCount: 10, spawnSeconds: 2, timeSeconds: 180, winRatio: 0.75,
     supply: { digger: 2, builder: 2, blocker: 2, climber: 2, flyer: 2, jumper: 0 },
-    goose: { x0: 250, x1: 299, y: 150, speed: 1.5, catchRadius: 1.5, relentless: false },
+    goose: { x0: 250, x1: 299, y: 150, speed: 1.5, catchRadius: 1.5 },
   };
 
   // A run of columns becomes one segment only while every one of its three
@@ -452,19 +451,17 @@
         setter(raw);
       }
     }
-    meta.goose.relentless = els('g-relentless').checked;
   }
 
   function writeMetaIntoFields(){
     for(const [id, [, , getter]] of Object.entries(fields)) els(id).value = getter();
     els('f-hatchDir').value = meta.hatchDir ?? '';
-    els('g-relentless').checked = Boolean(meta.goose.relentless);
   }
 
   for(const id of Object.keys(fields)){
     els(id).addEventListener('input', () => { readFieldsIntoMeta(); refreshExport(); saveToStorage(); });
   }
-  for(const id of ['g-relentless', 'f-hatchDir']){
+  for(const id of ['f-hatchDir']){
     els(id).addEventListener('change', () => { readFieldsIntoMeta(); refreshExport(); saveToStorage(); });
   }
 
@@ -518,7 +515,7 @@
     meta.nestX = 20; meta.goalX = 300; meta.hatchDir = '';
     meta.duckCount = 10; meta.spawnSeconds = 2; meta.timeSeconds = 180; meta.winRatio = 0.75;
     meta.supply = { digger: 2, builder: 2, blocker: 2, climber: 2, flyer: 2, jumper: 0 };
-    meta.goose = { x0: 250, x1: 299, y: 150, speed: 1.5, catchRadius: 1.5, relentless: false };
+    meta.goose = { x0: 250, x1: 299, y: 150, speed: 1.5, catchRadius: 1.5 };
     writeMetaIntoFields();
     refreshExport();
     saveToStorage();
@@ -541,7 +538,6 @@
       `x0: ${level.goose.x0}`, `x1: ${level.goose.x1}`, `y: ${level.goose.y}`,
       `speed: ${level.goose.speed}`, `catchRadius: ${level.goose.catchRadius}`,
     ];
-    if(level.goose.relentless) gooseParts.push('relentless: true');
 
     // Both of these are left out entirely when the level has none, rather
     // than written as an empty array — every level in content.js that has no

@@ -1023,26 +1023,64 @@ test('a duckling held up by a blocker walks on once it is stood down', () => {
 
 /* ------------------------------------------------------------------ goose */
 
-test('the goose catches a duckling that walks right into it', () => {
+test('the goose turns a duckling round rather than taking it', () => {
+  /* It used to eat one and leave. It costs a flock its progress now, not its
+     members: nothing is lost to a goose any more, and nothing gets past one
+     either until something moves it. */
   const level = miniLevel({
-    nestX: 5, goose: { x0: 5, x1: 5, y: 50, speed: 0, catchRadius: 2 },
+    nestX: 5, goalX: 60, goose: { x0: 5, x1: 5, y: 50, speed: 0, catchRadius: 2 },
   });
+  // It hatches walking right, straight into a goose standing on the nest.
   const state = run(newGame(level), 1);
-  assert.equal(state.ducks[0].state, 'lost');
-  assert.equal(state.ducks[0].cause, 'goosed');
+  const duck = state.ducks[0];
+  assert.notEqual(duck.state, 'lost', 'a goose takes nobody now');
+  assert.equal(duck.dir, -1, 'it should have been turned back the way it came');
+  assert.equal(state.scares, 1, 'and counted once');
+  assert.ok(duck.x < 5, 'and moved on the same tick rather than standing there');
 });
 
-test('the goose only ever catches its first duckling', () => {
+test('a duckling already walking away from the goose is left alone', () => {
+  // Otherwise a turn becomes a shudder: turned every tick, it would stand in
+  // front of the goose vibrating rather than leaving.
   const level = miniLevel({
-    duckCount: 4, spawnInterval: 3, goalX: 20, timeLimit: 200,
+    nestX: 5, goalX: 60, goose: { x0: 5, x1: 5, y: 50, speed: 0, catchRadius: 3 },
+  });
+  const state = run(newGame(level), 1);
+  const duck = state.ducks[0];
+  assert.equal(duck.dir, -1, 'turned on the tick it met the goose');
+  const away = duck.x;
+  run(state, 3);
+  assert.equal(duck.dir, -1, 'and still walking away three ticks later');
+  assert.ok(duck.x < away, 'having actually covered ground');
+});
+
+test('the goose stays put however many ducklings walk into it', () => {
+  // It used to leave after one. Only a hop or a Blocker moves it now.
+  const level = miniLevel({
+    duckCount: 4, spawnInterval: 3, goalX: 60, timeLimit: 200,
     goose: { x0: 5, x1: 5, y: 50, speed: 0, catchRadius: 3 },
   });
   const state = run(newGame(level), 200);
-  const goosed = state.ducks.filter(d => d.cause === 'goosed');
-  assert.equal(goosed.length, 1, 'every duckling in range should not be goosed, only the first');
-  const others = state.ducks.filter(d => d !== goosed[0]);
-  assert.ok(others.every(d => d.state === 'saved'), 'the rest should get through once the goose is fed');
+  assert.equal(state.lost, 0, 'nobody lost');
+  assert.equal(state.saved, 0, 'and nobody through');
+  assert.equal(state.goose.fed, false, 'the goose is still standing there');
+  assert.equal(state.scares, 4, 'having turned all four back');
 });
+
+test('the goose only counts a duckling once, however often it turns it', () => {
+  /* The count is what the page honks at, so it is per duckling rather than
+     per turn — a duckling pacing in front of a goose is one meeting, not
+     forty. */
+  const level = miniLevel({
+    duckCount: 1, goalX: 60, timeLimit: 400,
+    segments: [{ from: 0, to: SCENE_W, y: 50 }],
+    goose: { x0: 20, x1: 20, y: 50, speed: 0, catchRadius: 2 },
+  });
+  const state = run(newGame(level), 400);
+  assert.equal(state.scares, 1);
+  assert.ok(state.ducks[0].scared);
+});
+
 
 test('the goose leaves a duckling alone once it is out of reach', () => {
   const level = miniLevel({
@@ -1068,20 +1106,11 @@ test('a blocker in the goose\'s path turns it back and calls the hunt off', () =
   assert.equal(assignSkill(state, duck.id, 'blocker'), duck);
   assert.equal(state.goose.fed, false, 'the goose has not reached the block yet');
   run(state, 40); // enough for the goose to swing back around to column 15
-  assert.equal(state.goose.fed, true, 'turning the goose back calls the hunt off, same as a catch would');
+  assert.equal(state.goose.fed, true, 'walking into a Blocker is one of the two things that moves a goose');
 });
 
-test('a relentless goose keeps hunting after a catch, unless a blocker calls it off', () => {
-  const level = miniLevel({
-    duckCount: 3, spawnInterval: 60, nestX: 1, goalX: 40, timeLimit: 300,
-    goose: { x0: 10, x1: 30, y: 50, speed: 1, catchRadius: 1, relentless: true },
-  });
-  const state = run(newGame(level), 300);
-  const goosed = state.ducks.filter(d => d.cause === 'goosed');
-  assert.equal(goosed.length, state.ducks.length, 'a relentless, unblocked goose should take the whole flock');
-});
 
-test('blocking a relentless goose calls the hunt off for good, same as a catch would', () => {
+test('a Blocker planted in the goose\'s path sends it away for good', () => {
   // A single duckling: the point here is the goose itself giving up once
   // blocked (state.goose.fed), not what happens to the rest of the flock —
   // a planted Blocker is a wall for its own flock too (see the test above),
@@ -1090,7 +1119,7 @@ test('blocking a relentless goose calls the hunt off for good, same as a catch w
   const level = miniLevel({
     duckCount: 1, nestX: 1, goalX: 40, timeLimit: 300,
     supply: { digger: 0, builder: 0, blocker: 1, climber: 0 },
-    goose: { x0: 10, x1: 30, y: 50, speed: 1, catchRadius: 1, relentless: true },
+    goose: { x0: 10, x1: 30, y: 50, speed: 1, catchRadius: 1 },
   });
   const state = run(newGame(level), 1);
   const first = state.ducks[0];
@@ -1144,6 +1173,23 @@ function rampEnd(state){
   return state.decks.findLastIndex(at => at.length > 0);
 }
 
+/* The goose is a gate now, not a tax.
+ *
+ * It used to take one duckling and leave, so a bot could walk the flock
+ * straight past it and pay a single duckling for the privilege. It turns
+ * ducklings round and stays put instead (see sim.js's goosedAt), and on most
+ * levels it patrols the last stretch before the pond — so something has to
+ * move it before anything gets home. The cheapest something is the one
+ * Jumper every level carries: handed to a duckling walking up to it, the hop
+ * goes clean over its head and the goose goes.
+ */
+function hopTheGoose(state, level, from, to){
+  if(state.goose.fed || state.goose.gone) return;
+  const d = state.ducks.find(k => k.state === 'walking' && !hasTrait(k, 'jumper')
+    && k.x > from && k.x < to && Math.abs(k.y - level.goose.y) <= WALK_STEP);
+  if(d) assignSkill(state, d.id, 'jumper');
+}
+
 function playLevel1(){
   const state = newGame(LEVEL_PARK);
   let builderUsed = false, extended = false;
@@ -1161,6 +1207,7 @@ function playLevel1(){
       if(!hasTrait(d, 'climber') && d.x >= 136 && d.x < 150) assignSkill(state, d.id, 'climber');
       else if(!hasTrait(d, 'flyer') && d.x >= 160 && d.x < 219) assignSkill(state, d.id, 'flyer');
     }
+    hopTheGoose(state, LEVEL_PARK, 225, 255);
     tick(state);
   }
   return state;
@@ -1231,7 +1278,8 @@ test('The Warren cannot be won without a Digger — neither wall has any other w
  * `wall` picks how the wall itself is crossed, because the level supplies
  * both and both still have to work.
  */
-function playLevel3({ wall = 'digger', diggers = 2, turnAt = 60, rampAt = 110, holdAt = 140,
+function playLevel3({ wall = 'digger', diggers = 2, turnAt = 100, rampAt = 110, holdAt = 140,
+                      scareAt = 60,
                       skip = null } = {}){
   const state = newGame(LEVEL_ORCHARD);
   let gap1 = false, gap2 = false, crossed = false, digs = 0;
@@ -1242,12 +1290,11 @@ function playLevel3({ wall = 'digger', diggers = 2, turnAt = 60, rampAt = 110, h
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
 
-      /* The goose meets a planted Blocker and leaves for good; standing it
-         down again a moment later leaves the road out of the nest clear. */
-      if(!scarer && Math.round(d.x) === 290 && d.y === 150){
-        if(assignSkill(state, d.id, 'blocker')) scarer = d;
-        continue;
-      }
+      /* The goose patrols the low plain now rather than the nest (see
+         LEVEL_ORCHARD), so there is nothing to scare off up here — and a
+         Blocker planted at the nest waiting for a goose that never comes
+         dams the whole flock behind it, which is exactly what it did. It is
+         dealt with down on the plain instead; see below. */
       if(!gap1 && d.x === 250){
         if(assignSkill(state, d.id, 'builder')) gap1 = true;
         continue;
@@ -1298,11 +1345,15 @@ function playLevel3({ wall = 'digger', diggers = 2, turnAt = 60, rampAt = 110, h
         continue;
       }
     }
-    /* Once only. That duckling goes on to walk the rest of the level, and
-       may well end up being the one planted to turn the flock later — at
-       which point an unguarded "release the scarer" would stand the turner
-       back up again, which is exactly what it did. */
-    if(scarer && !scared && scarer.state === 'blocking' && state.goose.fed){
+    /* The goose, down where it patrols: one Blocker planted in its path and
+       it leaves for good, and the flock's walk to the water is clear. The
+       duckling that plants it is stood back up once the goose has gone. */
+    if(!scarer){
+      const d = state.ducks.find(k => k.state === 'walking' && k.y === 175
+        && Math.round(k.x) === scareAt);
+      if(d && assignSkill(state, d.id, 'blocker')) scarer = d;
+    }
+    if(scarer && !scared && state.goose.fed){
       releaseBlocker(state, scarer.id);
       scared = true;
     }
@@ -1570,6 +1621,7 @@ function playLevel5(){
       if(!hasTrait(d, 'climber') && d.x >= 100 && d.x < 120) assignSkill(state, d.id, 'climber');
       if(!builder2Used && d.x === 179 && assignSkill(state, d.id, 'builder')){ builder2Used = true; continue; }
     }
+    hopTheGoose(state, LEVEL_AERIE, 205, 235);
     tick(state);
   }
   return state;
@@ -2010,9 +2062,15 @@ test('a jumper hops the goose, and the goose gives up and leaves empty-beaked', 
     supply: { digger: 0, builder: 0, blocker: 0, climber: 0, flyer: 0, jumper: 1 },
     goose: { x0: 100, x1: 140, y: 50, speed: 1.5, catchRadius: 1.5 },
   });
-  const caught = runHop(level, false);
-  assert.equal(caught.duck.state, 'lost');
-  assert.equal(caught.duck.cause, 'goosed');
+  /* Without one it is turned back instead — and then, because the goose is
+     a sweep rather than a wall and a duckling walks slower than it does, it
+     works its way through behind one eventually. The goose costs a flock
+     time and order, not members: nothing is lost to it, and it is still
+     standing there afterwards. */
+  const turned = runHop(level, false);
+  assert.notEqual(turned.duck.state, 'lost', 'the goose takes nobody');
+  assert.ok(turned.state.scares >= 1, 'it should have been turned back at least once');
+  assert.equal(turned.state.goose.fed, false, 'and should still be there, unhopped');
 
   const hopped = runHop(level, true);
   assert.equal(hopped.duck.state, 'saved');
@@ -2520,13 +2578,32 @@ test('The Stepping Stones carries a Climber and a Jumper for every duckling', ()
   }
 });
 
-test('The Stepping Stones loses one to the goose unless a duckling is given a Jumper', () => {
-  // And the same Jumper carries that duckling over the notch later — nothing
-  // in this game spends a trait but a Digger, which is what makes the trick
-  // free rather than a trade.
-  const { state } = playLevel10({ hopGoose: false, freeTurners: true });
-  assert.equal(state.saved, LEVEL_STONES.duckCount - 1);
-  assert.ok(state.ducks.some(d => d.cause === 'goosed'), 'the goose should have taken one');
+test('The Stepping Stones no longer pays the goose anything — the first ramp goes over its head', () => {
+  /* This used to cost a duckling. The goose patrols the pen floor at 90..150
+     and the climb out of the pen starts at 80, so the flock is up on the
+     ramp before it ever reaches the patrol — and now that the goose only
+     touches ducklings at its own height (see sim.js's goosedAt, which used
+     to compare columns alone and take ducklings off islands overhead), it
+     never meets them at all.
+     So the Jumper that used to be spent buying the goose off is free for the
+     notch, and a perfect run no longer needs it for anything else. The goose
+     is still there for a player who dawdles before building: ducklings that
+     wander down the pen meet it and get turned back, which costs time. */
+  const left = playLevel10({ hopGoose: false, freeTurners: true }).state;
+  assert.equal(left.saved, LEVEL_STONES.duckCount, 'the whole flock still gets up');
+  assert.equal(left.lost, 0, 'and the goose takes nobody');
+
+  const hopped = playLevel10({ hopGoose: true, freeTurners: true }).state;
+  assert.equal(hopped.saved, LEVEL_STONES.duckCount, 'hopping it changes nothing here');
+});
+
+test('a goose left alone on the pen floor does turn ducklings back', () => {
+  // The other half of the above: the goose is real, it is simply not on the
+  // route the level is solved along.
+  const state = newGame(LEVEL_STONES);
+  for(let i = 0; i < 600; i++) tick(state);
+  assert.ok(state.scares > 0, 'ducklings walking the pen should meet it');
+  assert.equal(state.lost, 0, 'and none of them should be lost to it');
 });
 
 test('The Stepping Stones wants its two turners stood down in order', () => {
