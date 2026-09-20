@@ -1231,10 +1231,10 @@ test('The Warren cannot be won without a Digger — neither wall has any other w
  * `wall` picks how the wall itself is crossed, because the level supplies
  * both and both still have to work.
  */
-function playLevel3({ wall = 'digger', turnAt = 60, rampAt = 110, holdAt = 140,
+function playLevel3({ wall = 'digger', diggers = 2, turnAt = 60, rampAt = 110, holdAt = 140,
                       skip = null } = {}){
   const state = newGame(LEVEL_ORCHARD);
-  let gap1 = false, gap2 = false, crossed = false;
+  let gap1 = false, gap2 = false, crossed = false, digs = 0;
   const flyers = [];
   let turner = null, ramped = false, holder = null, freed = false, scarer = null, scared = false;
 
@@ -1252,10 +1252,16 @@ function playLevel3({ wall = 'digger', turnAt = 60, rampAt = 110, holdAt = 140,
         if(assignSkill(state, d.id, 'builder')) gap1 = true;
         continue;
       }
-      // The wall, once, for the whole flock either way.
+      /* The wall, for the whole flock either way — but it takes two Diggers
+         and one Climber. Forty-five columns of it and a tunnel reaches
+         thirty-three (see LEVEL_ORCHARD's note), so the first duckling stops
+         twelve short and walks back out; the second walks in along its hole
+         and cuts the rest. They are handed out to successive ducklings
+         coming up to the wall, which is what a player does — the relay needs
+         no aiming, only a second Digger. */
       if(wall === 'digger'){
-        if(!crossed && d.y === 150 && d.x > 206 && d.x < 229){
-          if(assignSkill(state, d.id, 'digger')) crossed = true;
+        if(digs < diggers && d.y === 150 && d.x > 206 && d.x < 229 && !hasTrait(d, 'digger')){
+          if(assignSkill(state, d.id, 'digger')){ digs++; crossed = digs >= diggers; }
           continue;
         }
       } else if(!hasTrait(d, 'climber')){
@@ -1264,7 +1270,7 @@ function playLevel3({ wall = 'digger', turnAt = 60, rampAt = 110, holdAt = 140,
       }
       // The two that go down, taken as soon as they are past the wall.
       if(skip !== 'flyer' && flyers.length < 2 && crossed && d.y === 150
-         && d.x > 140 && d.x < 174 && !hasTrait(d, 'flyer')){
+         && d.x > 132 && d.x < 158 && !hasTrait(d, 'flyer')){
         if(assignSkill(state, d.id, 'flyer')) flyers.push(d);
         continue;
       }
@@ -1330,10 +1336,59 @@ test('The Orchard\'s wall is the Digger\'s now — climbing it strands the flock
   const { state } = playLevel3({ wall: 'climber' });
   assert.notEqual(state.ended, 'won', 'climbing cannot carry the flock any more');
 
+  /* The plateau is the wall's own top, and the drop is off its far side.
+     Found rather than written down: this used to name columns 174 and 175,
+     which were the wall's edge until the wall was widened, at which point it
+     was quietly measuring two columns of the same plateau against each other
+     and reporting a drop of nothing. */
   const level = newGame(LEVEL_ORCHARD);
-  const plateauDrop = level.terrain[174] - level.terrain[175];
+  const wallTop = Math.min(...level.terrain);
+  const farSide = level.terrain.indexOf(wallTop);
+  assert.ok(farSide > 0, 'the wall should not start at the edge of the level');
+  const plateauDrop = level.terrain[farSide - 1] - wallTop;
   assert.ok(plateauDrop > FALL_SAFE,
     `the drop off the plateau is ${plateauDrop}, which is why climbing needs a Flyer each`);
+});
+
+/* The wall is wider than a tunnel is long, which is what makes it two
+ * Diggers rather than one.
+ *
+ * sim.js's stepDigging has always supported the relay — a Digger is spent on
+ * the one tunnel it cuts, so a duckling that runs out of clock inside a hill
+ * walks back out of its own hole and the way on is a second Digger given to
+ * a second duckling — but until now no wall in the game was thick enough to
+ * need it. Forty-five columns against a tunnel that reaches thirty-three.
+ */
+test('The Orchard\'s wall is longer than one tunnel, and one Digger cannot finish it', () => {
+  const level = newGame(LEVEL_ORCHARD);
+  const wallTop = Math.min(...level.terrain);
+  const width = level.terrain.reduce((n, y) => n + (y === wallTop ? 1 : 0), 0);
+  assert.ok(width > DIG_MAX_STEPS,
+    `the wall is ${width} columns and a tunnel reaches ${DIG_MAX_STEPS} — one Digger would do it`);
+  assert.ok(width <= DIG_MAX_STEPS * 2,
+    `${width} columns needs more than the two Diggers this level is built around`);
+});
+
+test('one Digger stops inside the hill; the second one walks in and finishes it', () => {
+  const tunnelled = state =>
+    state.tunnelY.reduce((n, y) => n + (y != null ? 1 : 0), 0);
+
+  const one = playLevel3({ diggers: 1 }).state;
+  assert.equal(tunnelled(one), DIG_MAX_STEPS,
+    'one Digger should cut exactly its own tunnel and stop');
+  assert.notEqual(one.ended, 'won', 'and the flock should not get through on it');
+
+  const two = playLevel3({ diggers: 2 }).state;
+  const wallTop = Math.min(...newGame(LEVEL_ORCHARD).terrain);
+  const width = newGame(LEVEL_ORCHARD).terrain.reduce((n, y) => n + (y === wallTop ? 1 : 0), 0);
+  assert.equal(tunnelled(two), width, 'two should open the whole wall');
+  assert.equal(two.ended, 'won');
+});
+
+test('The Orchard still carries a Digger to spare on top of the two it needs', () => {
+  // The same margin Builder has always had here: enough to get it wrong once.
+  assert.ok(LEVEL_ORCHARD.supply.digger >= 3,
+    `${LEVEL_ORCHARD.supply.digger} Diggers leaves no room for a wasted one`);
 });
 
 test('The Orchard\'s way down needs the Flyers, the turn and the ramp alike', () => {
