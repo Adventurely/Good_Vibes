@@ -641,7 +641,7 @@
      own flyer for the drop off the far side of the plateau, since neither
      of those leaves anything behind for the next one. */
   let state = newGame(LEVEL_PARK);
-  let builderUsed = false, rampExtended = false;
+  let builderUsed = false, rampExtended = false, holder = null;
 
   function playStep(){
     for(const d of state.ducks){
@@ -650,9 +650,18 @@
       // the lip and then extends it from its far end — see content.js's
       // note on LEVEL_PARK, and BUILD_SECONDS for why it takes two.
       if(!builderUsed && d.x === 69 && assignSkill(state, d.id, 'builder')){ builderUsed = true; continue; }
-      const end = state.decks.findLastIndex(at => at.length > 0);
-      if(builderUsed && !rampExtended && end > 0 && d.x === end && state.decks[end].includes(d.y)){
+      /* The duckling that just laid the first ramp is standing on the end of
+         it waiting out BUILD_PAUSE_TICKS — which is the moment, and the
+         duckling, a player clicks. Watching the pause rather than a column
+         keeps this working whatever the ramp's length happens to be. */
+      if(builderUsed && !rampExtended && d.buildPause > 0){
         if(assignSkill(state, d.id, 'builder')) rampExtended = true;
+        continue;
+      }
+      // And a Blocker past the gap, so what turns back at the wall is held
+      // rather than walking off the gap's far lip — see the test bot.
+      if(!holder && d.dir < 0 && d.y === 126 && Math.round(d.x) === 108){
+        if(assignSkill(state, d.id, 'blocker')) holder = d;
         continue;
       }
       if(!hasTrait(d, 'climber') && d.x >= 136 && d.x < 150) assignSkill(state, d.id, 'climber');
@@ -663,6 +672,7 @@
       state = newGame(LEVEL_PARK);
       builderUsed = false;
       rampExtended = false;
+      holder = null;
     }
   }
 

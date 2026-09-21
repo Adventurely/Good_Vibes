@@ -94,7 +94,7 @@
    straight off the page whether they have the latest build, rather than
    having to guess from behavior alone. Bump it on every change that ships,
    however small. */
-export const GAME_VERSION = '1.35';
+export const GAME_VERSION = '1.36';
 
 export const SCENE_W = 320;
 export const SCENE_H = 180;
@@ -217,10 +217,10 @@ export const BUILD_PAUSE_TICKS = Math.round(TICK_RATE * BUILD_PAUSE_SECONDS);
    far end is the case that is not safe, and deliberately so — see
    stepBuilding on why a ramp is a real thing left in the world.
 
-   A staircase of them is not bounded by this at all. Builders alternate
-   climbing and level runs (see sim.js's assignSkill), so the third one is
-   twice this height above the ground and the fifth is three times, and the
-   end of any of those is a ledge that kills. That is the whole risk of The
+   A staircase of them is not bounded by this at all. Every ramp climbs (see
+   sim.js's assignSkill), so a second laid off the end of the first stands
+   twice this height above the ground, a third three times, and the end of
+   any of those is a ledge that kills. That is the whole risk of The
    Stepping Stones, and the reason it hands out Blockers by the handful. */
 export const BUILD_RISE_HEIGHT = FALL_SAFE;
 
@@ -242,7 +242,7 @@ export const BUILD_RISE_HEIGHT = FALL_SAFE;
 export const DIG_SECONDS = 3;
 export const DIG_MAX_STEPS = TICK_RATE * DIG_SECONDS;
 
-/* A tunnel runs DOWNHILL, at about thirty degrees — see sim.js's stepDigging.
+/* A tunnel runs DOWNHILL, at a shallow angle — see sim.js's stepDigging.
  *
  * It used to run dead level, which made a Digger a hole-punch: it went in one
  * side of a wall and came out the other at exactly the height it started,
@@ -253,11 +253,17 @@ export const DIG_MAX_STEPS = TICK_RATE * DIG_SECONDS;
  * direction the flock walks, which is what The Warren now does.
  *
  * One tick is one column, so the drop per tick is the tangent of the angle:
- * a shade over half a pixel, nineteen pixels over a whole three-second dig.
- * Kept as the angle rather than as the slope, because the angle is the thing
- * anyone would want to change.
+ * about a third of a pixel, twelve over a whole three-second dig. Kept as the
+ * angle rather than as the slope, because the angle is the thing anyone would
+ * want to change — and it has been changed once already, from thirty, which
+ * sank nineteen pixels in a dig and made every wall in the game a question of
+ * whether the cut would reach daylight before it reached the floor.
+ *
+ * Twenty still falls away plainly — a tunnel that goes under level ground
+ * still goes under it, which is the mistake the slope exists to make possible
+ * — but it leaves a wall's far side a good deal more room to be found.
  */
-export const DIG_ANGLE = 30;
+export const DIG_ANGLE = 20;
 export const DIG_DROP = Math.tan(DIG_ANGLE * Math.PI / 180);
 
 /* What a Jumper can clear in one hop — see sim.js's stepWalking, which is
@@ -451,7 +457,14 @@ export const LEVEL_PARK = {
 
   /* [0, 70)    flat ground out of the nest
      [70, 105)  the gap — 35 columns of pit, wants a Builder
-     [105, 150) flat ground up to the wall
+     [105, 150) the far bank, one ramp's climb above the near one, up to
+                the wall. It stands higher because both ramps climb (see
+                assignSkill): the pair land the flock a full
+                BUILD_RISE_HEIGHT above where the first one started, and a
+                far bank level with the near one would put the end of that
+                bridge two rises up — a fatal step down for every duckling
+                that walked it. Level with the top of the bridge's first
+                ramp, the step off the end is exactly FALL_SAFE.
      [150, 220) the wall and the plateau on top of it — wants a Climber
      [220, 260) flat ground again, well below the plateau — the 50px step
                 down from it wants a Flyer, or it is a lethal fall
@@ -460,7 +473,7 @@ export const LEVEL_PARK = {
   segments: [
     { from: 0, to: 70, y: 150 },
     { from: 70, to: 105, y: PIT_Y },
-    { from: 105, to: 150, y: 150 },
+    { from: 105, to: 150, y: 126 },
     { from: 150, to: 220, y: 100 },
     { from: 220, to: 320, y: 150 },
   ],
@@ -533,13 +546,13 @@ export const LEVEL_WARREN = {
 
   /* The warren runs DOWNHILL, and it has to.
    *
-   * A tunnel falls away as it cuts, about thirty degrees of it (content.js's
-   * DIG_DROP), so it comes out lower than it went in — eighteen pixels lower
-   * over a thirty-column wall. That makes one rule out of the whole level:
-   * the ground a tunnel opens onto has to be BELOW the ground it started
-   * from, or the tunnel passes underneath it and stops in the dark. So each
-   * stretch here sits eighteen pixels under the one before it, and the walk
-   * out of the nest is a walk downhill.
+   * A tunnel falls away as it cuts (content.js's DIG_DROP), so it comes out
+   * lower than it went in — eleven pixels lower over a thirty-column wall.
+   * That makes one rule out of the whole level: the ground a tunnel opens
+   * onto has to be BELOW the ground it started from, or the tunnel passes
+   * underneath it and stops in the dark. So each stretch here sits eighteen
+   * pixels under the one before it, comfortably past what a wall's worth of
+   * tunnel sinks, and the walk out of the nest is a walk downhill.
    *
    * It used to be flat at 150 throughout, which worked when a tunnel ran
    * level and does not now: the first dig would have gone under the ground
@@ -688,7 +701,7 @@ export const LEVEL_ORCHARD = {
                 them walks through.
      [205, 230) the approach to the wall, and thirty pixels ABOVE the ledge
                 on its far side rather than level with it. A tunnel falls
-                away as it cuts (content.js's DIG_DROP) — twenty-six pixels
+                away as it cuts (content.js's DIG_DROP) — sixteen pixels
                 over forty-five columns — so it has to start above the
                 ground it means to come out on, or it passes underneath and
                 stops in the dark. This whole right-hand side of the level
@@ -1450,18 +1463,16 @@ export const LEVEL_OVERLOOK = {
  * one is fatal. Planting one at the working end while the next ramp goes in
  * costs nothing and saves whatever would have walked off it.
  *
- * The climbing is the other half. A Builder handed to a duckling on the
- * ground or on an island climbs BUILD_RISE_HEIGHT; one handed to a duckling
- * already on a climbing ramp runs level; and one handed to a duckling on
- * *that* runs up again (see sim.js's assignSkill). So a chain of Builders
- * is a staircase, and the last hop — C to D, forty-eight pixels — is built
- * to need the whole of it: climb, level, climb, three Builders and
- * ninety-nine columns of it. The first three hops are one ramp each,
- * because an island is ground: a ramp off one starts a fresh staircase
- * rather than carrying on from whatever got the flock up there. That is
- * what the islands are for. Ramps alone gain twenty-four pixels every
- * sixty-six columns, which does not reach the top of this level inside the
- * width of the scene; ramps off islands gain it every thirty-three.
+ * The climbing is the other half. Every Builder climbs BUILD_RISE_HEIGHT,
+ * wherever the duckling given it happens to be standing — the ground, an
+ * island, or the deck of another ramp (see sim.js's assignSkill). So a
+ * chain of Builders is a staircase, and the last hop — C to D, forty-eight
+ * pixels — is built to need two of them, one laid off the end of the other,
+ * sixty-six columns of ramp all told. The first three hops are one ramp
+ * each, because an island is somewhere to stand: a ramp off one starts from
+ * the island's own height rather than from wherever the last ramp left off.
+ * That is what the islands are for — they are the landings that let a
+ * player put the flock down between climbs.
  *
  * The pond is the right-hand end of the top island, a hundred and twenty
  * pixels above the grass, and the first water in this game that is not on
@@ -1590,15 +1601,15 @@ export const LEVEL_STONES = {
  * A ramp climbs in whichever direction the duckling given it was already
  * walking, and the only thing that turns a duckling around in mid-air is a
  * Blocker (see sim.js's releaseBlocker for the other half of that). So the
- * climb alternates, and it has to:
+ * climb switchbacks, and it has to:
  *
  *   pen -> floor A    a ramp left to right, off the pen floor
  *   A -> B            a Blocker at A's right-hand end, then a ramp built
  *                     right to left by a duckling walking back
  *   B -> C            a Blocker at B's left-hand end, then a ramp left to
- *                     right again — and this one is forty-eight pixels, so
- *                     it is the climb-level-climb staircase, three Builders
- *                     of it (see assignSkill)
+ *                     right again — and this one is forty-eight pixels,
+ *                     twice what a ramp climbs, so it takes two Builders
+ *                     stacked one on the end of the other (see assignSkill)
  *
  * Two of those Blockers are the route rather than a safety net, and they
  * stay planted: stand either down while ducklings are still coming and the
@@ -1661,12 +1672,12 @@ export const LEVEL_BELFRY = {
 
   duckCount: 24,
   spawnInterval: TICK_RATE * 3,
-  timeLimit: TICK_RATE * 420,       // seven minutes: five ramps and a lot of walking
+  timeLimit: TICK_RATE * 420,       // seven minutes: four ramps and a lot of walking
 
   winRatio: 0.5,
 
-  /* Builder: ten, for the five the climb needs — one onto A, one onto B,
-     and three for the staircase up to C. Five spare, because every one of
+  /* Builder: ten, for the four the climb needs — one onto A, one onto B,
+     and two for the double climb up to C. Six spare, because every one of
      them is a placement decision and a ramp cannot be taken back. Blocker:
      six, for the two turns the route cannot be walked without and four for
      holding a working edge while a ramp goes in. Digger: zero, and there is

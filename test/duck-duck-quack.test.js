@@ -232,7 +232,7 @@ test('a digger tunnels through a wall, sloping downhill as it goes, permanently'
     assert.ok(state.tunnelY[x] <= previous + 1, `column ${x} should fall at most a pixel a column`);
     previous = state.tunnelY[x];
   }
-  // The angle, end to end: thirty columns at the tangent of thirty degrees.
+  // The angle, end to end: thirty columns at the tangent of DIG_ANGLE.
   const expected = Math.round(50 + 30 * DIG_DROP);
   assert.ok(Math.abs(state.tunnelY[39] - expected) <= 1,
     `after thirty columns the cut should be near ${expected}, was ${state.tunnelY[39]}`);
@@ -652,8 +652,9 @@ test('a second Builder given during that pause carries the ramp on from where th
   run(state, BUILD_MAX_STEPS);
   assert.ok(duck.x > firstEndX + BUILD_MAX_STEPS - 2,
     'the second ramp runs on from the end of the first');
-  // Standing on a climbing deck, the next ramp runs level — see assignSkill.
-  assert.equal(duck.y, firstEndY, 'and it runs level, the way a staircase alternates');
+  // Every ramp climbs — see assignSkill — so a chain gains height per Builder.
+  assert.equal(duck.y, firstEndY - BUILD_RISE_HEIGHT,
+    'and it climbs again, so two Builders are twice the height of one');
 });
 
 test('a builder stops dead at a wall rather than climbing it, and turns back like anything else would', () => {
@@ -740,13 +741,13 @@ test('a ramp laid across one already standing leaves both — neither clears the
   assert.ok(deckCount(state) > deckColumns(state), 'and some columns should be carrying both');
 });
 
-test('a second builder given out on a ramp extends it, carrying on level rather than climbing again', () => {
+test('a second builder given out on a ramp extends it, climbing again rather than running level', () => {
   /* What gets a flock over a gap wider than one ramp reaches — The Park's,
-   * see LEVEL_PARK. The first Builder decides how high the ramp goes; every one
-   * after it decides how far. If an extension climbed another
-   * BUILD_RISE_HEIGHT of its own, the far end would be twice FALL_SAFE above
-   * the ground, and the ledge at the end of a ramp is one every duckling
-   * behind has to step off.
+   * see LEVEL_PARK — and over anything taller than one ramp climbs. Every
+   * ramp goes up: the first Builder buys BUILD_RISE_HEIGHT and so does the
+   * second, so the pair reach both further and twice as high. What a player
+   * reads off the screen is a single unbroken slope, which is what a
+   * staircase built out of Builders ought to look like.
    */
   const level = miniLevel({
     duckCount: 2, spawnInterval: 1,
@@ -768,11 +769,16 @@ test('a second builder given out on a ramp extends it, carrying on level rather 
 
   const newEnd = state.decks.findLastIndex(at => at.length > 0);
   assert.ok(newEnd > end, 'the ramp should now reach further');
+  const newTop = Math.min(...state.decks.flat());
+  assert.equal(newTop, top - BUILD_RISE_HEIGHT, 'and a whole ramp higher than the first ended');
+  assert.equal(50 - newTop, 2 * BUILD_RISE_HEIGHT, 'two Builders, two rises above the ground');
+  // The extension is a slope of its own, not a shelf: every column between
+  // the join and the new end is somewhere between the two heights.
   for(let x = end + 1; x <= newEnd; x++){
-    assert.ok(state.decks[x].includes(top), `column ${x} should carry the ramp on at its own height`);
+    assert.ok(state.decks[x].length > 0, `column ${x} should carry the extension`);
+    const at = Math.min(...state.decks[x]);
+    assert.ok(at <= top && at >= newTop, `column ${x} should be on the climb, not a ledge`);
   }
-  // Which keeps the one thing that makes a ramp's far end safe true.
-  assert.equal(50 - top, FALL_SAFE, 'and the whole ramp is still only one climb above the ground');
 });
 
 test('a duckling walks under a ramp overhead rather than being lifted onto it', () => {
@@ -936,26 +942,26 @@ function stairLevel(builders){
   });
 }
 
-test('builders alternate: ground climbs, a climbing ramp runs level, a level one climbs again', () => {
+test('every builder climbs, so a chain of them is a staircase and not a landing', () => {
+  /* Ramps used to alternate — climb, level, climb — which meant half the
+     Builders a player spent bought no height at all, and which of the two
+     you got depended on what the duckling happened to be standing on.
+     Straight up every time is what the skill now says on the tin. */
   const state = run(newGame(stairLevel(6)), 1);
   const duck = state.ducks[0];
-  const kinds = [];
   const heights = [];
-  for(let i = 0; i < 400 && kinds.length < 6; i++){
+  for(let i = 0; i < 400 && heights.length < 6; i++){
     if(duck.state === 'walking'){
       heights.push(duck.y);
       assignSkill(state, duck.id, 'builder');
-      kinds.push(duck.buildLevel ? 'level' : 'climb');
     }
     tick(state);
   }
-  assert.deepEqual(kinds, ['climb', 'level', 'climb', 'level', 'climb', 'level']);
-  // And the climbs actually gain height, a ramp's worth at a time.
-  assert.deepEqual(heights, [50, 50 - BUILD_RISE_HEIGHT, 50 - BUILD_RISE_HEIGHT,
-    50 - 2 * BUILD_RISE_HEIGHT, 50 - 2 * BUILD_RISE_HEIGHT, 50 - 3 * BUILD_RISE_HEIGHT]);
+  assert.deepEqual(heights, [0, 1, 2, 3, 4, 5].map(n => 50 - n * BUILD_RISE_HEIGHT),
+    'each Builder hands the next one a ramp\'s worth of height');
 });
 
-test('a ramp off an island climbs — an island is ground, not somebody else\'s staircase', () => {
+test('a ramp off an island climbs from the island, not from the ground under it', () => {
   const level = miniLevel({
     segments: [{ from: 0, to: SCENE_W, y: 150 }],
     islands: [{ from: 20, to: 120, y: 100, floor: 110 }],
@@ -968,7 +974,6 @@ test('a ramp off an island climbs — an island is ground, not somebody else\'s 
   run(state, 20);
   assert.equal(duck.y, 100, 'up on the island');
   assignSkill(state, duck.id, 'builder');
-  assert.equal(duck.buildLevel, false, 'so its ramp climbs');
   run(state, BUILD_MAX_STEPS);
   const top = Math.min(...state.decks.flat());
   assert.equal(top, 100 - BUILD_RISE_HEIGHT, 'a full ramp\'s climb above the island');
@@ -1278,6 +1283,15 @@ function rampEnd(state){
 function atAWall(state, d){
   const nextX = Math.round(d.x) + d.dir;
   if(nextX < 0 || nextX >= state.terrain.length) return false;
+  /* A column something has already tunnelled is never a wall worth digging,
+     whatever height its floor happens to be at. A tunnel comes out of a hill
+     wherever the ground outside has fallen below it, so its mouth can stand
+     a few pixels over that ground — a step down on the way out, and a step
+     up on the way back in. Without this, a duckling that walked out of a
+     tunnel and turned round would be handed a Digger and sent back into the
+     hole it just left, cutting a second tunnel over the first and wiping
+     out the route for everything behind it. */
+  if(state.tunnelY[nextX] != null) return false;
   const surfaces = [state.terrain[nextX], state.tunnelY[nextX], ...(state.decks[nextX] ?? [])]
     .filter(v => v != null);
   /* Every surface there standing more than a step above. A surface BELOW is
@@ -1332,7 +1346,7 @@ function playLevel1(){
          far lip and steps off it. One Blocker there holds the lot of them
          safely between it and the wall, which is what the level carries two
          for and what a player does the first time they watch it happen. */
-      if(!holder && d.dir < 0 && d.y === 150 && Math.round(d.x) === 108){
+      if(!holder && d.dir < 0 && d.y === 126 && Math.round(d.x) === 108){
         if(assignSkill(state, d.id, 'blocker')) holder = d;
         continue;
       }
@@ -1966,11 +1980,11 @@ test('The Spire wants its ramp started early along the pen floor', () => {
      side before it reaches the rock. Started in the first stretch of the pen
      the ramp has its full run-up and the tunnel goes through; started late
      it begins too low and dies in the seam with the flock behind it. */
-  for(const rampAt of [60, 62, 64, 66]){
+  for(const rampAt of [60, 64, 68, 72]){
     const state = playLevel6({ rampAt });
     assert.equal(state.ended, 'won', `a ramp started at ${rampAt} should win`);
   }
-  for(const rampAt of [70, 75, 80]){
+  for(const rampAt of [78, 82, 86]){
     const state = playLevel6({ rampAt });
     const cut = state.tunnelY.filter(v => v != null).length;
     assert.ok(cut > 0 && cut < 30, `a ramp started at ${rampAt} should stop short, cut ${cut}`);
@@ -2955,15 +2969,14 @@ test('The Stepping Stones puts the crag out of the pen\'s reach', () => {
 const BELFRY_PLAN = [
   { y: 150, at: 40, dir: 1 },                  // pen -> A, left to right
   { y: 126, at: 100, dir: -1, turn: 115 },     // A -> B, right to left
-  { y: 102, at: 30, dir: 1, turn: 22 },        // B -> C: climb, left to right
-  { y: 78, at: 63, dir: 1 },                   //    ... level
-  { y: 78, at: 96, dir: 1 },                   //    ... climb, onto C
+  { y: 102, at: 30, dir: 1, turn: 22 },        // B -> C: first climb, left to right
+  { y: 78, at: 63, dir: 1 },                   //    ... and the second, onto C
 ];
 
 function playLevel11({ steps = BELFRY_PLAN.length, turns = true } = {}){
   const state = newGame(LEVEL_BELFRY);
   let stage = 0, held = null;
-  const kinds = [], dirs = [];
+  const tops = [], dirs = [];
   for(let i = 0; i < LEVEL_BELFRY.timeLimit && !state.ended; i++){
     const move = stage < steps ? BELFRY_PLAN[stage] : null;
     if(move){
@@ -2976,7 +2989,7 @@ function playLevel11({ steps = BELFRY_PLAN.length, turns = true } = {}){
         const d = state.ducks.find(k => k.state === 'walking'
           && Math.round(k.x) === move.at && k.y === move.y && k.dir === move.dir);
         if(d && assignSkill(state, d.id, 'builder')){
-          kinds.push(d.buildLevel ? 'level' : 'climb');
+          tops.push(d.y);
           dirs.push(d.dir);
           stage++;
           held = null;
@@ -2985,14 +2998,14 @@ function playLevel11({ steps = BELFRY_PLAN.length, turns = true } = {}){
     }
     tick(state);
   }
-  return { state, built: stage, kinds, dirs };
+  return { state, built: stage, tops, dirs };
 }
 
 test('The Belfry can be won by switchbacking up its floors', () => {
-  const { state, built, kinds, dirs } = playLevel11();
-  assert.equal(built, 5, 'all five ramps should have gone in');
-  assert.deepEqual(kinds, ['climb', 'climb', 'climb', 'level', 'climb'],
-    'three single ramps, then the climb-level-climb staircase');
+  const { state, built, tops } = playLevel11();
+  assert.equal(built, 4, 'all four ramps should have gone in');
+  assert.deepEqual(tops, [150, 126, 102, 78],
+    'each ramp starts a rise above the last: one onto A, one onto B, two up to C');
   assert.equal(state.ended, 'won');
   assert.ok(state.saved >= winCount(LEVEL_BELFRY), `only ${state.saved} saved, needed ${winCount(LEVEL_BELFRY)}`);
 });

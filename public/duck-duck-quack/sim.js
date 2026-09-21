@@ -39,9 +39,6 @@ function hatchling(level, groundY){
     fallFrom: 0,
     buildBaseY: 0,      // the height the ramp started from — see stepBuilding
     buildStep: 0,       // ticks spent building so far, up to BUILD_MAX_STEPS
-    // true when this ramp runs level instead of climbing, which depends on
-    // what the duckling was standing on when it was given — see assignSkill.
-    buildLevel: false,
     /* Ticks left standing still at the end of a ramp just finished, before
        walking on — see BUILD_PAUSE_TICKS and stepBuilding. The duckling is
        'walking' throughout, which is the point: a paused one can still be
@@ -52,7 +49,7 @@ function hatchling(level, groundY){
     jumpFromX: 0, jumpFromY: 0, jumpToX: 0, jumpToY: 0, jumpSpan: 0, jumpStep: 0,
     digLeft: 0,
     /* Where a tunnel has got to vertically, kept as a fraction because it
-       falls about half a pixel a column — see DIG_DROP. `y` is this rounded
+       falls about a third of a pixel a column — see DIG_DROP. `y` is this rounded
        to the column the duckling is actually standing in. */
     digY: 0,
     // The teleporter pad this one is standing on because it just came out of
@@ -126,7 +123,6 @@ export function newGame(level){
     // a plain list of heights, and only one thing in the whole game asks
     // this question — see assignSkill, where standing on a level deck is
     // what sends the next ramp back up.
-    flatDecks: Array.from({ length: level.width }, () => new Set()),
     // Where a wall is rock rather than dirt — see rockAt below and
     // content.js's header note on segments' `hard` field. `floors` (art.js's
     // drawGround) is not read anywhere in this file at all — nothing below a
@@ -241,14 +237,11 @@ function padUnder(state, d){
 const setTunnelAt = (state, x, y) => { state.tunnelY[columnAt(state, x)] = y; };
 
 /* Adds a deck without disturbing any already standing at that column — see
-   `decks` in newGame. A ramp laid across an older one leaves both. `flat`
-   records which kind of run laid it, which is the only thing that tells a
-   level stretch of ramp apart from a climbing one later on. */
-const addDeckAt = (state, x, y, flat) => {
+   `decks` in newGame. A ramp laid across an older one leaves both. */
+const addDeckAt = (state, x, y) => {
   const col = columnAt(state, x);
   const at = state.decks[col];
   if(!at.includes(y)) at.push(y);
-  if(flat) state.flatDecks[col].add(y);
 };
 
 /* Which of a column's surfaces a duckling at `fromY` would actually step
@@ -769,9 +762,15 @@ function stepDigging(state, d){
   if(nextX < 0 || nextX >= level.width){ endDig(d); return; }
 
   /* Down as well as along — see DIG_DROP. The height is carried as a
-     fraction and rounded per column, so the slope is an even thirty degrees
-     rather than a stair of whole pixels every other column. */
-  const nextY = Math.round(d.digY + DIG_DROP);
+     fraction and taken to whole pixels per column, so the slope is an even
+     DIG_ANGLE rather than a stair of whole pixels every other column.
+     Rounded UP rather than to nearest, which matters on the very first
+     column: at a shallow angle the first fraction of a pixel would round
+     back onto the ground the duckling is standing on, the cut would read as
+     having surfaced before it began, and a Digger given on the flat would
+     do nothing at all. Up means every column is strictly below the last
+     one, which is what digging down means. */
+  const nextY = Math.ceil(d.digY + DIG_DROP);
 
   if(rockAt(state, nextX, nextY)){ endDig(d); return; }
   // Dug clean out of the bottom of the scene, which nothing should do.
@@ -839,9 +838,7 @@ function stepBuilding(state, d){
   if(nextX < 0 || nextX >= level.width){ stopBuilding(d); return; }
 
   const step = d.buildStep + 1;
-  const y = d.buildLevel
-    ? d.buildBaseY
-    : d.buildBaseY - Math.round(step * BUILD_RISE_HEIGHT / BUILD_MAX_STEPS);
+  const y = d.buildBaseY - Math.round(step * BUILD_RISE_HEIGHT / BUILD_MAX_STEPS);
 
   /* Strictly higher, not "at or above": the first few ticks of a ramp round
      to no rise at all (BUILD_RISE_HEIGHT spread over BUILD_MAX_STEPS is well
@@ -862,7 +859,7 @@ function stepBuilding(state, d){
     return;
   }
 
-  addDeckAt(state, nextX, y, d.buildLevel);
+  addDeckAt(state, nextX, y);
   d.x = nextX;
   d.y = y;
   d.buildStep = step;
@@ -1044,30 +1041,25 @@ export function assignSkill(state, duckId, skill){
     d.buildPause = 0;
     d.buildBaseY = d.y;
     d.buildStep = 0;
-    /* A ramp climbs or runs level depending entirely on what this duckling
-     * is standing on, and the three cases alternate:
+    /* Every ramp climbs. A Builder laid on the ground, on an island or on
+     * the deck of another ramp all do the same thing: BUILD_RISE_HEIGHT up
+     * over BUILD_MAX_STEPS columns, in whichever direction the duckling was
+     * already walking.
      *
-     *   the ground, or an island   climb BUILD_RISE_HEIGHT
-     *   a climbing ramp's deck     run level
-     *   a level ramp's deck        climb again
+     * It used to alternate — climb off the ground, run level off a climbing
+     * deck, climb again off a level one — so that a chain read as a
+     * staircase and a player was never more than one climb above the last
+     * flat thing. That bought safety and cost the thing a ramp is for: half
+     * of every chain went sideways, so two Builders bought one climb's worth
+     * of height, and a player laying a second ramp on the end of the first
+     * got a shelf when they had asked for more height.
      *
-     * so a chain of Builders is a staircase — up, along, up, along — rather
-     * than either one endless climb or one endless shelf. The level run in
-     * the middle is what makes the climb safe to build: the far end of any
-     * ramp is a ledge everything behind it has to step off, and each climb
-     * puts BUILD_RISE_HEIGHT between the deck and whatever it started from.
-     * Alternating means a player is never more than one climb's worth above
-     * the last flat thing while the next segment goes in, and it is what
-     * turns a handful of Builders into real height — The Stepping Stones is
-     * built on exactly that, seventy pixels of it.
-     *
-     * A duckling standing on an island is on neither kind of deck, so it
-     * climbs: an island is ground, and a ramp off one starts a fresh
-     * staircase rather than continuing the one that got it up there.
+     * Straight up every time is what a Builder now says on the tin, and it
+     * doubles what a chain is worth: two of them are forty-eight pixels
+     * rather than twenty-four. The ledge at the end of each one is the price
+     * — see BUILD_PAUSE_TICKS, which is the moment a player gets to lay the
+     * next one before anybody walks off it.
      */
-    const col = columnAt(state, d.x);
-    const onDeck = state.decks[col].includes(d.y);
-    d.buildLevel = onDeck && !state.flatDecks[col].has(d.y);
     return d;
   }
   // climber, flyer, jumper: stay 'walking' until the right hazard asks for
