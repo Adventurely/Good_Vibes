@@ -94,7 +94,7 @@
    straight off the page whether they have the latest build, rather than
    having to guess from behavior alone. Bump it on every change that ships,
    however small. */
-export const GAME_VERSION = '1.40';
+export const GAME_VERSION = '1.41';
 
 export const SCENE_W = 320;
 export const SCENE_H = 180;
@@ -530,19 +530,27 @@ export const LEVEL_PARK = {
      ducks down (TICK_RATE 14 -> 11) made the walk itself take longer in
      real seconds, and on top of that a real player has to notice each
      hazard coming and click the right skill on the right duckling, up to
-     nine times over for Climber and again for Flyer. Three and a half
+     ten times over for Climber and again for Flyer. Three and a half
      minutes gives that room without turning the level into a wait. */
   timeLimit: TICK_RATE * 210,       // three and a half minutes
   winRatio: 0.8,
 
-  /* Generous on purpose — this is the first level anyone will ever play, and
-     the point of it is to feel the skills work, not to run out of them.
-     Climber and Flyer are the two every crossing duckling needs its own
-     copy of, so both are sized to the save quota with one to spare. Builder
-     is four: two to reach across the gap (see the level's note above) and
-     two more, because getting a ramp wrong on the level that teaches ramps
-     should cost a Builder, not the run. Digger is zero: see the note too. */
-  supply: { digger: 0, builder: 4, blocker: 2, climber: 9, flyer: 9, jumper: 1 },
+  /* Climber and Flyer are the two that every crossing duckling needs its
+     own copy of — one gets one duckling up the wall, one gets one duckling
+     down the far side, and the next duckling arrives at each exactly as the
+     first one found it. Ten of each is one per duckling hatched, so neither
+     of those is ever the thing that loses this run: on the level that
+     teaches what a one-duckling skill is, running out of one teaches
+     nothing.
+
+     Builder is two, which is exactly what the gap takes (see the level's
+     note above) and not one more. That is the level's one real decision and
+     the only place a run can be lost here: the ramp has to go in at the
+     lip, and the second has to go on the end of the first. Get either
+     wrong and there is nothing left to bridge with.
+
+     Digger is zero: see the note too. */
+  supply: { digger: 0, builder: 2, blocker: 2, climber: 10, flyer: 10, jumper: 1 },
 
   /* Patrols the near half of the pond's approach. `speed` is columns a tick,
      `catchRadius` is how close a duckling has to be to it, in columns, to get
@@ -1004,8 +1012,11 @@ export const LEVEL_AERIE = {
   timeLimit: TICK_RATE * 300,
   winRatio: 0.7,
 
-  /* Climber: nine for ten hatchlings, the same margin The Park gives its own
-     mandatory Climber. Digger: a small honest supply rather than zero — it
+  /* Climber: nine for ten hatchlings, one short of the flock on purpose —
+     unlike The Park, which hands out one per duckling because it is still
+     teaching what a one-duckling skill is, this one expects a player to
+     have learned it and holds the quota at seven of ten. Digger: a small
+     honest supply rather than zero — it
      is on the page so a player who reaches for it out of habit discovers
      rock refuses it, rather than never getting the chance to find out.
      Builder: one spare over its two required bridges. Flyer: zero, nothing
