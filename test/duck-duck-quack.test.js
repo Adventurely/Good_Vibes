@@ -210,10 +210,8 @@ test('a digger tunnels through a wall, sloping downhill as it goes, permanently'
   const duck = state.ducks[0];
   tickUntilAt(state, duck, 9);
   assert.equal(assignSkill(state, duck.id, 'digger'), duck);
-  // Digging is deferred, not instant: the duckling is still just walking
-  // until the very next step is the one that would otherwise turn it back.
-  assert.equal(duck.state, 'walking');
-  tick(state);
+  // A Digger goes in on the click, the way a Builder does — it does not wait
+  // for the wall to arrive.
   assert.equal(duck.state, 'digging');
   run(state, 65);
   assert.equal(duck.state, 'saved');
@@ -241,22 +239,58 @@ test('a digger tunnels through a wall, sloping downhill as it goes, permanently'
   assert.ok(state.tunnelY[39] > 50, 'and below where it started, not level with it');
 });
 
-test('a digger given the skill right at the nest still tunnels the wall three obstacles later', () => {
-  // The actual bug this is guarding against: a skill that only worked when
-  // clicked on the exact column a hazard started on was, in practice,
-  // unusable — nobody can land a tap on one specific column of a moving
-  // duckling. Handed out the moment it hatches, long before it can see the
-  // wall coming, it still has to work.
+test('a Digger is no longer a knack a duckling carries around', () => {
+  /* It used to be one of the four deferred skills, held until the hazard it
+     answers turned up. It acts on the click now, like Builder and Blocker,
+     so nothing is stored on the duckling and the "that one already has it"
+     refusal does not apply to it — a duckling that has finished one dig can
+     be handed another. */
   const level = miniLevel({
     segments: [{ from: 0, to: 10, y: 50 }, { from: 10, to: SCENE_W, y: 0 }],
-    goalX: 40, supply: { digger: 1, builder: 0, blocker: 0, climber: 0, flyer: 0 },
+    goalX: 60, timeLimit: 900,
+    supply: { digger: 2, builder: 0, blocker: 0, climber: 0, flyer: 0 },
+  });
+  const state = run(newGame(level), 1);
+  const duck = state.ducks[0];
+  assert.equal(assignSkill(state, duck.id, 'digger'), duck);
+  assert.equal(hasTrait(duck, 'digger'), false, 'nothing is carried');
+  assert.equal(duck.state, 'digging');
+  assert.equal(assignRefusal(state, duck.id, 'digger'), 'That one is busy.',
+    'though it is busy while it is actually cutting');
+
+  run(state, DIG_MAX_STEPS + 4);
+  assert.equal(duck.state, 'walking');
+  assert.equal(assignRefusal(state, duck.id, 'digger'), null,
+    'and can be given a second one once it is done');
+  assert.equal(assignSkill(state, duck.id, 'digger'), duck);
+});
+
+test('a digger handed one far from the wall digs where it stands, and gets nowhere', () => {
+  /* The cost of a Digger that acts on the click rather than waiting.
+   *
+   * It used to be carried until something in front of the duckling needed
+   * it, so it could be handed out at the nest and would still answer a wall
+   * three obstacles later. It cuts from wherever it is given now, which is
+   * what makes WHERE it is given the whole of the decision — and what makes
+   * giving one too early a way to waste it. The shaft goes into open ground,
+   * runs out its clock under the grass, and the duckling walks back out of
+   * its own hole none the wiser.
+   */
+  const level = miniLevel({
+    segments: [{ from: 0, to: 40, y: 50 }, { from: 40, to: SCENE_W, y: 0 }],
+    goalX: 60, timeLimit: 900,
+    supply: { digger: 1, builder: 0, blocker: 0, climber: 0, flyer: 0 },
   });
   const state = run(newGame(level), 1);
   const duck = state.ducks[0];
   assert.ok(duck.x < 9, 'the duckling should still be well short of the wall');
   assert.equal(assignSkill(state, duck.id, 'digger'), duck);
-  run(state, 80);
-  assert.equal(duck.state, 'saved');
+  assert.equal(duck.state, 'digging', 'and it starts cutting there and then');
+  run(state, 400);
+  assert.notEqual(duck.state, 'saved', 'a shaft into open ground reaches nothing');
+  const cut = state.tunnelY.map((v, x) => v != null ? x : null).filter(x => x != null);
+  assert.ok(cut[0] < 20, `the cut should start where it was given, began at ${cut[0]}`);
+  assert.equal(state.tunnelY[39], null, 'and nowhere near the wall it never reached');
 });
 
 test('a digger only answers a wall — facing a gap instead, it still just falls', () => {
@@ -320,10 +354,26 @@ test('a second digger carries on from where the first one stopped', () => {
     duckCount: 2, spawnInterval: 4, timeLimit: 600, goalX: SCENE_W - 1,
     supply: { digger: 2, builder: 0, blocker: 0, climber: 0, flyer: 0 },
   });
+  /* Both are given theirs at the wall's own face rather than back down the
+     ground, because a Digger cuts from where it is given now — the first at
+     the lip, the second once it has walked in along the first one's hole to
+     where the cutting stopped. */
   const state = run(newGame(level), 1);
-  for(const d of state.ducks) assignSkill(state, d.id, 'digger');
-  run(state, 20);
-  for(const d of state.ducks) if(d.state === 'walking') assignSkill(state, d.id, 'digger');
+  const first = state.ducks[0];
+  tickUntilAt(state, first, 9);
+  assert.equal(assignSkill(state, first.id, 'digger'), first);
+  run(state, DIG_MAX_STEPS + 4);
+
+  // The second walks in behind it and is given one at the dead end.
+  const second = state.ducks.find(d => d.id !== first.id);
+  for(let i = 0; i < 400 && second.state === 'walking'; i++){
+    if(state.tunnelY[Math.round(second.x)] != null && second.dir > 0
+      && state.tunnelY[Math.round(second.x) + 1] == null){
+      assignSkill(state, second.id, 'digger');
+      break;
+    }
+    tick(state);
+  }
   run(state, 400);
   const cut = state.tunnelY.filter(v => v != null).length;
   assert.ok(cut > DIG_MAX_STEPS, `two diggers should reach past one tunnel, got ${cut}`);
@@ -579,8 +629,8 @@ test('the pause is long enough to be clicked in, and short enough to be a hesita
   /* The number itself, held to what it is for. Much under a second is the
      reflex test this replaced; much over and a duckling that has finished
      its ramp looks like one waiting for orders. */
-  assert.ok(BUILD_PAUSE_TICKS >= TICK_RATE, 'a player needs at least a second to see it and click');
-  assert.ok(BUILD_PAUSE_TICKS <= TICK_RATE * 3, 'but it is a hesitation, not a halt');
+  assert.ok(BUILD_PAUSE_TICKS >= TICK_RATE / 2, 'a player needs time to see it and click');
+  assert.ok(BUILD_PAUSE_TICKS <= TICK_RATE * 2, 'but it is a hesitation, not a halt');
 });
 
 test('a second Builder given during that pause carries the ramp on from where the first stopped', () => {
@@ -593,8 +643,8 @@ test('a second Builder given during that pause carries the ramp on from where th
   const firstEndX = duck.x, firstEndY = duck.y;
   assert.equal(duck.state, 'walking');
 
-  // A whole second later — hopeless before, comfortable now.
-  run(state, TICK_RATE);
+  // Most of the pause later — one tick of warning before, a real window now.
+  run(state, BUILD_PAUSE_TICKS - 2);
   assert.equal(duck.x, firstEndX, 'still there to be clicked');
   assert.equal(assignSkill(state, duck.id, 'builder'), duck, 'and still able to take the next one');
   assert.equal(duck.state, 'building');
@@ -1214,6 +1264,29 @@ function rampEnd(state){
   return state.decks.findLastIndex(at => at.length > 0);
 }
 
+/* A Digger cuts from where it is given now rather than waiting for a wall to
+ * arrive (see sim.js's assignSkill), so a bot has to click at the moment the
+ * old deferred trait would have fired for itself: with the duckling nose to
+ * the thing it means to cut. This is that test, done from outside — every
+ * surface in the next column standing more than a step above where the
+ * duckling is walking, which is what stepWalking calls a wall.
+ *
+ * It is also what a player is doing by eye, and it works just as well on a
+ * dead end left by an earlier tunnel as on the face of a hill, which is what
+ * makes the two-Digger relay a bot can drive.
+ */
+function atAWall(state, d){
+  const nextX = Math.round(d.x) + d.dir;
+  if(nextX < 0 || nextX >= state.terrain.length) return false;
+  const surfaces = [state.terrain[nextX], state.tunnelY[nextX], ...(state.decks[nextX] ?? [])]
+    .filter(v => v != null);
+  /* Every surface there standing more than a step above. A surface BELOW is
+     not a wall, it is a step down or a fall, and it has to stay in the list
+     for that reason: a pit with a ramp deck climbing over it has both, and
+     dropping the pit out made the deck overhead look like a wall to dig. */
+  return surfaces.length > 0 && surfaces.every(y => d.y - y > WALK_STEP);
+}
+
 /* The goose is a gate now, not a tax.
  *
  * It used to take one duckling and leave, so a bot could walk the flock
@@ -1233,20 +1306,36 @@ function hopTheGoose(state, level, from, to){
 
 function playLevel1(){
   const state = newGame(LEVEL_PARK);
-  let builderUsed = false, extended = false;
+  let builderUsed = false, extended = false, holder = null;
   for(let i = 0; i < LEVEL_PARK.timeLimit && !state.ended; i++){
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
       // The Park's gap is wider than one ramp reaches (see LEVEL_PARK's note):
       // lay one at the lip, then extend it from its far end.
       if(!builderUsed && d.x === 69 && assignSkill(state, d.id, 'builder')){ builderUsed = true; continue; }
-      const end = rampEnd(state);
-      if(builderUsed && !extended && end > 0 && d.x === end && state.decks[end].includes(d.y)){
+      /* Extend the ramp from its own far end, using the duckling that just
+         laid it — it is standing there waiting out BUILD_PAUSE_TICKS, which
+         is exactly the moment and the duckling a player clicks. Watching for
+         `buildPause` rather than for a particular column makes this immune
+         to how long that pause happens to be; pinned to `d.x === rampEnd` it
+         quietly stopped working when the pause was shortened. */
+      if(builderUsed && !extended && d.buildPause > 0){
         if(assignSkill(state, d.id, 'builder')) extended = true;
         continue;
       }
       if(!hasTrait(d, 'climber') && d.x >= 136 && d.x < 150) assignSkill(state, d.id, 'climber');
       else if(!hasTrait(d, 'flyer') && d.x >= 160 && d.x < 219) assignSkill(state, d.id, 'flyer');
+      /* And a Blocker just past the gap, on the first duckling that comes
+         back the other way. The ramp across the gap is a bridge climbing
+         away from its own near bank, so it cannot be got back onto from the
+         far side: anything that turns round at the wall walks to the gap's
+         far lip and steps off it. One Blocker there holds the lot of them
+         safely between it and the wall, which is what the level carries two
+         for and what a player does the first time they watch it happen. */
+      if(!holder && d.dir < 0 && d.y === 150 && Math.round(d.x) === 108){
+        if(assignSkill(state, d.id, 'blocker')) holder = d;
+        continue;
+      }
     }
     hopTheGoose(state, LEVEL_PARK, 225, 255);
     tick(state);
@@ -1352,7 +1441,7 @@ function playLevel3({ wall = 'digger', diggers = 2, turnAt = 100, rampAt = 110, 
       if(wall === 'digger'){
         // The approach's own height, read off the level rather than written
         // down here — it dropped thirty pixels when tunnels started sloping.
-        if(digs < diggers && d.y === ORCHARD_APPROACH_Y && d.x > 206 && d.x < 229 && !hasTrait(d, 'digger')){
+        if(digs < diggers && d.x > 155 && d.x < 229 && atAWall(state, d) && d.dir < 0){
           if(assignSkill(state, d.id, 'digger')){ digs++; crossed = digs >= diggers; }
           continue;
         }
@@ -1579,7 +1668,7 @@ function playLevel4(rampAt = 100){
         if(assignSkill(state, d.id, 'builder')) wallRamp = true;
         continue;
       }
-      if(!diggerUsed && !hasTrait(d, 'digger') && d.x >= 120 && d.x < 130){
+      if(!diggerUsed && d.x >= 120 && d.x < 132 && d.dir > 0 && atAWall(state, d)){
         if(assignSkill(state, d.id, 'digger')) diggerUsed = true;
         continue;
       }
@@ -1590,7 +1679,7 @@ function playLevel4(rampAt = 100){
          off the right-hand lip into the pit. Thirty ticks of digging is
          long enough for four of them to do it. A Blocker on the approach
          costs nothing and is what a player does. */
-      if(diggerUsed && !holder && d.x >= 90 && d.x < 100 && !hasTrait(d, 'digger')){
+      if(diggerUsed && !holder && d.x >= 90 && d.x < 100 && d.state === 'walking'){
         if(assignSkill(state, d.id, 'blocker')) holder = d;
         continue;
       }
@@ -1641,7 +1730,7 @@ test('The Grove\'s wall is rock at the level a duckling meets it — a Digger al
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
       if(!gapBuilder && d.x === 49){ if(assignSkill(state, d.id, 'builder')) gapBuilder = true; continue; }
-      if(!hasTrait(d, 'digger') && d.x >= 120 && d.x < 130) assignSkill(state, d.id, 'digger');
+      if(d.x >= 120 && d.x < 132 && d.dir > 0 && atAWall(state, d)) assignSkill(state, d.id, 'digger');
     }
     tick(state);
   }
@@ -1761,7 +1850,7 @@ function playLevel6({ flyers = 3, rampAt = 62, dig = true } = {}){
         if(assignSkill(state, d.id, 'builder')) ramped = true;
         continue;
       }
-      if(dig && ramped && !dug && d.dir > 0 && d.x >= 62 && d.x <= 88){
+      if(dig && ramped && !dug && d.dir > 0 && d.x >= 62 && d.x <= 95 && atAWall(state, d)){
         if(assignSkill(state, d.id, 'digger')) dug = true;
         continue;
       }
@@ -1843,7 +1932,7 @@ test('The Spire cannot be tunnelled from the grass — the seam is rock down the
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
       if(!hasTrait(d, 'flyer') && d.y <= 40) assignSkill(state, d.id, 'flyer');
-      if(!hasTrait(d, 'digger') && d.y >= 150) assignSkill(state, d.id, 'digger');
+      if(d.y >= 150 && d.dir > 0 && atAWall(state, d)) assignSkill(state, d.id, 'digger');
     }
     tick(state);
     ticks++;
@@ -1862,7 +1951,7 @@ test('The Spire\'s bluff is rock — a Digger sent at it never starts', () => {
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
       if(!hasTrait(d, 'flyer') && d.y <= 40) assignSkill(state, d.id, 'flyer');
-      if(!hasTrait(d, 'digger') && d.y >= 150) assignSkill(state, d.id, 'digger');
+      if(d.y >= 150 && d.dir > 0 && atAWall(state, d)) assignSkill(state, d.id, 'digger');
     }
     tick(state);
     if(state.tunnelY.slice(0, 60).some(v => v != null)) cutAtBluff = true;
@@ -2360,7 +2449,12 @@ function playLevel7(useDigger){
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
       if(!hasTrait(d, 'flyer')) assignSkill(state, d.id, 'flyer');
-      if(!hasTrait(d, useDigger ? 'digger' : 'climber')) assignSkill(state, d.id, useDigger ? 'digger' : 'climber');
+      if(useDigger){
+        // At the face: the crag's, and the one wall's, both met walking left.
+        if(atAWall(state, d)) assignSkill(state, d.id, 'digger');
+      } else if(!hasTrait(d, 'climber')){
+        assignSkill(state, d.id, 'climber');
+      }
       if(!builder1Used && d.x === 300){ if(assignSkill(state, d.id, 'builder')) builder1Used = true; continue; }
       if(!builder2Used && d.x === 140){ if(assignSkill(state, d.id, 'builder')) builder2Used = true; continue; }
     }
@@ -2425,6 +2519,9 @@ test('a digger cannot start into the stone part of a crag', () => {
   });
   const state = run(newGame(level), 1);
   const duck = state.ducks[0];
+  // Given it nose to the crag, where the face it is looking at is stone.
+  for(let i = 0; i < 200 && !atAWall(state, duck); i++) tick(state);
+  assert.ok(atAWall(state, duck), 'it should have reached the crag');
   assignSkill(state, duck.id, 'digger');
   run(state, 120);
   assert.ok(state.tunnelY.every(v => v == null), 'nothing should have been cut');
@@ -3076,7 +3173,7 @@ test('a run out of time is judged on what got home by then', () => {
    and back. Then the Blocker comes off. */
 function playLevel12({ blockAt = 90, buildAt = 55, release = true, skip = null } = {}){
   const state = newGame(LEVEL_ERRAND);
-  let blocker = null, errand = null, built = false, released = false, warpsAtBridge = null;
+  let blocker = null, errand = null, built = false, released = false, warpsAtBridge = null, dug = false;
 
   for(let i = 0; i < LEVEL_ERRAND.timeLimit && !state.ended; i++){
     if(!blocker && skip !== 'blocker'){
@@ -3090,10 +3187,13 @@ function playLevel12({ blockAt = 90, buildAt = 55, release = true, skip = null }
         && k.id !== blocker.id && k.x > 100 && k.x < 149);
       if(d && assignSkill(state, d.id, 'climber')) errand = d;
     }
-    // The hill, at the height the high shelf runs at.
-    if(errand && !hasTrait(errand, 'digger') && skip !== 'digger'
-       && errand.state === 'walking' && errand.y === 56 && errand.x > 160 && errand.x < 189){
-      assignSkill(state, errand.id, 'digger');
+    /* The hill, cut from its own face. A Digger goes in on the click now, so
+       this waits until the errand duckling is actually looking at the hill
+       rather than handing it one anywhere along the shelf. */
+    if(errand && !dug && skip !== 'digger'
+       && errand.state === 'walking' && errand.x > 150 && errand.x < 195
+       && atAWall(state, errand)){
+      if(assignSkill(state, errand.id, 'digger')) dug = true;
     }
     // And the bridge, once the pad has put it back on the far shelf.
     if(errand && !built && skip !== 'builder' && errand.state === 'walking'

@@ -94,7 +94,7 @@
    straight off the page whether they have the latest build, rather than
    having to guess from behavior alone. Bump it on every change that ships,
    however small. */
-export const GAME_VERSION = '1.34';
+export const GAME_VERSION = '1.35';
 
 export const SCENE_W = 320;
 export const SCENE_H = 180;
@@ -184,7 +184,7 @@ export const BUILD_MAX_STEPS = TICK_RATE * BUILD_SECONDS;
  * the level design already assumes the chain is possible (see The Stepping
  * Stones and The Belfry).
  *
- * A second and a half is long enough to see the ramp stop, find the Builder
+ * Three quarters of a second is long enough to see the ramp stop, find the Builder
  * button and click, and short enough that it still reads as a duckling
  * hesitating at an edge rather than waiting for instructions. It applies
  * however the ramp ended — out of clock, run into a wall, or run out of
@@ -205,7 +205,7 @@ export const BUILD_MAX_STEPS = TICK_RATE * BUILD_SECONDS;
  */
 export const HATCH_RUSH_TICKS = 2;
 
-export const BUILD_PAUSE_SECONDS = 1.5;
+export const BUILD_PAUSE_SECONDS = 0.75;
 export const BUILD_PAUSE_TICKS = Math.round(TICK_RATE * BUILD_PAUSE_SECONDS);
 
 /* How high a Builder's ramp climbs over the full BUILD_MAX_STEPS, if it
@@ -337,7 +337,7 @@ export const SKILLS = ['digger', 'builder', 'blocker', 'climber', 'flyer', 'jump
 
 export const SKILL_INFO = {
   digger: { name: 'Digger', verb: 'Dig',
-    blurb: `Tunnels down through the next wall for ${DIG_SECONDS} seconds, sloping as it goes, and leaves the way through for the rest. Then the knack is spent.` },
+    blurb: `Starts cutting the moment you click it, downward the way it faces, for ${DIG_SECONDS} seconds — so where you start it is where it comes out. Leaves the way through for the rest.` },
   builder: { name: 'Builder', verb: 'Build',
     blurb: `Starts a ramp the way it faces, right where you click it, for ${BUILD_SECONDS} seconds. From the ground it climbs; from a climbing ramp it carries on level; from a level one it climbs again — so a chain of them is a staircase.` },
   blocker: { name: 'Blocker', verb: 'Block',

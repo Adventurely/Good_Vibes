@@ -85,7 +85,7 @@ const SKILL_BADGE = {
 /* Drawn in this order wherever more than one is held, so the same pair
    always reads the same way round rather than in whatever order they were
    handed out in. Builder is not here — see drawDuck. */
-const BADGE_ORDER = ['digger', 'climber', 'flyer', 'jumper'];
+const BADGE_ORDER = ['climber', 'flyer', 'jumper'];
 
 const BADGE_W = 3, BADGE_H = 4, BADGE_PAD = 1, BADGE_GAP = 1;
 export const BADGE_PLATE_W = BADGE_W + BADGE_PAD * 2;
@@ -1129,6 +1129,9 @@ export function drawDuck(ctx, d, ticks = 0){
      is happening right now". */
   const held = BADGE_ORDER.filter(skill => d.traits.has(skill));
   if(d.state === 'building') held.unshift('builder');
+  // Digger acts on the click too, so like Builder it is shown while it is
+  // happening rather than carried as a mark over a duckling's head.
+  if(d.state === 'digging') held.unshift('digger');
   if(!held.length) return;
 
   const total = held.length * BADGE_PLATE_W + (held.length - 1) * BADGE_GAP;

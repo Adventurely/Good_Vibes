@@ -636,7 +636,6 @@ function stepWalking(state, d){
     // flock nothing: a hop leaves the wall exactly as it was, so a duckling
     // that can hop a low step should, rather than spend a tunnel on it.
     if(hasTrait(d, 'jumper') && startJump(state, d)) return;
-    if(!rockAt(state, nextX, d.y) && hasTrait(d, 'digger')){ d.state = 'digging'; d.digLeft = DIG_MAX_STEPS; d.digY = d.y; return; }
     if(hasTrait(d, 'climber')){ d.state = 'climbing'; d.x = nextX; return; }
     d.dir = -d.dir;
     return;
@@ -762,7 +761,6 @@ function stepFalling(state, d){
  */
 function endDig(d){
   d.state = 'walking';
-  d.traits.delete('digger');
 }
 
 function stepDigging(state, d){
@@ -981,7 +979,7 @@ export function assignRefusal(state, duckId, skill){
   const d = state.ducks.find(duck => duck.id === duckId);
   if(!d) return 'There is no such duckling.';
   if(d.state !== 'walking') return 'That one is busy.';
-  if(skill !== 'blocker' && skill !== 'builder' && hasTrait(d, skill)) return 'That one already has it.';
+  if(skill !== 'blocker' && skill !== 'builder' && skill !== 'digger' && hasTrait(d, skill)) return 'That one already has it.';
   if(!(state.supply[skill] > 0)) return `Out of ${skill}s.`;
   return null;
 }
@@ -1018,6 +1016,29 @@ export function assignSkill(state, duckId, skill){
      below leave it alone on purpose: a duckling given a Jumper while it
      pauses is still a duckling pausing. */
   if(skill === 'blocker'){ d.state = 'blocking'; d.buildPause = 0; return d; }
+  /* A Digger goes in on the click, the way a Builder does, and cuts downward
+   * in whichever direction the duckling was already walking. It does not wait
+   * for a wall any more.
+   *
+   * That is what a sloping tunnel actually wants to be. Waiting made sense
+   * while a cut ran dead level and its only use was the far side of a wall —
+   * the duckling carried the knack until something in front of it needed it.
+   * A cut that falls away is a different tool: it is an excavation, aimed
+   * from wherever the player picks, and where it is started is the whole of
+   * what decides where it comes out. Held until a wall, the player had no say
+   * in that at all.
+   *
+   * It costs the aiming that deferring bought. Handed one too early and the
+   * duckling drives a shaft into open ground and dead-ends in it, which is a
+   * real way to waste a Digger and a real thing to learn.
+   */
+  if(skill === 'digger'){
+    d.state = 'digging';
+    d.digLeft = DIG_MAX_STEPS;
+    d.digY = d.y;
+    d.buildPause = 0;
+    return d;
+  }
   if(skill === 'builder'){
     d.state = 'building';
     d.buildPause = 0;
@@ -1049,8 +1070,8 @@ export function assignSkill(state, duckId, skill){
     d.buildLevel = onDeck && !state.flatDecks[col].has(d.y);
     return d;
   }
-  // digger, climber, flyer, jumper: stay 'walking' until the right hazard
-  // asks for them.
+  // climber, flyer, jumper: stay 'walking' until the right hazard asks for
+  // them. Digger used to be one of these and is handled above now.
   d.traits.add(skill);
   return d;
 }
