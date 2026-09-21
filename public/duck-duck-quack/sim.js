@@ -9,7 +9,7 @@
  */
 
 import { SCENE_H, FALL_SAFE, WALK_STEP, FALL_SPEED, FLY_SPEED, FLY_DRIFT, CLIMB_SPEED,
-  BUILD_MAX_STEPS, BUILD_PAUSE_TICKS, BUILD_RISE_HEIGHT, DIG_DROP, DIG_MAX_STEPS, HATCH_RUSH_TICKS, JUMP_SPAN, JUMP_RISE,
+  BUILD_MAX_STEPS, BUILD_PAUSE_TICKS, BUILD_RISE_HEIGHT, DIG_DROP, DIG_MAX_STEPS, DIG_PAUSE_TICKS, HATCH_RUSH_TICKS, JUMP_SPAN, JUMP_RISE,
   SKILLS, GOOSE_FLEE_SPEED, TUNNEL_HEADROOM, ZAP_TICKS,
   GOOSE_FLEE_LIFT, POOF_TICKS, buildTerrain, buildLayer, winCount, goalHeading,
   hatchHeading } from './content.js';
@@ -39,12 +39,15 @@ function hatchling(level, groundY){
     fallFrom: 0,
     buildBaseY: 0,      // the height the ramp started from — see stepBuilding
     buildStep: 0,       // ticks spent building so far, up to BUILD_MAX_STEPS
-    /* Ticks left standing still at the end of a ramp just finished, before
-       walking on — see BUILD_PAUSE_TICKS and stepBuilding. The duckling is
+    /* Ticks left standing still at the end of a job just finished, before
+       walking on — see BUILD_PAUSE_TICKS and stepBuilding for a ramp,
+       DIG_PAUSE_TICKS and endDig for a tunnel. Both are the same moment: the
+       duckling that did the work is the one standing where the next one has
+       to start, and it is the one the player is watching. The duckling is
        'walking' throughout, which is the point: a paused one can still be
-       given the next Builder, and a state of its own would have made it
-       "busy" to assignSkill. */
-    buildPause: 0,
+       given the next Builder or Digger, and a state of its own would have
+       made it "busy" to assignSkill. */
+    pause: 0,
     // Where a hop took off from and where it is coming down — see startJump.
     jumpFromX: 0, jumpFromY: 0, jumpToX: 0, jumpToY: 0, jumpSpan: 0, jumpStep: 0,
     digLeft: 0,
@@ -107,22 +110,22 @@ export function newGame(level){
   return {
     level,
     terrain: buildTerrain(level.segments, level.width),
-    // Where a Digger has cut through — one height per column, or null where
-    // nothing has been dug. See groundAt below for why this lives apart from
-    // `terrain` rather than overwriting it.
-    tunnelY: new Array(level.width).fill(null),
+    /* Every tunnel floor cut at each column, as a list rather than one
+       height, for exactly the reason `decks` below is one: tunnels cross.
+       Dig one way along a hillside and then back the other way underneath
+       it and both are there, one over the other, each its own passage to
+       walk. It was a single height per column until a player dug a second
+       cut back through the first and watched it rub the first one out — see
+       setTunnelAt, which now only ever adds. Empty where nothing has been
+       dug. See groundAt below for why this lives apart from `terrain`
+       rather than overwriting it. */
+    tunnels: Array.from({ length: level.width }, () => []),
     // Every ramp deck standing at each column, as a list rather than one
     // height: ramps cross. Build one over another heading the other way and
     // both are still there, one above the other, each its own thing to walk
     // on — see surfacesAt below, and addDeckAt, which never replaces a deck
     // already standing at a column, only adds to it.
     decks: Array.from({ length: level.width }, () => []),
-    // Which of those decks were laid level rather than climbing, by height.
-    // A parallel layer rather than a field on each deck for the same reason
-    // `rock` and `rockBelow` are layers: everything that reads `decks` wants
-    // a plain list of heights, and only one thing in the whole game asks
-    // this question — see assignSkill, where standing on a level deck is
-    // what sends the next ramp back up.
     // Where a wall is rock rather than dirt — see rockAt below and
     // content.js's header note on segments' `hard` field. `floors` (art.js's
     // drawGround) is not read anywhere in this file at all — nothing below a
@@ -190,7 +193,13 @@ const columnAt = (state, x) => Math.max(0, Math.min(state.level.width - 1, Math.
    tunnel is kept apart rather than overwriting the wall it runs through. */
 const groundAt = (state, x) => {
   const col = columnAt(state, x);
-  if(state.tunnelY[col] != null) return state.tunnelY[col];
+  /* The deepest cut, where there is more than one. A tunnel floor over your
+     head is a hole in a ceiling rather than ground you could run a ramp
+     into, so the lowest is the one that behaves like ground here. With a
+     single tunnel — which is every case this had before tunnels became a
+     list — it is that tunnel, exactly as it was. */
+  const cut = state.tunnels[col];
+  if(cut.length) return Math.max(...cut);
   return state.terrain[col];
 };
 
@@ -206,26 +215,25 @@ const groundAt = (state, x) => {
 const surfacesAt = (state, x) => {
   const col = columnAt(state, x);
   const out = [];
-  const floor = state.tunnelY[col];
-  /* A tunnelled column usually has two floors, not one: the hillside still
+  const cut = state.tunnels[col];
+  /* A tunnelled column has more floors than one: the hillside still
      standing over the hole (which is what art.js draws — see content.js's
-     header note) and the tunnel's own floor inside it. Both are real
-     ground, and which one a duckling is on is decided the same way it is
-     decided for a ramp crossing a column: by where that duckling already
-     was. Tunnelling under a ledge used to quietly delete the ledge, which
-     was only ever invisible because nothing had walked along the top of a
-     hill it had also dug through.
+     header note), and then a floor for every tunnel cut through it. All of
+     them are real ground, and which one a duckling is on is decided the
+     same way it is decided for a ramp crossing a column: by where that
+     duckling already was. Tunnelling under a ledge used to quietly delete
+     the ledge, which was only ever invisible because nothing had walked
+     along the top of a hill it had also dug through.
 
-     Unless the cut came out through the top of it. A tunnel takes
+     Unless a cut came out through the top of it. A tunnel takes
      TUNNEL_HEADROOM of hillside with it, so a column whose surface is
-     inside that of the floor has nothing left over the hole — art.js draws
+     inside that of a floor has nothing left over that hole — art.js draws
      exactly that, ink all the way up to the grass. There is no roof to walk
      on there, so the surface is not offered: a duckling steps down into the
      cut instead of strolling over the top of a trench that is plainly open.
      That is what a Digger given on the flat digs. */
-  if(floor == null || state.terrain[col] < floor - TUNNEL_HEADROOM) out.push(state.terrain[col]);
-  if(floor != null) out.push(floor);
-  return out.concat(state.sky[col], state.decks[col]);
+  if(!cut.some(floor => state.terrain[col] >= floor - TUNNEL_HEADROOM)) out.push(state.terrain[col]);
+  return out.concat(cut, state.sky[col], state.decks[col]);
 };
 
 /* The teleporter pad this duckling is actually standing on, or null.
@@ -262,14 +270,37 @@ function padUnder(state, d){
  */
 const underTunnelRoof = (state, x, y) => {
   const col = columnAt(state, x);
-  const floor = state.tunnelY[col];
+  // The cut this duckling is actually standing in, rather than one running
+  // over its head or under its feet at the same column.
+  const floor = state.tunnels[col].find(f => Math.abs(y - f) <= WALK_STEP);
   if(floor == null) return false;
-  // Actually down in it, rather than walking the hill over the top of it.
-  if(Math.abs(y - floor) > WALK_STEP) return false;
   return state.terrain[col] < floor - TUNNEL_HEADROOM;
 };
 
-const setTunnelAt = (state, x, y) => { state.tunnelY[columnAt(state, x)] = y; };
+/* Adds a tunnel floor without disturbing any already cut at that column —
+   see `tunnels` in newGame. A cut driven back through an older one leaves
+   both, the way a ramp laid across an older one leaves both. */
+const setTunnelAt = (state, x, y) => {
+  const at = state.tunnels[columnAt(state, x)];
+  if(!at.includes(y)) at.push(y);
+};
+
+/* Would a cut whose floor lands at `y` be arriving in a passage that is
+   already open here?
+ *
+ * A tunnel's void is the TUNNEL_HEADROOM above its floor, not around it, and
+ * that asymmetry is the whole of this. A cut landing inside that band —
+ * at or above the old floor, below the old ceiling — has broken into the
+ * old tunnel and has nothing left in front of it to take out. A cut landing
+ * BELOW the old floor is a different thing entirely: it is taking out
+ * ground that is still there, under the old tunnel's floor, and deepening
+ * the hole as it goes. That is what a second Digger driven back along a
+ * trench the other way does, and it has to keep working — the two floors
+ * are both kept and art.js draws both bands, so the hole a player sees is
+ * the union of the two and nothing they dug earlier disappears.
+ */
+const cutOpenAt = (state, x, y) =>
+  state.tunnels[columnAt(state, x)].some(f => y <= f && y >= f - TUNNEL_HEADROOM);
 
 /* Adds a deck without disturbing any already standing at that column — see
    `decks` in newGame. A ramp laid across an older one leaves both. */
@@ -546,7 +577,7 @@ function stepWalking(state, d){
      rest of the game is concerned: the goose can still take it, a Blocker
      still stops it, and, the whole point, it can still be handed the next
      Builder. */
-  if(d.buildPause > 0){ d.buildPause -= 1; return; }
+  if(d.pause > 0){ d.pause -= 1; return; }
 
   // Reached or past the pond, in whichever direction it actually lies —
   // see content.js's goalHeading. `d.x >= level.goalX` on its own is only
@@ -765,10 +796,10 @@ function stepFalling(state, d){
  *
  * Unlike the old cut-to-head-height notch, this leaves `terrain` itself
  * completely alone — see groundAt above and content.js's header note. What
- * gets written is `tunnelY`, a second number for the same column that only
- * ever matters where it is not null, so the wall the tunnel runs through
- * still stands, full height, in art.js: a bored hole with rock still
- * overhead, not a hillside quietly bulldozed down to head height.
+ * gets written is a floor added to `tunnels`, a list of its own for the
+ * same column, so the wall the tunnel runs through still stands, full
+ * height, in art.js: a bored hole with rock still overhead, not a hillside
+ * quietly bulldozed down to head height.
  *
  * It stops the moment the ground ahead is already at or below the height
  * being cut, and stops without stepping onto it, so the ordinary walking
@@ -793,8 +824,15 @@ function stepFalling(state, d){
  * wall" true rather than nearly true; a duckling that tunnelled here still
  * turns back at the next wall along.
  */
+/* However the cut ended — broken out, run into rock, arrived in an older
+   tunnel, or simply run out of clock — the duckling stands where it stopped
+   for a moment before walking on. See DIG_PAUSE_TICKS: on a wall too thick
+   for one tunnel, this duckling at this column is exactly what the second
+   leg of the relay wants, and without the pause it was already walking back
+   out of its own hole by the time a player could click it. */
 function endDig(d){
   d.state = 'walking';
+  d.pause = DIG_PAUSE_TICKS;
 }
 
 function stepDigging(state, d){
@@ -823,7 +861,18 @@ function stepDigging(state, d){
      which is the whole of what changed about a Digger. Dig into a wall with
      the same ground on both sides and the tunnel passes underneath it and
      stops in the dark, which is a mistake a player can now make. */
-  if(groundAt(state, nextX) >= nextY){ endDig(d); return; }
+  if(state.terrain[columnAt(state, nextX)] >= nextY){ endDig(d); return; }
+
+  /* Or into somewhere already hollow. Driving a cut into a tunnel that is
+     already there is not digging, it is arriving: the two voids are one
+     passage from here on, and there is nothing left in front of this
+     duckling to take out. It stops rather than cutting on through, which is
+     also what keeps a second cut from running the length of an older one a
+     pixel below it and leaving the pair of them unreadable.
+     Far enough above or below to be its own passage — further than
+     TUNNEL_HEADROOM, see cutOpenAt — is a different thing entirely, and
+     that one carries on and is kept alongside the old one. */
+  if(cutOpenAt(state, nextX, nextY)){ endDig(d); return; }
 
   setTunnelAt(state, nextX, nextY);
   d.x = nextX;
@@ -912,7 +961,7 @@ function stepBuilding(state, d){
    places a ramp can end so that all three get it. */
 function stopBuilding(d){
   d.state = 'walking';
-  d.buildPause = BUILD_PAUSE_TICKS;
+  d.pause = BUILD_PAUSE_TICKS;
 }
 
 /* Climbs until it reaches something to stand on — the first surface it comes
@@ -1053,7 +1102,7 @@ export function assignSkill(state, duckId, skill){
      moment for a Builder or a Blocker to be handed out. The deferred four
      below leave it alone on purpose: a duckling given a Jumper while it
      pauses is still a duckling pausing. */
-  if(skill === 'blocker'){ d.state = 'blocking'; d.buildPause = 0; return d; }
+  if(skill === 'blocker'){ d.state = 'blocking'; d.pause = 0; return d; }
   /* A Digger goes in on the click, the way a Builder does, and cuts downward
    * in whichever direction the duckling was already walking. It does not wait
    * for a wall any more.
@@ -1074,12 +1123,12 @@ export function assignSkill(state, duckId, skill){
     d.state = 'digging';
     d.digLeft = DIG_MAX_STEPS;
     d.digY = d.y;
-    d.buildPause = 0;
+    d.pause = 0;
     return d;
   }
   if(skill === 'builder'){
     d.state = 'building';
-    d.buildPause = 0;
+    d.pause = 0;
     d.buildBaseY = d.y;
     d.buildStep = 0;
     /* Every ramp climbs. A Builder laid on the ground, on an island or on

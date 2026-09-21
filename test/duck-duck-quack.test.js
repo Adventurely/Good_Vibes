@@ -14,7 +14,7 @@ import { readFileSync } from 'node:fs';
 
 import {
   SCENE_W, SCENE_H, WALK_STEP, FALL_SAFE, FALL_SPEED, FLY_SPEED, TICK_RATE, BUILD_SECONDS,
-  BUILD_MAX_STEPS, BUILD_PAUSE_TICKS, BUILD_RISE_HEIGHT, DIG_SECONDS, DIG_MAX_STEPS, TUNNEL_HEADROOM, JUMP_SPAN, JUMP_RISE, PIT_Y,
+  BUILD_MAX_STEPS, BUILD_PAUSE_TICKS, BUILD_RISE_HEIGHT, DIG_SECONDS, DIG_MAX_STEPS, DIG_PAUSE_SECONDS, DIG_PAUSE_TICKS, TUNNEL_HEADROOM, JUMP_SPAN, JUMP_RISE, PIT_Y,
   FLY_DRIFT, SKILLS, SKILL_INFO,
   LEVEL_PARK, LEVEL_WARREN, LEVEL_ORCHARD, LEVEL_GROVE, LEVEL_AERIE, LEVEL_SPIRE, LEVEL_FALLS, LEVEL_HEDGEROW, LEVEL_OVERLOOK, LEVEL_STONES,
   LEVEL_BELFRY, LEVEL_ERRAND, LEVELS,
@@ -55,6 +55,18 @@ function tickUntilAt(state, duck, x, limit = 400){
   for(let i = 0; i < limit && !(duck.state === 'walking' && duck.x === x); i++) tick(state);
   return state;
 }
+
+/* `state.tunnels` is a list of floors per column, the way `decks` is (two
+   tunnels can cross), but almost every test here cuts at most one through
+   any given column and wants to talk about "the tunnel at x". These two say
+   that plainly: the floor cut at a column or null, and which columns have
+   been cut at all. */
+const cutAt = (state, x) => {
+  const at = state.tunnels[x];
+  return at && at.length ? Math.min(...at) : null;
+};
+const cutColumns = state =>
+  state.tunnels.map((at, x) => at.length ? x : null).filter(x => x !== null);
 
 /* --------------------------------------------------------------- the table */
 
@@ -220,23 +232,23 @@ test('a digger tunnels through a wall, sloping downhill as it goes, permanently'
      starts at the height the duckling was walking at and sinks about a
      tangent-of-thirty-degrees a column from there, which over a full dig is
      nineteen pixels. `terrain` itself is untouched throughout — the wall
-     still stands, see content.js's header note — it is `tunnelY` that
+     still stands, see content.js's header note — it is `tunnels` that
      carries the cut. */
   assert.equal(state.terrain[9], 50, 'the column dug from is untouched');
-  assert.equal(state.tunnelY[9], null, 'no tunnel starts before the wall');
+  assert.equal(cutAt(state, 9), null, 'no tunnel starts before the wall');
   let previous = 50;
   for(let x = 10; x < 40; x++){
     assert.equal(state.terrain[x], 0, `column ${x}'s terrain should be untouched, wall and all`);
-    assert.ok(state.tunnelY[x] != null, `column ${x} should have been cut`);
-    assert.ok(state.tunnelY[x] >= previous, `column ${x} should not rise back up`);
-    assert.ok(state.tunnelY[x] <= previous + 1, `column ${x} should fall at most a pixel a column`);
-    previous = state.tunnelY[x];
+    assert.ok(cutAt(state, x) != null, `column ${x} should have been cut`);
+    assert.ok(cutAt(state, x) >= previous, `column ${x} should not rise back up`);
+    assert.ok(cutAt(state, x) <= previous + 1, `column ${x} should fall at most a pixel a column`);
+    previous = cutAt(state, x);
   }
   // The angle, end to end: thirty columns at the tangent of DIG_ANGLE.
   const expected = Math.round(50 + 30 * DIG_DROP);
-  assert.ok(Math.abs(state.tunnelY[39] - expected) <= 1,
-    `after thirty columns the cut should be near ${expected}, was ${state.tunnelY[39]}`);
-  assert.ok(state.tunnelY[39] > 50, 'and below where it started, not level with it');
+  assert.ok(Math.abs(cutAt(state, 39) - expected) <= 1,
+    `after thirty columns the cut should be near ${expected}, was ${cutAt(state, 39)}`);
+  assert.ok(cutAt(state, 39) > 50, 'and below where it started, not level with it');
 });
 
 test('a Digger is no longer a knack a duckling carries around', () => {
@@ -292,9 +304,9 @@ test('a digger handed one far from the wall digs where it stands, and gets nowhe
   assert.equal(duck.state, 'digging', 'and it starts cutting there and then');
   run(state, 400);
   assert.notEqual(duck.state, 'saved', 'a shaft into open ground reaches nothing');
-  const cut = state.tunnelY.map((v, x) => v != null ? x : null).filter(x => x != null);
+  const cut = cutColumns(state);
   assert.ok(cut[0] < 20, `the cut should start where it was given, began at ${cut[0]}`);
-  assert.equal(state.tunnelY[wallAt - 1], null, 'and nowhere near the wall it never reached');
+  assert.equal(cutAt(state, wallAt - 1), null, 'and nowhere near the wall it never reached');
 });
 
 test('a digger only answers a wall — facing a gap instead, it still just falls', () => {
@@ -319,7 +331,7 @@ test('a digger only answers a wall — facing a gap instead, it still just falls
   assert.equal(duck.cause, 'fell');
   // And it dug nothing — a digger that never triggered has nothing to
   // have dug.
-  for(let x = 10; x < 20; x++) assert.equal(state.tunnelY[x], null);
+  for(let x = 10; x < 20; x++) assert.equal(cutAt(state, x), null);
 });
 
 test('a tunnel stops after DIG_MAX_STEPS columns and the trait goes with it', () => {
@@ -338,13 +350,13 @@ test('a tunnel stops after DIG_MAX_STEPS columns and the trait goes with it', ()
   assert.equal(duck.state, 'walking', 'the dig should be over');
   assert.equal(hasTrait(duck, 'digger'), false, 'and the trait spent with it');
 
-  const cut = state.tunnelY.filter(v => v != null).length;
+  const cut = cutColumns(state).length;
   assert.equal(cut, DIG_MAX_STEPS, `a tunnel is ${DIG_MAX_STEPS} columns, got ${cut}`);
-  assert.equal(state.tunnelY[10 + DIG_MAX_STEPS], null, 'and not one column further');
+  assert.equal(cutAt(state, 10 + DIG_MAX_STEPS), null, 'and not one column further');
 
   // Left where it is, it never starts again, however long it walks.
   run(state, 200);
-  assert.equal(state.tunnelY.filter(v => v != null).length, DIG_MAX_STEPS,
+  assert.equal(cutColumns(state).length, DIG_MAX_STEPS,
     'a spent digger does not pick the tunnel back up');
   assert.notEqual(duck.state, 'saved');
 });
@@ -371,15 +383,15 @@ test('a second digger carries on from where the first one stopped', () => {
   // The second walks in behind it and is given one at the dead end.
   const second = state.ducks.find(d => d.id !== first.id);
   for(let i = 0; i < 400 && second.state === 'walking'; i++){
-    if(state.tunnelY[Math.round(second.x)] != null && second.dir > 0
-      && state.tunnelY[Math.round(second.x) + 1] == null){
+    if(cutAt(state, Math.round(second.x)) != null && second.dir > 0
+      && cutAt(state, Math.round(second.x) + 1) == null){
       assignSkill(state, second.id, 'digger');
       break;
     }
     tick(state);
   }
   run(state, 400);
-  const cut = state.tunnelY.filter(v => v != null).length;
+  const cut = cutColumns(state).length;
   assert.ok(cut > DIG_MAX_STEPS, `two diggers should reach past one tunnel, got ${cut}`);
   assert.ok(cut <= 2 * DIG_MAX_STEPS, `and no further than two, got ${cut}`);
 });
@@ -404,10 +416,10 @@ test('a digger that breaks through early is spent all the same', () => {
   const duck = state.ducks[0];
   assert.equal(assignSkill(state, duck.id, 'digger'), duck);
   run(state, 30);
-  assert.ok(state.tunnelY[10] != null, 'the first wall should be tunnelled');
+  assert.ok(cutAt(state, 10) != null, 'the first wall should be tunnelled');
   assert.equal(hasTrait(duck, 'digger'), false, 'and the trait spent on it');
   run(state, 100);
-  assert.equal(state.tunnelY[30], null, 'the second wall turns the same duckling back');
+  assert.equal(cutAt(state, 30), null, 'the second wall turns the same duckling back');
 });
 
 test('a tunnel dug at a wall with level ground behind it passes underneath and stops in the dark', () => {
@@ -429,11 +441,86 @@ test('a tunnel dug at a wall with level ground behind it passes underneath and s
   const duck = state.ducks[0];
   assert.equal(assignSkill(state, duck.id, 'digger'), duck);
   run(state, 200);
-  const cut = state.tunnelY.filter(v => v != null).length;
+  const cut = cutColumns(state).length;
   assert.equal(cut, DIG_MAX_STEPS, 'it should spend the whole clock rather than break out');
-  const last = state.tunnelY.reduce((n, v, x) => v != null ? x : n, -1);
-  assert.ok(state.tunnelY[last] > 50, 'and end below the ground it started from');
+  const last = cutColumns(state).at(-1) ?? -1;
+  assert.ok(cutAt(state, last) > 50, 'and end below the ground it started from');
   assert.notEqual(duck.state, 'saved', 'nobody gets through a tunnel that went under the level');
+});
+
+/* ------------------------------------------------------- tunnels that cross */
+
+/* Reported from a real game: a duckling dug one way along the flat, a second
+ * dug back the other way from down inside that cut, and the first one's hole
+ * partly disappeared. A tunnel floor was one number per column, so the
+ * second cut — which runs deeper than the first everywhere behind it, the
+ * two sloping apart — simply replaced it, and art.js drew the newer, lower
+ * band where the older, higher one had been.
+ */
+test('a second cut driven back through the first leaves both, rather than rubbing one out', () => {
+  const level = miniLevel({
+    duckCount: 2, spawnInterval: 1, goalX: SCENE_W - 1, timeLimit: 900,
+    supply: { digger: 2, builder: 0, blocker: 0, climber: 0, flyer: 0 },
+  });
+  const state = run(newGame(level), 2);
+  const [first, second] = state.ducks;
+
+  assignSkill(state, first.id, 'digger');
+  run(state, DIG_MAX_STEPS + 4);
+  const before = cutColumns(state).map(x => [x, [...state.tunnels[x]]]);
+  assert.ok(before.length > 20, 'the first cut should be a decent length');
+
+  // The second, down in that trench and facing the other way.
+  const deepest = before[before.length - 1][0];
+  second.x = deepest - 4;
+  second.y = cutAt(state, Math.round(second.x));
+  second.dir = -1; second.state = 'walking'; second.pause = 0;
+  assignSkill(state, second.id, 'digger');
+  run(state, DIG_MAX_STEPS + 4);
+
+  for(const [x, floors] of before){
+    for(const f of floors){
+      assert.ok(state.tunnels[x].includes(f),
+        `the first cut's floor at column ${x} (${f}) should still be there`);
+    }
+  }
+  const shared = before.filter(([x]) => state.tunnels[x].length > 1);
+  assert.ok(shared.length > 5,
+    `columns both cuts pass through should carry both floors, got ${shared.length}`);
+});
+
+test('a dig that arrives in a tunnel already open stops there, having nothing left to cut', () => {
+  /* The other half of tunnels crossing. Landing BELOW an older floor is
+     taking out ground that is still there, and carries on; landing inside
+     the older tunnel's own headroom is arriving in it. */
+  // A hill deep enough to hold two bores one over the other.
+  const level = miniLevel({
+    segments: [{ from: 0, to: 10, y: 50 }, { from: 10, to: SCENE_W, y: 0 }],
+    duckCount: 2, spawnInterval: 1, goalX: SCENE_W - 1, timeLimit: 900,
+    supply: { digger: 2, builder: 0, blocker: 0, climber: 0, flyer: 0 },
+  });
+  const state = run(newGame(level), 2);
+  const [first, second] = state.ducks;
+  while(Math.round(first.x) < 9) tick(state);
+  assignSkill(state, first.id, 'digger');
+  run(state, DIG_MAX_STEPS + 4);
+  const cut = cutColumns(state);
+  const far = cut[cut.length - 1];
+
+  /* The second starts thirty pixels over the far end of that bore, well
+     clear of its headroom, and is driven back the other way. The two slope
+     towards each other — the old one rising as it goes left, the new one
+     falling — so it cuts real ground for a while and then breaks in. */
+  second.x = far;
+  second.y = cutAt(state, far) - 30;
+  second.dir = -1; second.state = 'walking'; second.pause = 0;
+  const floorsBefore = state.tunnels.reduce((n, a) => n + a.length, 0);
+  assignSkill(state, second.id, 'digger');
+  run(state, DIG_MAX_STEPS + 4);
+  const added = state.tunnels.reduce((n, a) => n + a.length, 0) - floorsBefore;
+  assert.ok(added > 4, `it should cut the ground above the old bore, cut ${added}`);
+  assert.ok(added < DIG_MAX_STEPS,
+    `and stop on breaking in rather than running its whole clock, cut ${added}`);
 });
 
 /* -------------------------------------------- a cut that breaks the surface */
@@ -455,11 +542,11 @@ test('a shaft dug into open ground is a trench the flock walks down into, not a 
   assert.equal(assignSkill(state, digger.id, 'digger'), digger);
   run(state, DIG_MAX_STEPS + 4);
 
-  const cut = state.tunnelY.map((v, x) => v != null ? x : null).filter(x => x != null);
+  const cut = cutColumns(state);
   assert.ok(cut.length > 0, 'there should be a trench to walk into');
   for(const x of cut){
-    assert.ok(state.tunnelY[x] > 50, `the trench at ${x} should be below the grass it was cut from`);
-    assert.ok(state.tunnelY[x] - 50 < TUNNEL_HEADROOM,
+    assert.ok(cutAt(state, x) > 50, `the trench at ${x} should be below the grass it was cut from`);
+    assert.ok(cutAt(state, x) - 50 < TUNNEL_HEADROOM,
       `and shallow enough at ${x} that nothing is left standing over it`);
   }
 
@@ -470,7 +557,7 @@ test('a shaft dug into open ground is a trench the flock walks down into, not a 
     for(const d of state.ducks){
       if(d.state !== 'walking') continue;
       const col = Math.round(d.x);
-      if(state.tunnelY[col] != null && Math.abs(d.y - state.tunnelY[col]) <= 1) inTheCut.add(d.id);
+      if(cutAt(state, col) != null && Math.abs(d.y - cutAt(state, col)) <= 1) inTheCut.add(d.id);
     }
   }
   assert.equal(inTheCut.size, state.ducks.length, 'every duckling should have walked into it');
@@ -491,8 +578,8 @@ test('a bore through a wall leaves the hilltop standing, because there is a hill
   const [digger, walker] = state.ducks;
   assert.equal(assignSkill(state, digger.id, 'digger'), digger);
   run(state, DIG_MAX_STEPS + 4);
-  assert.ok(state.tunnelY[15] != null, 'the wall should be bored through');
-  assert.ok(state.tunnelY[15] - 0 >= TUNNEL_HEADROOM, 'well below its own top');
+  assert.ok(cutAt(state, 15) != null, 'the wall should be bored through');
+  assert.ok(cutAt(state, 15) - 0 >= TUNNEL_HEADROOM, 'well below its own top');
 
   // Put a duckling up on the wall's top and it walks it, hole or no hole —
   // right up to the far edge, where falling off is the hill's business
@@ -527,7 +614,7 @@ test('a climber at the dead end of a bore turns back rather than climbing up thr
   run(state, 10);
   duck.state = 'walking';
   const boreAt = Math.round(duck.x);
-  assert.ok(state.tunnelY[boreAt] != null, 'it should be standing in its own bore');
+  assert.ok(cutAt(state, boreAt) != null, 'it should be standing in its own bore');
   assert.ok(duck.y - state.terrain[boreAt] > TUNNEL_HEADROOM,
     'with the wall standing well over its head');
 
@@ -552,9 +639,9 @@ test('a climber does get out of an open trench, because there is nothing over it
   assert.equal(assignSkill(state, duck.id, 'digger'), duck);
   run(state, DIG_MAX_STEPS + 4);
 
-  const end = state.tunnelY.reduce((n, v, x) => v != null ? x : n, -1);
-  assert.ok(state.tunnelY[end] - 50 < TUNNEL_HEADROOM, 'the trench is open to the sky');
-  duck.x = end; duck.y = state.tunnelY[end]; duck.dir = 1; duck.state = 'walking';
+  const end = cutColumns(state).at(-1) ?? -1;
+  assert.ok(cutAt(state, end) - 50 < TUNNEL_HEADROOM, 'the trench is open to the sky');
+  duck.x = end; duck.y = cutAt(state, end); duck.dir = 1; duck.state = 'walking';
   assert.equal(assignSkill(state, duck.id, 'climber'), duck);
   run(state, 120);
   assert.equal(duck.y, 50, 'it should be back up on the grass');
@@ -576,7 +663,7 @@ test('a digger cannot start a tunnel into rock — it just turns back, over and 
     tick(state);
   }
   assert.notEqual(state.ducks[0].state, 'saved');
-  assert.equal(state.tunnelY[10], null, 'rock is never cut, however many diggers are handed out');
+  assert.equal(cutAt(state, 10), null, 'rock is never cut, however many diggers are handed out');
 });
 
 test('a climber scales rock exactly the way it scales an ordinary wall', () => {
@@ -605,9 +692,9 @@ test('a tunnel already under way stops cold at rock, rather than cutting through
   assert.equal(assignSkill(state, duck.id, 'digger'), duck);
   run(state, 30);
   assert.notEqual(duck.state, 'saved');
-  assert.ok(state.tunnelY[19] != null, 'the ordinary wall in front of the rock was cut');
-  assert.ok(state.tunnelY[19] > 50, 'and the cut sloped down on its way there');
-  assert.equal(state.tunnelY[20], null, 'the rock behind it was not');
+  assert.ok(cutAt(state, 19) != null, 'the ordinary wall in front of the rock was cut');
+  assert.ok(cutAt(state, 19) > 50, 'and the cut sloped down on its way there');
+  assert.equal(cutAt(state, 20), null, 'the rock behind it was not');
 });
 
 /* --------------------------------------------------------------- flying */
@@ -784,6 +871,45 @@ test('a second Builder given during that pause carries the ramp on from where th
   // Every ramp climbs — see assignSkill — so a chain gains height per Builder.
   assert.equal(duck.y, firstEndY - BUILD_RISE_HEIGHT,
     'and it climbs again, so two Builders are twice the height of one');
+});
+
+/* And the same window at the end of a dig, for the same reason — the relay
+ * on a wall thicker than one tunnel (see DIG_SECONDS) wants the duckling
+ * that just stopped cutting, standing where it stopped. Without it, that
+ * duckling was already walking back out of its own hole by the time anyone
+ * could click it.
+ */
+test('a duckling waits at the end of a dig, and a second Digger carries the tunnel on', () => {
+  const level = miniLevel({
+    segments: [{ from: 0, to: 10, y: 50 }, { from: 10, to: SCENE_W, y: 0 }],
+    goalX: SCENE_W - 1, timeLimit: 900,
+    supply: { digger: 2, builder: 0, blocker: 0, climber: 0, flyer: 0 },
+  });
+  const state = run(newGame(level), 1);
+  const duck = state.ducks[0];
+  while(Math.round(duck.x) < 9) tick(state);
+  assignSkill(state, duck.id, 'digger');
+  run(state, DIG_MAX_STEPS);
+  assert.equal(duck.state, 'walking', 'the cut is over');
+
+  const restingX = duck.x, restingY = duck.y;
+  for(let i = 0; i < DIG_PAUSE_TICKS - 1; i++){
+    tick(state);
+    assert.equal(duck.x, restingX, `it should still be standing at tick ${i + 1} of the pause`);
+    assert.equal(duck.y, restingY);
+  }
+  // And the whole point: it is still there to be given the next one.
+  assert.equal(assignRefusal(state, duck.id, 'digger'), null, 'and free to take another');
+  assert.equal(assignSkill(state, duck.id, 'digger'), duck);
+  const reach = cutColumns(state).length;
+  run(state, DIG_MAX_STEPS + 4);
+  assert.ok(cutColumns(state).length > reach, 'the tunnel should now go further');
+});
+
+test('the dig pause is about half a second — long enough to click in, short enough to read as a hesitation', () => {
+  assert.equal(DIG_PAUSE_SECONDS, 0.5);
+  assert.ok(DIG_PAUSE_TICKS >= TICK_RATE / 3, 'a player needs time to see it and click');
+  assert.ok(DIG_PAUSE_TICKS <= BUILD_PAUSE_TICKS, 'and less than a ramp needs, which ends in mid-air');
 });
 
 test('a builder stops dead at a wall rather than climbing it, and turns back like anything else would', () => {
@@ -1440,8 +1566,8 @@ function atAWall(state, d){
      tunnel and turned round would be handed a Digger and sent back into the
      hole it just left, cutting a second tunnel over the first and wiping
      out the route for everything behind it. */
-  if(state.tunnelY[nextX] != null) return false;
-  const surfaces = [state.terrain[nextX], state.tunnelY[nextX], ...(state.decks[nextX] ?? [])]
+  if(cutAt(state, nextX) != null) return false;
+  const surfaces = [state.terrain[nextX], cutAt(state, nextX), ...(state.decks[nextX] ?? [])]
     .filter(v => v != null);
   /* Every surface there standing more than a step above. A surface BELOW is
      not a wall, it is a step down or a fall, and it has to stay in the list
@@ -1479,10 +1605,10 @@ function playLevel1(){
       /* Extend the ramp from its own far end, using the duckling that just
          laid it — it is standing there waiting out BUILD_PAUSE_TICKS, which
          is exactly the moment and the duckling a player clicks. Watching for
-         `buildPause` rather than for a particular column makes this immune
+         `pause` rather than for a particular column makes this immune
          to how long that pause happens to be; pinned to `d.x === rampEnd` it
          quietly stopped working when the pause was shortened. */
-      if(builderUsed && !extended && d.buildPause > 0){
+      if(builderUsed && !extended && d.pause > 0){
         if(assignSkill(state, d.id, 'builder')) extended = true;
         continue;
       }
@@ -1719,7 +1845,7 @@ test('The Orchard\'s wall is longer than one tunnel, and one Digger cannot finis
 
 test('one Digger stops inside the hill; the second one walks in and finishes it', () => {
   const tunnelled = state =>
-    state.tunnelY.reduce((n, y) => n + (y != null ? 1 : 0), 0);
+    cutColumns(state).length;
 
   const one = playLevel3({ diggers: 1 }).state;
   assert.equal(tunnelled(one), DIG_MAX_STEPS,
@@ -1861,9 +1987,9 @@ test('The Grove can be won by ramping up to the wall and digging above the rock'
   assert.equal(state.ended, 'won');
   assert.ok(state.saved >= winCount(LEVEL_GROVE), `only ${state.saved} saved, needed ${winCount(LEVEL_GROVE)}`);
   // The tunnel is up in the dirt, not down at the ground the flock started on.
-  const cut = state.tunnelY.findIndex(v => v != null);
+  const cut = cutColumns(state)[0];
   assert.ok(cut > 0, 'a tunnel should have been cut at all');
-  assert.ok(state.tunnelY[cut] <= 140, `the tunnel should be above the rock seam, got ${state.tunnelY[cut]}`);
+  assert.ok(cutAt(state, cut) <= 140, `the tunnel should be above the rock seam, got ${cutAt(state, cut)}`);
 });
 
 test('The Grove cannot be won without a Digger — the wall still has no other way through', () => {
@@ -1897,7 +2023,7 @@ test('The Grove\'s wall is rock at the level a duckling meets it — a Digger al
     }
     tick(state);
   }
-  assert.ok(state.tunnelY.every(v => v == null), 'rock should refuse every one of them');
+  assert.ok(cutColumns(state).length === 0, 'rock should refuse every one of them');
   assert.equal(state.saved, 0);
 });
 
@@ -1906,7 +2032,7 @@ test('The Grove\'s ramp has to be started far enough back to clear the seam, and
      down onto the ground and meets the rock, so not a column is cut. */
   for(const rampAt of [85, 90, 95]){
     const state = playLevel4(rampAt);
-    assert.ok(state.tunnelY.every(v => v == null),
+    assert.ok(cutColumns(state).length === 0,
       `a ramp started at ${rampAt} ends short, so nothing should be cut at all`);
   }
 
@@ -1917,7 +2043,7 @@ test('The Grove\'s ramp has to be started far enough back to clear the seam, and
      telling apart. */
   for(const rampAt of [116, 120]){
     const state = playLevel4(rampAt);
-    const cut = state.tunnelY.filter(v => v != null).length;
+    const cut = cutColumns(state).length;
     assert.ok(cut > 0, `a ramp started at ${rampAt} should still start a tunnel`);
     assert.ok(cut < 20, `and it should die inside the hill, cut ${cut} of 20`);
     assert.equal(state.saved, 0, 'with nobody getting through it');
@@ -2027,7 +2153,7 @@ test('The Spire can be won with a Flyer, a Builder and a Digger, in that order',
   const state = playLevel6();
   assert.equal(state.ended, 'won');
   assert.ok(state.saved >= winCount(LEVEL_SPIRE), `only ${state.saved} saved, needed ${winCount(LEVEL_SPIRE)}`);
-  const cut = state.tunnelY.filter(v => v != null).length;
+  const cut = cutColumns(state).length;
   assert.equal(cut, 30, `the spire is thirty columns thick, got a tunnel of ${cut}`);
   assert.ok(cut <= DIG_MAX_STEPS, 'and inside what one Digger reaches');
 });
@@ -2101,7 +2227,7 @@ test('The Spire cannot be tunnelled from the grass — the seam is rock down the
     ticks++;
   }
   assert.ok(ticks > 0);
-  assert.ok(state.tunnelY.every(v => v == null), 'not one column cut from the grass');
+  assert.ok(cutColumns(state).length === 0, 'not one column cut from the grass');
   assert.equal(state.saved, 0);
 });
 
@@ -2117,7 +2243,7 @@ test('The Spire\'s bluff is rock — a Digger sent at it never starts', () => {
       if(d.y >= 150 && d.dir > 0 && atAWall(state, d)) assignSkill(state, d.id, 'digger');
     }
     tick(state);
-    if(state.tunnelY.slice(0, 60).some(v => v != null)) cutAtBluff = true;
+    if(cutColumns(state).some(x => x < 60)) cutAtBluff = true;
   }
   assert.equal(cutAtBluff, false, 'no tunnel should ever appear in the bluff');
 });
@@ -2135,7 +2261,7 @@ test('The Spire wants its ramp started early along the pen floor', () => {
   }
   for(const rampAt of [78, 82, 86]){
     const state = playLevel6({ rampAt });
-    const cut = state.tunnelY.filter(v => v != null).length;
+    const cut = cutColumns(state).length;
     assert.ok(cut > 0 && cut < 30, `a ramp started at ${rampAt} should stop short, cut ${cut}`);
     assert.equal(state.saved, 0, 'and nobody should get through');
   }
@@ -2662,10 +2788,10 @@ test('a column can be rock on top and diggable earth underneath', () => {
   const duck = state.ducks[0];
   assert.equal(assignSkill(state, duck.id, 'digger'), duck);
   run(state, 120);
-  const cut = state.tunnelY.map((v, x) => v != null ? x : null).filter(x => x != null);
+  const cut = cutColumns(state);
   assert.ok(cut.length > 0, 'a Digger should get under it');
-  assert.ok(state.tunnelY[cut[0]] >= 46, 'and every column of the cut is below the seam');
-  for(const x of cut) assert.ok(state.tunnelY[x] >= 46, `column ${x} cut into the rock at ${state.tunnelY[x]}`);
+  assert.ok(cutAt(state, cut[0]) >= 46, 'and every column of the cut is below the seam');
+  for(const x of cut) assert.ok(cutAt(state, x) >= 46, `column ${x} cut into the rock at ${cutAt(state, x)}`);
 });
 
 test('a digger cannot start into the stone part of a crag', () => {
@@ -2687,7 +2813,7 @@ test('a digger cannot start into the stone part of a crag', () => {
   assert.ok(atAWall(state, duck), 'it should have reached the crag');
   assignSkill(state, duck.id, 'digger');
   run(state, 120);
-  assert.ok(state.tunnelY.every(v => v == null), 'nothing should have been cut');
+  assert.ok(cutColumns(state).length === 0, 'nothing should have been cut');
   assert.notEqual(duck.state, 'saved');
 });
 
@@ -2708,9 +2834,9 @@ test('The Falls is won by digging under the crag, and the tunnel stays out of th
   const state = playLevel7(true);
   assert.equal(state.ended, 'won');
   const seam = state.rockAbove[110];
-  const under = state.tunnelY
-    .map((v, x) => (v != null && x >= 100 && x < 120) ? { x, y: v } : null)
-    .filter(Boolean);
+  const under = cutColumns(state)
+    .filter(x => x >= 100 && x < 120)
+    .map(x => ({ x, y: cutAt(state, x) }));
   assert.ok(under.length >= 18, `the crag should be tunnelled end to end, got ${under.length} columns`);
   for(const { x, y } of under){
     assert.ok(y >= seam, `column ${x} was cut at ${y}, which is inside the stone`);

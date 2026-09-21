@@ -654,7 +654,7 @@
          it waiting out BUILD_PAUSE_TICKS — which is the moment, and the
          duckling, a player clicks. Watching the pause rather than a column
          keeps this working whatever the ramp's length happens to be. */
-      if(builderUsed && !rampExtended && d.buildPause > 0){
+      if(builderUsed && !rampExtended && d.pause > 0){
         if(assignSkill(state, d.id, 'builder')) rampExtended = true;
         continue;
       }

@@ -758,16 +758,18 @@ function tuftRow(level, isle){
  * used to be because the floor of a bore through a hillside is the hillside.
  */
 function drawTunnels(ctx, state){
-  const { terrain, tunnelY } = state;
-  for(let x = 0; x < tunnelY.length; x++){
-    const floor = tunnelY[x];
-    if(floor == null) continue;
-    const top = Math.max(terrain[x], floor - TUNNEL_HEADROOM);
-    if(floor <= top) continue;
-    ctx.fillStyle = hex('k');
-    ctx.fillRect(x, top, 1, floor - top);
-    ctx.fillStyle = SOIL[4];
-    ctx.fillRect(x, floor - 1, 1, 1);
+  const { terrain, tunnels } = state;
+  for(let x = 0; x < tunnels.length; x++){
+    // Every cut through this column, not just one: two tunnels crossing
+    // leave two holes with hillside between them — see sim.js's `tunnels`.
+    for(const floor of tunnels[x]){
+      const top = Math.max(terrain[x], floor - TUNNEL_HEADROOM);
+      if(floor <= top) continue;
+      ctx.fillStyle = hex('k');
+      ctx.fillRect(x, top, 1, floor - top);
+      ctx.fillStyle = SOIL[4];
+      ctx.fillRect(x, floor - 1, 1, 1);
+    }
   }
 }
 

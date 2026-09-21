@@ -15,7 +15,7 @@
  * between two neighbouring columns, a "gap" is a run of columns set far below
  * the screen (so far that the fall is always lethal). `terrain` itself is
  * never touched once a level starts — a Digger and a Builder each leave their
- * mark somewhere else instead (`tunnelY` and `decks` in sim.js's game state).
+ * mark somewhere else instead (`tunnels` and `decks` in sim.js's game state).
  * A tunnel is one height per column, consulted in the terrain's place wherever
  * it is not null, which is what lets a dig leave the wall standing — a bored
  * hole through it, the wall still overhead — rather than quietly bulldozing
@@ -94,7 +94,7 @@
    straight off the page whether they have the latest build, rather than
    having to guess from behavior alone. Bump it on every change that ships,
    however small. */
-export const GAME_VERSION = '1.39';
+export const GAME_VERSION = '1.40';
 
 export const SCENE_W = 320;
 export const SCENE_H = 180;
@@ -207,6 +207,23 @@ export const HATCH_RUSH_TICKS = 2;
 
 export const BUILD_PAUSE_SECONDS = 0.75;
 export const BUILD_PAUSE_TICKS = Math.round(TICK_RATE * BUILD_PAUSE_SECONDS);
+
+/* And the same hesitation at the end of a dig, for the same reason.
+ *
+ * A wall thicker than one tunnel is a relay (see DIG_SECONDS), and the
+ * duckling best placed to run the second leg is the one already standing at
+ * the dead end — it is in the right column, facing the right way, and it is
+ * the one the player is watching. Without a pause it took its next step on
+ * the tick after the cut ended and started walking back out of its own
+ * hole, so continuing a dig meant catching a duckling that was already
+ * leaving. Half a second is a window to click in.
+ *
+ * Shorter than a Builder's because there is less to read: a ramp ends in
+ * mid-air and a player has to look at where it got to before deciding, while
+ * a tunnel that stopped has stopped somewhere plainly still inside the hill.
+ */
+export const DIG_PAUSE_SECONDS = 0.5;
+export const DIG_PAUSE_TICKS = Math.round(TICK_RATE * DIG_PAUSE_SECONDS);
 
 /* How high a Builder's ramp climbs over the full BUILD_MAX_STEPS, if it
    never runs into ground first — see sim.js's stepBuilding. Kept at exactly
