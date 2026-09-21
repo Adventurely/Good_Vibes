@@ -276,9 +276,13 @@ test('a digger handed one far from the wall digs where it stands, and gets nowhe
    * runs out its clock under the grass, and the duckling walks back out of
    * its own hole none the wiser.
    */
+  // The wall is set beyond a whole dig's reach of the nest on purpose — a
+  // shaft begun here runs out of clock before it is anywhere near the thing
+  // it was meant for.
+  const wallAt = 20 + DIG_MAX_STEPS + 10;
   const level = miniLevel({
-    segments: [{ from: 0, to: 40, y: 50 }, { from: 40, to: SCENE_W, y: 0 }],
-    goalX: 60, timeLimit: 900,
+    segments: [{ from: 0, to: wallAt, y: 50 }, { from: wallAt, to: SCENE_W, y: 0 }],
+    goalX: wallAt + 20, timeLimit: 900,
     supply: { digger: 1, builder: 0, blocker: 0, climber: 0, flyer: 0 },
   });
   const state = run(newGame(level), 1);
@@ -290,7 +294,7 @@ test('a digger handed one far from the wall digs where it stands, and gets nowhe
   assert.notEqual(duck.state, 'saved', 'a shaft into open ground reaches nothing');
   const cut = state.tunnelY.map((v, x) => v != null ? x : null).filter(x => x != null);
   assert.ok(cut[0] < 20, `the cut should start where it was given, began at ${cut[0]}`);
-  assert.equal(state.tunnelY[39], null, 'and nowhere near the wall it never reached');
+  assert.equal(state.tunnelY[wallAt - 1], null, 'and nowhere near the wall it never reached');
 });
 
 test('a digger only answers a wall — facing a gap instead, it still just falls', () => {

@@ -94,7 +94,7 @@
    straight off the page whether they have the latest build, rather than
    having to guess from behavior alone. Bump it on every change that ships,
    however small. */
-export const GAME_VERSION = '1.36';
+export const GAME_VERSION = '1.37';
 
 export const SCENE_W = 320;
 export const SCENE_H = 180;
@@ -225,22 +225,23 @@ export const BUILD_PAUSE_TICKS = Math.round(TICK_RATE * BUILD_PAUSE_SECONDS);
 export const BUILD_RISE_HEIGHT = FALL_SAFE;
 
 /* How long a Digger keeps cutting, and so how far one tunnel reaches: one
-   tick of digging is one column, so three seconds is thirty-three columns.
-   Stated in seconds the way BUILD_SECONDS, spawnInterval and timeLimit are,
-   and converted into ticks once, here.
+   tick of digging is one column, so three and a half seconds is thirty-nine
+   columns. Stated in seconds the way BUILD_SECONDS, spawnInterval and
+   timeLimit are, and converted into ticks once, here — rounded, because
+   half a second is not a whole number of ticks and a column is the only
+   unit a tunnel has.
 
    This is a real limit rather than the safety cap it used to be (it was
-   sixty, further than any wall in the game was thick). A Digger now spends
+   sixty, further than any wall in the game was thick). A Digger spends
    itself on one tunnel and the trait goes with it — see sim.js's
-   stepDigging — so a wall thicker than thirty-three columns takes a second
+   stepDigging — so a wall thicker than thirty-nine columns takes a second
    Digger handed to a second duckling standing in the hole the first one
-   left. No level here is built to need that relay — every wall in the game
-   is thirty columns or less, one tunnel's worth with a little room to
-   spare, and several were narrowed to keep it that way when this stopped
-   being a safety cap. It is a thing a player can do, not a thing a level
-   asks for. */
-export const DIG_SECONDS = 3;
-export const DIG_MAX_STEPS = TICK_RATE * DIG_SECONDS;
+   left. One level is built to need that relay: The Orchard's wall is
+   forty-five columns, deliberately past what one dig reaches. Everywhere
+   else a wall is thirty columns or less, one tunnel's worth with room to
+   spare. */
+export const DIG_SECONDS = 3.5;
+export const DIG_MAX_STEPS = Math.round(TICK_RATE * DIG_SECONDS);
 
 /* A tunnel runs DOWNHILL, at a shallow angle — see sim.js's stepDigging.
  *
@@ -691,8 +692,8 @@ export const LEVEL_ORCHARD = {
      [130, 160) flat ground the wall's far side opens onto — the buffer
                 past where any wall-tunnel could possibly still be cutting
      [160, 205) the wall — 45 columns, and deliberately more than one tunnel
-                long. A dig reaches thirty-three (DIG_SECONDS), so the first
-                Digger stops twelve columns short of daylight and walks back
+                long. A dig reaches thirty-nine (DIG_SECONDS), so the first
+                Digger stops six columns short of daylight and walks back
                 out of its own hole; the way through is a second Digger,
                 given to a second duckling once it has walked in to where
                 the cutting stopped. See sim.js's stepDigging. Climber still
@@ -998,7 +999,7 @@ export const LEVEL_AERIE = {
  *
  * Then the spire itself: thirty columns between the ground on the left and
  * the ground on the right, and a face too tall to walk up on either side.
- * One Digger tunnels it (thirty is inside a tunnel's thirty-three, see
+ * One Digger tunnels it (thirty is inside a tunnel's thirty-nine, see
  * DIG_SECONDS) and the flock walks through to the pond.
  *
  * But not at any height it likes. The spire is earth standing on rock, and
