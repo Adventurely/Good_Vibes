@@ -505,6 +505,62 @@ test('a bore through a wall leaves the hilltop standing, because there is a hill
   assert.ok(walker.x >= 28, 'and it crossed the whole of the bored stretch up there');
 });
 
+test('a climber at the dead end of a bore turns back rather than climbing up through the hill', () => {
+  /* Reported from a real game: a Climber given to a duckling standing in a
+   * half-finished tunnel went straight up through the middle of the
+   * hillside and out on top of the wall. A climb needs a face and sky above
+   * it, and inside a bore there is a ceiling and then the whole hill — see
+   * sim.js's underTunnelRoof. The duckling keeps its Climber; this is not a
+   * wall it can climb, and the next one may be.
+   */
+  const level = miniLevel({
+    segments: [{ from: 0, to: 20, y: 50 }, { from: 20, to: SCENE_W, y: 0 }],
+    goalX: SCENE_W - 1, timeLimit: 900,
+    supply: { digger: 1, builder: 0, blocker: 0, climber: 1, flyer: 0 },
+  });
+  const state = run(newGame(level), 1);
+  const duck = state.ducks[0];
+
+  // Into the wall, and stopped well short of its far side.
+  while(Math.round(duck.x) < 19) tick(state);
+  assert.equal(assignSkill(state, duck.id, 'digger'), duck);
+  run(state, 10);
+  duck.state = 'walking';
+  const boreAt = Math.round(duck.x);
+  assert.ok(state.tunnelY[boreAt] != null, 'it should be standing in its own bore');
+  assert.ok(duck.y - state.terrain[boreAt] > TUNNEL_HEADROOM,
+    'with the wall standing well over its head');
+
+  assert.equal(assignSkill(state, duck.id, 'climber'), duck);
+  run(state, 120);
+  assert.notEqual(duck.state, 'climbing', 'it should not be scaling the inside of a hill');
+  assert.ok(duck.y > state.terrain[boreAt] + TUNNEL_HEADROOM,
+    `it should still be down in the bore, not up on the wall top (y ${duck.y})`);
+  assert.ok(hasTrait(duck, 'climber'), 'and it keeps the Climber for a wall it can use it on');
+});
+
+test('a climber does get out of an open trench, because there is nothing over it', () => {
+  // The other side of underTunnelRoof: a shaft cut into open ground has no
+  // roof at all (see TUNNEL_HEADROOM), so climbing out of one is ordinary
+  // climbing and has to keep working.
+  const level = miniLevel({
+    goalX: SCENE_W - 1, timeLimit: 900,
+    supply: { digger: 1, builder: 0, blocker: 0, climber: 1, flyer: 0 },
+  });
+  const state = run(newGame(level), 1);
+  const duck = state.ducks[0];
+  assert.equal(assignSkill(state, duck.id, 'digger'), duck);
+  run(state, DIG_MAX_STEPS + 4);
+
+  const end = state.tunnelY.reduce((n, v, x) => v != null ? x : n, -1);
+  assert.ok(state.tunnelY[end] - 50 < TUNNEL_HEADROOM, 'the trench is open to the sky');
+  duck.x = end; duck.y = state.tunnelY[end]; duck.dir = 1; duck.state = 'walking';
+  assert.equal(assignSkill(state, duck.id, 'climber'), duck);
+  run(state, 120);
+  assert.equal(duck.y, 50, 'it should be back up on the grass');
+  assert.ok(duck.x > end, 'and out the far side of its own trench');
+});
+
 /* ----------------------------------------------------------------- rock */
 
 test('a digger cannot start a tunnel into rock — it just turns back, over and over', () => {
@@ -1257,6 +1313,26 @@ test('the goose leaves a duckling alone once it is out of reach', () => {
   });
   const state = run(newGame(level), 40);
   assert.equal(state.ducks[0].state, 'saved');
+});
+
+test('every goose in the game stands on the ground it patrols', () => {
+  /* Reported from a real game of The Park: a goose four pixels off the
+   * grass, which art.js draws hovering (the sprite is built up from `y`,
+   * so `y` is its feet) and which ducklings then look like they are walking
+   * underneath. It still caught them — four is exactly WALK_STEP, so
+   * goosedAt's height test scraped in — which is what let it sit wrong
+   * through several versions without a test failing. The Warren had the
+   * same number wrong the other way and was drawing its goose sunk into the
+   * grass. Both were one stretch of terrain being moved without its goose.
+   */
+  for(const level of LEVELS){
+    if(!level.goose) continue;
+    const terrain = buildTerrain(level.segments, level.width);
+    for(let x = level.goose.x0; x <= level.goose.x1; x++){
+      assert.equal(level.goose.y, terrain[x],
+        `${level.name}'s goose stands at ${level.goose.y} over ground at ${terrain[x]} (column ${x})`);
+    }
+  }
 });
 
 test('a blocker in the goose\'s path turns it back and calls the hunt off', () => {

@@ -244,6 +244,31 @@ function padUnder(state, d){
   return null;
 }
 
+/* Is this duckling standing inside a tunnel, with hillside still over it?
+ *
+ * A climb needs a face and sky above it. Inside a bore there is neither:
+ * there is TUNNEL_HEADROOM of ceiling overhead and the whole hill on top of
+ * that. A Climber handed to a duckling at the dead end of a half-finished
+ * bore used to send it straight up through the middle of the hillside and
+ * out on the wall's top — eighty-odd pixels of solid ground climbed like a
+ * wall, because the rules only ever asked "is the next column too tall to
+ * step onto", and the inside of a hill always is.
+ *
+ * The breached case is the exception and it is the reason this is a test
+ * rather than a flat "no climbing in tunnels": a shaft cut into open ground
+ * has no roof left over it at all (see surfacesAt and content.js's
+ * TUNNEL_HEADROOM), so it is a trench in the daylight, and climbing out of
+ * one is exactly what a Climber is for.
+ */
+const underTunnelRoof = (state, x, y) => {
+  const col = columnAt(state, x);
+  const floor = state.tunnelY[col];
+  if(floor == null) return false;
+  // Actually down in it, rather than walking the hill over the top of it.
+  if(Math.abs(y - floor) > WALK_STEP) return false;
+  return state.terrain[col] < floor - TUNNEL_HEADROOM;
+};
+
 const setTunnelAt = (state, x, y) => { state.tunnelY[columnAt(state, x)] = y; };
 
 /* Adds a deck without disturbing any already standing at that column — see
@@ -639,7 +664,13 @@ function stepWalking(state, d){
     // flock nothing: a hop leaves the wall exactly as it was, so a duckling
     // that can hop a low step should, rather than spend a tunnel on it.
     if(hasTrait(d, 'jumper') && startJump(state, d)) return;
-    if(hasTrait(d, 'climber')){ d.state = 'climbing'; d.x = nextX; return; }
+    /* Climbing, unless the duckling is down a bore with the hill still over
+       its head — see underTunnelRoof, which is the whole of why. It keeps
+       the trait either way: this is not a wall it can climb, and the next
+       one may well be. */
+    if(hasTrait(d, 'climber') && !underTunnelRoof(state, d.x, d.y)){
+      d.state = 'climbing'; d.x = nextX; return;
+    }
     d.dir = -d.dir;
     return;
   }

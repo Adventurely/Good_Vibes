@@ -94,7 +94,7 @@
    straight off the page whether they have the latest build, rather than
    having to guess from behavior alone. Bump it on every change that ships,
    however small. */
-export const GAME_VERSION = '1.38';
+export const GAME_VERSION = '1.39';
 
 export const SCENE_W = 320;
 export const SCENE_H = 180;
@@ -534,8 +534,13 @@ export const LEVEL_PARK = {
      level is played the same way twice is not a hazard, it is a tax, and
      with the flock walking in evenly-spaced lockstep the whole way here,
      "only when nearby" alone would have been exactly that: either every
-     duckling's crossing lines up with the goose's sweep, or none of them do. */
-  goose: { x0: 260, x1: 299, y: 146, speed: 1.5, catchRadius: 1.5 },
+     duckling's crossing lines up with the goose's sweep, or none of them do.
+
+     `y` is the goose's feet, so it is the height of the ground it patrols
+     and nothing else — art.js draws the sprite up from it. A test holds
+     every goose in the game to that, because one four pixels out reads as a
+     goose hovering over the grass while ducklings walk under it. */
+  goose: { x0: 260, x1: 299, y: 150, speed: 1.5, catchRadius: 1.5 },
 };
 
 /* "The Warren": a gap, then two walls, then the goose and the pond — the
@@ -623,7 +628,10 @@ export const LEVEL_WARREN = {
      note above). */
   supply: { digger: 3, builder: 2, blocker: 2, climber: 0, flyer: 0, jumper: 1 },
 
-  goose: { x0: 260, x1: 299, y: 150, speed: 1.5, catchRadius: 1.5 },
+  // On the grass at the end of the walk down — 146 here, not the 150 the
+  // rest of the game's ground sits at. See LEVEL_PARK's goose on why `y` is
+  // the ground's height and not a number of its own.
+  goose: { x0: 260, x1: 299, y: 146, speed: 1.5, catchRadius: 1.5 },
 };
 
 /* "The Orchard": nest and pond swapped ends — the first level run the other
