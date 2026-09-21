@@ -28,7 +28,7 @@
 
 import { PALETTE, hex, drawSprite, drawTextOutlined } from '../good-vibes/pixel.js';
 import { GRASS, SOIL, SUBSOIL, STONE, SKY, HILLS, HILL_CROWN, WATER } from './palette.js';
-import { SCENE_W, SCENE_H, POOF_TICKS, ZAP_TICKS, goalHeading } from './content.js';
+import { SCENE_W, SCENE_H, POOF_TICKS, TUNNEL_HEADROOM, ZAP_TICKS, goalHeading } from './content.js';
 
 export { PALETTE, hex };
 
@@ -746,13 +746,6 @@ function tuftRow(level, isle){
   for(let x = Math.max(0, isle.from); x < Math.min(SCENE_W, isle.to); x++) row[x] = isle.y;
   return row;
 }
-
-/* How tall a Digger's tunnel reads on screen — enough headroom for a duck
-   sprite (six pixels) with room to spare, capped at the wall's own surface
-   (see drawTunnels) so a shallow wall never shows a hole poking out its
-   top. Independent of DIG_MAX_STEPS in content.js: that is how far a dig
-   can run, this is how tall one looks once it has. */
-const TUNNEL_HEADROOM = 16;
 
 /* A hole bored through a wall, one per tunnelled column — see sim.js's
  * stepDigging and content.js's header note on why this is a second layer

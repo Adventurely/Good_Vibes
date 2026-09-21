@@ -14,7 +14,7 @@ import { readFileSync } from 'node:fs';
 
 import {
   SCENE_W, SCENE_H, WALK_STEP, FALL_SAFE, FALL_SPEED, FLY_SPEED, TICK_RATE, BUILD_SECONDS,
-  BUILD_MAX_STEPS, BUILD_PAUSE_TICKS, BUILD_RISE_HEIGHT, DIG_SECONDS, DIG_MAX_STEPS, JUMP_SPAN, JUMP_RISE, PIT_Y,
+  BUILD_MAX_STEPS, BUILD_PAUSE_TICKS, BUILD_RISE_HEIGHT, DIG_SECONDS, DIG_MAX_STEPS, TUNNEL_HEADROOM, JUMP_SPAN, JUMP_RISE, PIT_Y,
   FLY_DRIFT, SKILLS, SKILL_INFO,
   LEVEL_PARK, LEVEL_WARREN, LEVEL_ORCHARD, LEVEL_GROVE, LEVEL_AERIE, LEVEL_SPIRE, LEVEL_FALLS, LEVEL_HEDGEROW, LEVEL_OVERLOOK, LEVEL_STONES,
   LEVEL_BELFRY, LEVEL_ERRAND, LEVELS,
@@ -434,6 +434,75 @@ test('a tunnel dug at a wall with level ground behind it passes underneath and s
   const last = state.tunnelY.reduce((n, v, x) => v != null ? x : n, -1);
   assert.ok(state.tunnelY[last] > 50, 'and end below the ground it started from');
   assert.notEqual(duck.state, 'saved', 'nobody gets through a tunnel that went under the level');
+});
+
+/* -------------------------------------------- a cut that breaks the surface */
+
+/* What the flock does with the hole, which is the other half of digging and
+ * for a long time was not true of the picture. A shaft cut down from open
+ * ground takes TUNNEL_HEADROOM of hillside with it (content.js), so there is
+ * no ground left over it — art.js draws it as an open trench, ink up to the
+ * grass — and the rules used to leave the grass standing anyway. The flock
+ * walked over the top of a hole that was visibly not there.
+ */
+test('a shaft dug into open ground is a trench the flock walks down into, not a roof it walks over', () => {
+  const level = miniLevel({
+    duckCount: 4, spawnInterval: 3, goalX: SCENE_W - 1, timeLimit: 900,
+    supply: { digger: 1, builder: 0, blocker: 0, climber: 0, flyer: 0 },
+  });
+  const state = run(newGame(level), 1);
+  const digger = state.ducks[0];
+  assert.equal(assignSkill(state, digger.id, 'digger'), digger);
+  run(state, DIG_MAX_STEPS + 4);
+
+  const cut = state.tunnelY.map((v, x) => v != null ? x : null).filter(x => x != null);
+  assert.ok(cut.length > 0, 'there should be a trench to walk into');
+  for(const x of cut){
+    assert.ok(state.tunnelY[x] > 50, `the trench at ${x} should be below the grass it was cut from`);
+    assert.ok(state.tunnelY[x] - 50 < TUNNEL_HEADROOM,
+      `and shallow enough at ${x} that nothing is left standing over it`);
+  }
+
+  // Everything hatched behind it ends up down in the cut rather than on top.
+  const inTheCut = new Set();
+  for(let i = 0; i < 400; i++){
+    tick(state);
+    for(const d of state.ducks){
+      if(d.state !== 'walking') continue;
+      const col = Math.round(d.x);
+      if(state.tunnelY[col] != null && Math.abs(d.y - state.tunnelY[col]) <= 1) inTheCut.add(d.id);
+    }
+  }
+  assert.equal(inTheCut.size, state.ducks.length, 'every duckling should have walked into it');
+  assert.equal(state.lost, 0, 'and a trench a duckling walks down is not a trench it dies in');
+});
+
+test('a bore through a wall leaves the hilltop standing, because there is a hill left over it', () => {
+  /* The case the breach rule must not touch, and the whole reason a tunnel
+     is a second layer rather than the terrain getting shorter: a wall's top
+     is far more than TUNNEL_HEADROOM above a tunnel through its foot, so
+     there is real hillside over the hole and it stays walkable. */
+  const level = miniLevel({
+    segments: [{ from: 0, to: 10, y: 50 }, { from: 10, to: 30, y: 0 }, { from: 30, to: SCENE_W, y: 56 }],
+    duckCount: 2, spawnInterval: 1, goalX: SCENE_W - 1, timeLimit: 600,
+    supply: { digger: 1, builder: 0, blocker: 0, climber: 0, flyer: 0 },
+  });
+  const state = run(newGame(level), 2);
+  const [digger, walker] = state.ducks;
+  assert.equal(assignSkill(state, digger.id, 'digger'), digger);
+  run(state, DIG_MAX_STEPS + 4);
+  assert.ok(state.tunnelY[15] != null, 'the wall should be bored through');
+  assert.ok(state.tunnelY[15] - 0 >= TUNNEL_HEADROOM, 'well below its own top');
+
+  // Put a duckling up on the wall's top and it walks it, hole or no hole —
+  // right up to the far edge, where falling off is the hill's business
+  // rather than the hole's.
+  walker.x = 11; walker.y = 0; walker.dir = 1; walker.state = 'walking';
+  while(walker.x < 28 && walker.state === 'walking'){
+    tick(state);
+    assert.equal(walker.y, 0, `dropped into the bore at ${walker.x} instead of walking over it`);
+  }
+  assert.ok(walker.x >= 28, 'and it crossed the whole of the bored stretch up there');
 });
 
 /* ----------------------------------------------------------------- rock */

@@ -10,7 +10,7 @@
 
 import { SCENE_H, FALL_SAFE, WALK_STEP, FALL_SPEED, FLY_SPEED, FLY_DRIFT, CLIMB_SPEED,
   BUILD_MAX_STEPS, BUILD_PAUSE_TICKS, BUILD_RISE_HEIGHT, DIG_DROP, DIG_MAX_STEPS, HATCH_RUSH_TICKS, JUMP_SPAN, JUMP_RISE,
-  SKILLS, GOOSE_FLEE_SPEED, ZAP_TICKS,
+  SKILLS, GOOSE_FLEE_SPEED, TUNNEL_HEADROOM, ZAP_TICKS,
   GOOSE_FLEE_LIFT, POOF_TICKS, buildTerrain, buildLayer, winCount, goalHeading,
   hatchHeading } from './content.js';
 
@@ -205,16 +205,26 @@ const groundAt = (state, x) => {
    sky rather than a hole in the ground under it. */
 const surfacesAt = (state, x) => {
   const col = columnAt(state, x);
-  const out = [state.terrain[col]];
-  // A tunnelled column has two floors, not one: the hillside still standing
-  // over the hole (which is what art.js has always drawn — see content.js's
-  // header note) and the tunnel's own floor inside it. Both are real
-  // ground, and which one a duckling is on is decided the same way it is
-  // decided for a ramp crossing a column: by where that duckling already
-  // was. Tunnelling under a ledge used to quietly delete the ledge, which
-  // was only ever invisible because nothing had walked along the top of a
-  // hill it had also dug through.
-  if(state.tunnelY[col] != null) out.push(state.tunnelY[col]);
+  const out = [];
+  const floor = state.tunnelY[col];
+  /* A tunnelled column usually has two floors, not one: the hillside still
+     standing over the hole (which is what art.js draws — see content.js's
+     header note) and the tunnel's own floor inside it. Both are real
+     ground, and which one a duckling is on is decided the same way it is
+     decided for a ramp crossing a column: by where that duckling already
+     was. Tunnelling under a ledge used to quietly delete the ledge, which
+     was only ever invisible because nothing had walked along the top of a
+     hill it had also dug through.
+
+     Unless the cut came out through the top of it. A tunnel takes
+     TUNNEL_HEADROOM of hillside with it, so a column whose surface is
+     inside that of the floor has nothing left over the hole — art.js draws
+     exactly that, ink all the way up to the grass. There is no roof to walk
+     on there, so the surface is not offered: a duckling steps down into the
+     cut instead of strolling over the top of a trench that is plainly open.
+     That is what a Digger given on the flat digs. */
+  if(floor == null || state.terrain[col] < floor - TUNNEL_HEADROOM) out.push(state.terrain[col]);
+  if(floor != null) out.push(floor);
   return out.concat(state.sky[col], state.decks[col]);
 };
 

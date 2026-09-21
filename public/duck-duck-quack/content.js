@@ -94,7 +94,7 @@
    straight off the page whether they have the latest build, rather than
    having to guess from behavior alone. Bump it on every change that ships,
    however small. */
-export const GAME_VERSION = '1.37';
+export const GAME_VERSION = '1.38';
 
 export const SCENE_W = 320;
 export const SCENE_H = 180;
@@ -242,6 +242,30 @@ export const BUILD_RISE_HEIGHT = FALL_SAFE;
    spare. */
 export const DIG_SECONDS = 3.5;
 export const DIG_MAX_STEPS = Math.round(TICK_RATE * DIG_SECONDS);
+
+/* How much hillside a tunnel takes out above its own floor: enough headroom
+   for a duck sprite (six pixels) with room to spare.
+ *
+ * This is shared rather than art's alone, because it decides two things that
+ * have to agree or the picture lies. art.js draws a bore as ink from the
+ * floor up to this height, capped at the column's own surface, so a tunnel
+ * running under thin cover is drawn open to the sky — there is no hillside
+ * left above it to draw. sim.js's surfacesAt reads it the same way: a column
+ * whose surface is inside this of the tunnel floor has been broken through,
+ * so the surface is not ground any more and a duckling walks down into the
+ * cut rather than over the top of it.
+ *
+ * Which is what a Digger given on open ground does now. The shaft used to be
+ * drawn as an open trench that the rest of the flock then strolled across,
+ * because the terrain above it was still standing as far as the rules were
+ * concerned — the one thing on screen that was a picture of something that
+ * was not there. A dig into the flat is still a dig that arrives nowhere;
+ * it is now a hole the flock can actually walk into and back out of. A bore
+ * through a wall is untouched: a wall's top is far more than this above the
+ * tunnel through its foot, so the hill over the hole stays standing and
+ * walkable, which is the whole point of keeping a tunnel as a second layer
+ * (see the header note on `terrain`). */
+export const TUNNEL_HEADROOM = 16;
 
 /* A tunnel runs DOWNHILL, at a shallow angle — see sim.js's stepDigging.
  *
